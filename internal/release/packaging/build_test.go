@@ -13,23 +13,23 @@ import (
 // the binaries run. The only signal is a size nobody was watching, which is why it is asserted here
 // rather than trusted to review.
 
-func TestReleaseBuildStripsSymbols(t *testing.T) {
-	t.Parallel()
+func TestReleaseBuildStripsSymbols(test *testing.T) {
+	test.Parallel()
 
 	if len(StripFlags) == 0 {
-		t.Fatalf("no strip flags, so released binaries would ship with symbols and DWARF")
+		test.Fatalf("no strip flags, so released binaries would ship with symbols and DWARF")
 	}
 
 	stripped := strings.Join(StripFlags, " ")
 	for _, required := range []string{"-s", "-w"} {
 		if !strings.Contains(stripped, required) {
-			t.Errorf("strip flags %q are missing %s", stripped, required)
+			test.Errorf("strip flags %q are missing %s", stripped, required)
 		}
 	}
 }
 
-func TestDescribeBuildNamesTheFlagsActuallyUsed(t *testing.T) {
-	t.Parallel()
+func TestDescribeBuildNamesTheFlagsActuallyUsed(test *testing.T) {
+	test.Parallel()
 
 	// A size label that names the wrong build is worse than an unlabeled size: it is confidently
 	// wrong rather than ambiguous. So the description is built from the same values the compiler
@@ -38,12 +38,12 @@ func TestDescribeBuildNamesTheFlagsActuallyUsed(t *testing.T) {
 
 	for _, flag := range BuildFlags {
 		if !strings.Contains(description, flag) {
-			t.Errorf("the build description %q omits %s, which the build actually passes", description, flag)
+			test.Errorf("the build description %q omits %s, which the build actually passes", description, flag)
 		}
 	}
 	for _, flag := range StripFlags {
 		if !strings.Contains(description, flag) {
-			t.Errorf("the build description %q omits %s, which the build actually passes", description, flag)
+			test.Errorf("the build description %q omits %s, which the build actually passes", description, flag)
 		}
 	}
 }
@@ -52,37 +52,37 @@ func TestDescribeBuildNamesTheFlagsActuallyUsed(t *testing.T) {
 // That distinction is the whole point of these: "verified to exist" answers a narrower question
 // than its name implies, and a mis-staged binary passes every check that stops at existence.
 
-func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(t *testing.T) {
-	t.Parallel()
+func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(test *testing.T) {
+	test.Parallel()
 
 	// The reachable failure: a staging bug writes one target's binary into another's package. It
 	// publishes cleanly, installs cleanly, and fails at exec on a user's machine with a format
 	// error that reads as a broken install rather than as our mistake.
 	darwin := Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
 
-	elf := writeFakeExecutable(t, []byte{0x7f, 'E', 'L', 'F'})
+	elf := writeFakeExecutable(test, []byte{0x7f, 'E', 'L', 'F'})
 	if _, err := cohereBinary(elf, darwin); err == nil {
-		t.Fatalf("a Linux binary passed verification as a darwin package's contents")
+		test.Fatalf("a Linux binary passed verification as a darwin package's contents")
 	}
 
-	windows := writeFakeExecutable(t, []byte{'M', 'Z'})
+	windows := writeFakeExecutable(test, []byte{'M', 'Z'})
 	if _, err := cohereBinary(windows, darwin); err == nil {
-		t.Fatalf("a Windows binary passed verification as a darwin package's contents")
+		test.Fatalf("a Windows binary passed verification as a darwin package's contents")
 	}
 }
 
-func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(t *testing.T) {
-	t.Parallel()
+func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(test *testing.T) {
+	test.Parallel()
 
 	// Large enough to clear the size floor and still not a program.
-	notABinary := writeFakeExecutable(t, []byte("#!/bin/sh\necho nope\n"))
+	notABinary := writeFakeExecutable(test, []byte("#!/bin/sh\necho nope\n"))
 	if _, err := cohereBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); err == nil {
-		t.Fatalf("plain text passed verification as a Linux binary")
+		test.Fatalf("plain text passed verification as a Linux binary")
 	}
 }
 
-func TestVerifyBinaryAcceptsTheRightFormat(t *testing.T) {
-	t.Parallel()
+func TestVerifyBinaryAcceptsTheRightFormat(test *testing.T) {
+	test.Parallel()
 
 	// A guard that refuses everything is as useless as one that refuses nothing, and it is the
 	// version that gets deleted rather than fixed.
@@ -92,44 +92,44 @@ func TestVerifyBinaryAcceptsTheRightFormat(t *testing.T) {
 		"windows": {'M', 'Z'},
 	}
 	for operatingSystem, magic := range cases {
-		path := writeFakeExecutable(t, magic)
+		path := writeFakeExecutable(test, magic)
 		target := Target{GoOperatingSystem: operatingSystem, GoArchitecture: "amd64"}
 		if _, err := cohereBinary(path, target); err != nil {
-			t.Errorf("a correct %s binary was refused: %v", operatingSystem, err)
+			test.Errorf("a correct %s binary was refused: %v", operatingSystem, err)
 		}
 	}
 }
 
-func TestEveryTargetHasAKnownExecutableFormat(t *testing.T) {
-	t.Parallel()
+func TestEveryTargetHasAKnownExecutableFormat(test *testing.T) {
+	test.Parallel()
 
 	// The guard skips an operating system it has no magic for, so that adding a target never blocks
 	// a release on a missing table entry. That is the right runtime behavior and the wrong thing to
 	// discover silently, so the omission fails here instead.
 	for _, target := range Targets {
 		if _, known := executableMagic[target.GoOperatingSystem]; !known {
-			t.Errorf("%s ships with no executable-format check, so a mis-staged binary would pass", target)
+			test.Errorf("%s ships with no executable-format check, so a mis-staged binary would pass", target)
 		}
 	}
 }
 
 // writeFakeExecutable writes a file that clears the size floor and begins with the given bytes.
-func writeFakeExecutable(t *testing.T, magic []byte) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "cohere")
+func writeFakeExecutable(test *testing.T, magic []byte) string {
+	test.Helper()
+	path := filepath.Join(test.TempDir(), "cohere")
 
 	const clearsTheSizeFloor = 2 << 20
 	contents := make([]byte, clearsTheSizeFloor)
 	copy(contents, magic)
 
 	if err := os.WriteFile(path, contents, 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return path
 }
 
-func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(t *testing.T) {
-	t.Parallel()
+func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(test *testing.T) {
+	test.Parallel()
 
 	// Every other test of this table builds its fixtures out of the table, so they pass for any
 	// value in it, including a wrong one. That is the shape where a corpus encodes a misreading:
@@ -140,12 +140,12 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(t *testing.T) {
 	// actually wrote. About two seconds for three platforms, which is the entire cost of anchoring
 	// the last constant in this package to something outside it.
 	if testing.Short() {
-		t.Skip("cross-compiles three binaries")
+		test.Skip("cross-compiles three binaries")
 	}
 
-	directory := t.TempDir()
-	writeFile(t, filepath.Join(directory, "go.mod"), "module magiccheck\n\ngo 1.27\n")
-	writeFile(t, filepath.Join(directory, "main.go"), "package main\n\nfunc main() {}\n")
+	directory := test.TempDir()
+	writeFile(test, filepath.Join(directory, "go.mod"), "module magiccheck\n\ngo 1.27\n")
+	writeFile(test, filepath.Join(directory, "main.go"), "package main\n\nfunc main() {}\n")
 
 	// One architecture per operating system: the magic is keyed by GOOS, and this asserts exactly
 	// that scope rather than implying it covers architecture too.
@@ -164,11 +164,11 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(t *testing.T) {
 			"CGO_ENABLED=0",
 		)
 		if output, err := command.CombinedOutput(); err != nil {
-			t.Fatalf("cross-compiling for %s: %v\n%s", target, err, output)
+			test.Fatalf("cross-compiling for %s: %v\n%s", target, err, output)
 		}
 
 		if _, err := cohereBinaryFormatOnly(path, target); err != nil {
-			t.Errorf("the magic table rejects a binary Go actually produced for %s: %v", target, err)
+			test.Errorf("the magic table rejects a binary Go actually produced for %s: %v", target, err)
 		}
 	}
 }
@@ -181,12 +181,12 @@ func cohereBinaryFormatOnly(path string, target Target) (int64, error) {
 	return 0, requireExecutableFormat(path, target)
 }
 
-func writeFile(t *testing.T, path string, contents string) {
-	t.Helper()
+func writeFile(test *testing.T, path string, contents string) {
+	test.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 }

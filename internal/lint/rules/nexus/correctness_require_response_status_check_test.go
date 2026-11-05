@@ -50,9 +50,9 @@ func correctnessRequireResponseStatusCheckSource(lines ...string) string {
 	return correctnessRequireResponseStatusCheckPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessRequireResponseStatusCheckRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessRequireResponseStatusCheck, map[string]string{
+func correctnessRequireResponseStatusCheckRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessRequireResponseStatusCheck, map[string]string{
 		correctnessRequireResponseStatusCheckFile:               sourceText,
 		correctnessRequireResponseStatusCheckNetworkServiceFile: correctnessRequireResponseStatusCheckNetworkService,
 	}, correctnessRequireResponseStatusCheckFile)
@@ -67,8 +67,8 @@ type correctnessRequireResponseStatusCheckFinding struct {
 
 // correctnessRequireResponseStatusCheckExpect asserts the findings in source order. The harness
 // trims the subject file before writing it, so spans are read from the program's own text.
-func correctnessRequireResponseStatusCheckExpect(t *testing.T, result rule_testing.Result, want []correctnessRequireResponseStatusCheckFinding) {
-	t.Helper()
+func correctnessRequireResponseStatusCheckExpect(test *testing.T, result rule_testing.Result, want []correctnessRequireResponseStatusCheckFinding) {
+	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
 		return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -79,21 +79,21 @@ func correctnessRequireResponseStatusCheckExpect(t *testing.T, result rule_testi
 	for _, finding := range want {
 		wantIds = append(wantIds, finding.id)
 	}
-	rule_testing.ExpectFindings(t, sorted, wantIds...)
+	rule_testing.ExpectFindings(test, sorted, wantIds...)
 	text := result.SourceFile.Text()
 	var got []correctnessRequireResponseStatusCheckFinding
 	for _, diagnostic := range diagnostics {
 		got = append(got, correctnessRequireResponseStatusCheckFinding{diagnostic.Message.Id, text[diagnostic.Range.Pos():diagnostic.Range.End()]})
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %v, got %d %v", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %v, got %d %v", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %v, want %v (all: %v)", index, got[index], want[index], got)
+			test.Fatalf("finding %d is %v, want %v (all: %v)", index, got[index], want[index], got)
 		}
 	}
 }
@@ -155,44 +155,44 @@ func correctnessRequireResponseStatusCheckFinanceReview(fixed bool) string {
 }
 
 // The real inbox request, before the fix: the parse is reported, and nothing else is.
-func TestCorrectnessRequireResponseStatusCheckFiresOnTaskInbox(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckFiresOnTaskInbox(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessRequireResponseStatusCheckRun(t, correctnessRequireResponseStatusCheckTaskInbox(""))
-	correctnessRequireResponseStatusCheckExpect(t, result, []correctnessRequireResponseStatusCheckFinding{
+	result := correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckTaskInbox(""))
+	correctnessRequireResponseStatusCheckExpect(test, result, []correctnessRequireResponseStatusCheckFinding{
 		correctnessRequireResponseStatusCheckBody("response.json()"),
 	})
 }
 
 // After the fix: a failed request throws before the parse, and nothing fires.
-func TestCorrectnessRequireResponseStatusCheckStaysSilentOnFixedTaskInbox(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckStaysSilentOnFixedTaskInbox(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessRequireResponseStatusCheckRun(t, correctnessRequireResponseStatusCheckTaskInbox(
+	result := correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckTaskInbox(
 		"            if(!response.ok) { throw new Error(`Inbox request failed with ${response.status}`); }",
 	))
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // The real finance actions, before the fix: both writes drop their Response.
-func TestCorrectnessRequireResponseStatusCheckFiresOnFinanceReview(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckFiresOnFinanceReview(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessRequireResponseStatusCheckRun(t, correctnessRequireResponseStatusCheckFinanceReview(false))
-	correctnessRequireResponseStatusCheckExpect(t, result, []correctnessRequireResponseStatusCheckFinding{
+	result := correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckFinanceReview(false))
+	correctnessRequireResponseStatusCheckExpect(test, result, []correctnessRequireResponseStatusCheckFinding{
 		correctnessRequireResponseStatusCheckDiscard("await networkService.request('/api/finance/categorize', {\n        method: 'POST',\n        body: JSON.stringify(variables),\n    });"),
 		correctnessRequireResponseStatusCheckDiscard("await networkService.request('/api/finance/rules', {\n        method: 'POST',\n        body: JSON.stringify({ ...variables, matchField: 'Merchant', source: 'Learned' }),\n    });"),
 	})
 }
 
-func TestCorrectnessRequireResponseStatusCheckStaysSilentOnFixedFinanceReview(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckStaysSilentOnFixedFinanceReview(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessRequireResponseStatusCheckRun(t, correctnessRequireResponseStatusCheckFinanceReview(true)))
+	rule_testing.ExpectClean(test, correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckFinanceReview(true)))
 }
 
-func TestCorrectnessRequireResponseStatusCheckFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -295,17 +295,17 @@ func TestCorrectnessRequireResponseStatusCheckFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessRequireResponseStatusCheckRun(t, correctnessRequireResponseStatusCheckSource(testCase.lines...))
-			correctnessRequireResponseStatusCheckExpect(t, result, testCase.want)
+			result := correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckSource(testCase.lines...))
+			correctnessRequireResponseStatusCheckExpect(test, result, testCase.want)
 		})
 	}
 }
 
-func TestCorrectnessRequireResponseStatusCheckStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -465,18 +465,18 @@ func TestCorrectnessRequireResponseStatusCheckStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessRequireResponseStatusCheckRun(t, correctnessRequireResponseStatusCheckSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckSource(testCase.lines...)))
 		})
 	}
 }
 
 // A `fetch` that is ambient but not global, a method of a typed client declared in a namespace, is
 // some other function, which may well throw on an error status. Only the global one is the platform's.
-func TestCorrectnessRequireResponseStatusCheckIgnoresANamespacedFetch(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckIgnoresANamespacedFetch(test *testing.T) {
+	test.Parallel()
 
 	declarations := strings.Join([]string{
 		`/// <reference lib="dom" />`,
@@ -491,7 +491,7 @@ func TestCorrectnessRequireResponseStatusCheckIgnoresANamespacedFetch(t *testing
 		"    return response.json();",
 		"}",
 	}, "\n")
-	rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, CorrectnessRequireResponseStatusCheck, map[string]string{
+	rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, CorrectnessRequireResponseStatusCheck, map[string]string{
 		"/repository/types/strict-client.d.ts": declarations,
 		"/repository/source/Load.ts":           subject,
 	}, "/repository/source/Load.ts"))
@@ -500,8 +500,8 @@ func TestCorrectnessRequireResponseStatusCheckIgnoresANamespacedFetch(t *testing
 // `fetch` as `@types/node` declares it: inside `declare global` in a module, not in a global script.
 // Typed this way the platform's fetch must still be recognized, and lib.dom is left out so the node
 // declaration is the only one.
-func TestCorrectnessRequireResponseStatusCheckRecognizesTheNodeDeclaration(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessRequireResponseStatusCheckRecognizesTheNodeDeclaration(test *testing.T) {
+	test.Parallel()
 
 	globals := strings.Join([]string{
 		"export {};",
@@ -521,11 +521,11 @@ func TestCorrectnessRequireResponseStatusCheckRecognizesTheNodeDeclaration(t *te
 		"    return response.json();",
 		"}",
 	}, "\n")
-	result := rule_testing.RunTypedFiles(t, CorrectnessRequireResponseStatusCheck, map[string]string{
+	result := rule_testing.RunTypedFiles(test, CorrectnessRequireResponseStatusCheck, map[string]string{
 		"/repository/types/node/web-globals/fetch.d.ts": globals,
 		"/repository/source/Load.ts":                    subject,
 	}, "/repository/source/Load.ts")
-	correctnessRequireResponseStatusCheckExpect(t, result, []correctnessRequireResponseStatusCheckFinding{
+	correctnessRequireResponseStatusCheckExpect(test, result, []correctnessRequireResponseStatusCheckFinding{
 		correctnessRequireResponseStatusCheckBody("response.json()"),
 	})
 }

@@ -41,18 +41,18 @@ type canonicalUnportedFixture map[string][]string
 //
 // The list is held exact in both directions: a class that is listed and now agrees fails too, so porting
 // a pass shrinks the list in the same change, and the count it prints is the true remainder.
-func TestCanonicalizeAgreesWithTailwind(t *testing.T) {
-	t.Parallel()
-	forEachOracleCopy(t, "testdata/canonical_singles.json", func(t *testing.T, fixtureName string) {
+func TestCanonicalizeAgreesWithTailwind(test *testing.T) {
+	test.Parallel()
+	forEachOracleCopy(test, "testdata/canonical_singles.json", func(test *testing.T, fixtureName string) {
 		var fixture canonicalSinglesFixture
-		readJsonFixture(t, fixtureName, &fixture)
+		readJsonFixture(test, fixtureName, &fixture)
 		if len(fixture.Cases) == 0 {
-			t.Fatalf("%s holds no cases, so agreement would be vacuous", fixtureName)
+			test.Fatalf("%s holds no cases, so agreement would be vacuous", fixtureName)
 		}
 
-		unportedName := oracleSibling(t, fixtureName, "testdata/canonical_unported.json")
+		unportedName := oracleSibling(test, fixtureName, "testdata/canonical_unported.json")
 		var unported canonicalUnportedFixture
-		readJsonFixture(t, unportedName, &unported)
+		readJsonFixture(test, unportedName, &unported)
 		passByClass := map[string]string{}
 		for pass, classes := range unported {
 			for _, className := range classes {
@@ -60,7 +60,7 @@ func TestCanonicalizeAgreesWithTailwind(t *testing.T) {
 			}
 		}
 
-		canonicalizer := NewCanonicalizer(oracleSystem(t, fixture.EntryPoint)).
+		canonicalizer := NewCanonicalizer(oracleSystem(test, fixture.EntryPoint)).
 			WithFeatures(SignatureFeaturesFor(fixture.Options.Collapse, fixture.Options.LogicalToPhysical))
 
 		agreed, rewrites, silent := 0, 0, map[string][]string{}
@@ -74,11 +74,11 @@ func TestCanonicalizeAgreesWithTailwind(t *testing.T) {
 			case got == testCase.Canonical:
 				agreed++
 				if pass, isListed := passByClass[testCase.ClassName]; isListed {
-					t.Errorf("%s agrees with Tailwind now (%q), so it leaves %s's %s list",
+					test.Errorf("%s agrees with Tailwind now (%q), so it leaves %s's %s list",
 						testCase.ClassName, got, unportedName, pass)
 				}
 			case testCase.Canonical == testCase.ClassName:
-				t.Errorf("%s (%s): Tailwind leaves it as written and the port gives %q, a rewrite Tailwind "+
+				test.Errorf("%s (%s): Tailwind leaves it as written and the port gives %q, a rewrite Tailwind "+
 					"does not make", testCase.ClassName, testCase.Origin, got)
 			default:
 				// Tailwind rewrites it and the port either leaves it or stops partway, where printing
@@ -97,7 +97,7 @@ func TestCanonicalizeAgreesWithTailwind(t *testing.T) {
 
 		if len(unlisted) > 0 {
 			sort.Strings(unlisted)
-			t.Errorf("%d classes Tailwind rewrites are left as written and not listed in %s, under the pass "+
+			test.Errorf("%d classes Tailwind rewrites are left as written and not listed in %s, under the pass "+
 				"that rewrites them:\n  %s", len(unlisted), unportedName, strings.Join(unlisted, "\n  "))
 		}
 
@@ -107,7 +107,7 @@ func TestCanonicalizeAgreesWithTailwind(t *testing.T) {
 		}
 		for className, pass := range passByClass {
 			if !seen[className] {
-				t.Errorf("%s lists %s under %s, and %s has no such class", unportedName, className, pass, fixtureName)
+				test.Errorf("%s lists %s under %s, and %s has no such class", unportedName, className, pass, fixtureName)
 			}
 		}
 
@@ -118,23 +118,23 @@ func TestCanonicalizeAgreesWithTailwind(t *testing.T) {
 			silentCount += len(classes)
 		}
 		sort.Strings(passes)
-		t.Logf("%s: %d classes, %d rewritten by Tailwind, %d answered alike, %d short of Tailwind by unported passes",
+		test.Logf("%s: %d classes, %d rewritten by Tailwind, %d answered alike, %d short of Tailwind by unported passes",
 			fixtureName, len(fixture.Cases), rewrites, agreed, silentCount)
 		for _, pass := range passes {
-			t.Logf("  %s: %d", pass, len(silent[pass]))
+			test.Logf("  %s: %d", pass, len(silent[pass]))
 		}
 	})
 }
 
 // readJsonFixture decodes a committed fixture, failing the test rather than skipping when it is absent,
 // because an oracle that silently goes missing is a test that silently stops comparing.
-func readJsonFixture(t *testing.T, name string, into any) {
-	t.Helper()
+func readJsonFixture(test *testing.T, name string, into any) {
+	test.Helper()
 	contents, err := os.ReadFile(filepath.Clean(name))
 	if err != nil {
-		t.Fatalf("reading %s: %v", name, err)
+		test.Fatalf("reading %s: %v", name, err)
 	}
 	if err := json.Unmarshal(contents, into); err != nil {
-		t.Fatalf("decoding %s: %v", name, err)
+		test.Fatalf("decoding %s: %v", name, err)
 	}
 }

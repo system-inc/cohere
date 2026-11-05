@@ -22,11 +22,11 @@ func preferLiteralEnumMemberCaseName(index int) string {
 // Building the options struct directly would leave the decoder untested, and the decoder is where
 // the wire shape lives: cohere strips ESLint's [severity, options] tuple, so what arrives here is
 // the bare object rather than upstream's one-element array.
-func decodePreferLiteralEnumMemberOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
+func decodePreferLiteralEnumMemberOptionsForTest(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodePreferLiteralEnumMemberOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return decoded
 }
@@ -42,8 +42,8 @@ func decodePreferLiteralEnumMemberOptionsForTest(t *testing.T, raw string) any {
 // that pay for themselves here: a regular expression initializer is one node upstream calls a
 // Literal, and a bare backtick string is a NoSubstitutionTemplateLiteral rather than a
 // TemplateLiteral with an empty expression list.
-func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\nenum ValidRegex {\n  A = /test/,\n}\n    ",
@@ -58,9 +58,9 @@ func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(t *testing.T) {
 		"\nenum ValidQuotedKeyWithAssignment {\n  'a' = 1,\n}\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferLiteralEnumMember,
+		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, PreferLiteralEnumMember,
 				preferLiteralEnumMemberFile, sourceText))
 		})
 	}
@@ -78,8 +78,8 @@ func TestPreferLiteralEnumMemberStaysSilentOnUpstreamPassCases(t *testing.T) {
 // parenthesis away entirely, so `Foo.A | (Foo.B & ~Foo.C)` reaches its rule as a bare binary
 // expression; ours produces a real KindParenthesizedExpression, and without the unwrap in the rule
 // this case reports and upstream does not.
-func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\nenum Foo {\n  A = 1 << 0,\n  B = 1 >> 0,\n  C = 1 >>> 0,\n  D = 1 | 0,\n  E = 1 & 0,\n  F = 1 ^ 0,\n  G = ~1,\n}\n      ",
@@ -92,10 +92,10 @@ func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(t *t
 		"\nenum Foo {\n  A = 1 << 0,\n  B = 1 << 1,\n  C = 1 << 2,\n  D = Foo.A | -Foo.B,\n}\n      ",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
-				preferLiteralEnumMemberFile, sourceText, decodePreferLiteralEnumMemberOptionsForTest(t, `{"allowBitwiseExpressions": true}`)))
+		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
+				preferLiteralEnumMemberFile, sourceText, decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": true}`)))
 		})
 	}
 }
@@ -108,8 +108,8 @@ func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(t *t
 // initializer would satisfy every message id in this table and point somewhere upstream never
 // points. Each expected span below is sliced out of upstream's own line and column numbers rather
 // than typed, so the assertion cannot drift from what the corpus recorded.
-func TestPreferLiteralEnumMemberFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -178,19 +178,19 @@ func TestPreferLiteralEnumMemberFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferLiteralEnumMember,
+		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferLiteralEnumMember,
 				preferLiteralEnumMemberFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -205,8 +205,8 @@ func TestPreferLiteralEnumMemberFiresOnUpstreamFailCases(t *testing.T) {
 // second row is the one that pins the "part of a bitwise computation" carve-out: an enum member may
 // name a sibling member only inside a bitwise expression, so `x >> Foo.A` reports for `x` while
 // `Foo.A | Foo.B` two rows above does not.
-func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -225,19 +225,19 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(t *testing
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
-				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(t, `{"allowBitwiseExpressions": true}`))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
+				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": true}`))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -251,8 +251,8 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(t *testing
 // key are the same verdict for this rule and they arrive at the decoder as different inputs, so this
 // row is what proves the decoder does not treat a written false as a missing key and fall back to a
 // default that happened to agree.
-func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallowed(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallowed(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -266,19 +266,19 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallow
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferLiteralEnumMemberCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
-				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(t, `{"allowBitwiseExpressions": false}`))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
+				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": false}`))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -292,8 +292,8 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallow
 // source, alongside a control input that reported, so a silent row is a verdict rather than a rule
 // that never ran. None of these appear in upstream's test file: its parser cannot produce a
 // parenthesis node at all, so no case it writes could have found the unwrap missing.
-func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -481,27 +481,27 @@ func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.options == "" {
-				result = rule_testing.Run(t, PreferLiteralEnumMember,
+				result = rule_testing.Run(test, PreferLiteralEnumMember,
 					preferLiteralEnumMemberFile, testCase.sourceText)
 			} else {
-				result = rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
+				result = rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
 					preferLiteralEnumMemberFile, testCase.sourceText,
-					decodePreferLiteralEnumMemberOptionsForTest(t, testCase.options))
+					decodePreferLiteralEnumMemberOptionsForTest(test, testCase.options))
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -517,8 +517,8 @@ func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T
 // happen to agree for this rule, whose only key defaults to false, and the test exists because that
 // agreement is a coincidence: the next key added here may default to true, and nothing else in this
 // file would notice a decoder that dropped it.
-func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		raw  string
@@ -529,15 +529,15 @@ func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFal
 		{raw: `{"allowBitwiseExpressions": true}`, want: true},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded := decodePreferLiteralEnumMemberOptionsForTest(t, testCase.raw)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded := decodePreferLiteralEnumMemberOptionsForTest(test, testCase.raw)
 			settings, isSettings := decoded.(PreferLiteralEnumMemberOptions)
 			if !isSettings {
-				t.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
+				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
 			}
 			if settings.AllowBitwiseExpressions != testCase.want {
-				t.Errorf("allowBitwiseExpressions decoded to %v, wanted %v",
+				test.Errorf("allowBitwiseExpressions decoded to %v, wanted %v",
 					settings.AllowBitwiseExpressions, testCase.want)
 			}
 		})
@@ -551,12 +551,12 @@ func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFal
 // satisfy, so the fallback is the only thing standing between that configuration and a zero value.
 // Every other fixture in this file reaches the rule through the decoder and none of them can see
 // this line.
-func TestPreferLiteralEnumMemberFallsBackWhenHandedNilOptions(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberFallsBackWhenHandedNilOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
+	result := rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
 		preferLiteralEnumMemberFile, "enum Foo {\n  A = 1 << 0,\n}\n", nil)
-	rule_testing.ExpectFindings(t, result, "notLiteral")
+	rule_testing.ExpectFindings(test, result, "notLiteral")
 }
 
 // TestPreferLiteralEnumMemberRendersUpstreamsMessageText asserts what a reader is actually told.
@@ -569,8 +569,8 @@ func TestPreferLiteralEnumMemberFallsBackWhenHandedNilOptions(t *testing.T) {
 // The wanted strings are typed here as literals rather than read from the rule's own constants. A
 // comparison against the constant is equality, it looks correct, and both sides move together under
 // mutation, which is the specific way this assertion fails to be an assertion.
-func TestPreferLiteralEnumMemberRendersUpstreamsMessageText(t *testing.T) {
-	t.Parallel()
+func TestPreferLiteralEnumMemberRendersUpstreamsMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -594,26 +594,26 @@ func TestPreferLiteralEnumMemberRendersUpstreamsMessageText(t *testing.T) {
 	}
 	const sourceText = "enum Foo {\n  A = 2 + 2,\n}\n"
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.options == "" {
-				result = rule_testing.Run(t, PreferLiteralEnumMember,
+				result = rule_testing.Run(test, PreferLiteralEnumMember,
 					preferLiteralEnumMemberFile, sourceText)
 			} else {
-				result = rule_testing.RunWithOptions(t, PreferLiteralEnumMember,
+				result = rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
 					preferLiteralEnumMemberFile, sourceText,
-					decodePreferLiteralEnumMemberOptionsForTest(t, testCase.options))
+					decodePreferLiteralEnumMemberOptionsForTest(test, testCase.options))
 			}
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := result.Diagnostics[0]
 			if reported.Message.Id != testCase.wantId {
-				t.Errorf("reported id %q, wanted %q", reported.Message.Id, testCase.wantId)
+				test.Errorf("reported id %q, wanted %q", reported.Message.Id, testCase.wantId)
 			}
 			if reported.Message.Description != testCase.wantMessage {
-				t.Errorf("reported message %q, wanted %q",
+				test.Errorf("reported message %q, wanted %q",
 					reported.Message.Description, testCase.wantMessage)
 			}
 		})

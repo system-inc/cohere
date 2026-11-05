@@ -92,13 +92,13 @@ const networkServiceStub = "export const networkService = {\n" +
 // A rule that panics is worse than a rule that is wrong. `fdcf866` added a per-file boundary so one
 // panic loses one file rather than the run, and that boundary is what keeps a tree verifiable while
 // this guard finds the panics. Neither replaces the other.
-func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
-	t.Parallel()
+func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
+	test.Parallel()
 	rules := All()
 	if len(rules) == 0 {
 		// A sweep that finds nothing to check passes for the wrong reason, which is the same shape
 		// as the defect it guards against.
-		t.Fatal("the registry is empty, so this test proved nothing")
+		test.Fatal("the registry is empty, so this test proved nothing")
 	}
 
 	// Both extensions and a route path, because a React-gated rule declines a .ts file before
@@ -122,13 +122,13 @@ func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 	// vacuous shape this repository keeps finding.
 	for _, subject := range rules {
 		for index, source := range crashShapes {
-			t.Run(fmt.Sprintf("%s/shape-%d", subject.Name, index), func(t *testing.T) {
-				t.Parallel()
+			test.Run(fmt.Sprintf("%s/shape-%d", subject.Name, index), func(test *testing.T) {
+				test.Parallel()
 				// A panic fails the test. The only assertion is that this returns at all: what each
 				// rule concludes about these shapes belongs in its own fixture pair, and asserting
 				// it here would make this guard fail for reasons that are not crashes.
 				for _, fileName := range fileNames {
-					rule_testing.Run(t, subject, fileName, source)
+					rule_testing.Run(test, subject, fileName, source)
 				}
 			})
 		}
@@ -148,10 +148,10 @@ func TestNoRegisteredRuleCrashesOnAbsentOptionalNodes(t *testing.T) {
 // half affordable. The walk contains a rule's panic to that rule and names it (cf5afb6), so this reads
 // the crashes the walk names rather than recovering on its own, and a run with several crashing
 // rules names every one.
-func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(t *testing.T) {
-	t.Parallel()
+func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(test *testing.T) {
+	test.Parallel()
 	rules := All()
-	directory := t.TempDir()
+	directory := test.TempDir()
 	files := map[string]string{"tsconfig.json": typedCorpusConfig}
 	for index, source := range crashShapes {
 		for _, folder := range []string{"source/api", "source/components", fmt.Sprintf("app/thing%d", index)} {
@@ -164,20 +164,20 @@ func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(t *testing.T) {
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building the corpus program: %v", err)
+		test.Fatalf("building the corpus program: %v", err)
 	}
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
-		t.Fatalf("walking the corpus: %v", err)
+		test.Fatalf("walking the corpus: %v", err)
 	}
 
 	// Every type-aware rule must have been handed a file, or this proved nothing about it.
@@ -188,17 +188,17 @@ func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(t *testing.T) {
 		}
 		typed++
 		if result.Coverage.RulesOffered[subject.Name] == 0 {
-			t.Errorf("type-aware rule %s was offered no file of the corpus, so its typed half went unswept", subject.Name)
+			test.Errorf("type-aware rule %s was offered no file of the corpus, so its typed half went unswept", subject.Name)
 		}
 	}
 	if typed == 0 {
-		t.Fatal("no registered rule declares NeedsTypeChecker, so the typed sweep proved nothing")
+		test.Fatal("no registered rule declares NeedsTypeChecker, so the typed sweep proved nothing")
 	}
 
 	for _, crash := range result.Coverage.RulesCrashed {
-		t.Errorf("rule %s crashed on %s with types: %v", crash.RuleName, filepath.Base(crash.FileName), crash.Cause)
+		test.Errorf("rule %s crashed on %s with types: %v", crash.RuleName, filepath.Base(crash.FileName), crash.Cause)
 	}
 	for _, crash := range result.Coverage.FilesCrashed {
-		t.Errorf("%s crashed outside any rule with types: %v", filepath.Base(crash.FileName), crash.Cause)
+		test.Errorf("%s crashed outside any rule with types: %v", filepath.Base(crash.FileName), crash.Cause)
 	}
 }

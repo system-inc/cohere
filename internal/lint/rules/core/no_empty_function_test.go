@@ -17,14 +17,14 @@ const emptyFunctionFile = "/repository/source/EmptyFunction.ts"
 //
 // An empty string means the rule is configured as bare "error", which is what the live config
 // does and what hands the rule nil.
-func decodedEmptyFunctionOptions(t *testing.T, raw string) any {
-	t.Helper()
+func decodedEmptyFunctionOptions(test *testing.T, raw string) any {
+	test.Helper()
 	if raw == "" {
 		return nil
 	}
 	options, err := DecodeNoEmptyFunctionOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return options
 }
@@ -43,8 +43,8 @@ func decodedEmptyFunctionOptions(t *testing.T, raw string) any {
 // Upstream splits these across two rule testers, one with its default parser and one with the
 // TypeScript parser. Both are imported here as one set, because our parser reads TypeScript
 // natively and the split is a fact about espree rather than about the rule.
-func TestNoEmptyFunctionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyFunctionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -626,10 +626,10 @@ func TestNoEmptyFunctionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+"|"+testCase.options, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoEmptyFunction,
-				emptyFunctionFile, testCase.sourceText, decodedEmptyFunctionOptions(t, testCase.options)))
+		test.Run(testCase.sourceText+"|"+testCase.options, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoEmptyFunction,
+				emptyFunctionFile, testCase.sourceText, decodedEmptyFunctionOptions(test, testCase.options)))
 		})
 	}
 }
@@ -640,8 +640,8 @@ func TestNoEmptyFunctionStaysSilent(t *testing.T) {
 // The message interpolates a function name that has twenty distinct forms in this corpus, so a
 // message-id assertion cannot see most of what the rule decides. The text below is upstream's own
 // `data` rendered through its own template.
-func TestNoEmptyFunctionFires(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyFunctionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -2392,17 +2392,17 @@ func TestNoEmptyFunctionFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+"|"+testCase.options, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoEmptyFunction, emptyFunctionFile,
-				testCase.sourceText, decodedEmptyFunctionOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, "unexpected")
+		test.Run(testCase.sourceText+"|"+testCase.options, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
+				testCase.sourceText, decodedEmptyFunctionOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, "unexpected")
 
 			// Equality on the rendered text, not a prefix: the interpolated name is most of what
 			// this rule decides and a weaker predicate would not be a guard.
 			wantText := "Unexpected empty " + testCase.wantName + "."
 			if got := result.Diagnostics[0].Message.Description; got != wantText {
-				t.Errorf("rendered:\n  %q\nwant:\n  %q", got, wantText)
+				test.Errorf("rendered:\n  %q\nwant:\n  %q", got, wantText)
 			}
 
 			// The harness applies a fix but not a suggestion, so the applier is hand-rolled. The
@@ -2410,13 +2410,13 @@ func TestNoEmptyFunctionFires(t *testing.T) {
 			// `Run` does not trim, so upstream's output is compared as written.
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 {
-				t.Fatalf("offered %d suggestions, want 1", len(suggestions))
+				test.Fatalf("offered %d suggestions, want 1", len(suggestions))
 			}
 			if suggestions[0].Message.Id != "suggestComment" {
-				t.Errorf("suggestion is %q, want %q", suggestions[0].Message.Id, "suggestComment")
+				test.Errorf("suggestion is %q, want %q", suggestions[0].Message.Id, "suggestComment")
 			}
-			if got := applyEmptyFunctionSuggestion(t, result.SourceFile.Text(), suggestions[0]); got != testCase.wantOutput {
-				t.Errorf("applying the suggestion produced:\n  %q\nwant:\n  %q", got, testCase.wantOutput)
+			if got := applyEmptyFunctionSuggestion(test, result.SourceFile.Text(), suggestions[0]); got != testCase.wantOutput {
+				test.Errorf("applying the suggestion produced:\n  %q\nwant:\n  %q", got, testCase.wantOutput)
 			}
 		})
 	}
@@ -2426,10 +2426,10 @@ func TestNoEmptyFunctionFires(t *testing.T) {
 //
 // Same ordering the fix engine and `rule_testing.ExpectFixedSource` use, and for the same reason.
 // `rule_testing` has no suggestion support at all, so this lives here.
-func applyEmptyFunctionSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyEmptyFunctionSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	if len(suggestion.Fixes) == 0 {
-		t.Fatalf("suggestion %q carries no fixes", suggestion.Message.Id)
+		test.Fatalf("suggestion %q carries no fixes", suggestion.Message.Id)
 	}
 	ordered := make([]rule.Fix, len(suggestion.Fixes))
 	copy(ordered, suggestion.Fixes)
@@ -2438,7 +2438,7 @@ func applyEmptyFunctionSuggestion(t *testing.T, source string, suggestion rule.S
 	})
 	for _, fix := range ordered {
 		if fix.Range.Pos() < 0 || fix.Range.End() > len(source) || fix.Range.Pos() > fix.Range.End() {
-			t.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule",
+			test.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule",
 				fix.Range.Pos(), fix.Range.End())
 		}
 		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
@@ -2455,8 +2455,8 @@ func applyEmptyFunctionSuggestion(t *testing.T, source string, suggestion rule.S
 //
 // The multi-line row is the one that pins the end: a body spanning a newline reports through to
 // the closing brace on the next line rather than stopping at the first.
-func TestNoEmptyFunctionSpansTheBody(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyFunctionSpansTheBody(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -2472,16 +2472,16 @@ func TestNoEmptyFunctionSpansTheBody(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoEmptyFunction, emptyFunctionFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
 				testCase.sourceText, nil)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			source := result.SourceFile.Text()
 			if got := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != testCase.wantReported {
-				t.Errorf("the finding points at %q, want %q", got, testCase.wantReported)
+				test.Errorf("the finding points at %q, want %q", got, testCase.wantReported)
 			}
 		})
 	}
@@ -2490,8 +2490,8 @@ func TestNoEmptyFunctionSpansTheBody(t *testing.T) {
 // The decoder is the line with no upstream counterpart. `allow` defaults to an EMPTY LIST, so
 // the zero value happens to be right, and the fallback is written out anyway so a later default
 // change cannot silently switch every kind off.
-func TestDecodeNoEmptyFunctionOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoEmptyFunctionOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -2506,18 +2506,18 @@ func TestDecodeNoEmptyFunctionOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoEmptyFunctionOptions(json.RawMessage(testCase.raw))
 			if err != nil {
-				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, err)
 			}
 			options, isOptions := decoded.(NoEmptyFunctionOptions)
 			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than NoEmptyFunctionOptions", decoded)
+				test.Fatalf("the decoder returned %T rather than NoEmptyFunctionOptions", decoded)
 			}
 			if strings.Join(options.Allow, ",") != strings.Join(testCase.want, ",") {
-				t.Errorf("allow decodes to %v, want %v", options.Allow, testCase.want)
+				test.Errorf("allow decodes to %v, want %v", options.Allow, testCase.want)
 			}
 		})
 	}
@@ -2530,8 +2530,8 @@ func TestDecodeNoEmptyFunctionOptions(t *testing.T) {
 // `protected-constructors` are what the typescript-eslint EXTENSION accepts, and core rejects
 // both. Measured: eslint 10.8.1 refuses to load a config naming either. This port is the core
 // rule, so it refuses them too, and the extension is where the kebab spellings belong.
-func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{
 		`{"allow": ["nonsense"]}`,
@@ -2539,22 +2539,22 @@ func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(t *testing.T) {
 		`{"allow": ["protected-constructors"]}`,
 		`{"allow": ["Functions"]}`,
 	} {
-		t.Run(raw, func(t *testing.T) {
-			t.Parallel()
+		test.Run(raw, func(test *testing.T) {
+			test.Parallel()
 			if _, err := DecodeNoEmptyFunctionOptions(json.RawMessage(raw)); err == nil {
-				t.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
+				test.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
 			}
 		})
 	}
 }
 
 // A rule configured as bare "error" reaches Run with nil rather than with an options struct.
-func TestNoEmptyFunctionWithNilOptionsAllowsNothing(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyFunctionWithNilOptionsAllowsNothing(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoEmptyFunction,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoEmptyFunction,
 		emptyFunctionFile, "function a() {}", nil), "unexpected")
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoEmptyFunction,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoEmptyFunction,
 		emptyFunctionFile, "function a() { /* empty */ }", nil))
 }
 
@@ -2568,16 +2568,16 @@ func TestNoEmptyFunctionWithNilOptionsAllowsNothing(t *testing.T) {
 //
 // Measured against the installed eslint at 10.8.1 with the TypeScript parser: this REPORTS, and the
 // same class with `get foo()` in place of the constructor is clean.
-func TestNoEmptyFunctionOverrideDoesNotExemptAConstructor(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyFunctionOverrideDoesNotExemptAConstructor(test *testing.T) {
+	test.Parallel()
 
-	allowOverride := decodedEmptyFunctionOptions(t, `{"allow": ["overrideMethods"]}`)
+	allowOverride := decodedEmptyFunctionOptions(test, `{"allow": ["overrideMethods"]}`)
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoEmptyFunction, emptyFunctionFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
 		"class A extends B { override constructor() {} }", allowOverride), "unexpected")
 
 	// The control, and the reason the row above is about the GATE rather than about `override`
 	// itself: the same modifier on a getter does exempt.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoEmptyFunction, emptyFunctionFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoEmptyFunction, emptyFunctionFile,
 		"class A extends B { override get foo() {} }", allowOverride))
 }

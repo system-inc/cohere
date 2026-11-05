@@ -11,8 +11,8 @@ import (
 // against the extractor's own output rather than by reading them. Each one carries the file path
 // upstream gave it, because for this rule the path is load-bearing data rather than decoration: the
 // only clean case upstream ships for the gate is a reporting body under a non-document name.
-func TestNoStyledJsxInDocumentReports(t *testing.T) {
-	t.Parallel()
+func TestNoStyledJsxInDocumentReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -71,16 +71,16 @@ func TestNoStyledJsxInDocumentReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoStyledJsxInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoStyledJsxInDocument.Id)
 		})
 	}
 }
 
-func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoStyledJsxInDocumentIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -170,10 +170,10 @@ func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoStyledJsxInDocument, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoStyledJsxInDocument, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -182,46 +182,46 @@ func TestNoStyledJsxInDocumentIsSilent(t *testing.T) {
 // are asserted here. Upstream's span is the opening element alone rather than the whole element:
 // measured on the release binary at offset 17 length 11 over `export const a = <style jsx>{"x"}
 // </style>;`, which is exactly `<style jsx>`.
-func TestNoStyledJsxInDocumentPointsAtTheOpeningElement(t *testing.T) {
-	t.Parallel()
+func TestNoStyledJsxInDocumentPointsAtTheOpeningElement(test *testing.T) {
+	test.Parallel()
 
 	source := "export const a = <style jsx>{\"x\"}</style>;\n"
-	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
-	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+	result := rule_testing.Run(test, NoStyledJsxInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(test, result, messageNoStyledJsxInDocument.Id)
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "<style jsx>" {
-		t.Fatalf("expected the finding to cover the opening element, got %q", reported)
+		test.Fatalf("expected the finding to cover the opening element, got %q", reported)
 	}
 }
 
 // A self-closing element reports over its whole self, since it has no separate opening node.
-func TestNoStyledJsxInDocumentPointsAtASelfClosingElement(t *testing.T) {
-	t.Parallel()
+func TestNoStyledJsxInDocumentPointsAtASelfClosingElement(test *testing.T) {
+	test.Parallel()
 
 	source := "export const a = <style jsx />;\n"
-	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx", source)
-	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+	result := rule_testing.Run(test, NoStyledJsxInDocument, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(test, result, messageNoStyledJsxInDocument.Id)
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "<style jsx />" {
-		t.Fatalf("expected the finding to cover the element, got %q", reported)
+		test.Fatalf("expected the finding to cover the element, got %q", reported)
 	}
 }
 
 // The rendered text is asserted rather than a substring of it, because a predicate weaker than the
 // property it guards is not a guard.
-func TestNoStyledJsxInDocumentRendersItsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoStyledJsxInDocumentRendersItsMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoStyledJsxInDocument, "pages/_document.tsx",
+	result := rule_testing.Run(test, NoStyledJsxInDocument, "pages/_document.tsx",
 		"export const a = <style jsx>{\"x\"}</style>;\n")
-	rule_testing.ExpectFindings(t, result, messageNoStyledJsxInDocument.Id)
+	rule_testing.ExpectFindings(test, result, messageNoStyledJsxInDocument.Id)
 
 	if got := result.Diagnostics[0].Message.Description; got != messageNoStyledJsxInDocument.Description {
-		t.Fatalf("expected the message description verbatim, got %q", got)
+		test.Fatalf("expected the message description verbatim, got %q", got)
 	}
 	if !strings.HasPrefix(messageNoStyledJsxInDocument.Description, "This is styled-jsx inside the custom document.") {
-		t.Fatalf("the message should say what is wrong rather than restate the rule name")
+		test.Fatalf("the message should say what is wrong rather than restate the rule name")
 	}
 }

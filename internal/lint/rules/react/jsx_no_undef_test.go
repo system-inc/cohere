@@ -26,8 +26,8 @@ const jsxNoUndefFile = "/repository/source/JsxNoUndef.tsx"
 // into the Rust source by script before any Go was written. All 22 matched, which is worth stating
 // because two of them are multi-line raw strings whose leading newline and eight-space indentation
 // are part of what upstream tests.
-func TestJsxNoUndefFires(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUndefFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -80,16 +80,16 @@ func TestJsxNoUndefFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
 
-func TestJsxNoUndefStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUndefStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -141,10 +141,10 @@ func TestJsxNoUndefStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -155,16 +155,16 @@ func TestJsxNoUndefStaysSilent(t *testing.T) {
 // reporting anything, which makes every silent case above pass vacuously and looks from the outside
 // exactly like a working rule. A revert of `NeedsTypeChecker`, or a fixture switched to the untyped
 // harness by copying a neighbouring react rule that does not need types, fails here loudly instead.
-func TestJsxNoUndefNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUndefNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "var React; React.render(<App />);"
 
-	untyped := rule_testing.Run(t, JsxNoUndef, jsxNoUndefFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, JsxNoUndef, jsxNoUndefFile, source)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, source)
-	rule_testing.ExpectFindings(t, typed, "jsxIdentifierNotDefined")
+	typed := rule_testing.RunTyped(test, JsxNoUndef, jsxNoUndefFile, source)
+	rule_testing.ExpectFindings(test, typed, "jsxIdentifierNotDefined")
 }
 
 // TestJsxNoUndefPointsAtTheReferencedIdentifier asserts where each finding lands and what it says.
@@ -174,8 +174,8 @@ func TestJsxNoUndefNeedsTheTypedHarness(t *testing.T) {
 // passes the two tables above completely. Upstream snapshots the span for all eight of its fail
 // cases and underlines the object identifier alone in every one, including the columns for the
 // member cases, so this is upstream's assertion rather than an invented one.
-func TestJsxNoUndefPointsAtTheReferencedIdentifier(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUndefPointsAtTheReferencedIdentifier(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -191,15 +191,15 @@ func TestJsxNoUndefPointsAtTheReferencedIdentifier(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "jsxIdentifierNotDefined")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, JsxNoUndef, jsxNoUndefFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "jsxIdentifierNotDefined")
 
 			finding := result.Diagnostics[0]
 			reported := testCase.sourceText[finding.Range.Pos():finding.Range.End()]
 			if reported != testCase.reported {
-				t.Fatalf("finding covers %q, want %q", reported, testCase.reported)
+				test.Fatalf("finding covers %q, want %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -213,17 +213,17 @@ func TestJsxNoUndefPointsAtTheReferencedIdentifier(t *testing.T) {
 // reports a tag naming only a global, a lib global included, and `allowGlobals: true` lets it
 // resolve. An import, and a `declare global` member declared in the same file, both count as in
 // scope under the default.
-func TestJsxNoUndefAllowGlobals(t *testing.T) {
-	t.Parallel()
+func TestJsxNoUndefAllowGlobals(test *testing.T) {
+	test.Parallel()
 
 	const globals = "/repository/source/globals.d.ts"
 	allowed, err := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": true}`))
 	if err != nil {
-		t.Fatalf("decoding allowGlobals: %v", err)
+		test.Fatalf("decoding allowGlobals: %v", err)
 	}
 	disallowed, err := rule.DecodeOptionsInto[JsxNoUndefOptions]()([]byte(`{"allowGlobals": false}`))
 	if err != nil {
-		t.Fatalf("decoding allowGlobals false: %v", err)
+		test.Fatalf("decoding allowGlobals false: %v", err)
 	}
 
 	cases := []struct {
@@ -242,14 +242,14 @@ func TestJsxNoUndefAllowGlobals(t *testing.T) {
 		{"an undeclared name under allowGlobals", "export {}; <Missing />;", allowed, 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(t, JsxNoUndef, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithOptions(test, JsxNoUndef, map[string]string{
 				globals:        "declare var Text: any;\n",
 				jsxNoUndefFile: testCase.sourceText,
 			}, jsxNoUndefFile, testCase.options)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
+				test.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}
 		})
 	}

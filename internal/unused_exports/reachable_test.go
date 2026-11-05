@@ -11,8 +11,8 @@ import (
 
 // TestUnreachableFires is the half that proves the analysis can report. Each case holds code that
 // genuinely cannot run, and the expected line is the first statement of the dead run.
-func TestUnreachableFires(t *testing.T) {
-	t.Parallel()
+func TestUnreachableFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name string
 		code string
@@ -59,16 +59,16 @@ func TestUnreachableFires(t *testing.T) {
 			want: "beta();",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			sourceFile := parse(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			sourceFile := parse(test, testCase.code)
 			findings := FindUnreachable(sourceFile)
 			if len(findings) != 1 {
-				t.Fatalf("got %d findings, want 1: %s", len(findings), describe(testCase.code, findings))
+				test.Fatalf("got %d findings, want 1: %s", len(findings), describe(testCase.code, findings))
 			}
 			got := strings.TrimSpace(testCase.code[findings[0].Range.Position:findings[0].Range.End])
 			if got != testCase.want {
-				t.Fatalf("reported %q, want %q", got, testCase.want)
+				test.Fatalf("reported %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -76,8 +76,8 @@ func TestUnreachableFires(t *testing.T) {
 
 // TestUnreachableStaysSilent is the half that proves the analysis can decline. Every case here is
 // live code, and several are shapes a naive "statement after a return" scan reports wrongly.
-func TestUnreachableStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestUnreachableStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name string
 		code string
@@ -132,11 +132,11 @@ func TestUnreachableStaysSilent(t *testing.T) {
 			code: "function f(x) {\n\tif (!x) return;\n\tbeta();\n\tgamma();\n}",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			sourceFile := parse(t, testCase.code)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			sourceFile := parse(test, testCase.code)
 			if findings := FindUnreachable(sourceFile); len(findings) != 0 {
-				t.Fatalf("reported live code as unreachable: %s", describe(testCase.code, findings))
+				test.Fatalf("reported live code as unreachable: %s", describe(testCase.code, findings))
 			}
 		})
 	}
@@ -144,26 +144,26 @@ func TestUnreachableStaysSilent(t *testing.T) {
 
 // TestUnreachableReportsOncePerDeadRun asserts a three-statement dead run reports once rather than
 // three times. A single mistake should read as one finding.
-func TestUnreachableReportsOncePerDeadRun(t *testing.T) {
-	t.Parallel()
-	sourceFile := parse(t, "function f() {\n\treturn;\n\talpha();\n\tbeta();\n\tgamma();\n}")
+func TestUnreachableReportsOncePerDeadRun(test *testing.T) {
+	test.Parallel()
+	sourceFile := parse(test, "function f() {\n\treturn;\n\talpha();\n\tbeta();\n\tgamma();\n}")
 	findings := FindUnreachable(sourceFile)
 	if len(findings) != 1 {
-		t.Fatalf("got %d findings for one dead run, want 1", len(findings))
+		test.Fatalf("got %d findings for one dead run, want 1", len(findings))
 	}
 }
 
 // TestUnreachableHandlesEmptyInput asserts a nil file reports nothing rather than panicking, since
 // this runs over a whole tree and one odd file must not end the report.
-func TestUnreachableHandlesEmptyInput(t *testing.T) {
-	t.Parallel()
+func TestUnreachableHandlesEmptyInput(test *testing.T) {
+	test.Parallel()
 	if findings := FindUnreachable(nil); len(findings) != 0 {
-		t.Fatalf("a nil file reported %d findings", len(findings))
+		test.Fatalf("a nil file reported %d findings", len(findings))
 	}
 }
 
-func parse(t *testing.T, code string) *ast.SourceFile {
-	t.Helper()
+func parse(test *testing.T, code string) *ast.SourceFile {
+	test.Helper()
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/unused-fixture.ts",
 		PathKey:  "/unused-fixture.ts",

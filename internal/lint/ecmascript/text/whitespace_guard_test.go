@@ -112,11 +112,11 @@ func goWhitespaceSitesIn(fileSet *token.FileSet, file *ast.File, relative string
 
 // goWhitespaceSites walks the ported code, lint and format, and finds every unmarked site. Test files
 // are left out: a test trimming its own expected output never reaches a verdict a user sees.
-func goWhitespaceSites(t *testing.T) []goWhitespaceSite {
-	t.Helper()
+func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
+	test.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var found []goWhitespaceSite
 	files := 0
@@ -142,12 +142,12 @@ func goWhitespaceSites(t *testing.T) []goWhitespaceSite {
 			return nil
 		})
 		if walkError != nil {
-			t.Fatalf("walking %s: %v", directory, walkError)
+			test.Fatalf("walking %s: %v", directory, walkError)
 		}
 	}
 	// A walk that read nothing would pass everything, so it has to have read the tree.
 	if files < 1000 {
-		t.Fatalf("the walk read %d files under internal/lint and internal/format, which is not the tree", files)
+		test.Fatalf("the walk read %d files under internal/lint and internal/format, which is not the tree", files)
 	}
 	sort.Slice(found, func(left, right int) bool {
 		return found[left].file < found[right].file || found[left].file == found[right].file && found[left].line < found[right].line
@@ -159,10 +159,10 @@ func goWhitespaceSites(t *testing.T) []goWhitespaceSite {
 // fails here by file and line unless it carries a `// Go whitespace:` comment saying why Go's set is
 // right there, or its file is pinned in goWhitespaceUnswept at its exact count. A pin above the count
 // fails too, so the list can only shrink.
-func TestPortedCodeReadsWhitespaceAsJavaScriptDoes(t *testing.T) {
-	t.Parallel()
+func TestPortedCodeReadsWhitespaceAsJavaScriptDoes(test *testing.T) {
+	test.Parallel()
 	byFile := map[string][]goWhitespaceSite{}
-	for _, site := range goWhitespaceSites(t) {
+	for _, site := range goWhitespaceSites(test) {
 		byFile[site.file] = append(byFile[site.file], site)
 	}
 	for file, sites := range byFile {
@@ -171,25 +171,25 @@ func TestPortedCodeReadsWhitespaceAsJavaScriptDoes(t *testing.T) {
 			continue
 		}
 		if len(sites) < pinned {
-			t.Errorf("%s holds %d unmarked Go-whitespace calls, below its pin of %d: lower the pin in goWhitespaceUnswept", file, len(sites), pinned)
+			test.Errorf("%s holds %d unmarked Go-whitespace calls, below its pin of %d: lower the pin in goWhitespaceUnswept", file, len(sites), pinned)
 			continue
 		}
 		for _, site := range sites {
-			t.Errorf("%s:%d: %s uses Go's whitespace, which is not JavaScript's: use text.TrimWhitespace, text.WhitespaceFields or text.IsWhitespace, or say why Go's set is right with a `// %s` comment",
+			test.Errorf("%s:%d: %s uses Go's whitespace, which is not JavaScript's: use text.TrimWhitespace, text.WhitespaceFields or text.IsWhitespace, or say why Go's set is right with a `// %s` comment",
 				site.file, site.line, site.function, goWhitespaceMarker)
 		}
 	}
 	for file, pinned := range goWhitespaceUnswept {
 		if len(byFile[file]) == 0 {
-			t.Errorf("goWhitespaceUnswept pins %s at %d, and it holds none: remove it", file, pinned)
+			test.Errorf("goWhitespaceUnswept pins %s at %d, and it holds none: remove it", file, pinned)
 		}
 	}
 }
 
 // The guard sees each kind of site it exists for, through an aliased import and as a value, and keeps
 // each marked one: the control that the tree-wide pass above is a walk that could have failed.
-func TestTheWhitespaceGuardSeesEachKindOfSite(t *testing.T) {
-	t.Parallel()
+func TestTheWhitespaceGuardSeesEachKindOfSite(test *testing.T) {
+	test.Parallel()
 	source := `package probe
 
 import (
@@ -215,7 +215,7 @@ func probe(value string, raw []byte) {
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, "probe.go", source, parser.ParseComments)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var lines []string
 	for _, site := range goWhitespaceSitesIn(fileSet, file, "probe.go") {
@@ -223,6 +223,6 @@ func probe(value string, raw []byte) {
 	}
 	want := []string{"10 strings.TrimSpace", "11 strings.Fields", "12 bytes.TrimSpace", "13 unicode.IsSpace"}
 	if !slices.Equal(lines, want) {
-		t.Fatalf("the guard found %v, want %v", lines, want)
+		test.Fatalf("the guard found %v, want %v", lines, want)
 	}
 }

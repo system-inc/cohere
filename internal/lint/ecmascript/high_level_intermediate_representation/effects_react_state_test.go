@@ -10,8 +10,8 @@ import (
 	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
-func TestStateEffectsFollowImportOrigin(t *testing.T) {
-	t.Parallel()
+func TestStateEffectsFollowImportOrigin(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name   string
 		prefix string
@@ -36,8 +36,8 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 		{"typed impostor", `import {useState as real} from 'react'; const useState: typeof real = value => [value, () => {}];`, "useState", false},
 		{"unresolved", "", "useState", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			parameters := ""
 			if testCase.name == "local shadow" {
 				parameters = "useState: (value: unknown) => unknown"
@@ -70,7 +70,7 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 								origin = call.CalleeOrigin
 							}
 							if (origin.Module == "react" && origin.Export == "useState") != testCase.frozen {
-								t.Errorf("origin=%+v; want React state=%t", origin, testCase.frozen)
+								test.Errorf("origin=%+v; want React state=%t", origin, testCase.frozen)
 							}
 							wantFrozen := testCase.frozen || testCase.name == "wrong package" ||
 								testCase.name == "overridden star export" || testCase.name == "typed impostor"
@@ -82,13 +82,13 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 								frozenArgument = frozenArgument || effect.Kind == mutation_aliasing.AliasingEffectFreeze
 							}
 							if frozenResult != wantFrozen || frozenArgument != wantFrozen {
-								t.Errorf("result frozen=%t, argument frozen=%t; want both %t", frozenResult, frozenArgument, wantFrozen)
+								test.Errorf("result frozen=%t, argument frozen=%t; want both %t", frozenResult, frozenArgument, wantFrozen)
 							}
 						}
 					})
 				}}
 			}}
-			rule_testing.RunTypedFiles(t, probe, map[string]string{
+			rule_testing.RunTypedFiles(test, probe, map[string]string{
 				"/react.d.ts":    reactiveDeclarations + `declare module 'react' { const React: {useState: typeof useState}; export default React; }`,
 				"/named.ts":      `export {useState as state} from 'react';`,
 				"/star.ts":       `export * from 'react';`,
@@ -97,14 +97,14 @@ func TestStateEffectsFollowImportOrigin(t *testing.T) {
 				"/fixture.tsx":   source,
 			}, "/fixture.tsx")
 			if visited != 1 {
-				t.Fatalf("visited %d calls, want exactly one", visited)
+				test.Fatalf("visited %d calls, want exactly one", visited)
 			}
 		})
 	}
 }
 
-func TestStateMethodCallDoesNotMakeSetterReactive(t *testing.T) {
-	t.Parallel()
+func TestStateMethodCallDoesNotMakeSetterReactive(test *testing.T) {
+	test.Parallel()
 	const source = `import * as React from 'react';
 export function PD(properties: {ids: string[]; suggested?: {personId: string}}) {
 const [selectedValue] = React.useState<string>(properties.suggested ? properties.suggested.personId : 'new');
@@ -126,8 +126,8 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 		{"default import method read", strings.ReplaceAll(source, "import * as React", "import React"), false},
 		{"unpreserved property call", `import {useMemo} from 'react'; function Component({propA}) { return useMemo(() => propA.x(), [propA.x]); }`, true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var findings, markers int
 			probe := rule.Rule{Name: "state-method-memoization", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
@@ -147,19 +147,19 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T;
 const React: {useState: typeof useState; useCallback: typeof useCallback}; export default React;
 }`
-			rule_testing.RunTypedFiles(t, probe, map[string]string{"/react.d.ts": declarations, "/fixture.tsx": testCase.source}, "/fixture.tsx")
+			rule_testing.RunTypedFiles(test, probe, map[string]string{"/react.d.ts": declarations, "/fixture.tsx": testCase.source}, "/fixture.tsx")
 			if markers == 0 {
-				t.Fatal("the fixture did not exercise a memo marker")
+				test.Fatal("the fixture did not exercise a memo marker")
 			}
 			if (findings != 0) != testCase.fires {
-				t.Fatalf("findings=%d, want fires=%t", findings, testCase.fires)
+				test.Fatalf("findings=%d, want fires=%t", findings, testCase.fires)
 			}
 		})
 	}
 }
 
-func TestStateSetterDependencyIsPrunedAfterScopeSeparation(t *testing.T) {
-	t.Parallel()
+func TestStateSetterDependencyIsPrunedAfterScopeSeparation(test *testing.T) {
+	test.Parallel()
 	const source = `import {useCallback, useEffect, useState} from 'react';
 let someGlobal = {};
 function Component() {
@@ -202,7 +202,7 @@ return <div>{String(state)}</div>;
 					return count
 				}
 				if count := setterDependencies(); count != 1 {
-					t.Errorf("raw setter dependencies=%d, want one outside the state scope", count)
+					test.Errorf("raw setter dependencies=%d, want one outside the state scope", count)
 				}
 				tree, _ := BuildReactiveFunctionWithFlattenedScopes(function, flattened)
 				MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, ctx.TypeChecker)
@@ -211,17 +211,17 @@ return <div>{String(state)}</div>;
 				PruneAlwaysInvalidatingScopes(tree, function, dependencies)
 				PruneNonReactiveDependencies(tree, function, dependencies)
 				if count := setterDependencies(); count != 0 {
-					t.Errorf("final setter dependencies=%d, want zero for a stable setter", count)
+					test.Errorf("final setter dependencies=%d, want zero for a stable setter", count)
 				}
 				visited++
 			})
 		}}
 	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 	if visited != 1 {
-		t.Fatalf("visited %d functions, want one", visited)
+		test.Fatalf("visited %d functions, want one", visited)
 	}
 }

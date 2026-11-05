@@ -629,13 +629,13 @@ var preferRegexLiteralsDecidedByGlobalsConfig = []preferRegexLiteralsRow{
 // surface for declaring a global off, this test is what tells the next reader these four were a
 // known consequence of not having one, and it fails the moment the behaviour changes in either
 // direction.
-func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range preferRegexLiteralsDecidedByGlobalsConfig {
-		t.Run(row.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runPreferRegexLiterals(t, row), row.ids...)
+		test.Run(row.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runPreferRegexLiterals(test, row), row.ids...)
 		})
 	}
 }
@@ -700,13 +700,13 @@ var preferRegexLiteralsDecidedByLanguageEdition = []preferRegexLiteralsRow{
 // across editions for these rows; the suggestion is exactly what the edition decides, and it is
 // described at each row rather than pinned, so this test does not have to be rewritten every time
 // the pattern scanner learns a new syntax.
-func TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range preferRegexLiteralsDecidedByLanguageEdition {
-		t.Run(row.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runPreferRegexLiterals(t, row), row.ids...)
+		test.Run(row.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runPreferRegexLiterals(test, row), row.ids...)
 		})
 	}
 }
@@ -717,35 +717,35 @@ func TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence(t *testing.T) {
 // global object, as it does for every rule on it. ESLint's corpus runs this row with `window` declared a
 // browser global and reports it, so the two agree here; without that config ESLint is silent, which is
 // the one edge the ESLint table leaves out.
-func TestPreferRegexLiteralsFollowsWindowAsTheGlobalObject(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsFollowsWindowAsTheGlobalObject(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferRegexLiterals, preferRegexLiteralsFile,
 		"new window['RegExp']('\\x56\\x78\\x45', '');"), "unexpectedRegExp")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PreferRegexLiterals, preferRegexLiteralsFile,
 		"window.RegExp('a');"), "unexpectedRegExp")
 }
 
-func TestPreferRegexLiteralsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range preferRegexLiteralsClean {
-		t.Run(row.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runPreferRegexLiterals(t, row))
+		test.Run(row.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runPreferRegexLiterals(test, row))
 		})
 	}
 }
 
-func TestPreferRegexLiteralsFires(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range preferRegexLiteralsReporting {
-		t.Run(row.source, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferRegexLiterals(t, row)
-			rule_testing.ExpectFindings(t, result, row.ids...)
-			expectPreferRegexLiteralsSuggestions(t, row, result)
+		test.Run(row.source, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferRegexLiterals(test, row)
+			rule_testing.ExpectFindings(test, result, row.ids...)
+			expectPreferRegexLiteralsSuggestions(test, row, result)
 		})
 	}
 }
@@ -761,26 +761,26 @@ func TestPreferRegexLiteralsFires(t *testing.T) {
 // a suggestion that rewrites the right span with the wrong text, and it cannot see a suggestion
 // offered where upstream withholds one. Thirty-three of the corpus's findings deliberately carry no
 // suggestion, and those rows are asserted here as offering none.
-func expectPreferRegexLiteralsSuggestions(t *testing.T, row preferRegexLiteralsRow, result rule_testing.Result) {
-	t.Helper()
+func expectPreferRegexLiteralsSuggestions(test *testing.T, row preferRegexLiteralsRow, result rule_testing.Result) {
+	test.Helper()
 
 	var offered []preferRegexLiteralsSuggestion
 	for _, diagnostic := range result.Diagnostics {
 		for _, suggestion := range diagnostic.Suggestions {
 			offered = append(offered, preferRegexLiteralsSuggestion{
 				id:     suggestion.Message.Id,
-				output: applyPreferRegexLiteralsSuggestion(t, row.source, suggestion),
+				output: applyPreferRegexLiteralsSuggestion(test, row.source, suggestion),
 			})
 		}
 	}
 
 	if len(offered) != len(row.suggestions) {
-		t.Fatalf("wanted %d suggestions, got %d: %+v", len(row.suggestions), len(offered), offered)
+		test.Fatalf("wanted %d suggestions, got %d: %+v", len(row.suggestions), len(offered), offered)
 	}
 	for index, want := range row.suggestions {
 		got := offered[index]
 		if got.id != want.id {
-			t.Errorf("suggestion %d: wanted id %q, got %q", index, want.id, got.id)
+			test.Errorf("suggestion %d: wanted id %q, got %q", index, want.id, got.id)
 		}
 		// Both sides are normalised the same way before comparing, and the reason is the harness
 		// rather than either side being wrong.
@@ -795,7 +795,7 @@ func expectPreferRegexLiteralsSuggestions(t *testing.T, row preferRegexLiteralsR
 		// and transforming only the expectation failed a hundred and fifty-seven on a trailing
 		// newline. The rule did not change between those runs.
 		if strings.TrimSpace(got.output) != strings.TrimSpace(want.output) {
-			t.Errorf("suggestion %d: wanted output %q, got %q", index, want.output, got.output)
+			test.Errorf("suggestion %d: wanted output %q, got %q", index, want.output, got.output)
 		}
 	}
 }
@@ -807,8 +807,8 @@ func expectPreferRegexLiteralsSuggestions(t *testing.T, row preferRegexLiteralsR
 // Every suggestion this rule proposes carries exactly one edit, but the loop does not assume that,
 // because an applier that silently mishandles two would be a wrong instrument rather than a failing
 // one.
-func applyPreferRegexLiteralsSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyPreferRegexLiteralsSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	// Edits are offsets into the text the RULE saw, and that is not the literal in the table above:
 	// the typed harness writes each fixture as `strings.TrimSpace(contents)+"\n"`
 	// (internal/rule_testing/program.go:160). Replaying an edit into the untrimmed literal lands it
@@ -821,7 +821,7 @@ func applyPreferRegexLiteralsSuggestion(t *testing.T, source string, suggestion 
 		fix := suggestion.Fixes[index]
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(edited) || start > end {
-			t.Fatalf("suggestion edit [%d,%d) is outside the source of length %d", start, end, len(edited))
+			test.Fatalf("suggestion edit [%d,%d) is outside the source of length %d", start, end, len(edited))
 		}
 		edited = edited[:start] + fix.Text + edited[end:]
 	}
@@ -837,10 +837,10 @@ func harnessSourceForPreferRegexLiterals(source string) string {
 	return strings.TrimSpace(source) + "\n"
 }
 
-func runPreferRegexLiterals(t *testing.T, row preferRegexLiteralsRow) rule_testing.Result {
-	t.Helper()
+func runPreferRegexLiterals(test *testing.T, row preferRegexLiteralsRow) rule_testing.Result {
+	test.Helper()
 	if row.options == "" {
-		return rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, row.source)
+		return rule_testing.RunTyped(test, PreferRegexLiterals, preferRegexLiteralsFile, row.source)
 	}
 	// Routed through the rule's own registered decoder rather than by building the options struct,
 	// so the wire shape and the json tag are under test too. cohere's config layer unwraps the
@@ -848,9 +848,9 @@ func runPreferRegexLiterals(t *testing.T, row preferRegexLiteralsRow) rule_testi
 	// though upstream's corpus writes it inside an array.
 	decoded, err := rule.DecodeOptionsInto[PreferRegexLiteralsOptions]()([]byte(row.options))
 	if err != nil {
-		t.Fatalf("decoding options %s: %v", row.options, err)
+		test.Fatalf("decoding options %s: %v", row.options, err)
 	}
-	return rule_testing.RunTypedWithOptions(t, PreferRegexLiterals, preferRegexLiteralsFile, row.source, decoded)
+	return rule_testing.RunTypedWithOptions(test, PreferRegexLiterals, preferRegexLiteralsFile, row.source, decoded)
 }
 
 // TestPreferRegexLiteralsNeedsTheTypedHarness pins the checker declaration.
@@ -859,15 +859,15 @@ func runPreferRegexLiterals(t *testing.T, row preferRegexLiteralsRow) rule_testi
 // failure: every StaysSilent case would pass vacuously and the suite would stay green over a rule
 // that had stopped working. This asserts the typed harness is what makes it report, so a later
 // revert of `NeedsTypeChecker` fails loudly.
-func TestPreferRegexLiteralsNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "new RegExp('abc');"
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, source),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, PreferRegexLiterals, preferRegexLiteralsFile, source),
 		"unexpectedRegExp")
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, PreferRegexLiterals, preferRegexLiteralsFile, source))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, PreferRegexLiterals, preferRegexLiteralsFile, source))
 }
 
 // TestPreferRegexLiteralsReportsTheWholeCall asserts WHERE the finding points.
@@ -875,17 +875,17 @@ func TestPreferRegexLiteralsNeedsTheTypedHarness(t *testing.T) {
 // `ExpectFindings` asserts ids and count and nothing else, so a rule anchored on the callee rather
 // than the call would pass every row above while pointing at the wrong span, and the suggestion it
 // carries would then replace the wrong bytes. Upstream reports the whole call expression.
-func TestPreferRegexLiteralsReportsTheWholeCall(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsReportsTheWholeCall(test *testing.T) {
+	test.Parallel()
 
 	const source = "const pattern = new RegExp('abc', 'g');"
-	result := rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, source)
+	result := rule_testing.RunTyped(test, PreferRegexLiterals, preferRegexLiteralsFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "new RegExp('abc', 'g')" {
-		t.Errorf("wanted the whole call, got %q", reported)
+		test.Errorf("wanted the whole call, got %q", reported)
 	}
 }
 
@@ -895,18 +895,18 @@ func TestPreferRegexLiteralsReportsTheWholeCall(t *testing.T) {
 // its own name is the first one somebody disables. Compared against a literal typed here rather than
 // against the rule's own constant, since comparing a diagnostic to the constant it was built from is
 // an equality that moves on both sides under mutation and therefore proves nothing.
-func TestPreferRegexLiteralsExplainsWhyItMatters(t *testing.T) {
-	t.Parallel()
+func TestPreferRegexLiteralsExplainsWhyItMatters(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, PreferRegexLiterals, preferRegexLiteralsFile, "new RegExp('abc');")
+	result := rule_testing.RunTyped(test, PreferRegexLiterals, preferRegexLiteralsFile, "new RegExp('abc');")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	description := result.Diagnostics[0].Message.Description
 	if !strings.HasPrefix(description, "This builds a regular expression by handing constant strings") {
-		t.Errorf("message does not open by naming the mistake: %q", description)
+		test.Errorf("message does not open by naming the mistake: %q", description)
 	}
 	if !strings.Contains(description, "Write the regular expression literal.") {
-		t.Errorf("message does not say what to do instead: %q", description)
+		test.Errorf("message does not say what to do instead: %q", description)
 	}
 }

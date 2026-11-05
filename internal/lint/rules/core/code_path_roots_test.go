@@ -17,8 +17,8 @@ func init() {
 // TestCodePathRootsAreIndexedOncePerFile runs the three rules that read codePathRoots over one file
 // with one FileCache, the way the walk runs them, on a file each of them has a root to build for.
 // The index must be filled once for all three, not once per rule.
-func TestCodePathRootsAreIndexedOncePerFile(t *testing.T) {
-	t.Parallel()
+func TestCodePathRootsAreIndexedOncePerFile(test *testing.T) {
+	test.Parallel()
 	source := "export function total(items: number[]) {\n" +
 		"  let sum = 0;\n" +
 		"  for (const item of items) { sum += item; }\n" +
@@ -37,8 +37,8 @@ func TestCodePathRootsAreIndexedOncePerFile(t *testing.T) {
 			fills = ctx.FileCache.Fills()["control_flow_graph.Roots"]
 		}}
 	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
+	rule_testing.RunTypedFiles(test, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
 	if fills != 1 {
-		t.Fatalf("the root index was filled %d times for one file across three rules, want once", fills)
+		test.Fatalf("the root index was filled %d times for one file across three rules, want once", fills)
 	}
 }

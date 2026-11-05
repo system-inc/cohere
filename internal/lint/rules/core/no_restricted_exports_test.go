@@ -26,18 +26,18 @@ type noRestrictedExportsCase struct {
 // schema constraint that has no spelling in the type -- `default` in `restrictedNamedExports`
 // beside `restrictDefaultExports` -- and the pattern compile. A fixture bypassing it would leave
 // both untested and would also not be the path a real configuration takes.
-func runNoRestrictedExports(t *testing.T, testCase noRestrictedExportsCase) rule_testing.Result {
-	t.Helper()
+func runNoRestrictedExports(test *testing.T, testCase noRestrictedExportsCase) rule_testing.Result {
+	test.Helper()
 
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeNoRestrictedExportsOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, NoRestrictedExports, noRestrictedExportsFile,
+	return rule_testing.RunWithOptions(test, NoRestrictedExports, noRestrictedExportsFile,
 		testCase.sourceText, decoded)
 }
 
@@ -254,8 +254,8 @@ func noRestrictedExportsCases() []noRestrictedExportsCase {
 }
 
 // TestNoRestrictedExportsMatchesUpstream replays the whole corpus.
-func TestNoRestrictedExportsMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedExportsMatchesUpstream(test *testing.T) {
+	test.Parallel()
 
 	cases := noRestrictedExportsCases()
 
@@ -268,15 +268,15 @@ func TestNoRestrictedExportsMatchesUpstream(t *testing.T) {
 		}
 	}
 	if len(cases) != 183 {
-		t.Fatalf("expected 183 corpus cases, have %d", len(cases))
+		test.Fatalf("expected 183 corpus cases, have %d", len(cases))
 	}
 	if reporting != 88 {
-		t.Fatalf("expected 88 reporting cases, have %d", reporting)
+		test.Fatalf("expected 88 reporting cases, have %d", reporting)
 	}
 
 	for _, testCase := range cases {
-		result := runNoRestrictedExports(t, testCase)
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		result := runNoRestrictedExports(test, testCase)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 	}
 }
 
@@ -286,17 +286,17 @@ func TestNoRestrictedExportsMatchesUpstream(t *testing.T) {
 // Every corpus row supplies options, so none of them can tell a rule that declines an unconfigured
 // file from one that is simply never reached. This asserts the decline directly, on source that the
 // rule reports on the moment a name is listed.
-func TestNoRestrictedExportsIsSilentWithNoConfiguration(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedExportsIsSilentWithNoConfiguration(test *testing.T) {
+	test.Parallel()
 
 	const source = "export var a; export default b; export { c } from 'm';"
 
-	unconfigured := rule_testing.RunWithOptions(t, NoRestrictedExports, noRestrictedExportsFile,
+	unconfigured := rule_testing.RunWithOptions(test, NoRestrictedExports, noRestrictedExportsFile,
 		source, NoRestrictedExportsOptions{})
-	rule_testing.ExpectClean(t, unconfigured)
+	rule_testing.ExpectClean(test, unconfigured)
 
 	// The control. Without it the assertion above passes for a rule that can never report at all.
-	configured := runNoRestrictedExports(t, noRestrictedExportsCase{
+	configured := runNoRestrictedExports(test, noRestrictedExportsCase{
 		sourceText: source,
 		options: NoRestrictedExportsOptions{
 			RestrictedNamedExports: []string{"a", "c"},
@@ -305,7 +305,7 @@ func TestNoRestrictedExportsIsSilentWithNoConfiguration(t *testing.T) {
 			},
 		},
 	})
-	rule_testing.ExpectFindings(t, configured, "restrictedNamed", "restrictedDefault", "restrictedNamed")
+	rule_testing.ExpectFindings(test, configured, "restrictedNamed", "restrictedDefault", "restrictedNamed")
 }
 
 // TestNoRestrictedExportsRejectsContradictoryConfiguration covers the decoder's own arms.
@@ -314,8 +314,8 @@ func TestNoRestrictedExportsIsSilentWithNoConfiguration(t *testing.T) {
 // reach, and both would otherwise fail silently: an uncompilable pattern would match nothing and
 // read as a clean tree, and the contradictory pairing would report under whichever message the
 // ordering happened to reach first.
-func TestNoRestrictedExportsRejectsContradictoryConfiguration(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedExportsRejectsContradictoryConfiguration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -331,10 +331,10 @@ func TestNoRestrictedExportsRejectsContradictoryConfiguration(t *testing.T) {
 	for _, testCase := range cases {
 		_, err := DecodeNoRestrictedExportsOptions([]byte(testCase.configured))
 		if testCase.wantError && err == nil {
-			t.Errorf("%s: expected the decoder to refuse %s", testCase.name, testCase.configured)
+			test.Errorf("%s: expected the decoder to refuse %s", testCase.name, testCase.configured)
 		}
 		if !testCase.wantError && err != nil {
-			t.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, err)
+			test.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, err)
 		}
 	}
 }
@@ -351,8 +351,8 @@ func TestNoRestrictedExportsRejectsContradictoryConfiguration(t *testing.T) {
 // It is still reachable, because a caller can build the options struct directly, and without the
 // return that configuration reports TWICE on one export. Found by a mutation that deleted the return
 // and survived every one of the 183 corpus rows.
-func TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags(test *testing.T) {
+	test.Parallel()
 
 	// Deliberately not through the decoder, which refuses this pairing. The point is the rule's own
 	// arm order, not the configuration surface.
@@ -371,9 +371,9 @@ func TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags(t *testing.T
 		"export { foo as default } from 'mod';",
 		"export * as default from 'mod';",
 	} {
-		result := rule_testing.RunWithOptions(t, NoRestrictedExports, noRestrictedExportsFile,
+		result := rule_testing.RunWithOptions(test, NoRestrictedExports, noRestrictedExportsFile,
 			source, options)
-		rule_testing.ExpectFindings(t, result, "restrictedNamed")
+		rule_testing.ExpectFindings(test, result, "restrictedNamed")
 	}
 
 	// The control: with the name NOT restricted, the same sources reach the default arms and report
@@ -386,9 +386,9 @@ func TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags(t *testing.T
 		"export { foo as default } from 'mod';",
 		"export * as default from 'mod';",
 	} {
-		result := rule_testing.RunWithOptions(t, NoRestrictedExports, noRestrictedExportsFile,
+		result := rule_testing.RunWithOptions(test, NoRestrictedExports, noRestrictedExportsFile,
 			source, flagsOnly)
-		rule_testing.ExpectFindings(t, result, "restrictedDefault")
+		rule_testing.ExpectFindings(test, result, "restrictedDefault")
 	}
 }
 
@@ -402,8 +402,8 @@ func TestNoRestrictedExportsNamedRestrictionWinsOverTheDefaultFlags(t *testing.T
 // Treating `export =` as a default export would be wrong on its own terms as well as unfaithful:
 // it publishes the module's whole value under a name the importer supplies via `import x = require`,
 // which is not the `export default` construct `restrictDefaultExports.direct` names.
-func TestNoRestrictedExportsIgnoresExportEquals(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedExportsIgnoresExportEquals(test *testing.T) {
+	test.Parallel()
 
 	options := NoRestrictedExportsOptions{
 		RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
@@ -411,13 +411,13 @@ func TestNoRestrictedExportsIgnoresExportEquals(t *testing.T) {
 		},
 	}
 
-	silent := rule_testing.RunWithOptions(t, NoRestrictedExports, noRestrictedExportsFile,
+	silent := rule_testing.RunWithOptions(test, NoRestrictedExports, noRestrictedExportsFile,
 		"const foo = 1;\nexport = foo;", options)
-	rule_testing.ExpectClean(t, silent)
+	rule_testing.ExpectClean(test, silent)
 
 	// The control. The same option on the same file with `export default` instead reports, so the
 	// silence above is the guard rather than a rule that never fires under this configuration.
-	reporting := rule_testing.RunWithOptions(t, NoRestrictedExports, noRestrictedExportsFile,
+	reporting := rule_testing.RunWithOptions(test, NoRestrictedExports, noRestrictedExportsFile,
 		"const foo = 1;\nexport default foo;", options)
-	rule_testing.ExpectFindings(t, reporting, "restrictedDefault")
+	rule_testing.ExpectFindings(test, reporting, "restrictedDefault")
 }

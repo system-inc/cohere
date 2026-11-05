@@ -16,8 +16,8 @@ import "testing"
 //
 // The no-break space (U+00A0) is whitespace to both, so its cases pass either way, and they are here
 // so a fix that narrowed the set to Go's minus one character would fail.
-func TestDirectivesReadWhitespaceAsJavaScriptDoes(t *testing.T) {
-	t.Parallel()
+func TestDirectivesReadWhitespaceAsJavaScriptDoes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -48,12 +48,12 @@ func TestDirectivesReadWhitespaceAsJavaScriptDoes(t *testing.T) {
 		{"enable, U+0085 after the word", "/* eslint-disable no-debugger */\n/* eslint-enable\u0085no-debugger */\ndebugger;", 2, true},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			index := Build(testCase.source)
 			got := index.Suppresses("no-debugger", offsetOfLine(testCase.source, testCase.debuggerLine))
 			if got != testCase.suppressed {
-				t.Errorf("suppressed = %v, ESLint says %v", got, testCase.suppressed)
+				test.Errorf("suppressed = %v, ESLint says %v", got, testCase.suppressed)
 			}
 		})
 	}

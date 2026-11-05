@@ -26,8 +26,8 @@ func banTslintCommentCaseName(index int) string {
 // the TypeScript compiler rather than by reading it, so no escape sequence passed through a shell
 // or a keyboard on the way here. Every one was additionally run through the installed 8.67.0 build
 // driven by the ESLint 10.8.1 Linter API, which reported nothing on all five.
-func TestBanTslintCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestBanTslintCommentStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"let a: readonly any[] = [];",
@@ -37,9 +37,9 @@ func TestBanTslintCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 		"/* another comment that mentions tslint */",
 	}
 	for index, sourceText := range cases {
-		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, BanTslintComment,
+		test.Run(banTslintCommentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, BanTslintComment,
 				banTslintCommentFile, sourceText))
 		})
 	}
@@ -55,8 +55,8 @@ func TestBanTslintCommentStaysSilentOnUpstreamPassCases(t *testing.T) {
 //
 // All four assertions run on each row, which is the point. A finding at the right span with the
 // wrong rewrite, and a rewrite at the right span with the wrong text, both pass a message-id check.
-func TestBanTslintCommentFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestBanTslintCommentFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -114,14 +114,14 @@ func TestBanTslintCommentFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "commentDetected")
+		test.Run(banTslintCommentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BanTslintComment, banTslintCommentFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "commentDetected")
 
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantSpan {
-				t.Errorf("the finding covers %q, want %q", reported, testCase.wantSpan)
+				test.Errorf("the finding covers %q, want %q", reported, testCase.wantSpan)
 			}
 
 			// The rendered comment is the only part of the description that varies per input, and
@@ -130,11 +130,11 @@ func TestBanTslintCommentFiresOnUpstreamFailCases(t *testing.T) {
 			// was built from moves both sides under mutation and asserts nothing.
 			wantDescription := messageBanTslintComment(testCase.wantText).Description
 			if result.Diagnostics[0].Message.Description != wantDescription {
-				t.Errorf("the description is %q, want %q",
+				test.Errorf("the description is %q, want %q",
 					result.Diagnostics[0].Message.Description, wantDescription)
 			}
 
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -145,8 +145,8 @@ func TestBanTslintCommentFiresOnUpstreamFailCases(t *testing.T) {
 // regex's trailing group, the anchor, JSDoc, or a file holding more than one directive. Every row
 // here was run through the installed 8.67.0 build and carries the verdict that build produced, so a
 // row asserting silence is asserting upstream's silence rather than this port's.
-func TestBanTslintCommentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestBanTslintCommentDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -220,10 +220,10 @@ func TestBanTslintCommentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) 
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(banTslintCommentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BanTslintComment, banTslintCommentFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -233,8 +233,8 @@ func TestBanTslintCommentDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) 
 // The normalization is invisible to a message-id assertion and it is the whole of what upstream
 // interpolates, so a port dropping the trim would agree with every other fixture in this file. Each
 // row's expectation is the text the installed build printed for that exact input.
-func TestBanTslintCommentRendersTheCommentUpstreamRenders(t *testing.T) {
-	t.Parallel()
+func TestBanTslintCommentRendersTheCommentUpstreamRenders(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -254,13 +254,13 @@ func TestBanTslintCommentRendersTheCommentUpstreamRenders(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "commentDetected")
+		test.Run(banTslintCommentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BanTslintComment, banTslintCommentFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "commentDetected")
 			want := messageBanTslintComment(testCase.wantText).Description
 			if result.Diagnostics[0].Message.Description != want {
-				t.Errorf("the description is %q, want %q",
+				test.Errorf("the description is %q, want %q",
 					result.Diagnostics[0].Message.Description, want)
 			}
 		})
@@ -276,8 +276,8 @@ func TestBanTslintCommentRendersTheCommentUpstreamRenders(t *testing.T) {
 // `upstreamFixed` is what the installed build's `cohereAndFix` actually wrote, captured rather than
 // predicted, so the row stays honest if upstream ever narrows this itself. `wantFixed` is what this
 // port writes.
-func TestBanTslintCommentFixDeclinesToDeleteCode(t *testing.T) {
-	t.Parallel()
+func TestBanTslintCommentFixDeclinesToDeleteCode(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText    string
@@ -311,11 +311,11 @@ func TestBanTslintCommentFixDeclinesToDeleteCode(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(banTslintCommentCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, BanTslintComment, banTslintCommentFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "commentDetected")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		test.Run(banTslintCommentCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, BanTslintComment, banTslintCommentFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "commentDetected")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -325,8 +325,8 @@ func TestBanTslintCommentFixDeclinesToDeleteCode(t *testing.T) {
 // `ban-ts-comment` in this package declines a JavaScript file and this rule must not, so the
 // difference is pinned rather than left to a doc comment. Measured on the installed build: the same
 // input reports in every one of these extensions.
-func TestBanTslintCommentHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestBanTslintCommentHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	for _, fileName := range []string{
 		"/repository/source/Thing.ts",
@@ -336,9 +336,9 @@ func TestBanTslintCommentHasNoFileGate(t *testing.T) {
 		"/repository/source/Thing.js",
 		"/repository/source/Thing.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, BanTslintComment,
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, BanTslintComment,
 				fileName, "// tslint:disable"), "commentDetected")
 		})
 	}
@@ -357,13 +357,13 @@ func TestBanTslintCommentHasNoFileGate(t *testing.T) {
 // load-bearing here and unreachable upstream. That is why no finding assertion appears below: this
 // test asserts an absence of panic, and asserting a verdict would be inventing one upstream never
 // gave.
-func TestBanTslintCommentSurvivesAnUnterminatedBlockComment(t *testing.T) {
-	t.Parallel()
+func TestBanTslintCommentSurvivesAnUnterminatedBlockComment(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{"/*", "/*/", "/**", "/* tslint:disable"} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.Run(t, BanTslintComment, banTslintCommentFile, sourceText)
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.Run(test, BanTslintComment, banTslintCommentFile, sourceText)
 		})
 	}
 }

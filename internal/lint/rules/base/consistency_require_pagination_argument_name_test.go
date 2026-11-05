@@ -27,8 +27,8 @@ const consistencyRequirePaginationArgumentNameFile = "/repository/source/Consist
 // rather than a verdict. And the whole-tree run reports zero for this rule, which is a real property
 // of that tree rather than a broken instrument: the control said 2310 files linted and 44 findings
 // from other rules, so the run happened and this rule genuinely has nothing to say there.
-func TestPaginationDecoratorFires(t *testing.T) {
-	t.Parallel()
+func TestPaginationDecoratorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -51,9 +51,9 @@ func TestPaginationDecoratorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), "invalidName")
 		})
 	}
@@ -70,8 +70,8 @@ func TestPaginationDecoratorFires(t *testing.T) {
 // recovers per FILE rather than per rule, so one Text() call on a property access costs every rule
 // in this package every finding in that file, and both a qualified type name and a member-expression
 // arrow body are property accesses. Each is measured clean against the original rather than assumed.
-func TestPaginationDecoratorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPaginationDecoratorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -104,9 +104,9 @@ func TestPaginationDecoratorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText))
 		})
 	}
@@ -118,8 +118,8 @@ func TestPaginationDecoratorStaysSilent(t *testing.T) {
 // token the author has to edit, and every ExpectFindings assertion above is satisfied by a rule
 // reporting the whole decorator instead. Measured against the original: it reports column 24 for the
 // literal form and column 26 for the parameter form on the seeded file, which are those two tokens.
-func TestPaginationDecoratorPointsAtTheName(t *testing.T) {
-	t.Parallel()
+func TestPaginationDecoratorPointsAtTheName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -135,15 +135,15 @@ func TestPaginationDecoratorPointsAtTheName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyRequirePaginationArgumentName, consistencyRequirePaginationArgumentNameFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequirePaginationArgumentName, consistencyRequirePaginationArgumentNameFile,
 				testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "invalidName")
+			rule_testing.ExpectFindings(test, result, "invalidName")
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("expected the finding on %q, pointed at %q", testCase.want, reported)
+				test.Errorf("expected the finding on %q, pointed at %q", testCase.want, reported)
 			}
 		})
 	}
@@ -154,8 +154,8 @@ func TestPaginationDecoratorPointsAtTheName(t *testing.T) {
 // `PaginationInput$` is the original's own test and it accepts every `@PaginationInputFor` subclass
 // without a list of them existing anywhere. Anchoring matters in both directions: a type merely
 // containing the word is not a paginator, and the base type itself is.
-func TestPaginationDecoratorMatchesTheTypeSuffix(t *testing.T) {
-	t.Parallel()
+func TestPaginationDecoratorMatchesTheTypeSuffix(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -173,9 +173,9 @@ func TestPaginationDecoratorMatchesTheTypeSuffix(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), testCase.messages...)
 		})
 	}
@@ -190,8 +190,8 @@ func TestPaginationDecoratorMatchesTheTypeSuffix(t *testing.T) {
 // Measured against the original rule rather than reasoned about, on a seeded file inside
 // api-phi-health's tsconfig: it reports all three of these at the same columns this port does.
 // `pagination` exactly and a name ending in `Pagination` are the only two accepted spellings.
-func TestPaginationDecoratorAnchorsTheNameSuffix(t *testing.T) {
-	t.Parallel()
+func TestPaginationDecoratorAnchorsTheNameSuffix(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -213,9 +213,9 @@ func TestPaginationDecoratorAnchorsTheNameSuffix(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), testCase.messages...)
 		})
 	}
@@ -237,8 +237,8 @@ func TestPaginationDecoratorAnchorsTheNameSuffix(t *testing.T) {
 // So the guard is load bearing twice over, and a message-id fixture is the wrong instrument for half
 // of it: no ExpectFindings assertion can see a panic. The clean assertion here is what would fail,
 // by taking the whole run down rather than by disagreeing.
-func TestPaginationDecoratorDeclinesAQualifiedTypeName(t *testing.T) {
-	t.Parallel()
+func TestPaginationDecoratorDeclinesAQualifiedTypeName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -255,9 +255,9 @@ func TestPaginationDecoratorDeclinesAQualifiedTypeName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyRequirePaginationArgumentName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyRequirePaginationArgumentName,
 				consistencyRequirePaginationArgumentNameFile, testCase.sourceText), testCase.messages...)
 		})
 	}

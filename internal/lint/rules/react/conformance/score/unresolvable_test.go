@@ -17,20 +17,20 @@ import (
 //
 // A fixture that stays silent with types present was never excused by their absence, and its
 // verdict is an excuse rather than a measurement.
-func TestUnresolvableTypesIsEarnedNotAssumed(t *testing.T) {
-	t.Parallel()
+func TestUnresolvableTypesIsEarnedNotAssumed(test *testing.T) {
+	test.Parallel()
 	if testing.Short() {
-		t.Skip("builds a TypeScript program per fixture")
+		test.Skip("builds a TypeScript program per fixture")
 	}
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+		test.Fatalf("loading the corpus: %v", err)
 	}
 
 	subject := Rules["set-state-in-render"]
 	moved, stayedSilent := 0, 0
 	for _, fixture := range SelectFixtures(fixtures, "set-state-in-render") {
-		result, analyzeErr := Analyze(subject, fixture, t.TempDir())
+		result, analyzeErr := Analyze(subject, fixture, test.TempDir())
 		verdict := react_conformance.Classify(fixture, result, analyzeErr)
 		if verdict.Verdict != react_conformance.VerdictUnresolvableTypes {
 			continue
@@ -45,9 +45,9 @@ func TestUnresolvableTypesIsEarnedNotAssumed(t *testing.T) {
 		// produced the same symptom — every fixture silent — which read as the rule being broken.
 		typed := fixture
 		typed.Source = "import {useState} from 'react';\n" + fixture.Source
-		directory := t.TempDir()
+		directory := test.TempDir()
 		if err := writeReactStub(directory); err != nil {
-			t.Fatalf("writing the stub: %v", err)
+			test.Fatalf("writing the stub: %v", err)
 		}
 		withTypes, _ := Analyze(subject, typed, directory)
 
@@ -55,13 +55,13 @@ func TestUnresolvableTypesIsEarnedNotAssumed(t *testing.T) {
 			moved++
 		} else {
 			stayedSilent++
-			t.Logf("  %s stayed silent even with react types present", fixture.Name)
+			test.Logf("  %s stayed silent even with react types present", fixture.Name)
 		}
 	}
 
-	t.Logf("of the unresolvable-types fixtures: %d start reporting once types resolve, %d stay silent", moved, stayedSilent)
+	test.Logf("of the unresolvable-types fixtures: %d start reporting once types resolve, %d stay silent", moved, stayedSilent)
 	if moved == 0 {
-		t.Error("no fixture changed answer when types were supplied, so `unresolvable types` is not the mechanism it claims")
+		test.Error("no fixture changed answer when types were supplied, so `unresolvable types` is not the mechanism it claims")
 	}
 }
 

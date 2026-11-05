@@ -27,9 +27,9 @@ type proseWrapOracle struct {
 	err     error
 }
 
-func newProseWrapOracle(t *testing.T) *proseWrapOracle {
-	t.Helper()
-	return &proseWrapOracle{golden: oracletest.Open(t, t.Name())}
+func newProseWrapOracle(test *testing.T) *proseWrapOracle {
+	test.Helper()
+	return &proseWrapOracle{golden: oracletest.Open(test, test.Name())}
 }
 
 func (oracle *proseWrapOracle) load() {
@@ -106,9 +106,9 @@ var proseWrapFixtures = []string{
 	"*a*\nb", "a\n*b*", "**中文**\nabc", "`a`\n中文", "a[^1]\nb\n\n[^1]: c\nd", "[^1]: a\n  b",
 }
 
-func TestProseWrapFixturesMatchOracle(t *testing.T) {
-	t.Parallel()
-	oracle := newProseWrapOracle(t)
+func TestProseWrapFixturesMatchOracle(test *testing.T) {
+	test.Parallel()
+	oracle := newProseWrapOracle(test)
 	for _, proseWrap := range []string{"always", "never", "preserve"} {
 		for variantIndex, options := range formatVariants {
 			for _, input := range append(append([]string{}, proseWrapFixtures...), formatFixtures...) {
@@ -117,15 +117,15 @@ func TestProseWrapFixturesMatchOracle(t *testing.T) {
 				}
 				expected, err := oracle.format(input, options, proseWrap)
 				if err != nil {
-					t.Fatalf("the oracle failed on %q: %v", input, err)
+					test.Fatalf("the oracle failed on %q: %v", input, err)
 				}
 				actual, err := formatWithProseWrap(input, options, proseWrap, nil)
 				if err != nil {
-					t.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
+					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
 					continue
 				}
 				if actual != expected {
-					t.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, actual))
+					test.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, actual))
 				}
 			}
 		}

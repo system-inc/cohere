@@ -37,20 +37,20 @@ type accessorPairsCase struct {
 // struct directly would leave the single line most likely to be wrong completely untested. A nil
 // options value is passed through as nil, which is what the config layer hands a rule configured as
 // a bare severity.
-func runAccessorPairs(t *testing.T, testCase accessorPairsCase) rule_testing.Result {
-	t.Helper()
+func runAccessorPairs(test *testing.T, testCase accessorPairsCase) rule_testing.Result {
+	test.Helper()
 	if testCase.options == nil {
-		return rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile, testCase.sourceText)
+		return rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile, testCase.sourceText)
 	}
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeAccessorPairsOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunTypedWithOptions(t, AccessorPairs, accessorPairsFile,
+	return rule_testing.RunTypedWithOptions(test, AccessorPairs, accessorPairsFile,
 		testCase.sourceText, decoded)
 }
 
@@ -385,24 +385,24 @@ func accessorPairsSilentCases() []accessorPairsCase {
 	}
 }
 
-func TestAccessorPairsFires(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range accessorPairsFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runAccessorPairs(t, testCase), testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runAccessorPairs(test, testCase), testCase.wantIds...)
 		})
 	}
 }
 
-func TestAccessorPairsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range accessorPairsSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAccessorPairs(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAccessorPairs(test, testCase))
 		})
 	}
 }
@@ -422,8 +422,8 @@ func TestAccessorPairsStaysSilent(t *testing.T) {
 // The mechanism those cases guard -- that the receiver must be the real global -- is covered by
 // TestAccessorPairsDeclinesALocalObjectBinding below, which asks the same question with a local
 // binding, a channel this tree does have. Upstream ships that case too and it is imported above.
-func TestAccessorPairsGlobalShadowing(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsGlobalShadowing(test *testing.T) {
+	test.Parallel()
 
 	cases := []accessorPairsCase{
 		{"Reflect.defineProperty(foo, 'bar', { get() {} })",
@@ -435,9 +435,9 @@ func TestAccessorPairsGlobalShadowing(t *testing.T) {
 			[]string{"missingGetterInPropertyDescriptor"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runAccessorPairs(t, testCase), testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runAccessorPairs(test, testCase), testCase.wantIds...)
 		})
 	}
 }
@@ -449,17 +449,17 @@ func TestAccessorPairsGlobalShadowing(t *testing.T) {
 // reason the rule declares the type checker at all: nothing syntactic separates the global `Object`
 // from a parameter of the same name. Imported from upstream's own corpus and repeated here with a
 // control, because it is the single case standing in for three that could not be imported.
-func TestAccessorPairsDeclinesALocalObjectBinding(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsDeclinesALocalObjectBinding(test *testing.T) {
+	test.Parallel()
 
 	shadowed := "function f(Object) { Object.defineProperties(foo, { bar: { set(value) {} } }) }"
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile,
 		shadowed))
 
 	// The control: the same call with no local binding reports, so the silence above is the shadow
 	// rather than the shape.
 	global := "Object.defineProperties(foo, { bar: { set(value) {} } })"
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile,
 		global), "missingGetterInPropertyDescriptor")
 }
 
@@ -469,16 +469,16 @@ func TestAccessorPairsDeclinesALocalObjectBinding(t *testing.T) {
 // type information would report NOTHING on the descriptor path and every clean fixture would pass
 // vacuously. This pins the direction: with no checker the descriptor finding disappears, while the
 // object-literal finding, which needs no checker, survives.
-func TestAccessorPairsNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	descriptor := "Object.defineProperty(foo, 'bar', { set(value) {} })"
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile,
 		descriptor), "missingGetterInPropertyDescriptor")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, AccessorPairs, accessorPairsFile, descriptor))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, AccessorPairs, accessorPairsFile, descriptor))
 
 	literal := "var o = { set a(value) {} };"
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, AccessorPairs, accessorPairsFile, literal),
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, AccessorPairs, accessorPairsFile, literal),
 		"missingGetterInObjectLiteral")
 }
 
@@ -491,8 +491,8 @@ func TestAccessorPairsNeedsTheTypedHarness(t *testing.T) {
 // accessor, and reading that helper does not obviously predict that `static` is inside the span.
 //
 // A rule reporting the whole accessor including its body would pass every id fixture above.
-func TestAccessorPairsPointsAtTheAccessorHead(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsPointsAtTheAccessorHead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -525,19 +525,19 @@ func TestAccessorPairsPointsAtTheAccessorHead(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runAccessorPairs(t, accessorPairsCase{
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runAccessorPairs(test, accessorPairsCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans),
 					len(result.Diagnostics))
 			}
 			for index, want := range testCase.wantSpans {
 				span := result.Diagnostics[index].Range
 				got := testCase.sourceText[span.Pos():span.End()]
 				if got != want {
-					t.Errorf("finding %d pointed at %q, wanted %q", index, got, want)
+					test.Errorf("finding %d pointed at %q, wanted %q", index, got, want)
 				}
 			}
 		})
@@ -555,8 +555,8 @@ func TestAccessorPairsPointsAtTheAccessorHead(t *testing.T) {
 // spell a private name renders QUOTED, while a real private name renders bare and keeps its hash.
 // Upstream reaches those through two different branches, and a port collapsing them to one would
 // render one of the two wrongly while every count stayed right.
-func TestAccessorPairsDescribesTheAccessor(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsDescribesTheAccessor(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -592,17 +592,17 @@ func TestAccessorPairsDescribesTheAccessor(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runAccessorPairs(t, accessorPairsCase{
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runAccessorPairs(test, accessorPairsCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			// Equality against a literal typed here, never against the rule's own constant: a
 			// comparison to the constant moves with the code under mutation and asserts nothing.
 			if got := result.Diagnostics[0].Message.Description; got != testCase.wantText {
-				t.Errorf("rendered\n  %q\nwanted\n  %q", got, testCase.wantText)
+				test.Errorf("rendered\n  %q\nwanted\n  %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -614,43 +614,43 @@ func TestAccessorPairsDescribesTheAccessor(t *testing.T) {
 // reporting rather than one that errors. An absent key must keep the default; an explicit `false`
 // must override it; and nil input, which is what the config layer hands a rule configured as a bare
 // severity, must produce the defaults rather than the zero value.
-func TestDecodeAccessorPairsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeAccessorPairsOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input yields upstream's defaults", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil input yields upstream's defaults", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeAccessorPairsOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		settings := decoded.(AccessorPairsOptions).resolve()
 		if settings.getWithoutSet != false || settings.setWithoutGet != true ||
 			settings.enforceForClassMembers != true || settings.enforceForTSTypes != false {
-			t.Fatalf("defaults came back as %+v", settings)
+			test.Fatalf("defaults came back as %+v", settings)
 		}
 	})
 
-	t.Run("an explicit false overrides a true default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an explicit false overrides a true default", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeAccessorPairsOptions([]byte(`{"setWithoutGet": false}`))
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		settings := decoded.(AccessorPairsOptions).resolve()
 		if settings.setWithoutGet != false {
-			t.Error("an explicit false was read as the default true")
+			test.Error("an explicit false was read as the default true")
 		}
 		if settings.enforceForClassMembers != true {
-			t.Error("an unrelated key lost its default")
+			test.Error("an unrelated key lost its default")
 		}
 	})
 
-	t.Run("the wire shape is the bare object, not upstream's array", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the wire shape is the bare object, not upstream's array", func(test *testing.T) {
+		test.Parallel()
 		// cohere's config layer unwraps the `[severity, options]` tuple before dispatch, so the
 		// decoder is handed `{...}` where upstream's schema writes `[{...}]`.
 		if _, err := DecodeAccessorPairsOptions([]byte(`[{"setWithoutGet": false}]`)); err == nil {
-			t.Error("the array spelling decoded, which means the wire shape is not what is assumed")
+			test.Error("the array spelling decoded, which means the wire shape is not what is assumed")
 		}
 	})
 }
@@ -661,16 +661,16 @@ func TestDecodeAccessorPairsOptions(t *testing.T) {
 // rule turns `setWithoutGet` and `enforceForClassMembers` off and leaves a rule that registers on
 // every file and reports nothing. Every fixture above reaches the rule through the decoder, so none
 // of them can see it.
-func TestAccessorPairsWithNilOptionsUsesTheDefaults(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsWithNilOptionsUsesTheDefaults(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile,
 		"var o = { set a(v) {} };"), "missingGetterInObjectLiteral")
 	// enforceForClassMembers defaults true, so the class arm must be live with no options at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile,
 		"class A { set a(v) {} }"), "missingGetterInClass")
 	// getWithoutSet defaults false, so this half must stay quiet.
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, AccessorPairs, accessorPairsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile,
 		"var o = { get a() {} };"))
 }
 
@@ -687,8 +687,8 @@ func TestAccessorPairsWithNilOptionsUsesTheDefaults(t *testing.T) {
 // token stream is flat, so upstream separates these by the BRACKET tokens it happens to include,
 // while this separates them by the node kind. Different mechanisms, and the corpus does not say
 // they agree, so it was measured.
-func TestAccessorPairsSeparatesComputedKeysByShape(t *testing.T) {
-	t.Parallel()
+func TestAccessorPairsSeparatesComputedKeysByShape(test *testing.T) {
+	test.Parallel()
 
 	both := AccessorPairsOptions{
 		GetWithoutSet: accessorPairsTrue,
@@ -713,14 +713,14 @@ func TestAccessorPairsSeparatesComputedKeysByShape(t *testing.T) {
 		{"var o = { get [a.b]() {}, set [a.b](v) {} };", both, []string{}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runAccessorPairs(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runAccessorPairs(test, testCase)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

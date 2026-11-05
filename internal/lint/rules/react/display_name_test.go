@@ -13,8 +13,8 @@ import (
 // TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing.
 const displayNameFile = "/repository/source/DisplayName.tsx"
 
-func TestDisplayNameStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -86,16 +86,16 @@ func TestDisplayNameStaysSilent(t *testing.T) {
 		{"upstream valid 78", "\n        import { createContext } from 'react';\n\n        var Hello;\n        Hello = React.createContext();\n        Hello.displayName = \"HelloContext\";\n      ", DisplayNameOptions{IgnoreTranspilerName: false, CheckContextObjects: true}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestDisplayNameFires(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -134,10 +134,10 @@ func TestDisplayNameFires(t *testing.T) {
 		{"upstream invalid 36", "\n        import { createContext } from 'react';\n\n        var Hello;\n        Hello = React.createContext();\n      ", DisplayNameOptions{IgnoreTranspilerName: false, CheckContextObjects: true}, []string{"noContextDisplayName"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -154,8 +154,8 @@ func TestDisplayNameFires(t *testing.T) {
 // below are the ones whose verdict does not move. They are real corpus data about the rule rather
 // than about the gate, and they belong in the suite. The four that do move are recorded in
 // TestDisplayNameSettingsGatedCasesThisPortCannotExpress instead.
-func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -170,12 +170,12 @@ func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Errorf("installed build with default settings reports %d, this rule reports %d",
+				test.Errorf("installed build with default settings reports %d, this rule reports %d",
 					testCase.wantFindings, len(result.Diagnostics))
 			}
 		})
@@ -203,8 +203,8 @@ func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(t *testing.T) {
 // fire today.
 //
 // Each row asserts what this port does, so the record fails loudly if any of it changes.
-func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name             string
@@ -230,12 +230,12 @@ func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Errorf("this port reports %d, want %d (upstream under its own settings: %d)",
+				test.Errorf("this port reports %d, want %d (upstream under its own settings: %d)",
 					len(result.Diagnostics), testCase.wantFindings, testCase.upstreamWithGate)
 			}
 		})
@@ -254,8 +254,8 @@ func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(t *testing.T) {
 // This port follows the installed build, because that is the artifact the gate measures. If the
 // installed plugin is ever upgraded past this release these rows flip, and this test is where that
 // will surface.
-func TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "import React, { memo, forwardRef } from 'react'\n\n" +
 		"const TestComponent = function () {\n" +
@@ -265,18 +265,18 @@ func TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing(t *testing.T)
 		"  return null\n" +
 		"}\n"
 
-	result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, sourceText,
+	result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, sourceText,
 		DefaultDisplayNameOptions())
 	// The installed build reports the shadowed member form. The clone would be silent.
-	rule_testing.ExpectFindings(t, result, "noDisplayName")
+	rule_testing.ExpectFindings(test, result, "noDisplayName")
 }
 
 // TestDisplayNameBareWrapperShadowingIsExempt is the control for the test above.
 //
 // The bare half of shadowing IS in the installed build, so a shadowed `memo(...)` is silent. Without
 // this row the test above reads as "shadowing is unimplemented" rather than as "one half of it is".
-func TestDisplayNameBareWrapperShadowingIsExempt(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameBareWrapperShadowingIsExempt(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "import { memo } from 'react'\n\n" +
 		"const TestComponent = function () {\n" +
@@ -285,9 +285,9 @@ func TestDisplayNameBareWrapperShadowingIsExempt(t *testing.T) {
 		"  return null\n" +
 		"}\n"
 
-	result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, sourceText,
+	result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, sourceText,
 		DefaultDisplayNameOptions())
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite is a differential table.
@@ -307,8 +307,8 @@ func TestDisplayNameBareWrapperShadowingIsExempt(t *testing.T) {
 //	                         and which the shared detector was missing
 //	the context surface      only reachable under `checkContextObjects`, and `other.createContext()`
 //	                         counts because upstream matches the callee name without the receiver
-func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -363,11 +363,11 @@ func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -392,8 +392,8 @@ func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *test
 // 2026-08-27: with the loop the first row below is silent, and with an index-zero pick it reports.
 // That is the distinguishing input, and it is why a surviving mutant on this branch was a real
 // defect rather than an equivalent rewrite.
-func TestDisplayNameMergedDeclarationsAreAllOffered(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameMergedDeclarationsAreAllOffered(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -410,11 +410,11 @@ func TestDisplayNameMergedDeclarationsAreAllOffered(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile,
 				testCase.sourceText, DefaultDisplayNameOptions())
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -423,13 +423,13 @@ func TestDisplayNameMergedDeclarationsAreAllOffered(t *testing.T) {
 //
 // Without it, narrowing the lookup to "always find something" would pass that test while silencing
 // the rule everywhere. The same merged shape with no `displayName` write must still report.
-func TestDisplayNameMergedDeclarationsStillReportWhenUnnamed(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameMergedDeclarationsStillReportWhenUnnamed(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "import {memo} from 'react';\ninterface C { x: number }\nconst C = memo(() => <div/>);\n"
-	result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, sourceText,
+	result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, sourceText,
 		DefaultDisplayNameOptions())
-	rule_testing.ExpectFindings(t, result, "noDisplayName")
+	rule_testing.ExpectFindings(test, result, "noDisplayName")
 }
 
 // TestDecodeDisplayNameOptions routes configuration through the rule's own decoder.
@@ -442,8 +442,8 @@ func TestDisplayNameMergedDeclarationsStillReportWhenUnnamed(t *testing.T) {
 // Both options default to FALSE, so the zero value happens to be correct and the decoder needs no
 // pointer fields. That is worth stating because the sibling `self-closing-comp` defaults both of
 // its options to true and the same shape there would silently disable the rule.
-func TestDecodeDisplayNameOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeDisplayNameOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name             string
@@ -462,28 +462,28 @@ func TestDecodeDisplayNameOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeDisplayNameOptions([]byte(testCase.raw))
 			if testCase.wantErr {
 				if err == nil {
-					t.Fatalf("want an error, got %#v", decoded)
+					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				test.Fatalf("unexpected error: %v", err)
 			}
 			options, isOptions := decoded.(DisplayNameOptions)
 			if !isOptions {
-				t.Fatalf("decoder returned %T, want DisplayNameOptions", decoded)
+				test.Fatalf("decoder returned %T, want DisplayNameOptions", decoded)
 			}
 			if options.IgnoreTranspilerName != testCase.wantIgnore {
-				t.Errorf("IgnoreTranspilerName is %v, want %v",
+				test.Errorf("IgnoreTranspilerName is %v, want %v",
 					options.IgnoreTranspilerName, testCase.wantIgnore)
 			}
 			if options.CheckContextObjects != testCase.wantCheckContext {
-				t.Errorf("CheckContextObjects is %v, want %v",
+				test.Errorf("CheckContextObjects is %v, want %v",
 					options.CheckContextObjects, testCase.wantCheckContext)
 			}
 		})
@@ -495,17 +495,17 @@ func TestDecodeDisplayNameOptions(t *testing.T) {
 // A rule configured as a bare `"error"` can reach `Run` with nil options, where `options.(T)` yields
 // the zero value. Both defaults are false so the zero value is right, and this pins that rather
 // than leaving it to luck.
-func TestDisplayNameNilOptionsFallsBackToTheDefault(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameNilOptionsFallsBackToTheDefault(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "import {memo} from 'react';\nconst C = memo(() => <div/>);\n"
-	result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, sourceText, nil)
-	rule_testing.ExpectFindings(t, result, "noDisplayName")
+	result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, sourceText, nil)
+	rule_testing.ExpectFindings(test, result, "noDisplayName")
 
 	// The control: with the context option defaulting to false, a bare createContext is silent.
 	contextText := "const C = React.createContext();\n"
-	contextResult := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, contextText, nil)
-	rule_testing.ExpectClean(t, contextResult)
+	contextResult := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, contextText, nil)
+	rule_testing.ExpectClean(test, contextResult)
 }
 
 // TestDisplayNameAnchorsOnTheComponent pins where each finding points.
@@ -514,8 +514,8 @@ func TestDisplayNameNilOptionsFallsBackToTheDefault(t *testing.T) {
 // component NODE, which differs per shape: the whole wrapping call for a pragma wrapper, the
 // function itself for an anonymous default export, and the class for a class component. Every span
 // below was measured against the installed build on 2026-08-27 by slicing its reported range.
-func TestDisplayNameAnchorsOnTheComponent(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameAnchorsOnTheComponent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -547,17 +547,17 @@ func TestDisplayNameAnchorsOnTheComponent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantSpans[index] {
-					t.Errorf("finding %d points at %q, want %q",
+					test.Errorf("finding %d points at %q, want %q",
 						index, reported, testCase.wantSpans[index])
 				}
 			}
@@ -570,20 +570,20 @@ func TestDisplayNameAnchorsOnTheComponent(t *testing.T) {
 // Neither message interpolates, so there is nothing to render wrong, but both texts are upstream's
 // own strings and a paraphrase would diverge silently. Asserted against literals typed here rather
 // than against the rule's own constants, so the two cannot move together under mutation.
-func TestDisplayNameMessages(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameMessages(test *testing.T) {
+	test.Parallel()
 
 	if messageNoDisplayName.Id != "noDisplayName" {
-		t.Errorf("id is %q, want %q", messageNoDisplayName.Id, "noDisplayName")
+		test.Errorf("id is %q, want %q", messageNoDisplayName.Id, "noDisplayName")
 	}
 	if messageNoDisplayName.Description != "Component definition is missing display name" {
-		t.Errorf("description is %q, want upstream's own text", messageNoDisplayName.Description)
+		test.Errorf("description is %q, want upstream's own text", messageNoDisplayName.Description)
 	}
 	if messageNoContextDisplayName.Id != "noContextDisplayName" {
-		t.Errorf("id is %q, want %q", messageNoContextDisplayName.Id, "noContextDisplayName")
+		test.Errorf("id is %q, want %q", messageNoContextDisplayName.Id, "noContextDisplayName")
 	}
 	if messageNoContextDisplayName.Description != "Context definition is missing display name" {
-		t.Errorf("description is %q, want upstream's own text",
+		test.Errorf("description is %q, want upstream's own text",
 			messageNoContextDisplayName.Description)
 	}
 }
@@ -594,18 +594,18 @@ func TestDisplayNameMessages(t *testing.T) {
 // The rule declares NeedsTypeChecker because it resolves the object of a `C.displayName` write back
 // to its declaration. Run on the plain harness it receives a nil checker and, without the guard,
 // would answer a narrower question while every quiet fixture passed vacuously.
-func TestDisplayNameRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestDisplayNameRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "import {memo} from 'react';\nconst C = memo(() => <div/>);\n"
 
 	// The control. On the typed harness this reports, so the zero below means the guard fired
 	// rather than that the input was uninteresting.
-	typed := rule_testing.RunTypedWithOptions(t, DisplayName, displayNameFile, sourceText,
+	typed := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, sourceText,
 		DefaultDisplayNameOptions())
-	rule_testing.ExpectFindings(t, typed, "noDisplayName")
+	rule_testing.ExpectFindings(test, typed, "noDisplayName")
 
-	untyped := rule_testing.RunWithOptions(t, DisplayName, displayNameFile, sourceText,
+	untyped := rule_testing.RunWithOptions(test, DisplayName, displayNameFile, sourceText,
 		DefaultDisplayNameOptions())
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 }

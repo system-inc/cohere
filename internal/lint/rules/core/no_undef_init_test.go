@@ -25,8 +25,8 @@ const undefInitFile = "/repository/source/UndefInit.ts"
 // This rule reads the checker, so its fixtures use `RunTyped`. Handed the plain harness the rule
 // guards and goes completely silent, which would make every clean case below pass for the wrong
 // reason.
-func TestNoUndefInitStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -41,17 +41,17 @@ func TestNoUndefInitStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoUndefInit, undefInitFile, testCase.sourceText))
 		})
 	}
 }
 
 // Every reporting case names one `unnecessaryUndefinedInit`, which is upstream's own count.
-func TestNoUndefInitFires(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -80,10 +80,10 @@ func TestNoUndefInitFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoUndefInit, undefInitFile, testCase.sourceText),
 				"unnecessaryUndefinedInit")
 		})
 	}
@@ -99,8 +99,8 @@ func TestNoUndefInitFires(t *testing.T) {
 //
 // The definite-assignment case is the same hazard one field over: `!` is a sibling of the name too,
 // and dropping it changes what the compiler will accept.
-func TestNoUndefInitKeepsTheTypeAnnotation(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitKeepsTheTypeAnnotation(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -115,10 +115,10 @@ func TestNoUndefInitKeepsTheTypeAnnotation(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.RunTyped(test, NoUndefInit, undefInitFile, testCase.sourceText),
 				strings.TrimSpace(testCase.wantSource)+"\n")
 		})
 	}
@@ -131,8 +131,8 @@ func TestNoUndefInitKeepsTheTypeAnnotation(t *testing.T) {
 // comment story: a comment before the binding name is outside the removal range and survives, and a
 // comment after the initializer is also outside it and survives, while a comment between them
 // blocks the fix entirely and appears in the declined list below.
-func TestNoUndefInitFixes(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -149,14 +149,14 @@ func TestNoUndefInitFixes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			// The harness writes each fixture as `TrimSpace(source)+"\n"`, so the file on disk
 			// carries a trailing newline the upstream `output` string does not. Transforming the
 			// expectation the same way the harness transforms the input is the honest fix; padding
 			// the rule to emit one would be a rule change made to satisfy a harness detail.
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText),
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.RunTyped(test, NoUndefInit, undefInitFile, testCase.sourceText),
 				strings.TrimSpace(testCase.wantSource)+"\n")
 		})
 	}
@@ -172,8 +172,8 @@ func TestNoUndefInitFixes(t *testing.T) {
 //
 // Asserted as "reports, and offers no fix", which is the pair. Asserting only the finding would pass
 // for a rule that fixes all thirteen.
-func TestNoUndefInitDeclinesToFix(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitDeclinesToFix(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -194,14 +194,14 @@ func TestNoUndefInitDeclinesToFix(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUndefInit, undefInitFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-				t.Fatalf("upstream declines to fix this and we offered %d fix(es)", len(fixes))
+				test.Fatalf("upstream declines to fix this and we offered %d fix(es)", len(fixes))
 			}
 		})
 	}
@@ -212,16 +212,16 @@ func TestNoUndefInitDeclinesToFix(t *testing.T) {
 // The Description interpolates the binding name, and a `rule.Message` carries no rendering layer, so
 // nothing between the format string and the reader checks it. A verb swapped into the name's slot
 // produces a finding with the right id, the right span and a sentence naming the wrong thing.
-func TestNoUndefInitNamesTheBinding(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitNamesTheBinding(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, "let someBinding = undefined;")
+	result := rule_testing.RunTyped(test, NoUndefInit, undefInitFile, "let someBinding = undefined;")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	description := result.Diagnostics[0].Message.Description
 	if !strings.HasPrefix(description, "`someBinding` is initialized to `undefined`") {
-		t.Fatalf("the message reads %q, which does not name the binding it reports", description)
+		test.Fatalf("the message reads %q, which does not name the binding it reports", description)
 	}
 }
 
@@ -235,8 +235,8 @@ func TestNoUndefInitNamesTheBinding(t *testing.T) {
 // each of them asserts which message fired or what the repair wrote and none asserts where the
 // finding points. A finding carrying a correct fix while pointing at the wrong span is the failure
 // this closes: the edit lands somewhere the reader was never shown.
-func TestNoUndefInitReportsTheWholeDeclarator(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitReportsTheWholeDeclarator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -248,18 +248,18 @@ func TestNoUndefInitReportsTheWholeDeclarator(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUndefInit, undefInitFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			// Sliced from the source the harness actually wrote rather than from the literal above,
 			// because the harness trims and a slice of the literal is one byte off.
 			written := result.SourceFile.Text()
 			reported := written[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantSpan {
-				t.Fatalf("reported %q, upstream spans %q", reported, testCase.wantSpan)
+				test.Fatalf("reported %q, upstream spans %q", reported, testCase.wantSpan)
 			}
 		})
 	}
@@ -274,8 +274,8 @@ func TestNoUndefInitReportsTheWholeDeclarator(t *testing.T) {
 //
 // Three shadow shapes, each a different binding kind, and all three confirmed silent on the
 // installed ESLint build. The control is the same file shape with no shadow, which reports.
-func TestNoUndefInitDeclinesAShadowedUndefined(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitDeclinesAShadowedUndefined(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -287,15 +287,15 @@ func TestNoUndefInitDeclinesAShadowedUndefined(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUndefInit, undefInitFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUndefInit, undefInitFile, testCase.sourceText))
 		})
 	}
 
 	// The control: the same shape with nothing shadowing the name, so the silence above is a
 	// measurement about the shadow rather than about the surrounding code.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUndefInit, undefInitFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUndefInit, undefInitFile,
 		"function f() { let foo = undefined; return foo; }"), "unnecessaryUndefinedInit")
 }
 
@@ -317,15 +317,15 @@ func TestNoUndefInitDeclinesAShadowedUndefined(t *testing.T) {
 //
 // The control is the same two-file shape with the declaration written in source instead, which is a
 // real shadow and does suppress it.
-func TestNoUndefInitIgnoresAnAmbientDeclaration(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitIgnoresAnAmbientDeclaration(test *testing.T) {
+	test.Parallel()
 
 	reporting := map[string]string{
 		"/repository/source/Ambient.d.ts": "declare var undefined: any;\n",
 		"/repository/source/Use.ts":       "let a = undefined;\n",
 	}
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedFiles(t, NoUndefInit, reporting, "/repository/source/Use.ts"),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedFiles(test, NoUndefInit, reporting, "/repository/source/Use.ts"),
 		"unnecessaryUndefinedInit")
 
 	// The control: a shadow written in source, in the same two-file program, is a real shadow.
@@ -333,8 +333,8 @@ func TestNoUndefInitIgnoresAnAmbientDeclaration(t *testing.T) {
 		"/repository/source/Ambient.d.ts": "declare var undefined: any;\n",
 		"/repository/source/Use.ts":       "var undefined = 5;\nlet a = undefined;\n",
 	}
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTypedFiles(t, NoUndefInit, shadowed, "/repository/source/Use.ts"))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunTypedFiles(test, NoUndefInit, shadowed, "/repository/source/Use.ts"))
 }
 
 // The typed harness is required, so a later revert to `rule_testing.Run` fails loudly.
@@ -342,11 +342,11 @@ func TestNoUndefInitIgnoresAnAmbientDeclaration(t *testing.T) {
 // The rule guards on a nil checker and returns, so under the plain harness it goes completely
 // silent: every clean case passes vacuously and every reporting case fails in a way that reads as a
 // rule defect rather than as a harness choice.
-func TestNoUndefInitNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUndefInitNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoUndefInit.NeedsTypeChecker {
-		t.Fatal("this rule resolves `undefined` through the checker and must declare it")
+		test.Fatal("this rule resolves `undefined` through the checker and must declare it")
 	}
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUndefInit, undefInitFile, "let a = undefined;"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUndefInit, undefInitFile, "let a = undefined;"))
 }

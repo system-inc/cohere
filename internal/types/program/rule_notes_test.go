@@ -17,8 +17,8 @@ import (
 // the findings cache stores a file's notes beside its findings and a refresh re-walks only some of a
 // file's rules. Two rules noting the same key in the same file stay apart, and a file nothing noted in
 // does not appear.
-func TestNotesAreCountedPerFilePerRulePerKey(t *testing.T) {
-	t.Parallel()
+func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
+	test.Parallel()
 	notingEachDeclaration := func(name string, key func(declaration *ast.Node) string) rule.Rule {
 		return rule.Rule{
 			Name: name,
@@ -32,7 +32,7 @@ func TestNotesAreCountedPerFilePerRulePerKey(t *testing.T) {
 	byName := notingEachDeclaration("test-by-name", func(declaration *ast.Node) string { return declaration.Name().Text() })
 	constant := notingEachDeclaration("test-constant", func(declaration *ast.Node) string { return "a" })
 
-	directory := writeProject(t, map[string]string{
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json":       minimalConfig,
 		"CohereSettings.json": `{"rules": {"test-by-name": "error", "test-constant": "error"}}`,
 		"main.ts":             "export const a = 1;\nexport const b = 2;\nexport const a2 = a + b;\n",
@@ -41,15 +41,15 @@ func TestNotesAreCountedPerFilePerRulePerKey(t *testing.T) {
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+		test.Fatalf("loading the config: %v", err)
 	}
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{byName, constant})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	want := map[string]program.RuleNotes{
@@ -63,16 +63,16 @@ func TestNotesAreCountedPerFilePerRulePerKey(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(result.Notes, want) {
-		t.Errorf("notes are %v, want %v", result.Notes, want)
+		test.Errorf("notes are %v, want %v", result.Notes, want)
 	}
 }
 
 // The caller-data rule notes each write a `@processState` type exempts, under the tagged type and the
 // file declaring it, so --coverage can say which tag silenced how much. Two exempt writes in one file are
 // two notes; a write through an untagged type is a finding and no note.
-func TestTheCallerDataRuleNotesEachProcessStateExemption(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json":       minimalConfig,
 		"CohereSettings.json": `{"rules": {"nexus/correctness-no-caller-data-mutation": "error"}}`,
 		"hub.ts": "/** @processState the one hub every helper keeps current */\n" +
@@ -83,15 +83,15 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(t *testing.T) {
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+		test.Fatalf("loading the config: %v", err)
 	}
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{nexus.CorrectnessNoCallerDataMutation})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	hub := filepath.Join(directory, "hub.ts")
@@ -99,10 +99,10 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(t *testing.T) {
 		hub: {"nexus/correctness-no-caller-data-mutation": {"HubInterface in " + hub: 2}},
 	}
 	if !reflect.DeepEqual(result.Notes, want) {
-		t.Errorf("notes are %v, want %v", result.Notes, want)
+		test.Errorf("notes are %v, want %v", result.Notes, want)
 	}
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("%d findings, want the one write through the untagged type: %v", len(result.Diagnostics), result.Diagnostics)
+		test.Errorf("%d findings, want the one write through the untagged type: %v", len(result.Diagnostics), result.Diagnostics)
 	}
 }
 
@@ -110,9 +110,9 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(t *testing.T) {
 // parameter and the file declaring them. The contract sits in another file, as Base's scheduler does
 // for api's jobs, and is reached through the override; the neighbouring parameter is a finding and no
 // note (#tnn31qs).
-func TestTheCallerDataRuleNotesEachOutParameterContract(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json":       minimalConfig,
 		"CohereSettings.json": `{"rules": {"nexus/correctness-no-caller-data-mutation": "error"}}`,
 		"base.ts": "export interface RecordInterface { status: string; log: string[] }\n" +
@@ -127,15 +127,15 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(t *testing.T) {
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+		test.Fatalf("loading the config: %v", err)
 	}
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{nexus.CorrectnessNoCallerDataMutation})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	job := filepath.Join(directory, "job.ts")
@@ -143,9 +143,9 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(t *testing.T) {
 		job: {"nexus/correctness-no-caller-data-mutation": {"ScheduledExecutable.run(entity) in " + filepath.Join(directory, "base.ts"): 2}},
 	}
 	if !reflect.DeepEqual(result.Notes, want) {
-		t.Errorf("notes are %v, want %v", result.Notes, want)
+		test.Errorf("notes are %v, want %v", result.Notes, want)
 	}
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("%d findings, want the one write through the untagged parameter: %v", len(result.Diagnostics), result.Diagnostics)
+		test.Errorf("%d findings, want the one write through the untagged parameter: %v", len(result.Diagnostics), result.Diagnostics)
 	}
 }

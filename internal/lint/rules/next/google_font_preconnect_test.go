@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestGoogleFontPreconnectReports(t *testing.T) {
-	t.Parallel()
+func TestGoogleFontPreconnectReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -42,16 +42,16 @@ func TestGoogleFontPreconnectReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GoogleFontPreconnect, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageGoogleFontPreconnect.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GoogleFontPreconnect, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageGoogleFontPreconnect.Id)
 		})
 	}
 }
 
-func TestGoogleFontPreconnectIsSilent(t *testing.T) {
-	t.Parallel()
+func TestGoogleFontPreconnectIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -100,10 +100,10 @@ func TestGoogleFontPreconnectIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GoogleFontPreconnect, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GoogleFontPreconnect, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -111,8 +111,8 @@ func TestGoogleFontPreconnectIsSilent(t *testing.T) {
 // TestGoogleFontPreconnectDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
 // JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
-func TestGoogleFontPreconnectDecodesEntities(t *testing.T) {
-	t.Parallel()
+func TestGoogleFontPreconnectDecodesEntities(test *testing.T) {
+	test.Parallel()
 
 	for _, row := range []struct {
 		name   string
@@ -122,14 +122,14 @@ func TestGoogleFontPreconnectDecodesEntities(t *testing.T) {
 		{`encoded slashes in the font host`, `export const Test = () => <link href="https:&#47;&#47;fonts.gstatic.com" />;`, []string{messageGoogleFontPreconnect.Id}},
 		{`an encoded letter in rel`, `export const Test = () => <link rel="pre&#99;onnect" href="https://fonts.gstatic.com" />;`, []string{}},
 	} {
-		t.Run(row.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GoogleFontPreconnect, "Component.tsx", row.source)
+		test.Run(row.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GoogleFontPreconnect, "Component.tsx", row.source)
 			if len(row.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, row.ids...)
+			rule_testing.ExpectFindings(test, result, row.ids...)
 		})
 	}
 }

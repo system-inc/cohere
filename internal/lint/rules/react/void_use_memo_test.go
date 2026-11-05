@@ -34,8 +34,8 @@ type voidUseMemoCase struct {
 	want   []string
 }
 
-func TestVoidUseMemoFires(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoFires(test *testing.T) {
+	test.Parallel()
 
 	// Message ids are written as literals rather than referenced through the rule's own message
 	// constants, so an assertion cannot move together with the code it guards.
@@ -243,16 +243,16 @@ func TestVoidUseMemoFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidUseMemo, "component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestVoidUseMemoStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []voidUseMemoCase{
 		// oxc's only pass case. A concise arrow body lowers to an Implicit return.
@@ -499,10 +499,10 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidUseMemo, "component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -519,8 +519,8 @@ func TestVoidUseMemoStaysSilent(t *testing.T) {
 // makes a mandatory measurement rather than an assumption. Measured on React: the parenthesized
 // callback reports at column 22 rather than 21, and the parenthesized callee at column 4 rather
 // than 3.
-func TestVoidUseMemoSpans(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -560,16 +560,16 @@ func TestVoidUseMemoSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, VoidUseMemo, "component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, VoidUseMemo, "component.tsx", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			reported := testCase.source[finding.Range.Pos():finding.Range.End()]
 			if reported != testCase.want {
-				t.Errorf("finding points at %q, want %q", reported, testCase.want)
+				test.Errorf("finding points at %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -578,20 +578,20 @@ func TestVoidUseMemoSpans(t *testing.T) {
 // `rule.Message` is `{Id, Description}` with no interpolation layer, so there is no rendered text
 // to guard and the assertion is on the two fields directly. Literals are typed here rather than
 // compared against the rule's own constants, which would move together with the code.
-func TestVoidUseMemoMessages(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoMessages(test *testing.T) {
+	test.Parallel()
 
 	if messageUseMemoCallbackReturnsNothing.Id != "useMemoCallbackReturnsNothing" {
-		t.Errorf("void-return id is %q", messageUseMemoCallbackReturnsNothing.Id)
+		test.Errorf("void-return id is %q", messageUseMemoCallbackReturnsNothing.Id)
 	}
 	if messageUseMemoResultUnused.Id != "useMemoResultUnused" {
-		t.Errorf("unused-result id is %q", messageUseMemoResultUnused.Id)
+		test.Errorf("unused-result id is %q", messageUseMemoResultUnused.Id)
 	}
 	if !strings.Contains(messageUseMemoCallbackReturnsNothing.Description, "does not return a value") {
-		t.Errorf("void-return description does not say what is wrong: %q", messageUseMemoCallbackReturnsNothing.Description)
+		test.Errorf("void-return description does not say what is wrong: %q", messageUseMemoCallbackReturnsNothing.Description)
 	}
 	if !strings.Contains(messageUseMemoResultUnused.Description, "nothing reads it") {
-		t.Errorf("unused-result description does not say what is wrong: %q", messageUseMemoResultUnused.Description)
+		test.Errorf("unused-result description does not say what is wrong: %q", messageUseMemoResultUnused.Description)
 	}
 }
 
@@ -604,14 +604,14 @@ func TestVoidUseMemoMessages(t *testing.T) {
 // arrangements, because the reporting layer sorts by position before handing them over. The
 // collection order was asserted here first and the measurement corrected it, which is why the
 // claim is now about source order.
-func TestVoidUseMemoReportsBothKindsInSourceOrder(t *testing.T) {
-	t.Parallel()
+func TestVoidUseMemoReportsBothKindsInSourceOrder(test *testing.T) {
+	test.Parallel()
 
 	unusedFirst := "function Component() {\n  useMemo(() => { return 1; }, []);\n  const x = useMemo(() => { foo(); }, []);\n  return <div>{x}</div>;\n}\n"
-	result := rule_testing.Run(t, VoidUseMemo, "component.tsx", unusedFirst)
-	rule_testing.ExpectFindings(t, result, "useMemoResultUnused", "useMemoCallbackReturnsNothing")
+	result := rule_testing.Run(test, VoidUseMemo, "component.tsx", unusedFirst)
+	rule_testing.ExpectFindings(test, result, "useMemoResultUnused", "useMemoCallbackReturnsNothing")
 
 	voidFirst := "function Component() {\n  const x = useMemo(() => { foo(); }, []);\n  useMemo(() => { return 1; }, []);\n  return <div>{x}</div>;\n}\n"
-	result = rule_testing.Run(t, VoidUseMemo, "component.tsx", voidFirst)
-	rule_testing.ExpectFindings(t, result, "useMemoCallbackReturnsNothing", "useMemoResultUnused")
+	result = rule_testing.Run(test, VoidUseMemo, "component.tsx", voidFirst)
+	rule_testing.ExpectFindings(test, result, "useMemoCallbackReturnsNothing", "useMemoResultUnused")
 }

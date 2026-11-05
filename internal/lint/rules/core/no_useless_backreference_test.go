@@ -23,8 +23,8 @@ const backreferenceFile = "/repository/source/Backreference.ts"
 // The ids are per problem kind rather than one shared id, because upstream emits five different
 // sentences and the kind is the diagnosis. A single id would let a port that calls a
 // different-alternative case a forward reference pass every fixture here.
-func TestNoUselessBackreferenceFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -123,10 +123,10 @@ func TestNoUselessBackreferenceFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, testCase.sourceText),
 				testCase.findings...)
 		})
 	}
@@ -141,8 +141,8 @@ func TestNoUselessBackreferenceFires(t *testing.T) {
 // character class, a doubled backslash); a backreference that is genuinely reachable, including
 // the many lookaround shapes where the group does run before the reference; and patterns whose
 // syntax is broken, which upstream skips because its parser refuses them.
-func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -244,10 +244,10 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
 	}
 }
@@ -262,15 +262,15 @@ func TestNoUselessBackreferenceStaysSilent(t *testing.T) {
 // and the pattern is valid (confirmed against node), so the useless `\1` must still report; with
 // the flag the same text is a syntax error and the whole pattern is upstream's business, not this
 // rule's.
-func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/`)
-	rule_testing.ExpectFindings(t, result, "forward")
+	result := rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, `/\1(a)\2/`)
+	rule_testing.ExpectFindings(test, result, "forward")
 
 	// The same text under `u` is a syntax error, so the rule steps aside entirely.
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `/\1(a)\2/u`))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, `/\1(a)\2/u`))
 }
 
 // TestNoUselessBackreferenceHandlesConstructorArgumentShapes covers arguments the corpus leaves untested.
@@ -284,31 +284,31 @@ func TestNoUselessBackreferenceStillReportsBesideALegacyOctal(t *testing.T) {
 // argument is an identifier nothing gives a constant value or a template with a substitution. Flags held
 // in a constant binding are read: `const flags = 'gus'` puts the pattern under `u`, where its brace is a
 // syntax error and the rule steps aside.
-func TestNoUselessBackreferenceHandlesConstructorArgumentShapes(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceHandlesConstructorArgumentShapes(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a regex literal argument reports at the literal and at the call", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '');`)
-		rule_testing.ExpectFindings(t, result, "forward", "forward")
+	test.Run("a regex literal argument reports at the literal and at the call", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, `RegExp(/\1(a)/, '');`)
+		rule_testing.ExpectFindings(test, result, "forward", "forward")
 	})
 
 	for _, sourceText := range []string{
 		`RegExp('\\1(a)', flags);`,
 		"RegExp('\\\\1(a)', `${flags}`);",
 	} {
-		t.Run("unreadable flags check under none: "+sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, sourceText), "forward")
+		test.Run("unreadable flags check under none: "+sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, sourceText), "forward")
 		})
 	}
 
-	t.Run("flags in a constant binding are read", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
+	test.Run("flags in a constant binding are read", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile,
 			`const flags = 'gus'; RegExp('\\1(a){', flags);`))
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile,
 			`let flags = 'u'; flags = ''; RegExp('\\1(a){', flags);`), "forward")
 	})
 }
@@ -318,8 +318,8 @@ func TestNoUselessBackreferenceHandlesConstructorArgumentShapes(t *testing.T) {
 // These five are ESLint's own pass cases. The port used to report them, since it read the callee's
 // spelling and had no checker to ask what the name was bound to; the shelf's ReferenceTracker asks, and
 // follows the global through an alias or `globalThis` as well, which the table covers.
-func TestNoUselessBackreferenceIgnoresALocalRegExp(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceIgnoresALocalRegExp(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		`let RegExp; new RegExp('\\1(a)');`,
@@ -329,9 +329,9 @@ func TestNoUselessBackreferenceIgnoresALocalRegExp(t *testing.T) {
 		`if (foo) { const RegExp = bar; RegExp('\\1(a)'); }`,
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, sourceText))
 		})
 	}
 }
@@ -340,18 +340,18 @@ func TestNoUselessBackreferenceIgnoresALocalRegExp(t *testing.T) {
 // ESLint. ESLint evaluates `String.raw`...“ by calling String.raw, and reports the call below;
 // reference.ConstantStringIn evaluates no built-in call, so the pattern is not a constant here and the
 // call is not checked, the silent direction.
-func TestNoUselessBackreferenceDeclinesAPatternABuiltinBuilds(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceDeclinesAPatternABuiltinBuilds(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile,
 		"RegExp(String.raw`\\1(a)`);"))
 }
 
 // TestNoUselessBackreferencePointsAtThePattern asserts where each finding lands, which ExpectFindings
 // cannot see: the whole regex literal, or the whole RegExp call, as ESLint reports it. The message names
 // the backreference, so two useless references in one pattern are two findings at one place.
-func TestNoUselessBackreferencePointsAtThePattern(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferencePointsAtThePattern(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -366,17 +366,17 @@ func TestNoUselessBackreferencePointsAtThePattern(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.reported), len(result.Diagnostics))
 			}
 			source := result.SourceFile.Text()
 			for index, want := range testCase.reported {
 				diagnostic := result.Diagnostics[index]
 				if got := source[diagnostic.Range.Pos():diagnostic.Range.End()]; got != want {
-					t.Errorf("finding %d points at %q, expected %q", index, got, want)
+					test.Errorf("finding %d points at %q, expected %q", index, got, want)
 				}
 			}
 		})
@@ -396,8 +396,8 @@ func TestNoUselessBackreferencePointsAtThePattern(t *testing.T) {
 // Every path recorded by the scanner must begin with the root node, index 0. That invariant is
 // what makes starting the lowest-common-ancestor walk at 1 rather than 0 the same computation:
 // the comparison at 0 is 0 == 0 for every pair of paths, so it can only ever advance.
-func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(test *testing.T) {
+	test.Parallel()
 
 	patterns := []string{
 		`\1(a)`, `(b)(\2a)`, `(a|\1b)`, `\1(?!(a))`, `(?<=(a)\1)b`, `\k<foo>(?<foo>bar)`,
@@ -412,12 +412,12 @@ func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(t *testing.T) {
 			}
 			for _, group := range structure.groups {
 				if len(group.path) == 0 || group.path[0] != 0 {
-					t.Errorf("group path %v in %q flags %q does not start at the root", group.path, pattern, flagText)
+					test.Errorf("group path %v in %q flags %q does not start at the root", group.path, pattern, flagText)
 				}
 			}
 			for _, reference := range structure.backreferences {
 				if len(reference.path) == 0 || reference.path[0] != 0 {
-					t.Errorf("reference path %v in %q flags %q does not start at the root", reference.path, pattern, flagText)
+					test.Errorf("reference path %v in %q flags %q does not start at the root", reference.path, pattern, flagText)
 				}
 			}
 		}
@@ -435,8 +435,8 @@ func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(t *testing.T) {
 //
 // Upstream reaches two of these (`RegExp('\\1(a)[')` is in its pass vector) and stops there, so
 // the unbalanced and trailing-backslash shapes are ours.
-func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -449,10 +449,10 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, testCase.sourceText))
 		})
 	}
 
@@ -460,16 +460,16 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 	// the useless backreference in it still reports. This is the contrast that makes the digit
 	// check in opensQuantifier a real decision rather than an unreachable guard: read it as a
 	// quantifier and the pattern is judged well-formed under `u` when it is not.
-	t.Run("a literal brace does not suppress the finding", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t,
-			rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}')`),
+	test.Run("a literal brace does not suppress the finding", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test,
+			rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}')`),
 			"forward")
 	})
-	t.Run("the same brace under u is a syntax error", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t,
-			rule_testing.RunTyped(t, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}', 'u')`))
+	test.Run("the same brace under u is a syntax error", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test,
+			rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, `RegExp('\\1(a){,}', 'u')`))
 	})
 }
 
@@ -479,8 +479,8 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(t *test
 // reads pattern text and the shape of the call around it, and never asks what a name binds to.
 // Declaring the checker would take an exclusive per-file lock for nothing. The one question that
 // would need it, whether a `RegExp` callee is locally shadowed, is the stated divergence above.
-func TestNoUselessBackreferenceIsRegistered(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceIsRegistered(test *testing.T) {
+	test.Parallel()
 
 	var found *rule.Registration
 	for index, registration := range rule.Registered() {
@@ -490,11 +490,11 @@ func TestNoUselessBackreferenceIsRegistered(t *testing.T) {
 		}
 	}
 	if found == nil {
-		t.Fatal("no-useless-backreference is absent from the registry")
+		test.Fatal("no-useless-backreference is absent from the registry")
 	}
 	// The global RegExp is told from a local one, and a constant argument followed to its binding,
 	// through the checker, so a registered copy without it would find no call at all.
 	if !found.Rule.NeedsTypeChecker {
-		t.Error("the registered copy does not declare NeedsTypeChecker, so it would check no RegExp call")
+		test.Error("the registered copy does not declare NeedsTypeChecker, so it would check no RegExp call")
 	}
 }

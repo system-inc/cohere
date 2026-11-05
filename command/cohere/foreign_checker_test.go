@@ -18,18 +18,18 @@ import (
 //
 // A fixture with type-aware findings and one with a type error always run. COHERE_FOREIGN_TREES, a list of
 // project roots separated by the platform's list separator, runs the same comparison on real trees.
-func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
+func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
 	fixture := func(files map[string]string) string {
-		root := t.TempDir()
+		root := test.TempDir()
 		for name, contents := range files {
 			path := filepath.Join(root, name)
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		}
 		return root
@@ -77,8 +77,8 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(t *testing.T) {
 	reported := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
 	moved := regexp.MustCompile(`foreign checkers: (\d+) of (\d+) files walked`)
 	// threads is the process's GOMAXPROCS, which sets the checker count (one per thread, at most 12).
-	run := func(t *testing.T, root string, foreign bool, threads string) []string {
-		t.Helper()
+	run := func(test *testing.T, root string, foreign bool, threads string) []string {
+		test.Helper()
 		command := exec.Command(binary, "--verbose", "--no-fix", "--no-cache")
 		command.Dir = root
 		command.Env = append(os.Environ(), "COHERE_TEST_FOREIGN_CHECKERS=", "GOMAXPROCS="+threads)
@@ -89,26 +89,26 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(t *testing.T) {
 		if foreign {
 			// The instrument has to have moved the files, or an identical run proves nothing.
 			if match := moved.FindStringSubmatch(string(output)); match == nil || match[1] == "0" || match[1] != match[2] {
-				t.Fatalf("the foreign run did not walk every file on a foreign checker (%v):\n%s", match, output)
+				test.Fatalf("the foreign run did not walk every file on a foreign checker (%v):\n%s", match, output)
 			}
 		}
 		return reported.FindAllString(string(output), -1)
 	}
 	for name, root := range roots {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			home := run(t, root, false, "1")
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			home := run(test, root, false, "1")
 			if len(home) == 0 {
-				t.Fatalf("the home run reported nothing, so an identical foreign run proves nothing")
+				test.Fatalf("the home run reported nothing, so an identical foreign run proves nothing")
 			}
 			for _, threads := range []string{"4", "16"} {
-				foreign := run(t, root, true, threads)
+				foreign := run(test, root, true, threads)
 				if strings.Join(home, "\n") != strings.Join(foreign, "\n") {
-					t.Fatalf("walked on foreign checkers at %s threads, %d lines differ from %d on one checker\n--- one checker\n%s\n--- foreign\n%s",
+					test.Fatalf("walked on foreign checkers at %s threads, %d lines differ from %d on one checker\n--- one checker\n%s\n--- foreign\n%s",
 						threads, len(foreign), len(home), strings.Join(home, "\n"), strings.Join(foreign, "\n"))
 				}
 			}
-			t.Logf("%d findings and type diagnostics, identical on foreign checkers at 4 and 16 threads", len(home))
+			test.Logf("%d findings and type diagnostics, identical on foreign checkers at 4 and 16 threads", len(home))
 		})
 	}
 }

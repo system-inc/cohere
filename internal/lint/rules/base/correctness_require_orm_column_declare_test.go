@@ -25,8 +25,8 @@ func asTheOrmColumnHarnessWroteIt(text string) string {
 // Three rows are the reason this rule does not share a decorator helper with its sibling: a bare
 // decorator reports here and is silent there, a namespaced one is silent in both, and a private
 // name reports with its name rendered as a placeholder.
-func TestOrmColumnRequiresDeclare(t *testing.T) {
-	t.Parallel()
+func TestOrmColumnRequiresDeclare(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -214,9 +214,9 @@ func TestOrmColumnRequiresDeclare(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, CorrectnessRequireOrmColumnDeclare,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, CorrectnessRequireOrmColumnDeclare,
 				correctnessRequireOrmColumnDeclareFile, testCase.sourceText)
 			// A row expecting nothing goes through ExpectClean rather than through ExpectFindings
 			// with an empty list. The two are the same assertion to a reader and not to the
@@ -224,12 +224,12 @@ func TestOrmColumnRequiresDeclare(t *testing.T) {
 			// ExpectFindings proves the rule can detect and never that it can stay quiet, and a
 			// violation-only corpus is exactly what that guard exists to catch.
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheOrmColumnHarnessWroteIt(testCase.sourceText)
@@ -237,11 +237,11 @@ func TestOrmColumnRequiresDeclare(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 				if reported.Message.Description != testCase.wantMessages[findingIndex] {
-					t.Errorf("finding %d reads %q, wanted %q", findingIndex,
+					test.Errorf("finding %d reads %q, wanted %q", findingIndex,
 						reported.Message.Description, testCase.wantMessages[findingIndex])
 				}
 			}

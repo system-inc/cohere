@@ -34,8 +34,8 @@ var noUnusedVarsOptionsCorpusDivergences = map[int]struct {
 	25: {"a value read of an uninstantiated namespace (TS2708) resolves to no symbol", []noUnusedVarsOptionsCorpusFinding{}},
 }
 
-func TestNoUnusedVarsOptionsUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	upstream, pinned := 0, 0
 	for _, row := range noUnusedVarsOptionsCorpus {
@@ -48,7 +48,7 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(t *testing.T) {
 		}
 	}
 	if upstream != noUnusedVarsOptionsCorpusUpstreamRows || pinned != noUnusedVarsOptionsCorpusUpstreamPinned {
-		t.Fatalf("the corpus holds %d upstream rows, %d pinned, and upstream has %d, %d pinned",
+		test.Fatalf("the corpus holds %d upstream rows, %d pinned, and upstream has %d, %d pinned",
 			upstream, pinned, noUnusedVarsOptionsCorpusUpstreamRows, noUnusedVarsOptionsCorpusUpstreamPinned)
 	}
 
@@ -57,16 +57,16 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+				test.Fatalf("decoding %q: %v", row.options, err)
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnusedVars, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"file.ts": row.source}, "file.ts", options,
 				func(directory string) {
 					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); err != nil {
-						t.Fatal(err)
+						test.Fatal(err)
 					}
 				})
 
@@ -87,24 +87,24 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(t *testing.T) {
 			}
 			if divergence, diverges := noUnusedVarsOptionsCorpusDivergences[row.index]; diverges && row.edge == "" {
 				if fmt.Sprint(reported) != fmt.Sprint(divergence.cohere) {
-					t.Fatalf("row %d is a recorded divergence (%s) where cohere reports %q, and it now reports %q",
+					test.Fatalf("row %d is a recorded divergence (%s) where cohere reports %q, and it now reports %q",
 						row.index, divergence.reason, divergence.cohere, reported)
 				}
-				rule_testing.RecordAssertedCase(t, result)
+				rule_testing.RecordAssertedCase(test, result)
 				return
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
-				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+				test.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
-			rule_testing.RecordAssertedCase(t, result)
+			rule_testing.RecordAssertedCase(test, result)
 		})
 	}
 }
 
 // usedIgnoredVar names the pattern that set the binding aside, by the option that holds it, so a reader
 // can tell which of four patterns to fix. Asserted on one row per kind rather than read off the constant.
-func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -118,19 +118,19 @@ func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(t *testing.T) {
 		{"array element", "const [_a] = [1];\nconsole.log(_a);\nexport {};", `{"reportUsedIgnorePattern": true, "destructuredArrayIgnorePattern": "^_"}`, "'_a' matches destructuredArrayIgnorePattern ^_, which marks an element of array destructuring"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
-			result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "/repository/source/Case.ts", testCase.source, options)
+			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "/repository/source/Case.ts", testCase.source, options)
 			if len(result.Diagnostics) != 1 || result.Diagnostics[0].Message.Id != "usedIgnoredVar" {
-				t.Fatalf("got %+v, want one usedIgnoredVar", result.Diagnostics)
+				test.Fatalf("got %+v, want one usedIgnoredVar", result.Diagnostics)
 			}
 			description := result.Diagnostics[0].Message.Description
 			if len(description) < len(testCase.want) || description[:len(testCase.want)] != testCase.want {
-				t.Errorf("the message reads %q, want it to begin %q", description, testCase.want)
+				test.Errorf("the message reads %q, want it to begin %q", description, testCase.want)
 			}
 		})
 	}

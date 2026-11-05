@@ -50,15 +50,15 @@ var All = []Corpus{Ahra, Structure, Connected, PrettierFork}
 
 // Root is the corpus's directory, or a skip naming the variable to set when it is unset. A variable set to
 // something that is not a directory fails the test: the developer asked for coverage they are not getting.
-func (corpus Corpus) Root(t testing.TB) string {
-	t.Helper()
+func (corpus Corpus) Root(test testing.TB) string {
+	test.Helper()
 	root := os.Getenv(corpus.Variable)
 	if root == "" {
-		t.Skipf("%s: set %s to %s to cover this test", corpus.Name, corpus.Variable, corpus.What)
+		test.Skipf("%s: set %s to %s to cover this test", corpus.Name, corpus.Variable, corpus.What)
 	}
 	information, err := os.Stat(root)
 	if err != nil || !information.IsDir() {
-		t.Fatalf("%s is set to %s, which is not a directory, so this test cannot read %s", corpus.Variable, root, corpus.What)
+		test.Fatalf("%s is set to %s, which is not a directory, so this test cannot read %s", corpus.Variable, root, corpus.What)
 	}
 	return root
 }
@@ -70,9 +70,9 @@ func (corpus Corpus) Covered() bool {
 }
 
 // Path is a path inside the corpus, or the skip or failure Root gives.
-func (corpus Corpus) Path(t testing.TB, elements ...string) string {
-	t.Helper()
-	return filepath.Join(append([]string{corpus.Root(t)}, elements...)...)
+func (corpus Corpus) Path(test testing.TB, elements ...string) string {
+	test.Helper()
+	return filepath.Join(append([]string{corpus.Root(test)}, elements...)...)
 }
 
 // A file that records a path inside a corpus, such as a fixture's entry point, spells it
@@ -105,36 +105,36 @@ func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err e
 // too and never skips, which is how a fixture generated from a public theme records its entry point
 // (#f598zk0). An absolute path fails, and so does a relative one that climbs out of the repository:
 // neither reads the same on another machine.
-func Resolve(t testing.TB, spelling string) string {
-	t.Helper()
+func Resolve(test testing.TB, spelling string) string {
+	test.Helper()
 	corpus, inside, spelled, err := Spelled(spelling)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if !spelled {
 		if filepath.IsAbs(spelling) {
-			t.Fatalf("%q is an absolute path, which reads the same on no other machine: spell it "+
+			test.Fatalf("%q is an absolute path, which reads the same on no other machine: spell it "+
 				"<corpus>:<path in it>, or give it relative to this repository", spelling)
 		}
 		root, err := RepositoryRoot()
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		path := filepath.Join(root, filepath.FromSlash(spelling))
 		// A path that climbs out of the repository would let a fixture depend on a sibling checkout
 		// while looking portable, and read nothing on a machine without one.
 		if inside, err := filepath.Rel(root, path); err != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
-			t.Fatalf("%q climbs out of this repository, so it reads the same on no other machine: spell it "+
+			test.Fatalf("%q climbs out of this repository, so it reads the same on no other machine: spell it "+
 				"<corpus>:<path in it>, or give a path inside this repository", spelling)
 		}
 		if _, err := os.Stat(path); err != nil {
-			t.Fatalf("%q is neither spelled <corpus>:<path in it> nor in this repository: %v", spelling, err)
+			test.Fatalf("%q is neither spelled <corpus>:<path in it> nor in this repository: %v", spelling, err)
 		}
 		return path
 	}
-	path := corpus.Path(t, filepath.FromSlash(inside))
+	path := corpus.Path(test, filepath.FromSlash(inside))
 	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("%s is set, but %s is not in it: %v", corpus.Variable, spelling, err)
+		test.Fatalf("%s is set, but %s is not in it: %v", corpus.Variable, spelling, err)
 	}
 	return path
 }

@@ -20,9 +20,9 @@ import (
 //
 // Confirmed to fail: replacing WriteAtomically's body with os.WriteFile makes this test report
 // torn reads. That mutation passes every other test in this package, which is why this one exists.
-func TestConcurrentReadersNeverSeeAPartialFile(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestConcurrentReadersNeverSeeAPartialFile(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	fileName := filepath.Join(directory, "contended.ts")
 
 	// Large enough that a non-atomic write cannot complete between two reads. A small file is
@@ -31,7 +31,7 @@ func TestConcurrentReadersNeverSeeAPartialFile(t *testing.T) {
 	newBody := strings.Repeat("const alpha = 'new';\n", 4000)
 
 	if err := os.WriteFile(fileName, []byte(oldBody), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	stop := make(chan struct{})
@@ -78,7 +78,7 @@ func TestConcurrentReadersNeverSeeAPartialFile(t *testing.T) {
 		if err := WriteAtomically(fileName, body); err != nil {
 			close(stop)
 			waitGroup.Wait()
-			t.Fatalf("write failed on round %d: %v", round, err)
+			test.Fatalf("write failed on round %d: %v", round, err)
 		}
 	}
 
@@ -90,7 +90,7 @@ func TestConcurrentReadersNeverSeeAPartialFile(t *testing.T) {
 		if len(shown) > 5 {
 			shown = shown[:5]
 		}
-		t.Fatalf("%d readers saw a partial file (writes are not atomic):\n  %s",
+		test.Fatalf("%d readers saw a partial file (writes are not atomic):\n  %s",
 			len(torn), strings.Join(shown, "\n  "))
 	}
 }
@@ -122,17 +122,17 @@ func itoa(value int) string {
 // The temp file must be created beside the target rather than in the system temp directory. A
 // rename across filesystems is not atomic — it degrades to copy-and-delete — so a temp file on
 // another device silently removes the guarantee this function exists to provide.
-func TestTemporaryFileIsCreatedBesideTheTarget(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	nested := filepath.Join(directory, "nested")
 	if err := os.Mkdir(nested, 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	fileName := filepath.Join(nested, "target.ts")
 
 	if err := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	// Watch the directory during the write by racing a reader that records what it sees.
@@ -161,12 +161,12 @@ func TestTemporaryFileIsCreatedBesideTheTarget(t *testing.T) {
 		if err := WriteAtomically(fileName, "const a = 2;\n"); err != nil {
 			close(stop)
 			<-done
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if err := WriteAtomically(fileName, "const a = 1;\n"); err != nil {
 			close(stop)
 			<-done
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	close(stop)
@@ -179,17 +179,17 @@ func TestTemporaryFileIsCreatedBesideTheTarget(t *testing.T) {
 		}
 	}
 	if !sawTemporary {
-		t.Fatalf("no temp file was ever observed beside the target; writes may not be going through temp+rename (saw: %v)", keysOf(seen))
+		test.Fatalf("no temp file was ever observed beside the target; writes may not be going through temp+rename (saw: %v)", keysOf(seen))
 	}
 
 	// And none may survive.
 	entries, err := os.ReadDir(nested)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, entry := range entries {
 		if entry.Name() != "target.ts" {
-			t.Fatalf("a temp file survived the write: %s", entry.Name())
+			test.Fatalf("a temp file survived the write: %s", entry.Name())
 		}
 	}
 }
@@ -203,11 +203,11 @@ func keysOf(set map[string]bool) []string {
 }
 
 // A write into a directory that does not exist must fail loudly rather than silently doing nothing.
-func TestWriteIntoAMissingDirectoryFails(t *testing.T) {
-	t.Parallel()
-	missing := filepath.Join(t.TempDir(), "absent", "target.ts")
+func TestWriteIntoAMissingDirectoryFails(test *testing.T) {
+	test.Parallel()
+	missing := filepath.Join(test.TempDir(), "absent", "target.ts")
 	if err := WriteAtomically(missing, "const a = 1;\n"); err == nil {
-		t.Fatalf("expected an error writing into a directory that does not exist")
+		test.Fatalf("expected an error writing into a directory that does not exist")
 	}
 }
 
@@ -222,8 +222,8 @@ func TestWriteIntoAMissingDirectoryFails(t *testing.T) {
 // with TypeScript syntax errors against css, json and markdown. Before that split every file
 // reaching this package was TypeScript by construction, so the guard's scope was adequate by
 // accident, in exactly the way the type graph was an adequate format universe by accident.
-func TestTheParseGuardOnlyJudgesTypeScript(t *testing.T) {
-	t.Parallel()
+func TestTheParseGuardOnlyJudgesTypeScript(test *testing.T) {
+	test.Parallel()
 	// Real content in each language, none of which is valid TypeScript.
 	for _, testCase := range []struct{ fileName, text string }{
 		{"styles.css", ".foo{color:red;background:blue}\n"},
@@ -232,7 +232,7 @@ func TestTheParseGuardOnlyJudgesTypeScript(t *testing.T) {
 		{"config.yaml", "key: value\nlist:\n  - one\n"},
 	} {
 		if parses, reason := Parses(testCase.fileName, testCase.text); !parses {
-			t.Fatalf("%s was refused by a TypeScript parser: %s", testCase.fileName, reason)
+			test.Fatalf("%s was refused by a TypeScript parser: %s", testCase.fileName, reason)
 		}
 	}
 }
@@ -241,27 +241,27 @@ func TestTheParseGuardOnlyJudgesTypeScript(t *testing.T) {
 //
 // This is the half that makes the change safe rather than merely permissive: a broken .ts is still
 // refused, so the discipline that lets autofix write to source at all is intact.
-func TestTheParseGuardStillFiresOnTypeScript(t *testing.T) {
-	t.Parallel()
+func TestTheParseGuardStillFiresOnTypeScript(test *testing.T) {
+	test.Parallel()
 	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.jsx", "e.mjs", "f.cjs", "g.mts", "h.cts"} {
 		if parses, _ := Parses(fileName, "export function alpha( {\n"); parses {
-			t.Fatalf("%s: a broken file was accepted, so the guard is off for a language it owns", fileName)
+			test.Fatalf("%s: a broken file was accepted, so the guard is off for a language it owns", fileName)
 		}
 	}
 }
 
 // TypeScriptParsable must discriminate, not merely answer. A predicate that said yes to everything
 // would restore the bug; one that said no to everything would disable the guard entirely.
-func TestTypeScriptParsableDiscriminates(t *testing.T) {
-	t.Parallel()
+func TestTypeScriptParsableDiscriminates(test *testing.T) {
+	test.Parallel()
 	for _, fileName := range []string{"a.ts", "b.tsx", "c.js", "d.mjs"} {
 		if !TypeScriptParsable(fileName) {
-			t.Fatalf("%s is TypeScript-family and was not recognized", fileName)
+			test.Fatalf("%s is TypeScript-family and was not recognized", fileName)
 		}
 	}
 	for _, fileName := range []string{"a.css", "b.json", "c.md", "d.yaml", "Makefile", "e.rb"} {
 		if TypeScriptParsable(fileName) {
-			t.Fatalf("%s is not TypeScript-family and was claimed", fileName)
+			test.Fatalf("%s is not TypeScript-family and was claimed", fileName)
 		}
 	}
 }
@@ -269,16 +269,16 @@ func TestTypeScriptParsableDiscriminates(t *testing.T) {
 // An Adamic `.a` file is TypeScript to the guard (#6mhafvb): it is parsable, valid TypeScript in it parses, and
 // a broken one is refused with a reason, which is the refusal that lets autofix write a `.a` at all. Dropping
 // sourcename.TreatedAs from TypeScriptParsable passes the broken text through unguarded, and this fails.
-func TestTheParseGuardJudgesAnAdamicFileAsTypeScript(t *testing.T) {
-	t.Parallel()
+func TestTheParseGuardJudgesAnAdamicFileAsTypeScript(test *testing.T) {
+	test.Parallel()
 	if !TypeScriptParsable("/repo/geometry.a") {
-		t.Fatal("an Adamic .a file is not TypeScript to the guard")
+		test.Fatal("an Adamic .a file is not TypeScript to the guard")
 	}
 	if parses, reason := Parses("/repo/geometry.a", "const widened = <number>value;\nexport const area = (width: number): number => width;\n"); !parses {
-		t.Fatalf("valid TypeScript in a .a file was refused: %s", reason)
+		test.Fatalf("valid TypeScript in a .a file was refused: %s", reason)
 	}
 	parses, reason := Parses("/repo/geometry.a", "export function alpha( {\n")
 	if parses || reason == "" {
-		t.Fatalf("a broken .a file was accepted (reason %q), so the guard is off for it", reason)
+		test.Fatalf("a broken .a file was accepted (reason %q), so the guard is off for it", reason)
 	}
 }

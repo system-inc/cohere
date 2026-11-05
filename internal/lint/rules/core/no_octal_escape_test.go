@@ -29,8 +29,8 @@ const octalEscapeFile = "/repository/source/OctalEscape.ts"
 //
 // Copied because a fixture a porter invents encodes the same belief as the port, and the case that
 // catches a bug is the one nobody would think to write.
-func TestNoOctalEscapeFires(t *testing.T) {
-	t.Parallel()
+func TestNoOctalEscapeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -99,10 +99,10 @@ func TestNoOctalEscapeFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "octalEscapeSequence")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "octalEscapeSequence")
 
 			// The sequence is interpolated into the message, so the id assertion above cannot see
 			// it. Upstream states a `data.sequence` per case and it is not always the digits a
@@ -115,7 +115,7 @@ func TestNoOctalEscapeFires(t *testing.T) {
 			// rather than read from the rule's own constant, so both sides cannot move together.
 			wantPrefix := "Do not use the octal escape `\\" + testCase.wantSequence + "`."
 			if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
-				t.Errorf("message %q does not begin with %q", got, wantPrefix)
+				test.Errorf("message %q does not begin with %q", got, wantPrefix)
 			}
 		})
 	}
@@ -140,8 +140,8 @@ func TestNoOctalEscapeFires(t *testing.T) {
 //
 // The no-escape group (`'0'`, `'01'`, `'08'`, `'12'`) is digits with no backslash at all, and
 // `'\x51'`, `'\a'`, `'\n'` are escapes that are not numeric.
-func TestNoOctalEscapeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoOctalEscapeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"var foo = \"\\x51\";",
@@ -181,9 +181,9 @@ func TestNoOctalEscapeStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctalEscape, octalEscapeFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoOctalEscape, octalEscapeFile, sourceText))
 		})
 	}
 }
@@ -208,8 +208,8 @@ func TestNoOctalEscapeStaysSilent(t *testing.T) {
 //
 // The last two are why the two productions cannot be collapsed into one greedy scan: a value
 // starting 4 through 7 overflows a byte with three digits, so upstream stops at two.
-func TestNoOctalEscapeProductionWidths(t *testing.T) {
-	t.Parallel()
+func TestNoOctalEscapeProductionWidths(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -225,13 +225,13 @@ func TestNoOctalEscapeProductionWidths(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "octalEscapeSequence")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "octalEscapeSequence")
 			wantPrefix := "Do not use the octal escape `\\" + testCase.wantSequence + "`."
 			if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
-				t.Errorf("message %q does not begin with %q", got, wantPrefix)
+				test.Errorf("message %q does not begin with %q", got, wantPrefix)
 			}
 		})
 	}
@@ -247,8 +247,8 @@ func TestNoOctalEscapeProductionWidths(t *testing.T) {
 //
 // The offset cases matter more than the shape: a rule reporting the escape itself rather than the
 // literal would pass every message assertion in this file.
-func TestNoOctalEscapeReportsTheWholeLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoOctalEscapeReportsTheWholeLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -261,15 +261,15 @@ func TestNoOctalEscapeReportsTheWholeLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if result.Diagnostics[0].Range.Pos() != testCase.wantStart || reported != testCase.wantText {
-				t.Errorf("finding at [%d,%d) = %q, want start %d and %q",
+				test.Errorf("finding at [%d,%d) = %q, want start %d and %q",
 					result.Diagnostics[0].Range.Pos(), result.Diagnostics[0].Range.End(),
 					reported, testCase.wantStart, testCase.wantText)
 			}
@@ -286,8 +286,8 @@ func TestNoOctalEscapeReportsTheWholeLiteral(t *testing.T) {
 //
 // A port reporting every escape would name the right id on every input and double the count on
 // exactly these.
-func TestNoOctalEscapeReportsOncePerLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoOctalEscapeReportsOncePerLiteral(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -300,11 +300,11 @@ func TestNoOctalEscapeReportsOncePerLiteral(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoOctalEscape, octalEscapeFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.wantFindings)
 			}
 		})
 	}
@@ -321,8 +321,8 @@ func TestNoOctalEscapeReportsOncePerLiteral(t *testing.T) {
 // through this rule. They are here because our listener map is where the decision now lives, and a
 // port adding a template kind to it would report on a template holding `\1`, which is a syntax error in a
 // template and therefore code that cannot exist rather than code that is wrong.
-func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
-	t.Parallel()
+func TestNoOctalEscapeDeclinesOtherLiteralKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -334,9 +334,9 @@ func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoOctalEscape, octalEscapeFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoOctalEscape, octalEscapeFile, testCase.sourceText))
 		})
 	}
 }
@@ -346,17 +346,17 @@ func TestNoOctalEscapeDeclinesOtherLiteralKinds(t *testing.T) {
 //
 // The id literal is typed here rather than read from the rule's own constant, so a rename cannot
 // move both sides at once and stay green.
-func TestNoOctalEscapeMessage(t *testing.T) {
-	t.Parallel()
+func TestNoOctalEscapeMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoOctalEscape, octalEscapeFile, `'\01'`)
+	result := rule_testing.Run(test, NoOctalEscape, octalEscapeFile, `'\01'`)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "octalEscapeSequence" {
-		t.Errorf("message id = %q, want %q", got, "octalEscapeSequence")
+		test.Errorf("message id = %q, want %q", got, "octalEscapeSequence")
 	}
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "Do not use the octal escape `\\01`.") {
-		t.Errorf("message %q does not name the sequence", got)
+		test.Errorf("message %q does not name the sequence", got)
 	}
 }

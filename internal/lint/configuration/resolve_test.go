@@ -9,8 +9,8 @@ import "testing"
  * Returning unconfigured routes this to the caller that already reports "nobody has said whether
  * this rule should run", which is true, rather than picking whichever key the map yielded first.
  */
-func TestSettingForDeclinesAnAmbiguousBareName(t *testing.T) {
-	t.Parallel()
+func TestSettingForDeclinesAnAmbiguousBareName(test *testing.T) {
+	test.Parallel()
 
 	config := &Config{
 		Rules: map[string]RuleSetting{
@@ -22,7 +22,7 @@ func TestSettingForDeclinesAnAmbiguousBareName(t *testing.T) {
 
 	for attempt := 0; attempt < 200; attempt++ {
 		if config.Resolve("/file.ts").Enabled("no-shadow") {
-			t.Fatalf("attempt %d: an ambiguous bare name resolved as enabled; two prefixed entries "+
+			test.Fatalf("attempt %d: an ambiguous bare name resolved as enabled; two prefixed entries "+
 				"reach it and the config has not said which one is meant", attempt)
 		}
 	}
@@ -36,15 +36,15 @@ func TestSettingForDeclinesAnAmbiguousBareName(t *testing.T) {
  * therefore disabled, which is the failure the doc comment on `settingFor` records as having
  * printed 0 findings over 3,408 files with exit 0.
  */
-func TestSettingForStillReconcilesABarePluginRule(t *testing.T) {
-	t.Parallel()
+func TestSettingForStillReconcilesABarePluginRule(test *testing.T) {
+	test.Parallel()
 
 	config := &Config{
 		Rules: map[string]RuleSetting{"nexus/consistency-no-enum": {Severity: SeverityError}},
 		Root:  "/",
 	}
 	if !config.Resolve("/file.ts").Enabled("consistency-no-enum") {
-		t.Error("a bare registry name no longer finds its prefixed config entry")
+		test.Error("a bare registry name no longer finds its prefixed config entry")
 	}
 }
 
@@ -66,8 +66,8 @@ func TestSettingForStillReconcilesABarePluginRule(t *testing.T) {
  * arrive as itself, and a bare severity as nil rather than an empty list a decoder might read as
  * "configured with nothing".
  */
-func TestParseRuleSettingKeepsEveryOptionElement(t *testing.T) {
-	t.Parallel()
+func TestParseRuleSettingKeepsEveryOptionElement(test *testing.T) {
+	test.Parallel()
 
 	for name, testCase := range map[string]struct {
 		body        string
@@ -92,21 +92,21 @@ func TestParseRuleSettingKeepsEveryOptionElement(t *testing.T) {
 			body: `["error"]`,
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			setting, err := parseRuleSetting([]byte(testCase.body))
 			if err != nil {
-				t.Fatalf("parse: %v", err)
+				test.Fatalf("parse: %v", err)
 			}
 			if testCase.wantOptions == nil && setting.Options != nil {
-				t.Fatalf("Options = %s, want nil for a rule with no option elements", setting.Options)
+				test.Fatalf("Options = %s, want nil for a rule with no option elements", setting.Options)
 			}
 			if len(setting.Options) != len(testCase.wantOptions) {
-				t.Fatalf("Options has %d elements, want %d", len(setting.Options), len(testCase.wantOptions))
+				test.Fatalf("Options has %d elements, want %d", len(setting.Options), len(testCase.wantOptions))
 			}
 			for index, want := range testCase.wantOptions {
 				if got := string(setting.Options[index]); got != want {
-					t.Errorf("Options[%d] = %s, want %s", index, got, want)
+					test.Errorf("Options[%d] = %s, want %s", index, got, want)
 				}
 			}
 		})

@@ -166,35 +166,35 @@ var noPlusplusSilentCases = []noPlusplusCase{
 }
 
 // decodedNoPlusplus routes a row's raw JSON through the rule's own exported decoder.
-func decodedNoPlusplus(t *testing.T, raw string) any {
-	t.Helper()
+func decodedNoPlusplus(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeNoPlusplusOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+		test.Fatalf("decoding options %q: %v", raw, err)
 	}
 	return decoded
 }
 
-func TestNoPlusplusFires(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noPlusplusFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, testCase.source,
-				decodedNoPlusplus(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, testCase.source,
+				decodedNoPlusplus(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestNoPlusplusStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noPlusplusSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, testCase.source,
-				decodedNoPlusplus(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, testCase.source,
+				decodedNoPlusplus(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -208,8 +208,8 @@ func TestNoPlusplusStaysSilent(t *testing.T) {
 // The coverage was already paid for: upstream's corpus asserts `Unary operator '--' used.` on three
 // cases. This reads it. Widening an assertion is cheaper than adding a fixture, and it is the first
 // thing to check when a mutant survives a corpus that looks like it should catch it.
-func TestNoPlusplusNamesTheOperator(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusNamesTheOperator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -223,17 +223,17 @@ func TestNoPlusplusNamesTheOperator(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, testCase.source,
-				decodedNoPlusplus(t, ""))
-			rule_testing.ExpectFindings(t, result, "unexpectedUnaryOp")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, testCase.source,
+				decodedNoPlusplus(test, ""))
+			rule_testing.ExpectFindings(test, result, "unexpectedUnaryOp")
 			if len(result.Diagnostics) != 1 {
 				return
 			}
 			wanted := "Unary operator `" + testCase.operator + "` used."
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, wanted) {
-				t.Errorf("rendered %q, expected it to name the operator as %q",
+				test.Errorf("rendered %q, expected it to name the operator as %q",
 					result.Diagnostics[0].Message.Description, testCase.operator)
 			}
 		})
@@ -256,13 +256,13 @@ func TestNoPlusplusNamesTheOperator(t *testing.T) {
 // wrong is narrow. It is pinned anyway, because the failure it guards against is the inert-rule
 // shape: a rule that registers on every file and silently judges with the wrong default reads
 // exactly like a clean tree.
-func TestNoPlusplusSurvivesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoPlusplusSurvivesNilOptions(test *testing.T) {
+	test.Parallel()
 
 	// A for-loop update, which is exempt under `allowForLoopAfterthoughts: true` and reports under
 	// the default. So this input separates the two defaults rather than merely exercising the path.
 	const source = "for (i = 0; i < l; i++) { console.log(i); }\n"
 
-	result := rule_testing.RunWithOptions(t, NoPlusplus, noPlusplusFile, source, nil)
-	rule_testing.ExpectFindings(t, result, "unexpectedUnaryOp")
+	result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, source, nil)
+	rule_testing.ExpectFindings(test, result, "unexpectedUnaryOp")
 }

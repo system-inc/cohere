@@ -7,10 +7,10 @@ import (
 )
 
 // Every committed record is the honest account of its own runs, and is named for itself.
-func TestEveryCommittedRecordValidates(t *testing.T) {
-	t.Parallel()
+func TestEveryCommittedRecordValidates(test *testing.T) {
+	test.Parallel()
 	if _, err := Read(filepath.Join("..", "..", Directory)); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 }
 
@@ -76,45 +76,45 @@ func coldOnlyRecord() Record {
 	return record
 }
 
-func TestAnHonestRecordValidates(t *testing.T) {
-	t.Parallel()
+func TestAnHonestRecordValidates(test *testing.T) {
+	test.Parallel()
 	record := honestRecord()
 	if err := Validate(record); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if record.Modes[ModeEdit].Quiet != nil {
-		t.Fatalf("Edit had no quiet run and carries a quiet number: %+v", record.Modes[ModeEdit].Quiet)
+		test.Fatalf("Edit had no quiet run and carries a quiet number: %+v", record.Modes[ModeEdit].Quiet)
 	}
 	if quiet := record.Modes[ModeCold].Quiet; quiet == nil || quiet.Count != 1 || quiet.Best != 1.8 {
-		t.Fatalf("Cold's one quiet run gave %+v, want a count of 1 at 1.8s", quiet)
+		test.Fatalf("Cold's one quiet run gave %+v, want a count of 1 at 1.8s", quiet)
 	}
 	if quiet := record.Modes[ModeWarm].Quiet; quiet == nil || quiet.Count != 2 {
-		t.Fatalf("Warm's two quiet runs, at loads of 6 that decide nothing here, gave %+v", quiet)
+		test.Fatalf("Warm's two quiet runs, at loads of 6 that decide nothing here, gave %+v", quiet)
 	}
 	if got := FileName(record); got != "2026-10-05-aaaaaaaaaaaa-mac16-5.json" {
-		t.Errorf("named %s", got)
+		test.Errorf("named %s", got)
 	}
 }
 
 // A schema 1 record, as committed before idleness decided, still validates by the loads it was judged by.
-func TestALoadSchemaRecordStillValidates(t *testing.T) {
-	t.Parallel()
+func TestALoadSchemaRecordStillValidates(test *testing.T) {
+	test.Parallel()
 	if err := Validate(loadSchemaRecord()); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 }
 
 // A record may measure Cold alone, read no cache and so prime nothing, and stop early when its quiet runs agree.
-func TestAColdOnlyRecordThatStoppedEarlyValidates(t *testing.T) {
-	t.Parallel()
+func TestAColdOnlyRecordThatStoppedEarlyValidates(test *testing.T) {
+	test.Parallel()
 	if err := Validate(coldOnlyRecord()); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 }
 
 // Each way a record could claim more than its runs measured is refused.
-func TestADishonestRecordIsRefused(t *testing.T) {
-	t.Parallel()
+func TestADishonestRecordIsRefused(test *testing.T) {
+	test.Parallel()
 	for name, mutate := range map[string]func(*Record){
 		"a quiet number on a mode with no quiet run": func(record *Record) {
 			summary := record.Modes[ModeEdit]
@@ -206,15 +206,15 @@ func TestADishonestRecordIsRefused(t *testing.T) {
 			record.LoadCeiling = 0
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			record := honestRecord()
 			mutate(&record)
 			if err := Validate(record); err == nil {
-				t.Fatal("validated")
+				test.Fatal("validated")
 			}
 			if _, err := Encode(record); err == nil {
-				t.Fatal("encoded")
+				test.Fatal("encoded")
 			}
 		})
 	}

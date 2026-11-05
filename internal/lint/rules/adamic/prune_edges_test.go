@@ -28,9 +28,9 @@ var offeredSites = rule.Rule{
 }
 
 // offeredTargets is the target of every site offered in source, by the value's text.
-func offeredTargets(t *testing.T, source string) map[string]string {
-	t.Helper()
-	result := runAdamic(t, offeredSites, source)
+func offeredTargets(test *testing.T, source string) map[string]string {
+	test.Helper()
+	result := runAdamic(test, offeredSites, source)
 	text := rule_testing.FixtureText(source)
 	targets := map[string]string{}
 	for _, diagnostic := range result.Diagnostics {
@@ -40,16 +40,16 @@ func offeredTargets(t *testing.T, source string) map[string]string {
 }
 
 // typeErrorCount is how many errors tsc reports in source under Adamic's options.
-func typeErrorCount(t *testing.T, source string) int {
-	t.Helper()
-	directory := t.TempDir()
-	writeAdamicSupport(t)(directory)
+func typeErrorCount(test *testing.T, source string) int {
+	test.Helper()
+	directory := test.TempDir()
+	writeAdamicSupport(test)(directory)
 	if err := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(source), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	return len(graph.Program.GetSemanticDiagnostics(context.Background(), nil))
 }
@@ -57,8 +57,8 @@ func typeErrorCount(t *testing.T, source string) int {
 // TestTheWalkOffersEveryEdgeTargetWithAnObjectPart pins the prune from #m6tyg79 from the offered side:
 // a target with an object part anywhere in it is still handed to the rules and judged. `{}` is an
 // object type with no slots, and a union of a primitive and an array has one member to write through.
-func TestTheWalkOffersEveryEdgeTargetWithAnObjectPart(t *testing.T) {
-	t.Parallel()
+func TestTheWalkOffersEveryEdgeTargetWithAnObjectPart(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		value  string
@@ -80,11 +80,11 @@ function admit<Pack extends Animal[], Narrow extends Pack>(narrow: Narrow): Pack
 declare const tagged: Dog[] & { tag: string };
 const wide: Animal[] & { tag: string } = tagged;`, "tagged", "Animal[] & { tag: string; }"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			targets := offeredTargets(t, fixture.source)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			targets := offeredTargets(test, fixture.source)
 			if got, offered := targets[fixture.value]; !offered || got != fixture.target {
-				t.Errorf("%s offered as %q (offered: %v), want %q; every site offered: %v", fixture.value, got,
+				test.Errorf("%s offered as %q (offered: %v), want %q; every site offered: %v", fixture.value, got,
 					offered, fixture.target, targets)
 			}
 		})
@@ -94,10 +94,10 @@ const wide: Animal[] & { tag: string } = tagged;`, "tagged", "Animal[] & { tag: 
 	union := animals + `
 const dogs: Dog[] = [rex];
 const either: string | Animal[] = dogs;`
-	result := runAdamic(t, InvariantMutable, union)
-	rule_testing.ExpectFindings(t, result, "mutableWidening")
-	expectSpans(t, union, result, "dogs")
-	rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, animals+`
+	result := runAdamic(test, InvariantMutable, union)
+	rule_testing.ExpectFindings(test, result, "mutableWidening")
+	expectSpans(test, union, result, "dogs")
+	rule_testing.ExpectClean(test, runAdamic(test, InvariantMutable, animals+`
 const dogs: Dog[] = [rex];
 const anything: {} = dogs;`))
 }
@@ -106,8 +106,8 @@ const anything: {} = dogs;`))
 // type parameter, `object` and `unknown` have no object part, so a site whose target is one is never
 // offered. That is sound only because no write reaches the original through such a name: each probe below
 // tries one and tsc refuses it, so a lie there needs a cast, which is no-unchecked-cast's to see.
-func TestTheWalkSkipsTargetsNothingCanBeWrittenThrough(t *testing.T) {
-	t.Parallel()
+func TestTheWalkSkipsTargetsNothingCanBeWrittenThrough(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		value  string
@@ -143,17 +143,17 @@ const thing: unknown = dogs;
 thing.push({ name: 'Tom' });`,
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			targets := offeredTargets(t, fixture.source)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			targets := offeredTargets(test, fixture.source)
 			if target, offered := targets[fixture.value]; offered {
-				t.Errorf("%s was offered as %q, so the prune no longer skips this target", fixture.value, target)
+				test.Errorf("%s was offered as %q, so the prune no longer skips this target", fixture.value, target)
 			}
-			if typeErrorCount(t, fixture.source) != 0 {
-				t.Fatalf("the skipped site is not a program tsc accepts, so it proves nothing")
+			if typeErrorCount(test, fixture.source) != 0 {
+				test.Fatalf("the skipped site is not a program tsc accepts, so it proves nothing")
 			}
-			if typeErrorCount(t, fixture.write) == 0 {
-				t.Errorf("tsc accepts a write through the skipped target, so skipping it can hide a hole")
+			if typeErrorCount(test, fixture.write) == 0 {
+				test.Errorf("tsc accepts a write through the skipped target, so skipping it can hide a hole")
 			}
 		})
 	}

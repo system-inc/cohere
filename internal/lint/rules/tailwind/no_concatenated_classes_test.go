@@ -31,8 +31,8 @@ import (
 // as silent, measured under ahra's legacy settings, whose selectors have no matchers and so never
 // reach a `+` operand.
 
-func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
-	t.Parallel()
+func TestNoConcatenatedClassesReportsGluedFragments(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -121,10 +121,10 @@ func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoConcatenatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -134,8 +134,8 @@ func TestNoConcatenatedClassesReportsGluedFragments(t *testing.T) {
 // The ahra tree holds 141 interpolated class literals and zero of them are findings, so a rule that
 // reported every interpolated literal would produce 141 false positives on a tree that is actually
 // correct. Every case here is a shape that appears in real code and must stay silent.
-func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConcatenatedClassesStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -221,10 +221,10 @@ func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoConcatenatedClasses, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoConcatenatedClasses, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -234,8 +234,8 @@ func TestNoConcatenatedClassesStaysSilent(t *testing.T) {
 // The upstream message says only "avoid dynamic class construction". In a template holding thirty
 // classes and three holes, that tells the reader nothing about which seam to fix. Naming the
 // fragment is the difference between an actionable finding and one that gets suppressed.
-func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
-	t.Parallel()
+func TestNoConcatenatedClassesNamesTheFragment(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name         string
 		source       string
@@ -259,15 +259,15 @@ func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoConcatenatedClasses, "Component.tsx", testCase.source)
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("expected a finding, got none")
+				test.Fatal("expected a finding, got none")
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.Contains(description, "\""+testCase.wantFragment+"\"") {
-				t.Errorf("message does not name the fragment %q: %s", testCase.wantFragment, description)
+				test.Errorf("message does not name the fragment %q: %s", testCase.wantFragment, description)
 			}
 		})
 	}
@@ -279,20 +279,20 @@ func TestNoConcatenatedClassesNamesTheFragment(t *testing.T) {
 // A fix here would have to invent them, and an autofix that invents class names would silently
 // change what the markup renders. Asserting the absence keeps a later well-meaning change from
 // adding one without arguing for it.
-func TestNoConcatenatedClassesProposesNoFix(t *testing.T) {
-	t.Parallel()
-	result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx",
+func TestNoConcatenatedClassesProposesNoFix(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.Run(test, NoConcatenatedClasses, "Component.tsx",
 		"const element = <div className={`px-${size}`} />;")
 
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatal("this rule must not propose a fix: the repair requires knowing which class names the " +
+		test.Fatal("this rule must not propose a fix: the repair requires knowing which class names the " +
 			"author meant, and inventing them would change what renders")
 	}
 	if len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatal("nor a suggestion, for the same reason")
+		test.Fatal("nor a suggestion, for the same reason")
 	}
 }
 
@@ -304,8 +304,8 @@ func TestNoConcatenatedClassesProposesNoFix(t *testing.T) {
 //
 // So the narrowed reading runs against the silent fixtures and is required to disagree. A rule whose
 // discrimination has never been exercised has been shown to detect, never to discriminate.
-func TestBoundaryReadingIsWhitespaceAware(t *testing.T) {
-	t.Parallel()
+func TestBoundaryReadingIsWhitespaceAware(test *testing.T) {
+	test.Parallel()
 	// Sources with an interpolation that must stay silent. A report-any-interpolation rule flags
 	// every one of these.
 	silentButInterpolated := []string{
@@ -316,16 +316,16 @@ func TestBoundaryReadingIsWhitespaceAware(t *testing.T) {
 	}
 
 	for _, source := range silentButInterpolated {
-		result := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx", source)
+		result := rule_testing.Run(test, NoConcatenatedClasses, "Component.tsx", source)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("a whitespace-aware rule must stay silent on %q, it reported %d", source, len(result.Diagnostics))
+			test.Errorf("a whitespace-aware rule must stay silent on %q, it reported %d", source, len(result.Diagnostics))
 		}
 	}
 
 	// And the discrimination has to be real: the same reader must fire when the whitespace is gone.
-	glued := rule_testing.Run(t, NoConcatenatedClasses, "Component.tsx",
+	glued := rule_testing.Run(test, NoConcatenatedClasses, "Component.tsx",
 		"const element = <div className={`flex ${a} gap-${b}`} />;")
 	if len(glued.Diagnostics) == 0 {
-		t.Fatal("the rule stayed silent on a genuinely glued seam, so the silence above proves nothing")
+		test.Fatal("the rule stayed silent on a genuinely glued seam, so the silence above proves nothing")
 	}
 }

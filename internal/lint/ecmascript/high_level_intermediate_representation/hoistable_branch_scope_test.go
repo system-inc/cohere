@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(t *testing.T) {
-	t.Parallel()
+func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name         string
@@ -49,19 +49,19 @@ func TestBranchLocalHoistableFactsRespectDominatingReactiveScope(t *testing.T) {
 
 	for _, testCase := range testCases {
 		for _, enabled := range []bool{true, false} {
-			t.Run(fmt.Sprintf("%s/preservation=%t", testCase.name, enabled), func(t *testing.T) {
-				t.Parallel()
+			test.Run(fmt.Sprintf("%s/preservation=%t", testCase.name, enabled), func(test *testing.T) {
+				test.Parallel()
 				source, wantFindings := testCase.source, 0
 				if !enabled {
 					source = "// @enablePreserveExistingMemoizationGuarantees:false\n" + source
 					wantFindings = testCase.wantFindings
 				}
-				findings, lowered := findingsForSource(t, source)
+				findings, lowered := findingsForSource(test, source)
 				if !lowered {
-					t.Fatal("fixture did not lower")
+					test.Fatal("fixture did not lower")
 				}
 				if len(findings) != wantFindings {
-					t.Fatalf("got %d preserved-memoization findings, want %d: %+v",
+					test.Fatalf("got %d preserved-memoization findings, want %d: %+v",
 						len(findings), wantFindings, findings)
 				}
 			})

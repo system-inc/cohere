@@ -73,9 +73,9 @@ type optionDecodingFindings struct {
 
 // findOptionDecodes loads the packages matching patterns from moduleRoot and walks every decode in
 // their non-test files.
-func findOptionDecodes(t *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionDecodingFindings {
-	t.Helper()
-	loaded := loadRules(t, moduleRoot, patterns...)
+func findOptionDecodes(test *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionDecodingFindings {
+	test.Helper()
+	loaded := loadRules(test, moduleRoot, patterns...)
 
 	findings := optionDecodingFindings{lenientAt: map[string]bool{}}
 	untagged := map[string]bool{}
@@ -91,7 +91,7 @@ func findOptionDecodes(t *testing.T, moduleRoot string, rulesRoot string, patter
 			}
 			relative, err := filepath.Rel(rulesRoot, fileName)
 			if err != nil {
-				t.Fatalf("relating %s to %s: %v", fileName, rulesRoot, err)
+				test.Fatalf("relating %s to %s: %v", fileName, rulesRoot, err)
 			}
 			for _, declaration := range file.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
@@ -244,27 +244,27 @@ func unmarshalsItself(named *types.Named) bool {
 }
 
 // TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey is the guard over the rules tree.
-func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(t *testing.T) {
-	t.Parallel()
+func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(test *testing.T) {
+	test.Parallel()
 	rulesRoot, err := filepath.Abs("../rules")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	findings := findOptionDecodes(t, "../../..", rulesRoot, "./internal/lint/rules/...")
+	findings := findOptionDecodes(test, "../../..", rulesRoot, "./internal/lint/rules/...")
 
 	for _, decode := range findings.loose {
-		t.Errorf("%s (%s) decodes options into %s with json.%s, which drops an unknown key and matches "+
+		test.Errorf("%s (%s) decodes options into %s with json.%s, which drops an unknown key and matches "+
 			"case-insensitively. Use rule.UnmarshalOptions, or, if upstream's schema leaves this object "+
 			"open, name %s in lenientOptionDecodes and say so at the site",
 			decode.position, decode.site, types.TypeString(decode.target, shortPackageName), decode.call, decode.site)
 	}
 	for _, field := range findings.untagged {
-		t.Errorf("%s is an option field with no json tag, so no spelling is declared for it and its key "+
+		test.Errorf("%s is an option field with no json tag, so no spelling is declared for it and its key "+
 			"matches in any case. Tag it with upstream's exact key", field)
 	}
 	for site := range lenientOptionDecodes {
 		if !findings.lenientAt[site] {
-			t.Errorf("lenientOptionDecodes names %s, which no longer makes a loose decode; remove the entry", site)
+			test.Errorf("lenientOptionDecodes names %s, which no longer makes a loose decode; remove the entry", site)
 		}
 	}
 
@@ -278,23 +278,23 @@ func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(t *testing.T
 			strict++
 		}
 	}
-	t.Logf("%d option decodes, %d through rule.UnmarshalOptions or rule.DecodeOptionsInto, %d lenient by upstream's schema",
+	test.Logf("%d option decodes, %d through rule.UnmarshalOptions or rule.DecodeOptionsInto, %d lenient by upstream's schema",
 		len(findings.decodes), strict, len(findings.lenientAt))
 	if len(findings.decodes) < 200 || strict < 150 {
-		t.Fatalf("found %d option decodes, %d of them strict, so this walk examined too little to mean anything",
+		test.Fatalf("found %d option decodes, %d of them strict, so this walk examined too little to mean anything",
 			len(findings.decodes), strict)
 	}
 }
 
 // TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField runs the same walk over a planted
 // package, so a clean result above is a measurement rather than a matcher that never matches.
-func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(t *testing.T) {
-	t.Parallel()
+func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(test *testing.T) {
+	test.Parallel()
 	plantedRoot, err := filepath.Abs("testdata/optiondecoding")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	findings := findOptionDecodes(t, "../../..", plantedRoot, "./internal/lint/registry/testdata/optiondecoding")
+	findings := findOptionDecodes(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optiondecoding")
 
 	loose := map[string]bool{}
 	for _, decode := range findings.loose {
@@ -308,12 +308,12 @@ func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(t *testing.T) 
 	}
 	for site := range want {
 		if !loose[site] {
-			t.Errorf("the planted loose decode in %s was not found", site)
+			test.Errorf("the planted loose decode in %s was not found", site)
 		}
 	}
 	for site := range loose {
 		if !want[site] {
-			t.Errorf("%s was reported loose, and the planted package decodes there strictly or into no struct", site)
+			test.Errorf("%s was reported loose, and the planted package decodes there strictly or into no struct", site)
 		}
 	}
 
@@ -324,11 +324,11 @@ func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(t *testing.T) 
 	}
 	for _, field := range []string{"plantedOptions.Untagged", "plantedNested.Deep", "plantedStrictOptions.AlsoUntagged"} {
 		if !untagged[field] {
-			t.Errorf("the planted untagged field %s was not found; found %v", field, findings.untagged)
+			test.Errorf("the planted untagged field %s was not found; found %v", field, findings.untagged)
 		}
 	}
 	if len(untagged) != 3 {
-		t.Errorf("want exactly the three planted untagged fields, and a tagged, skipped, unexported, promoted "+
+		test.Errorf("want exactly the three planted untagged fields, and a tagged, skipped, unexported, promoted "+
 			"or self-decoding one was reported too: %v", findings.untagged)
 	}
 }

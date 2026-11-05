@@ -22,8 +22,8 @@ import (
  * regex literals handed over with and without flags, and flags that are constant, written, or
  * unknowable.
  */
-func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestNoMisleadingCharacterClassAgreesWithESLint(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		origin string
@@ -213,7 +213,7 @@ func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTypedVerbatimWithOptions(t, NoMisleadingCharacterClass, "input.ts", testCase.code, nil)
+		result := rule_testing.RunTypedVerbatimWithOptions(test, NoMisleadingCharacterClass, "input.ts", testCase.code, nil)
 		source := result.SourceFile.Text()
 		got := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -224,7 +224,7 @@ func TestNoMisleadingCharacterClassAgreesWithESLint(t *testing.T) {
 		sort.Strings(got)
 		sort.Strings(want)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, want)
+			test.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, want)
 		}
 	}
 }

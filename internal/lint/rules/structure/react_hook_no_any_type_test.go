@@ -45,25 +45,25 @@ const reactHookNoAnyTypeReactDeclarations = `declare module 'react' {
 }`
 
 // runReactHookAnyTypeWithReact runs a fixture with React's declarations resolvable.
-func runReactHookAnyTypeWithReact(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, ReactHookNoAnyType, map[string]string{
+func runReactHookAnyTypeWithReact(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, ReactHookNoAnyType, map[string]string{
 		"react.d.ts":  reactHookNoAnyTypeReactDeclarations,
 		"fixture.tsx": source,
 	}, "fixture.tsx")
 }
 
 // runReactHookAnyTypeWithoutReact runs a fixture with nothing declaring React at all.
-func runReactHookAnyTypeWithoutReact(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, ReactHookNoAnyType, map[string]string{
+func runReactHookAnyTypeWithoutReact(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, ReactHookNoAnyType, map[string]string{
 		"fixture.tsx": source,
 	}, "fixture.tsx")
 }
 
 // TestReactHookAnyTypeFires covers every arrangement that costs the type-based rules their sight.
-func TestReactHookAnyTypeFires(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -160,22 +160,22 @@ export function Widget() {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.withReact {
-				result = runReactHookAnyTypeWithReact(t, testCase.source)
+				result = runReactHookAnyTypeWithReact(test, testCase.source)
 			} else {
-				result = runReactHookAnyTypeWithoutReact(t, testCase.source)
+				result = runReactHookAnyTypeWithoutReact(test, testCase.source)
 			}
-			rule_testing.ExpectFindings(t, result, testCase.want...)
+			rule_testing.ExpectFindings(test, result, testCase.want...)
 		})
 	}
 }
 
 // TestReactHookAnyTypeStaysSilent covers healthy code and the near neighbours that must not report.
-func TestReactHookAnyTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -315,15 +315,15 @@ export function Widget() {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var result rule_testing.Result
 			if testCase.withReact {
-				result = runReactHookAnyTypeWithReact(t, testCase.source)
+				result = runReactHookAnyTypeWithReact(test, testCase.source)
 			} else {
-				result = runReactHookAnyTypeWithoutReact(t, testCase.source)
+				result = runReactHookAnyTypeWithoutReact(test, testCase.source)
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -340,46 +340,46 @@ export function Widget() {
 // `rule_testing.RunTypedFiles` writes `strings.TrimSpace(contents)+"\n"`, so a fixture with leading
 // whitespace sits one byte off its Go literal and a hand-computed offset reports the wrong text.
 // Trimming the same way is what keeps the two aligned.
-func TestReactHookAnyTypeSpan(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeSpan(test *testing.T) {
+	test.Parallel()
 
 	source := `import React from 'react';
 export function Widget() {
     const [count, setCount] = React.useState(0);
     return count;
 }`
-	result := runReactHookAnyTypeWithoutReact(t, source)
+	result := runReactHookAnyTypeWithoutReact(test, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
+		test.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
 	}
 
 	written := strings.TrimSpace(source) + "\n"
 	found := result.Diagnostics[0]
 	reported := written[found.Range.Pos():found.Range.End()]
 	if reported != "React.useState(0)" {
-		t.Errorf("the finding covers %q, want %q", reported, "React.useState(0)")
+		test.Errorf("the finding covers %q, want %q", reported, "React.useState(0)")
 	}
 }
 
 // TestReactHookAnyTypeSpanOnABareCall pins the other callee spelling.
-func TestReactHookAnyTypeSpanOnABareCall(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeSpanOnABareCall(test *testing.T) {
+	test.Parallel()
 
 	source := `declare function useState<T>(initial: T): any;
 export function Widget() {
     const [count, setCount] = useState(0);
     return count;
 }`
-	result := runReactHookAnyTypeWithoutReact(t, source)
+	result := runReactHookAnyTypeWithoutReact(test, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
+		test.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
 	}
 
 	written := strings.TrimSpace(source) + "\n"
 	found := result.Diagnostics[0]
 	reported := written[found.Range.Pos():found.Range.End()]
 	if reported != "useState(0)" {
-		t.Errorf("the finding covers %q, want %q", reported, "useState(0)")
+		test.Errorf("the finding covers %q, want %q", reported, "useState(0)")
 	}
 }
 
@@ -393,8 +393,8 @@ export function Widget() {
 //
 // Asserted against literal strings typed here rather than against the rule's own builder, so that a
 // mutation moving the text fails rather than moving both sides together.
-func TestReactHookAnyTypeMessageNamesTheHook(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeMessageNamesTheHook(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -420,18 +420,18 @@ export function Widget() {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runReactHookAnyTypeWithoutReact(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runReactHookAnyTypeWithoutReact(test, testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
+				test.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
 			}
 			got := result.Diagnostics[0].Message.Description
 			if !strings.HasPrefix(got, testCase.wantOpener) {
-				t.Errorf("message opens with %q,\nwant it to open with %q", got, testCase.wantOpener)
+				test.Errorf("message opens with %q,\nwant it to open with %q", got, testCase.wantOpener)
 			}
 			if result.Diagnostics[0].Message.Id != "reactHookNoAnyType" {
-				t.Errorf("message id = %q, want %q", result.Diagnostics[0].Message.Id, "reactHookNoAnyType")
+				test.Errorf("message id = %q, want %q", result.Diagnostics[0].Message.Id, "reactHookNoAnyType")
 			}
 		})
 	}
@@ -478,12 +478,12 @@ func init() {
 // `react-hook-no-destructuring` is the negative control: it is registered in this same binary, in
 // this same package, and declares neither `NeedsTypeChecker` nor the flag. If the derivation were
 // reading the whole catalog rather than the flag, its name would appear.
-func TestReactHookAnyTypeNamesTheBlindedRulesFromTheCatalog(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeNamesTheBlindedRulesFromTheCatalog(test *testing.T) {
+	test.Parallel()
 
 	blinded := reactHookNoAnyTypeBlindedRules()
 	if len(blinded) == 0 {
-		t.Fatal("the stand-in rule declaring ResolvesReactValueTypes is not in the catalog, so " +
+		test.Fatal("the stand-in rule declaring ResolvesReactValueTypes is not in the catalog, so " +
 			"this test would prove the empty branch twice rather than the populated one")
 	}
 
@@ -491,22 +491,22 @@ func TestReactHookAnyTypeNamesTheBlindedRulesFromTheCatalog(t *testing.T) {
 export function Widget() {
     return useState(0);
 }`
-	result := runReactHookAnyTypeWithoutReact(t, source)
+	result := runReactHookAnyTypeWithoutReact(test, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
+		test.Fatalf("diagnostics = %d, want 1", len(result.Diagnostics))
 	}
 	got := result.Diagnostics[0].Message.Description
 
 	if !strings.Contains(got, "react-hook-any-type-stand-in-blinded") {
-		t.Errorf("the message does not name the rule that declared ResolvesReactValueTypes;\ngot %q", got)
+		test.Errorf("the message does not name the rule that declared ResolvesReactValueTypes;\ngot %q", got)
 	}
 	// The negative control. Registered in this binary, declares nothing, must not be named.
 	if strings.Contains(got, "react-hook-no-destructuring") {
-		t.Errorf("the message names a rule that declared nothing, so the list is not being derived "+
+		test.Errorf("the message names a rule that declared nothing, so the list is not being derived "+
 			"from the flag;\ngot %q", got)
 	}
 	if !strings.Contains(got, "Suppressing this finding turns those off for the file") {
-		t.Errorf("the message does not name the cost of suppression;\ngot %q", got)
+		test.Errorf("the message does not name the cost of suppression;\ngot %q", got)
 	}
 }
 
@@ -515,8 +515,8 @@ export function Widget() {
 // Separate from the message test because the two can fail for different reasons and reporting one
 // defect under two names wastes a reader's time. This one says the derivation reads the flag; that
 // one says the message renders what the derivation returned.
-func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(test *testing.T) {
+	test.Parallel()
 
 	blinded := reactHookNoAnyTypeBlindedRules()
 
@@ -528,7 +528,7 @@ func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(t *testing.T) {
 	for _, registration := range rule.Registered() {
 		want := registration.Rule.ResolvesReactValueTypes
 		if got := named[registration.Rule.Name]; got != want {
-			t.Errorf("rule %q declares ResolvesReactValueTypes=%v but the derivation %s it",
+			test.Errorf("rule %q declares ResolvesReactValueTypes=%v but the derivation %s it",
 				registration.Rule.Name, want, map[bool]string{true: "named", false: "did not name"}[got])
 		}
 	}
@@ -539,23 +539,23 @@ func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(t *testing.T) {
 // A typed rule handed a nil checker goes silent, and every StaysSilent case above would then pass
 // vacuously while proving nothing. This makes that state a failure rather than a green suite, so a
 // later revert of `NeedsTypeChecker` or of the guard fails loudly instead of quietly.
-func TestReactHookAnyTypeRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := `declare function useState<T>(initial: T): any;
 export function Widget() {
     return useState(0);
 }`
 
-	typed := runReactHookAnyTypeWithoutReact(t, source)
+	typed := runReactHookAnyTypeWithoutReact(test, source)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("the typed harness produced %d findings, want 1", len(typed.Diagnostics))
+		test.Fatalf("the typed harness produced %d findings, want 1", len(typed.Diagnostics))
 	}
 
 	// The untyped harness hands the rule a nil checker, which it must decline rather than crash on.
-	untyped := rule_testing.Run(t, ReactHookNoAnyType, "fixture.tsx", source)
+	untyped := rule_testing.Run(test, ReactHookNoAnyType, "fixture.tsx", source)
 	if len(untyped.Diagnostics) != 0 {
-		t.Errorf("the untyped harness produced %d findings, want 0; this rule cannot answer without "+
+		test.Errorf("the untyped harness produced %d findings, want 0; this rule cannot answer without "+
 			"a checker and must decline rather than guess", len(untyped.Diagnostics))
 	}
 }
@@ -568,8 +568,8 @@ export function Widget() {
 // entirely — a rule reporting on the mere absence of a sibling file, or on the string `useState`,
 // would satisfy them all. This one cannot be satisfied that way, because the bytes of the subject
 // file are identical in both runs.
-func TestReactHookAnyTypeSeesTheDifferenceTheDeclarationsMake(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeSeesTheDifferenceTheDeclarationsMake(test *testing.T) {
+	test.Parallel()
 
 	source := `import React from 'react';
 export function Widget() {
@@ -577,14 +577,14 @@ export function Widget() {
     return count;
 }`
 
-	withReact := runReactHookAnyTypeWithReact(t, source)
+	withReact := runReactHookAnyTypeWithReact(test, source)
 	if len(withReact.Diagnostics) != 0 {
-		t.Errorf("with React resolvable the rule produced %d findings, want 0", len(withReact.Diagnostics))
+		test.Errorf("with React resolvable the rule produced %d findings, want 0", len(withReact.Diagnostics))
 	}
 
-	withoutReact := runReactHookAnyTypeWithoutReact(t, source)
+	withoutReact := runReactHookAnyTypeWithoutReact(test, source)
 	if len(withoutReact.Diagnostics) != 1 {
-		t.Errorf("with React unresolvable the rule produced %d findings, want 1", len(withoutReact.Diagnostics))
+		test.Errorf("with React unresolvable the rule produced %d findings, want 1", len(withoutReact.Diagnostics))
 	}
 }
 
@@ -600,8 +600,8 @@ export function Widget() {
 // worth doing: the alternative is an arm that silently renders wrong prose on the day it first runs.
 // Asserted against literal strings typed here rather than against the joiner's own output, so a
 // mutation moves one side and not both.
-func TestReactHookAnyTypeJoinRendersEveryArity(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeJoinRendersEveryArity(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -615,10 +615,10 @@ func TestReactHookAnyTypeJoinRendersEveryArity(t *testing.T) {
 		{name: "four", names: []string{"a", "b", "c", "d"}, want: "`a`, `b`, `c`, and `d`"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := reactHookNoAnyTypeJoin(testCase.names); got != testCase.want {
-				t.Errorf("reactHookNoAnyTypeJoin(%q) = %q, want %q", testCase.names, got, testCase.want)
+				test.Errorf("reactHookNoAnyTypeJoin(%q) = %q, want %q", testCase.names, got, testCase.want)
 			}
 		})
 	}
@@ -644,8 +644,8 @@ func TestReactHookAnyTypeJoinRendersEveryArity(t *testing.T) {
 // to drift. That is a reason to expect this test to pass, not a reason to skip writing it: an
 // upstream reordering that moves `flags` off zero would silently turn this rule into one that
 // reports nothing, or reports on everything, and nothing else in the tree would notice.
-func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(test *testing.T) {
+	test.Parallel()
 
 	subjects := []struct {
 		name string
@@ -664,8 +664,8 @@ func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(t *testing.T) {
 	}
 
 	for _, subject := range subjects {
-		t.Run(subject.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(subject.name, func(test *testing.T) {
+			test.Parallel()
 			var gotName string
 			var gotAny bool
 			var visited int
@@ -697,19 +697,19 @@ func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(t *testing.T) {
 export function Widget() {
     return useSubject();
 }`
-			rule_testing.RunTypedFiles(t, probe, map[string]string{"fixture.tsx": source}, "fixture.tsx")
+			rule_testing.RunTypedFiles(test, probe, map[string]string{"fixture.tsx": source}, "fixture.tsx")
 
 			if visited != 1 {
 				// A measurement that visited nothing reads exactly like agreement, which is the
 				// failure this whole file is about.
-				t.Fatalf("the probe visited %d call expressions, want 1; nothing was measured", visited)
+				test.Fatalf("the probe visited %d call expressions, want 1; nothing was measured", visited)
 			}
 			if gotName != subject.wantTypeName {
-				t.Errorf("the checker calls this type %q, want %q; the fixture is not producing "+
+				test.Errorf("the checker calls this type %q, want %q; the fixture is not producing "+
 					"the type this case is about", gotName, subject.wantTypeName)
 			}
 			if gotAny != subject.wantAny {
-				t.Errorf("shimchecker.Type_flags says any=%v for a type the checker itself calls "+
+				test.Errorf("shimchecker.Type_flags says any=%v for a type the checker itself calls "+
 					"%q, want any=%v; the mirrored struct in shim/checker/shim.go is reading a "+
 					"field other than the one it names", gotAny, gotName, subject.wantAny)
 			}
@@ -719,8 +719,8 @@ export function Widget() {
 
 // The branch no test binary reaches through the catalog: a build that linked none of the rules says so
 // instead of naming an empty list. Both of the message's options are exercised, this one here.
-func TestReactHookAnyTypeSaysWhenNoBlindedRuleIsLinked(t *testing.T) {
-	t.Parallel()
+func TestReactHookAnyTypeSaysWhenNoBlindedRuleIsLinked(test *testing.T) {
+	test.Parallel()
 
 	got := reactHookNoAnyTypeDescriptionFor("useThing", nil)
 	want := "`useThing` here resolves to `any`, so the type checker cannot see what this hook returns. " +
@@ -729,6 +729,6 @@ func TestReactHookAnyTypeSaysWhenNoBlindedRuleIsLinked(t *testing.T) {
 		"`@types/react` is installed and current, that no ambient declaration is shadowing it, and that the " +
 		"path mapping for `react` resolves."
 	if got != want {
-		t.Errorf("reads %q, want %q", got, want)
+		test.Errorf("reads %q, want %q", got, want)
 	}
 }

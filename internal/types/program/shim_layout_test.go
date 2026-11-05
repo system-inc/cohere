@@ -48,12 +48,12 @@ import (
 // substitutions no accessor reads today. This test covers what that check cannot see. A stand-in of
 // the RIGHT size in the WRONG order, or an upstream field reordering that keeps the struct the same
 // size, moves these fields without changing any size the generator compares.
-func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
-	t.Parallel()
-	fileChecker, sourceFile, release := buildLayoutSubject(t)
+func TestShimFieldAccessorsReadTheFieldsTheyName(test *testing.T) {
+	test.Parallel()
+	fileChecker, sourceFile, release := buildLayoutSubject(test)
 	defer release()
 
-	declaredTypes, valueTypes := layoutSubjectTypes(t, fileChecker, sourceFile)
+	declaredTypes, valueTypes := layoutSubjectTypes(test, fileChecker, sourceFile)
 
 	// --- Checker: numberType, stringType, booleanType, globalRegExpType -------------------------
 	//
@@ -71,11 +71,11 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	}
 	for _, testCase := range checkerCases {
 		if testCase.actual == nil {
-			t.Fatalf("%s returned nil, so the struct mirror in shim/checker no longer matches "+
+			test.Fatalf("%s returned nil, so the struct mirror in shim/checker no longer matches "+
 				"upstream's Checker layout", testCase.accessor)
 		}
 		if got := fileChecker.TypeToString(testCase.actual); got != testCase.want {
-			t.Fatalf("%s returned the %q type rather than %q.%s", testCase.accessor, got,
+			test.Fatalf("%s returned the %q type rather than %q.%s", testCase.accessor, got,
 				testCase.want, layoutDriftAdvice)
 		}
 	}
@@ -88,27 +88,27 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	// would let a stuck value satisfy the assertion.
 	numberLiteral := valueTypes["numberLiteralValue"]
 	if numberLiteral == nil {
-		t.Fatal("the fixture produced no type for numberLiteralValue, so nothing below is measured")
+		test.Fatal("the fixture produced no type for numberLiteralValue, so nothing below is measured")
 	}
 	if got := fileChecker.TypeToString(numberLiteral); got != "1" {
-		t.Fatalf("the fixture subject numberLiteralValue is the %q type, not the number literal "+
+		test.Fatalf("the fixture subject numberLiteralValue is the %q type, not the number literal "+
 			"this test was written against", got)
 	}
 	if flags := checker.Type_flags(numberLiteral); flags&checker.TypeFlagsNumberLiteral == 0 {
-		t.Fatalf("Type_flags on the `1` literal returned %v, which does not include "+
+		test.Fatalf("Type_flags on the `1` literal returned %v, which does not include "+
 			"TypeFlagsNumberLiteral.%s", flags, layoutDriftAdvice)
 	}
 	if flags := checker.Type_flags(numberLiteral); flags&checker.TypeFlagsObject != 0 {
-		t.Fatalf("Type_flags on the `1` literal returned %v, which wrongly includes "+
+		test.Fatalf("Type_flags on the `1` literal returned %v, which wrongly includes "+
 			"TypeFlagsObject.%s", flags, layoutDriftAdvice)
 	}
 
 	boxInstance := valueTypes["boxValue"]
 	if boxInstance == nil {
-		t.Fatal("the fixture produced no type for boxValue")
+		test.Fatal("the fixture produced no type for boxValue")
 	}
 	if flags := checker.Type_flags(boxInstance); flags&checker.TypeFlagsObject == 0 {
-		t.Fatalf("Type_flags on an interface instance returned %v, which does not include "+
+		test.Fatalf("Type_flags on an interface instance returned %v, which does not include "+
 			"TypeFlagsObject.%s", flags, layoutDriftAdvice)
 	}
 	// `Box` is a declared interface, so its instance carries ObjectFlagsReference; a plain object
@@ -116,11 +116,11 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	// read cannot satisfy both.
 	boxObjectFlags := checker.Type_objectFlags(boxInstance)
 	if boxObjectFlags&checker.ObjectFlagsReference == 0 {
-		t.Fatalf("Type_objectFlags on the Box<string> instance returned %v, which does not include "+
+		test.Fatalf("Type_objectFlags on the Box<string> instance returned %v, which does not include "+
 			"ObjectFlagsReference.%s", boxObjectFlags, layoutDriftAdvice)
 	}
 	if boxObjectFlags&checker.ObjectFlagsTuple != 0 {
-		t.Fatalf("Type_objectFlags on the Box<string> instance returned %v, which wrongly includes "+
+		test.Fatalf("Type_objectFlags on the Box<string> instance returned %v, which wrongly includes "+
 			"ObjectFlagsTuple.%s", boxObjectFlags, layoutDriftAdvice)
 	}
 
@@ -128,10 +128,10 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	// a shifted read yields some other valid *ast.Symbol, and only its name distinguishes them.
 	boxSymbol := checker.Type_symbol(boxInstance)
 	if boxSymbol == nil {
-		t.Fatalf("Type_symbol on the Box<string> instance returned nil.%s", layoutDriftAdvice)
+		test.Fatalf("Type_symbol on the Box<string> instance returned nil.%s", layoutDriftAdvice)
 	}
 	if boxSymbol.Name != "Box" {
-		t.Fatalf("Type_symbol on the Box<string> instance named %q rather than \"Box\".%s",
+		test.Fatalf("Type_symbol on the Box<string> instance named %q rather than \"Box\".%s",
 			boxSymbol.Name, layoutDriftAdvice)
 	}
 
@@ -140,19 +140,19 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	// of the two.
 	aliasedTuple := valueTypes["pairValue"]
 	if aliasedTuple == nil {
-		t.Fatal("the fixture produced no type for pairValue")
+		test.Fatal("the fixture produced no type for pairValue")
 	}
 	tupleAlias := checker.Type_alias(aliasedTuple)
 	if tupleAlias == nil {
-		t.Fatalf("Type_alias on a value declared as the alias `Pair` returned nil.%s",
+		test.Fatalf("Type_alias on a value declared as the alias `Pair` returned nil.%s",
 			layoutDriftAdvice)
 	}
 	if symbol := tupleAlias.Symbol(); symbol == nil || symbol.Name != "Pair" {
-		t.Fatalf("Type_alias on a value declared as `Pair` named %v rather than \"Pair\".%s",
+		test.Fatalf("Type_alias on a value declared as `Pair` named %v rather than \"Pair\".%s",
 			aliasSymbolName(tupleAlias), layoutDriftAdvice)
 	}
 	if unaliased := checker.Type_alias(numberLiteral); unaliased != nil {
-		t.Fatalf("Type_alias on the `1` literal, which was never written through an alias, "+
+		test.Fatalf("Type_alias on the `1` literal, which was never written through an alias, "+
 			"returned %v rather than nil.%s", aliasSymbolName(unaliased), layoutDriftAdvice)
 	}
 
@@ -172,22 +172,22 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	for _, testCase := range tupleCases {
 		subjectType := valueTypes[testCase.subject]
 		if subjectType == nil {
-			t.Fatalf("the fixture produced no type for %s", testCase.subject)
+			test.Fatalf("the fixture produced no type for %s", testCase.subject)
 		}
 		if !checker.IsTupleType(subjectType) {
-			t.Fatalf("the fixture subject %s is not a tuple type, so this case measures nothing",
+			test.Fatalf("the fixture subject %s is not a tuple type, so this case measures nothing",
 				testCase.subject)
 		}
 		target := subjectType.Target()
 		if target == nil {
-			t.Fatalf("the tuple %s has no target type", testCase.subject)
+			test.Fatalf("the tuple %s has no target type", testCase.subject)
 		}
 		tupleType := target.AsTupleType()
 		if tupleType == nil {
-			t.Fatalf("the tuple %s did not resolve to a TupleType", testCase.subject)
+			test.Fatalf("the tuple %s did not resolve to a TupleType", testCase.subject)
 		}
 		if got := checker.TupleType_combinedFlags(tupleType); got != testCase.want {
-			t.Fatalf("TupleType_combinedFlags on %s returned %v rather than %v.%s",
+			test.Fatalf("TupleType_combinedFlags on %s returned %v rather than %v.%s",
 				testCase.subject, got, testCase.want, layoutDriftAdvice)
 		}
 	}
@@ -199,23 +199,23 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	// a shifted read that happened to land on another type the checker prints the same way.
 	boxDeclared := declaredTypes["Box"]
 	if boxDeclared == nil {
-		t.Fatal("the fixture produced no declared type for the interface Box")
+		test.Fatal("the fixture produced no declared type for the interface Box")
 	}
 	interfaceType := boxDeclared.AsInterfaceType()
 	if interfaceType == nil {
-		t.Fatal("the declared type of the interface Box did not resolve to an InterfaceType")
+		test.Fatal("the declared type of the interface Box did not resolve to an InterfaceType")
 	}
 	thisType := checker.InterfaceType_thisType(interfaceType)
 	if thisType == nil {
-		t.Fatalf("InterfaceType_thisType on an interface with a polymorphic `this` returned nil.%s",
+		test.Fatalf("InterfaceType_thisType on an interface with a polymorphic `this` returned nil.%s",
 			layoutDriftAdvice)
 	}
 	if got := fileChecker.TypeToString(thisType); got != "this" {
-		t.Fatalf("InterfaceType_thisType returned the %q type rather than \"this\".%s",
+		test.Fatalf("InterfaceType_thisType returned the %q type rather than \"this\".%s",
 			got, layoutDriftAdvice)
 	}
 	if flags := checker.Type_flags(thisType); flags&checker.TypeFlagsTypeParameter == 0 {
-		t.Fatalf("InterfaceType_thisType returned a type whose flags are %v, which does not "+
+		test.Fatalf("InterfaceType_thisType returned a type whose flags are %v, which does not "+
 			"include TypeFlagsTypeParameter as a `this` type must.%s", flags, layoutDriftAdvice)
 	}
 
@@ -226,11 +226,11 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	// would have to coincide with `[first second third]` to pass.
 	functionType := valueTypes["twoParams"]
 	if functionType == nil {
-		t.Fatal("the fixture produced no type for twoParams")
+		test.Fatal("the fixture produced no type for twoParams")
 	}
 	signatures := checker.Checker_getSignaturesOfType(fileChecker, functionType, checker.SignatureKindCall)
 	if len(signatures) != 1 {
-		t.Fatalf("the fixture subject twoParams has %d call signatures rather than 1",
+		test.Fatalf("the fixture subject twoParams has %d call signatures rather than 1",
 			len(signatures))
 	}
 	parameterNames := []string{}
@@ -239,12 +239,12 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	}
 	wantParameterNames := []string{"first", "second", "third"}
 	if len(parameterNames) != len(wantParameterNames) {
-		t.Fatalf("Signature_parameters returned %d parameters (%v) rather than %d.%s",
+		test.Fatalf("Signature_parameters returned %d parameters (%v) rather than %d.%s",
 			len(parameterNames), parameterNames, len(wantParameterNames), layoutDriftAdvice)
 	}
 	for i, want := range wantParameterNames {
 		if parameterNames[i] != want {
-			t.Fatalf("Signature_parameters returned %v rather than %v.%s",
+			test.Fatalf("Signature_parameters returned %v rather than %v.%s",
 				parameterNames, wantParameterNames, layoutDriftAdvice)
 		}
 	}
@@ -253,14 +253,14 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(t *testing.T) {
 	// land on a function declaration that is also named `twoParams`.
 	declaration := checker.Signature_declaration(signatures[0])
 	if declaration == nil {
-		t.Fatalf("Signature_declaration on a declared function returned nil.%s", layoutDriftAdvice)
+		test.Fatalf("Signature_declaration on a declared function returned nil.%s", layoutDriftAdvice)
 	}
 	if declaration.Kind != ast.KindFunctionDeclaration {
-		t.Fatalf("Signature_declaration returned a %v node rather than a function declaration.%s",
+		test.Fatalf("Signature_declaration returned a %v node rather than a function declaration.%s",
 			declaration.Kind, layoutDriftAdvice)
 	}
 	if name := declaration.Name(); name == nil || name.Text() != "twoParams" {
-		t.Fatalf("Signature_declaration returned a function declaration named %q rather than "+
+		test.Fatalf("Signature_declaration returned a function declaration named %q rather than "+
 			"\"twoParams\".%s", declarationName(declaration), layoutDriftAdvice)
 	}
 }
@@ -312,17 +312,17 @@ export const boxValue: Box<string> = { value: "v", self() { return this; } };
 export const numberLiteralValue = 1;
 `
 
-func buildLayoutSubject(t *testing.T) (*checker.Checker, *ast.SourceFile, func()) {
-	t.Helper()
-	directory := t.TempDir()
+func buildLayoutSubject(test *testing.T) (*checker.Checker, *ast.SourceFile, func()) {
+	test.Helper()
+	directory := test.TempDir()
 	sourcePath := filepath.Join(directory, "Subject.ts")
 	if err := os.WriteFile(sourcePath, []byte(layoutSubjectSource), 0o644); err != nil {
-		t.Fatalf("writing the fixture: %v", err)
+		test.Fatalf("writing the fixture: %v", err)
 	}
 	configPath := filepath.Join(directory, "tsconfig.json")
 	config := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"types":[]},"include":["*.ts"]}`
 	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
-		t.Fatalf("writing the tsconfig: %v", err)
+		test.Fatalf("writing the tsconfig: %v", err)
 	}
 
 	graph, err := program.Build(program.Options{
@@ -331,11 +331,11 @@ func buildLayoutSubject(t *testing.T) (*checker.Checker, *ast.SourceFile, func()
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the type graph: %v", err)
+		test.Fatalf("building the type graph: %v", err)
 	}
 	files := graph.ProjectFiles()
 	if len(files) == 0 {
-		t.Fatal("the program contains no project files, so this test would prove nothing")
+		test.Fatal("the program contains no project files, so this test would prove nothing")
 	}
 	fileChecker, release := graph.CheckerForFile(context.Background(), files[0])
 	return fileChecker, files[0], release
@@ -344,11 +344,11 @@ func buildLayoutSubject(t *testing.T) (*checker.Checker, *ast.SourceFile, func()
 // layoutSubjectTypes returns the declared types of the fixture's type and interface declarations,
 // and the value types of its variables and functions, both keyed by name.
 func layoutSubjectTypes(
-	t *testing.T,
+	test *testing.T,
 	fileChecker *checker.Checker,
 	sourceFile *ast.SourceFile,
 ) (declared map[string]*checker.Type, values map[string]*checker.Type) {
-	t.Helper()
+	test.Helper()
 	declared = map[string]*checker.Type{}
 	values = map[string]*checker.Type{}
 
@@ -374,7 +374,7 @@ func layoutSubjectTypes(
 	sourceFile.AsNode().ForEachChild(walk)
 
 	if len(declared) == 0 || len(values) == 0 {
-		t.Fatal("the fixture yielded no types, so every assertion below would pass vacuously")
+		test.Fatal("the fixture yielded no types, so every assertion below would pass vacuously")
 	}
 	return declared, values
 }

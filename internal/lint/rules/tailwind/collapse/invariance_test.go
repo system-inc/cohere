@@ -39,13 +39,13 @@ import (
 // If a release ever made a redefinition renumber, every class carrying a variant would sort against
 // a stale table and the differential would not catch it, because both sides would be reading the
 // same wrong number. This test is the thing that would catch it.
-func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
-	t.Parallel()
-	baseline, packageRoot := frameworkVariantStylesheet(t, `@import "tailwindcss";`)
+func TestRepositoryVariantsCannotMoveFrameworkRegistrations(test *testing.T) {
+	test.Parallel()
+	baseline, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";`)
 
 	baselineSystem, err := LoadDesignSystem(LoadOptions{EntryPoint: baseline, TailwindPackageRoot: packageRoot})
 	if err != nil {
-		t.Fatalf("loading the baseline: %v", err)
+		test.Fatalf("loading the baseline: %v", err)
 	}
 
 	// A repository that redefines a framework variant and adds two of its own, which is the shape
@@ -56,12 +56,12 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
 @custom-variant totally-new-variant (&:hover);
 @custom-variant another-new-one (&:focus);
 `), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
+		test.Fatalf("write: %v", err)
 	}
 
 	redefiningSystem, err := LoadDesignSystem(LoadOptions{EntryPoint: redefining, TailwindPackageRoot: packageRoot})
 	if err != nil {
-		t.Fatalf("loading the redefining system: %v", err)
+		test.Fatalf("loading the redefining system: %v", err)
 	}
 
 	baselineOrders := make(map[string]int)
@@ -77,7 +77,7 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
 			continue
 		}
 		if registration.Order != baselineOrder {
-			t.Errorf(
+			test.Errorf(
 				"%q moved from order %d to %d when the repository redefined a variant; the baked table cannot survive that",
 				registration.Name, baselineOrder, registration.Order,
 			)
@@ -89,10 +89,10 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
 	// that put a false invariance claim into the generated header: the enumeration it cited never
 	// read a repository stylesheet at all.
 	if len(added) != 2 {
-		t.Errorf("expected the two new @custom-variant names to register, got %v", added)
+		test.Errorf("expected the two new @custom-variant names to register, got %v", added)
 	}
 	if !redefiningSystem.HasVariant("totally-new-variant") {
-		t.Error("a repository's own @custom-variant did not reach the registry, so this test proves nothing about repositories")
+		test.Error("a repository's own @custom-variant did not reach the registry, so this test proves nothing about repositories")
 	}
 }
 
@@ -105,10 +105,10 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(t *testing.T) {
 // The reason is structural rather than lucky, and it is what this asserts: the outputs are roots the
 // framework itself registers, so a table of them cannot pick up a repository token the way
 // KnownStatics did, back when that table existed.
-func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
-	t.Parallel()
+func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(test *testing.T) {
+	test.Parallel()
 	if len(CollapseFamilies) == 0 {
-		t.Fatal("no collapse families, which is a broken table rather than a Tailwind with no shorthands")
+		test.Fatal("no collapse families, which is a broken table rather than a Tailwind with no shorthands")
 	}
 
 	// A negative-prefixed root is registered under its bare name, so `-mx` is `mx` in the registry.
@@ -122,7 +122,7 @@ func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
 	for _, family := range CollapseFamilies {
 		for _, root := range []string{family.First, family.Second, family.Output} {
 			if !frameworkFunctionalRoots[registryName(root)] {
-				t.Errorf(
+				test.Errorf(
 					"family %s + %s => %s names %q, which is not a root the design system registers; a family over an unregistered root is a repository token in a framework table",
 					family.First, family.Second, family.Output, root,
 				)
@@ -141,22 +141,22 @@ func TestCollapseFamiliesHoldForRootsTheFrameworkOwns(t *testing.T) {
 // So the assertion inverts: the framework statics must carry none of the repository's own names. It
 // checks against the blocks this repository declares rather than a hardcoded list, so a repository
 // adding a utility extends the check automatically.
-func TestFrameworkStaticsCarryNoRepositoryTokens(t *testing.T) {
-	t.Parallel()
-	system := loadWave1DesignSystem(t)
+func TestFrameworkStaticsCarryNoRepositoryTokens(test *testing.T) {
+	test.Parallel()
+	system := loadWave1DesignSystem(test)
 
 	declared := system.RepositoryStaticUtilityNames()
 	if len(declared) == 0 {
-		t.Fatal("the design system reports no repository static utilities, so this comparison measured nothing")
+		test.Fatal("the design system reports no repository static utilities, so this comparison measured nothing")
 	}
 
 	leaked := 0
 	for _, name := range declared {
 		if _, found := FrameworkStaticDeclarations[name]; found {
 			leaked++
-			t.Errorf("%q is declared by this repository and is also in FrameworkStaticDeclarations, so a "+
+			test.Errorf("%q is declared by this repository and is also in FrameworkStaticDeclarations, so a "+
 				"repository token is being carried as a framework fact", name)
 		}
 	}
-	t.Logf("checked %d repository-declared statics against the framework table, %d leaked", len(declared), leaked)
+	test.Logf("checked %d repository-declared statics against the framework table, %d leaked", len(declared), leaked)
 }

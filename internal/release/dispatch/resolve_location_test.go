@@ -19,38 +19,38 @@ import (
 // a binary, would put it in whatever tree the caller was standing in. That would make the help text
 // false while every other launcher test kept passing.
 //
-// Not parallel: it moves into a stand-in project with t.Chdir, which a parallel test may not call.
-func TestTheDevelopmentHashLandsInCoheresOwnCache(t *testing.T) {
-	module := t.TempDir()
-	project := t.TempDir()
+// Not parallel: it moves into a stand-in project with test.Chdir, which a parallel test may not call.
+func TestTheDevelopmentHashLandsInCoheresOwnCache(test *testing.T) {
+	module := test.TempDir()
+	project := test.TempDir()
 	paths := DefaultPaths(module)
 	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
-	t.Chdir(project)
+	test.Chdir(project)
 	if err := recordDevelopmentHash(paths, "0123456789abcdef"); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	cache := filepath.Join(module, ".cache", "cohere") + string(filepath.Separator)
 	written := paths.developmentHashPath()
 	if !filepath.IsAbs(written) || !strings.HasPrefix(written, cache) {
-		t.Errorf("the development hash path %s is not inside the module's cache %s", written, cache)
+		test.Errorf("the development hash path %s is not inside the module's cache %s", written, cache)
 	}
 	if contents, err := os.ReadFile(written); err != nil || strings.TrimSpace(string(contents)) != "0123456789abcdef" {
-		t.Errorf("the hash was not written where the path says (read %q, %v)", contents, err)
+		test.Errorf("the hash was not written where the path says (read %q, %v)", contents, err)
 	}
 
 	entries, err := os.ReadDir(project)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(entries) != 0 {
 		names := make([]string, 0, len(entries))
 		for _, entry := range entries {
 			names = append(names, entry.Name())
 		}
-		t.Errorf("recording the development hash wrote into the directory it ran from: %v", names)
+		test.Errorf("recording the development hash wrote into the directory it ran from: %v", names)
 	}
 }

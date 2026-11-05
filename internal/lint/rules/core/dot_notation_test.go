@@ -421,35 +421,35 @@ var dotNotationSilentCases = []dotNotationCase{
 }
 
 // decodedDotNotation routes a row's raw JSON through the rule's own exported decoder.
-func decodedDotNotation(t *testing.T, raw string) any {
-	t.Helper()
+func decodedDotNotation(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeDotNotationOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+		test.Fatalf("decoding options %q: %v", raw, err)
 	}
 	return decoded
 }
 
-func TestDotNotationFires(t *testing.T) {
-	t.Parallel()
+func TestDotNotationFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range dotNotationFiresCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DotNotation, dotNotationFile, testCase.source,
-				decodedDotNotation(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DotNotation, dotNotationFile, testCase.source,
+				decodedDotNotation(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestDotNotationStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDotNotationStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range dotNotationSilentCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DotNotation, dotNotationFile, testCase.source,
-				decodedDotNotation(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DotNotation, dotNotationFile, testCase.source,
+				decodedDotNotation(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -706,36 +706,36 @@ var dotNotationDeclineCases = []dotNotationFixCase{
 	},
 }
 
-func TestDotNotationRepairsWhatUpstreamRepairs(t *testing.T) {
-	t.Parallel()
+func TestDotNotationRepairsWhatUpstreamRepairs(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range dotNotationRepairCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DotNotation, dotNotationFile, testCase.source,
-				decodedDotNotation(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DotNotation, dotNotationFile, testCase.source,
+				decodedDotNotation(test, testCase.options))
 			// Applies the repair and compares the whole rewritten file, rather than comparing
 			// the fix's text: a fix writing the right string over the wrong span passes a text
 			// comparison and is a real defect this repository has shipped before.
-			rule_testing.ExpectFixedSource(t, result, testCase.wanted)
+			rule_testing.ExpectFixedSource(test, result, testCase.wanted)
 		})
 	}
 }
 
-func TestDotNotationDeclinesTheRepairsUpstreamDeclines(t *testing.T) {
-	t.Parallel()
+func TestDotNotationDeclinesTheRepairsUpstreamDeclines(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range dotNotationDeclineCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DotNotation, dotNotationFile, testCase.source,
-				decodedDotNotation(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DotNotation, dotNotationFile, testCase.source,
+				decodedDotNotation(test, testCase.options))
 
 			// The finding is still expected. Only the repair is withheld.
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected a finding; a decline withholds the FIX, not the report")
+				test.Fatalf("expected a finding; a decline withholds the FIX, not the report")
 			}
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("proposed %d fix(es); upstream declines to repair this case",
+					test.Errorf("proposed %d fix(es); upstream declines to repair this case",
 						len(diagnostic.Fixes))
 				}
 			}

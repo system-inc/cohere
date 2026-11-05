@@ -21,8 +21,8 @@ const protoFile = "/repository/source/Proto.ts"
 //
 // All 9 were additionally driven through the installed eslint build and agreed with the file,
 // spans included.
-func TestNoProtoFires(t *testing.T) {
-	t.Parallel()
+func TestNoProtoFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -35,10 +35,10 @@ func TestNoProtoFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
 		})
 	}
 }
@@ -49,8 +49,8 @@ func TestNoProtoFires(t *testing.T) {
 // is a declaration rather than an access. The third is a different key that merely starts the same.
 // The fourth contains the name followed by a newline, so any rule matching on source text reports
 // it. The fifth is a private name, which cannot collide because its text carries the leading hash.
-func TestNoProtoStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoProtoStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -64,9 +64,9 @@ func TestNoProtoStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoProto, protoFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoProto, protoFile, testCase.sourceText))
 		})
 	}
 }
@@ -79,8 +79,8 @@ func TestNoProtoStaysSilent(t *testing.T) {
 //
 // `rule_testing.Run` does not trim its input, so these offsets index the literal directly. The trimming
 // hazard the brief describes applies to `RunTyped`, which this rule does not use.
-func TestNoProtoReportsTheWholeAccess(t *testing.T) {
-	t.Parallel()
+func TestNoProtoReportsTheWholeAccess(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -94,15 +94,15 @@ func TestNoProtoReportsTheWholeAccess(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoProto, protoFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoProto, protoFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			got := result.Diagnostics[0].Range
 			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
-				t.Fatalf("reported [%d:%d), wanted [%d:%d) which is %q",
+				test.Fatalf("reported [%d:%d), wanted [%d:%d) which is %q",
 					got.Pos(), got.End(), testCase.wantPos, testCase.wantEnd,
 					testCase.sourceText[testCase.wantPos:testCase.wantEnd])
 			}
@@ -112,19 +112,19 @@ func TestNoProtoReportsTheWholeAccess(t *testing.T) {
 
 // The message, asserted against literals typed here rather than against the rule's own constants,
 // which would move with it.
-func TestNoProtoReportsWhyItMatters(t *testing.T) {
-	t.Parallel()
+func TestNoProtoReportsWhyItMatters(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoProto, protoFile, "var a = test.__proto__;")
+	result := rule_testing.Run(test, NoProto, protoFile, "var a = test.__proto__;")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "unexpectedProto" {
-		t.Fatalf("message id was %q", got)
+		test.Fatalf("message id was %q", got)
 	}
 	const wantPrefix = "This reads or writes `__proto__`, which reaches an object's prototype"
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
-		t.Fatalf("description was %q", got)
+		test.Fatalf("description was %q", got)
 	}
 }
 
@@ -134,8 +134,8 @@ func TestNoProtoReportsWhyItMatters(t *testing.T) {
 // template's cooked text without checking for substitutions would report the first; a port anchored
 // on "any node naming this property" would report the second and third. All three are clean on the
 // installed build, measured before they were written here.
-func TestNoProtoDeclinesShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestNoProtoDeclinesShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -147,9 +147,9 @@ func TestNoProtoDeclinesShapesTheCorpusOmits(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoProto, protoFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoProto, protoFile, testCase.sourceText))
 		})
 	}
 }
@@ -158,8 +158,8 @@ func TestNoProtoDeclinesShapesTheCorpusOmits(t *testing.T) {
 //
 // Both spellings fire upstream. Our parser hangs both off the same two access kinds the rule already
 // listens to, so this pins that no extra arm is needed rather than documenting a limit.
-func TestNoProtoReportsThroughOptionalChaining(t *testing.T) {
-	t.Parallel()
+func TestNoProtoReportsThroughOptionalChaining(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -170,10 +170,10 @@ func TestNoProtoReportsThroughOptionalChaining(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoProto, protoFile, testCase.sourceText), "unexpectedProto")
 		})
 	}
 }

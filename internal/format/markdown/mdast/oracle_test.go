@@ -32,18 +32,18 @@ type treeOracle struct {
 }
 
 // newTreeOracle answers from the test's golden.
-func newTreeOracle(t *testing.T) *treeOracle {
-	t.Helper()
-	return &treeOracle{golden: oracletest.Open(t, t.Name())}
+func newTreeOracle(test *testing.T) *treeOracle {
+	test.Helper()
+	return &treeOracle{golden: oracletest.Open(test, test.Name())}
 }
 
 // newLiveTreeOracle answers from the bundle's parser on every call.
-func newLiveTreeOracle(t *testing.T) *treeOracle {
-	t.Helper()
+func newLiveTreeOracle(test *testing.T) *treeOracle {
+	test.Helper()
 	oracle := &treeOracle{}
 	oracle.once.Do(oracle.load)
 	if oracle.err != nil {
-		t.Fatal(oracle.err)
+		test.Fatal(oracle.err)
 	}
 	return oracle
 }
@@ -328,42 +328,42 @@ var treeFixtures = []string{
 	"a  \nb\\\nc",
 }
 
-func TestTreesMatchUpstream(t *testing.T) {
-	t.Parallel()
-	oracle := newTreeOracle(t)
+func TestTreesMatchUpstream(test *testing.T) {
+	test.Parallel()
+	oracle := newTreeOracle(test)
 	for _, text := range treeFixtures {
 		if difference := compareTree(oracle, text); difference != "" {
-			t.Errorf("%q: %s", text, difference)
+			test.Errorf("%q: %s", text, difference)
 		}
 	}
 }
 
 // TestTreeOracleCanFail: the comparison must see a wrong node and a wrong offset.
-func TestTreeOracleCanFail(t *testing.T) {
-	t.Parallel()
-	oracle := newTreeOracle(t)
+func TestTreeOracleCanFail(test *testing.T) {
+	test.Parallel()
+	oracle := newTreeOracle(test)
 	expected, err := oracle.parse("*a*")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	root, _ := ParseMarkdown("**a**", nil)
 	encoded, _ := json.Marshal(describe(root))
 	var actual any
 	_ = json.Unmarshal(encoded, &actual)
 	if firstTreeDifference("root", expected, actual) == "" {
-		t.Fatal("no difference found between the trees of *a* and **a**")
+		test.Fatal("no difference found between the trees of *a* and **a**")
 	}
 }
 
 // TestCorpusTreesMatchUpstream compares every .md file under COHERE_MARKDOWN_CORPUS.
-func TestCorpusTreesMatchUpstream(t *testing.T) {
-	t.Parallel()
+func TestCorpusTreesMatchUpstream(test *testing.T) {
+	test.Parallel()
 	root := os.Getenv("COHERE_MARKDOWN_CORPUS")
 	if root == "" {
-		t.Skip("set COHERE_MARKDOWN_CORPUS to a directory to compare every .md file under it")
+		test.Skip("set COHERE_MARKDOWN_CORPUS to a directory to compare every .md file under it")
 	}
 	// The live oracle, not a golden: the corpus is whatever markdown is on disk.
-	oracle := newLiveTreeOracle(t)
+	oracle := newLiveTreeOracle(test)
 	total, failures := 0, 0
 	byDifference := map[string]int{}
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
@@ -387,13 +387,13 @@ func TestCorpusTreesMatchUpstream(t *testing.T) {
 			failures++
 			byDifference[treeDifferenceClass(difference)]++
 			if failures <= 30 {
-				t.Errorf("%s: %s", path, difference)
+				test.Errorf("%s: %s", path, difference)
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	classes := make([]string, 0, len(byDifference))
 	for class := range byDifference {
@@ -401,9 +401,9 @@ func TestCorpusTreesMatchUpstream(t *testing.T) {
 	}
 	sort.Slice(classes, func(left, right int) bool { return byDifference[classes[left]] > byDifference[classes[right]] })
 	for _, class := range classes {
-		t.Logf("%5d  %s", byDifference[class], class)
+		test.Logf("%5d  %s", byDifference[class], class)
 	}
-	t.Logf("%d of %d files match upstream's tree", total-failures, total)
+	test.Logf("%d of %d files match upstream's tree", total-failures, total)
 }
 
 // treeDifferenceClass groups differences by the field path without indexes.

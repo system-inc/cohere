@@ -12,15 +12,15 @@ import (
 
 // correctnessNoImportCycleLoadTimeReadRun runs the rule on subject with every file of the fixture in
 // the program.
-func correctnessNoImportCycleLoadTimeReadRun(t *testing.T, files map[string]string, subject string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoImportCycleLoadTimeRead, files, subject)
+func correctnessNoImportCycleLoadTimeReadRun(test *testing.T, files map[string]string, subject string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoImportCycleLoadTimeRead, files, subject)
 }
 
 // correctnessNoImportCycleLoadTimeReadExpect asserts the findings, in source order, by the text each
 // points at.
-func correctnessNoImportCycleLoadTimeReadExpect(t *testing.T, result rule_testing.Result, want ...string) {
-	t.Helper()
+func correctnessNoImportCycleLoadTimeReadExpect(test *testing.T, result rule_testing.Result, want ...string) {
+	test.Helper()
 	// The shared assertion by message id, which proves the rule can fire; the checks below hold
 	// each finding's exact text.
 	if len(want) > 0 {
@@ -28,7 +28,7 @@ func correctnessNoImportCycleLoadTimeReadExpect(t *testing.T, result rule_testin
 		for index := range wantIds {
 			wantIds[index] = correctnessNoImportCycleLoadTimeReadId
 		}
-		rule_testing.ExpectFindings(t, result, wantIds...)
+		rule_testing.ExpectFindings(test, result, wantIds...)
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -38,15 +38,15 @@ func correctnessNoImportCycleLoadTimeReadExpect(t *testing.T, result rule_testin
 	var got []string
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != correctnessNoImportCycleLoadTimeReadId {
-			t.Fatalf("unexpected message id %q", diagnostic.Message.Id)
+			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 		got = append(got, strings.TrimSpace(text[diagnostic.Range.Pos():diagnostic.Range.End()]))
 	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
-		t.Fatalf("findings %q, want %q", got, want)
+		test.Fatalf("findings %q, want %q", got, want)
 	}
 }
 
@@ -153,31 +153,31 @@ func correctnessNoImportCycleLoadTimeReadBaseErrors(fixed bool) map[string]strin
 }
 
 // The real site: the spread of the one module in the cycle is reported, the two outside it are not.
-func TestCorrectnessNoImportCycleLoadTimeReadFiresOnBaseErrorIdentifiers(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadFiresOnBaseErrorIdentifiers(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoImportCycleLoadTimeReadRun(t, correctnessNoImportCycleLoadTimeReadBaseErrors(false), correctnessNoImportCycleLoadTimeReadIdentifiersFile)
-	correctnessNoImportCycleLoadTimeReadExpect(t, result, "RateLimiterModuleErrors")
+	result := correctnessNoImportCycleLoadTimeReadRun(test, correctnessNoImportCycleLoadTimeReadBaseErrors(false), correctnessNoImportCycleLoadTimeReadIdentifiersFile)
+	correctnessNoImportCycleLoadTimeReadExpect(test, result, "RateLimiterModuleErrors")
 	if !strings.Contains(result.Diagnostics[0].Message.Description, "BaseErrorIdentifiers.ts → RateLimiterModuleErrors.ts → BaseErrorIdentifiers.ts") {
-		t.Fatalf("the message should name the cycle, got %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("the message should name the cycle, got %q", result.Diagnostics[0].Message.Description)
 	}
 }
 
 // The other two members of the cycle only read the identifier keys inside functions.
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnTheRestOfTheBaseErrorCycle(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnTheRestOfTheBaseErrorCycle(test *testing.T) {
+	test.Parallel()
 
 	for _, subject := range []string{correctnessNoImportCycleLoadTimeReadRateLimiterFile, correctnessNoImportCycleLoadTimeReadBaseErrorFile} {
-		rule_testing.ExpectClean(t, correctnessNoImportCycleLoadTimeReadRun(t, correctnessNoImportCycleLoadTimeReadBaseErrors(false), subject))
+		rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, correctnessNoImportCycleLoadTimeReadBaseErrors(false), subject))
 	}
 }
 
 // After the fix the guard lives beside the declarations rather than in them, nothing imports back
 // into the identifiers file from the rate limiter's declarations, and the spread is silent.
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnFixedBaseErrorIdentifiers(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnFixedBaseErrorIdentifiers(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoImportCycleLoadTimeReadRun(t, correctnessNoImportCycleLoadTimeReadBaseErrors(true), correctnessNoImportCycleLoadTimeReadIdentifiersFile))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, correctnessNoImportCycleLoadTimeReadBaseErrors(true), correctnessNoImportCycleLoadTimeReadIdentifiersFile))
 }
 
 const (
@@ -215,16 +215,16 @@ func correctnessNoImportCycleLoadTimeReadSubject(lines ...string) string {
 }
 
 // correctnessNoImportCycleLoadTimeReadPair runs the rule on A.ts against B.ts.
-func correctnessNoImportCycleLoadTimeReadPair(t *testing.T, subject []string, other []string) rule_testing.Result {
-	t.Helper()
-	return correctnessNoImportCycleLoadTimeReadRun(t, map[string]string{
+func correctnessNoImportCycleLoadTimeReadPair(test *testing.T, subject []string, other []string) rule_testing.Result {
+	test.Helper()
+	return correctnessNoImportCycleLoadTimeReadRun(test, map[string]string{
 		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject(subject...),
 		correctnessNoImportCycleLoadTimeReadOtherFile:   strings.Join(other, "\n"),
 	}, correctnessNoImportCycleLoadTimeReadSubjectFile)
 }
 
-func TestCorrectnessNoImportCycleLoadTimeReadFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -248,15 +248,15 @@ func TestCorrectnessNoImportCycleLoadTimeReadFires(t *testing.T) {
 		{"two reads", []string{"import { Limit } from './B';", "use(Limit);", "export const a = [Limit];"}, []string{"Limit", "Limit"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			correctnessNoImportCycleLoadTimeReadExpect(t, correctnessNoImportCycleLoadTimeReadPair(t, testCase.lines, correctnessNoImportCycleLoadTimeReadOther), testCase.want...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			correctnessNoImportCycleLoadTimeReadExpect(test, correctnessNoImportCycleLoadTimeReadPair(test, testCase.lines, correctnessNoImportCycleLoadTimeReadOther), testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -286,14 +286,14 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilent(t *testing.T) {
 		{"a module outside the cycle", []string{"import { Outside } from './C';", "import { Limit } from './B';", "use(Outside);", "export function read(): number { return Limit; }"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := correctnessNoImportCycleLoadTimeReadRun(t, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := correctnessNoImportCycleLoadTimeReadRun(test, map[string]string{
 				correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject(testCase.lines...),
 				correctnessNoImportCycleLoadTimeReadOtherFile:   strings.Join(correctnessNoImportCycleLoadTimeReadOther, "\n"),
 				"/repository/source/C.ts":                       "export const Outside = 1;",
 			}, correctnessNoImportCycleLoadTimeReadSubjectFile)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -306,8 +306,8 @@ func correctnessNoImportCycleLoadTimeReadBackEdge(lines ...string) []string {
 }
 
 // The back edge executes, so A.ts's read of Limit at load is in a cycle.
-func TestCorrectnessNoImportCycleLoadTimeReadFiresOnEveryRuntimeBackEdge(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadFiresOnEveryRuntimeBackEdge(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -323,17 +323,17 @@ func TestCorrectnessNoImportCycleLoadTimeReadFiresOnEveryRuntimeBackEdge(t *test
 		{"a mixed import whose value binding is read", []string{"import { type FromAType, fromA } from './A';", "export function read(): FromAType { return fromA; }"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := correctnessNoImportCycleLoadTimeReadPair(t, []string{"import { Limit } from './B';", "export const doubled = Limit * 2;"}, correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...))
-			correctnessNoImportCycleLoadTimeReadExpect(t, result, "Limit")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := correctnessNoImportCycleLoadTimeReadPair(test, []string{"import { Limit } from './B';", "export const doubled = Limit * 2;"}, correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...))
+			correctnessNoImportCycleLoadTimeReadExpect(test, result, "Limit")
 		})
 	}
 }
 
 // The back edge is erased or deferred, so there is no runtime cycle and the read is safe.
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentWithoutARuntimeBackEdge(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentWithoutARuntimeBackEdge(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -349,64 +349,64 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentWithoutARuntimeBackEdge(
 		{"a server actions module", []string{"'use server';", "import { fromA } from './A';", "export async function read(): Promise<number> { return fromA; }"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := correctnessNoImportCycleLoadTimeReadPair(t, []string{"import { Limit } from './B';", "export const doubled = Limit * 2;"}, correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := correctnessNoImportCycleLoadTimeReadPair(test, []string{"import { Limit } from './B';", "export const doubled = Limit * 2;"}, correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // A read through a barrel is a read of the declaring file's binding, and the barrel's re-export is a
 // runtime edge, so A → Barrel → B → A is the cycle.
-func TestCorrectnessNoImportCycleLoadTimeReadFollowsABarrel(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadFollowsABarrel(test *testing.T) {
+	test.Parallel()
 
 	files := map[string]string{
 		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject("import { Limit } from './Barrel';", "export const doubled = Limit * 2;"),
 		"/repository/source/Barrel.ts":                  "export { Limit } from './B';",
 		correctnessNoImportCycleLoadTimeReadOtherFile:   strings.Join(correctnessNoImportCycleLoadTimeReadBackEdge("import './A';"), "\n"),
 	}
-	result := correctnessNoImportCycleLoadTimeReadRun(t, files, correctnessNoImportCycleLoadTimeReadSubjectFile)
-	correctnessNoImportCycleLoadTimeReadExpect(t, result, "Limit")
+	result := correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile)
+	correctnessNoImportCycleLoadTimeReadExpect(test, result, "Limit")
 	if !strings.Contains(result.Diagnostics[0].Message.Description, "A.ts → Barrel.ts → B.ts → A.ts") {
-		t.Fatalf("the message should name the cycle through the barrel, got %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("the message should name the cycle through the barrel, got %q", result.Diagnostics[0].Message.Description)
 	}
 }
 
 // A barrel in the cycle whose binding is declared outside it: the barrel is mid-load, but the binding
 // lives in a file that cannot be, because it imports nothing back.
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentWhenTheDeclarationIsOutsideTheCycle(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentWhenTheDeclarationIsOutsideTheCycle(test *testing.T) {
+	test.Parallel()
 
 	files := map[string]string{
 		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject("import { Outside } from './Barrel';", "export const doubled = Outside * 2;"),
 		"/repository/source/Barrel.ts":                  "export { Outside } from './C';\nimport './A';",
 		"/repository/source/C.ts":                       "export const Outside = 1;",
 	}
-	rule_testing.ExpectClean(t, correctnessNoImportCycleLoadTimeReadRun(t, files, correctnessNoImportCycleLoadTimeReadSubjectFile))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile))
 }
 
 // A re-export of a name another module exported with `export type` is elided like any type, so it is
 // no edge even though the name lands on a value: B.ts reaches Mid.ts only through it, and the cycle
 // A → B → Mid → A does not run.
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentThroughATypeOnlyReExport(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentThroughATypeOnlyReExport(test *testing.T) {
+	test.Parallel()
 
 	files := map[string]string{
 		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject("import { Limit } from './B';", "export const doubled = Limit * 2;"),
 		correctnessNoImportCycleLoadTimeReadOtherFile:   "export { fromA } from './Mid';\nexport const Limit = 10;",
 		"/repository/source/Mid.ts":                     "import './A';\nexport type { fromA } from './A';",
 	}
-	rule_testing.ExpectClean(t, correctnessNoImportCycleLoadTimeReadRun(t, files, correctnessNoImportCycleLoadTimeReadSubjectFile))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile))
 }
 
 // correctnessNoImportCycleLoadTimeReadJsxPair runs the rule on a JSX pair modelled on the component
 // cycles in ahra (`TaskRowExpandable.tsx` and `TaskRowExpandedChildren.tsx` render each other).
 // `element` is A.tsx's top-level use of B.tsx's component; `component` is how B.tsx declares it.
-func correctnessNoImportCycleLoadTimeReadJsxPair(t *testing.T, element string, component string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFilesWithSetup(t, CorrectnessNoImportCycleLoadTimeRead, map[string]string{
+func correctnessNoImportCycleLoadTimeReadJsxPair(test *testing.T, element string, component string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFilesWithSetup(test, CorrectnessNoImportCycleLoadTimeRead, map[string]string{
 		"/repository/source/A.tsx": strings.Join([]string{
 			"import { Child } from './B';",
 			"declare global { namespace JSX { interface IntrinsicElements { div: unknown } } }",
@@ -421,29 +421,29 @@ func correctnessNoImportCycleLoadTimeReadJsxPair(t *testing.T, element string, c
 	}, "/repository/source/A.tsx", func(directory string) {
 		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "jsx": "preserve", "moduleDetection": "force", "types": []}, "include": ["**/*.tsx"]}`
 		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-			t.Fatalf("writing the JSX tsconfig: %v", err)
+			test.Fatalf("writing the JSX tsconfig: %v", err)
 		}
 	})
 }
 
 // Components that render each other inside function bodies are the common, harmless cycle.
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnComponentsRenderingEachOther(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnComponentsRenderingEachOther(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoImportCycleLoadTimeReadJsxPair(t, "", "export const Child = function(): unknown { return null; };"))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadJsxPair(test, "", "export const Child = function(): unknown { return null; };"))
 }
 
 // An element built at load reads its component then. The closing tag is not a second read.
-func TestCorrectnessNoImportCycleLoadTimeReadFiresOnAnElementBuiltAtLoad(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadFiresOnAnElementBuiltAtLoad(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoImportCycleLoadTimeReadJsxPair(t, "export const placeholder = <Child></Child>;", "export const Child = function(): unknown { return null; };")
-	correctnessNoImportCycleLoadTimeReadExpect(t, result, "Child")
+	result := correctnessNoImportCycleLoadTimeReadJsxPair(test, "export const placeholder = <Child></Child>;", "export const Child = function(): unknown { return null; };")
+	correctnessNoImportCycleLoadTimeReadExpect(test, result, "Child")
 }
 
 // The same element is safe when the component is a function declaration, which is hoisted.
-func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnAnElementOfAHoistedComponent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnAnElementOfAHoistedComponent(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoImportCycleLoadTimeReadJsxPair(t, "export const placeholder = <Child></Child>;", "export function Child(): unknown { return null; }"))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadJsxPair(test, "export const placeholder = <Child></Child>;", "export function Child(): unknown { return null; }"))
 }

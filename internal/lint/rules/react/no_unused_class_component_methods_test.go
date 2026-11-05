@@ -33,8 +33,8 @@ const noUnusedClassComponentMethodsFile = "/repository/source/NoUnusedClassCompo
 // appends a sentence of reasoning after upstream's wording.
 
 // TestNoUnusedClassComponentMethodsFires runs upstream's reporting cases.
-func TestNoUnusedClassComponentMethodsFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -67,16 +67,16 @@ func TestNoUnusedClassComponentMethodsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoUnusedClassComponentMethods(t, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoUnusedClassComponentMethods(test, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if !strings.HasPrefix(diagnostic.Message.Description, testCase.wantTexts[index]) {
-					t.Errorf("finding %d reads %q, want it to begin %q",
+					test.Errorf("finding %d reads %q, want it to begin %q",
 						index, diagnostic.Message.Description, testCase.wantTexts[index])
 				}
 			}
@@ -85,8 +85,8 @@ func TestNoUnusedClassComponentMethodsFires(t *testing.T) {
 }
 
 // TestNoUnusedClassComponentMethodsStaysSilent runs upstream's clean cases.
-func TestNoUnusedClassComponentMethodsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -131,9 +131,9 @@ func TestNoUnusedClassComponentMethodsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoUnusedClassComponentMethods(t, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoUnusedClassComponentMethods(test, testCase.sourceText))
 		})
 	}
 }
@@ -143,9 +143,9 @@ func TestNoUnusedClassComponentMethodsStaysSilent(t *testing.T) {
 // `Run` rather than `RunTyped`, because every question this rule asks is on the AST: what a class
 // extends, what members it declares, and which `this` accesses appear inside them.
 // `TestNoUnusedClassComponentMethodsNeedsNoChecker` pins that the two harnesses agree.
-func runNoUnusedClassComponentMethods(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.Run(t, NoUnusedClassComponentMethods, noUnusedClassComponentMethodsFile, sourceText)
+func runNoUnusedClassComponentMethods(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.Run(test, NoUnusedClassComponentMethods, noUnusedClassComponentMethodsFile, sourceText)
 }
 
 // TestNoUnusedClassComponentMethodsDefinitionVersusUse pins the narrowest distinction here.
@@ -155,8 +155,8 @@ func runNoUnusedClassComponentMethods(t *testing.T, sourceText string) rule_test
 // which reads backwards until you see that an update expression is not an assignment in the AST.
 // The corpus writes neither, so a port that had grouped all writes together would pass every
 // imported case. Every verdict measured on the installed build.
-func TestNoUnusedClassComponentMethodsDefinitionVersusUse(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsDefinitionVersusUse(test *testing.T) {
+	test.Parallel()
 
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
@@ -190,9 +190,9 @@ func TestNoUnusedClassComponentMethodsDefinitionVersusUse(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -203,8 +203,8 @@ func TestNoUnusedClassComponentMethodsDefinitionVersusUse(t *testing.T) {
 // that `this` in a static method is the constructor rather than the instance. So a static member is
 // neither reported nor able to mark anything used, and a method called only from a static method
 // still reports. Both measured.
-func TestNoUnusedClassComponentMethodsStaticIsInvisible(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsStaticIsInvisible(test *testing.T) {
+	test.Parallel()
 
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
@@ -219,9 +219,9 @@ func TestNoUnusedClassComponentMethodsStaticIsInvisible(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -232,8 +232,8 @@ func TestNoUnusedClassComponentMethodsStaticIsInvisible(t *testing.T) {
 // uncomputed identifier. A computed key still counts when what is inside is a literal, because that
 // arm fires regardless of `computed`, and a private name has its own node type upstream never sees.
 // Every verdict measured on the installed build.
-func TestNoUnusedClassComponentMethodsKeyShapes(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsKeyShapes(test *testing.T) {
+	test.Parallel()
 
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
@@ -263,9 +263,9 @@ func TestNoUnusedClassComponentMethodsKeyShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -275,34 +275,34 @@ func TestNoUnusedClassComponentMethodsKeyShapes(t *testing.T) {
 // `unusedWithClass` names the class and `unused` does not, and upstream picks on whether the class
 // node has a name. A `createReactClass` object never has one, and neither does an anonymous default
 // export. The two ids carry different interpolations, so this asserts the rendered text as well.
-func TestNoUnusedClassComponentMethodsBothIds(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsBothIds(test *testing.T) {
+	test.Parallel()
 
-	named := runNoUnusedClassComponentMethods(t,
+	named := runNoUnusedClassComponentMethods(test,
 		"declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} }\n")
-	rule_testing.ExpectFindings(t, named, "unusedWithClass")
+	rule_testing.ExpectFindings(test, named, "unusedWithClass")
 	if !strings.HasPrefix(named.Diagnostics[0].Message.Description,
 		`Unused method or property "handleClick" of class "Foo"`) {
-		t.Errorf("named reads %q", named.Diagnostics[0].Message.Description)
+		test.Errorf("named reads %q", named.Diagnostics[0].Message.Description)
 	}
 
-	anonymous := runNoUnusedClassComponentMethods(t,
+	anonymous := runNoUnusedClassComponentMethods(test,
 		"declare const React: any;\nexport default class extends React.Component { render() { return null; } handleClick() {} }\n")
-	rule_testing.ExpectFindings(t, anonymous, "unused")
+	rule_testing.ExpectFindings(test, anonymous, "unused")
 	if !strings.HasPrefix(anonymous.Diagnostics[0].Message.Description,
 		`Unused method or property "handleClick"`) {
-		t.Errorf("anonymous reads %q", anonymous.Diagnostics[0].Message.Description)
+		test.Errorf("anonymous reads %q", anonymous.Diagnostics[0].Message.Description)
 	}
 	if strings.Contains(anonymous.Diagnostics[0].Message.Description, "of class") {
-		t.Errorf("anonymous message names a class: %q", anonymous.Diagnostics[0].Message.Description)
+		test.Errorf("anonymous message names a class: %q", anonymous.Diagnostics[0].Message.Description)
 	}
 
-	object := runNoUnusedClassComponentMethods(t,
+	object := runNoUnusedClassComponentMethods(test,
 		"declare function createReactClass(spec: any): any;\ncreateReactClass({ render() { return null; }, handleClick() {} });\n")
-	rule_testing.ExpectFindings(t, object, "unused")
+	rule_testing.ExpectFindings(test, object, "unused")
 	if !strings.HasPrefix(object.Diagnostics[0].Message.Description,
 		`Unused method or property "handleClick"`) {
-		t.Errorf("object reads %q", object.Diagnostics[0].Message.Description)
+		test.Errorf("object reads %q", object.Diagnostics[0].Message.Description)
 	}
 }
 
@@ -312,8 +312,8 @@ func TestNoUnusedClassComponentMethodsBothIds(t *testing.T) {
 // `getDefaultProps` and `mixins` are exempt in the object and NOT in a class. The two sets are
 // mirrors, and a port that merged them would pass every imported case, because the corpus writes
 // each name only on the side where it is exempt. Every verdict measured.
-func TestNoUnusedClassComponentMethodsLifecycleSets(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsLifecycleSets(test *testing.T) {
+	test.Parallel()
 
 	const classHead = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	const objectHead = "declare function createReactClass(spec: any): any;\ncreateReactClass({ render() { return null; }, "
@@ -335,9 +335,9 @@ func TestNoUnusedClassComponentMethodsLifecycleSets(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -347,8 +347,8 @@ func TestNoUnusedClassComponentMethodsLifecycleSets(t *testing.T) {
 // Upstream has a whole `VariableDeclarator` listener for it, and the renamed form
 // `const { foo: bar } = this` counts the SOURCE name rather than the local one, because it reads
 // `prop.key`. Both measured.
-func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(test *testing.T) {
+	test.Parallel()
 
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} "
 	cases := []struct {
@@ -363,9 +363,9 @@ func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -375,8 +375,8 @@ func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(t *testing.T) {
 // Upstream reports on the KEY node rather than on the member, so a finding on an unused method
 // points at the name and not at the body. That is invisible to every id assertion above, and it is
 // the difference between a reader seeing one word underlined and seeing twenty lines.
-func TestNoUnusedClassComponentMethodsSpans(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsSpans(test *testing.T) {
+	test.Parallel()
 
 	const head = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } "
 	cases := []struct {
@@ -393,17 +393,17 @@ func TestNoUnusedClassComponentMethodsSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoUnusedClassComponentMethods(t, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoUnusedClassComponentMethods(test, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			source := result.SourceFile.Text()
 			for index, diagnostic := range result.Diagnostics {
 				got := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.wantTexts[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
 				}
 			}
 		})
@@ -415,8 +415,8 @@ func TestNoUnusedClassComponentMethodsSpans(t *testing.T) {
 // A plain class is not one, a class EXPRESSION is not listened for, and only `createReactClass`
 // counts on the object side: the shelf's `react.IsEs5ComponentCall` also accepts `createClass` and
 // the namespaced spelling, and upstream accepts neither. Measured.
-func TestNoUnusedClassComponentMethodsComponentGate(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsComponentGate(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -441,9 +441,9 @@ func TestNoUnusedClassComponentMethodsComponentGate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoUnusedClassComponentMethods(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -459,8 +459,8 @@ func TestNoUnusedClassComponentMethodsComponentGate(t *testing.T) {
 // alternative is reproducing a single-slot bug that silently loses findings, and the shape that
 // triggers it, a component declared inside another component's method, is rare. Stated here rather
 // than hidden, so the next reader meets a decision rather than a surprise.
-func TestNoUnusedClassComponentMethodsNestedClass(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsNestedClass(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\n" +
 		"class Outer extends React.Component {\n" +
@@ -471,8 +471,8 @@ func TestNoUnusedClassComponentMethodsNestedClass(t *testing.T) {
 		"  outerUnused() {}\n" +
 		"}\n"
 
-	result := runNoUnusedClassComponentMethods(t, source)
-	rule_testing.ExpectFindings(t, result, "unusedWithClass", "unusedWithClass")
+	result := runNoUnusedClassComponentMethods(test, source)
+	rule_testing.ExpectFindings(test, result, "unusedWithClass", "unusedWithClass")
 
 	source_ := result.SourceFile.Text()
 	names := make([]string, 0, len(result.Diagnostics))
@@ -482,19 +482,19 @@ func TestNoUnusedClassComponentMethodsNestedClass(t *testing.T) {
 	// Upstream reports only `innerUnused` here. This port reports both, and the order follows the
 	// walk: the outer class is entered first, so its member is judged first.
 	if names[0] != "outerUnused" || names[1] != "innerUnused" {
-		t.Errorf("reported %v, want [outerUnused innerUnused]", names)
+		test.Errorf("reported %v, want [outerUnused innerUnused]", names)
 	}
 }
 
 // TestNoUnusedClassComponentMethodsNeedsNoChecker pins that this rule is syntactic.
-func TestNoUnusedClassComponentMethodsNeedsNoChecker(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsNeedsNoChecker(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} }\n"
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnusedClassComponentMethods,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUnusedClassComponentMethods,
 		noUnusedClassComponentMethodsFile, source), "unusedWithClass")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUnusedClassComponentMethods,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUnusedClassComponentMethods,
 		noUnusedClassComponentMethodsFile, source), "unusedWithClass")
 }
 
@@ -504,17 +504,17 @@ func TestNoUnusedClassComponentMethodsNeedsNoChecker(t *testing.T) {
 // upstream behavior, each with a test asserting the gate, so the suite locked the bug in. This pins
 // the opposite. The source carries no JSX, because JSX in a `.ts` file is a syntax error and a case
 // that failed to parse would be silent for a reason unrelated to any gate.
-func TestNoUnusedClassComponentMethodsHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\nclass Foo extends React.Component { render() { return null; } handleClick() {} }\n"
 	for _, fileName := range []string{
 		"/repository/source/NoUnusedClassComponentMethods.tsx",
 		"/repository/source/NoUnusedClassComponentMethods.ts",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUnusedClassComponentMethods, fileName, source),
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUnusedClassComponentMethods, fileName, source),
 				"unusedWithClass")
 		})
 	}
@@ -524,8 +524,8 @@ func TestNoUnusedClassComponentMethodsHasNoFileGate(t *testing.T) {
 //
 // The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic.
-func TestNoUnusedClassComponentMethodsSurvivesShapesThatWouldPanic(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedClassComponentMethodsSurvivesShapesThatWouldPanic(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"declare function createReactClass(spec: any): any;\ncreateReactClass();\n",
@@ -539,9 +539,9 @@ func TestNoUnusedClassComponentMethodsSurvivesShapesThatWouldPanic(t *testing.T)
 	}
 
 	for index, sourceText := range sources {
-		t.Run(string(rune('a'+index)), func(t *testing.T) {
-			t.Parallel()
-			runNoUnusedClassComponentMethods(t, sourceText)
+		test.Run(string(rune('a'+index)), func(test *testing.T) {
+			test.Parallel()
+			runNoUnusedClassComponentMethods(test, sourceText)
 		})
 	}
 }

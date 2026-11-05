@@ -55,8 +55,8 @@ var optionElementRules = []string{
 }
 
 // TestEveryMultiElementRuleReadsItsWholeOptionList pins the arity each of those rules declares.
-func TestEveryMultiElementRuleReadsItsWholeOptionList(t *testing.T) {
-	t.Parallel()
+func TestEveryMultiElementRuleReadsItsWholeOptionList(test *testing.T) {
+	test.Parallel()
 	registrations := map[string]rule.Registration{}
 	for _, registration := range rule.Registered() {
 		registrations[registration.Rule.Name] = registration
@@ -64,11 +64,11 @@ func TestEveryMultiElementRuleReadsItsWholeOptionList(t *testing.T) {
 	for _, name := range optionElementRules {
 		registration, registered := registrations[name]
 		if !registered {
-			t.Errorf("%s is listed as taking several option elements and is not registered under that name", name)
+			test.Errorf("%s is listed as taking several option elements and is not registered under that name", name)
 			continue
 		}
 		if registration.DecodeOptionList == nil {
-			t.Errorf("%s takes several option elements upstream and does not register DecodeOptionList, "+
+			test.Errorf("%s takes several option elements upstream and does not register DecodeOptionList, "+
 				"so the config layer refuses every element after its first", name)
 		}
 	}
@@ -184,8 +184,8 @@ var optionElementCases = []optionElementCase{
  * tree cannot honour (`includeFromSettings`), so its `true` is refused rather than enforced;
  * `TestASecondElementTheRuleCannotHonourIsRefused` covers it.
  */
-func TestTheSecondOptionElementReachesTheRule(t *testing.T) {
-	t.Parallel()
+func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
+	test.Parallel()
 
 	rules := map[string]rule.Rule{}
 	for _, subject := range All() {
@@ -195,14 +195,14 @@ func TestTheSecondOptionElementReachesTheRule(t *testing.T) {
 
 	for _, testCase := range optionElementCases {
 		covered[testCase.rule] = true
-		t.Run(testCase.rule, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.rule, func(test *testing.T) {
+			test.Parallel()
 			subject, registered := rules[testCase.rule]
 			if !registered {
-				t.Fatalf("%s is not registered", testCase.rule)
+				test.Fatalf("%s is not registered", testCase.rule)
 			}
 			if testCase.controlCount == testCase.treatmentCount {
-				t.Fatalf("the row's two counts are equal, so it cannot show the element did anything")
+				test.Fatalf("the row's two counts are equal, so it cannot show the element did anything")
 			}
 			fileName := "/repository/source/Probe.ts"
 			if testCase.fileName != "" {
@@ -217,13 +217,13 @@ func TestTheSecondOptionElementReachesTheRule(t *testing.T) {
 				{"control", testCase.control, testCase.controlCount},
 				{"treatment", testCase.treatment, testCase.treatmentCount},
 			} {
-				options, err := optionsThroughTheConfigLayer(t, testCase.rule, arm.config)
+				options, err := optionsThroughTheConfigLayer(test, testCase.rule, arm.config)
 				if err != nil {
-					t.Fatalf("%s %s was refused: %v", arm.name, arm.config, err)
+					test.Fatalf("%s %s was refused: %v", arm.name, arm.config, err)
 				}
-				result := rule_testing.RunTypedWithOptions(t, subject, fileName, testCase.source, options)
+				result := rule_testing.RunTypedWithOptions(test, subject, fileName, testCase.source, options)
 				if len(result.Diagnostics) != arm.want {
-					t.Errorf("%s %s reported %d, want %d: %v",
+					test.Errorf("%s %s reported %d, want %d: %v",
 						arm.name, arm.config, len(result.Diagnostics), arm.want, result.MessageIds())
 				}
 			}
@@ -232,7 +232,7 @@ func TestTheSecondOptionElementReachesTheRule(t *testing.T) {
 
 	for _, name := range optionElementRules {
 		if !covered[name] && name != "react/jsx-no-script-url" {
-			t.Errorf("%s takes several option elements and has no control-and-treatment row here", name)
+			test.Errorf("%s takes several option elements and has no control-and-treatment row here", name)
 		}
 	}
 }
@@ -240,8 +240,8 @@ func TestTheSecondOptionElementReachesTheRule(t *testing.T) {
 // TestASecondElementTheRuleCannotHonourIsRefused covers the rule whose second element's only key is
 // unimplemented here. Its default is accepted, because that is what the rule already does,
 // and `true` is refused by name, because accepting it would be an option read and never honoured.
-func TestASecondElementTheRuleCannotHonourIsRefused(t *testing.T) {
-	t.Parallel()
+func TestASecondElementTheRuleCannotHonourIsRefused(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		rule, accepted, refused, key string
@@ -253,12 +253,12 @@ func TestASecondElementTheRuleCannotHonourIsRefused(t *testing.T) {
 			key:      "includeFromSettings",
 		},
 	} {
-		if _, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.accepted); err != nil {
-			t.Errorf("%s refused its second element at the default: %v", testCase.rule, err)
+		if _, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); err != nil {
+			test.Errorf("%s refused its second element at the default: %v", testCase.rule, err)
 		}
-		_, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.refused)
+		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
 		if err == nil || !strings.Contains(err.Error(), testCase.key) {
-			t.Errorf("%s: want a refusal naming %s, got %v", testCase.rule, testCase.key, err)
+			test.Errorf("%s: want a refusal naming %s, got %v", testCase.rule, testCase.key, err)
 		}
 	}
 }
@@ -270,8 +270,8 @@ func TestASecondElementTheRuleCannotHonourIsRefused(t *testing.T) {
  * Through real registrations rather than a test registry, so a rule that quietly switches to
  * DecodeOptionList, or one whose decoder starts tolerating a list, fails here.
  */
-func TestAnElementTheRuleDoesNotTakeIsALoudError(t *testing.T) {
-	t.Parallel()
+func TestAnElementTheRuleDoesNotTakeIsALoudError(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		rule, config string
@@ -296,22 +296,22 @@ func TestAnElementTheRuleDoesNotTakeIsALoudError(t *testing.T) {
 			mustName: []string{"prefer-destructuring", `element 3 {"array":true}`},
 		},
 	} {
-		_, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.config)
+		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.config)
 		if err == nil {
-			t.Errorf("%s %s loaded, and the extra element would never be read", testCase.rule, testCase.config)
+			test.Errorf("%s %s loaded, and the extra element would never be read", testCase.rule, testCase.config)
 			continue
 		}
 		for _, want := range testCase.mustName {
 			if !strings.Contains(err.Error(), want) {
-				t.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, err)
+				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, err)
 			}
 		}
 	}
 
 	// The control: the same single-element rule with one element loads, so the refusals above are
 	// about the count rather than about the rule refusing everything.
-	if _, err := optionsThroughTheConfigLayer(t, "array-callback-return", `["error", {"allowImplicit": true}]`); err != nil {
-		t.Errorf("array-callback-return refused its one element: %v", err)
+	if _, err := optionsThroughTheConfigLayer(test, "array-callback-return", `["error", {"allowImplicit": true}]`); err != nil {
+		test.Errorf("array-callback-return refused its one element: %v", err)
 	}
 }
 
@@ -324,8 +324,8 @@ func TestAnElementTheRuleDoesNotTakeIsALoudError(t *testing.T) {
  * three decoder shapes: one built on rule.UnmarshalOptions, one list rule that reads its elements
  * with json.Unmarshal, and a null standing for a whole element.
  */
-func TestANullInARulesOptionsIsRefused(t *testing.T) {
-	t.Parallel()
+func TestANullInARulesOptionsIsRefused(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		rule, accepted, refused, mustName string
@@ -355,17 +355,17 @@ func TestANullInARulesOptionsIsRefused(t *testing.T) {
 			mustName: "element 1 is null",
 		},
 	} {
-		if _, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.accepted); err != nil {
-			t.Errorf("%s refused %s, so the refusal below would not be about the null: %v", testCase.rule, testCase.accepted, err)
+		if _, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); err != nil {
+			test.Errorf("%s refused %s, so the refusal below would not be about the null: %v", testCase.rule, testCase.accepted, err)
 		}
-		_, err := optionsThroughTheConfigLayer(t, testCase.rule, testCase.refused)
+		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
 		if err == nil {
-			t.Errorf("%s %s loaded, and the null would have read as the default", testCase.rule, testCase.refused)
+			test.Errorf("%s %s loaded, and the null would have read as the default", testCase.rule, testCase.refused)
 			continue
 		}
 		for _, want := range []string{testCase.rule, testCase.mustName} {
 			if !strings.Contains(err.Error(), want) {
-				t.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, err)
+				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, err)
 			}
 		}
 	}
@@ -373,20 +373,20 @@ func TestANullInARulesOptionsIsRefused(t *testing.T) {
 
 // optionsThroughTheConfigLayer writes one rule's config value to a CohereSettings.json, loads and
 // resolves it, and decodes the result through the registry exactly as the lint walk does.
-func optionsThroughTheConfigLayer(t *testing.T, ruleName string, value string) (any, error) {
-	t.Helper()
+func optionsThroughTheConfigLayer(test *testing.T, ruleName string, value string) (any, error) {
+	test.Helper()
 	if !json.Valid([]byte(value)) {
-		t.Fatalf("the row's config value is not JSON: %s", value)
+		test.Fatalf("the row's config value is not JSON: %s", value)
 	}
-	directory := t.TempDir()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"` + ruleName + `": ` + value + `}}`
 	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
-		t.Fatalf("writing %s: %v", path, err)
+		test.Fatalf("writing %s: %v", path, err)
 	}
 	loaded, err := configuration.Load(path)
 	if err != nil {
-		t.Fatalf("loading %s: %v", contents, err)
+		test.Fatalf("loading %s: %v", contents, err)
 	}
 	resolved := loaded.Resolve(filepath.Join(directory, "Probe.ts"))
 	return Options().Decode(ruleName, resolved.RawOptionsFor(ruleName))

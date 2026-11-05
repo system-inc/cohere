@@ -17,8 +17,8 @@ const locationAssignFile = "/repository/source/Navigate.tsx"
 // `location`, `document` and `self` declared as globals before it will report at all, because its
 // global check reads the global scope's binding set; without them every input is silent and a
 // silent probe is indistinguishable from a decline.
-func TestNoLocationAssignRelativeDestinationFires(t *testing.T) {
-	t.Parallel()
+func TestNoLocationAssignRelativeDestinationFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -72,9 +72,9 @@ func TestNoLocationAssignRelativeDestinationFires(t *testing.T) {
 		{"a use outside a block that shadowed the name", "{\n    const location = { assign() {} };\n    location.assign('/inner');\n}\nlocation.assign('/dashboard');\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoLocationAssignRelativeDestination,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText), "noLocationAssign")
 		})
 	}
@@ -85,8 +85,8 @@ func TestNoLocationAssignRelativeDestinationFires(t *testing.T) {
 // The cases that matter most are the ones where the rule declines something a naive port would
 // report: a value it cannot resolve, a receiver that is not the global, and the two navigation
 // forms upstream simply does not handle.
-func TestNoLocationAssignRelativeDestinationStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoLocationAssignRelativeDestinationStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -153,9 +153,9 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(t *testing.T) {
 		{"a member of href", "location.href.length = 0;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoLocationAssignRelativeDestination,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText))
 		})
 	}
@@ -169,8 +169,8 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(t *testing.T) {
 // fixture above while pointing somewhere else. The expected text below is written out rather than
 // derived from the rule, so a change to what the rule reports cannot quietly move the expectation
 // with it.
-func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) {
-	t.Parallel()
+func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -207,16 +207,16 @@ func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) 
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoLocationAssignRelativeDestination,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoLocationAssignRelativeDestination,
 				locationAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantText {
-				t.Fatalf("expected the finding to cover %q, got %q", testCase.wantText, reported)
+				test.Fatalf("expected the finding to cover %q, got %q", testCase.wantText, reported)
 			}
 		})
 	}
@@ -227,17 +227,17 @@ func TestNoLocationAssignRelativeDestinationPointsAtTheNavigation(t *testing.T) 
 // Compared against a literal typed here rather than against the rule's own message constant. The
 // constant would move with the rule under any edit, so an assertion against it can never fail and
 // reads as a guard while guarding nothing.
-func TestNoLocationAssignRelativeDestinationRendersItsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoLocationAssignRelativeDestinationRendersItsMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoLocationAssignRelativeDestination,
+	result := rule_testing.Run(test, NoLocationAssignRelativeDestination,
 		locationAssignFile, "location.assign('/dashboard');\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	const wantId = "noLocationAssign"
 	if result.Diagnostics[0].Message.Id != wantId {
-		t.Fatalf("expected id %q, got %q", wantId, result.Diagnostics[0].Message.Id)
+		test.Fatalf("expected id %q, got %q", wantId, result.Diagnostics[0].Message.Id)
 	}
 	const wantDescription = "Navigating to an internal page through `location.assign` or by writing " +
 		"`location.href` tears down the running application and reloads it from the server, so " +
@@ -245,6 +245,6 @@ func TestNoLocationAssignRelativeDestinationRendersItsMessage(t *testing.T) {
 		"`redirect()` in the render phase, or `useRouter().push()` in a Client Component's event " +
 		"handler."
 	if result.Diagnostics[0].Message.Description != wantDescription {
-		t.Fatalf("expected description %q, got %q", wantDescription, result.Diagnostics[0].Message.Description)
+		test.Fatalf("expected description %q, got %q", wantDescription, result.Diagnostics[0].Message.Description)
 	}
 }

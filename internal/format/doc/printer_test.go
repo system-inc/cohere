@@ -317,9 +317,9 @@ func boundaryCases() ([]*spec, []Options) {
 }
 
 // TestPrintAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestPrintAgreesWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestPrintAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	const count = 5000
 	random := rand.New(rand.NewSource(20261001))
 	cases := make([]printCase, count)
@@ -341,7 +341,7 @@ func TestPrintAgreesWithUpstream(t *testing.T) {
 
 	encoded, err := json.Marshal(cases)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", upstreamScript)
 	command.Dir = root
@@ -349,11 +349,11 @@ func TestPrintAgreesWithUpstream(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	var upstream []printResultJSON
 	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	mismatches, upstreamErrors, rewrites := 0, 0, 0
@@ -361,7 +361,7 @@ func TestPrintAgreesWithUpstream(t *testing.T) {
 		if upstream[index].Error != "" {
 			upstreamErrors++
 			if upstreamErrors <= 3 {
-				t.Logf("upstream refused case %d: %s", index, upstream[index].Error)
+				test.Logf("upstream refused case %d: %s", index, upstream[index].Error)
 			}
 			continue
 		}
@@ -373,13 +373,13 @@ func TestPrintAgreesWithUpstream(t *testing.T) {
 			mismatches++
 			if mismatches <= 5 {
 				specJSON, _ := json.Marshal(testCase.Spec)
-				t.Errorf("case %d (%+v)\nspec %s\nwant %q\ngot  %q", index, options[index], specJSON, upstream[index].Formatted, got)
+				test.Errorf("case %d (%+v)\nspec %s\nwant %q\ngot  %q", index, options[index], specJSON, upstream[index].Formatted, got)
 			}
 		}
 	}
-	t.Logf("%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
+	test.Logf("%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
 		len(cases), count, len(boundarySpecs), upstreamErrors, rewrites, mismatches)
 	if upstreamErrors > count/10 {
-		t.Errorf("upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf("upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison is thinner than it looks", upstreamErrors, count)
 	}
 }

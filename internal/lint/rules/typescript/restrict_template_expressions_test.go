@@ -22,19 +22,19 @@ func restrictTemplateExpressionsCaseName(index int) string {
 // standard-library types rather than an empty list.
 //
 // The empty string is the shape a bare `"error"` delivers: no bytes at all.
-func restrictTemplateExpressionsSettingsFor(t *testing.T, wire string) any {
-	t.Helper()
+func restrictTemplateExpressionsSettingsFor(test *testing.T, wire string) any {
+	test.Helper()
 	decoded, err := DecodeRestrictTemplateExpressionsOptions([]byte(wire))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", wire, err)
+		test.Fatalf("decoding %q: %v", wire, err)
 	}
 	return decoded
 }
 
 // TestRestrictTemplateExpressionsStaysSilent is upstream's sixty passing cases verbatim, across
 // every option setting its corpus exercises.
-func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -116,11 +116,11 @@ func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+		test.Run(restrictTemplateExpressionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
 				RestrictTemplateExpressions, restrictTemplateExpressionsFile, testCase.sourceText,
-				restrictTemplateExpressionsSettingsFor(t, testCase.wire)))
+				restrictTemplateExpressionsSettingsFor(test, testCase.wire)))
 		})
 	}
 }
@@ -130,8 +130,8 @@ func TestRestrictTemplateExpressionsStaysSilent(t *testing.T) {
 //
 // The text is asserted by equality because the message interpolates a type name through the
 // checker, and that name is the only part of the output a reader uses to understand the finding.
-func TestRestrictTemplateExpressionsFires(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -610,29 +610,29 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+		test.Run(restrictTemplateExpressionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 				restrictTemplateExpressionsFile, testCase.sourceText,
-				restrictTemplateExpressionsSettingsFor(t, testCase.wire))
+				restrictTemplateExpressionsSettingsFor(test, testCase.wire))
 
 			wantIds := make([]string, 0, len(testCase.wantFindings))
 			for _, want := range testCase.wantFindings {
 				wantIds = append(wantIds, want.id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// RunTyped writes the fixture trimmed, so the span slice is against that text.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for findingIndex, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[findingIndex]
 				if diagnostic.Message.Description != want.message {
-					t.Fatalf("finding %d message: expected %q, got %q", findingIndex, want.message,
+					test.Fatalf("finding %d message: expected %q, got %q", findingIndex, want.message,
 						diagnostic.Message.Description)
 				}
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.span {
-					t.Fatalf("finding %d span: expected %q, got %q", findingIndex, want.span, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", findingIndex, want.span, gotSpan)
 				}
 			}
 		})
@@ -651,8 +651,8 @@ func TestRestrictTemplateExpressionsFires(t *testing.T) {
 //
 // The three inputs below are the three defaults that separate the two: a number, a boolean and an
 // interpolated `Error` are all allowed by default and all reported under the strict preset.
-func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"declare const n: number;\n`${n}`;\n",
@@ -660,17 +660,17 @@ func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing
 		"declare const e: Error;\n`${e}`;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(restrictTemplateExpressionsCaseName(index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(restrictTemplateExpressionsCaseName(index), func(test *testing.T) {
+			test.Parallel()
 			// nil rather than a decoded struct, which is what the config layer delivers.
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
 				RestrictTemplateExpressions, restrictTemplateExpressionsFile, sourceText, nil))
 		})
 	}
 
 	// The control: something no default allows still reports through the same path, so the silence
 	// above is the defaults applying rather than the rule declining to run at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, "declare const o: object;\n`${o}`;\n", nil), "invalidType")
 }
 
@@ -678,21 +678,21 @@ func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(t *testing
 // checker and declines rather than crashing when handed none.
 //
 // Unreachable from every other test here, because RunTyped always supplies a live checker.
-func TestRestrictTemplateExpressionsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !RestrictTemplateExpressions.NeedsTypeChecker {
-		t.Fatal("the rule must declare NeedsTypeChecker: every judgment is about an interpolated value's type")
+		test.Fatal("the rule must declare NeedsTypeChecker: every judgment is about an interpolated value's type")
 	}
 
 	sourceText := "declare const o: object;\n`${o}`;\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, RestrictTemplateExpressions,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText))
 
 	// The control, so the silence above is the guard declining rather than the rule being blind to
 	// this shape.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText, nil), "invalidType")
 }
 
@@ -705,25 +705,25 @@ func TestRestrictTemplateExpressionsRequiresTheTypedHarness(t *testing.T) {
 // all three rows below, because the merge semantics are the sort of thing a port gets subtly wrong
 // in a way no imported case catches: every one of upstream's allow cases supplies a list, so the
 // interaction with the default is never exercised.
-func TestRestrictTemplateExpressionsAllowReplacesTheDefault(t *testing.T) {
-	t.Parallel()
+func TestRestrictTemplateExpressionsAllowReplacesTheDefault(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "declare const e: Error;\n`${e}`;\n"
 
 	// An allow list naming something else drops Error, so this reports.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText,
-		restrictTemplateExpressionsSettingsFor(t, `{"allow":[{"from":"file","name":"Whatever"}]}`)),
+		restrictTemplateExpressionsSettingsFor(test, `{"allow":[{"from":"file","name":"Whatever"}]}`)),
 		"invalidType")
 
 	// An EMPTY allow list drops it too, which is the row that separates replace from merge: under
 	// merge semantics an empty list would change nothing.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText,
-		restrictTemplateExpressionsSettingsFor(t, `{"allow":[]}`)), "invalidType")
+		restrictTemplateExpressionsSettingsFor(test, `{"allow":[]}`)), "invalidType")
 
 	// An options object with no allow key keeps the default, so this is silent.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RestrictTemplateExpressions,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText,
-		restrictTemplateExpressionsSettingsFor(t, `{"allowNumber":true}`)))
+		restrictTemplateExpressionsSettingsFor(test, `{"allowNumber":true}`)))
 }

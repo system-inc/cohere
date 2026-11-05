@@ -33,8 +33,8 @@ const dangerWithChildrenFile = "/repository/source/DangerWithChildren.tsx"
 // every case appears twice, once against `div` and once against `Hello`. The rule is deliberately
 // indifferent to whether the tag is a host element or a component, and that indifference is
 // upstream's, so dropping either half of each pair would leave it untested.
-func TestNoDangerWithChildrenFires(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -57,10 +57,10 @@ func TestNoDangerWithChildrenFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noDangerWithChildren")
 		})
 	}
 }
@@ -74,8 +74,8 @@ func TestNoDangerWithChildrenFires(t *testing.T) {
 // props. Two turn on `createElement` being given exactly two arguments with no `children` key. One
 // turns on a formatting newline not counting as a child. And one is a self-referential
 // `const props = {...props}`, which is a cycle a naive recursion hangs on.
-func TestNoDangerWithChildrenStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -101,10 +101,10 @@ func TestNoDangerWithChildrenStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -117,8 +117,8 @@ func TestNoDangerWithChildrenStaysSilent(t *testing.T) {
 // before the trailing semicolon. The sibling rule in this package reports the attribute *name*
 // instead, so this is a real choice between two shapes rather than the only thing a react rule can
 // do, and getting it wrong here would underline one word where upstream underlines a block.
-func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenPointsAtTheWholeElement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -145,14 +145,14 @@ func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noDangerWithChildren")
 			finding := result.Diagnostics[0]
 			reported := testCase.sourceText[finding.Range.Pos():finding.Range.End()]
 			if reported != testCase.wantReported {
-				t.Fatalf("want the finding to cover %q, got %q", testCase.wantReported, reported)
+				test.Fatalf("want the finding to cover %q, got %q", testCase.wantReported, reported)
 			}
 		})
 	}
@@ -163,18 +163,18 @@ func TestNoDangerWithChildrenPointsAtTheWholeElement(t *testing.T) {
 // Equality rather than `strings.Contains`, because a predicate weaker than the property it guards
 // is not a guard: a doubled word or a stray prefix is a substring match away from passing while the
 // message is wrong. This message interpolates nothing, so the assertion is exact.
-func TestNoDangerWithChildrenRendersItsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenRendersItsMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+	result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile,
 		"<div dangerouslySetInnerHTML={{ __html: \"HTML\" }}>Children</div>")
-	rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
+	rule_testing.ExpectFindings(test, result, "noDangerWithChildren")
 	got := result.Diagnostics[0].Message.Description
 	if got != messageNoDangerWithChildren.Description {
-		t.Fatalf("want the message %q, got %q", messageNoDangerWithChildren.Description, got)
+		test.Fatalf("want the message %q, got %q", messageNoDangerWithChildren.Description, got)
 	}
 	if !strings.HasPrefix(got, "This element sets `dangerouslySetInnerHTML`") {
-		t.Fatalf("want the message to open by naming the prop, got %q", got)
+		test.Fatalf("want the message to open by naming the prop, got %q", got)
 	}
 }
 
@@ -190,37 +190,37 @@ func TestNoDangerWithChildrenRendersItsMessage(t *testing.T) {
 // oxc destructures `Expression::StaticMemberExpression` at `no_danger_with_children.rs:76` and then
 // compares `callee.property.name`, so a bare call is not a member expression, an element access is
 // not a static member, and `document` is never special-cased.
-func TestNoDangerWithChildrenMatchesUpstreamsNarrowerCalleeTest(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenMatchesUpstreamsNarrowerCalleeTest(test *testing.T) {
+	test.Parallel()
 
 	danger := "{ dangerouslySetInnerHTML: { __html: \"HTML\" } }"
 
-	t.Run("a bare createElement call is silent, where the shelf helper would accept it", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+	test.Run("a bare createElement call is silent, where the shelf helper would accept it", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile,
 			"createElement(\"div\", "+danger+", \"Children\");")
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("a computed member is silent, where the shelf helper would accept it", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+	test.Run("a computed member is silent, where the shelf helper would accept it", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile,
 			"React[\"createElement\"](\"div\", "+danger+", \"Children\");")
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("document.createElement reports, where the shelf helper would reject it", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+	test.Run("document.createElement reports, where the shelf helper would reject it", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile,
 			"document.createElement(\"div\", "+danger+", \"Children\");")
-		rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
+		rule_testing.ExpectFindings(test, result, "noDangerWithChildren")
 	})
 
-	t.Run("any other object is accepted, since the receiver is never checked", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile,
+	test.Run("any other object is accepted, since the receiver is never checked", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile,
 			"Preact.createElement(\"div\", "+danger+", \"Children\");")
-		rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
+		rule_testing.ExpectFindings(test, result, "noDangerWithChildren")
 	})
 }
 
@@ -236,8 +236,8 @@ func TestNoDangerWithChildrenMatchesUpstreamsNarrowerCalleeTest(t *testing.T) {
 // The first case is also the one that would crash rather than misjudge. `Node.Text()` panics
 // outright on a `ComputedPropertyName`, so a version reading key text before checking the kind
 // takes the whole run down on any `{[k]: v}` anywhere in the tree.
-func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -274,13 +274,13 @@ func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
 			if testCase.wantFinding {
-				rule_testing.ExpectFindings(t, result, "noDangerWithChildren")
+				rule_testing.ExpectFindings(test, result, "noDangerWithChildren")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -292,11 +292,11 @@ func TestNoDangerWithChildrenReadsKeysThatNeedNoEvaluation(t *testing.T) {
 // and every clean fixture above would keep passing vacuously while half the rule stopped working.
 // Asserting the declaration directly is what makes that revert visible, since no fixture can see
 // the difference between "correctly silent" and "silent because the checker was nil".
-func TestNoDangerWithChildrenNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoDangerWithChildren.NeedsTypeChecker {
-		t.Fatal("this rule resolves spread identifiers through the checker and must declare it")
+		test.Fatal("this rule resolves spread identifiers through the checker and must declare it")
 	}
 }
 
@@ -305,11 +305,11 @@ func TestNoDangerWithChildrenNeedsTheTypedHarness(t *testing.T) {
 // The inventory writes `react/no-danger-with-children` and the parity guard strips the namespace on
 // a `/` boundary, so a namespaced name here would lint zero files while every fixture above stayed
 // green. That failure has already shipped once in `internal/rules/next/`.
-func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(test *testing.T) {
+	test.Parallel()
 
 	if NoDangerWithChildren.Name != "react/no-danger-with-children" {
-		t.Fatalf("want the bare rule name, got %q", NoDangerWithChildren.Name)
+		test.Fatalf("want the bare rule name, got %q", NoDangerWithChildren.Name)
 	}
 }
 
@@ -323,8 +323,8 @@ func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(t *testing.T) {
 //
 // Upstream states the same gate as its own first move, with the reason that a call this short is
 // not a proper createElement call.
-func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps(t *testing.T) {
-	t.Parallel()
+func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -336,10 +336,10 @@ func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoDangerWithChildren, dangerWithChildrenFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

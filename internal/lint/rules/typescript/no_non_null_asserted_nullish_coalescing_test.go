@@ -20,14 +20,14 @@ func noNonNullAssertedNullishCoalescingCaseName(index int) string {
 //
 // The harness applies fixes and has no suggestion support, and this rule's ENTIRE repair surface is
 // a suggestion, so without this the thing it offers would go completely unasserted.
-func applyNoNonNullAssertedNullishCoalescingSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyNoNonNullAssertedNullishCoalescingSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool { return fixes[first].Range.Pos() > fixes[second].Range.Pos() })
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(source) || start > end {
-			t.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
 		}
 		source = source[:start] + fix.Text + source[end:]
 	}
@@ -44,8 +44,8 @@ func applyNoNonNullAssertedNullishCoalescingSuggestion(t *testing.T, source stri
 // left of a nullish coalesce, is clean because the assertion may genuinely be doing something. Those
 // six are most of what this rule decides, and none of them can be reached without resolving the
 // identifier to its binding.
-func TestNoNonNullAssertedNullishCoalescingStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedNullishCoalescingStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"foo ?? bar;",
@@ -68,9 +68,9 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnUpstreamPassCases(t *tes
 		"\nlet x: string;\nfunction foo() {\n  return x ?? '';\n}\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
+		test.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, sourceText))
 		})
 	}
@@ -89,8 +89,8 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnUpstreamPassCases(t *tes
 //
 // The harness writes each fixture as `strings.TrimSpace(source)+"\n"`, so both the span slices and
 // the expected rewrites are against that trimmed text rather than the Go literal.
-func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText     string
@@ -174,45 +174,45 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(t *testing.T
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
+		test.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noNonNullAssertedNullishCoalescing")
+			rule_testing.ExpectFindings(test, result, "noNonNullAssertedNullishCoalescing")
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 			if diagnostic.Message.Description != "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed." {
-				t.Fatalf("message: got %q", diagnostic.Message.Description)
+				test.Fatalf("message: got %q", diagnostic.Message.Description)
 			}
 			if diagnostic.Message.Id != "noNonNullAssertedNullishCoalescing" {
-				t.Fatalf("message id: got %q", diagnostic.Message.Id)
+				test.Fatalf("message id: got %q", diagnostic.Message.Id)
 			}
 
 			// The repair is offered, never applied. Removing the assertion can WIDEN the resulting
 			// type and break a return that used to compile, which is why upstream ships a
 			// suggestion and why a fix here would be a defect rather than an improvement.
 			if len(diagnostic.Fixes) != 0 {
-				t.Fatalf("the repair must be a suggestion, got %d fixes", len(diagnostic.Fixes))
+				test.Fatalf("the repair must be a suggestion, got %d fixes", len(diagnostic.Fixes))
 			}
 			if len(diagnostic.Suggestions) != 1 {
-				t.Fatalf("expected one suggestion, got %d", len(diagnostic.Suggestions))
+				test.Fatalf("expected one suggestion, got %d", len(diagnostic.Suggestions))
 			}
 			suggestion := diagnostic.Suggestions[0]
 			if suggestion.Message.Description != "Remove the non-null assertion." {
-				t.Fatalf("suggestion text: got %q", suggestion.Message.Description)
+				test.Fatalf("suggestion text: got %q", suggestion.Message.Description)
 			}
 			if suggestion.Message.Id != "suggestRemovingNonNull" {
-				t.Fatalf("suggestion id: got %q", suggestion.Message.Id)
+				test.Fatalf("suggestion id: got %q", suggestion.Message.Id)
 			}
-			applied := applyNoNonNullAssertedNullishCoalescingSuggestion(t, onDisk, suggestion)
+			applied := applyNoNonNullAssertedNullishCoalescingSuggestion(test, onDisk, suggestion)
 			if applied != testCase.wantSuggestion {
-				t.Fatalf("suggestion applied: expected %q, got %q", testCase.wantSuggestion, applied)
+				test.Fatalf("suggestion applied: expected %q, got %q", testCase.wantSuggestion, applied)
 			}
 		})
 	}
@@ -226,8 +226,8 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(t *testing.T
 // right binding, or that a parameter is not a variable declaration. The shadowing pair is the one
 // worth reading twice: resolving to the wrong binding would flip both rows, and each row alone would
 // still look correct.
-func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -302,9 +302,9 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
+		test.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, testCase.sourceText))
 		})
 	}
@@ -321,8 +321,8 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 //
 // The hoisted-write row pairs with its write-below twin in the clean test above, and together they
 // are what make the end-position comparison a real discrimination rather than a detail.
-func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText     string
@@ -369,25 +369,25 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(t 
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoNonNullAssertedNullishCoalescing,
+		test.Run(noNonNullAssertedNullishCoalescingCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoNonNullAssertedNullishCoalescing,
 				noNonNullAssertedNullishCoalescingFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noNonNullAssertedNullishCoalescing")
+			rule_testing.ExpectFindings(test, result, "noNonNullAssertedNullishCoalescing")
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 			if len(diagnostic.Suggestions) != 1 {
-				t.Fatalf("expected one suggestion, got %d", len(diagnostic.Suggestions))
+				test.Fatalf("expected one suggestion, got %d", len(diagnostic.Suggestions))
 			}
-			applied := applyNoNonNullAssertedNullishCoalescingSuggestion(t, onDisk, diagnostic.Suggestions[0])
+			applied := applyNoNonNullAssertedNullishCoalescingSuggestion(test, onDisk, diagnostic.Suggestions[0])
 			if applied != testCase.wantSuggestion {
-				t.Fatalf("suggestion applied: expected %q, got %q", testCase.wantSuggestion, applied)
+				test.Fatalf("suggestion applied: expected %q, got %q", testCase.wantSuggestion, applied)
 			}
 		})
 	}
@@ -402,16 +402,16 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(t 
 // Under the plain harness the checker is nil and the assignment test answers false, so every
 // identifier case goes silent. That is the dangerous direction: the clean fixtures would all pass
 // having proven nothing.
-func TestNoNonNullAssertedNullishCoalescingNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedNullishCoalescingNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoNonNullAssertedNullishCoalescing.NeedsTypeChecker {
-		t.Fatal("the assignment test resolves an identifier to its binding, so the rule must declare NeedsTypeChecker")
+		test.Fatal("the assignment test resolves an identifier to its binding, so the rule must declare NeedsTypeChecker")
 	}
 
 	// Handed no checker, the rule must stay silent rather than panic. The non-identifier shapes
 	// still report, because they never consult the checker at all, which is why this asserts an
 	// identifier case specifically.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoNonNullAssertedNullishCoalescing,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoNonNullAssertedNullishCoalescing,
 		noNonNullAssertedNullishCoalescingFile, "let x = foo();\nx! ?? '';"))
 }

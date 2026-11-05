@@ -17,17 +17,17 @@ import (
 
 var pruneNow = time.Date(2026, time.October, 2, 12, 0, 0, 0, time.UTC)
 
-func TestPruneRemovesExactlyWhatNoRunCanReach(t *testing.T) {
-	t.Parallel()
+func TestPruneRemovesExactlyWhatNoRunCanReach(test *testing.T) {
+	test.Parallel()
 
-	paths, ages := seedPruneCache(t)
+	paths, ages := seedPruneCache(test)
 
 	plan, err := PlanPrune(paths, []string{"cohere-" + platformTag() + "-keepme0000000000"}, "", pruneNow)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if plan.Examined != len(ages)+1 {
-		t.Fatalf("examined %d entries, the cache holds %d", plan.Examined, len(ages)+1)
+		test.Fatalf("examined %d entries, the cache holds %d", plan.Examined, len(ages)+1)
 	}
 
 	got := []string{}
@@ -49,30 +49,30 @@ func TestPruneRemovesExactlyWhatNoRunCanReach(t *testing.T) {
 	}
 	sort.Strings(want)
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("would remove\n  %s\nexpected\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
+		test.Fatalf("would remove\n  %s\nexpected\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
 	}
 
 	wantUnrecognised := []string{"a-subdirectory", "something-else"}
 	if !reflect.DeepEqual(plan.Unrecognised, wantUnrecognised) {
-		t.Fatalf("unrecognised %v, expected %v kept and reported", plan.Unrecognised, wantUnrecognised)
+		test.Fatalf("unrecognised %v, expected %v kept and reported", plan.Unrecognised, wantUnrecognised)
 	}
 }
 
-func TestApplyPruneRemovesOnlyThePlanAndLeavesFrozenACandidate(t *testing.T) {
-	t.Parallel()
+func TestApplyPruneRemovesOnlyThePlanAndLeavesFrozenACandidate(test *testing.T) {
+	test.Parallel()
 
-	paths, ages := seedPruneCache(t)
+	paths, ages := seedPruneCache(test)
 	plan, err := PlanPrune(paths, nil, "", pruneNow)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	removed, err := ApplyPrune(paths, plan)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(removed) != len(plan.Remove) {
-		t.Fatalf("removed %d of the %d planned", len(removed), len(plan.Remove))
+		test.Fatalf("removed %d of the %d planned", len(removed), len(plan.Remove))
 	}
 	for name := range ages {
 		_, statErr := os.Stat(filepath.Join(paths.BinaryDirectory(), name))
@@ -81,51 +81,51 @@ func TestApplyPruneRemovesOnlyThePlanAndLeavesFrozenACandidate(t *testing.T) {
 			planned = planned || file.Name == name
 		}
 		if planned != os.IsNotExist(statErr) {
-			t.Errorf("%s: planned=%v, but on disk the file %s", name, planned, map[bool]string{true: "is gone", false: "is still there"}[os.IsNotExist(statErr)])
+			test.Errorf("%s: planned=%v, but on disk the file %s", name, planned, map[bool]string{true: "is gone", false: "is still there"}[os.IsNotExist(statErr)])
 		}
 	}
 
 	// A second apply of the same plan finds every file already gone, which is a concurrent prune, not
 	// an error.
 	if again, err := ApplyPrune(paths, plan); err != nil || len(again) != 0 {
-		t.Fatalf("re-applying an applied plan: removed %d, err %v", len(again), err)
+		test.Fatalf("re-applying an applied plan: removed %d, err %v", len(again), err)
 	}
 
 	if _, err := ResolveFrozen(paths); err != nil {
-		t.Fatalf("after a prune --frozen has nothing to run: %v", err)
+		test.Fatalf("after a prune --frozen has nothing to run: %v", err)
 	}
 }
 
-func TestApplyPruneRefusesANameThatIsAPath(t *testing.T) {
-	t.Parallel()
+func TestApplyPruneRefusesANameThatIsAPath(test *testing.T) {
+	test.Parallel()
 
-	paths, _ := seedPruneCache(t)
+	paths, _ := seedPruneCache(test)
 	outside := filepath.Join(paths.CacheDirectory, "outside")
-	writeFile(t, outside, "not in the binary cache\n")
+	writeFile(test, outside, "not in the binary cache\n")
 
 	_, err := ApplyPrune(paths, PrunePlan{Remove: []PrunedFile{{Name: "../outside"}}})
 	if err == nil {
-		t.Fatal("a name that walks out of the binary cache was accepted")
+		test.Fatal("a name that walks out of the binary cache was accepted")
 	}
 	if _, statErr := os.Stat(outside); statErr != nil {
-		t.Fatalf("the file outside the binary cache was removed: %v", statErr)
+		test.Fatalf("the file outside the binary cache was removed: %v", statErr)
 	}
 }
 
 // Compiler extractions and leftover snapshots are judged by the same rule as binaries: the current one
 // and anything used within the hour stay, the rest go. Ages are real (relative to now) rather than to
 // pruneNow, because ApplyPrune asks the clock again at the moment of removal.
-func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(t *testing.T) {
-	t.Parallel()
+func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(test *testing.T) {
+	test.Parallel()
 
-	paths, _ := seedPruneCache(t)
+	paths, _ := seedPruneCache(test)
 	now := time.Now()
 	directory := func(parent string, name string, age time.Duration) string {
 		path := filepath.Join(parent, name)
-		writeFile(t, filepath.Join(path, "tsc", "go.mod"), "module "+name+"\n")
+		writeFile(test, filepath.Join(path, "tsc", "go.mod"), "module "+name+"\n")
 		stamp := now.Add(-age)
 		if err := os.Chtimes(path, stamp, stamp); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		return path
 	}
@@ -141,13 +141,13 @@ func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(t *testing.T) {
 
 	plan, err := PlanPrune(paths, nil, current, now)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	names := func(list []PrunedFile) []string {
 		out := []string{}
 		for _, entry := range list {
 			if entry.Bytes == 0 {
-				t.Errorf("%s planned with no size, so the log would understate what was reclaimed", entry.Name)
+				test.Errorf("%s planned with no size, so the log would understate what was reclaimed", entry.Name)
 			}
 			out = append(out, entry.Name)
 		}
@@ -157,150 +157,150 @@ func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(t *testing.T) {
 	wantCompilers := []string{filepath.Base(stale), filepath.Base(abandoned)}
 	sort.Strings(wantCompilers)
 	if got := names(plan.StaleCompilers); !reflect.DeepEqual(got, wantCompilers) {
-		t.Fatalf("stale compilers %v, expected %v", got, wantCompilers)
+		test.Fatalf("stale compilers %v, expected %v", got, wantCompilers)
 	}
 	if got := names(plan.StaleSnapshots); !reflect.DeepEqual(got, []string{filepath.Base(killed)}) {
-		t.Fatalf("stale snapshots %v, expected only %s", got, filepath.Base(killed))
+		test.Fatalf("stale snapshots %v, expected only %s", got, filepath.Base(killed))
 	}
 
 	if _, err := ApplyPrune(paths, plan); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, path := range []string{stale, abandoned, killed} {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Errorf("%s survived the prune: %v", path, err)
+			test.Errorf("%s survived the prune: %v", path, err)
 		}
 	}
 	for _, path := range []string{current, inUse, extracting, building} {
 		if _, err := os.Stat(filepath.Join(path, "tsc", "go.mod")); err != nil {
-			t.Errorf("%s was removed, and a build can still reach it: %v", path, err)
+			test.Errorf("%s was removed, and a build can still reach it: %v", path, err)
 		}
 	}
 
 	// Without the current compiler named, nothing says which one a build reads, so none is planned.
 	if unknown, err := PlanPrune(paths, nil, "", now); err != nil || len(unknown.StaleCompilers) != 0 {
-		t.Fatalf("with no current compiler, planned %v (err %v)", unknown.StaleCompilers, err)
+		test.Fatalf("with no current compiler, planned %v (err %v)", unknown.StaleCompilers, err)
 	}
 }
 
 // A build that touches an extraction between the plan and its removal keeps it. The plan is made, the
 // extraction is marked used the way ensureCompiler marks it, and the apply must leave it.
-func TestApplyPruneKeepsAnExtractionTouchedSinceThePlan(t *testing.T) {
-	t.Parallel()
+func TestApplyPruneKeepsAnExtractionTouchedSinceThePlan(test *testing.T) {
+	test.Parallel()
 
-	paths, _ := seedPruneCache(t)
+	paths, _ := seedPruneCache(test)
 	now := time.Now()
 	current := filepath.Join(paths.CompilerDirectory(), "current")
-	writeFile(t, filepath.Join(current, "tsc", "go.mod"), "module current\n")
+	writeFile(test, filepath.Join(current, "tsc", "go.mod"), "module current\n")
 	raced := filepath.Join(paths.CompilerDirectory(), "raced")
-	writeFile(t, filepath.Join(raced, "tsc", "go.mod"), "module raced\n")
+	writeFile(test, filepath.Join(raced, "tsc", "go.mod"), "module raced\n")
 	old := now.Add(-5 * time.Hour)
 	if err := os.Chtimes(raced, old, old); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	plan, err := PlanPrune(paths, nil, current, now)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(plan.StaleCompilers) != 1 {
-		t.Fatalf("expected the raced extraction planned, got %v", plan.StaleCompilers)
+		test.Fatalf("expected the raced extraction planned, got %v", plan.StaleCompilers)
 	}
 	if err := os.Chtimes(raced, time.Now(), time.Now()); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if _, err := ApplyPrune(paths, plan); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(raced, "tsc", "go.mod")); err != nil {
-		t.Fatalf("an extraction a build marked in use after the plan was removed: %v", err)
+		test.Fatalf("an extraction a build marked in use after the plan was removed: %v", err)
 	}
 }
 
 // The other half of the race: a build reusing an extraction marks it, so the hour counts from that
 // build. Without the mark, a pin extracted yesterday is stale to the prune while a build compiles
 // against it.
-func TestEnsureCompilerMarksAReusedExtractionInUse(t *testing.T) {
-	t.Parallel()
+func TestEnsureCompilerMarksAReusedExtractionInUse(test *testing.T) {
+	test.Parallel()
 
-	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: t.TempDir()}
+	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: test.TempDir()}
 	commit := "8d550c837c90bd1805b047b7eeccc2baac2d5e7a"
 	extraction := filepath.Join(paths.CompilerDirectory(), commit)
-	writeFile(t, filepath.Join(extraction, "tsc", "go.mod"), "module tsc\n")
+	writeFile(test, filepath.Join(extraction, "tsc", "go.mod"), "module tsc\n")
 	old := time.Now().Add(-48 * time.Hour)
 	if err := os.Chtimes(extraction, old, old); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	got, err := ensureCompiler(paths, commit)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if got != extraction {
-		t.Fatalf("reused %s, expected %s", got, extraction)
+		test.Fatalf("reused %s, expected %s", got, extraction)
 	}
 	information, err := os.Stat(extraction)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if time.Since(information.ModTime()) > time.Minute {
-		t.Fatalf("a reused extraction still reads as last used at %s, so a prune would take it mid-build", information.ModTime())
+		test.Fatalf("a reused extraction still reads as last used at %s, so a prune would take it mid-build", information.ModTime())
 	}
 }
 
-func TestApplyPruneRefusesADirectoryNameThatIsAPath(t *testing.T) {
-	t.Parallel()
+func TestApplyPruneRefusesADirectoryNameThatIsAPath(test *testing.T) {
+	test.Parallel()
 
-	paths, _ := seedPruneCache(t)
+	paths, _ := seedPruneCache(test)
 	outside := filepath.Join(paths.CacheDirectory, "keep")
-	writeFile(t, filepath.Join(outside, "file"), "not in the compiler cache\n")
+	writeFile(test, filepath.Join(outside, "file"), "not in the compiler cache\n")
 
 	_, err := ApplyPrune(paths, PrunePlan{StaleCompilers: []PrunedFile{{Name: "../keep"}}})
 	if err == nil {
-		t.Fatal("a directory name that walks out of the compiler cache was accepted")
+		test.Fatal("a directory name that walks out of the compiler cache was accepted")
 	}
 	if _, statErr := os.Stat(filepath.Join(outside, "file")); statErr != nil {
-		t.Fatalf("the directory outside the compiler cache was removed: %v", statErr)
+		test.Fatalf("the directory outside the compiler cache was removed: %v", statErr)
 	}
 }
 
-func TestAPruneThatRemovesNothingSaysHowManyItLookedAt(t *testing.T) {
-	t.Parallel()
+func TestAPruneThatRemovesNothingSaysHowManyItLookedAt(test *testing.T) {
+	test.Parallel()
 
-	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: t.TempDir()}
+	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: test.TempDir()}
 	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	writeFile(t, filepath.Join(paths.BinaryDirectory(), "cohere-dev"), "binary\n")
+	writeFile(test, filepath.Join(paths.BinaryDirectory(), "cohere-dev"), "binary\n")
 
 	plan, err := PlanPrune(paths, nil, "", pruneNow)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := RecordPrune(paths, plan, nil, pruneNow); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	logged, err := os.ReadFile(paths.PruneLogPath())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if !strings.Contains(string(logged), "examined 1, removed 0 (0 bytes)") {
-		t.Fatalf("the log does not say what an empty prune looked at:\n%s", logged)
+		test.Fatalf("the log does not say what an empty prune looked at:\n%s", logged)
 	}
 
 	// The other direction: a listing that cannot be read is an error, never an empty plan.
-	if _, err := PlanPrune(Paths{CacheDirectory: filepath.Join(t.TempDir(), "absent")}, nil, "", pruneNow); err == nil {
-		t.Fatal("a missing binary cache planned as if it were empty")
+	if _, err := PlanPrune(Paths{CacheDirectory: filepath.Join(test.TempDir(), "absent")}, nil, "", pruneNow); err == nil {
+		test.Fatal("a missing binary cache planned as if it were empty")
 	}
 }
 
 // seedPruneCache fills a binary cache with every kind of entry the real one holds, and returns each
 // file's age relative to pruneNow.
-func seedPruneCache(t *testing.T) (Paths, map[string]time.Duration) {
-	t.Helper()
-	paths := Paths{ModuleDirectory: t.TempDir(), CacheDirectory: t.TempDir()}
+func seedPruneCache(test *testing.T) (Paths, map[string]time.Duration) {
+	test.Helper()
+	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: test.TempDir()}
 	if err := os.MkdirAll(filepath.Join(paths.BinaryDirectory(), "a-subdirectory"), 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	ages := map[string]time.Duration{}
@@ -328,11 +328,11 @@ func seedPruneCache(t *testing.T) (Paths, map[string]time.Duration) {
 	for name, age := range ages {
 		path := filepath.Join(paths.BinaryDirectory(), name)
 		if err := os.WriteFile(path, []byte(name), 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		stamp := pruneNow.Add(-age)
 		if err := os.Chtimes(path, stamp, stamp); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	return paths, ages

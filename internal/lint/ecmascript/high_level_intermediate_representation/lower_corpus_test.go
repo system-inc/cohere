@@ -43,9 +43,9 @@ import (
 // no `switch` written with a space after the keyword, and the grep used to confirm coverage was
 // itself wrong, so "no unsupported constructs" was measuring a corpus far narrower than intended.
 // Widening it is the cheap fix and it costs about a second.
-func corpusRoot(t testing.TB) string {
-	t.Helper()
-	return corpus.Structure.Path(t, "source")
+func corpusRoot(test testing.TB) string {
+	test.Helper()
+	return corpus.Structure.Path(test, "source")
 }
 
 // pinnedCorpusCommit is a commit in the structure corpus's repository whose files can never change.
@@ -70,19 +70,19 @@ const (
 const fastTierVariable = "COHERE_FAST_TIER"
 
 // skipCorpusWalkInFastTier skips a corpus walk under the fast tier, saying so.
-func skipCorpusWalkInFastTier(t *testing.T) {
-	t.Helper()
+func skipCorpusWalkInFastTier(test *testing.T) {
+	test.Helper()
 	if os.Getenv(fastTierVariable) != "" {
-		t.Skip("a corpus walk, left to the landing gate by cohere-dev test --fast")
+		test.Skip("a corpus walk, left to the landing gate by cohere-dev test --fast")
 	}
 }
 
 // skipWithoutCorpus skips a test that walks the live corpus when the fast tier runs it, or when the
 // structure corpus is not set.
-func skipWithoutCorpus(t *testing.T) {
-	t.Helper()
-	skipCorpusWalkInFastTier(t)
-	corpusRoot(t)
+func skipWithoutCorpus(test *testing.T) {
+	test.Helper()
+	skipCorpusWalkInFastTier(test)
+	corpusRoot(test)
 }
 
 // pinnedCorpusFiles returns the first count TypeScript paths under `source/` at pinnedCorpusCommit,
@@ -91,9 +91,9 @@ func skipWithoutCorpus(t *testing.T) {
 // It skips when the structure corpus is not set, as the live tests do. It fails when the corpus is set
 // and the commit or a file is not in it, and when fewer than count files come back,
 // because each of those would otherwise measure a different corpus and still report a number.
-func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
-	t.Helper()
-	skipCorpusWalkInFastTier(t)
+func pinnedCorpusFiles(test *testing.T, count int) ([]string, map[string]string) {
+	test.Helper()
+	skipCorpusWalkInFastTier(test)
 
 	pinnedCorpus.Lock()
 	read := pinnedCorpus.byCount[count]
@@ -103,10 +103,10 @@ func pinnedCorpusFiles(t *testing.T, count int) ([]string, map[string]string) {
 	}
 	pinnedCorpus.Unlock()
 
-	repository := corpus.Structure.Root(t)
+	repository := corpus.Structure.Root(test)
 	read.once.Do(func() { read.paths, read.contents, read.failure = readPinnedCorpus(repository, count) })
 	if read.failure != "" {
-		t.Fatal(read.failure)
+		test.Fatal(read.failure)
 	}
 	return read.paths, read.contents
 }
@@ -189,13 +189,13 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 // set, successors existing, predecessors agreeing in both directions, evaluation order assigned and
 // increasing, every place naming a real identifier. Those are the properties every pass built on
 // this will assume, and they are the ones a construct nobody anticipated will break.
-func TestLowerRealCodebase(t *testing.T) {
-	t.Parallel()
+func TestLowerRealCodebase(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 
 	var files []string
-	err := filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -209,10 +209,10 @@ func TestLowerRealCodebase(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking the corpus: %v", err)
+		test.Fatalf("walking the corpus: %v", err)
 	}
 	if len(files) < 10 {
-		t.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
+		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
 	}
 
 	totalFunctions := 0
@@ -246,9 +246,9 @@ func TestLowerRealCodebase(t *testing.T) {
 			if name == "" {
 				name = "<anonymous>"
 			}
-			t.Run(filepath.Base(path)+"/"+name, func(t *testing.T) {
-				t.Parallel()
-				checkInvariants(t, function)
+			test.Run(filepath.Base(path)+"/"+name, func(test *testing.T) {
+				test.Parallel()
+				checkInvariants(test, function)
 			})
 
 			var count func(*Function)
@@ -269,11 +269,11 @@ func TestLowerRealCodebase(t *testing.T) {
 	}
 
 	if totalFunctions < 1000 {
-		t.Errorf("lowered only %d functions from %d files; the walk is probably not finding them",
+		test.Errorf("lowered only %d functions from %d files; the walk is probably not finding them",
 			totalFunctions, len(files))
 	}
 
-	t.Logf("lowered %d functions from %d files: %d blocks, %d instructions",
+	test.Logf("lowered %d functions from %d files: %d blocks, %d instructions",
 		totalFunctions, len(files), totalBlocks, totalInstructions)
 
 	// The unsupported tally is reported rather than asserted. It is the measurement that tells the
@@ -284,7 +284,7 @@ func TestLowerRealCodebase(t *testing.T) {
 		for reason, count := range unsupported {
 			lines = append(lines, reason+"="+itoa(count))
 		}
-		t.Logf("unsupported constructs encountered: %s", strings.Join(lines, " "))
+		test.Logf("unsupported constructs encountered: %s", strings.Join(lines, " "))
 	}
 }
 
@@ -298,10 +298,10 @@ func TestLowerRealCodebase(t *testing.T) {
 // The sample is read from the pinned corpus, whose files never change. It used to be a named file in the
 // live tree, style/ColorConverter.ts, which moved away and left the test skipping on every machine (#sycrdr6).
 // It is the first pinned file that lowers to something, so the comparison is never over nothing.
-func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
-	t.Parallel()
+func TestLowerRealCodebaseIsDeterministic(test *testing.T) {
+	test.Parallel()
 
-	paths, contents := pinnedCorpusFiles(t, 100)
+	paths, contents := pinnedCorpusFiles(test, 100)
 
 	printOnce := func(path string) string {
 		kind := core.ScriptKindTS
@@ -330,14 +330,14 @@ func TestLowerRealCodebaseIsDeterministic(t *testing.T) {
 		}
 	}
 	if sample == "" {
-		t.Fatalf("none of the %d pinned files lowers to anything, so there is no sample to compare", len(paths))
+		test.Fatalf("none of the %d pinned files lowers to anything, so there is no sample to compare", len(paths))
 	}
 	first := printOnce(sample)
 	second := printOnce(sample)
 	if first != second {
-		t.Error("lowering the same file twice produced different output; something depends on map order")
+		test.Error("lowering the same file twice produced different output; something depends on map order")
 	}
-	t.Logf("lowered %s twice, %d bytes each", sample, len(first))
+	test.Logf("lowered %s twice, %d bytes each", sample, len(first))
 }
 
 // forEachFunctionLike calls visit for every function-like node in the tree, outermost first.

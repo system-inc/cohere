@@ -21,32 +21,32 @@ import (
 // (colon separated), and every repository nested in them is compared as a repository of its own, the way
 // a walk meets it. git runs under sandbox-exec, with no network and no writes outside a temporary
 // directory, and the sandbox is shown to hold before git reads anything.
-func TestTheMatcherAgreesWithGitOnRealTrees(t *testing.T) {
-	t.Parallel()
+func TestTheMatcherAgreesWithGitOnRealTrees(test *testing.T) {
+	test.Parallel()
 	trees := os.Getenv("COHERE_GITIGNORE_TREES")
 	if trees == "" {
-		t.Skip("COHERE_GITIGNORE_TREES names no trees to compare")
+		test.Skip("COHERE_GITIGNORE_TREES names no trees to compare")
 	}
-	oracle := newOracle(t)
+	oracle := newOracle(test)
 	for _, tree := range strings.Split(trees, ":") {
 		pending := []string{tree}
 		for len(pending) > 0 {
 			root := pending[0]
 			pending = pending[1:]
-			comparison := compareWithGit(t, oracle, root)
+			comparison := compareWithGit(test, oracle, root)
 			pending = append(pending, comparison.nested...)
-			t.Logf("%s: %d paths compared (%d ignored, %d re-included by a negation, %d decided by no rule), %d ignore files read, %d nested repositories, %d differences",
+			test.Logf("%s: %d paths compared (%d ignored, %d re-included by a negation, %d decided by no rule), %d ignore files read, %d nested repositories, %d differences",
 				root, comparison.compared, comparison.ignored, comparison.reincluded, comparison.undecided,
 				comparison.ignoreFiles, len(comparison.nested), len(comparison.differences))
 			for index, difference := range comparison.differences {
 				if index == 20 {
-					t.Errorf("%s: %d more differences", root, len(comparison.differences)-20)
+					test.Errorf("%s: %d more differences", root, len(comparison.differences)-20)
 					break
 				}
-				t.Errorf("%s: %s", root, difference)
+				test.Errorf("%s: %s", root, difference)
 			}
 			if comparison.compared == 0 {
-				t.Errorf("%s: no path was compared, so agreeing proves nothing", root)
+				test.Errorf("%s: no path was compared, so agreeing proves nothing", root)
 			}
 		}
 	}
@@ -55,44 +55,44 @@ func TestTheMatcherAgreesWithGitOnRealTrees(t *testing.T) {
 // The same differential over generated trees: random names, random ignore files at random depths, and
 // patterns drawn from every construct gitignore(5) describes, so the matcher meets combinations no real
 // tree holds. COHERE_GITIGNORE_GENERATED is how many trees, COHERE_GITIGNORE_SEED fixes the sequence.
-func TestTheMatcherAgreesWithGitOnGeneratedTrees(t *testing.T) {
-	t.Parallel()
+func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
+	test.Parallel()
 	count, _ := strconv.Atoi(os.Getenv("COHERE_GITIGNORE_GENERATED"))
 	if count <= 0 {
-		t.Skip("COHERE_GITIGNORE_GENERATED asks for no generated trees")
+		test.Skip("COHERE_GITIGNORE_GENERATED asks for no generated trees")
 	}
 	seed, err := strconv.ParseInt(os.Getenv("COHERE_GITIGNORE_SEED"), 10, 64)
 	if err != nil {
 		seed = rand.Int63()
 	}
-	t.Logf("seed %d", seed)
+	test.Logf("seed %d", seed)
 	random := rand.New(rand.NewSource(seed))
-	oracle := newOracle(t)
+	oracle := newOracle(test)
 
 	compared, ignored, reincluded, failing := 0, 0, 0, 0
 	for tree := 0; tree < count; tree++ {
 		root := filepath.Join(oracle.scratch, fmt.Sprintf("generated-%d", tree))
-		exclude := generateTree(t, random, root)
-		oracle.run(t, root, nil, "init", "--quiet")
+		exclude := generateTree(test, random, root)
+		oracle.run(test, root, nil, "init", "--quiet")
 		if exclude != "" {
-			writeTree(t, root, map[string]string{ExcludeFile: exclude})
+			writeTree(test, root, map[string]string{ExcludeFile: exclude})
 		}
-		comparison := compareWithGit(t, oracle, root)
+		comparison := compareWithGit(test, oracle, root)
 		compared += comparison.compared
 		ignored += comparison.ignored
 		reincluded += comparison.reincluded
 		if len(comparison.differences) > 0 {
 			failing++
 			if failing <= 5 {
-				t.Errorf("generated tree %d (%s), %d differences, first: %s", tree, root, len(comparison.differences), comparison.differences[0])
+				test.Errorf("generated tree %d (%s), %d differences, first: %s", tree, root, len(comparison.differences), comparison.differences[0])
 			}
 		}
 	}
-	t.Logf("%d generated trees, %d paths compared (%d ignored, %d re-included by a negation), %d trees with a difference",
+	test.Logf("%d generated trees, %d paths compared (%d ignored, %d re-included by a negation), %d trees with a difference",
 		count, compared, ignored, reincluded, failing)
 	// Trees whose rules decided nothing would agree with git without testing the matcher.
 	if compared == 0 || ignored == 0 || reincluded == 0 {
-		t.Errorf("the generated trees exercised too little: %d compared, %d ignored, %d re-included", compared, ignored, reincluded)
+		test.Errorf("the generated trees exercised too little: %d compared, %d ignored, %d re-included", compared, ignored, reincluded)
 	}
 }
 
@@ -103,14 +103,14 @@ type oracle struct {
 	emptyExclude string
 }
 
-func newOracle(t *testing.T) *oracle {
-	t.Helper()
+func newOracle(test *testing.T) *oracle {
+	test.Helper()
 	if runtime.GOOS != "darwin" {
-		t.Skip("the oracle sandbox is sandbox-exec, which is macOS only")
+		test.Skip("the oracle sandbox is sandbox-exec, which is macOS only")
 	}
-	scratch, err := filepath.EvalSymlinks(t.TempDir())
+	scratch, err := filepath.EvalSymlinks(test.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	profile := filepath.Join(scratch, "oracle.sb")
 	rules := fmt.Sprintf(`(version 1)
@@ -120,11 +120,11 @@ func newOracle(t *testing.T) *oracle {
 (allow file-write* (subpath %q) (literal "/dev/null") (regex #"^/dev/fd/") (literal "/dev/stdout") (literal "/dev/stderr"))
 `, scratch)
 	if err := os.WriteFile(profile, []byte(rules), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	emptyExclude := filepath.Join(scratch, "empty-excludes")
 	if err := os.WriteFile(emptyExclude, nil, 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	result := &oracle{scratch: scratch, profile: profile, emptyExclude: emptyExclude}
 
@@ -133,21 +133,21 @@ func newOracle(t *testing.T) *oracle {
 	outside := filepath.Join(os.Getenv("HOME"), fmt.Sprintf(".cohere-sandbox-probe-%d", os.Getpid()))
 	if err := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/touch", outside).Run(); err == nil {
 		_ = os.Remove(outside)
-		t.Fatal("the sandbox let a write outside its scratch directory through")
+		test.Fatal("the sandbox let a write outside its scratch directory through")
 	}
 	if err := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/touch", filepath.Join(scratch, "inside")).Run(); err != nil {
-		t.Fatalf("the sandbox refused a write inside its scratch directory: %v", err)
+		test.Fatalf("the sandbox refused a write inside its scratch directory: %v", err)
 	}
 	if err := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/nc", "-z", "-G", "2", "1.1.1.1", "443").Run(); err == nil {
-		t.Fatal("the sandbox let a network connection through")
+		test.Fatal("the sandbox let a network connection through")
 	}
 	return result
 }
 
 // run runs git in repository, sandboxed, with no configuration but the repository's own, no global
 // excludes file, and case sensitive matching.
-func (oracle *oracle) run(t *testing.T, repository string, stdin []byte, arguments ...string) []byte {
-	t.Helper()
+func (oracle *oracle) run(test *testing.T, repository string, stdin []byte, arguments ...string) []byte {
+	test.Helper()
 	command := exec.Command("sandbox-exec", append([]string{"-f", oracle.profile, "git",
 		"-c", "core.excludesFile=" + oracle.emptyExclude, "-c", "core.ignorecase=false"}, arguments...)...)
 	command.Dir = repository
@@ -164,7 +164,7 @@ func (oracle *oracle) run(t *testing.T, repository string, stdin []byte, argumen
 		err = nil
 	}
 	if err != nil {
-		t.Fatalf("git %s in %s: %v\n%s", strings.Join(arguments, " "), repository, err, standardError.String())
+		test.Fatalf("git %s in %s: %v\n%s", strings.Join(arguments, " "), repository, err, standardError.String())
 	}
 	return output
 }
@@ -183,12 +183,12 @@ type comparison struct {
 
 // compareWithGit decides every path in the repository at root with the matcher and with git, and lists
 // where they differ. Nested repositories are not entered; they are returned for their own comparison.
-func compareWithGit(t *testing.T, oracle *oracle, root string) comparison {
-	t.Helper()
+func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
+	test.Helper()
 	var result comparison
 	matcher, err := New(root)
 	if err != nil {
-		t.Fatalf("%s: %v", root, err)
+		test.Fatalf("%s: %v", root, err)
 	}
 
 	ours := map[string]verdict{}
@@ -197,7 +197,7 @@ func compareWithGit(t *testing.T, oracle *oracle, root string) comparison {
 	walk = func(scope *Matcher, directory string) {
 		entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(directory)))
 		if err != nil {
-			t.Fatalf("%s: %v", root, err)
+			test.Fatalf("%s: %v", root, err)
 		}
 		for _, entry := range entries {
 			name := entry.Name()
@@ -227,7 +227,7 @@ func compareWithGit(t *testing.T, oracle *oracle, root string) comparison {
 				}
 				child, err := scope.Enter(relative)
 				if err != nil {
-					t.Fatalf("%s: %v", root, err)
+					test.Fatalf("%s: %v", root, err)
 				}
 				walk(child, relative)
 			}
@@ -240,10 +240,10 @@ func compareWithGit(t *testing.T, oracle *oracle, root string) comparison {
 		input.WriteString(relative)
 		input.WriteByte(0)
 	}
-	output := oracle.run(t, root, input.Bytes(), "check-ignore", "--no-index", "--verbose", "--non-matching", "-z", "--stdin")
+	output := oracle.run(test, root, input.Bytes(), "check-ignore", "--no-index", "--verbose", "--non-matching", "-z", "--stdin")
 	fields := bytes.Split(bytes.TrimSuffix(output, []byte{0}), []byte{0})
 	if len(output) > 0 && len(fields)%4 != 0 {
-		t.Fatalf("%s: git printed %d fields, not a multiple of four", root, len(fields))
+		test.Fatalf("%s: git printed %d fields, not a multiple of four", root, len(fields))
 	}
 	theirs := map[string]verdict{}
 	for index := 0; index+3 < len(fields); index += 4 {
@@ -254,7 +254,7 @@ func compareWithGit(t *testing.T, oracle *oracle, root string) comparison {
 		}
 		lineNumber, err := strconv.Atoi(line)
 		if err != nil {
-			t.Fatalf("%s: git printed line %q for %s", root, line, relative)
+			test.Fatalf("%s: git printed line %q for %s", root, line, relative)
 		}
 		theirs[relative] = verdict{ignored: !strings.HasPrefix(pattern, "!"), source: Source{File: file, Line: lineNumber, Pattern: pattern}}
 	}
@@ -289,8 +289,8 @@ func compareWithGit(t *testing.T, oracle *oracle, root string) comparison {
 
 // generateTree writes a random tree with random ignore files under root, and returns patterns for its
 // info/exclude, written once git has made the repository, or "" for none.
-func generateTree(t *testing.T, random *rand.Rand, root string) string {
-	t.Helper()
+func generateTree(test *testing.T, random *rand.Rand, root string) string {
+	test.Helper()
 	names := []string{"a", "b", "ab", "abc", "x.log", "y.tmp", "build", "out", "node_modules", "keep",
 		"#hash", "!bang", "sp ace", "trail ", "star*", "q?", "br[ack]et", "back\\slash", "deep", "Dot.go", ".hidden"}
 	var directories = []string{""}
@@ -311,7 +311,7 @@ func generateTree(t *testing.T, random *rand.Rand, root string) string {
 			files[joinRelative(directory, IgnoreFileName)] = generatePatterns(random, names)
 		}
 	}
-	writeTreeTolerant(t, root, files)
+	writeTreeTolerant(test, root, files)
 	if random.Intn(2) == 0 {
 		return generatePatterns(random, names)
 	}
@@ -319,8 +319,8 @@ func generateTree(t *testing.T, random *rand.Rand, root string) string {
 }
 
 // writeTreeTolerant writes a generated tree, skipping a file whose name a directory already took.
-func writeTreeTolerant(t *testing.T, root string, files map[string]string) {
-	t.Helper()
+func writeTreeTolerant(test *testing.T, root string, files map[string]string) {
+	test.Helper()
 	keys := make([]string, 0, len(files))
 	for name := range files {
 		keys = append(keys, name)
@@ -339,7 +339,7 @@ func writeTreeTolerant(t *testing.T, root string, files map[string]string) {
 			continue
 		}
 		if err := os.WriteFile(full, []byte(files[name]), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 }

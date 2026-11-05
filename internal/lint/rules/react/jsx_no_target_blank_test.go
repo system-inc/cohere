@@ -52,8 +52,8 @@ const jsxNoTargetBlankFile = "/repository/source/JsxNoTargetBlank.tsx"
 // is checked with `ExpectFixedSource`, which compares the whole rewritten file. The 22 with no
 // output are cases upstream reports and declines to fix, and their empty column asserts that
 // decline rather than skipping the question.
-func TestJsxNoTargetBlankFires(t *testing.T) {
-	t.Parallel()
+func TestJsxNoTargetBlankFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -198,14 +198,14 @@ func TestJsxNoTargetBlankFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := decodeTargetBlankOptionsForTest(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 				return
 			}
 			// An empty fix column is an assertion, not a skip.
@@ -220,7 +220,7 @@ func TestJsxNoTargetBlankFires(t *testing.T) {
 			// offered, which is the failure mode the empty column looked like it was closing.
 			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d offered %d fixes; upstream declines to fix this shape",
+					test.Errorf("finding %d offered %d fixes; upstream declines to fix this shape",
 						index, len(diagnostic.Fixes))
 				}
 			}
@@ -228,8 +228,8 @@ func TestJsxNoTargetBlankFires(t *testing.T) {
 	}
 }
 
-func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxNoTargetBlankStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -347,12 +347,12 @@ func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := decodeTargetBlankOptionsForTest(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -362,11 +362,11 @@ func TestJsxNoTargetBlankStaysSilent(t *testing.T) {
 // This is the whole point of storing raw JSON in the tables: the enum inversion and the `links`
 // default live in that function and nowhere else, so a fixture that built the struct directly would
 // be testing the rule against options no config can produce.
-func decodeTargetBlankOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
+func decodeTargetBlankOptionsForTest(test *testing.T, raw string) any {
+	test.Helper()
 	options, err := DecodeJsxNoTargetBlankOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+		test.Fatalf("decoding options %q: %v", raw, err)
 	}
 	return options
 }
@@ -381,8 +381,8 @@ func decodeTargetBlankOptionsForTest(t *testing.T, raw string) any {
 //
 // This matters twice for this rule, because 42 of its fixtures carry a repair: a finding anchored
 // on the wrong node while carrying a fix means the edit lands somewhere the reader was never shown.
-func TestJsxNoTargetBlankSpans(t *testing.T) {
-	t.Parallel()
+func TestJsxNoTargetBlankSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -399,19 +399,19 @@ func TestJsxNoTargetBlankSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := decodeTargetBlankOptionsForTest(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := decodeTargetBlankOptionsForTest(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
 				testCase.sourceText, options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			// `rule_testing.RunWithOptions` does not trim, so the source on disk is this literal and
 			// slicing it directly is sound. The typed harness would need the trim applied first.
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Errorf("span: got %q, want %q", reported, testCase.want)
+				test.Errorf("span: got %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -422,8 +422,8 @@ func TestJsxNoTargetBlankSpans(t *testing.T) {
 // Both lines here have no upstream counterpart to copy from: `enforceDynamicLinks` is a string
 // enum inverted into a bool, and `links` defaults to true. A fixture that built the options struct
 // by hand would exercise neither, which is why every table above routes through this function.
-func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -451,20 +451,20 @@ func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeJsxNoTargetBlankOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.raw, err)
+				test.Fatalf("decoding %q: %v", testCase.raw, err)
 			}
 			if decoded != any(testCase.want) {
-				t.Errorf("got %+v, want %+v", decoded, testCase.want)
+				test.Errorf("got %+v, want %+v", decoded, testCase.want)
 			}
 		})
 	}
 
 	if _, err := DecodeJsxNoTargetBlankOptions([]byte("not json")); err == nil {
-		t.Error("malformed input should error rather than silently producing defaults")
+		test.Error("malformed input should error rather than silently producing defaults")
 	}
 }
 
@@ -474,18 +474,18 @@ func TestDecodeJsxNoTargetBlankOptions(t *testing.T) {
 // `Links` is false rather than upstream's true. Nothing reads `Links` today, so this cannot change
 // a verdict; the test exists because the rule restores the default explicitly and a later reader
 // deleting that restoration should fail here rather than ship a silent change.
-func TestJsxNoTargetBlankHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestJsxNoTargetBlankHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+	result := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
 		"<a target=\"_blank\" href=\"http://x.com\"></a>", nil)
-	rule_testing.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
+	rule_testing.ExpectFindings(test, result, "noTargetBlankWithoutNoreferrer")
 
 	// And the dynamic-href arm, which is the one the absent enum turns ON. A nil-options rule that
 	// read the enum as "never" would be silent here.
-	dynamic := rule_testing.RunWithOptions(t, JsxNoTargetBlank, jsxNoTargetBlankFile,
+	dynamic := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
 		"<a target=\"_blank\" href={dynamicLink}></a>", nil)
-	rule_testing.ExpectFindings(t, dynamic, "noTargetBlankWithoutNoreferrer")
+	rule_testing.ExpectFindings(test, dynamic, "noTargetBlankWithoutNoreferrer")
 }
 
 // TestJsxNoTargetBlankHasNoFileGate pins that the extension decides nothing.
@@ -493,8 +493,8 @@ func TestJsxNoTargetBlankHandlesNilOptions(t *testing.T) {
 // Upstream registers no filename predicate. Only the three JSX-capable extensions are exercised,
 // because a `.ts` file cannot parse `<a ... />` as JSX at all and its silence would say nothing
 // about the rule.
-func TestJsxNoTargetBlankHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestJsxNoTargetBlankHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "<a target=\"_blank\" href=\"http://x.com\"></a>"
 	for _, fileName := range []string{
@@ -502,10 +502,10 @@ func TestJsxNoTargetBlankHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.jsx",
 		"/repository/source/Probe.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, JsxNoTargetBlank, fileName, source, nil)
-			rule_testing.ExpectFindings(t, result, "noTargetBlankWithoutNoreferrer")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, JsxNoTargetBlank, fileName, source, nil)
+			rule_testing.ExpectFindings(test, result, "noTargetBlankWithoutNoreferrer")
 		})
 	}
 }

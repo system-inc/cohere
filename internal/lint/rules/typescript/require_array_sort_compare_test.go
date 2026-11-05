@@ -26,14 +26,14 @@ func requireArraySortCompareCaseName(index int) string {
 //
 // An empty specifier means the case ran with no options at all, which is upstream's default and is
 // also what cohere hands a rule configured as a bare "error".
-func requireArraySortCompareOptionsFor(t *testing.T, optionsJson string) any {
-	t.Helper()
+func requireArraySortCompareOptionsFor(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return DefaultRequireArraySortCompareSettings()
 	}
 	decoded, err := DecodeRequireArraySortCompareOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+		test.Fatalf("decoding %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -46,8 +46,8 @@ func requireArraySortCompareOptionsFor(t *testing.T, optionsJson string) any {
 //
 // Seven of the twenty carry explicit options, and both settings of the single option appear, so the
 // exemption is exercised in both directions rather than only at its default.
-func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -135,11 +135,11 @@ func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+		test.Run(requireArraySortCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
-				requireArraySortCompareOptionsFor(t, testCase.optionsJson)))
+				requireArraySortCompareOptionsFor(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -158,8 +158,8 @@ func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(t *testing.T) {
 // slices the TRIMMED text rather than the Go literal. Every case in this corpus carries a leading
 // newline, so comparing against the literal would be off by one byte on all seventeen and would read
 // exactly like an off-by-one in the rule.
-func TestRequireArraySortCompareFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestRequireArraySortCompareFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -253,28 +253,28 @@ func TestRequireArraySortCompareFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+		test.Run(requireArraySortCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
-				requireArraySortCompareOptionsFor(t, testCase.optionsJson))
-			rule_testing.ExpectFindings(t, result, "requireCompare")
+				requireArraySortCompareOptionsFor(test, testCase.optionsJson))
+			rule_testing.ExpectFindings(test, result, "requireCompare")
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 
 			if diagnostic.Message.Description != "Require 'compare' argument." {
-				t.Fatalf("message: got %q", diagnostic.Message.Description)
+				test.Fatalf("message: got %q", diagnostic.Message.Description)
 			}
 			if diagnostic.Message.Id != "requireCompare" {
-				t.Fatalf("message id: got %q", diagnostic.Message.Id)
+				test.Fatalf("message id: got %q", diagnostic.Message.Id)
 			}
 			if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-				t.Fatalf("expected no repair, got %d fixes and %d suggestions",
+				test.Fatalf("expected no repair, got %d fixes and %d suggestions",
 					len(diagnostic.Fixes), len(diagnostic.Suggestions))
 			}
 		})
@@ -292,8 +292,8 @@ func TestRequireArraySortCompareFiresOnUpstreamFailCases(t *testing.T) {
 // option explicitly and would keep passing, and the twenty-four that do not name it are mostly
 // non-string arrays whose verdict the option cannot change. Only a string array with no options at
 // all separates the two decoders, which is the third case below.
-func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t *testing.T) {
-	t.Parallel()
+func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -305,18 +305,18 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 		{name: "explicitFalse", raw: `{"ignoreStringArrays": false}`, want: false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeRequireArraySortCompareOptions(json.RawMessage(testCase.raw))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.raw, err)
+				test.Fatalf("decoding %s: %v", testCase.raw, err)
 			}
 			options, isOptions := decoded.(RequireArraySortCompareOptions)
 			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than the options struct", decoded)
+				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
 			}
 			if options.IgnoreStringArrays != testCase.want {
-				t.Fatalf("ignoreStringArrays: expected %v, got %v", testCase.want, options.IgnoreStringArrays)
+				test.Fatalf("ignoreStringArrays: expected %v, got %v", testCase.want, options.IgnoreStringArrays)
 			}
 		})
 	}
@@ -331,20 +331,20 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 //
 // A string array with no options is the separating input. Under the default it is exempt; under a
 // zeroed struct it reports.
-func TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions(t *testing.T) {
-	t.Parallel()
+func TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions(test *testing.T) {
+	test.Parallel()
 
 	const stringArray = "['foo', 'bar', 'baz'].sort();"
 
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 		requireArraySortCompareFile, stringArray, nil))
 
 	// The control: the same input with the exemption explicitly off must report, so the clean
 	// verdict above is the option working rather than the rule being inert.
-	reported := rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+	reported := rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 		requireArraySortCompareFile, stringArray,
 		RequireArraySortCompareOptions{IgnoreStringArrays: false})
-	rule_testing.ExpectFindings(t, reported, "requireCompare")
+	rule_testing.ExpectFindings(test, reported, "requireCompare")
 }
 
 // TestRequireArraySortCompareNeedsTheTypedHarness pins the checker declaration.
@@ -353,15 +353,15 @@ func TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions(t *testing.T) 
 // fixture would pass vacuously and every reporting one would fail in a way that reads like a rule
 // defect. Asserting the declaration directly means a later revert fails loudly rather than going
 // quietly green.
-func TestRequireArraySortCompareNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRequireArraySortCompareNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !RequireArraySortCompare.NeedsTypeChecker {
-		t.Fatal("the rule resolves the receiver's type, so it must declare NeedsTypeChecker")
+		test.Fatal("the rule resolves the receiver's type, so it must declare NeedsTypeChecker")
 	}
 
 	// The guard's other half: handed no checker, the rule must stay silent rather than panic.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, RequireArraySortCompare,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, RequireArraySortCompare,
 		requireArraySortCompareFile, "function f(a: number[]) {\n  a.sort();\n}\n"))
 }
 
@@ -372,8 +372,8 @@ func TestRequireArraySortCompareNeedsTheTypedHarness(t *testing.T) {
 // while a mixed tuple is silent for a DIFFERENT reason, that a tuple is not an array type and so
 // fails the report test. Two clean verdicts, two mechanisms, and a port could get one right by
 // accident while breaking the other.
-func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -437,9 +437,9 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(t *test
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+		test.Run(requireArraySortCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
 				DefaultRequireArraySortCompareSettings()))
 		})
@@ -456,8 +456,8 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(t *test
 // That last case is here because the first version of this rule got it wrong from a confident
 // argument. The doc comment asserted `(a.sort)()` was silent upstream on the reasoning that a paren
 // breaks the child relation. Measured, it reports, and the port was silently missing it.
-func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -510,17 +510,17 @@ func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(t *testing.T)
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(requireArraySortCompareCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+		test.Run(requireArraySortCompareCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 				requireArraySortCompareFile, testCase.sourceText,
 				DefaultRequireArraySortCompareSettings())
-			rule_testing.ExpectFindings(t, result, "requireCompare")
+			rule_testing.ExpectFindings(test, result, "requireCompare")
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			gotSpan := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 		})
 	}
@@ -540,15 +540,15 @@ func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(t *testing.T)
 // The controls matter as much as the case: the literal-key spelling of the same access DOES report
 // here, so the silence below is specifically about folding through a binding rather than about
 // computed access being unsupported.
-func TestRequireArraySortCompareDoesNotConstantFoldAComputedKey(t *testing.T) {
-	t.Parallel()
+func TestRequireArraySortCompareDoesNotConstantFoldAComputedKey(test *testing.T) {
+	test.Parallel()
 
 	const folded = "function f(a: number[]) {\n  const key = 'sort';\n  a[key]();\n}"
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 		requireArraySortCompareFile, folded, DefaultRequireArraySortCompareSettings()))
 
 	const literalKey = "function f(a: number[]) {\n  a['sort']();\n}"
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RequireArraySortCompare,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RequireArraySortCompare,
 		requireArraySortCompareFile, literalKey, DefaultRequireArraySortCompareSettings()),
 		"requireCompare")
 }

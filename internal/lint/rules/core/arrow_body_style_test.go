@@ -27,16 +27,16 @@ type arrowBodyStyleCase struct {
 // Through the decoder rather than by building the struct, because the decoder is where the default
 // mode is applied and where an unknown mode is rejected, and neither line has an upstream
 // counterpart to inherit correctness from.
-func runArrowBodyStyle(t *testing.T, testCase arrowBodyStyleCase) rule_testing.Result {
-	t.Helper()
+func runArrowBodyStyle(test *testing.T, testCase arrowBodyStyleCase) rule_testing.Result {
+	test.Helper()
 	if testCase.options == nil {
-		return rule_testing.Run(t, ArrowBodyStyle, arrowBodyStyleFile, testCase.sourceText)
+		return rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile, testCase.sourceText)
 	}
 	decoded, err := DecodeArrowBodyStyleOptions([]byte(arrowBodyStyleUpstreamList(testCase.options.(ArrowBodyStyleOptions))))
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, ArrowBodyStyle, arrowBodyStyleFile,
+	return rule_testing.RunWithOptions(test, ArrowBodyStyle, arrowBodyStyleFile,
 		testCase.sourceText, decoded)
 }
 
@@ -163,24 +163,24 @@ func arrowBodyStyleSilentCases() []arrowBodyStyleCase {
 	}
 }
 
-func TestArrowBodyStyleFires(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range arrowBodyStyleFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runArrowBodyStyle(t, testCase), testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runArrowBodyStyle(test, testCase), testCase.wantIds...)
 		})
 	}
 }
 
-func TestArrowBodyStyleStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range arrowBodyStyleSilentCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runArrowBodyStyle(t, testCase))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runArrowBodyStyle(test, testCase))
 		})
 	}
 }
@@ -197,16 +197,16 @@ func TestArrowBodyStyleStaysSilent(t *testing.T) {
 // so a typed rule's expectation must be transformed the same way or every byte-correct repair fails
 // on a trailing newline. `Run` does not trim, this rule needs no checker, and transforming here
 // instead broke all 56 rows before the difference was measured rather than assumed.
-func TestArrowBodyStyleFixesTheSource(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleFixesTheSource(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range arrowBodyStyleFiresCases() {
 		if testCase.wantFixedSource == "" {
 			continue
 		}
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t, runArrowBodyStyle(t, testCase),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test, runArrowBodyStyle(test, testCase),
 				testCase.wantFixedSource)
 		})
 	}
@@ -221,8 +221,8 @@ func TestArrowBodyStyleFixesTheSource(t *testing.T) {
 //
 // Asserted as carrying NO fix at all, rather than as a fix that happens to be a no-op: those are
 // different artifacts and only the first is what upstream ships.
-func TestArrowBodyStyleDeclinesToFix(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleDeclinesToFix(test *testing.T) {
+	test.Parallel()
 
 	declined := 0
 	for _, testCase := range arrowBodyStyleFiresCases() {
@@ -230,22 +230,22 @@ func TestArrowBodyStyleDeclinesToFix(t *testing.T) {
 			continue
 		}
 		declined++
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runArrowBodyStyle(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runArrowBodyStyle(test, testCase)
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("wanted a finding")
+				test.Fatal("wanted a finding")
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d carried %d fixes, wanted none", index,
+					test.Errorf("finding %d carried %d fixes, wanted none", index,
 						len(diagnostic.Fixes))
 				}
 			}
 		})
 	}
 	if declined != 7 {
-		t.Errorf("the corpus carried %d declined repairs, wanted 7", declined)
+		test.Errorf("the corpus carried %d declined repairs, wanted 7", declined)
 	}
 }
 
@@ -254,8 +254,8 @@ func TestArrowBodyStyleDeclinesToFix(t *testing.T) {
 // Upstream reports the arrow function node but overrides the location to the BODY, which is a
 // distinction invisible from the message id and easy to get wrong in the direction that still looks
 // plausible: pointing at the whole arrow reads fine in a terminal and puts the caret on `var`.
-func TestArrowBodyStylePointsAtTheBody(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStylePointsAtTheBody(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -270,16 +270,16 @@ func TestArrowBodyStylePointsAtTheBody(t *testing.T) {
 		{"var foo = () => { return { bar: 1 }; };", nil, "{ return { bar: 1 }; }"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runArrowBodyStyle(t, arrowBodyStyleCase{
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runArrowBodyStyle(test, arrowBodyStyleCase{
 				sourceText: testCase.sourceText, options: testCase.options})
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			span := result.Diagnostics[0].Range
 			if got := testCase.sourceText[span.Pos():span.End()]; got != testCase.wantSpan {
-				t.Errorf("pointed at %q, wanted %q", got, testCase.wantSpan)
+				test.Errorf("pointed at %q, wanted %q", got, testCase.wantSpan)
 			}
 		})
 	}
@@ -291,8 +291,8 @@ func TestArrowBodyStylePointsAtTheBody(t *testing.T) {
 // Upstream chooses between them by what the block holds, because the remedy differs in each case,
 // and a rule reporting one id for all four would pass a count-based fixture set. These are the four
 // discriminating shapes, one per id.
-func TestArrowBodyStyleChoosesTheMessageByShape(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleChoosesTheMessageByShape(test *testing.T) {
+	test.Parallel()
 
 	never := ArrowBodyStyleOptions{Mode: ArrowBodyStyleNever}
 	cases := []arrowBodyStyleCase{
@@ -303,9 +303,9 @@ func TestArrowBodyStyleChoosesTheMessageByShape(t *testing.T) {
 		{"var foo = () => { return { bar: 1 }; };", never, []string{"unexpectedObjectBlock"}, ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runArrowBodyStyle(t, testCase), testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runArrowBodyStyle(test, testCase), testCase.wantIds...)
 		})
 	}
 }
@@ -314,71 +314,71 @@ func TestArrowBodyStyleChoosesTheMessageByShape(t *testing.T) {
 // spelling of the first. The default, the mode-dependent second element and the rejection of an
 // unknown mode are written here rather than inherited, and none would be exercised by a fixture that
 // built the options struct directly.
-func TestDecodeArrowBodyStyleOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeArrowBodyStyleOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("nil input selects upstream's default mode", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil input selects upstream's default mode", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeArrowBodyStyleOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		if mode := decoded.(ArrowBodyStyleOptions).Mode; mode != ArrowBodyStyleAsNeeded {
-			t.Errorf("mode came back %q, wanted AsNeeded", mode)
+			test.Errorf("mode came back %q, wanted AsNeeded", mode)
 		}
 	})
 
-	t.Run("the second element is read beside as-needed", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the second element is read beside as-needed", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeArrowBodyStyleOptions(
 			[]byte(`["as-needed", {"requireReturnForObjectLiteral": true}]`))
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		options := decoded.(ArrowBodyStyleOptions)
 		if options.Mode != ArrowBodyStyleAsNeeded {
-			t.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
+			test.Errorf("mode came back %q, wanted AsNeeded", options.Mode)
 		}
 		if !options.RequireReturnForObjectLiteral {
-			t.Error("the second element was handed over and not read")
+			test.Error("the second element was handed over and not read")
 		}
 	})
 
-	t.Run("a second element beside always is refused rather than ignored", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a second element beside always is refused rather than ignored", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeArrowBodyStyleOptions(
 			[]byte(`["always", {"requireReturnForObjectLiteral": true}]`)); err == nil {
-			t.Error("an option the always mode never reads decoded")
+			test.Error("an option the always mode never reads decoded")
 		}
 	})
 
-	t.Run("a third element is refused", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a third element is refused", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeArrowBodyStyleOptions(
 			[]byte(`["as-needed", {"requireReturnForObjectLiteral": true}, "never"]`)); err == nil {
-			t.Error("a third element decoded and would have been dropped")
+			test.Error("a third element decoded and would have been dropped")
 		}
 	})
 
-	t.Run("an unknown key in the second element is refused", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unknown key in the second element is refused", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeArrowBodyStyleOptions(
 			[]byte(`["as-needed", {"requireReturnForObjectLiterals": true}]`)); err == nil {
-			t.Error("a misspelled key decoded, so the option it carried would be ignored")
+			test.Error("a misspelled key decoded, so the option it carried would be ignored")
 		}
 	})
 
-	t.Run("an unknown mode is rejected rather than silently disabling the rule", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unknown mode is rejected rather than silently disabling the rule", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeArrowBodyStyleOptions([]byte(`["AsNeeded"]`)); err == nil {
-			t.Error("the Go constant's spelling decoded; it is not one of upstream's three modes")
+			test.Error("the Go constant's spelling decoded; it is not one of upstream's three modes")
 		}
 	})
 
-	t.Run("the retired object spelling is rejected", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the retired object spelling is rejected", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeArrowBodyStyleOptions([]byte(`{"mode":"Always"}`)); err == nil {
-			t.Error("the pre-list object spelling decoded, which the config layer never delivers")
+			test.Error("the pre-list object spelling decoded, which the config layer never delivers")
 		}
 	})
 }
@@ -388,16 +388,16 @@ func TestDecodeArrowBodyStyleOptions(t *testing.T) {
 // `options.(T)` on nil yields the zero value, whose empty mode matches no arm in the rule, so
 // without the fallback the rule would register on every file and report nothing. Every fixture
 // above reaches the rule through the decoder, so none of them can see this.
-func TestArrowBodyStyleWithNilOptionsUsesAsNeeded(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleWithNilOptionsUsesAsNeeded(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ArrowBodyStyle, arrowBodyStyleFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile,
 		"var foo = () => { return 0; };"), "unexpectedSingleBlock")
 	// Always and Never both differ from AsNeeded here, so this pins WHICH default was chosen
 	// rather than merely that some default was.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, ArrowBodyStyle, arrowBodyStyleFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile,
 		"var foo = () => 0;"))
-	rule_testing.ExpectClean(t, rule_testing.Run(t, ArrowBodyStyle, arrowBodyStyleFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ArrowBodyStyle, arrowBodyStyleFile,
 		"var foo = () => { bar(); };"))
 }
 
@@ -410,8 +410,8 @@ func TestArrowBodyStyleWithNilOptionsUsesAsNeeded(t *testing.T) {
 //
 // The three rows separate the two things a `/` can start. Every verdict was measured against the
 // installed rule before it was written down.
-func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(test *testing.T) {
+	test.Parallel()
 
 	cases := []arrowBodyStyleCase{
 		// A comment then a semicolon: repaired, and the comment survives.
@@ -424,19 +424,19 @@ func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(t *testing.T) {
 			[]string{"unexpectedSingleBlock"}, ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runArrowBodyStyle(t, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runArrowBodyStyle(test, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixedSource == "" {
 				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d carried a repair, wanted none", index)
+						test.Errorf("finding %d carried a repair, wanted none", index)
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 }
@@ -452,8 +452,8 @@ func TestArrowBodyStyleSkipsCommentsWhenCheckingTheNextToken(t *testing.T) {
 //
 // The clause discrimination is the other half: only a for statement's INITIALIZER makes `in`
 // ambiguous, so the same arrow in the condition clause needs no parentheses.
-func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(test *testing.T) {
+	test.Parallel()
 
 	cases := []arrowBodyStyleCase{
 		// The initializer clause: wrapped.
@@ -481,11 +481,11 @@ func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(t *testing.T) {
 			"for (var f = () => a;;);"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runArrowBodyStyle(t, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runArrowBodyStyle(test, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 }
@@ -501,8 +501,8 @@ func TestArrowBodyStyleParenthesizesTheInOperatorLikeUpstream(t *testing.T) {
 // All four outputs were measured against the installed rule before being written down: the
 // preserving branch removes only the tokens and leaves the whitespace, which is why the repaired
 // source carries doubled spaces that the ordinary branch would have collapsed.
-func TestArrowBodyStyleKeepsCommentsOnEitherSide(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleKeepsCommentsOnEitherSide(test *testing.T) {
+	test.Parallel()
 
 	cases := []arrowBodyStyleCase{
 		// Before the return keyword: only the first half of the check sees this.
@@ -530,11 +530,11 @@ func TestArrowBodyStyleKeepsCommentsOnEitherSide(t *testing.T) {
 			"var foo = () => 5;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runArrowBodyStyle(t, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runArrowBodyStyle(test, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixedSource)
 		})
 	}
 }
@@ -552,13 +552,13 @@ func TestArrowBodyStyleKeepsCommentsOnEitherSide(t *testing.T) {
 // So the check is structural rather than textual: assert directly that the ranges are pairwise
 // disjoint. A test that only compared the rewritten source would keep passing under the same defect,
 // which is exactly what happened.
-func TestArrowBodyStyleProposesDisjointFixes(t *testing.T) {
-	t.Parallel()
+func TestArrowBodyStyleProposesDisjointFixes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range arrowBodyStyleFiresCases() {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := runArrowBodyStyle(t, testCase)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := runArrowBodyStyle(test, testCase)
 			type span struct{ start, end int }
 			var spans []span
 			for _, diagnostic := range result.Diagnostics {
@@ -578,7 +578,7 @@ func TestArrowBodyStyleProposesDisjointFixes(t *testing.T) {
 						right.start == right.end && left.start != right.start) {
 						if right.start < left.end || left.start == left.end ||
 							right.start == right.end {
-							t.Errorf("fixes [%d,%d) and [%d,%d) touch or overlap, so the engine "+
+							test.Errorf("fixes [%d,%d) and [%d,%d) touch or overlap, so the engine "+
 								"will drop one", left.start, left.end, right.start, right.end)
 						}
 					}

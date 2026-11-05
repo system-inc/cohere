@@ -22,8 +22,8 @@ const guardForInFile = "/repository/source/GuardForIn.ts"
 // rule is asking for. A block holding only an `if` is the same shape wearing braces. And the last two
 // are the guard written as an early `continue`, in both the braced and unbraced spellings, which is
 // the idiom the rule exists to permit rather than to flag.
-func TestGuardForInStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestGuardForInStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"for (var x in o);",
@@ -35,9 +35,9 @@ func TestGuardForInStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, GuardForIn, guardForInFile, sourceText))
 		})
 	}
 }
@@ -48,8 +48,8 @@ func TestGuardForInStaysSilent(t *testing.T) {
 // something else is NOT the early-exit idiom, in either order, because the other statement runs. The
 // third and fourth guard part of the body and then run `g()` unguarded. The last two have no guard
 // at all, braced and unbraced.
-func TestGuardForInFires(t *testing.T) {
-	t.Parallel()
+func TestGuardForInFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"for (var x in o) { if (x) { f(); continue; } g(); }",
@@ -61,10 +61,10 @@ func TestGuardForInFires(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, GuardForIn, guardForInFile, sourceText), "wrap")
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, GuardForIn, guardForInFile, sourceText), "wrap")
 		})
 	}
 }
@@ -74,25 +74,25 @@ func TestGuardForInFires(t *testing.T) {
 // Upstream reports on the loop STATEMENT rather than on the body or on the `for` keyword, so the
 // finding covers the whole loop including its head. A port anchoring on the body would pass every
 // assertion above while pointing somewhere the reader was not shown.
-func TestGuardForInReportsOnTheWholeLoop(t *testing.T) {
-	t.Parallel()
+func TestGuardForInReportsOnTheWholeLoop(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "for (var x in o) foo();"
 
-	result := rule_testing.Run(t, GuardForIn, guardForInFile, sourceText)
+	result := rule_testing.Run(test, GuardForIn, guardForInFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 
 	// `rule_testing.Run` does not trim, so the literal above and the file on disk agree and slicing the
 	// literal is safe here. `RunTyped` would trim and this slice would be off by one.
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != sourceText {
-		t.Fatalf("finding spans %q, wanted the whole loop %q", reported, sourceText)
+		test.Fatalf("finding spans %q, wanted the whole loop %q", reported, sourceText)
 	}
 
 	if result.Diagnostics[0].Message.Id != "wrap" {
-		t.Fatalf("message id is %q, wanted %q", result.Diagnostics[0].Message.Id, "wrap")
+		test.Fatalf("message id is %q, wanted %q", result.Diagnostics[0].Message.Id, "wrap")
 	}
 }
 
@@ -103,15 +103,15 @@ func TestGuardForInReportsOnTheWholeLoop(t *testing.T) {
 // isolates why: the single-statement arm accepts ANY consequent while the longer-block arm demands
 // a bare `continue`. A port collapsing the two arms into one `continue` test would report the first
 // of these, which upstream accepts. A port collapsing them the other way would accept the second.
-func TestGuardForInSeparatesTheTwoBlockArms(t *testing.T) {
-	t.Parallel()
+func TestGuardForInSeparatesTheTwoBlockArms(test *testing.T) {
+	test.Parallel()
 
 	// One statement, a non-skipping consequent: clean, because the `if` is the whole body.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, GuardForIn, guardForInFile,
 		"for (var x in o) { if (x) { f(); } }"))
 
 	// Two statements, the same non-skipping consequent: reports, because `g()` runs unfiltered.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, GuardForIn, guardForInFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, GuardForIn, guardForInFile,
 		"for (var x in o) { if (x) { f(); } g(); }"), "wrap")
 }
 
@@ -122,14 +122,14 @@ func TestGuardForInSeparatesTheTwoBlockArms(t *testing.T) {
 // rather than on `KindForInStatement` would report every unguarded `for-of` in the tree, and no
 // imported fixture can see it: upstream's corpus writes no `for-of` at all, because its parser
 // gives the two different node types and the mistake is not available there.
-func TestGuardForInDeclinesForOf(t *testing.T) {
-	t.Parallel()
+func TestGuardForInDeclinesForOf(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, GuardForIn, guardForInFile, "for (var x of o) foo();"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, GuardForIn, guardForInFile, "for (var x of o) foo();"))
 
 	// The control: the same body under `for-in` does report, so the silence above is about the
 	// loop kind rather than about the fixture failing to reach the rule.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, GuardForIn, guardForInFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, GuardForIn, guardForInFile,
 		"for (var x in o) foo();"), "wrap")
 }
 
@@ -140,8 +140,8 @@ func TestGuardForInDeclinesForOf(t *testing.T) {
 // unstated. These are the ones where a defensible reading of the source gives the wrong answer, so
 // each row is a place a port could drift silently. Driven with the ESLint Linter API on
 // `sourceType: "script"`, `ecmaVersion: 2022`.
-func TestGuardForInMatchesTheInstalledBuild(t *testing.T) {
-	t.Parallel()
+func TestGuardForInMatchesTheInstalledBuild(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -181,11 +181,11 @@ func TestGuardForInMatchesTheInstalledBuild(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, GuardForIn, guardForInFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, GuardForIn, guardForInFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Fatalf("got %d findings, wanted %d (measured on eslint 10.8.1)",
+				test.Fatalf("got %d findings, wanted %d (measured on eslint 10.8.1)",
 					len(result.Diagnostics), testCase.wantFindings)
 			}
 		})

@@ -36,8 +36,8 @@ func idLengthOf(optionJson string) any {
 // see text.GraphemeCount, which is scored against Intl.Segmenter.
 //
 //	84 reporting cases, 97 clean cases.
-func TestIdLengthFires(t *testing.T) {
-	t.Parallel()
+func TestIdLengthFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -134,21 +134,21 @@ func TestIdLengthFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, IdLength, idLengthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, len(testCase.findings),
 				len(result.Diagnostics), result.MessageIds())
 			continue
 		}
-		rule_testing.ExpectFindings(t, result, testCase.findings...)
+		rule_testing.ExpectFindings(test, result, testCase.findings...)
 	}
 }
 
 // TestIdLengthStaysSilent carries upstream's clean cases, which are the false positives it already
 // thought about. Each one is a class this port would otherwise ship.
-func TestIdLengthStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestIdLengthStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -258,13 +258,13 @@ func TestIdLengthStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, IdLength, idLengthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("%q with %+v: expected no findings, got %d: %v",
+			test.Errorf("%q with %+v: expected no findings, got %d: %v",
 				testCase.source, testCase.settings, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -295,8 +295,8 @@ func TestIdLengthStaysSilent(t *testing.T) {
 // looking identical while silently destroying what they test. The glyphs above appear raw in this
 // comment only, for readability; the first draft of this file wrote them raw in the literals too,
 // which is how it got checked.
-func TestIdLengthCountsGraphemesNotRunes(t *testing.T) {
-	t.Parallel()
+func TestIdLengthCountsGraphemesNotRunes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -331,15 +331,15 @@ func TestIdLengthCountsGraphemesNotRunes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, IdLength, idLengthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, len(testCase.findings),
 				len(result.Diagnostics), result.MessageIds())
 			continue
 		}
 		if len(testCase.findings) > 0 {
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		}
 	}
 }
@@ -366,8 +366,8 @@ func TestIdLengthCountsGraphemesNotRunes(t *testing.T) {
 //	var [ a ] = x;         properties never   1 finding
 //	function f([a]) {}     properties never   2 findings, on `f` and `a`
 //	var { p: [a] } = x;    properties never   1 finding, on `a`
-func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(t *testing.T) {
-	t.Parallel()
+func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -393,9 +393,9 @@ func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, IdLength, idLengthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 			continue
@@ -406,7 +406,7 @@ func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(t *testing.T) {
 		source := result.SourceFile.Text()
 		reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != testCase.reported {
-			t.Errorf("%q: expected the finding on %q, got %q", testCase.source, testCase.reported, reported)
+			test.Errorf("%q: expected the finding on %q, got %q", testCase.source, testCase.reported, reported)
 		}
 	}
 }
@@ -421,8 +421,8 @@ func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(t *testing.T) {
 // the message text is a verdict a fixture asserts, not a thing to tidy.
 //
 // Every expected span and message is what the installed ESLint 10.8.1 rule produced.
-func TestIdLengthSpansAndMessages(t *testing.T) {
-	t.Parallel()
+func TestIdLengthSpansAndMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -466,9 +466,9 @@ func TestIdLengthSpansAndMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, IdLength, idLengthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.spans) {
-			t.Errorf("%q: expected %d findings, got %d %v",
+			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, len(testCase.spans), len(result.Diagnostics), result.MessageIds())
 			continue
 		}
@@ -476,11 +476,11 @@ func TestIdLengthSpansAndMessages(t *testing.T) {
 		for index, diagnostic := range result.Diagnostics {
 			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.spans[index] {
-				t.Errorf("%q finding %d: expected the span to cover %q, got %q",
+				test.Errorf("%q finding %d: expected the span to cover %q, got %q",
 					testCase.source, index, testCase.spans[index], reported)
 			}
 			if !strings.HasPrefix(diagnostic.Message.Description, testCase.messages[index]) {
-				t.Errorf("%q finding %d: expected the message to open with %q, got %q",
+				test.Errorf("%q finding %d: expected the message to open with %q, got %q",
 					testCase.source, index, testCase.messages[index], diagnostic.Message.Description)
 			}
 		}
@@ -493,50 +493,50 @@ func TestIdLengthSpansAndMessages(t *testing.T) {
 // A rule handed nil options must enforce a minimum of 2 with properties ON. The zero value says
 // minimum 0 and properties off, which is not a weaker rule but a silent one, and every fixture
 // above would still pass because they all configure explicitly.
-func TestIdLengthDecoderReadsEveryOption(t *testing.T) {
-	t.Parallel()
+func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeIdLengthOptions([]byte(`{"min": 3, "max": 9, "properties": "never", "exceptions": ["x"], "exceptionPatterns": ["^_"]}`))
 	if err != nil {
-		t.Fatalf("decoding a full option object: %v", err)
+		test.Fatalf("decoding a full option object: %v", err)
 	}
 	settings, ok := decoded.(IdLengthSettings)
 	if !ok {
-		t.Fatalf("expected IdLengthSettings, got %T", decoded)
+		test.Fatalf("expected IdLengthSettings, got %T", decoded)
 	}
 	if settings.Minimum != 3 || settings.Maximum != 9 || !settings.HasMaximum {
-		t.Errorf("expected min 3 and max 9, got %+v", settings)
+		test.Errorf("expected min 3 and max 9, got %+v", settings)
 	}
 	if settings.CheckProperties {
-		t.Error(`expected properties "never" to turn property checking off`)
+		test.Error(`expected properties "never" to turn property checking off`)
 	}
 	if !settings.Exceptions["x"] || len(settings.ExceptionPatterns) != 1 {
-		t.Errorf("expected the exception list and pattern to be read, got %+v", settings)
+		test.Errorf("expected the exception list and pattern to be read, got %+v", settings)
 	}
 
 	// The defaults, which the zero value does not supply.
 	decoded, _ = DecodeIdLengthOptions(nil)
 	settings, _ = decoded.(IdLengthSettings)
 	if settings.Minimum != 2 || !settings.CheckProperties || settings.HasMaximum {
-		t.Errorf("expected the documented defaults (min 2, properties on, no maximum), got %+v", settings)
+		test.Errorf("expected the documented defaults (min 2, properties on, no maximum), got %+v", settings)
 	}
 
 	// An uncompilable exception pattern is an error rather than a silently dropped exemption,
 	// which would report names the author asked to exempt.
 	if _, err := DecodeIdLengthOptions([]byte(`{"exceptionPatterns": ["^[a-z"]}`)); err == nil {
-		t.Error("expected an uncompilable exceptionPattern to be reported, got no error")
+		test.Error("expected an uncompilable exceptionPattern to be reported, got no error")
 	}
 
 	// End to end: a rule handed nil options enforces the default minimum rather than nothing.
-	result := rule_testing.RunWithOptions(t, IdLength, idLengthFile, "var a = 1;", nil)
+	result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, "var a = 1;", nil)
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected the default minimum of 2 to report once, got %d: %v",
+		test.Errorf("expected the default minimum of 2 to report once, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 	// And the control: with properties on by default, an object key is checked too.
-	result = rule_testing.RunWithOptions(t, IdLength, idLengthFile, "var obj = { a: 1 };", nil)
+	result = rule_testing.RunWithOptions(test, IdLength, idLengthFile, "var obj = { a: 1 };", nil)
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected properties to be checked by default, got %d: %v",
+		test.Errorf("expected properties to be checked by default, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 }

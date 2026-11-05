@@ -14,8 +14,8 @@ const dupeClassMembersFile = "/repository/source/Members.ts"
 // One Tester block, 36 pass and 38 fail, with the snapshot recording 40 diagnostics from 38 inputs:
 // two inputs declare the same member three times and report twice, so a fixture asserting one
 // finding per input is wrong on those and right everywhere else.
-func TestNoDupeClassMembersFires(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -40,10 +40,10 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
 				"noDupeClassMembers")
 		})
 	}
@@ -58,8 +58,8 @@ func TestNoDupeClassMembersFires(t *testing.T) {
 //
 // A rule comparing source text gets two of these right by accident and two wrong; one comparing
 // cooked text gets the other pair wrong. The type has to travel with the value.
-func TestNoDupeClassMembersStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -85,10 +85,10 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
 		})
 	}
 }
@@ -99,13 +99,13 @@ func TestNoDupeClassMembersStaysSilent(t *testing.T) {
 // Upstream tracks that with an `is_private` flag on the element and its corpus never exercises it,
 // which is exactly the shape a port drops silently: the flag looks like defensive copying until a
 // file declares both.
-func TestNoDupeClassMembersSeparatesPrivateNames(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersSeparatesPrivateNames(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoDupeClassMembers, dupeClassMembersFile,
 		"class A { #foo() {} foo() {} }"))
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoDupeClassMembers, dupeClassMembersFile,
 		"class A { #foo() {} #foo() {} }"), "noDupeClassMembers")
 }
 
@@ -121,8 +121,8 @@ func TestNoDupeClassMembersSeparatesPrivateNames(t *testing.T) {
 //
 // Found on `BaseSchema.ts` in a real repository, which overloads `is` and `in` twice each: four
 // reports on code `tsc --noEmit` accepts without a diagnostic.
-func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersAllowsOverloadSignatures(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -137,10 +137,10 @@ func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText))
 		})
 	}
 }
@@ -150,8 +150,8 @@ func TestNoDupeClassMembersAllowsOverloadSignatures(t *testing.T) {
 // The half that makes the test above mean something: skipping every body-less member would let a
 // genuine duplicate through, and the third case is the one that catches it, since a class can carry
 // signatures and a duplicate implementation at once.
-func TestNoDupeClassMembersStillReportsDuplicatesBesideOverloads(t *testing.T) {
-	t.Parallel()
+func TestNoDupeClassMembersStillReportsDuplicatesBesideOverloads(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -164,10 +164,10 @@ func TestNoDupeClassMembersStillReportsDuplicatesBesideOverloads(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoDupeClassMembers, dupeClassMembersFile, testCase.sourceText),
 				"noDupeClassMembers")
 		})
 	}

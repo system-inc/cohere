@@ -52,8 +52,8 @@ import (
 // test panicked rather than failing, which is the whole argument for asserting instead of printing.
 // A probe that printed its result would have shown the panic as a crash with no verdict attached,
 // and the wrong belief would have reached the rule.
-func TestAliasAccessorsWalkTheChainToADeprecation(t *testing.T) {
-	t.Parallel()
+func TestAliasAccessorsWalkTheChainToADeprecation(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name string
 		// otherSource is the imported module, where the deprecation is written.
@@ -86,24 +86,24 @@ func TestAliasAccessorsWalkTheChainToADeprecation(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			fileChecker, sourceFile, release := buildAliasSubject(t, testCase.otherSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			fileChecker, sourceFile, release := buildAliasSubject(test, testCase.otherSource)
 			defer release()
 
-			importedUse := aliasSubjectImportedUse(t, fileChecker, sourceFile)
+			importedUse := aliasSubjectImportedUse(test, fileChecker, sourceFile)
 
 			// The symbol an import produces must BE an alias, or the two accessors below are never
 			// reached and every assertion after this is vacuous.
 			if importedUse.Flags&ast.SymbolFlagsAlias == 0 {
-				t.Fatalf("the imported symbol does not carry SymbolFlagsAlias, so the alias "+
+				test.Fatalf("the imported symbol does not carry SymbolFlagsAlias, so the alias "+
 					"accessors are unreachable and this case measures nothing (flags %v)",
 					importedUse.Flags)
 			}
 
 			resolved := checker.Checker_resolveAlias(fileChecker, importedUse)
 			if resolved == nil {
-				t.Fatal("Checker_resolveAlias returned nil for a symbol carrying the alias flag")
+				test.Fatal("Checker_resolveAlias returned nil for a symbol carrying the alias flag")
 			}
 			// It must reach the ORIGINAL, not merely something. A chain that stopped at the export
 			// would satisfy a nil check and answer the wrong question.
@@ -112,18 +112,18 @@ func TestAliasAccessorsWalkTheChainToADeprecation(t *testing.T) {
 			// a name that happens to match.
 			const aliasName, originalName = "renamed", "exported"
 			if resolved.Name != originalName {
-				t.Errorf("Checker_resolveAlias reached %q; it must reach the original %q rather "+
+				test.Errorf("Checker_resolveAlias reached %q; it must reach the original %q rather "+
 					"than stopping at the alias %q", resolved.Name, originalName, aliasName)
 			}
 			if got := symbolIsDeprecated(resolved); got != testCase.wantResolvedFindsDeprecation {
-				t.Errorf("reading the resolved symbol alone says deprecated=%v, wanted %v; that is "+
+				test.Errorf("reading the resolved symbol alone says deprecated=%v, wanted %v; that is "+
 					"the answer a rule gives WITHOUT the alias walk", got,
 					testCase.wantResolvedFindsDeprecation)
 			}
 
-			if got := aliasChainFindsDeprecation(t, fileChecker, importedUse); got !=
+			if got := aliasChainFindsDeprecation(test, fileChecker, importedUse); got !=
 				testCase.wantChainFindsDeprecation {
-				t.Errorf("walking the alias chain says deprecated=%v, wanted %v",
+				test.Errorf("walking the alias chain says deprecated=%v, wanted %v",
 					got, testCase.wantChainFindsDeprecation)
 			}
 		})
@@ -140,15 +140,15 @@ func TestAliasAccessorsWalkTheChainToADeprecation(t *testing.T) {
 // Recovering in a package 49 rules import is a real cost, so it buys something specific: it names
 // which of the two behaves this way. Both do, and a future upstream that softened either one would
 // fail here rather than silently making a caller's gate redundant.
-func TestAliasAccessorsRefuseANonAlias(t *testing.T) {
-	t.Parallel()
-	fileChecker, sourceFile, release := buildAliasSubject(t, "export function exported(): void {}\n")
+func TestAliasAccessorsRefuseANonAlias(test *testing.T) {
+	test.Parallel()
+	fileChecker, sourceFile, release := buildAliasSubject(test, "export function exported(): void {}\n")
 	defer release()
 
 	// The locally declared function is not an alias of anything.
-	local := aliasSubjectLocalDeclaration(t, fileChecker, sourceFile)
+	local := aliasSubjectLocalDeclaration(test, fileChecker, sourceFile)
 	if local.Flags&ast.SymbolFlagsAlias != 0 {
-		t.Fatalf("the local declaration carries SymbolFlagsAlias, so it is the wrong subject "+
+		test.Fatalf("the local declaration carries SymbolFlagsAlias, so it is the wrong subject "+
 			"for this test (flags %v)", local.Flags)
 	}
 
@@ -170,7 +170,7 @@ func TestAliasAccessorsRefuseANonAlias(t *testing.T) {
 	for _, testCase := range cases {
 		// Not parallel: every case calls into the parent's one checker, which the parent's deferred release()
 		// returns when its body ends, before parallel subtests would start.
-		t.Run(testCase.accessor, func(t *testing.T) {
+		test.Run(testCase.accessor, func(test *testing.T) {
 			panicked := func() (panicked bool) {
 				defer func() {
 					if recover() != nil {
@@ -181,7 +181,7 @@ func TestAliasAccessorsRefuseANonAlias(t *testing.T) {
 				return false
 			}()
 			if !panicked {
-				t.Errorf("%s accepted a symbol without SymbolFlagsAlias; every caller gates on that "+
+				test.Errorf("%s accepted a symbol without SymbolFlagsAlias; every caller gates on that "+
 					"flag because this panics, and a caller that stopped gating would now be "+
 					"relying on behavior this test says has changed", testCase.accessor)
 			}
@@ -194,11 +194,11 @@ func TestAliasAccessorsRefuseANonAlias(t *testing.T) {
 // This is the shape the rule will use: a deprecation may sit on any link, so stopping at the first
 // or jumping straight to the last both miss cases the corpus records.
 func aliasChainFindsDeprecation(
-	t *testing.T,
+	test *testing.T,
 	fileChecker *checker.Checker,
 	symbol *ast.Symbol,
 ) bool {
-	t.Helper()
+	test.Helper()
 	current := symbol
 	// The bound is a guard against a cyclic chain rather than a real limit; a chain this deep in a
 	// two-file fixture would itself be the finding.
@@ -215,7 +215,7 @@ func aliasChainFindsDeprecation(
 		}
 		current = next
 	}
-	t.Fatal("the alias chain did not terminate within eight hops, which a two-file fixture cannot " +
+	test.Fatal("the alias chain did not terminate within eight hops, which a two-file fixture cannot " +
 		"legitimately produce")
 	return false
 }
@@ -236,9 +236,9 @@ func symbolIsDeprecated(symbol *ast.Symbol) bool {
 // at all, because the use site resolves straight to the declaration, so a single-file fixture reports
 // `SymbolFlagsAlias` unset and every assertion here would pass vacuously. That is not hypothetical:
 // it was the first shape tried while developing this, and it read as a broken shim.
-func buildAliasSubject(t *testing.T, otherSource string) (*checker.Checker, *ast.SourceFile, func()) {
-	t.Helper()
-	directory := t.TempDir()
+func buildAliasSubject(test *testing.T, otherSource string) (*checker.Checker, *ast.SourceFile, func()) {
+	test.Helper()
+	directory := test.TempDir()
 
 	// The import is RENAMED so that "the chain reached the original" is falsifiable. With both
 	// names spelled the same, an assertion that the resolved symbol is named `original` passes for
@@ -250,7 +250,7 @@ func buildAliasSubject(t *testing.T, otherSource string) (*checker.Checker, *ast
 
 	write := func(name string, contents string) {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", name, err)
+			test.Fatalf("writing %s: %v", name, err)
 		}
 	}
 	write("Subject.ts", subjectSource)
@@ -265,7 +265,7 @@ func buildAliasSubject(t *testing.T, otherSource string) (*checker.Checker, *ast
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the type graph: %v", err)
+		test.Fatalf("building the type graph: %v", err)
 	}
 
 	var subject *ast.SourceFile
@@ -275,7 +275,7 @@ func buildAliasSubject(t *testing.T, otherSource string) (*checker.Checker, *ast
 		}
 	}
 	if subject == nil {
-		t.Fatal("the program does not contain Subject.ts, so nothing below is measured")
+		test.Fatal("the program does not contain Subject.ts, so nothing below is measured")
 	}
 	fileChecker, release := graph.CheckerForFile(context.Background(), subject)
 	return fileChecker, subject, release
@@ -286,11 +286,11 @@ func buildAliasSubject(t *testing.T, otherSource string) (*checker.Checker, *ast
 // The USE site rather than the import specifier, because that is what a rule visiting identifiers
 // is handed and the two need not resolve identically.
 func aliasSubjectImportedUse(
-	t *testing.T,
+	test *testing.T,
 	fileChecker *checker.Checker,
 	sourceFile *ast.SourceFile,
 ) *ast.Symbol {
-	t.Helper()
+	test.Helper()
 	var found *ast.Symbol
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
@@ -307,18 +307,18 @@ func aliasSubjectImportedUse(
 	sourceFile.AsNode().ForEachChild(walk)
 
 	if found == nil {
-		t.Fatal("no symbol at the `renamed()` call site, so every assertion would pass vacuously")
+		test.Fatal("no symbol at the `renamed()` call site, so every assertion would pass vacuously")
 	}
 	return found
 }
 
 // aliasSubjectLocalDeclaration returns the symbol of the locally declared function.
 func aliasSubjectLocalDeclaration(
-	t *testing.T,
+	test *testing.T,
 	fileChecker *checker.Checker,
 	sourceFile *ast.SourceFile,
 ) *ast.Symbol {
-	t.Helper()
+	test.Helper()
 	var found *ast.Symbol
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
@@ -333,7 +333,7 @@ func aliasSubjectLocalDeclaration(
 	sourceFile.AsNode().ForEachChild(walk)
 
 	if found == nil {
-		t.Fatal("no symbol for the local declaration, so this test measures nothing")
+		test.Fatal("no symbol for the local declaration, so this test measures nothing")
 	}
 	return found
 }

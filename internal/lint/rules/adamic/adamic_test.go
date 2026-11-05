@@ -57,25 +57,25 @@ export type Weak<Target extends object> = (Target & WeakBrand) | undefined;`,
 }
 
 // writeAdamicSupport writes adamicSupport into a fixture's directory, over the harness's default tsconfig.
-func writeAdamicSupport(t *testing.T) func(directory string) {
+func writeAdamicSupport(test *testing.T) func(directory string) {
 	return func(directory string) {
 		for name, contents := range adamicSupport {
 			path := filepath.Join(directory, name)
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		}
 	}
 }
 
 // runAdamic runs one rule over one fixture, Case.ts, under Adamic's options.
-func runAdamic(t *testing.T, subject rule.Rule, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFilesWithSetup(t, subject, map[string]string{"Case.ts": source}, "Case.ts",
-		writeAdamicSupport(t))
+func runAdamic(test *testing.T, subject rule.Rule, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFilesWithSetup(test, subject, map[string]string{"Case.ts": source}, "Case.ts",
+		writeAdamicSupport(test))
 }
 
 // spans is the text each finding covers, in order, from the fixture as the harness wrote it.
@@ -91,11 +91,11 @@ func spans(source string, result rule_testing.Result) []string {
 
 // expectSpans asserts exactly the spans the findings cover, so a finding at the wrong node fails as surely
 // as a missing one. The ids are asserted beside it, with rule_testing.ExpectFindings, at each call.
-func expectSpans(t *testing.T, source string, result rule_testing.Result, want ...string) {
-	t.Helper()
+func expectSpans(test *testing.T, source string, result rule_testing.Result, want ...string) {
+	test.Helper()
 	sort.Strings(want)
 	if got := spans(source, result); strings.Join(got, "\x00") != strings.Join(want, "\x00") {
-		t.Errorf("spans %q, want %q", got, want)
+		test.Errorf("spans %q, want %q", got, want)
 	}
 }
 
@@ -109,8 +109,8 @@ func repeated(id string, count int) []string {
 }
 
 // adamicPrograms reads Adamic's ten programs, keyed by their path under testdata/programs.
-func adamicPrograms(t *testing.T) map[string]string {
-	t.Helper()
+func adamicPrograms(test *testing.T) map[string]string {
+	test.Helper()
 	programs := map[string]string{}
 	root := filepath.Join("testdata", "programs")
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
@@ -126,25 +126,25 @@ func adamicPrograms(t *testing.T) map[string]string {
 		return err
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	// Eleven files: ten programs, the seventh in two modules.
 	if len(programs) != 11 {
-		t.Fatalf("read %d program files, want 11, so the clean corpus is not the one Adamic must compile", len(programs))
+		test.Fatalf("read %d program files, want 11, so the clean corpus is not the one Adamic must compile", len(programs))
 	}
 	return programs
 }
 
 // expectProgramsClean runs a rule over each of Adamic's programs and expects nothing: each is a program
 // Adamic 0.1 must compile, so a finding on one is a rule refusing real Adamic.
-func expectProgramsClean(t *testing.T, subject rule.Rule) {
-	t.Helper()
-	programs := adamicPrograms(t)
+func expectProgramsClean(test *testing.T, subject rule.Rule) {
+	test.Helper()
+	programs := adamicPrograms(test)
 	for name := range programs {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFilesWithSetup(t, subject, programs, name, writeAdamicSupport(t))
-			rule_testing.ExpectClean(t, result)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithSetup(test, subject, programs, name, writeAdamicSupport(test))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

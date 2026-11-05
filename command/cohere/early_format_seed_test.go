@@ -38,26 +38,26 @@ var seedSources = map[string]string{
 // here they are created at the same moment the pass starts reading the same files, many times over: run under
 // -race, a tree read before its binding finished is reported. boundTreeOf without its IsBound check is the
 // mutant that must be caught there; it was, see #dk2502g.
-func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(t *testing.T) {
-	t.Parallel()
+func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *testing.T) {
+	test.Parallel()
 	// Resolved, so the names are the program's own: on macOS the temporary directory is behind a symbolic link.
-	directory, err := filepath.EvalSymlinks(t.TempDir())
+	directory, err := filepath.EvalSymlinks(test.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var candidates []string
 	for name, source := range seedSources {
 		for index := range 8 {
 			fileName := filepath.Join(directory, fmt.Sprintf("%d%s", index, name))
 			if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			candidates = append(candidates, fileName)
 		}
 	}
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler","jsx":"preserve","lib":["esnext","esnext.disposable"]},"include":["**/*.ts","**/*.tsx"]}`
 	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	formatter := native.Formatter{Options: formatoptions.Default()}
@@ -79,7 +79,7 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(t *tes
 	for round := range 6 {
 		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		var programs programOffer
 		programs.offer(graph)
@@ -99,34 +99,34 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(t *tes
 		during := speculateFormatOn(candidates, transformCounting(&programs, &fromProgram), 1, 8, &programs)
 		during.wait()
 		binding.Wait()
-		sameResults(t, fmt.Sprintf("round %d, during binding", round), reference, during)
+		sameResults(test, fmt.Sprintf("round %d, during binding", round), reference, during)
 
 		// Bound now: every file must be formatted from the program's tree, once each.
 		fromProgram.Store(0)
 		after := speculateFormatOn(candidates, transformCounting(&programs, &fromProgram), 1, 8, &programs)
 		after.wait()
-		sameResults(t, fmt.Sprintf("round %d, after binding", round), reference, after)
+		sameResults(test, fmt.Sprintf("round %d, after binding", round), reference, after)
 		if formatted := int(fromProgram.Load()); formatted != len(candidates) {
-			t.Fatalf("round %d: %d of %d files were formatted from the program's tree", round, formatted, len(candidates))
+			test.Fatalf("round %d: %d of %d files were formatted from the program's tree", round, formatted, len(candidates))
 		}
 	}
 }
 
 // sameResults fails unless two speculations kept the same files with the same results.
-func sameResults(t *testing.T, label string, expected *formatSpeculation, actual *formatSpeculation) {
-	t.Helper()
+func sameResults(test *testing.T, label string, expected *formatSpeculation, actual *formatSpeculation) {
+	test.Helper()
 	if len(actual.attempts) != len(expected.attempts) {
-		t.Errorf("%s: %d files kept, against %d with no program", label, len(actual.attempts), len(expected.attempts))
+		test.Errorf("%s: %d files kept, against %d with no program", label, len(actual.attempts), len(expected.attempts))
 	}
 	for fileName, want := range expected.attempts {
 		got, kept := actual.attempts[fileName]
 		if !kept {
-			t.Errorf("%s: %s was not kept", label, filepath.Base(fileName))
+			test.Errorf("%s: %s was not kept", label, filepath.Base(fileName))
 			continue
 		}
 		if got.result.Text != want.result.Text || got.result.TransformSkipped != want.result.TransformSkipped ||
 			errorText(got.err) != errorText(want.err) {
-			t.Errorf("%s: %s formatted otherwise from the program's tree", label, filepath.Base(fileName))
+			test.Errorf("%s: %s formatted otherwise from the program's tree", label, filepath.Base(fileName))
 		}
 	}
 }

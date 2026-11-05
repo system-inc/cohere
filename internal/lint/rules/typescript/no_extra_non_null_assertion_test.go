@@ -8,8 +8,8 @@ import (
 
 const extraNonNullFile = "/repository/source/Thing.ts"
 
-func TestNoExtraNonNullAssertionFires(t *testing.T) {
-	t.Parallel()
+func TestNoExtraNonNullAssertionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -33,14 +33,14 @@ func TestNoExtraNonNullAssertionFires(t *testing.T) {
 		{"three assertions", "declare const foo: any;\nexport const r = foo!!!;\n", 2},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noExtraNonNullAssertion"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -52,8 +52,8 @@ func TestNoExtraNonNullAssertionFires(t *testing.T) {
 // only one that rewrites a file unattended. An id assertion proves the least exactly where the blast
 // radius is largest: a fix that deleted the wrong byte would satisfy every assertion above, because
 // the finding it is attached to is identical either way.
-func TestNoExtraNonNullAssertionFixesWriteWhatTheyClaim(t *testing.T) {
-	t.Parallel()
+func TestNoExtraNonNullAssertionFixesWriteWhatTheyClaim(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -73,17 +73,17 @@ func TestNoExtraNonNullAssertionFixesWriteWhatTheyClaim(t *testing.T) {
 		{"multibyte text around the assertion", "declare const foo: any;\nexport const r = { '\u00e9\u00e8\u00ea': foo!! };\n", "declare const foo: any;\nexport const r = { '\u00e9\u00e8\u00ea': foo! };\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}
 }
 
-func TestNoExtraNonNullAssertionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExtraNonNullAssertionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -115,9 +115,9 @@ func TestNoExtraNonNullAssertionStaysSilent(t *testing.T) {
 		{"a definite assignment", "export let value!: number;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoExtraNonNullAssertion, extraNonNullFile, testCase.sourceText))
 		})
 	}
 }

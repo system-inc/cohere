@@ -33,18 +33,18 @@ const forbidElementsFile = "/repository/source/ForbidElements.tsx"
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
 // the string-or-object union under test. An empty body is the nil-options case: upstream reads
 // `configuration.forbid || []`, so the answer is an empty list and the rule declines everything.
-func forbidElementsOptions(t *testing.T, raw string) any {
-	t.Helper()
+func forbidElementsOptions(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeForbidElementsOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+		test.Fatalf("decoding %q: %v", raw, err)
 	}
 	return decoded
 }
 
 // TestForbidElementsFires runs the sixteen failing cases from upstream.
-func TestForbidElementsFires(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -73,23 +73,23 @@ func TestForbidElementsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunTypedWithOptions(
-				t,
+				test,
 				ForbidElements,
 				forbidElementsFile,
 				testCase.sourceText,
-				forbidElementsOptions(t, testCase.rawOptions),
+				forbidElementsOptions(test, testCase.rawOptions),
 			)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestForbidElementsStaysSilent runs the fourteen passing cases from upstream.
-func TestForbidElementsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -116,16 +116,16 @@ func TestForbidElementsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunTypedWithOptions(
-				t,
+				test,
 				ForbidElements,
 				forbidElementsFile,
 				testCase.sourceText,
-				forbidElementsOptions(t, testCase.rawOptions),
+				forbidElementsOptions(test, testCase.rawOptions),
 			)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -138,20 +138,20 @@ func TestForbidElementsStaysSilent(t *testing.T) {
 // `.jsx` and `.js` are not covered because the typed program's tsconfig includes only TypeScript
 // extensions, which is a fact about the harness rather than about the rule. `.ts` is the extension
 // that separates gated from ungated behaviour and it is the one the tree is mostly made of.
-func TestForbidElementsHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	for _, suffix := range []string{".tsx", ".ts"} {
-		t.Run(suffix, func(t *testing.T) {
-			t.Parallel()
+		test.Run(suffix, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunTypedWithOptions(
-				t,
+				test,
 				ForbidElements,
 				"/repository/source/SuffixProbe"+suffix,
 				`React.createElement("button");`,
-				forbidElementsOptions(t, `{"forbid":["button"]}`),
+				forbidElementsOptions(test, `{"forbid":["button"]}`),
 			)
-			rule_testing.ExpectFindings(t, result, "forbiddenElement")
+			rule_testing.ExpectFindings(test, result, "forbiddenElement")
 		})
 	}
 }
@@ -162,8 +162,8 @@ func TestForbidElementsHasNoFileSuffixGate(t *testing.T) {
 // in the wrong place. Upstream reports on the NAME node for JSX and on the ARGUMENT node for a
 // createElement call, so neither finding covers the whole element or the whole call. Both were read
 // from upstream's reported columns rather than from its source.
-func TestForbidElementsAnchorsOnTheName(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsAnchorsOnTheName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -179,21 +179,21 @@ func TestForbidElementsAnchorsOnTheName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// RunTyped writes strings.TrimSpace(source)+"\n" to disk, so the expectation is
 			// transformed the same way rather than sliced from the untransformed literal.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			result := rule_testing.RunTypedWithOptions(
-				t, ForbidElements, forbidElementsFile, testCase.sourceText,
-				forbidElementsOptions(t, testCase.rawOptions),
+				test, ForbidElements, forbidElementsFile, testCase.sourceText,
+				forbidElementsOptions(test, testCase.rawOptions),
 			)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("finding spans %q, want %q", got, testCase.wantText)
+				test.Errorf("finding spans %q, want %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -205,40 +205,40 @@ func TestForbidElementsAnchorsOnTheName(t *testing.T) {
 // keeps the LAST entry. The corpus states this once, for two objects sharing a message id, which
 // means an id assertion cannot see which of the two won. The rendered text can, and the mixed
 // spellings were measured against the installed build because the corpus writes neither.
-func TestForbidElementsLaterEntriesWin(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsLaterEntriesWin(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the last of two notes is the one reported", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the last of two notes is the one reported", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunTypedWithOptions(
-			t, ForbidElements, forbidElementsFile, `<button />`,
-			forbidElementsOptions(t, `{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`),
+			test, ForbidElements, forbidElementsFile, `<button />`,
+			forbidElementsOptions(test, `{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`),
 		)
-		rule_testing.ExpectFindings(t, result, "forbiddenElement_message")
+		rule_testing.ExpectFindings(test, result, "forbiddenElement_message")
 		got := result.Diagnostics[0].Message.Description
 		if !strings.HasSuffix(got, ": use <Button2> instead") {
-			t.Errorf("reported the wrong note: %q", got)
+			test.Errorf("reported the wrong note: %q", got)
 		}
 	})
 
 	// A string entry after an object entry ERASES the note, which is the direction a port storing
 	// the first match would get backwards.
-	t.Run("a bare string after an object drops the note", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a bare string after an object drops the note", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunTypedWithOptions(
-			t, ForbidElements, forbidElementsFile, `<button />`,
-			forbidElementsOptions(t, `{"forbid":[{"element":"button","message":"m"},"button"]}`),
+			test, ForbidElements, forbidElementsFile, `<button />`,
+			forbidElementsOptions(test, `{"forbid":[{"element":"button","message":"m"},"button"]}`),
 		)
-		rule_testing.ExpectFindings(t, result, "forbiddenElement")
+		rule_testing.ExpectFindings(test, result, "forbiddenElement")
 	})
 
-	t.Run("an object after a bare string adds the note", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an object after a bare string adds the note", func(test *testing.T) {
+		test.Parallel()
 		result := rule_testing.RunTypedWithOptions(
-			t, ForbidElements, forbidElementsFile, `<button />`,
-			forbidElementsOptions(t, `{"forbid":["button",{"element":"button","message":"m"}]}`),
+			test, ForbidElements, forbidElementsFile, `<button />`,
+			forbidElementsOptions(test, `{"forbid":["button",{"element":"button","message":"m"}]}`),
 		)
-		rule_testing.ExpectFindings(t, result, "forbiddenElement_message")
+		rule_testing.ExpectFindings(test, result, "forbiddenElement_message")
 	})
 }
 
@@ -248,22 +248,22 @@ func TestForbidElementsLaterEntriesWin(t *testing.T) {
 // an empty string, so an entry carrying `message: ""` reports the PLAIN id. Measured against the
 // installed build. A port testing for the key's presence rather than its truthiness would report a
 // message id with an empty tail, and no corpus case writes an empty message.
-func TestForbidElementsEmptyMessageIsNotAMessage(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsEmptyMessageIsNotAMessage(test *testing.T) {
+	test.Parallel()
 
 	result := rule_testing.RunTypedWithOptions(
-		t, ForbidElements, forbidElementsFile, `<button />`,
-		forbidElementsOptions(t, `{"forbid":[{"element":"button","message":""}]}`),
+		test, ForbidElements, forbidElementsFile, `<button />`,
+		forbidElementsOptions(test, `{"forbid":[{"element":"button","message":""}]}`),
 	)
-	rule_testing.ExpectFindings(t, result, "forbiddenElement")
+	rule_testing.ExpectFindings(test, result, "forbiddenElement")
 }
 
 // TestForbidElementsArgumentShapes covers the two regexes and the member arm.
 //
 // This is where nearly all of upstream's judgment sits and the corpus states only part of it. Every
 // case here was measured against the installed build before it was written.
-func TestForbidElementsArgumentShapes(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsArgumentShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -296,17 +296,17 @@ func TestForbidElementsArgumentShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunTypedWithOptions(
-				t, ForbidElements, forbidElementsFile, testCase.sourceText,
-				forbidElementsOptions(t, testCase.rawOptions),
+				test, ForbidElements, forbidElementsFile, testCase.sourceText,
+				forbidElementsOptions(test, testCase.rawOptions),
 			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -317,8 +317,8 @@ func TestForbidElementsArgumentShapes(t *testing.T) {
 // same resolution three sibling rules already share, so the value here is pinning that this rule
 // uses it rather than the shelf's wider `react.IsCreateElementCall`, which accepts a bare call with
 // no import and would report on upstream's own clean case.
-func TestForbidElementsCreateElementResolution(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsCreateElementResolution(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -333,17 +333,17 @@ func TestForbidElementsCreateElementResolution(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunTypedWithOptions(
-				t, ForbidElements, forbidElementsFile, testCase.sourceText,
-				forbidElementsOptions(t, `{"forbid":["button"]}`),
+				test, ForbidElements, forbidElementsFile, testCase.sourceText,
+				forbidElementsOptions(test, `{"forbid":["button"]}`),
 			)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -354,20 +354,20 @@ func TestForbidElementsCreateElementResolution(t *testing.T) {
 // harness that arm guards and goes silent while the JSX arm keeps reporting. A later revert of
 // `NeedsTypeChecker` fails here rather than producing a vacuous green, and the JSX half is what
 // makes this a discrimination rather than a blanket silence.
-func TestForbidElementsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestForbidElementsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "import {createElement} from 'react';\ncreateElement(\"button\");"
-	options := forbidElementsOptions(t, `{"forbid":["button"]}`)
+	options := forbidElementsOptions(test, `{"forbid":["button"]}`)
 
-	untyped := rule_testing.RunWithOptions(t, ForbidElements, forbidElementsFile, source, options)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.RunWithOptions(test, ForbidElements, forbidElementsFile, source, options)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTypedWithOptions(t, ForbidElements, forbidElementsFile, source, options)
-	rule_testing.ExpectFindings(t, typed, "forbiddenElement")
+	typed := rule_testing.RunTypedWithOptions(test, ForbidElements, forbidElementsFile, source, options)
+	rule_testing.ExpectFindings(test, typed, "forbiddenElement")
 
-	jsxUntyped := rule_testing.RunWithOptions(t, ForbidElements, forbidElementsFile, `<button />`, options)
-	rule_testing.ExpectFindings(t, jsxUntyped, "forbiddenElement")
+	jsxUntyped := rule_testing.RunWithOptions(test, ForbidElements, forbidElementsFile, `<button />`, options)
+	rule_testing.ExpectFindings(test, jsxUntyped, "forbiddenElement")
 }
 
 // TestDecodeForbidElementsOptions covers the union the schema declares and Go has no shape for.
@@ -376,62 +376,62 @@ func TestForbidElementsRequiresTheTypedHarness(t *testing.T) {
 // the object. Both arms and the nil path are asserted here, because a fixture handing the rule a
 // pre-built struct would leave the whole decoder untested, and the union is the one line most
 // likely to have no upstream counterpart.
-func TestDecodeForbidElementsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeForbidElementsOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an empty body yields an empty list rather than an error", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty body yields an empty list rather than an error", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidElementsOptions(nil)
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		options, ok := decoded.(ForbidElementsOptions)
 		if !ok {
-			t.Fatalf("decoded to %T", decoded)
+			test.Fatalf("decoded to %T", decoded)
 		}
 		if len(options.Forbid) != 0 {
-			t.Errorf("want an empty list, got %d entries", len(options.Forbid))
+			test.Errorf("want an empty list, got %d entries", len(options.Forbid))
 		}
 	})
 
-	t.Run("both arms of the union decode", func(t *testing.T) {
-		t.Parallel()
+	test.Run("both arms of the union decode", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidElementsOptions([]byte(`{"forbid":["a",{"element":"b","message":"m"}]}`))
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		options := decoded.(ForbidElementsOptions)
 		if len(options.Forbid) != 2 {
-			t.Fatalf("want 2 entries, got %d", len(options.Forbid))
+			test.Fatalf("want 2 entries, got %d", len(options.Forbid))
 		}
 		if options.Forbid[0].Element != "a" || options.Forbid[0].Message != "" {
-			t.Errorf("string arm decoded to %+v", options.Forbid[0])
+			test.Errorf("string arm decoded to %+v", options.Forbid[0])
 		}
 		if options.Forbid[1].Element != "b" || options.Forbid[1].Message != "m" {
-			t.Errorf("object arm decoded to %+v", options.Forbid[1])
+			test.Errorf("object arm decoded to %+v", options.Forbid[1])
 		}
 	})
 
-	t.Run("order is preserved, which is what makes the last entry win", func(t *testing.T) {
-		t.Parallel()
+	test.Run("order is preserved, which is what makes the last entry win", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeForbidElementsOptions([]byte(`{"forbid":["x","y","z"]}`))
 		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+			test.Fatalf("unexpected error: %v", err)
 		}
 		options := decoded.(ForbidElementsOptions)
 		got := []string{options.Forbid[0].Element, options.Forbid[1].Element, options.Forbid[2].Element}
 		if got[0] != "x" || got[1] != "y" || got[2] != "z" {
-			t.Errorf("order is %v", got)
+			test.Errorf("order is %v", got)
 		}
 	})
 
-	t.Run("a malformed body errors rather than silently emptying the list", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a malformed body errors rather than silently emptying the list", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeForbidElementsOptions([]byte(`{"forbid":`)); err == nil {
-			t.Error("want an error for a truncated body")
+			test.Error("want an error for a truncated body")
 		}
 		if _, err := DecodeForbidElementsOptions([]byte(`{"forbid":[1]}`)); err == nil {
-			t.Error("want an error for an entry that is neither a string nor an object")
+			test.Error("want an error for an entry that is neither a string nor an object")
 		}
 	})
 }

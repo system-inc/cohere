@@ -8,8 +8,8 @@ import (
 
 const isNaNFile = "/repository/source/Thing.ts"
 
-func TestUseIsNaNFires(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -28,9 +28,9 @@ func TestUseIsNaNFires(t *testing.T) {
 		{"parenthesized", "declare const value: number;\nexport const Bad = value === (NaN);\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, UseIsNaN, isNaNFile, testCase.sourceText),
 				"comparisonWithNaN")
 		})
 	}
@@ -42,8 +42,8 @@ func TestUseIsNaNFires(t *testing.T) {
 // Found by applying a finding from no-var to this rule: enumerate the shapes a construct takes
 // before writing the listener. A NaN comparison reaches the tree as a binary expression and as a
 // switch, and the binary listener alone is silent on the second.
-func TestUseIsNaNFiresOnSwitches(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNFiresOnSwitches(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -69,33 +69,33 @@ func TestUseIsNaNFiresOnSwitches(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, UseIsNaN, isNaNFile, testCase.sourceText), testCase.wantId)
 		})
 	}
 }
 
 // The option is read rather than ignored, in both directions.
-func TestUseIsNaNSwitchOption(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNSwitchOption(test *testing.T) {
+	test.Parallel()
 
 	source := "declare const value: number;\nexport function run() {\n    switch(value) {\n        case NaN: return 1;\n    }\n    return 0;\n}\n"
 
 	// Default is on, so a config that says nothing gets the rule rather than half of it.
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, source), "caseWithNaN")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, UseIsNaN, isNaNFile, source), "caseWithNaN")
 
 	disabled := false
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &disabled}))
 
 	enabled := true
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, UseIsNaN, isNaNFile, source,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, UseIsNaN, isNaNFile, source,
 		UseIsNaNOptions{EnforceForSwitchCase: &enabled}), "caseWithNaN")
 }
 
-func TestUseIsNaNStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestUseIsNaNStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -124,9 +124,9 @@ func TestUseIsNaNStaysSilent(t *testing.T) {
 		{"a parameter named Number, read in brackets", "declare const value: number;\nexport function run(Number: Record<string, number>) {\n    return value === Number['NaN'];\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, UseIsNaN, isNaNFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, UseIsNaN, isNaNFile, testCase.sourceText))
 		})
 	}
 }

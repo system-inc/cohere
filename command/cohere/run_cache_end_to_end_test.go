@@ -69,9 +69,9 @@ func foldNodeCounts(output string) string {
 //
 // Each scenario has been shown failing against a binary broken in the way it guards: the scope fact
 // ignored, the input recorder off, the fix-run decline removed, the invocation lines never tagged.
-func TestRunCacheEndToEnd(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
+func TestRunCacheEndToEnd(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
 	// Gigabytes too: the memory line reads available memory live, so two runs a second apart differ there.
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
 	// The findings cache's clause says how much of the verdict was remembered; a cold run never has it,
@@ -222,9 +222,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	}
 
 	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
-			t.Parallel()
-			fixture := newRunCacheFixture(t, binary)
+		test.Run(scenario.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newRunCacheFixture(test, binary)
 			if scenario.prepare != nil {
 				scenario.prepare(fixture)
 			}
@@ -234,7 +234,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			afterChange, afterChangeExit := fixture.run(true)
 			cold, coldExit := fixture.run(false)
 			if isRunCacheReplay(afterChange) {
-				t.Fatalf("the change was not noticed: the recorded run was replayed as current:\n%s", afterChange)
+				test.Fatalf("the change was not noticed: the recorded run was replayed as current:\n%s", afterChange)
 			}
 			// The clause rides on the lint line, and a run whose types bail prints no lint line at all, as a
 			// cold run does not either: the walk still replayed, but no lint verdict is reported to be
@@ -242,32 +242,32 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			replayedAny := layerTwoClause.MatchString(afterChange)
 			printedLint := regexp.MustCompile(`(?m)^lint: `).MatchString(afterChange)
 			if scenario.layerTwo && printedLint && !replayedAny {
-				t.Errorf("the run after the change served nothing from the findings cache, though its other files were unchanged:\n%s", afterChange)
+				test.Errorf("the run after the change served nothing from the findings cache, though its other files were unchanged:\n%s", afterChange)
 			}
 			if !scenario.layerTwo && replayedAny {
-				t.Fatalf("the findings cache served files after a change to its key:\n%s", afterChange)
+				test.Fatalf("the findings cache served files after a change to its key:\n%s", afterChange)
 			}
 			if normalized(afterChange) != normalized(cold) || afterChangeExit != coldExit {
-				t.Fatalf("the run after the change differs from a cold run (exit %d against %d):\n--- after the change\n%s\n--- cold\n%s",
+				test.Fatalf("the run after the change differs from a cold run (exit %d against %d):\n--- after the change\n%s\n--- cold\n%s",
 					afterChangeExit, coldExit, afterChange, cold)
 			}
 
 			next, nextExit := fixture.run(true)
 			if !isRunCacheReplay(next) {
-				t.Fatalf("the run after that did not replay the new truth:\n%s", next)
+				test.Fatalf("the run after that did not replay the new truth:\n%s", next)
 			}
 			// Under zero config the sets line comes first, and it replays as it was: which sets applied is the
 			// tree's verdict, not this run's.
 			if !provenance.MatchString(keepLines(next, "cached: ", "sets: ")) {
-				t.Fatalf("the replay printed the fix line as though the fix phase had just run:\n%s", next)
+				test.Fatalf("the replay printed the fix line as though the fix phase had just run:\n%s", next)
 			}
 			if replayBody(next) != verdict(cold) || nextExit != coldExit {
-				t.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+				test.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
 					nextExit, coldExit, replayBody(next), verdict(cold))
 			}
 			// And it ends on a footer of its own, which says it was replayed rather than claiming the cold run's.
 			if !regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`).MatchString(next) {
-				t.Fatalf("the replay did not end on a footer saying it was replayed:\n%s", next)
+				test.Fatalf("the replay did not end on a footer saying it was replayed:\n%s", next)
 			}
 		})
 	}
@@ -288,9 +288,9 @@ func TestRunCacheEndToEnd(t *testing.T) {
 		{"an untracked file in a directory the build never reads", nil,
 			func(fixture *runCacheFixture) { fixture.write("docs/notes.md", "notes\n") }},
 	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			t.Parallel()
-			fixture := newRunCacheFixture(t, binary)
+		test.Run(scenario.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newRunCacheFixture(test, binary)
 			if scenario.prepare != nil {
 				scenario.prepare(fixture)
 			}
@@ -300,7 +300,7 @@ func TestRunCacheEndToEnd(t *testing.T) {
 			replayed, replayedExit := fixture.run(true)
 			cold, coldExit := fixture.run(false)
 			if isRunCacheReplay(replayed) && (replayBody(replayed) != verdict(cold) || replayedExit != coldExit) {
-				t.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+				test.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
 					replayedExit, coldExit, replayBody(replayed), verdict(cold))
 			}
 		})
@@ -309,95 +309,95 @@ func TestRunCacheEndToEnd(t *testing.T) {
 	// A run whose fix phase rewrites a file is never replayed. The record step stats inputs after the
 	// rewrite, so without the decline the next run would match the fixed tree and replay "1 of 1 files
 	// rewritten" over a tree it never touched.
-	t.Run("a fix run is not replayed", func(t *testing.T) {
-		t.Parallel()
-		fixture := newRunCacheFixture(t, binary)
+	test.Run("a fix run is not replayed", func(test *testing.T) {
+		test.Parallel()
+		fixture := newRunCacheFixture(test, binary)
 		fixture.establishHit()
 		fixture.write("source/a.ts", "export const a: number = 1;\ndebugger;\n")
 
 		fixRun, _ := fixture.run(true)
 		if !strings.Contains(fixRun, "1 of 1 files rewritten") {
-			t.Fatalf("the fix run rewrote nothing, so this case proves nothing:\n%s", fixRun)
+			test.Fatalf("the fix run rewrote nothing, so this case proves nothing:\n%s", fixRun)
 		}
 		next, _ := fixture.run(true)
 		cold, _ := fixture.run(false)
 		if strings.Contains(next, "files rewritten, 1 fixes applied") {
-			t.Fatalf("the rewrite was replayed over a tree nothing touched:\n%s", next)
+			test.Fatalf("the rewrite was replayed over a tree nothing touched:\n%s", next)
 		}
 		if normalized(next) != normalized(cold) {
-			t.Fatalf("the run after the fix differs from a cold run:\n--- next\n%s\n--- cold\n%s", next, cold)
+			test.Fatalf("the run after the fix differs from a cold run:\n--- next\n%s\n--- cold\n%s", next, cold)
 		}
 	})
 
 	// `--no-fix` is cached on its own key: it records and replays, and it never replays a bare run's
 	// verdict or hands its own to one. The two print different reports, since `--no-fix` reports what a
 	// writing run would rewrite, so either one replayed as the other would be a wrong report.
-	t.Run("--no-fix is cached apart from a bare run", func(t *testing.T) {
-		t.Parallel()
-		fixture := newRunCacheFixture(t, binary)
+	test.Run("--no-fix is cached apart from a bare run", func(test *testing.T) {
+		test.Parallel()
+		fixture := newRunCacheFixture(test, binary)
 		fixture.establishHit()
 		if output, _ := fixture.run(true, "--no-fix"); isRunCacheReplay(output) {
-			t.Fatalf("the first --no-fix run replayed, so it was served the bare run's recording:\n%s", output)
+			test.Fatalf("the first --no-fix run replayed, so it was served the bare run's recording:\n%s", output)
 		}
 		replayed, replayedExit := fixture.run(true, "--no-fix")
 		if !isRunCacheReplay(replayed) {
-			t.Fatalf("an unchanged --no-fix run did not replay its own recording:\n%s", replayed)
+			test.Fatalf("an unchanged --no-fix run did not replay its own recording:\n%s", replayed)
 		}
 		cold, coldExit := fixture.run(false, "--no-fix")
 		if replayBody(replayed) != verdict(cold) || replayedExit != coldExit {
-			t.Fatalf("the --no-fix replay is not the cold --no-fix verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+			test.Fatalf("the --no-fix replay is not the cold --no-fix verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
 				replayedExit, coldExit, replayBody(replayed), verdict(cold))
 		}
 		if bare, _ := fixture.run(true); !isRunCacheReplay(bare) {
-			t.Fatalf("the bare run lost its own recording to the --no-fix one:\n%s", bare)
+			test.Fatalf("the bare run lost its own recording to the --no-fix one:\n%s", bare)
 		}
 	})
 
 	// A cache table that cannot be trusted is thrown away, file by file, said so once, and replaced.
 	// Overwritten rather than deleted, because a missing table is a first run and proves nothing about the
 	// discard.
-	t.Run("a corrupt cache table is discarded, said so, and rewritten", func(t *testing.T) {
-		t.Parallel()
-		fixture := newRunCacheFixture(t, binary)
+	test.Run("a corrupt cache table is discarded, said so, and rewritten", func(test *testing.T) {
+		test.Parallel()
+		fixture := newRunCacheFixture(test, binary)
 		fixture.establishHit()
 		// The table is the project's own, and the isolated fixture.home holds none.
-		tables := cacheTableFiles(t, fixture.root)
+		tables := cacheTableFiles(test, fixture.root)
 		if len(tables) == 0 {
-			t.Fatalf("no cache table in the project %s", fixture.root)
+			test.Fatalf("no cache table in the project %s", fixture.root)
 		}
 		filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, err error) error {
 			if err == nil && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
-				t.Errorf("a cache table landed in the user's fixture.home: %s", path)
+				test.Errorf("a cache table landed in the user's fixture.home: %s", path)
 			}
 			return nil
 		})
 		// Every run here leaves formatting out (see run), so the bare run is recorded as `--no-format`.
 		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
-			t.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
+			test.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}
 		for _, table := range tables {
 			if err := os.WriteFile(table, []byte("not a cache table"), 0o600); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		}
 		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "cache table discarded") {
-			t.Fatalf("--cache-dump printed a table this build would discard as though it were in use:\n%s", dump)
+			test.Fatalf("--cache-dump printed a table this build would discard as though it were in use:\n%s", dump)
 		}
 
 		discarded, discardedExit := fixture.run(true)
 		cold, coldExit := fixture.run(false)
 		if isRunCacheReplay(discarded) {
-			t.Fatalf("a corrupt table replayed:\n%s", discarded)
+			test.Fatalf("a corrupt table replayed:\n%s", discarded)
 		}
 		if !strings.Contains(discarded, "note: cache table discarded") {
-			t.Fatalf("the discard was silent, so a table thrown away every run would look merely cold:\n%s", discarded)
+			test.Fatalf("the discard was silent, so a table thrown away every run would look merely cold:\n%s", discarded)
 		}
 		withoutNote := keepLines(discarded, "note: cache table discarded")
 		if normalized(withoutNote) != normalized(cold) || discardedExit != coldExit {
-			t.Fatalf("the run after the discard differs from a cold run:\n--- after discard\n%s\n--- cold\n%s", discarded, cold)
+			test.Fatalf("the run after the discard differs from a cold run:\n--- after discard\n%s\n--- cold\n%s", discarded, cold)
 		}
 		if again, _ := fixture.run(true); !isRunCacheReplay(again) || strings.Contains(again, "discarded") {
-			t.Fatalf("the run after the discard did not write a table the next run could replay:\n%s", again)
+			test.Fatalf("the run after the discard did not write a table the next run could replay:\n%s", again)
 		}
 	})
 }
@@ -408,10 +408,10 @@ func TestRunCacheEndToEnd(t *testing.T) {
 // ignored the option would report the anchor from the start. An edit to a file nothing imports replays the
 // anchor's file with its derived rule, and a page added under `custom` runs that rule again on every replayed
 // file and reports the anchor, whose own bytes never changed. Each run is held against a cold one.
-func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
-	fixture := newRunCacheFixture(t, binary)
+func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	fixture := newRunCacheFixture(test, binary)
 	fixture.write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"preserve","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
 	fixture.write("CohereSettings.json", `{"plugins":["@next"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off",`+
 		`"no-debugger":"error","@next/next/no-html-link-for-pages":["error","custom"]}}`)
@@ -441,7 +441,7 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(t *tes
 
 	fixture.establishHit("--no-fix")
 	if output, _ := fixture.run(false, "--no-fix"); strings.Contains(output, finding) {
-		t.Fatalf("the anchor reports before any page under custom names it, so the option was not read:\n%s", output)
+		test.Fatalf("the anchor reports before any page under custom names it, so the option was not read:\n%s", output)
 	}
 
 	// An edit elsewhere: the anchor's file replays, its derived rule with it. The edited file is one nothing
@@ -451,13 +451,13 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(t *tes
 	warm, warmExit := fixture.run(true, "--no-fix")
 	cold, coldExit := fixture.run(false, "--no-fix")
 	if isRunCacheReplay(warm) || !strings.Contains(lintLine.FindString(warm), "files replayed from cache") {
-		t.Fatalf("an edit to b.ts served nothing from the findings cache:\n%s", warm)
+		test.Fatalf("an edit to b.ts served nothing from the findings cache:\n%s", warm)
 	}
 	if strings.Contains(warm, "derived rules ran again") {
-		t.Errorf("an edit outside the routes ran the derived rule again on replayed files:\n%s", warm)
+		test.Errorf("an edit outside the routes ran the derived rule again on replayed files:\n%s", warm)
 	}
 	if verdict(warm) != verdict(cold) || warmExit != coldExit {
-		t.Fatalf("the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s", warmExit, coldExit, warm, cold)
+		test.Fatalf("the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s", warmExit, coldExit, warm, cold)
 	}
 
 	// A page added under the configured directory: no file the rule checks changed, and the anchor now reports.
@@ -465,16 +465,16 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(t *tes
 	warm, warmExit = fixture.run(true, "--no-fix")
 	cold, coldExit = fixture.run(false, "--no-fix")
 	if isRunCacheReplay(warm) {
-		t.Fatalf("a page added under the configured directory was not noticed, and the run was replayed whole:\n%s", warm)
+		test.Fatalf("a page added under the configured directory was not noticed, and the run was replayed whole:\n%s", warm)
 	}
 	if !strings.Contains(cold, finding) {
-		t.Fatalf("a cold run does not report the anchor after its page was added, so this case proves nothing:\n%s", cold)
+		test.Fatalf("a cold run does not report the anchor after its page was added, so this case proves nothing:\n%s", cold)
 	}
 	if !strings.Contains(lintLine.FindString(warm), "derived rules ran again") {
-		t.Errorf("a page added under the configured directory did not run the derived rule again on the replayed files:\n%s", warm)
+		test.Errorf("a page added under the configured directory did not run the derived rule again on the replayed files:\n%s", warm)
 	}
 	if verdict(warm) != verdict(cold) || warmExit != coldExit {
-		t.Fatalf("after a page was added the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s",
+		test.Fatalf("after a page was added the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s",
 			warmExit, coldExit, warm, cold)
 	}
 }
@@ -489,9 +489,9 @@ type runCacheFixture struct {
 	home   string
 }
 
-func newRunCacheFixture(t *testing.T, binary string) *runCacheFixture {
-	t.Helper()
-	fixture := &runCacheFixture{t: t, binary: binary, root: t.TempDir(), home: t.TempDir()}
+func newRunCacheFixture(test *testing.T, binary string) *runCacheFixture {
+	test.Helper()
+	fixture := &runCacheFixture{t: test, binary: binary, root: test.TempDir(), home: test.TempDir()}
 	fixture.write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
 	fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
 	fixture.write("package.json", `{"name":"fixture","private":true,"type":"module"}`)

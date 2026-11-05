@@ -29,8 +29,8 @@ import (
 // The fixture is shaped so the unsorted walk fails deterministically rather than by scheduling luck:
 // one rule reports a file's declarations last to first from the file node, which no merge order can
 // put in position order, and the rule that sorts first by name is dispatched second.
-func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
-	t.Parallel()
+func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
+	test.Parallel()
 	const fileCount = 12
 	const declarationCount = 3
 
@@ -42,11 +42,11 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 		}
 		files[fmt.Sprintf("file%02d.ts", fileIndex)] = text.String()
 	}
-	directory := writeProject(t, files)
+	directory := writeProject(test, files)
 
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	declarationName := func(node *ast.Node) string {
@@ -115,7 +115,7 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 	for run := range 5 {
 		result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{forward, reverse})
 		if err != nil {
-			t.Fatalf("walking: %v", err)
+			test.Fatalf("walking: %v", err)
 		}
 		got := describe(result)
 
@@ -124,24 +124,24 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(t *testing.T) {
 		slices.Sort(sortedGot)
 		slices.Sort(sortedWant)
 		if !slices.Equal(sortedGot, sortedWant) {
-			t.Fatalf("run %d returned %d findings, want the %d the fixture produces; the set changed, "+
+			test.Fatalf("run %d returned %d findings, want the %d the fixture produces; the set changed, "+
 				"which no ordering fix is allowed to do", run, len(got), len(want))
 		}
 
 		// Order: the stated order, not merely the same order twice.
 		if !slices.Equal(got, want) {
-			t.Fatalf("run %d returned findings out of file-then-position order\n got: %s\nwant: %s",
+			test.Fatalf("run %d returned findings out of file-then-position order\n got: %s\nwant: %s",
 				run, strings.Join(got[:min(len(got), 9)], " | "), strings.Join(want[:9], " | "))
 		}
 
 		// Reproducibility across runs, with its own vacuity control: two empty runs agree trivially.
 		if run == 0 {
 			if len(got) == 0 {
-				t.Fatal("the first run returned no findings, so comparing runs would prove nothing")
+				test.Fatal("the first run returned no findings, so comparing runs would prove nothing")
 			}
 			first = got
 		} else if !slices.Equal(got, first) {
-			t.Fatalf("run %d returned a different sequence from run 0", run)
+			test.Fatalf("run %d returned a different sequence from run 0", run)
 		}
 	}
 }

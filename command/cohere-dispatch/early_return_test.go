@@ -19,9 +19,9 @@ import (
 // stderr and the exit code, on a clean tree, a tree with findings, one with a type error, and a run whose
 // fixes rewrite a file. Only what the caller does not wait for moves: the engine's cache write, which this
 // also waits for and reads back (#zqsdzbq, early return).
-func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
-	t.Parallel()
-	dispatcher, engine := buildDispatcherAndEngine(t)
+func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
+	test.Parallel()
+	dispatcher, engine := buildDispatcherAndEngine(test)
 	scenarios := []struct {
 		name      string
 		files     map[string]string
@@ -37,15 +37,15 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 	invocationLines := regexp.MustCompile(`(?m)^ *(total|memory:) .*\n`)
 
 	for _, scenario := range scenarios {
-		t.Run(scenario.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(scenario.name, func(test *testing.T) {
+			test.Parallel()
 			type outcome struct {
 				stdout, stderr string
 				code           int
 				root           string
 			}
 			run := func(wait bool) outcome {
-				root := writeEarlyReturnProject(t, scenario.files)
+				root := writeEarlyReturnProject(test, scenario.files)
 				command := earlyReturnCommand(dispatcher, engine, root, scenario.arguments...)
 				if wait {
 					command.Env = append(command.Env, "COHERE_WAIT=1")
@@ -56,7 +56,7 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 				if err := command.Run(); err != nil {
 					exitError, isExit := err.(*exec.ExitError)
 					if !isExit {
-						t.Fatalf("running the dispatcher: %v", err)
+						test.Fatalf("running the dispatcher: %v", err)
 					}
 					code = exitError.ExitCode()
 				}
@@ -74,7 +74,7 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 			waited := run(true)
 			early := run(false)
 			if early.stdout != waited.stdout || early.stderr != waited.stderr || early.code != waited.code {
-				t.Fatalf("returning early changed what the caller sees:\n--- waited (exit %d)\n%s\n%s\n--- early (exit %d)\n%s\n%s",
+				test.Fatalf("returning early changed what the caller sees:\n--- waited (exit %d)\n%s\n%s\n--- early (exit %d)\n%s\n%s",
 					waited.code, waited.stdout, waited.stderr, early.code, early.stdout, early.stderr)
 			}
 
@@ -86,24 +86,24 @@ func TestReturningEarlyChangesNothingTheCallerSees(t *testing.T) {
 					break
 				}
 				if time.Now().After(deadline) {
-					t.Fatal("the engine that returned early never wrote its cache table")
+					test.Fatal("the engine that returned early never wrote its cache table")
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
 			if _, err := os.Stat(filepath.Join(early.root, ".cache", "cohere", "notes-after-return.txt")); err == nil {
-				t.Error("the engine left a note after returning, so something it did in the background failed")
+				test.Error("the engine left a note after returning, so something it did in the background failed")
 			}
 		})
 	}
 }
 
 // buildDispatcherAndEngine builds this dispatcher and the engine it runs, from the working tree.
-func buildDispatcherAndEngine(t *testing.T) (dispatcher string, engine string) {
-	binaries := t.TempDir()
+func buildDispatcherAndEngine(test *testing.T) (dispatcher string, engine string) {
+	binaries := test.TempDir()
 	build := func(output string, packagePath string) string {
 		binary := filepath.Join(binaries, output)
 		if combined, err := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput(); err != nil {
-			t.Fatalf("building %s: %v\n%s", packagePath, err, combined)
+			test.Fatalf("building %s: %v\n%s", packagePath, err, combined)
 		}
 		return binary
 	}
@@ -115,8 +115,8 @@ func buildDispatcherAndEngine(t *testing.T) (dispatcher string, engine string) {
 //
 // The settings are written formatted, as the formatter leaves them: a bare run formats (#b1sjy7b), so a
 // fixture whose own JSON the formatter would rewrite turns every clean run into one that exits 1 on it.
-func writeEarlyReturnProject(t *testing.T, extra map[string]string) string {
-	root := t.TempDir()
+func writeEarlyReturnProject(test *testing.T, extra map[string]string) string {
+	root := test.TempDir()
 	files := map[string]string{
 		"tsconfig.json": "{\n" +
 			"  \"compilerOptions\": {\n" +
@@ -136,7 +136,7 @@ func writeEarlyReturnProject(t *testing.T, extra map[string]string) string {
 	}
 	for name, contents := range files {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	return root
@@ -154,18 +154,18 @@ func earlyReturnCommand(dispatcher string, engine string, root string, arguments
 // A profiled run does not return early. The profile is something the caller reads, so the moment the
 // dispatcher returns it must be whole: a gzip stream that reads to its end. Stopped after the verdict, it
 // could be read half-written, or empty, with a failure to close it swallowed.
-func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(t *testing.T) {
-	t.Parallel()
-	dispatcher, engine := buildDispatcherAndEngine(t)
+func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(test *testing.T) {
+	test.Parallel()
+	dispatcher, engine := buildDispatcherAndEngine(test)
 	for round := range 5 {
-		root := writeEarlyReturnProject(t, map[string]string{"Clean.ts": "export const clean = 1;\n"})
+		root := writeEarlyReturnProject(test, map[string]string{"Clean.ts": "export const clean = 1;\n"})
 		profilePath := filepath.Join(root, "cpu.pprof")
 		// Output to a file rather than a buffer, as a terminal takes it: a buffer is fed through a pipe the
 		// engine holds open, so the test would wait for the engine to exit and see a whole profile whenever
 		// it was written.
-		output, err := os.Create(filepath.Join(t.TempDir(), "output"))
+		output, err := os.Create(filepath.Join(test.TempDir(), "output"))
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		command := earlyReturnCommand(dispatcher, engine, root, "--no-fix", "--profile", profilePath)
 		command.Stdout, command.Stderr = output, output
@@ -173,33 +173,33 @@ func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(t *testing.T) {
 		output.Close()
 		if err != nil {
 			written, _ := os.ReadFile(output.Name())
-			t.Fatalf("round %d: the profiled run failed: %v\n%s", round, err, written)
+			test.Fatalf("round %d: the profiled run failed: %v\n%s", round, err, written)
 		}
 		file, err := os.Open(profilePath)
 		if err != nil {
-			t.Fatalf("round %d: no profile when the caller had its answer: %v", round, err)
+			test.Fatalf("round %d: no profile when the caller had its answer: %v", round, err)
 		}
 		reader, err := gzip.NewReader(file)
 		if err != nil {
 			file.Close()
-			t.Fatalf("round %d: the profile is not a whole gzip stream when the caller had its answer: %v", round, err)
+			test.Fatalf("round %d: the profile is not a whole gzip stream when the caller had its answer: %v", round, err)
 		}
 		read, err := io.Copy(io.Discard, reader)
 		file.Close()
 		if err != nil || read == 0 {
-			t.Fatalf("round %d: the profile read %d bytes and then %v when the caller had its answer", round, read, err)
+			test.Fatalf("round %d: the profile read %d bytes and then %v when the caller had its answer", round, read, err)
 		}
 	}
 }
 
 // writeRepositoryProject writes a project that records its runs: a repository with its cache ignored.
-func writeRepositoryProject(t *testing.T) string {
-	root := writeEarlyReturnProject(t, map[string]string{"Clean.ts": "export const clean = 1;\n", ".gitignore": ".cache/\n"})
+func writeRepositoryProject(test *testing.T) string {
+	root := writeEarlyReturnProject(test, map[string]string{"Clean.ts": "export const clean = 1;\n", ".gitignore": ".cache/\n"})
 	for _, arguments := range [][]string{{"init", "--quiet"}, {"add", "-A"}, {"-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "--quiet", "-m", "initial"}} {
 		git := exec.Command("git", arguments...)
 		git.Dir = root
 		if output, err := git.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", arguments, err, output)
+			test.Fatalf("git %v: %v\n%s", arguments, err, output)
 		}
 	}
 	return root
@@ -214,44 +214,44 @@ func writeRepositoryProject(t *testing.T) string {
 //
 // Whether the second run then replays is deliberately not asserted: the run cache records the project's
 // ancestor directories, and the shared temporary directory above a test's moves under other processes.
-func TestARunWaitsForAWriterStillHoldingTheTable(t *testing.T) {
-	t.Parallel()
-	dispatcher, engine := buildDispatcherAndEngine(t)
-	root := writeRepositoryProject(t)
+func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
+	test.Parallel()
+	dispatcher, engine := buildDispatcherAndEngine(test)
+	root := writeRepositoryProject(test)
 	if output, err := earlyReturnCommand(dispatcher, engine, root, "--no-fix").CombinedOutput(); err != nil {
-		t.Fatalf("the first run failed: %v\n%s", err, output)
+		test.Fatalf("the first run failed: %v\n%s", err, output)
 	}
 
 	// The first run's engine may still be finishing; taking the lock waits for it.
 	lock, err := os.OpenFile(filepath.Join(root, ".cache", "cohere", "table.lock"), os.O_RDWR, 0)
 	if err != nil {
-		t.Fatalf("the first run left no table lock: %v", err)
+		test.Fatalf("the first run left no table lock: %v", err)
 	}
 	defer lock.Close()
 	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	second := earlyReturnCommand(dispatcher, engine, root, "--no-fix")
 	var output bytes.Buffer
 	second.Stdout, second.Stderr = &output, &output
 	if err := second.Start(); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	finished := make(chan error, 1)
 	go func() { finished <- second.Wait() }()
 	select {
 	case err := <-finished:
-		t.Fatalf("the second run finished while the table's lock was held (%v):\n%s", err, output.String())
+		test.Fatalf("the second run finished while the table's lock was held (%v):\n%s", err, output.String())
 	case <-time.After(1500 * time.Millisecond):
 	}
 	syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
 	select {
 	case err := <-finished:
 		if err != nil {
-			t.Fatalf("the second run failed: %v\n%s", err, output.String())
+			test.Fatalf("the second run failed: %v\n%s", err, output.String())
 		}
 	case <-time.After(30 * time.Second):
-		t.Fatal("the second run did not finish after the lock was released")
+		test.Fatal("the second run did not finish after the lock was released")
 	}
 }

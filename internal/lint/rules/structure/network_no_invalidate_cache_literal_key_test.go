@@ -9,8 +9,8 @@ import (
 const cacheKeyDeclarations = "declare const networkService: { cache: { invalidate(key: unknown): void } };\n" +
 	"declare const UserCacheKey: string;\ndeclare const PostCacheKey: string;\ndeclare const id: string;\n"
 
-func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoInvalidateCacheLiteralKeyFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -62,16 +62,16 @@ func TestNetworkNoInvalidateCacheLiteralKeyFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
 
-func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -99,9 +99,9 @@ func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(t *testing.T) {
 		{"no calls at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NetworkNoInvalidateCacheLiteralKey, cacheFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkNoInvalidateCacheLiteralKey, cacheFile,
 				cacheKeyDeclarations+testCase.sourceText))
 		})
 	}

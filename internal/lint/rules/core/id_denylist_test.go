@@ -56,8 +56,8 @@ func idDenylistOf(names ...string) any {
 //
 //	88 reporting cases, 47 clean cases; 8 further cases are decided by ESLint's globals
 //	surface and are pinned separately in TestIdDenylistDivergesOnTheEslintGlobalsSurface.
-func TestIdDenylistFires(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -159,20 +159,20 @@ func TestIdDenylistFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
-			t.Errorf("%q with %v: expected %d findings, got %d %v",
+			test.Errorf("%q with %v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, len(testCase.findings), len(result.Diagnostics), result.MessageIds())
 			continue
 		}
-		rule_testing.ExpectFindings(t, result, testCase.findings...)
+		rule_testing.ExpectFindings(test, result, testCase.findings...)
 	}
 }
 
 // TestIdDenylistStaysSilent carries upstream's clean cases, which are the false positives it
 // already thought about. Each one is a class this port would otherwise ship.
-func TestIdDenylistStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -228,11 +228,11 @@ func TestIdDenylistStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
 		// matches the CALL NAME: a test that asserts the same property by hand reads to it as a
 		// rule nothing proves can stay quiet.
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -258,8 +258,8 @@ func TestIdDenylistStaysSilent(t *testing.T) {
 // Established by:
 //
 //	go test -count=1 -run TestIdDenylistDivergesOnTheEslintGlobalsSurface ./internal/lint/rules/core/
-func TestIdDenylistDivergesOnTheEslintGlobalsSurface(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistDivergesOnTheEslintGlobalsSurface(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -287,9 +287,9 @@ func TestIdDenylistDivergesOnTheEslintGlobalsSurface(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q: expected %d findings here (upstream gives %d, %s), got %d",
+			test.Errorf("%q: expected %d findings here (upstream gives %d, %s), got %d",
 				testCase.source, testCase.findings, testCase.upstream, testCase.why, len(result.Diagnostics))
 		}
 	}
@@ -307,8 +307,8 @@ func TestIdDenylistDivergesOnTheEslintGlobalsSurface(t *testing.T) {
 //
 // Every expected span and message string here is what the installed ESLint 10.8.1 rule produced on
 // the same source, read out of the oracle run rather than derived by hand.
-func TestIdDenylistSpansAndMessages(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistSpansAndMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -349,9 +349,9 @@ func TestIdDenylistSpansAndMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.spans) {
-			t.Errorf("%q: expected %d findings, got %d %v",
+			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, len(testCase.spans), len(result.Diagnostics), result.MessageIds())
 			continue
 		}
@@ -359,13 +359,13 @@ func TestIdDenylistSpansAndMessages(t *testing.T) {
 		for index, diagnostic := range result.Diagnostics {
 			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.spans[index] {
-				t.Errorf("%q finding %d: expected the span to cover %q, got %q",
+				test.Errorf("%q finding %d: expected the span to cover %q, got %q",
 					testCase.source, index, testCase.spans[index], reported)
 			}
 			// The whole message, not a prefix: the computed half is the name, which is the part a
 			// defect would get wrong.
 			if !strings.HasPrefix(diagnostic.Message.Description, testCase.messages[index]) {
-				t.Errorf("%q finding %d: expected the message to open with %q, got %q",
+				test.Errorf("%q finding %d: expected the message to open with %q, got %q",
 					testCase.source, index, testCase.messages[index], diagnostic.Message.Description)
 			}
 		}
@@ -380,41 +380,41 @@ func TestIdDenylistSpansAndMessages(t *testing.T) {
 // "error" is handed nil, and `options.(IdDenylistSettings)` on nil yields the zero value, whose
 // map is nil. That has to mean "deny nothing", which is upstream's own behaviour for an
 // unconfigured rule, rather than a rule that denies every name or panics.
-func TestIdDenylistDecoderReadsTheNameArray(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeIdDenylistOptions([]byte(`["data", "err", "cb"]`))
 	if err != nil {
-		t.Fatalf("decoding a name array: %v", err)
+		test.Fatalf("decoding a name array: %v", err)
 	}
 	settings, ok := decoded.(IdDenylistSettings)
 	if !ok {
-		t.Fatalf("expected IdDenylistSettings, got %T", decoded)
+		test.Fatalf("expected IdDenylistSettings, got %T", decoded)
 	}
 	for _, name := range []string{"data", "err", "cb"} {
 		if !settings.Denied[name] {
-			t.Errorf("expected %q to be denied, got %+v", name, settings.Denied)
+			test.Errorf("expected %q to be denied, got %+v", name, settings.Denied)
 		}
 	}
 	if settings.Denied["callback"] {
-		t.Error("expected a name absent from the config not to be denied")
+		test.Error("expected a name absent from the config not to be denied")
 	}
 
 	// An empty array denies nothing rather than erroring, which is what an explicitly empty
 	// configuration means.
 	decoded, err = DecodeIdDenylistOptions([]byte(`[]`))
 	if err != nil {
-		t.Fatalf("decoding an empty array: %v", err)
+		test.Fatalf("decoding an empty array: %v", err)
 	}
 	settings, _ = decoded.(IdDenylistSettings)
 	if len(settings.Denied) != 0 {
-		t.Errorf("expected an empty configuration to deny nothing, got %+v", settings.Denied)
+		test.Errorf("expected an empty configuration to deny nothing, got %+v", settings.Denied)
 	}
 
 	// A rule handed nil options denies nothing rather than reading a nil map as "everything".
-	result := rule_testing.RunTypedWithOptions(t, IdDenylist, idDenylistFile, "var data = 1;", nil)
+	result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, "var data = 1;", nil)
 	if len(result.Diagnostics) != 0 {
-		t.Errorf("expected an unconfigured rule to report nothing, got %d: %v",
+		test.Errorf("expected an unconfigured rule to report nothing, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 }
@@ -437,8 +437,8 @@ func TestIdDenylistDecoderReadsTheNameArray(t *testing.T) {
 //	class no_under {}; var x = no_under();           1 finding, column 7
 //
 // Both arms are mutation-proven by this test: emptying either one makes it fail.
-func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -455,10 +455,10 @@ func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdDenylist, idDenylistFile, testCase.source,
+		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source,
 			idDenylistOf("no_under"))
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%q: expected exactly 1 finding on the declaration, got %d %v",
+			test.Errorf("%q: expected exactly 1 finding on the declaration, got %d %v",
 				testCase.source, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
@@ -466,13 +466,13 @@ func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(t *testing.T) {
 		diagnostic := result.Diagnostics[0]
 		reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != testCase.span {
-			t.Errorf("%q: expected the span to cover %q, got %q", testCase.source, testCase.span, reported)
+			test.Errorf("%q: expected the span to cover %q, got %q", testCase.source, testCase.span, reported)
 		}
 		// The finding must be the DECLARATION, which is the first occurrence in the file. A finding
 		// on the callee would carry the same text and the same id, so the position is the only
 		// thing that separates them.
 		if diagnostic.Range.Pos() != strings.Index(source, testCase.span) {
-			t.Errorf("%q: expected the finding on the declaration at offset %d, got %d",
+			test.Errorf("%q: expected the finding on the declaration at offset %d, got %d",
 				testCase.source, strings.Index(source, testCase.span), diagnostic.Range.Pos())
 		}
 	}
@@ -497,8 +497,8 @@ func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(t *testing.T) {
 // The third row is worth stating because it looks like it should report: upstream's recursion does
 // NOT require the nesting key to be spelled `with`, so a nested object under any key in the options
 // argument is exempt at any depth. Measured, not assumed, and reproduced deliberately.
-func TestIdDenylistImportAttributeKeysStopAtTheImportCall(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistImportAttributeKeysStopAtTheImportCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -529,10 +529,10 @@ func TestIdDenylistImportAttributeKeysStopAtTheImportCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, IdDenylist, idDenylistFile, testCase.source,
+		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source,
 			idDenylistOf(testCase.denied))
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q denying %q: expected %d findings, got %d %v",
+			test.Errorf("%q denying %q: expected %d findings, got %d %v",
 				testCase.source, testCase.denied, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 		}
@@ -548,8 +548,8 @@ func TestIdDenylistImportAttributeKeysStopAtTheImportCall(t *testing.T) {
 // dry run and, once a bare string was accepted to stop the error, silently denied one name of three.
 //
 // These rows are the shapes the config layer delivers, and the ones it must not be read as.
-func TestIdDenylistDecoderAcceptsTheConfigLayersShape(t *testing.T) {
-	t.Parallel()
+func TestIdDenylistDecoderAcceptsTheConfigLayersShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		// raw is what the config layer hands the decoder: every element after the severity.
@@ -567,22 +567,22 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(t *testing.T) {
 	for _, testCase := range cases {
 		decoded, err := DecodeIdDenylistOptions([]byte(testCase.raw))
 		if err != nil {
-			t.Errorf("decoding %s: %v", testCase.raw, err)
+			test.Errorf("decoding %s: %v", testCase.raw, err)
 			continue
 		}
 		settings, ok := decoded.(IdDenylistSettings)
 		if !ok {
-			t.Errorf("decoding %s: expected IdDenylistSettings, got %T", testCase.raw, decoded)
+			test.Errorf("decoding %s: expected IdDenylistSettings, got %T", testCase.raw, decoded)
 			continue
 		}
 		if len(settings.Denied) != len(testCase.denied) {
-			t.Errorf("decoding %s: expected %d denied names, got %v",
+			test.Errorf("decoding %s: expected %d denied names, got %v",
 				testCase.raw, len(testCase.denied), settings.Denied)
 			continue
 		}
 		for _, name := range testCase.denied {
 			if !settings.Denied[name] {
-				t.Errorf("decoding %s: expected %q to be denied, got %v", testCase.raw, name, settings.Denied)
+				test.Errorf("decoding %s: expected %q to be denied, got %v", testCase.raw, name, settings.Denied)
 			}
 		}
 	}
@@ -597,7 +597,7 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(t *testing.T) {
 		`[["data", "err"]]`,
 	} {
 		if _, err := DecodeIdDenylistOptions([]byte(raw)); err == nil {
-			t.Errorf("expected %s to be refused, got no error", raw)
+			test.Errorf("expected %s to be refused, got no error", raw)
 		}
 	}
 }

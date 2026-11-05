@@ -27,9 +27,9 @@ type optionsOracle struct {
 	err     error
 }
 
-func newOptionsOracle(t *testing.T) *optionsOracle {
-	t.Helper()
-	return &optionsOracle{golden: oracletest.Open(t, t.Name())}
+func newOptionsOracle(test *testing.T) *optionsOracle {
+	test.Helper()
+	return &optionsOracle{golden: oracletest.Open(test, test.Name())}
 }
 
 func (oracle *optionsOracle) load() {
@@ -113,11 +113,11 @@ var proseWrapFixtures = []string{
 	"a: >\n  \u00a0x\n  y\n", "a: >\n  x\u00a0\n  y\n", "a: plain\u00a0 b\n  c",
 }
 
-func TestProseWrapMatchesOracle(t *testing.T) {
-	t.Parallel()
-	oracle := newOptionsOracle(t)
-	inputs := append(append(append([]string{}, proseWrapFixtures...), formatFixtures...), suiteInputs(t)...)
-	texts, byteOrderMarks, trees := parseInputs(t, inputs)
+func TestProseWrapMatchesOracle(test *testing.T) {
+	test.Parallel()
+	oracle := newOptionsOracle(test)
+	inputs := append(append(append([]string{}, proseWrapFixtures...), formatFixtures...), suiteInputs(test)...)
+	texts, byteOrderMarks, trees := parseInputs(test, inputs)
 	failures, fullStackFailures, compared := 0, 0, 0
 	for _, proseWrap := range []string{"always", "never"} {
 		for variantIndex, options := range formatVariants[:3] {
@@ -131,33 +131,33 @@ func TestProseWrapMatchesOracle(t *testing.T) {
 				if fullStack, err := formatFullStack("fixture.yaml", input, options, proseWrap, nil); err != nil || fullStack != expected {
 					fullStackFailures++
 					if err != nil {
-						t.Errorf("%s, variant %d, %q: Format: %v", proseWrap, variantIndex, input, err)
+						test.Errorf("%s, variant %d, %q: Format: %v", proseWrap, variantIndex, input, err)
 					} else {
-						t.Errorf("%s, variant %d, %q: Format: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, fullStack))
+						test.Errorf("%s, variant %d, %q: Format: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, fullStack))
 					}
 				}
 				actual, err := formatParsed("fixture.yaml", trees[index], texts[index], byteOrderMarks[index], options, proseWrap, nil)
 				if err != nil {
 					failures++
-					t.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
+					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
 					continue
 				}
 				if actual != expected {
 					failures++
-					t.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, actual))
+					test.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, actual))
 				}
 			}
 		}
 	}
-	t.Logf("%d proseWrap comparisons: full stack %d differ, tree loader %d differ", compared, fullStackFailures, failures)
+	test.Logf("%d proseWrap comparisons: full stack %d differ, tree loader %d differ", compared, fullStackFailures, failures)
 }
 
 // jsonTextToDoc stands in for the native JSON printer: the oracle formats the JSON, and the text comes
 // back as a doc with its trailing newline stripped, as textToDoc strips the trailing hardline.
-func jsonTextToDoc(t *testing.T, oracle *optionsOracle, options formatoptions.Options) printing.TextToDoc {
+func jsonTextToDoc(test *testing.T, oracle *optionsOracle, options formatoptions.Options) printing.TextToDoc {
 	return func(text string, parser string) (doc.Doc, error) {
 		if parser != "json" {
-			t.Errorf("the YAML printer asked for parser %q", parser)
+			test.Errorf("the YAML printer asked for parser %q", parser)
 		}
 		formatted, err := oracle.format(text, "embedded.json", "json", options, "preserve")
 		if err != nil {
@@ -169,41 +169,41 @@ func jsonTextToDoc(t *testing.T, oracle *optionsOracle, options formatoptions.Op
 
 // TestPrettierRcEmbedsJSON covers embed.js: a .prettierrc, .stylelintrc or .lintstagedrc that is JSON
 // prints as JSON, and one that is YAML falls back to the YAML printer; any other name never embeds.
-func TestPrettierRcEmbedsJSON(t *testing.T) {
-	t.Parallel()
-	oracle := newOptionsOracle(t)
+func TestPrettierRcEmbedsJSON(test *testing.T) {
+	test.Parallel()
+	oracle := newOptionsOracle(test)
 	inputs := []string{
 		`{"semi":false,"singleQuote":true}`, "{\n  \"a\": [1,2,3]\n}\n", "semi: false\nsingleQuote:   true\n",
 		"# c\nsemi: false", "[1,  2]", "{a: 1}", "", "\"a\"",
 	}
 	fileNames := []string{".prettierrc", "a/.stylelintrc", "a\\.lintstagedrc", "prettierrc", ".prettierrc.yaml", "x.yaml"}
-	texts, byteOrderMarks, trees := parseInputs(t, inputs)
+	texts, byteOrderMarks, trees := parseInputs(test, inputs)
 	for _, options := range formatVariants[:2] {
-		textToDoc := jsonTextToDoc(t, oracle, options)
+		textToDoc := jsonTextToDoc(test, oracle, options)
 		for _, fileName := range fileNames {
 			for index, input := range inputs {
 				expected, err := oracle.format(input, fileName, "yaml", options, "preserve")
 				if err != nil {
 					if trees[index].err == "" {
-						t.Errorf("%s, %q: the oracle failed (%v) but the parser did not", fileName, input, err)
+						test.Errorf("%s, %q: the oracle failed (%v) but the parser did not", fileName, input, err)
 					}
 					if _, fullStackErr := formatFullStack(fileName, input, options, "preserve", textToDoc); !printing.IsSyntax(fullStackErr) {
-						t.Errorf("%s, %q: the oracle failed (%v) but Format gave %v", fileName, input, err, fullStackErr)
+						test.Errorf("%s, %q: the oracle failed (%v) but Format gave %v", fileName, input, err, fullStackErr)
 					}
 					continue
 				}
 				if fullStack, err := formatFullStack(fileName, input, options, "preserve", textToDoc); err != nil {
-					t.Errorf("%s, %q: Format: %v", fileName, input, err)
+					test.Errorf("%s, %q: Format: %v", fileName, input, err)
 				} else if fullStack != expected {
-					t.Errorf("%s, %q: Format: %s", fileName, input, differential.FirstDifference(expected, fullStack))
+					test.Errorf("%s, %q: Format: %s", fileName, input, differential.FirstDifference(expected, fullStack))
 				}
 				actual, err := formatParsed(fileName, trees[index], texts[index], byteOrderMarks[index], options, "preserve", textToDoc)
 				if err != nil {
-					t.Errorf("%s, %q: %v", fileName, input, err)
+					test.Errorf("%s, %q: %v", fileName, input, err)
 					continue
 				}
 				if actual != expected {
-					t.Errorf("%s, %q: %s", fileName, input, differential.FirstDifference(expected, actual))
+					test.Errorf("%s, %q: %s", fileName, input, differential.FirstDifference(expected, actual))
 				}
 			}
 		}
@@ -212,15 +212,15 @@ func TestPrettierRcEmbedsJSON(t *testing.T) {
 
 // TestPrettierRcWithoutTextToDocPrintsYAML: with no textToDoc the embed fails, and the core prints the
 // file as YAML, as upstream does when the JSON format throws.
-func TestPrettierRcWithoutTextToDocPrintsYAML(t *testing.T) {
-	t.Parallel()
-	texts, _, trees := parseInputs(t, []string{`{"a":1}`})
+func TestPrettierRcWithoutTextToDocPrintsYAML(test *testing.T) {
+	test.Parallel()
+	texts, _, trees := parseInputs(test, []string{`{"a":1}`})
 	actual, err := PrintFile(".prettierrc", trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if actual != "{ 'a': 1 }\n" {
-		t.Fatalf("got %q", actual)
+		test.Fatalf("got %q", actual)
 	}
 }
 

@@ -22,8 +22,8 @@ const noLabelsFile = "/repository/source/NoLabels.ts"
 // The first is the trap: `{ label: foo () }` is an object property named `label`, not a labeled
 // statement, and a rule matching on the identifier reports it. The next three are unlabeled loop
 // jumps, which this rule never touches. The last four are labels the options permit.
-func TestNoLabelsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -40,10 +40,10 @@ func TestNoLabelsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(
-				t, NoLabels, noLabelsFile, testCase.sourceText, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
+				test, NoLabels, noLabelsFile, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -55,8 +55,8 @@ func TestNoLabelsStaysSilent(t *testing.T) {
 // emits its findings inside-out while the jumps interleave. `A: switch (a) { case 0: B: { break A; }
 // default: break; };` is the case that pins it: two `unexpectedLabel` then one
 // `unexpectedLabelInBreak`, which only comes out in that order if the label reports on exit.
-func TestNoLabelsFires(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -87,10 +87,10 @@ func TestNoLabelsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(
-				t, NoLabels, noLabelsFile, testCase.sourceText, testCase.options),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(
+				test, NoLabels, noLabelsFile, testCase.sourceText, testCase.options),
 				testCase.wantIds...)
 		})
 	}
@@ -106,54 +106,54 @@ func TestNoLabelsFires(t *testing.T) {
 // A; }` spans all 22 characters. `no-unused-labels` in this same package reports on the identifier
 // instead, so a port taking its shape from that neighbour would anchor wrong and pass every id
 // fixture. That is exactly the "read siblings for shape, never for semantics" trap.
-func TestNoLabelsSpansTheWholeStatement(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsSpansTheWholeStatement(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "A: if (a) { break A; }"
 
-	result := rule_testing.Run(t, NoLabels, noLabelsFile, sourceText)
+	result := rule_testing.Run(test, NoLabels, noLabelsFile, sourceText)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("wanted two diagnostics, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted two diagnostics, got %d", len(result.Diagnostics))
 	}
 
 	// The label finding covers the entire labeled statement.
 	label := result.Diagnostics[0]
 	if got := sourceText[label.Range.Pos():label.Range.End()]; got != sourceText {
-		t.Fatalf("label finding spans %q, wanted the whole statement %q", got, sourceText)
+		test.Fatalf("label finding spans %q, wanted the whole statement %q", got, sourceText)
 	}
 	if label.Message.Id != "unexpectedLabel" {
-		t.Fatalf("first finding is %q, wanted unexpectedLabel", label.Message.Id)
+		test.Fatalf("first finding is %q, wanted unexpectedLabel", label.Message.Id)
 	}
 
 	// The break finding covers the break statement including its semicolon, matching eslint's
 	// [1,13,1,21] on this input.
 	jump := result.Diagnostics[1]
 	if got := sourceText[jump.Range.Pos():jump.Range.End()]; got != "break A;" {
-		t.Fatalf("break finding spans %q, wanted %q", got, "break A;")
+		test.Fatalf("break finding spans %q, wanted %q", got, "break A;")
 	}
 	if jump.Message.Id != "unexpectedLabelInBreak" {
-		t.Fatalf("second finding is %q, wanted unexpectedLabelInBreak", jump.Message.Id)
+		test.Fatalf("second finding is %q, wanted unexpectedLabelInBreak", jump.Message.Id)
 	}
 }
 
 // A continue's span, asserted separately because it reports through a different arm and a different
 // message than break.
-func TestNoLabelsSpansAContinue(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsSpansAContinue(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "A: while (a) { B: while (b) { continue A; } }"
 
-	result := rule_testing.Run(t, NoLabels, noLabelsFile, sourceText)
+	result := rule_testing.Run(test, NoLabels, noLabelsFile, sourceText)
 	if len(result.Diagnostics) != 3 {
-		t.Fatalf("wanted three diagnostics, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted three diagnostics, got %d", len(result.Diagnostics))
 	}
 
 	jump := result.Diagnostics[2]
 	if got := sourceText[jump.Range.Pos():jump.Range.End()]; got != "continue A;" {
-		t.Fatalf("continue finding spans %q, wanted %q", got, "continue A;")
+		test.Fatalf("continue finding spans %q, wanted %q", got, "continue A;")
 	}
 	if jump.Message.Id != "unexpectedLabelInContinue" {
-		t.Fatalf("third finding is %q, wanted unexpectedLabelInContinue", jump.Message.Id)
+		test.Fatalf("third finding is %q, wanted unexpectedLabelInContinue", jump.Message.Id)
 	}
 }
 
@@ -164,17 +164,17 @@ func TestNoLabelsSpansAContinue(t *testing.T) {
 // errors on empty input and the config turns that into nil. The rule's fallback has to produce the
 // strict setting, because that is upstream's default. Passing nil directly bypasses the decoder the
 // way the live config does.
-func TestNoLabelsDefaultsWithoutTheDecoder(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsDefaultsWithoutTheDecoder(test *testing.T) {
+	test.Parallel()
 
 	// Under the default, a label wrapping a loop still reports, and so does the break naming it.
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, "A: while (a) { break A; }", nil),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, "A: while (a) { break A; }", nil),
 		"unexpectedLabel", "unexpectedLabelInBreak")
 
 	// The control: the same input under allowLoop is clean, so the finding above is about the
 	// default rather than about the rule reporting unconditionally.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: while (a) { break A; }", NoLabelsOptions{AllowLoop: true}))
 }
 
@@ -184,8 +184,8 @@ func TestNoLabelsDefaultsWithoutTheDecoder(t *testing.T) {
 // hand-built options struct leaves untested. Both field names are checked, because a typo in either
 // tag reads as "the option does nothing" and every fixture above would still pass by constructing
 // the struct directly.
-func TestNoLabelsDecodesItsOptionNames(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsDecodesItsOptionNames(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoLabelsOptions]()
 
@@ -202,10 +202,10 @@ func TestNoLabelsDecodesItsOptionNames(t *testing.T) {
 	for _, testCase := range cases {
 		decoded, err := decode([]byte(testCase.raw))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", testCase.raw, err)
+			test.Fatalf("decoding %s: %v", testCase.raw, err)
 		}
 		if decoded != any(testCase.want) {
-			t.Fatalf("decoding %s gave %+v, wanted %+v", testCase.raw, decoded, testCase.want)
+			test.Fatalf("decoding %s gave %+v, wanted %+v", testCase.raw, decoded, testCase.want)
 		}
 	}
 }
@@ -215,17 +215,17 @@ func TestNoLabelsDecodesItsOptionNames(t *testing.T) {
 // Both rows measured against the installed build. They are the same shape with the same nesting and
 // opposite verdicts, and the only difference is which option is set, which is what makes them the
 // pair that separates a correct port from one asking "is this jump inside a loop".
-func TestNoLabelsPermissionFollowsTheLabelNotTheJump(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsPermissionFollowsTheLabelNotTheJump(test *testing.T) {
+	test.Parallel()
 
 	const nested = "A: for (var a in obj) { for (;;) { switch (a) { case 0: continue A; } } }"
 
 	// `A` labels a `for`, so allowLoop exempts it even though the jump sits inside a switch.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, nested,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, nested,
 		NoLabelsOptions{AllowLoop: true}))
 
 	// allowSwitch does not, for the same input, because `A` does not label a switch.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, nested,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, nested,
 		NoLabelsOptions{AllowSwitch: true}), "unexpectedLabel", "unexpectedLabelInContinue")
 }
 
@@ -236,16 +236,16 @@ func TestNoLabelsPermissionFollowsTheLabelNotTheJump(t *testing.T) {
 // Measured: `A: B: while (a) { break A; }` under allowLoop reports `A` and the break, and leaves
 // `B` alone. A port passing `true` goes silent on both findings and no imported fixture sees it,
 // because the corpus writes no doubled label under an option.
-func TestNoLabelsDoesNotSeeThroughANestedLabel(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsDoesNotSeeThroughANestedLabel(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: B: while (a) { break A; }", NoLabelsOptions{AllowLoop: true}),
 		"unexpectedLabel", "unexpectedLabelInBreak")
 
 	// Naming the INNER label instead leaves only the outer label's own finding, which shows the
 	// jump resolved through the stack rather than through its ancestors.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: B: while (a) { break B; }", NoLabelsOptions{AllowLoop: true}), "unexpectedLabel")
 }
 
@@ -270,27 +270,27 @@ func TestNoLabelsDoesNotSeeThroughANestedLabel(t *testing.T) {
 //
 // A mutant reversing the stack search direction and a mutant making an unresolved name permitted
 // both survived the whole imported corpus, which is how these were found.
-func TestNoLabelsAnswersShapesEslintRefusesToParse(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsAnswersShapesEslintRefusesToParse(test *testing.T) {
+	test.Parallel()
 
 	// Duplicate label: the inner `A` names the switch, so `allowSwitch` exempts the break while
 	// `allowLoop` does not. Reversing the stack search flips both rows.
 	const duplicate = "A: while (a) { A: switch (b) { case 0: break A; } }"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, duplicate,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, duplicate,
 		NoLabelsOptions{AllowSwitch: true}), "unexpectedLabel")
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, duplicate,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, duplicate,
 		NoLabelsOptions{AllowLoop: true}), "unexpectedLabel", "unexpectedLabelInBreak")
 
 	// The mirror image, which is what makes the pair a measurement rather than one row: the same
 	// two options give the opposite verdicts when the nesting is reversed.
 	const reversed = "A: switch (b) { case 0: A: while(a) { break A; } }"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, reversed,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, reversed,
 		NoLabelsOptions{AllowLoop: true}), "unexpectedLabel")
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile, reversed,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, reversed,
 		NoLabelsOptions{AllowSwitch: true}), "unexpectedLabel", "unexpectedLabelInBreak")
 
 	// A jump naming a label that does not exist reports, under every option setting, because no
@@ -301,9 +301,9 @@ func TestNoLabelsAnswersShapesEslintRefusesToParse(t *testing.T) {
 		NoLabelsOptions{AllowSwitch: true},
 		NoLabelsOptions{AllowLoop: true, AllowSwitch: true},
 	} {
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 			"while(a) { break A; }", settings), "unexpectedLabelInBreak")
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 			"while(a) { continue A; }", settings), "unexpectedLabelInContinue")
 	}
 }
@@ -323,25 +323,25 @@ func TestNoLabelsAnswersShapesEslintRefusesToParse(t *testing.T) {
 // Both labels here wrap loops so the verdict is the same either way; what the case actually pins is
 // that the stack does not GROW without bound across siblings, which is what the second assertion
 // measures.
-func TestNoLabelsPopsTheStackWhenScopeEnds(t *testing.T) {
-	t.Parallel()
+func TestNoLabelsPopsTheStackWhenScopeEnds(test *testing.T) {
+	test.Parallel()
 
 	// Sequential same-name labels, both wrapping loops: clean under allowLoop. Measured on eslint
 	// 10.8.1, which parses this without a fatal and reports nothing.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: while(a) {} A: while(b) { break A; }", NoLabelsOptions{AllowLoop: true}))
 
 	// The measurement that needs the pop: a label wrapping a SWITCH, followed by a sibling label of
 	// the same name wrapping a loop. If the first entry survives into the second label's subtree, a
 	// stack search reaches a switch-bodied `A` and `allowLoop` stops exempting the break.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: switch(a) {} A: while(b) { break A; }", NoLabelsOptions{AllowLoop: true}),
 		"unexpectedLabel")
 
 	// The control for the row above, showing the finding is the SWITCH label rather than the break:
 	// under allowSwitch the switch label is exempt and the loop label reports instead, and the
 	// break stays clean under both because innermost-first resolution reaches the loop.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoLabels, noLabelsFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: switch(a) {} A: while(b) { break A; }", NoLabelsOptions{AllowSwitch: true}),
 		"unexpectedLabel", "unexpectedLabelInBreak")
 }

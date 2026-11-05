@@ -5,8 +5,8 @@ import "testing"
 // TestSetSparesFrameworkFiles is the half that proves the root set declines. Every path here is
 // alive by convention with no import statement anywhere in the tree, and reporting one would be the
 // failure that gets the unused report closed and never reopened.
-func TestSetSparesFrameworkFiles(t *testing.T) {
-	t.Parallel()
+func TestSetSparesFrameworkFiles(test *testing.T) {
+	test.Parallel()
 	roots := &Set{dynamicImportDirectories: []string{"/translations/"}}
 
 	for _, testCase := range []struct {
@@ -33,14 +33,14 @@ func TestSetSparesFrameworkFiles(t *testing.T) {
 		{"spec file", "/repo/modules/Thing.spec.tsx", ReasonTest},
 		{"dynamically imported locale", "/repo/libraries/structure/source/localization/translations/de.ts", ReasonDynamicImportTarget},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			isRoot, reason := roots.IsRoot(testCase.path)
 			if !isRoot {
-				t.Fatalf("%s was not spared, so a live file would be reported as unused", testCase.path)
+				test.Fatalf("%s was not spared, so a live file would be reported as unused", testCase.path)
 			}
 			if reason != testCase.want {
-				t.Fatalf("spared for %q, want %q", reason, testCase.want)
+				test.Fatalf("spared for %q, want %q", reason, testCase.want)
 			}
 		})
 	}
@@ -49,8 +49,8 @@ func TestSetSparesFrameworkFiles(t *testing.T) {
 // TestSetDoesNotSpareOrdinaryFiles is the half that proves the root set can still report. A root
 // set that spares everything is indistinguishable from a broken analysis, and it produces exactly
 // the clean-looking empty report this project exists to make impossible.
-func TestSetDoesNotSpareOrdinaryFiles(t *testing.T) {
-	t.Parallel()
+func TestSetDoesNotSpareOrdinaryFiles(test *testing.T) {
+	test.Parallel()
 	roots := &Set{dynamicImportDirectories: []string{"/translations/"}}
 
 	for _, path := range []string{
@@ -64,10 +64,10 @@ func TestSetDoesNotSpareOrdinaryFiles(t *testing.T) {
 		// A near-miss on the marker word, which must not be read as a convention.
 		"/repo/modules/apple/Pages.ts",
 	} {
-		t.Run(path, func(t *testing.T) {
-			t.Parallel()
+		test.Run(path, func(test *testing.T) {
+			test.Parallel()
 			if isRoot, reason := roots.IsRoot(path); isRoot {
-				t.Fatalf("%s was spared as %q, so a genuine finding would be hidden", path, reason)
+				test.Fatalf("%s was spared as %q, so a genuine finding would be hidden", path, reason)
 			}
 		})
 	}

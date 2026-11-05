@@ -12,9 +12,9 @@ import (
 // The live config, which is the only thing that decides whether a registered rule ever runs.
 // liveConfigPath is ahra's config, which is private, so the test that reads it skips where the ahra corpus
 // is not set, and the gate names it as not covered (#sycrdr6).
-func liveConfigPath(t testing.TB) string {
-	t.Helper()
-	return corpus.Ahra.Path(t, "CohereSettings.json")
+func liveConfigPath(test testing.TB) string {
+	test.Helper()
+	return corpus.Ahra.Path(test, "CohereSettings.json")
 }
 
 // A rule's fixture proves it works. The config decides whether it runs, and nothing else connects
@@ -28,12 +28,12 @@ func liveConfigPath(t testing.TB) string {
 //
 // This is the mechanical version: every registered rule must be a name the live config can resolve,
 // or be listed below as deliberately not enabled.
-func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
-	t.Parallel()
+func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(test *testing.T) {
+	test.Parallel()
 
-	loaded, err := configuration.Load(liveConfigPath(t))
+	loaded, err := configuration.Load(liveConfigPath(test))
 	if err != nil {
-		t.Fatalf("loading the live config: %v", err)
+		test.Fatalf("loading the live config: %v", err)
 	}
 	resolved := loaded.Resolve("app/Probe.tsx")
 
@@ -54,7 +54,7 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 
 	rules := All()
 	if len(rules) == 0 {
-		t.Fatal("the registry is empty, so this test proves nothing")
+		test.Fatal("the registry is empty, so this test proves nothing")
 	}
 
 	var unreachable []string
@@ -96,12 +96,12 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(t *testing.T) {
 	}
 	sort.Strings(staleExemptions)
 	if len(staleExemptions) > 0 {
-		t.Errorf("%d entries in deliberatelyNotEnabled no longer hold, so remove each one:\n  %s",
+		test.Errorf("%d entries in deliberatelyNotEnabled no longer hold, so remove each one:\n  %s",
 			len(staleExemptions), strings.Join(staleExemptions, "\n  "))
 	}
 
 	if len(unreachable) > 0 {
-		t.Errorf(
+		test.Errorf(
 			"%d registered rules are not mentioned by the live config, so they run on nothing and "+
 				"nobody has said whether they should: %v\n"+
 				"a rule whose name the config cannot resolve passes its own fixtures and lints no "+

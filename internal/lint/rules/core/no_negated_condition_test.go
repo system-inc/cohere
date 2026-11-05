@@ -34,55 +34,55 @@ type noNegatedConditionCase struct {
 // `rule_testing.Run` does NOT trim its input, unlike RunTyped, so no rebasing is needed here. Stated
 // because the sibling rules in this batch that need the typed harness do rebase, and a helper copied
 // between them without this line would be quietly wrong by one.
-func noNegatedConditionOffsetOf(t *testing.T, source string, line int, column int) int {
-	t.Helper()
+func noNegatedConditionOffsetOf(test *testing.T, source string, line int, column int) int {
+	test.Helper()
 	offset := 0
 	for current := 1; current < line; current++ {
 		next := strings.IndexByte(source[offset:], '\n')
 		if next < 0 {
-			t.Fatalf("the fixture has no line %d", line)
+			test.Fatalf("the fixture has no line %d", line)
 		}
 		offset += next + 1
 	}
 	return offset + column - 1
 }
 
-func runNoNegatedCondition(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.Run(t, NoNegatedCondition, noNegatedConditionFile, source)
+func runNoNegatedCondition(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.Run(test, NoNegatedCondition, noNegatedConditionFile, source)
 }
 
 // TestNoNegatedConditionStaysSilent runs upstream's whole `valid` list.
-func TestNoNegatedConditionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNegatedConditionStaysSilent(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noNegatedConditionCleanCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoNegatedCondition(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoNegatedCondition(test, testCase.source))
 		})
 	}
 }
 
 // TestNoNegatedConditionFires runs upstream's whole `invalid` list and asserts every span.
-func TestNoNegatedConditionFires(t *testing.T) {
-	t.Parallel()
+func TestNoNegatedConditionFires(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range noNegatedConditionReportingCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoNegatedCondition(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoNegatedCondition(test, testCase.source)
 
 			wantIds := make([]string, 0, len(testCase.findings))
 			for range testCase.findings {
 				wantIds = append(wantIds, messageNoNegatedCondition.Id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
-				wantPos := noNegatedConditionOffsetOf(t, testCase.source, expected.line, expected.column)
-				wantEnd := noNegatedConditionOffsetOf(t, testCase.source, expected.endLine, expected.endColumn)
+				wantPos := noNegatedConditionOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := noNegatedConditionOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
 				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					t.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
+					test.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
 						index, wantPos, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
 						testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
@@ -99,8 +99,8 @@ func TestNoNegatedConditionFires(t *testing.T) {
 // the finding with no fixture noticing.
 //
 // Every expectation was taken by driving the installed 10.8.1 build, not derived.
-func TestNoNegatedConditionParenthesesUpstreamCannotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoNegatedConditionParenthesesUpstreamCannotWrite(test *testing.T) {
+	test.Parallel()
 	cases := []noNegatedConditionCase{
 		{
 			name:   "a parenthesized unary negation reports",
@@ -137,20 +137,20 @@ func TestNoNegatedConditionParenthesesUpstreamCannotWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoNegatedCondition(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoNegatedCondition(test, testCase.source)
 			wantIds := make([]string, 0, len(testCase.findings))
 			for range testCase.findings {
 				wantIds = append(wantIds, messageNoNegatedCondition.Id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
-				wantPos := noNegatedConditionOffsetOf(t, testCase.source, expected.line, expected.column)
-				wantEnd := noNegatedConditionOffsetOf(t, testCase.source, expected.endLine, expected.endColumn)
+				wantPos := noNegatedConditionOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := noNegatedConditionOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
 				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					t.Errorf("expected span [%d,%d), got [%d,%d) %q. %s",
+					test.Errorf("expected span [%d,%d), got [%d,%d) %q. %s",
 						wantPos, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
 						testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()], testCase.reason)
 				}
@@ -163,8 +163,8 @@ func TestNoNegatedConditionParenthesesUpstreamCannotWrite(t *testing.T) {
 //
 // The first two are the ones a reader would expect to report and that upstream deliberately does
 // not, and both were confirmed against the installed build rather than argued from the source.
-func TestNoNegatedConditionShapesThatMustStaySilent(t *testing.T) {
-	t.Parallel()
+func TestNoNegatedConditionShapesThatMustStaySilent(test *testing.T) {
+	test.Parallel()
 	cases := []noNegatedConditionCase{
 		{
 			name:   "an equality against false is not a negation",
@@ -184,11 +184,11 @@ func TestNoNegatedConditionShapesThatMustStaySilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoNegatedCondition(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoNegatedCondition(test, testCase.source)
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
+				test.Errorf("expected silence, got %v. %s", result.MessageIds(), testCase.reason)
 			}
 		})
 	}
@@ -199,10 +199,10 @@ func TestNoNegatedConditionShapesThatMustStaySilent(t *testing.T) {
 // `!(a && b)` is a `!` and reports, which is worth a case of its own because it looks like a
 // parenthesized binary rather than a negation and the rule's three-operator list does not obviously
 // cover it. Measured upstream at columns 1 to 38.
-func TestNoNegatedConditionCompoundNegationReports(t *testing.T) {
-	t.Parallel()
-	result := runNoNegatedCondition(t, `if (!(a && b)) { f(); } else { g(); }`)
-	rule_testing.ExpectFindings(t, result, messageNoNegatedCondition.Id)
+func TestNoNegatedConditionCompoundNegationReports(test *testing.T) {
+	test.Parallel()
+	result := runNoNegatedCondition(test, `if (!(a && b)) { f(); } else { g(); }`)
+	rule_testing.ExpectFindings(test, result, messageNoNegatedCondition.Id)
 }
 
 // noNegatedConditionCleanCases are upstream's `valid` list, verbatim.
@@ -280,8 +280,8 @@ var noNegatedConditionReportingCases = []noNegatedConditionCase{
 // `~` is the one worth noting: it is a bitwise negation and reads as a negation in English, and it
 // is clean. `!!a` reports because its OUTER operator is `!`, which is the row that shows the test is
 // on the operator rather than on whether the value is inverted.
-func TestNoNegatedConditionOnlyTheBangOperatorCounts(t *testing.T) {
-	t.Parallel()
+func TestNoNegatedConditionOnlyTheBangOperatorCounts(test *testing.T) {
+	test.Parallel()
 	clean := []struct {
 		name   string
 		source string
@@ -296,19 +296,19 @@ func TestNoNegatedConditionOnlyTheBangOperatorCounts(t *testing.T) {
 		{"unary minus in a conditional expression", `-a ? b : c`},
 	}
 	for _, testCase := range clean {
-		t.Run(testCase.name+" is clean", func(t *testing.T) {
-			t.Parallel()
-			result := runNoNegatedCondition(t, testCase.source)
+		test.Run(testCase.name+" is clean", func(test *testing.T) {
+			test.Parallel()
+			result := runNoNegatedCondition(test, testCase.source)
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("expected silence, got %v: only `!` counts as a negation here",
+				test.Errorf("expected silence, got %v: only `!` counts as a negation here",
 					result.MessageIds())
 			}
 		})
 	}
 
-	t.Run("a double negation reports, because the outer operator is still !", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, runNoNegatedCondition(t, `if (!!a) { f(); } else { g(); }`),
+	test.Run("a double negation reports, because the outer operator is still !", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, runNoNegatedCondition(test, `if (!!a) { f(); } else { g(); }`),
 			messageNoNegatedCondition.Id)
 	})
 }

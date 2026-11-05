@@ -8,8 +8,8 @@ import (
 
 const debuggerFile = "/repository/source/Thing.ts"
 
-func TestNoDebuggerFires(t *testing.T) {
-	t.Parallel()
+func TestNoDebuggerFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -23,16 +23,16 @@ func TestNoDebuggerFires(t *testing.T) {
 		{"inside a loop", "export function run() {\n    for(let index = 0; index < 1; index++) {\n        debugger;\n    }\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDebugger, debuggerFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoDebugger, debuggerFile, testCase.sourceText),
 				"unexpectedDebugger")
 		})
 	}
 }
 
-func TestNoDebuggerStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDebuggerStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -48,27 +48,27 @@ func TestNoDebuggerStaysSilent(t *testing.T) {
 		{"no statement at all", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDebugger, debuggerFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDebugger, debuggerFile, testCase.sourceText))
 		})
 	}
 }
 
 // The fix removes the statement rather than commenting it out, because there is no form of it that
 // belongs in committed code.
-func TestNoDebuggerRemovesTheStatement(t *testing.T) {
-	t.Parallel()
+func TestNoDebuggerRemovesTheStatement(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
+	result := rule_testing.Run(test, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 1 {
-		t.Fatalf("want one fix, got %d", len(result.Diagnostics[0].Fixes))
+		test.Fatalf("want one fix, got %d", len(result.Diagnostics[0].Fixes))
 	}
 	if text := result.Diagnostics[0].Fixes[0].Text; text != "" {
-		t.Fatalf("want a deletion (empty text), got %q", text)
+		test.Fatalf("want a deletion (empty text), got %q", text)
 	}
 
 	// The text alone does not pin the rewrite. An empty replacement over the wrong range is still an
@@ -79,28 +79,28 @@ func TestNoDebuggerRemovesTheStatement(t *testing.T) {
 	// before it. Asserted as it actually is rather than as it reads best: a fixture that states a
 	// tidier result than the engine produces is a fixture that will be "fixed" by making the engine
 	// wrong.
-	rule_testing.ExpectFixedSource(t, result, "export function run() {\n    \n}\n")
+	rule_testing.ExpectFixedSource(test, result, "export function run() {\n    \n}\n")
 }
 
 // TestNoDebuggerRepairsOnlyInAStatementList pins where the removal is offered. In a list of
 // statements it is; as the whole body of an unbraced branch, a loop or a label it is not, since
 // `if (flag)` with nothing after it does not parse. ESLint's corpus writes that shape and offers no fix
 // for any shape (#kq9vtva).
-func TestNoDebuggerRepairsOnlyInAStatementList(t *testing.T) {
-	t.Parallel()
+func TestNoDebuggerRepairsOnlyInAStatementList(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
-	rule_testing.ExpectFixedSource(t, result, "export function run() {\n    \n}\n")
+	result := rule_testing.Run(test, NoDebugger, debuggerFile, "export function run() {\n    debugger;\n}\n")
+	rule_testing.ExpectFixedSource(test, result, "export function run() {\n    \n}\n")
 
 	for _, sourceText := range []string{
 		"export function run(flag: boolean) {\n    if(flag) debugger;\n}\n",
 		"export function run(flag: boolean) {\n    while(flag) debugger;\n}\n",
 		"export function run() {\n    here: debugger;\n}\n",
 	} {
-		result := rule_testing.Run(t, NoDebugger, debuggerFile, sourceText)
-		rule_testing.ExpectFindings(t, result, "unexpectedDebugger")
+		result := rule_testing.Run(test, NoDebugger, debuggerFile, sourceText)
+		rule_testing.ExpectFindings(test, result, "unexpectedDebugger")
 		if len(result.Diagnostics[0].Fixes) != 0 {
-			t.Errorf("a fix was offered for the lone body in %q", sourceText)
+			test.Errorf("a fix was offered for the lone body in %q", sourceText)
 		}
 	}
 }

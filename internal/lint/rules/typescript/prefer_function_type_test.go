@@ -20,8 +20,8 @@ func preferFunctionTypeCaseName(index int) string {
 // Each one is a distinct reason to decline: a second member, a supertype that is not Function, a
 // construct signature beside a call signature, and a call signature with no annotated return type.
 // Skipping any of them ships that class of false positive.
-func TestPreferFunctionTypeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"interface Foo {\n  (): void;\n  bar: number;\n}\n",
@@ -31,9 +31,9 @@ func TestPreferFunctionTypeStaysSilent(t *testing.T) {
 		"interface Foo {\n  bar: string;\n}\ninterface Bar extends Function, Foo {\n  (): void;\n}\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferFunctionTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, PreferFunctionType,
+		test.Run(preferFunctionTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, PreferFunctionType,
 				preferFunctionTypeFile, sourceText))
 		})
 	}
@@ -66,8 +66,8 @@ type preferFunctionTypeFinding struct {
 //
 // The repair is half this rule and the corpus asserts it, so `wantOutput` is the specification
 // rather than a convenience. Three findings carry no repair and say so.
-func TestPreferFunctionTypeFires(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -455,16 +455,16 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferFunctionTypeCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile,
+		test.Run(preferFunctionTypeCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, PreferFunctionType, preferFunctionTypeFile,
 				testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			anyFixExpected := false
@@ -473,18 +473,18 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if want.wantPosition != 0 && diagnostic.Range.Pos() != want.wantPosition {
-					t.Fatalf("finding %d position: expected %d, got %d", position, want.wantPosition,
+					test.Fatalf("finding %d position: expected %d, got %d", position, want.wantPosition,
 						diagnostic.Range.Pos())
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 
@@ -497,15 +497,15 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 					anyFixExpected = true
 				}
 				if len(diagnostic.Fixes) != wantFixes {
-					t.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
+					test.Fatalf("finding %d fixes: expected %d, got %d", position, wantFixes,
 						len(diagnostic.Fixes))
 				}
 			}
 
 			if anyFixExpected {
-				rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantOutput)+"\n")
+				rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantOutput)+"\n")
 			} else if strings.TrimSpace(testCase.wantOutput)+"\n" != onDisk {
-				t.Fatalf("a case expecting no repair must expect the source unchanged")
+				test.Fatalf("a case expecting no repair must expect the source unchanged")
 			}
 		})
 	}
@@ -519,8 +519,8 @@ func TestPreferFunctionTypeFires(t *testing.T) {
 // explicitly. `declare` is dropped, as upstream's installed build drops it; a type alias emits
 // nothing either way, so that is a spelling and not a meaning. Both outputs are byte-identical to
 // upstream's.
-func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeKeepsTheExport(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -530,9 +530,9 @@ func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
 		{"/** Doc. */\nexport interface Foo {\n  (): void;\n}\n", "/** Doc. */\nexport type Foo = () => void;\n"},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
-		rule_testing.ExpectFindings(t, result, "functionTypeOverCallableType")
-		rule_testing.ExpectFixedSource(t, result, testCase.want)
+		result := rule_testing.Run(test, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
+		rule_testing.ExpectFindings(test, result, "functionTypeOverCallableType")
+		rule_testing.ExpectFixedSource(test, result, testCase.want)
 	}
 }
 
@@ -542,8 +542,8 @@ func TestPreferFunctionTypeKeepsTheExport(t *testing.T) {
 // `type Options<TDef, TFlags extends object = {}, = ...` and did not parse (TS1139, #kq9vtva).
 // Upstream slices from the name through the list's own closing bracket, so the comma and the newline
 // survive into the alias, as they do here.
-func TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine(t *testing.T) {
-	t.Parallel()
+func TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -559,8 +559,8 @@ func TestPreferFunctionTypeKeepsATypeParameterListWrittenOnePerLine(t *testing.T
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.Run(t, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
-		rule_testing.ExpectFindings(t, result, "functionTypeOverCallableType")
-		rule_testing.ExpectFixedSource(t, result, testCase.want)
+		result := rule_testing.Run(test, PreferFunctionType, preferFunctionTypeFile, testCase.sourceText)
+		rule_testing.ExpectFindings(test, result, "functionTypeOverCallableType")
+		rule_testing.ExpectFixedSource(test, result, testCase.want)
 	}
 }

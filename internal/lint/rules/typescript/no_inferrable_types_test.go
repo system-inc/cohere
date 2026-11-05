@@ -22,18 +22,18 @@ type noInferrableTypesCase struct {
 }
 
 // runNoInferrableTypes drives one case through the rule's own exported decoder.
-func runNoInferrableTypes(t *testing.T, testCase noInferrableTypesCase) rule_testing.Result {
-	t.Helper()
+func runNoInferrableTypes(test *testing.T, testCase noInferrableTypesCase) rule_testing.Result {
+	test.Helper()
 
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeNoInferrableTypesOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options: %v", err)
+		test.Fatalf("could not decode options: %v", err)
 	}
-	return rule_testing.RunWithOptions(t, NoInferrableTypes, noInferrableTypesFile,
+	return rule_testing.RunWithOptions(test, NoInferrableTypes, noInferrableTypesFile,
 		testCase.sourceText, decoded)
 }
 
@@ -152,8 +152,8 @@ func noInferrableTypesCases() []noInferrableTypesCase {
 }
 
 // TestNoInferrableTypesMatchesUpstream replays the whole corpus.
-func TestNoInferrableTypesMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestNoInferrableTypesMatchesUpstream(test *testing.T) {
+	test.Parallel()
 
 	cases := noInferrableTypesCases()
 
@@ -167,18 +167,18 @@ func TestNoInferrableTypesMatchesUpstream(t *testing.T) {
 		}
 	}
 	if len(cases) != 99 {
-		t.Fatalf("expected 99 corpus cases, have %d", len(cases))
+		test.Fatalf("expected 99 corpus cases, have %d", len(cases))
 	}
 	if reporting != 44 {
-		t.Fatalf("expected 44 reporting cases, have %d", reporting)
+		test.Fatalf("expected 44 reporting cases, have %d", reporting)
 	}
 	if fixable != 44 {
-		t.Fatalf("expected 44 fixable cases, have %d", fixable)
+		test.Fatalf("expected 44 fixable cases, have %d", fixable)
 	}
 
 	for _, testCase := range cases {
-		result := runNoInferrableTypes(t, testCase)
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		result := runNoInferrableTypes(test, testCase)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 	}
 }
 
@@ -188,8 +188,8 @@ func TestNoInferrableTypesMatchesUpstream(t *testing.T) {
 // can see: deleting the annotation without its colon writes `const a: = 5`, and deleting it without
 // the `?` on an optional parameter writes `function f(a? = 5)`. Both parse-break, both report
 // identically, and only comparing the rewritten file separates them.
-func TestNoInferrableTypesRewritesWhatUpstreamRewrites(t *testing.T) {
-	t.Parallel()
+func TestNoInferrableTypesRewritesWhatUpstreamRewrites(test *testing.T) {
+	test.Parallel()
 
 	checked := 0
 	for _, testCase := range noInferrableTypesCases() {
@@ -197,11 +197,11 @@ func TestNoInferrableTypesRewritesWhatUpstreamRewrites(t *testing.T) {
 			continue
 		}
 		checked++
-		result := runNoInferrableTypes(t, testCase)
-		rule_testing.ExpectFixedSource(t, result, *testCase.wantOutput)
+		result := runNoInferrableTypes(test, testCase)
+		rule_testing.ExpectFixedSource(test, result, *testCase.wantOutput)
 	}
 	if checked != 44 {
-		t.Fatalf("expected to check 44 rewrites, checked %d", checked)
+		test.Fatalf("expected to check 44 rewrites, checked %d", checked)
 	}
 }
 
@@ -215,22 +215,22 @@ func TestNoInferrableTypesRewritesWhatUpstreamRewrites(t *testing.T) {
 //
 // The control is the same property without `readonly`, which reports. Without it this test also
 // passes for a rule that never looks at class properties.
-func TestNoInferrableTypesExemptsReadonlyForACompilerReason(t *testing.T) {
-	t.Parallel()
+func TestNoInferrableTypesExemptsReadonlyForACompilerReason(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"class C { readonly a: number = 5; }",
 		"class C { readonly a: string = 'x'; }",
 		"class C { a?: number = 5; }",
 	} {
-		result := runNoInferrableTypes(t, noInferrableTypesCase{sourceText: source})
-		rule_testing.ExpectClean(t, result)
+		result := runNoInferrableTypes(test, noInferrableTypesCase{sourceText: source})
+		rule_testing.ExpectClean(test, result)
 	}
 
-	control := runNoInferrableTypes(t, noInferrableTypesCase{
+	control := runNoInferrableTypes(test, noInferrableTypesCase{
 		sourceText: "class C { a: number = 5; }",
 	})
-	rule_testing.ExpectFindings(t, control, "noInferrableType")
+	rule_testing.ExpectFindings(test, control, "noInferrableType")
 }
 
 // TestNoInferrableTypesOptionsSuppressEachVisitor covers the two flags independently.
@@ -239,31 +239,31 @@ func TestNoInferrableTypesExemptsReadonlyForACompilerReason(t *testing.T) {
 // passes every corpus row that configures only one of them. The source below carries a violation in
 // all three positions at once, so each flag's effect is visible as a change in COUNT rather than as
 // a silence that could mean anything.
-func TestNoInferrableTypesOptionsSuppressEachVisitor(t *testing.T) {
-	t.Parallel()
+func TestNoInferrableTypesOptionsSuppressEachVisitor(test *testing.T) {
+	test.Parallel()
 
 	const source = "const a: number = 5;\nfunction f(b: number = 5) {}\nclass C { c: number = 5; }"
 
-	all := runNoInferrableTypes(t, noInferrableTypesCase{sourceText: source})
-	rule_testing.ExpectFindings(t, all, "noInferrableType", "noInferrableType", "noInferrableType")
+	all := runNoInferrableTypes(test, noInferrableTypesCase{sourceText: source})
+	rule_testing.ExpectFindings(test, all, "noInferrableType", "noInferrableType", "noInferrableType")
 
-	withoutParameters := runNoInferrableTypes(t, noInferrableTypesCase{
+	withoutParameters := runNoInferrableTypes(test, noInferrableTypesCase{
 		sourceText: source,
 		options:    NoInferrableTypesOptions{IgnoreParameters: true},
 	})
-	rule_testing.ExpectFindings(t, withoutParameters, "noInferrableType", "noInferrableType")
+	rule_testing.ExpectFindings(test, withoutParameters, "noInferrableType", "noInferrableType")
 
-	withoutProperties := runNoInferrableTypes(t, noInferrableTypesCase{
+	withoutProperties := runNoInferrableTypes(test, noInferrableTypesCase{
 		sourceText: source,
 		options:    NoInferrableTypesOptions{IgnoreProperties: true},
 	})
-	rule_testing.ExpectFindings(t, withoutProperties, "noInferrableType", "noInferrableType")
+	rule_testing.ExpectFindings(test, withoutProperties, "noInferrableType", "noInferrableType")
 
-	neither := runNoInferrableTypes(t, noInferrableTypesCase{
+	neither := runNoInferrableTypes(test, noInferrableTypesCase{
 		sourceText: source,
 		options:    NoInferrableTypesOptions{IgnoreParameters: true, IgnoreProperties: true},
 	})
-	rule_testing.ExpectFindings(t, neither, "noInferrableType")
+	rule_testing.ExpectFindings(test, neither, "noInferrableType")
 }
 
 // TestNoInferrableTypesAnchorsAParameterPropertyOnItsName pins a span the corpus cannot see.
@@ -277,8 +277,8 @@ func TestNoInferrableTypesOptionsSuppressEachVisitor(t *testing.T) {
 // `RuleTester` never compares one and every id fixture passes either way. A differential over 89
 // real files caught it: 202 of 204 findings matched exactly and both mismatches were parameter
 // properties differing only in column.
-func TestNoInferrableTypesAnchorsAParameterPropertyOnItsName(t *testing.T) {
-	t.Parallel()
+func TestNoInferrableTypesAnchorsAParameterPropertyOnItsName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source     string
@@ -293,14 +293,14 @@ func TestNoInferrableTypesAnchorsAParameterPropertyOnItsName(t *testing.T) {
 		{"function f(a: number = 5) {}", "a: number = 5"},
 	}
 	for _, testCase := range cases {
-		result := runNoInferrableTypes(t, noInferrableTypesCase{sourceText: testCase.source})
+		result := runNoInferrableTypes(test, noInferrableTypesCase{sourceText: testCase.source})
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("%q: expected 1 finding, got %d", testCase.source, len(result.Diagnostics))
+			test.Fatalf("%q: expected 1 finding, got %d", testCase.source, len(result.Diagnostics))
 		}
 		span := result.Diagnostics[0].Range
 		reported := testCase.source[span.Pos():span.End()]
 		if reported != testCase.wantAnchor {
-			t.Errorf("%q: anchored on %q, want %q", testCase.source, reported, testCase.wantAnchor)
+			test.Errorf("%q: anchored on %q, want %q", testCase.source, reported, testCase.wantAnchor)
 		}
 	}
 }

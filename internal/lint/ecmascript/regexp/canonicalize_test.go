@@ -9,8 +9,8 @@ import (
 // in JavaScript, which is Canonicalize comparing the two characters. The two
 // readings are tested together because the whole point of the flag is that they
 // disagree.
-func TestCanonicalize(t *testing.T) {
-	t.Parallel()
+func TestCanonicalize(test *testing.T) {
+	test.Parallel()
 	tests := []struct {
 		name  string
 		left  rune
@@ -42,27 +42,27 @@ func TestCanonicalize(t *testing.T) {
 		{name: "st ligature", left: 0xFB05, right: 0xFB06, plain: false, uFlag: true},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			for _, mode := range []struct {
 				unicodeMode bool
 				want        bool
 				flags       string
-			}{{false, test.plain, "i"}, {true, test.uFlag, "iu"}} {
-				got := Canonicalize(test.left, mode.unicodeMode) == Canonicalize(test.right, mode.unicodeMode)
+			}{{false, testCase.plain, "i"}, {true, testCase.uFlag, "iu"}} {
+				got := Canonicalize(testCase.left, mode.unicodeMode) == Canonicalize(testCase.right, mode.unicodeMode)
 				if got != mode.want {
-					t.Errorf("/%s/ Canonicalize(%U)==Canonicalize(%U) is %v, want %v (got %U and %U)",
-						mode.flags, test.left, test.right, got, mode.want,
-						Canonicalize(test.left, mode.unicodeMode), Canonicalize(test.right, mode.unicodeMode))
+					test.Errorf("/%s/ Canonicalize(%U)==Canonicalize(%U) is %v, want %v (got %U and %U)",
+						mode.flags, testCase.left, testCase.right, got, mode.want,
+						Canonicalize(testCase.left, mode.unicodeMode), Canonicalize(testCase.right, mode.unicodeMode))
 				}
 			}
 		})
 	}
 }
 
-func TestCaseEquivalents(t *testing.T) {
-	t.Parallel()
+func TestCaseEquivalents(test *testing.T) {
+	test.Parallel()
 	tests := []struct {
 		name        string
 		r           rune
@@ -86,12 +86,12 @@ func TestCaseEquivalents(t *testing.T) {
 		{name: "iota with dialytika under u", r: 0x1FD3, unicodeMode: true, want: []rune{0x0390, 0x1FD3}},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			got := CaseEquivalents(test.r, test.unicodeMode)
-			if !slices.Equal(got, test.want) {
-				t.Errorf("CaseEquivalents(%U, %v) = %U, want %U", test.r, test.unicodeMode, got, test.want)
+	for _, testCase := range tests {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			got := CaseEquivalents(testCase.r, testCase.unicodeMode)
+			if !slices.Equal(got, testCase.want) {
+				test.Errorf("CaseEquivalents(%U, %v) = %U, want %U", testCase.r, testCase.unicodeMode, got, testCase.want)
 			}
 		})
 	}
@@ -100,25 +100,25 @@ func TestCaseEquivalents(t *testing.T) {
 // TestCaseEquivalenceGroupsAgree covers the two views of the same table: every
 // member of every group has to look the group back up, and canonicalize onto
 // the same character as the rest of it.
-func TestCaseEquivalenceGroupsAgree(t *testing.T) {
-	t.Parallel()
+func TestCaseEquivalenceGroupsAgree(test *testing.T) {
+	test.Parallel()
 	for _, unicodeMode := range []bool{false, true} {
 		groups := CaseEquivalenceGroups(unicodeMode)
 		if len(groups) == 0 {
-			t.Fatalf("CaseEquivalenceGroups(%v) is empty", unicodeMode)
+			test.Fatalf("CaseEquivalenceGroups(%v) is empty", unicodeMode)
 		}
 		for _, members := range groups {
 			if len(members) < 2 {
-				t.Errorf("group %U has nothing to widen to", members)
+				test.Errorf("group %U has nothing to widen to", members)
 			}
 			canonical := Canonicalize(members[0], unicodeMode)
 			for _, member := range members {
 				if Canonicalize(member, unicodeMode) != canonical {
-					t.Errorf("group %U holds %U, which canonicalizes to %U not %U",
+					test.Errorf("group %U holds %U, which canonicalizes to %U not %U",
 						members, member, Canonicalize(member, unicodeMode), canonical)
 				}
 				if !slices.Equal(CaseEquivalents(member, unicodeMode), members) {
-					t.Errorf("CaseEquivalents(%U, %v) = %U, want the group %U",
+					test.Errorf("CaseEquivalents(%U, %v) = %U, want the group %U",
 						member, unicodeMode, CaseEquivalents(member, unicodeMode), members)
 				}
 			}
@@ -133,21 +133,21 @@ func TestCaseEquivalenceGroupsAgree(t *testing.T) {
 // inside the basic plane and leaves the two supplementary-plane scripts apart —
 // which is checked too, because the delta must not reach further than
 // JavaScript does.
-func TestCanonicalizeUnicode17(t *testing.T) {
-	t.Parallel()
+func TestCanonicalizeUnicode17(test *testing.T) {
+	test.Parallel()
 	for _, pair := range unicode17Pairs {
 		lower, upper := pair[0], pair[1]
 		group := []rune{min(lower, upper), max(lower, upper)}
 		joinsWithoutU := lower <= 0xFFFF
 
 		if got := Canonicalize(lower, true); got != group[0] {
-			t.Errorf("Canonicalize(%U, true) = %U, want %U", lower, got, group[0])
+			test.Errorf("Canonicalize(%U, true) = %U, want %U", lower, got, group[0])
 		}
 		if got := Canonicalize(upper, true); got != group[0] {
-			t.Errorf("Canonicalize(%U, true) = %U, want %U", upper, got, group[0])
+			test.Errorf("Canonicalize(%U, true) = %U, want %U", upper, got, group[0])
 		}
 		if got := CaseEquivalents(lower, true); !slices.Equal(got, group) {
-			t.Errorf("CaseEquivalents(%U, true) = %U, want %U", lower, got, group)
+			test.Errorf("CaseEquivalents(%U, true) = %U, want %U", lower, got, group)
 		}
 
 		wantCanonical, wantEquivalents := lower, []rune(nil)
@@ -155,13 +155,13 @@ func TestCanonicalizeUnicode17(t *testing.T) {
 			wantCanonical, wantEquivalents = upper, group
 		}
 		if got := Canonicalize(lower, false); got != wantCanonical {
-			t.Errorf("Canonicalize(%U, false) = %U, want %U", lower, got, wantCanonical)
+			test.Errorf("Canonicalize(%U, false) = %U, want %U", lower, got, wantCanonical)
 		}
 		if got := Canonicalize(upper, false); got != upper {
-			t.Errorf("Canonicalize(%U, false) = %U, want it to stand for itself", upper, got)
+			test.Errorf("Canonicalize(%U, false) = %U, want it to stand for itself", upper, got)
 		}
 		if got := CaseEquivalents(lower, false); !slices.Equal(got, wantEquivalents) {
-			t.Errorf("CaseEquivalents(%U, false) = %U, want %U", lower, got, wantEquivalents)
+			test.Errorf("CaseEquivalents(%U, false) = %U, want %U", lower, got, wantEquivalents)
 		}
 	}
 }

@@ -15,11 +15,11 @@ const paramReassignFile = "/repository/source/ParamReassign.ts"
 // Building the struct directly would leave the decoder and its two regex lists untested, and the
 // regex list is the one field whose wire shape has no upstream counterpart: upstream compiles a
 // fresh pattern at every call and this compiles once and caches.
-func decodedParamOptions(t *testing.T, raw string) any {
-	t.Helper()
+func decodedParamOptions(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeNoParamReassignOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", raw, err)
+		test.Fatalf("decoding %s: %v", raw, err)
 	}
 	return decoded
 }
@@ -40,8 +40,8 @@ func decodedParamOptions(t *testing.T, raw string) any {
 // as the trimmed source plus a newline, and every case here is a single line with no leading
 // whitespace, so the offsets are unshifted. That is checked rather than assumed: the assertion
 // slices the same string it passed in and compares the reported text.
-func TestNoParamReassignFires(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -64,43 +64,43 @@ func TestNoParamReassignFires(t *testing.T) {
 		{"function foo(bar) { ({x: [, bar = 0]} = {}); }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'bar'.", 28, 31},
 		{"function foo(bar) { for (bar in baz); }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'bar'.", 25, 28},
 		{"function foo(bar) { for (bar of baz); }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'bar'.", 25, 28},
-		{"function foo(bar) { bar.a = 0; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 20, 23},
-		{"function foo(bar) { bar.get(0).a = 0; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 20, 23},
-		{"function foo(bar) { delete bar.a; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 27, 30},
-		{"function foo(bar) { ++bar.a; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 22, 25},
-		{"function foo(bar) { for (bar.a in {}); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 25, 28},
-		{"function foo(bar) { for (bar.a of []); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 25, 28},
-		{"function foo(bar) { (bar ? bar : [])[0] = 1; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 27, 30},
-		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
-		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
-		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
-		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^B.*$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
+		{"function foo(bar) { bar.a = 0; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 20, 23},
+		{"function foo(bar) { bar.get(0).a = 0; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 20, 23},
+		{"function foo(bar) { delete bar.a; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 27, 30},
+		{"function foo(bar) { ++bar.a; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 22, 25},
+		{"function foo(bar) { for (bar.a in {}); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 25, 28},
+		{"function foo(bar) { for (bar.a of []); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 25, 28},
+		{"function foo(bar) { (bar ? bar : [])[0] = 1; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 27, 30},
+		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
+		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
+		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
+		{"function foo(bar) { [bar.a] = []; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^B.*$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 21, 24},
 		// #7mztrdd controls: the lookaround patterns that excuse in the silent table, on names they do not match. In
 		// Node, /^(?!un)/u tests false on unsafe and /(?<=^my)Foo$/u tests false on yourFoo.
-		{"function foo(unsafe) { unsafe.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'unsafe'.", 23, 29},
-		{"function foo(yourFoo) { yourFoo.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'yourFoo'.", 24, 31},
-		{"function foo(bar) { ({foo: bar.a} = {}); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 27, 30},
-		{"function foo(a) { ({a} = obj); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 20, 21},
+		{"function foo(unsafe) { unsafe.b = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'unsafe'.", 23, 29},
+		{"function foo(yourFoo) { yourFoo.b = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'yourFoo'.", 24, 31},
+		{"function foo(bar) { ({foo: bar.a} = {}); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'bar'.", 27, 30},
+		{"function foo(a) { ({a} = obj); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 20, 21},
 		{"function foo(a) { ([...a] = obj); }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 23, 24},
 		{"function foo(a) { ({...a} = obj); }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 23, 24},
-		{"function foo(a) { ([...a.b] = obj); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 23, 24},
-		{"function foo(a) { ({...a.b} = obj); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 23, 24},
-		{"function foo(a) { for ({bar: a.b} in {}); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 29, 30},
-		{"function foo(a) { for ([a.b] of []); }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 24, 25},
+		{"function foo(a) { ([...a.b] = obj); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 23, 24},
+		{"function foo(a) { ({...a.b} = obj); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 23, 24},
+		{"function foo(a) { for ({bar: a.b} in {}); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 29, 30},
+		{"function foo(a) { for ([a.b] of []); }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 24, 25},
 		{"function foo(a) { a &&= b; }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 18, 19},
 		{"function foo(a) { a ||= b; }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 18, 19},
 		{"function foo(a) { a ??= b; }", nil, "assignmentToFunctionParam", "Assignment to function parameter 'a'.", 18, 19},
-		{"function foo(a) { a.b &&= c; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 18, 19},
-		{"function foo(a) { a.b.c ||= d; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 18, 19},
-		{"function foo(a) { a[b] ??= c; }", decodedParamOptions(t, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 18, 19},
+		{"function foo(a) { a.b &&= c; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 18, 19},
+		{"function foo(a) { a.b.c ||= d; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 18, 19},
+		{"function foo(a) { a[b] ??= c; }", decodedParamOptions(test, `{"props": true}`), "assignmentToFunctionParamProp", "Assignment to property of function parameter 'a'.", 18, 19},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+" "+testCase.messageId, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		test.Run(testCase.sourceText+" "+testCase.messageId, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.messageId)
+			rule_testing.ExpectFindings(test, result, testCase.messageId)
 
 			finding := result.Diagnostics[0]
 
@@ -108,11 +108,11 @@ func TestNoParamReassignFires(t *testing.T) {
 			// property it guards is not a guard, and the two messages here differ only by a phrase
 			// in the middle, so a containment check on the parameter name passes for either one.
 			if finding.Message.Description != testCase.messageText {
-				t.Errorf("message %q, want %q", finding.Message.Description, testCase.messageText)
+				test.Errorf("message %q, want %q", finding.Message.Description, testCase.messageText)
 			}
 
 			if finding.Range.Pos() != testCase.spanStart || finding.Range.End() != testCase.spanEnd {
-				t.Errorf("reported [%d,%d), want [%d,%d)",
+				test.Errorf("reported [%d,%d), want [%d,%d)",
 					finding.Range.Pos(), finding.Range.End(), testCase.spanStart, testCase.spanEnd)
 			}
 
@@ -121,7 +121,7 @@ func TestNoParamReassignFires(t *testing.T) {
 			written := strings.TrimSpace(testCase.sourceText) + "\n"
 			reported := written[finding.Range.Pos():finding.Range.End()]
 			if !strings.HasSuffix(testCase.messageText, "'"+reported+"'.") {
-				t.Errorf("span covers %q, which is not the name the message reports", reported)
+				test.Errorf("span covers %q, which is not the name the message reports", reported)
 			}
 		})
 	}
@@ -129,8 +129,8 @@ func TestNoParamReassignFires(t *testing.T) {
 
 // The clean cases are the whole discrimination, and four of them are textually indistinguishable
 // from failing ones: what separates them is which binding the name resolves to.
-func TestNoParamReassignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -149,38 +149,38 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 		{"function foo(a) { delete a.b; }", nil},
 		{"function foo(a) { ++a.b; }", nil},
 		{"function foo(a) { [a.b] = []; }", nil},
-		{"function foo(a) { bar(a.b).c = 0; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { data[a.b] = 0; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { +a.b; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { (a ? [] : [])[0] = 1; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { (a.b ? [] : [])[0] = 1; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { a.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
-		{"function foo(a) { ++a.b; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
-		{"function foo(a) { delete a.b; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
-		{"function foo(a) { for (a.b in obj); }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
-		{"function foo(a) { for (a.b of arr); }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
-		{"function foo(a, z) { a.b = 0; x.y = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a", "x"]}`)},
-		{"function foo(a) { a.b.c = 0;}", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
-		{"function foo(aFoo) { aFoo.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
-		{"function foo(aFoo) { ++aFoo.b; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
-		{"function foo(aFoo) { delete aFoo.b; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
-		{"function foo(a, z) { aFoo.b = 0; x.y = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$", "^x.*$"]}`)},
-		{"function foo(aFoo) { aFoo.b.c = 0;}", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
+		{"function foo(a) { bar(a.b).c = 0; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { data[a.b] = 0; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { +a.b; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { (a ? [] : [])[0] = 1; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { (a.b ? [] : [])[0] = 1; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { a.b = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
+		{"function foo(a) { ++a.b; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
+		{"function foo(a) { delete a.b; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
+		{"function foo(a) { for (a.b in obj); }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
+		{"function foo(a) { for (a.b of arr); }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
+		{"function foo(a, z) { a.b = 0; x.y = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a", "x"]}`)},
+		{"function foo(a) { a.b.c = 0;}", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsFor": ["a"]}`)},
+		{"function foo(aFoo) { aFoo.b = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
+		{"function foo(aFoo) { ++aFoo.b; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
+		{"function foo(aFoo) { delete aFoo.b; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
+		{"function foo(a, z) { aFoo.b = 0; x.y = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$", "^x.*$"]}`)},
+		{"function foo(aFoo) { aFoo.b.c = 0;}", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^a.*$"]}`)},
 		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2 refuses a lookahead and a
 		// lookbehind, so these were dropped and the write reported; in Node /^(?!un)/u tests true on safe and
 		// /(?<=^my)Foo$/u tests true on myFoo.
-		{"function foo(safe) { safe.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`)},
-		{"function foo(myFoo) { myFoo.b = 0; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`)},
-		{"function foo(a) { ({ [a]: variable } = value) }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { ([...a.b] = obj); }", decodedParamOptions(t, `{"props": false}`)},
-		{"function foo(a) { ({...a.b} = obj); }", decodedParamOptions(t, `{"props": false}`)},
-		{"function foo(a) { for (obj[a.b] in obj); }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { for (obj[a.b] of arr); }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { for (bar in a.b); }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { for (bar of a.b); }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { for (bar in baz) a.b; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { for (bar of baz) a.b; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(bar, baz) { bar.a = true; baz.b = false; }", decodedParamOptions(t, `{"props": true, "ignorePropertyModificationsForRegex": ["^(foo|bar)$"], "ignorePropertyModificationsFor": ["baz"]}`)},
+		{"function foo(safe) { safe.b = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^(?!un)"]}`)},
+		{"function foo(myFoo) { myFoo.b = 0; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["(?<=^my)Foo$"]}`)},
+		{"function foo(a) { ({ [a]: variable } = value) }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { ([...a.b] = obj); }", decodedParamOptions(test, `{"props": false}`)},
+		{"function foo(a) { ({...a.b} = obj); }", decodedParamOptions(test, `{"props": false}`)},
+		{"function foo(a) { for (obj[a.b] in obj); }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { for (obj[a.b] of arr); }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { for (bar in a.b); }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { for (bar of a.b); }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { for (bar in baz) a.b; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { for (bar of baz) a.b; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(bar, baz) { bar.a = true; baz.b = false; }", decodedParamOptions(test, `{"props": true, "ignorePropertyModificationsForRegex": ["^(foo|bar)$"], "ignorePropertyModificationsFor": ["baz"]}`)},
 
 		// A catch binding spelled like the parameter, which is not it.
 		{"function foo(a) { try {} catch (a) { a = 1; } }", nil},
@@ -198,10 +198,10 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 		// decide WHERE a write lands and never the plainer one where it is simply the value being
 		// read, so a climb that forgot which side of the assignment it came up passes all 78
 		// imported cases and reports all three of these. Found by a mutant; measured silent.
-		{"function foo(a) { x = a.b; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { x.y = a.b; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { x += a.b; }", decodedParamOptions(t, `{"props": true}`)},
-		{"function foo(a) { var x = a.b; }", decodedParamOptions(t, `{"props": true}`)},
+		{"function foo(a) { x = a.b; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { x.y = a.b; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { x += a.b; }", decodedParamOptions(test, `{"props": true}`)},
+		{"function foo(a) { var x = a.b; }", decodedParamOptions(test, `{"props": true}`)},
 
 		// `props` off is the default, so a property write is clean unless the option turns it on.
 		// The corpus writes this shape under an explicit `false` and never under an absent option,
@@ -211,9 +211,9 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -231,8 +231,8 @@ func TestNoParamReassignStaysSilent(t *testing.T) {
 // report, so a stop set that never stopped would answer the same way here; what separates them is
 // that without the arm the climb runs off the top of the tree, and the arm is what makes the walk
 // terminate at the right boundary rather than by exhausting parents.
-func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignStopsAtAConciseArrowBody(test *testing.T) {
+	test.Parallel()
 
 	reporting := []struct {
 		sourceText string
@@ -240,27 +240,27 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 		options    any
 	}{
 		{"const f = (a) => a.b = 1;", "assignmentToFunctionParamProp",
-			decodedParamOptions(t, `{"props": true}`)},
+			decodedParamOptions(test, `{"props": true}`)},
 		{"const f = (a) => a.b++;", "assignmentToFunctionParamProp",
-			decodedParamOptions(t, `{"props": true}`)},
+			decodedParamOptions(test, `{"props": true}`)},
 		{"const f = (a) => delete a.b;", "assignmentToFunctionParamProp",
-			decodedParamOptions(t, `{"props": true}`)},
+			decodedParamOptions(test, `{"props": true}`)},
 		{"const f = (a) => (a.b, a.c = 1);", "assignmentToFunctionParamProp",
-			decodedParamOptions(t, `{"props": true}`)},
+			decodedParamOptions(test, `{"props": true}`)},
 		{"const f = (a) => a = 1;", "assignmentToFunctionParam", nil},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
 	}
 
-	t.Run("a concise arrow that merely reads", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
-			"const f = (a) => a.b;", decodedParamOptions(t, `{"props": true}`)))
+	test.Run("a concise arrow that merely reads", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
+			"const f = (a) => a.b;", decodedParamOptions(test, `{"props": true}`)))
 	})
 
 	// The case where the function-scope arm changes the VERDICT rather than only where the walk
@@ -278,10 +278,10 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 		"function foo(a) { x = ((a) => a).b; }",
 	}
 	for _, sourceText := range silentAcrossAFunctionBoundary {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
-				paramReassignFile, sourceText, decodedParamOptions(t, `{"props": true}`)))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
+				paramReassignFile, sourceText, decodedParamOptions(test, `{"props": true}`)))
 		})
 	}
 }
@@ -291,8 +291,8 @@ func TestNoParamReassignStopsAtAConciseArrowBody(t *testing.T) {
 // Upstream's tree gives both fixities one node type and its rule answers true for that type without
 // looking at the operator; ours gives them two kinds, so the postfix one is a separate arm that no
 // imported case reaches. Found by a mutant that neutralised it and survived all 78 corpus cases.
-func TestNoParamReassignSeesPostfixUpdates(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignSeesPostfixUpdates(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function foo(a) { a.b++; }",
@@ -303,10 +303,10 @@ func TestNoParamReassignSeesPostfixUpdates(t *testing.T) {
 		"function foo(a) { x = a.b++; }",
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
-				paramReassignFile, sourceText, decodedParamOptions(t, `{"props": true}`)),
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
+				paramReassignFile, sourceText, decodedParamOptions(test, `{"props": true}`)),
 				"assignmentToFunctionParamProp")
 		})
 	}
@@ -319,8 +319,8 @@ func TestNoParamReassignSeesPostfixUpdates(t *testing.T) {
 // the initialization flag on it, so everything else in the parameter list is an ordinary reference.
 // Found by a mutant that widened the search from the body to the whole function and survived every
 // fixture; measured against the installed rule on the five shapes below.
-func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignSeesIntoParameterDefaults(test *testing.T) {
+	test.Parallel()
 
 	reporting := []struct {
 		sourceText string
@@ -331,12 +331,12 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 		{"function foo(a = (a = 1)) { }", "assignmentToFunctionParam", nil},
 		{"function foo(a, b = ++a) { }", "assignmentToFunctionParam", nil},
 		{"function foo(a, b = (a.c = 1)) { }", "assignmentToFunctionParamProp",
-			decodedParamOptions(t, `{"props": true}`)},
+			decodedParamOptions(test, `{"props": true}`)},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options), testCase.messageId)
 		})
 	}
@@ -351,12 +351,12 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 		{"function foo(a = 1) { }", nil},
 		{"function foo(a, b = a) { }", nil},
 		{"function foo({a = 1}) { }", nil},
-		{"function foo({a, b = a.c}) { }", decodedParamOptions(t, `{"props": true}`)},
+		{"function foo({a, b = a.c}) { }", decodedParamOptions(test, `{"props": true}`)},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
 				paramReassignFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -368,8 +368,8 @@ func TestNoParamReassignSeesIntoParameterDefaults(t *testing.T) {
 // tree makes a method's value a plain function expression. Our parser gives each its own node kind
 // with no function expression underneath, so registering only upstream's three goes silent on every
 // parameter in every class. Found by a differential run, where all six of its mismatches were this.
-func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignReachesIntoClassBodies(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -381,7 +381,7 @@ func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
 		{"class C { set x(a) { a = 1; } }", "assignmentToFunctionParam", nil},
 		{"class C { static m(a) { a = 1; } }", "assignmentToFunctionParam", nil},
 		{"class C { m(a) { a.b = 1; } }", "assignmentToFunctionParamProp",
-			decodedParamOptions(t, `{"props": true}`)},
+			decodedParamOptions(test, `{"props": true}`)},
 
 		// A getter takes no parameters, so it is here for the listener rather than for a finding;
 		// the property write is on the setter beside it.
@@ -389,14 +389,14 @@ func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 				testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.messageId)
+			rule_testing.ExpectFindings(test, result, testCase.messageId)
 			if got := result.Diagnostics[0].Message.Description; got != "Assignment to function parameter 'a'." &&
 				got != "Assignment to property of function parameter 'a'." {
-				t.Errorf("message %q names the wrong parameter", got)
+				test.Errorf("message %q names the wrong parameter", got)
 			}
 		})
 	}
@@ -414,8 +414,8 @@ func TestNoParamReassignReachesIntoClassBodies(t *testing.T) {
 // the inner function's own parameter is being reassigned. Written first as a clean case on the
 // reasoning that a shadow is exempt, which is true of the binding it shadows and not of the shadow
 // itself. Measured against the installed rule, which reports one finding on each.
-func TestNoParamReassignAttributesAShadowedWriteToOneFunction(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignAttributesAShadowedWriteToOneFunction(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -431,14 +431,14 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 				testCase.sourceText, nil)
-			rule_testing.ExpectFindings(t, result, "assignmentToFunctionParam")
+			rule_testing.ExpectFindings(test, result, "assignmentToFunctionParam")
 			want := "Assignment to function parameter '" + testCase.wantName + "'."
 			if got := result.Diagnostics[0].Message.Description; got != want {
-				t.Errorf("message %q, want %q", got, want)
+				test.Errorf("message %q, want %q", got, want)
 			}
 		})
 	}
@@ -449,126 +449,126 @@ func TestNoParamReassignAttributesAShadowedWriteToOneFunction(t *testing.T) {
 // The failure without a checker is SILENCE rather than a crash, because GetSymbolAtLocation tolerates
 // a nil receiver and answers nil. That is the more dangerous of the two failure modes: every
 // StaysSilent case passes vacuously and only the Fires cases notice.
-func TestNoParamReassignNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoParamReassign.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring the checker, which makes every silent fixture vacuous")
+		test.Fatal("the rule stopped declaring the checker, which makes every silent fixture vacuous")
 	}
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoParamReassign, paramReassignFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoParamReassign, paramReassignFile,
 		"function foo(bar) { bar = 13; }"))
 }
 
 // The decoder and the two allowance lists, which are the lines with no upstream counterpart.
-func TestNoParamReassignOptions(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignOptions(test *testing.T) {
+	test.Parallel()
 
 	propertyWrite := "function foo(a) { a.b = 0; }"
 
-	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
+	test.Run("nil options, the shape the live config produces", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
 			paramReassignFile, propertyWrite, nil))
 	})
 
-	t.Run("a zero-value struct declines property writes", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoParamReassign,
+	test.Run("a zero-value struct declines property writes", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoParamReassign,
 			paramReassignFile, propertyWrite, NoParamReassignOptions{}))
 	})
 
-	t.Run("empty input decodes without erroring", func(t *testing.T) {
-		t.Parallel()
+	test.Run("empty input decodes without erroring", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoParamReassignOptions(nil)
 		if err != nil {
-			t.Fatalf("decoding empty input: %v", err)
+			test.Fatalf("decoding empty input: %v", err)
 		}
 		options, ok := decoded.(NoParamReassignOptions)
 		if !ok {
-			t.Fatalf("decoded to %T", decoded)
+			test.Fatalf("decoded to %T", decoded)
 		}
 		if options.Props {
-			t.Error("empty input decoded to props on, which widens the rule by default")
+			test.Error("empty input decoded to props on, which widens the rule by default")
 		}
 	})
 
-	t.Run("malformed input is an error", func(t *testing.T) {
-		t.Parallel()
+	test.Run("malformed input is an error", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeNoParamReassignOptions([]byte("[")); err == nil {
-			t.Error("malformed options decoded without an error")
+			test.Error("malformed options decoded without an error")
 		}
 	})
 
-	t.Run("an uncompilable pattern is dropped rather than fatal", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an uncompilable pattern is dropped rather than fatal", func(test *testing.T) {
+		test.Parallel()
 		// A divergence, stated at the rule and pinned here. Upstream builds a RegExp at every call
 		// and a bad pattern throws, taking the run down; this drops it, so the name stops being
 		// excused and the rule reports MORE. That is the visible direction rather than the one that
 		// hides findings.
-		options := decodedParamOptions(t,
+		options := decodedParamOptions(test,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(unclosed"]}`)
-		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 			propertyWrite, options)
-		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
+		rule_testing.ExpectFindings(test, result, "assignmentToFunctionParamProp")
 	})
 
-	t.Run("a pattern RE2 refuses is read as JavaScript reads it", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a pattern RE2 refuses is read as JavaScript reads it", func(test *testing.T) {
+		test.Parallel()
 		// Each pattern is upstream's `new RegExp(pattern, "u")`. RE2 has no lookaround, so this
 		// pattern used to be dropped and the write reported; now it is honoured as it is upstream
 		// (#7mztrdd). In Node, /^(?!x)a$/u tests true on a, so the write to `a` is excused.
-		options := decodedParamOptions(t,
+		options := decodedParamOptions(test,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(?!x)a$"]}`)
-		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 			propertyWrite, options)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("lookahead-control", func(t *testing.T) {
-		t.Parallel()
+	test.Run("lookahead-control", func(test *testing.T) {
+		test.Parallel()
 		// The same pattern on a name it does not match, so the case above proves the pattern is
 		// tested rather than excusing everything. In Node, /^(?!x)a$/u tests false on xa.
-		options := decodedParamOptions(t,
+		options := decodedParamOptions(test,
 			`{"props": true, "ignorePropertyModificationsForRegex": ["^(?!x)a$"]}`)
-		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 			"function foo(xa) { xa.b = 0; }", options)
-		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
+		rule_testing.ExpectFindings(test, result, "assignmentToFunctionParamProp")
 	})
 
-	t.Run("both lists apply together", func(t *testing.T) {
-		t.Parallel()
+	test.Run("both lists apply together", func(test *testing.T) {
+		test.Parallel()
 		// Upstream's last valid case pairs a literal name with a pattern; this is the same pairing
 		// asserted from the other side, with each list excusing a different parameter and a third
 		// parameter matching neither and reporting.
-		options := decodedParamOptions(t,
+		options := decodedParamOptions(test,
 			`{"props": true, "ignorePropertyModificationsFor": ["one"], "ignorePropertyModificationsForRegex": ["^tw"]}`)
-		result := rule_testing.RunTypedWithOptions(t, NoParamReassign, paramReassignFile,
+		result := rule_testing.RunTypedWithOptions(test, NoParamReassign, paramReassignFile,
 			"function foo(one, two, three) { one.a = 0; two.a = 0; three.a = 0; }", options)
-		rule_testing.ExpectFindings(t, result, "assignmentToFunctionParamProp")
+		rule_testing.ExpectFindings(test, result, "assignmentToFunctionParamProp")
 		if got := result.Diagnostics[0].Message.Description; got != "Assignment to property of function parameter 'three'." {
-			t.Errorf("reported %q, want the third parameter", got)
+			test.Errorf("reported %q, want the third parameter", got)
 		}
 	})
 }
 
 // Both messages, asserted against literals typed here rather than against the rule's own builders,
 // which would move with them under mutation.
-func TestNoParamReassignMessages(t *testing.T) {
-	t.Parallel()
+func TestNoParamReassignMessages(test *testing.T) {
+	test.Parallel()
 
 	binding := messageAssignmentToParameter("bar")
 	if binding.Id != "assignmentToFunctionParam" {
-		t.Errorf("binding message id is %q", binding.Id)
+		test.Errorf("binding message id is %q", binding.Id)
 	}
 	if binding.Description != "Assignment to function parameter 'bar'." {
-		t.Errorf("binding message renders as %q", binding.Description)
+		test.Errorf("binding message renders as %q", binding.Description)
 	}
 
 	property := messageAssignmentToParameterProperty("bar")
 	if property.Id != "assignmentToFunctionParamProp" {
-		t.Errorf("property message id is %q", property.Id)
+		test.Errorf("property message id is %q", property.Id)
 	}
 	if property.Description != "Assignment to property of function parameter 'bar'." {
-		t.Errorf("property message renders as %q", property.Description)
+		test.Errorf("property message renders as %q", property.Description)
 	}
 }

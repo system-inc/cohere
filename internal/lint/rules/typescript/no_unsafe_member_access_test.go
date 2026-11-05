@@ -20,11 +20,11 @@ func noUnsafeMemberAccessCaseName(index int) string {
 // The options text is the bare object rather than upstream's one-element array, because cohere's
 // config layer unwraps the severity tuple before a decoder ever sees it. Going through the decoder
 // is what puts the wire key name and the absent-versus-explicit-false handling under test.
-func noUnsafeMemberAccessDecoded(t *testing.T, optionsJson string) any {
-	t.Helper()
+func noUnsafeMemberAccessDecoded(test *testing.T, optionsJson string) any {
+	test.Helper()
 	decoded, err := DecodeNoUnsafeMemberAccessOptions([]byte(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+		test.Fatalf("decoding %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -39,8 +39,8 @@ func noUnsafeMemberAccessDecoded(t *testing.T, optionsJson string) any {
 // `this` in an object literal is typed as the literal rather than `any` once the option is on. It
 // is pinned here at the verdict this harness can observe rather than deleted, with the other column
 // recorded in the rule's doc comment.
-func TestNoUnsafeMemberAccessStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeMemberAccessStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -116,11 +116,11 @@ func TestNoUnsafeMemberAccessStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeMemberAccessCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
+		test.Run(noUnsafeMemberAccessCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoUnsafeMemberAccess,
 				noUnsafeMemberAccessFile, testCase.sourceText,
-				noUnsafeMemberAccessDecoded(t, testCase.optionsJson)))
+				noUnsafeMemberAccessDecoded(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -142,8 +142,8 @@ type noUnsafeMemberAccessFinding struct {
 // The span assertions carry more weight here than on most rules. A chain reports ONCE and on the
 // innermost property, so `x.a.b.c` underlines `a`; a port without the memoized recursion reports
 // three times, and one recursing the wrong way underlines `c`. Both satisfy every id assertion.
-func TestNoUnsafeMemberAccessFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeMemberAccessFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -444,17 +444,17 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeMemberAccessCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
+		test.Run(noUnsafeMemberAccessCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoUnsafeMemberAccess,
 				noUnsafeMemberAccessFile, testCase.sourceText,
-				noUnsafeMemberAccessDecoded(t, testCase.optionsJson))
+				noUnsafeMemberAccessDecoded(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
@@ -462,14 +462,14 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}
@@ -489,19 +489,19 @@ func TestNoUnsafeMemberAccessFires(t *testing.T) {
 // So this asserts the two halves separately. Under the untyped harness the rule must be silent and
 // must not panic, and under the typed one the same source must report. Without the guard the first
 // half takes the whole run down.
-func TestNoUnsafeMemberAccessRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeMemberAccessRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const x: any;\nx.a;\n"
 
 	// The untyped harness gives the rule no checker. Silence here is the guard working; a panic is
 	// what its absence produces, and a panic in one rule costs every rule its findings for the
 	// whole file.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUnsafeMemberAccess,
-		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(t, "{}")))
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUnsafeMemberAccess,
+		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(test, "{}")))
 
 	// The control. Without it the row above is satisfied by a rule that can never report at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoUnsafeMemberAccess,
-		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(t, "{}")),
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoUnsafeMemberAccess,
+		noUnsafeMemberAccessFile, sourceText, noUnsafeMemberAccessDecoded(test, "{}")),
 		"unsafeMemberExpression")
 }

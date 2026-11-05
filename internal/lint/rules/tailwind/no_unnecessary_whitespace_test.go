@@ -21,8 +21,8 @@ import (
 //	`flex ${x}  gap-2`     ->  `flex ${x} gap-2`
 //	"flex\titems-center"    silent           (a tab separates as well as a space)
 
-func TestNoUnnecessaryWhitespaceReportsPadding(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryWhitespaceReportsPadding(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -85,18 +85,18 @@ func TestNoUnnecessaryWhitespaceReportsPadding(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // The clean half. The template cases here are the ones a naive trim breaks, because the whitespace
 // next to a hole looks like padding and is actually the separator.
-func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryWhitespaceStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name     string
 		fileName string
@@ -161,10 +161,10 @@ func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryWhitespace, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -174,8 +174,8 @@ func TestNoUnnecessaryWhitespaceStaysSilent(t *testing.T) {
 // This rule rewrites source unattended, and the interesting cases are the template ones where the
 // obviously correct repair (trim it) is wrong. Each expectation is what upstream's `--fix` actually
 // produced.
-func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryWhitespaceFixMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -234,10 +234,10 @@ func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }
@@ -248,18 +248,18 @@ func TestNoUnnecessaryWhitespaceFixMatchesUpstream(t *testing.T) {
 // of a separator between two classes, because those bytes are what `no-duplicate-classes` and
 // `enforce-consistent-class-order` edit in the same pass (class_tokens.go). A rewrite of the whole
 // literal produces the same text and claims every byte, and the engine then refuses one of the two.
-func TestWhitespaceFixClaimsNoClassByte(t *testing.T) {
-	t.Parallel()
+func TestWhitespaceFixClaimsNoClassByte(test *testing.T) {
+	test.Parallel()
 	source := `const element = <div className="  flex   items-center  gap-2 " />;`
-	result := rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source)
+	result := rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 	fixes := result.Diagnostics[0].Fixes
 	for _, fix := range fixes {
 		removed := source[fix.Range.Pos():fix.Range.End()]
 		if fix.Text != "" || strings.TrimSpace(removed) != "" {
-			t.Errorf("a fix rewrites %q to %q, which is more than deleting whitespace", removed, fix.Text)
+			test.Errorf("a fix rewrites %q to %q, which is more than deleting whitespace", removed, fix.Text)
 		}
 	}
 
@@ -272,14 +272,14 @@ func TestWhitespaceFixClaimsNoClassByte(t *testing.T) {
 		separatorStart := contentStart + strings.Index(content, className) + len(className)
 		for _, fix := range fixes {
 			if fix.Range.Pos() <= separatorStart && separatorStart < fix.Range.End() {
-				t.Errorf("a fix covers the separator's first byte after %q, which another rule may edit", className)
+				test.Errorf("a fix covers the separator's first byte after %q, which another rule may edit", className)
 			}
 		}
 	}
 	if len(fixes) != 4 {
-		t.Errorf("expected four deletions (two padding runs, two excesses), got %d", len(fixes))
+		test.Errorf("expected four deletions (two padding runs, two excesses), got %d", len(fixes))
 	}
-	rule_testing.ExpectFixedSource(t, result, `const element = <div className="flex items-center gap-2" />;`)
+	rule_testing.ExpectFixedSource(test, result, `const element = <div className="flex items-center gap-2" />;`)
 }
 
 // TestWhitespaceFixNeverFusesClassesAcrossAHole is the known-dirty control.
@@ -291,8 +291,8 @@ func TestWhitespaceFixClaimsNoClassByte(t *testing.T) {
 // missing style at runtime.
 //
 // So the naive rewrite is computed here and required to differ from what the rule proposes.
-func TestWhitespaceFixNeverFusesClassesAcrossAHole(t *testing.T) {
-	t.Parallel()
+func TestWhitespaceFixNeverFusesClassesAcrossAHole(test *testing.T) {
+	test.Parallel()
 	// A segment sitting between two holes, with padding that a plain trim would remove entirely.
 	segment := ClassSegment{
 		Text:         "  flex  ",
@@ -302,47 +302,47 @@ func TestWhitespaceFixNeverFusesClassesAcrossAHole(t *testing.T) {
 
 	tidied, needsTidying := tidyWhitespace(segment, true)
 	if !needsTidying {
-		t.Fatal("a doubled space inside the segment is a defect and should have been reported")
+		test.Fatal("a doubled space inside the segment is a defect and should have been reported")
 	}
 
 	naive := "flex"
 	if tidied == naive {
-		t.Fatal("the fix trimmed the separators next to the interpolations, so the substituted values " +
+		test.Fatal("the fix trimmed the separators next to the interpolations, so the substituted values " +
 			"would fuse with the class and produce names that do not exist")
 	}
 	if tidied != " flex " {
-		t.Fatalf("expected one space preserved on each side of the hole, got %q", tidied)
+		test.Fatalf("expected one space preserved on each side of the hole, got %q", tidied)
 	}
 
 	// And the discrimination has to be real: with no holes, the same text trims fully.
 	plain := ClassSegment{Text: "  flex  "}
 	plainTidied, plainNeedsTidying := tidyWhitespace(plain, true)
 	if !plainNeedsTidying || plainTidied != "flex" {
-		t.Fatalf("outside a template the padding should be removed entirely, got %q", plainTidied)
+		test.Fatalf("outside a template the padding should be removed entirely, got %q", plainTidied)
 	}
 }
 
 // TestNoUnnecessaryWhitespaceAllowMultiline is upstream's `allowMultiline`, each way, on upstream's own
 // case. On, the default, a class list written across lines stays across lines. Off, it is whitespace
 // like any other and the list becomes one line.
-func TestNoUnnecessaryWhitespaceAllowMultiline(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryWhitespaceAllowMultiline(test *testing.T) {
+	test.Parallel()
 	const source = "const element = <img className={`\n      d  c\n      b  a\n    `} />;"
 	off := false
 
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", source),
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx", source),
 		"const element = <img className={`\n      d c\n      b a\n    `} />;")
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.RunWithOptions(t, NoUnnecessaryWhitespace, "Component.tsx", source,
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.RunWithOptions(test, NoUnnecessaryWhitespace, "Component.tsx", source,
 			NoUnnecessaryWhitespaceOptions{AllowMultiline: &off}),
 		"const element = <img className={`d c b a`} />;")
 
 	// A wrapped list with nothing else wrong is clean by default and a finding with the option off.
 	const wrapped = "const element = <div className={`flex\n    items-center`} />;"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryWhitespace, "Component.tsx", wrapped))
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.RunWithOptions(t, NoUnnecessaryWhitespace, "Component.tsx", wrapped,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnnecessaryWhitespace, "Component.tsx", wrapped))
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.RunWithOptions(test, NoUnnecessaryWhitespace, "Component.tsx", wrapped,
 			NoUnnecessaryWhitespaceOptions{AllowMultiline: &off}),
 		"const element = <div className={`flex items-center`} />;")
 }

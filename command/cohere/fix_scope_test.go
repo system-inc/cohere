@@ -40,8 +40,8 @@ const fixScopeTsconfig = `{
 
 // fixScopeProject writes a project where the named file, a file that imports it, and an unrelated
 // sibling all carry the same `debugger` statement, which `no-debugger` repairs.
-func fixScopeProject(t *testing.T, root string, extra map[string]string) {
-	t.Helper()
+func fixScopeProject(test *testing.T, root string, extra map[string]string) {
+	test.Helper()
 	files := map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
 		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
@@ -53,105 +53,105 @@ func fixScopeProject(t *testing.T, root string, extra map[string]string) {
 	for name, contents := range extra {
 		files[name] = contents
 	}
-	writeTree(t, root, files)
+	writeTree(test, root, files)
 }
 
-func readForTest(t *testing.T, path string) string {
-	t.Helper()
+func readForTest(test *testing.T, path string) string {
+	test.Helper()
 	contents, err := os.ReadFile(path)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return string(contents)
 }
 
 // assertWroteOnlyNamed checks the control and the boundary together.
-func assertWroteOnlyNamed(t *testing.T, root string, before map[string]string, written string, output string) {
-	t.Helper()
-	if after := readForTest(t, filepath.Join(root, written)); after == before[written] || strings.Contains(after, "debugger") {
-		t.Fatalf("the control failed: %s was named and still carries its violation, so the fixer never ran:\n%s\n%s",
+func assertWroteOnlyNamed(test *testing.T, root string, before map[string]string, written string, output string) {
+	test.Helper()
+	if after := readForTest(test, filepath.Join(root, written)); after == before[written] || strings.Contains(after, "debugger") {
+		test.Fatalf("the control failed: %s was named and still carries its violation, so the fixer never ran:\n%s\n%s",
 			written, after, output)
 	}
 	for name, contents := range before {
 		if name == written {
 			continue
 		}
-		if after := readForTest(t, filepath.Join(root, name)); after != contents {
-			t.Errorf("%s was not named and was rewritten:\nbefore:\n%s\nafter:\n%s\noutput:\n%s", name, contents, after, output)
+		if after := readForTest(test, filepath.Join(root, name)); after != contents {
+			test.Errorf("%s was not named and was rewritten:\nbefore:\n%s\nafter:\n%s\noutput:\n%s", name, contents, after, output)
 		}
 	}
 }
 
-func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
+func TestAFixRunWritesOnlyWhatWasNamed(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
 
 	// Within the closure limit: the consumer is checked because it imports the named file, and it
 	// is not written because nobody named it.
-	t.Run("a dependent is checked and not written", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-		fixScopeProject(t, root, nil)
+	test.Run("a dependent is checked and not written", func(test *testing.T) {
+		test.Parallel()
+		root := test.TempDir()
+		fixScopeProject(test, root, nil)
 		before := map[string]string{
-			"Producer.ts": readForTest(t, filepath.Join(root, "Producer.ts")),
-			"Consumer.ts": readForTest(t, filepath.Join(root, "Consumer.ts")),
-			"Sibling.ts":  readForTest(t, filepath.Join(root, "Sibling.ts")),
+			"Producer.ts": readForTest(test, filepath.Join(root, "Producer.ts")),
+			"Consumer.ts": readForTest(test, filepath.Join(root, "Consumer.ts")),
+			"Sibling.ts":  readForTest(test, filepath.Join(root, "Sibling.ts")),
 		}
 
-		output, code := runCohere(t, binary, root, "--fix", "Producer.ts")
+		output, code := runCohere(test, binary, root, "--fix", "Producer.ts")
 		if code != 0 {
-			t.Fatalf("exit %d:\n%s", code, output)
+			test.Fatalf("exit %d:\n%s", code, output)
 		}
-		assertWroteOnlyNamed(t, root, before, "Producer.ts", output)
+		assertWroteOnlyNamed(test, root, before, "Producer.ts", output)
 		// The withheld repair is named rather than dropped, so a reader knows a fixable finding sits
 		// outside what they asked about.
 		if !strings.Contains(output, "Consumer.ts") || !strings.Contains(output, "not rewritten") {
-			t.Errorf("the withheld repair was not reported:\n%s", output)
+			test.Errorf("the withheld repair was not reported:\n%s", output)
 		}
 	})
 
 	// Past the closure limit the whole tree is checked, which used to make the whole tree writable.
-	t.Run("the whole-tree fallback checks everything and writes only the named file", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
+	test.Run("the whole-tree fallback checks everything and writes only the named file", func(test *testing.T) {
+		test.Parallel()
+		root := test.TempDir()
 		consumers := map[string]string{}
 		for index := 0; index <= program.DependentClosureLimit; index++ {
 			consumers[filepath.Join("consumers", "Consumer"+itoaForTest(index)+".ts")] =
 				"import { value } from '../Producer';\nexport const used" + itoaForTest(index) + " = value();\n"
 		}
-		fixScopeProject(t, root, consumers)
+		fixScopeProject(test, root, consumers)
 		before := map[string]string{
-			"Producer.ts": readForTest(t, filepath.Join(root, "Producer.ts")),
-			"Consumer.ts": readForTest(t, filepath.Join(root, "Consumer.ts")),
-			"Sibling.ts":  readForTest(t, filepath.Join(root, "Sibling.ts")),
+			"Producer.ts": readForTest(test, filepath.Join(root, "Producer.ts")),
+			"Consumer.ts": readForTest(test, filepath.Join(root, "Consumer.ts")),
+			"Sibling.ts":  readForTest(test, filepath.Join(root, "Sibling.ts")),
 		}
 
-		output, code := runCohere(t, binary, root, "--fix", "Producer.ts")
+		output, code := runCohere(test, binary, root, "--fix", "Producer.ts")
 		if code != 0 {
-			t.Fatalf("exit %d:\n%s", code, output)
+			test.Fatalf("exit %d:\n%s", code, output)
 		}
 		// The premise: this run really did take the fallback. Without it the case would pass on a
 		// closure that stayed inside the limit and prove nothing about the fallback.
 		if !strings.Contains(output, "so the whole tree is checked") {
-			t.Fatalf("the fixture did not reach the whole-tree fallback:\n%s", output)
+			test.Fatalf("the fixture did not reach the whole-tree fallback:\n%s", output)
 		}
-		assertWroteOnlyNamed(t, root, before, "Producer.ts", output)
+		assertWroteOnlyNamed(test, root, before, "Producer.ts", output)
 	})
 
 	// The control on the boundary: with nothing named, the whole project is the caller's, and every
 	// file with a repair is written as it always was.
-	t.Run("with nothing named, every repair lands", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-		fixScopeProject(t, root, nil)
+	test.Run("with nothing named, every repair lands", func(test *testing.T) {
+		test.Parallel()
+		root := test.TempDir()
+		fixScopeProject(test, root, nil)
 
-		output, code := runCohere(t, binary, root, "--fix")
+		output, code := runCohere(test, binary, root, "--fix")
 		if code != 0 {
-			t.Fatalf("exit %d:\n%s", code, output)
+			test.Fatalf("exit %d:\n%s", code, output)
 		}
 		for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
-			if strings.Contains(readForTest(t, filepath.Join(root, name)), "debugger") {
-				t.Errorf("%s kept its violation on a run that named nothing:\n%s", name, output)
+			if strings.Contains(readForTest(test, filepath.Join(root, name)), "debugger") {
+				test.Errorf("%s kept its violation on a run that named nothing:\n%s", name, output)
 			}
 		}
 	})
@@ -165,69 +165,69 @@ func TestAFixRunWritesOnlyWhatWasNamed(t *testing.T) {
 // fixed is the control that proves the fixer ran, and the nested file staying byte-identical is the
 // boundary. Both shapes a nested repository takes are covered: a clone, whose `.git` is a directory,
 // and a submodule, whose `.git` is a gitlink file.
-func TestAFixRunDoesNotWriteIntoANestedRepository(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
+func TestAFixRunDoesNotWriteIntoANestedRepository(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
 	nestedViolation := "export function inside(): number {\n    debugger;\n    return 4;\n}\n"
 
 	shapes := []struct {
 		name  string
-		plant func(t *testing.T, nested string)
+		plant func(test *testing.T, nested string)
 	}{
 		{"a clone", plantClone},
-		{"a submodule's gitlink", func(t *testing.T, nested string) {
-			writeTree(t, nested, map[string]string{".git": "gitdir: ../.git/modules/nested\n"})
+		{"a submodule's gitlink", func(test *testing.T, nested string) {
+			writeTree(test, nested, map[string]string{".git": "gitdir: ../.git/modules/nested\n"})
 		}},
 	}
 	for _, shape := range shapes {
-		t.Run(shape.name+": a whole-tree run leaves it alone and says so", func(t *testing.T) {
-			t.Parallel()
-			root := t.TempDir()
-			fixScopeProject(t, root, map[string]string{"nested/Inside.ts": nestedViolation})
-			shape.plant(t, filepath.Join(root, "nested"))
+		test.Run(shape.name+": a whole-tree run leaves it alone and says so", func(test *testing.T) {
+			test.Parallel()
+			root := test.TempDir()
+			fixScopeProject(test, root, map[string]string{"nested/Inside.ts": nestedViolation})
+			shape.plant(test, filepath.Join(root, "nested"))
 
-			output, code := runCohere(t, binary, root, "--fix")
+			output, code := runCohere(test, binary, root, "--fix")
 			if code != 0 {
-				t.Fatalf("exit %d:\n%s", code, output)
+				test.Fatalf("exit %d:\n%s", code, output)
 			}
 			for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
-				if strings.Contains(readForTest(t, filepath.Join(root, name)), "debugger") {
-					t.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
+				if strings.Contains(readForTest(test, filepath.Join(root, name)), "debugger") {
+					test.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
 				}
 			}
-			if after := readForTest(t, filepath.Join(root, "nested", "Inside.ts")); after != nestedViolation {
-				t.Errorf("a file in a nested repository nobody named was rewritten:\n%s\noutput:\n%s", after, output)
+			if after := readForTest(test, filepath.Join(root, "nested", "Inside.ts")); after != nestedViolation {
+				test.Errorf("a file in a nested repository nobody named was rewritten:\n%s\noutput:\n%s", after, output)
 			}
 			if !strings.Contains(output, "1 fix not applied: in nested repository nested") {
-				t.Errorf("the withheld fix was not reported:\n%s", output)
+				test.Errorf("the withheld fix was not reported:\n%s", output)
 			}
 		})
 	}
 
-	t.Run("naming a path inside it writes it", func(t *testing.T) {
-		t.Parallel()
-		root := t.TempDir()
-		fixScopeProject(t, root, map[string]string{"nested/Inside.ts": nestedViolation})
-		plantClone(t, filepath.Join(root, "nested"))
+	test.Run("naming a path inside it writes it", func(test *testing.T) {
+		test.Parallel()
+		root := test.TempDir()
+		fixScopeProject(test, root, map[string]string{"nested/Inside.ts": nestedViolation})
+		plantClone(test, filepath.Join(root, "nested"))
 
-		output, code := runCohere(t, binary, root, "--fix", "nested/Inside.ts")
+		output, code := runCohere(test, binary, root, "--fix", "nested/Inside.ts")
 		if code != 0 {
-			t.Fatalf("exit %d:\n%s", code, output)
+			test.Fatalf("exit %d:\n%s", code, output)
 		}
-		if strings.Contains(readForTest(t, filepath.Join(root, "nested", "Inside.ts")), "debugger") {
-			t.Errorf("a named file inside a nested repository was not written:\n%s", output)
+		if strings.Contains(readForTest(test, filepath.Join(root, "nested", "Inside.ts")), "debugger") {
+			test.Errorf("a named file inside a nested repository was not written:\n%s", output)
 		}
 		if strings.Contains(output, "not applied: in nested repository") {
-			t.Errorf("a named file was reported as withheld:\n%s", output)
+			test.Errorf("a named file was reported as withheld:\n%s", output)
 		}
 	})
 }
 
 // plantClone makes a directory look like a clone the way cohere looks: a `.git` directory, which is all
 // formatfiles.HasOwnRepository asks. No git runs, so the fixture holds where git is absent.
-func plantClone(t *testing.T, directory string) {
-	t.Helper()
-	writeTree(t, directory, map[string]string{".git/HEAD": "ref: refs/heads/main\n"})
+func plantClone(test *testing.T, directory string) {
+	test.Helper()
+	writeTree(test, directory, map[string]string{".git/HEAD": "ref: refs/heads/main\n"})
 }
 
 // A format candidate the walk never linted is formatted and never fixed (#xn1k1gz). angular/angular keeps a
@@ -238,26 +238,26 @@ func plantClone(t *testing.T, directory string) {
 //
 // The project's own files losing their violation is the control that proves the fixer ran; the bundle being
 // reformatted proves the format pass reached it; its `debugger` surviving is the boundary.
-func TestAFileTheWalkNeverLintedIsFormattedAndNeverFixed(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
-	root := t.TempDir()
-	fixScopeProject(t, root, map[string]string{"bundle.js": "var first=1\nfunction run(){debugger;return first}\n"})
+func TestAFileTheWalkNeverLintedIsFormattedAndNeverFixed(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	fixScopeProject(test, root, map[string]string{"bundle.js": "var first=1\nfunction run(){debugger;return first}\n"})
 
-	output, code := runCohere(t, binary, root, "--fix")
+	output, code := runCohere(test, binary, root, "--fix")
 	if code != 0 {
-		t.Fatalf("exit %d:\n%s", code, output)
+		test.Fatalf("exit %d:\n%s", code, output)
 	}
 	for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
-		if strings.Contains(readForTest(t, filepath.Join(root, name)), "debugger") {
-			t.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
+		if strings.Contains(readForTest(test, filepath.Join(root, name)), "debugger") {
+			test.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
 		}
 	}
-	bundle := readForTest(t, filepath.Join(root, "bundle.js"))
+	bundle := readForTest(test, filepath.Join(root, "bundle.js"))
 	if !strings.Contains(bundle, "var first = 1;") {
-		t.Fatalf("the bundle was not formatted, so the format pass never reached it and the boundary is untested:\n%s\noutput:\n%s", bundle, output)
+		test.Fatalf("the bundle was not formatted, so the format pass never reached it and the boundary is untested:\n%s\noutput:\n%s", bundle, output)
 	}
 	if !strings.Contains(bundle, "debugger") {
-		t.Errorf("a file no rule was run over had a rule's fix applied to it:\n%s\noutput:\n%s", bundle, output)
+		test.Errorf("a file no rule was run over had a rule's fix applied to it:\n%s\noutput:\n%s", bundle, output)
 	}
 }

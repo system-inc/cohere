@@ -32,13 +32,13 @@ var (
 	testTableError error
 )
 
-func testTable(t *testing.T) *Table {
-	t.Helper()
+func testTable(test *testing.T) *Table {
+	test.Helper()
 	testTableOnce.Do(func() {
 		testTableValue, testTableError = loadTestTable("descriptor_table.json", "descriptor_context.json")
 	})
 	if testTableError != nil {
-		t.Fatalf("building the test table: %v", testTableError)
+		test.Fatalf("building the test table: %v", testTableError)
 	}
 	return testTableValue
 }

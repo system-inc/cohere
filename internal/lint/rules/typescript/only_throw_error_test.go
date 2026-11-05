@@ -44,16 +44,16 @@ var onlyThrowErrorSupportingFiles = map[string]string{
 // Adding `class.ts` to every program rather than only to the two cases that import it costs
 // nothing and removes a per-case branch. It declares a module, so it cannot leak a global into the
 // other cases.
-func runOnlyThrowError(t *testing.T, sourceText string, options any) rule_testing.Result {
-	t.Helper()
+func runOnlyThrowError(test *testing.T, sourceText string, options any) rule_testing.Result {
+	test.Helper()
 	files := map[string]string{onlyThrowErrorFile: sourceText}
 	for name, contents := range onlyThrowErrorSupportingFiles {
 		files[name] = contents
 	}
 	if options == nil {
-		return rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, nil)
+		return rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, files, onlyThrowErrorFile, nil)
 	}
-	return rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, options)
+	return rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, files, onlyThrowErrorFile, options)
 }
 
 // TestOnlyThrowErrorStaysSilent replays every clean case in upstream's corpus.
@@ -66,8 +66,8 @@ func runOnlyThrowError(t *testing.T, sourceText string, options any) rule_testin
 // Every one of the 42 was additionally replayed against the INSTALLED @typescript-eslint rule
 // before being written here, and all 42 agreed with the corpus's own verdict, so these are
 // measured expectations rather than transcribed ones.
-func TestOnlyThrowErrorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -121,9 +121,9 @@ func TestOnlyThrowErrorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runOnlyThrowError(test, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -135,8 +135,8 @@ func TestOnlyThrowErrorStaysSilent(t *testing.T) {
 // cases that report `undef` rather than `object`: the distinction is invisible to a fixture that
 // only counts findings, and it is the one place this rule's two messages can be swapped without
 // any count changing.
-func TestOnlyThrowErrorFires(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -194,9 +194,9 @@ func TestOnlyThrowErrorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runOnlyThrowError(t, testCase.sourceText, testCase.options), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runOnlyThrowError(test, testCase.sourceText, testCase.options), testCase.wantIds...)
 		})
 	}
 }
@@ -216,8 +216,8 @@ func TestOnlyThrowErrorFires(t *testing.T) {
 // with a leading newline is one byte shorter on disk than in the literal here. Every source in
 // this test is therefore written WITHOUT leading whitespace, so the literal and the file agree and
 // a slice taken against the literal is the slice the rule saw.
-func TestOnlyThrowErrorSpans(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -240,17 +240,17 @@ func TestOnlyThrowErrorSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runOnlyThrowError(t, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runOnlyThrowError(test, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantSpans))
 			}
 			for i, wantSpan := range testCase.wantSpans {
 				diagnostic := result.Diagnostics[i]
 				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d spans %q, want %q", i, gotSpan, wantSpan)
+					test.Errorf("finding %d spans %q, want %q", i, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -264,36 +264,36 @@ func TestOnlyThrowErrorSpans(t *testing.T) {
 // against the rule's own message constants: comparing a diagnostic to the constant it was built
 // from is an equality that looks correct while both sides move together under mutation, so a
 // message-text mutant would survive it.
-func TestOnlyThrowErrorMessages(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorMessages(test *testing.T) {
+	test.Parallel()
 
-	objectResult := runOnlyThrowError(t, "throw 'error';", nil)
+	objectResult := runOnlyThrowError(test, "throw 'error';", nil)
 	if len(objectResult.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(objectResult.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(objectResult.Diagnostics))
 	}
 	wantObject := "This throws a value that is not an Error, so whatever catches it gets no stack trace and no " +
 		"message. The failure then surfaces as a bare string or object with no record of where it came " +
 		"from, which is the difference between a five-minute fix and an afternoon. Throw `new Error(...)` " +
 		"instead."
 	if got := objectResult.Diagnostics[0].Message.Description; got != wantObject {
-		t.Errorf("object description is %q, want %q", got, wantObject)
+		test.Errorf("object description is %q, want %q", got, wantObject)
 	}
 	if got := objectResult.Diagnostics[0].Message.Id; got != "object" {
-		t.Errorf("object id is %q, want %q", got, "object")
+		test.Errorf("object id is %q, want %q", got, "object")
 	}
 
-	undefResult := runOnlyThrowError(t, "throw undefined;", nil)
+	undefResult := runOnlyThrowError(test, "throw undefined;", nil)
 	if len(undefResult.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(undefResult.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(undefResult.Diagnostics))
 	}
 	wantUndef := "This throws `undefined`, which reaches the handler as a value carrying nothing at all: no " +
 		"message, no stack, no type. It is almost always an expression that was meant to produce an error " +
 		"and did not. Throw `new Error(...)` instead."
 	if got := undefResult.Diagnostics[0].Message.Description; got != wantUndef {
-		t.Errorf("undef description is %q, want %q", got, wantUndef)
+		test.Errorf("undef description is %q, want %q", got, wantUndef)
 	}
 	if got := undefResult.Diagnostics[0].Message.Id; got != "undef" {
-		t.Errorf("undef id is %q, want %q", got, "undef")
+		test.Errorf("undef id is %q, want %q", got, "undef")
 	}
 }
 
@@ -308,14 +308,14 @@ func TestOnlyThrowErrorMessages(t *testing.T) {
 // `allowRethrowing` off makes the same source report, which shows the first case is silent because
 // the rethrow arm fired rather than for some unrelated reason. Both verdicts were measured against
 // the installed rule before being written here.
-func TestOnlyThrowErrorParenthesizedRethrow(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorParenthesizedRethrow(test *testing.T) {
+	test.Parallel()
 
 	source := "try {\n} catch (e) {\n  throw (e);\n}"
 
-	rule_testing.ExpectClean(t, runOnlyThrowError(t, source, nil))
+	rule_testing.ExpectClean(test, runOnlyThrowError(test, source, nil))
 
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(false),
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
@@ -333,8 +333,8 @@ func TestOnlyThrowErrorParenthesizedRethrow(t *testing.T) {
 // `any`, and with them on the case would be silent through the `any` arm regardless of what the
 // rethrow arm decided. That is the "change the one thing you think makes it pass" check applied
 // before the fixtures were written rather than after.
-func TestOnlyThrowErrorRethrowShape(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorRethrowShape(test *testing.T) {
+	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
@@ -378,14 +378,14 @@ func TestOnlyThrowErrorRethrowShape(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runOnlyThrowError(t, testCase.sourceText, strict)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runOnlyThrowError(test, testCase.sourceText, strict)
 			if testCase.wantIds == nil {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -405,11 +405,11 @@ func TestOnlyThrowErrorRethrowShape(t *testing.T) {
 // So upstream is silent and this port reports. No case in the corpus writes that shape. This test
 // asserts the DIVERGENCE rather than upstream's verdict, so that a later port of the evaluator
 // fails here loudly instead of quietly agreeing.
-func TestOnlyThrowErrorConstFoldedKeyDiverges(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorConstFoldedKeyDiverges(test *testing.T) {
+	test.Parallel()
 
 	source := "const k = 'catch';\nPromise.reject('x')[k](e => {\n  throw e;\n});"
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
@@ -422,8 +422,8 @@ func TestOnlyThrowErrorConstFoldedKeyDiverges(t *testing.T) {
 // wrong: every default here is permissive, so an inverted default turns an unconfigured rule into
 // one that reports every `any` and every rethrow in the tree. The three cases below are each
 // silent ONLY because of their own default, which is shown by the paired strict case reporting.
-func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorDefaultsArePermissive(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -448,13 +448,13 @@ func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// nil options is what a rule configured as bare "error" is handed.
-			rule_testing.ExpectClean(t, runOnlyThrowError(t, testCase.sourceText, nil))
+			rule_testing.ExpectClean(test, runOnlyThrowError(test, testCase.sourceText, nil))
 			// And the same source under the option turned off, which shows the default is what
 			// made the first assertion pass rather than something else about the input.
-			rule_testing.ExpectFindings(t, runOnlyThrowError(t, testCase.sourceText, testCase.strictValue), "object")
+			rule_testing.ExpectFindings(test, runOnlyThrowError(test, testCase.sourceText, testCase.strictValue), "object")
 		})
 	}
 }
@@ -470,17 +470,17 @@ func TestOnlyThrowErrorDefaultsArePermissive(t *testing.T) {
 // `object` rather than `undef`, because a union's own flags are `Union` and the undefined flag is
 // on a member rather than on the whole. Reading upstream's `isTypeFlagSet` alone would suggest the
 // opposite, so this is measured against the installed rule and pinned here.
-func TestOnlyThrowErrorUndefBeatsTheEscapes(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorUndefBeatsTheEscapes(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", nil), "undef")
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, "throw undefined;", nil), "undef")
 
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw undefined;", OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, "throw undefined;", OnlyThrowErrorOptions{
 		AllowThrowingAny:     type_checking.Ref(true),
 		AllowThrowingUnknown: type_checking.Ref(true),
 	}), "undef")
 
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t,
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test,
 		"declare const nullishError: Error | undefined;\nthrow nullishError;", nil), "object")
 }
 
@@ -489,16 +489,16 @@ func TestOnlyThrowErrorUndefBeatsTheEscapes(t *testing.T) {
 // Without the declaration the rule is handed a nil checker in production, and its guard makes it go
 // completely SILENT rather than crash, so every clean fixture would pass vacuously while the rule
 // found nothing at all. A test rather than a comment, so a later revert fails loudly.
-func TestOnlyThrowErrorNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !OnlyThrowError.NeedsTypeChecker {
-		t.Fatal("OnlyThrowError must declare NeedsTypeChecker; every arm reads the argument's type")
+		test.Fatal("OnlyThrowError must declare NeedsTypeChecker; every arm reads the argument's type")
 	}
 
 	// The untyped harness hands the rule a nil checker, and the guard turns that into silence.
 	// Asserting the silence is what pins the guard: without it this call panics.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, OnlyThrowError, onlyThrowErrorFile, "throw 'error';"))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, OnlyThrowError, onlyThrowErrorFile, "throw 'error';"))
 }
 
 // TestDecodeOnlyThrowErrorOptions puts the decoder itself under test.
@@ -507,111 +507,111 @@ func TestOnlyThrowErrorNeedsTheTypedHarness(t *testing.T) {
 // what covers the two lines with no upstream counterpart: the `from` string becoming a `uint8`
 // enum, and the one heterogeneous `allow` array splitting into two typed fields. Handing
 // `RunTypedFilesWithOptions` a struct would leave both untested.
-func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an empty object leaves every pointer nil so the rule defaults them", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an empty object leaves every pointer nil so the rule defaults them", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(`{}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options, ok := decoded.(OnlyThrowErrorOptions)
 		if !ok {
-			t.Fatalf("decoded to %T, want OnlyThrowErrorOptions", decoded)
+			test.Fatalf("decoded to %T, want OnlyThrowErrorOptions", decoded)
 		}
 		if options.AllowRethrowing != nil || options.AllowThrowingAny != nil || options.AllowThrowingUnknown != nil {
-			t.Errorf("absent booleans decoded to non-nil: %+v", options)
+			test.Errorf("absent booleans decoded to non-nil: %+v", options)
 		}
 		if len(options.Allow) != 0 || len(options.AllowInline) != 0 {
-			t.Errorf("absent allow decoded to %+v", options)
+			test.Errorf("absent allow decoded to %+v", options)
 		}
 	})
 
-	t.Run("false is distinguishable from absent", func(t *testing.T) {
-		t.Parallel()
+	test.Run("false is distinguishable from absent", func(test *testing.T) {
+		test.Parallel()
 		decoded, _ := DecodeOnlyThrowErrorOptions(json.RawMessage(`{"allowThrowingAny": false}`))
 		options := decoded.(OnlyThrowErrorOptions)
 		if options.AllowThrowingAny == nil {
-			t.Fatal("allowThrowingAny: false decoded to nil, which the rule would read as the TRUE default")
+			test.Fatal("allowThrowingAny: false decoded to nil, which the rule would read as the TRUE default")
 		}
 		if *options.AllowThrowingAny {
-			t.Error("allowThrowingAny: false decoded to true")
+			test.Error("allowThrowingAny: false decoded to true")
 		}
 	})
 
-	t.Run("a bare string lands in AllowInline and an object lands in Allow", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a bare string lands in AllowInline and an object lands in Allow", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": ["Promise", {"from": "lib", "name": "undefined"}]}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		if len(options.AllowInline) != 1 || options.AllowInline[0] != "Promise" {
-			t.Errorf("AllowInline is %v, want [Promise]", options.AllowInline)
+			test.Errorf("AllowInline is %v, want [Promise]", options.AllowInline)
 		}
 		if len(options.Allow) != 1 {
-			t.Fatalf("Allow holds %d specifiers, want 1", len(options.Allow))
+			test.Fatalf("Allow holds %d specifiers, want 1", len(options.Allow))
 		}
 		if options.Allow[0].From != type_checking.TypeOrValueSpecifierFromLib {
-			t.Errorf("from decoded to %v, want the lib enum", options.Allow[0].From)
+			test.Errorf("from decoded to %v, want the lib enum", options.Allow[0].From)
 		}
 		if len(options.Allow[0].Name) != 1 || options.Allow[0].Name[0] != "undefined" {
-			t.Errorf("name decoded to %v, want [undefined]", options.Allow[0].Name)
+			test.Errorf("name decoded to %v, want [undefined]", options.Allow[0].Name)
 		}
 	})
 
-	t.Run("name accepts an array as well as a string", func(t *testing.T) {
-		t.Parallel()
+	test.Run("name accepts an array as well as a string", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "file", "name": ["A", "B"], "path": "x.ts"}]}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		if len(options.Allow) != 1 || len(options.Allow[0].Name) != 2 {
-			t.Fatalf("Allow decoded to %+v", options.Allow)
+			test.Fatalf("Allow decoded to %+v", options.Allow)
 		}
 		if strings.Join(options.Allow[0].Name, ",") != "A,B" {
-			t.Errorf("name decoded to %v, want [A B]", options.Allow[0].Name)
+			test.Errorf("name decoded to %v, want [A B]", options.Allow[0].Name)
 		}
 		if options.Allow[0].Path != "x.ts" {
-			t.Errorf("path decoded to %q, want x.ts", options.Allow[0].Path)
+			test.Errorf("path decoded to %q, want x.ts", options.Allow[0].Path)
 		}
 	})
 
-	t.Run("an unrecognized from is dropped rather than silently meaning file", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unrecognized from is dropped rather than silently meaning file", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "nowhere", "name": "X"}]}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		// `file` is the zero value, so keeping the specifier would silently mean `file`. Dropping
 		// it says nothing at all, which is the honest answer for a value we cannot represent.
 		if len(options.Allow) != 0 {
-			t.Errorf("an unrecognized from produced %+v, want it dropped", options.Allow)
+			test.Errorf("an unrecognized from produced %+v, want it dropped", options.Allow)
 		}
 	})
 
-	t.Run("the package form carries its package name", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the package form carries its package name", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "package", "name": "ErrorLike", "package": "errors"}]}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		if len(options.Allow) != 1 {
-			t.Fatalf("Allow decoded to %+v", options.Allow)
+			test.Fatalf("Allow decoded to %+v", options.Allow)
 		}
 		if options.Allow[0].From != type_checking.TypeOrValueSpecifierFromPackage {
-			t.Errorf("from decoded to %v, want the package enum", options.Allow[0].From)
+			test.Errorf("from decoded to %v, want the package enum", options.Allow[0].From)
 		}
 		if options.Allow[0].Package != "errors" {
-			t.Errorf("package decoded to %q, want errors", options.Allow[0].Package)
+			test.Errorf("package decoded to %q, want errors", options.Allow[0].Package)
 		}
 	})
 }
@@ -655,8 +655,8 @@ func TestDecodeOnlyThrowErrorOptions(t *testing.T) {
 // So the case is recorded as REPORTING, with the reason at the line, rather than deleted or
 // green-ed by weakening the rule. Changing the shared harness's tsconfig for one case would move
 // every other typed rule's fixtures, which is a far larger blast radius than one documented row.
-func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(test *testing.T) {
+	test.Parallel()
 
 	files := map[string]string{
 		onlyThrowErrorFile: "import { createError } from 'errors';\nthrow createError();\n",
@@ -671,14 +671,14 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(t *testing.T) {
 	}
 
 	// Upstream is silent; we report, because the module does not resolve under this tsconfig.
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, options), "object")
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, files, onlyThrowErrorFile, options), "object")
 
 	// The control: the bare inline name needs no file or package comparison, so a type that had
 	// resolved to ErrorLike would go clean here. It reports, which locates the failure in module
 	// resolution rather than in the specifier matcher.
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, files, onlyThrowErrorFile, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, files, onlyThrowErrorFile, OnlyThrowErrorOptions{
 			AllowInline:          []string{"ErrorLike"},
 			AllowThrowingAny:     type_checking.Ref(false),
 			AllowThrowingUnknown: type_checking.Ref(false),
@@ -703,8 +703,8 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(t *testing.T) {
 //
 // Both panics were reproduced by applying the mutation and running these exact inputs, so the
 // category is measured rather than argued. Neither input appears anywhere in upstream's corpus.
-func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorSurvivesMalformedShapes(test *testing.T) {
+	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
@@ -712,18 +712,18 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
-	t.Run("a one-argument then does not index past its arguments", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a one-argument then does not index past its arguments", func(test *testing.T) {
+		test.Parallel()
 		// `.then` puts the rejection handler second, so this arrow is the FULFILLMENT handler and
 		// the throw is not a rethrow. Upstream reports it; the point here is that we get a verdict
 		// at all rather than a panic.
-		rule_testing.ExpectFindings(t, runOnlyThrowError(t,
+		rule_testing.ExpectFindings(test, runOnlyThrowError(test,
 			"Promise.reject('x').then(e => {\n  throw e;\n});", strict), "object")
 	})
 
-	t.Run("a computed key that is not a literal does not read text off it", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, runOnlyThrowError(t,
+	test.Run("a computed key that is not a literal does not read text off it", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, runOnlyThrowError(test,
 			"declare const o: any;\ndeclare function k(): string;\no[k()](e => {\n  throw e;\n});", strict), "object")
 	})
 }
@@ -741,8 +741,8 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(t *testing.T) {
 // The class is made thenable on purpose. A plain class with a `#catch` method is silent either way,
 // because the receiver test declines it, so it cannot separate the two versions and would have read
 // as coverage while proving nothing.
-func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorPrivateMethodName(test *testing.T) {
+	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
@@ -750,7 +750,7 @@ func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
-	rule_testing.ExpectClean(t, runOnlyThrowError(t,
+	rule_testing.ExpectClean(test, runOnlyThrowError(test,
 		"class C {\n"+
 			"  then(cb: (v: number) => void, r?: (e: any) => void): C {\n"+
 			"    return this;\n"+
@@ -765,7 +765,7 @@ func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 
 	// The control: the same shape on a receiver that is NOT thenable reports, which shows the case
 	// above is clean because the rethrow arm fired rather than because private names are skipped.
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t,
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test,
 		"class C {\n"+
 			"  #catch(cb: (e: any) => void) {}\n"+
 			"  m() {\n"+
@@ -794,8 +794,8 @@ func TestOnlyThrowErrorPrivateMethodName(t *testing.T) {
 //	Map<string,string> & { a: 1 }             allow [{from: lib, name: Map}]   SILENT
 //
 // The middle row is the one that separates `every` from `some`; without it the flip is invisible.
-func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorSpecifierComposites(test *testing.T) {
+	test.Parallel()
 
 	allowMap := OnlyThrowErrorOptions{
 		Allow:                []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}},
@@ -803,18 +803,18 @@ func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}
 
-	t.Run("a union matches only when every member matches", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, runOnlyThrowError(t,
+	test.Run("a union matches only when every member matches", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runOnlyThrowError(test,
 			"declare const m: Map<string, string> | Map<number, number>;\nthrow m;", allowMap))
 
-		rule_testing.ExpectFindings(t, runOnlyThrowError(t,
+		rule_testing.ExpectFindings(test, runOnlyThrowError(test,
 			"declare const m: Map<string, string> | Set<number>;\nthrow m;", allowMap), "object")
 	})
 
-	t.Run("an intersection matches when any member matches", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, runOnlyThrowError(t,
+	test.Run("an intersection matches when any member matches", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runOnlyThrowError(test,
 			"declare const m: Map<string, string> & { a: 1 };\nthrow m;", allowMap))
 	})
 }
@@ -839,24 +839,24 @@ func TestOnlyThrowErrorSpecifierComposites(t *testing.T) {
 //
 // Under the mutation the FIRST row goes silent and the other two do not, which is why the object
 // form is the one that can see this.
-func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(test *testing.T) {
+	test.Parallel()
 
 	source := "import { thing } from './nonexistent-module-xyz';\nthrow thing;"
 
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, OnlyThrowErrorOptions{
 		Allow:                []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"error"}}},
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
 
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, OnlyThrowErrorOptions{
 		AllowInline:          []string{"error"},
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
 
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, source, OnlyThrowErrorOptions{
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, OnlyThrowErrorOptions{
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
@@ -878,8 +878,8 @@ func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(t *testing.T) {
 // `throw;` was clean.
 //
 // Neither input is in any corpus, on either side, because neither parses upstream.
-func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorDeclinesSynthesizedNodes(test *testing.T) {
+	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
 		AllowThrowingAny:     type_checking.Ref(false),
@@ -887,10 +887,10 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
 	}
 
 	for _, source := range []string{"throw;", "throw ();", "throw (());"} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runOnlyThrowError(t, source, strict))
-			rule_testing.ExpectClean(t, runOnlyThrowError(t, source, nil))
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runOnlyThrowError(test, source, strict))
+			rule_testing.ExpectClean(test, runOnlyThrowError(test, source, nil))
 		})
 	}
 }
@@ -917,18 +917,18 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(t *testing.T) {
 // the permissive `allowThrowingAny` default swallows it before the `object` arm is reached. Only
 // with that option off does the finding appear, which is why the strict row is the one that puts
 // the nil guard under test.
-func TestOnlyThrowErrorUndeclaredIdentifier(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorUndeclaredIdentifier(test *testing.T) {
+	test.Parallel()
 
 	strict := OnlyThrowErrorOptions{
 		AllowRethrowing:      type_checking.Ref(true),
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}
-	rule_testing.ExpectFindings(t, runOnlyThrowError(t, "throw notDeclaredAnywhere;", strict), "object")
+	rule_testing.ExpectFindings(test, runOnlyThrowError(test, "throw notDeclaredAnywhere;", strict), "object")
 
 	// Silent at the defaults: the error type reports the `any` flag.
-	rule_testing.ExpectClean(t, runOnlyThrowError(t, "throw notDeclaredAnywhere;", nil))
+	rule_testing.ExpectClean(test, runOnlyThrowError(test, "throw notDeclaredAnywhere;", nil))
 }
 
 // TestOnlyThrowErrorDependsOnAnotherFile pins what the rule reads, and proves the cross-file claim the
@@ -941,23 +941,23 @@ func TestOnlyThrowErrorUndeclaredIdentifier(t *testing.T) {
 // untouched. The cache honors that through the type fingerprint, which covers other.ts as an import,
 // and the default library through the binary in its key; what the rule reads through ctx.Program is
 // the compiler options and the default library, and nothing else (#b8k3bp6).
-func TestOnlyThrowErrorDependsOnAnotherFile(t *testing.T) {
-	t.Parallel()
+func TestOnlyThrowErrorDependsOnAnotherFile(test *testing.T) {
+	test.Parallel()
 
 	if OnlyThrowError.ProgramReads != rule.ReadsCompilerOptions|rule.ReadsDefaultLibrary {
-		t.Fatalf("OnlyThrowError must declare what IsErrorLike and the allow specifiers read; declares %s", OnlyThrowError.ProgramReads)
+		test.Fatalf("OnlyThrowError must declare what IsErrorLike and the allow specifiers read; declares %s", OnlyThrowError.ProgramReads)
 	}
 
 	subject := "import { Wrapped } from './other';\nthrow new Wrapped();"
 
 	// The other file's class extends Error, so the throw is fine.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, map[string]string{
+	rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, map[string]string{
 		onlyThrowErrorFile: subject,
 		"other.ts":         "export class Wrapped extends Error {}\n",
 	}, onlyThrowErrorFile, nil))
 
 	// Byte-for-byte the same subject file, and the verdict moves because the OTHER file changed.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedFilesWithOptions(t, OnlyThrowError, map[string]string{
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, map[string]string{
 		onlyThrowErrorFile: subject,
 		"other.ts":         "export class Wrapped {}\n",
 	}, onlyThrowErrorFile, nil), "object")

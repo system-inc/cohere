@@ -26,8 +26,8 @@ func deadDirectiveRules() []rule.Rule {
 	}
 }
 
-func deadDirectiveGraph(t *testing.T, root, source string) *program.Graph {
-	t.Helper()
+func deadDirectiveGraph(test *testing.T, root, source string) *program.Graph {
+	test.Helper()
 	graph, err := program.Build(program.Options{
 		ConfigFileName: "tsconfig.json", CurrentDirectory: root,
 		FileSystem: program.NewMemoryFS(map[string]string{
@@ -36,16 +36,16 @@ func deadDirectiveGraph(t *testing.T, root, source string) *program.Graph {
 		}),
 	})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return graph
 }
 
-func walkDeadDirectiveFixture(t *testing.T, graph *program.Graph, rules []rule.Rule) program.Result {
-	t.Helper()
+func walkDeadDirectiveFixture(test *testing.T, graph *program.Graph, rules []rule.Rule) program.Result {
+	test.Helper()
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return result
 }
@@ -53,8 +53,8 @@ func walkDeadDirectiveFixture(t *testing.T, graph *program.Graph, rules []rule.R
 // Each shape checks the finding's own comment range and the edit engine's exact output. The
 // filtered and live shapes share the dead fixture's rule set; mutants removing either eligibility
 // or usage checks must turn those negative fixtures red. Fixes are re-walked to prove convergence.
-func TestDeadDisableFindingsAndFixes(t *testing.T) {
-	t.Parallel()
+func TestDeadDisableFindingsAndFixes(test *testing.T) {
+	test.Parallel()
 	for _, fixture := range []struct {
 		name, source, fixed string
 		filtered            bool
@@ -76,40 +76,40 @@ func TestDeadDisableFindingsAndFixes(t *testing.T) {
 		{"blanket live", "/* eslint-disable */\ndebugger;\n", "/* eslint-disable */\ndebugger;\n", false, 0},
 		{"unicode whitespace", "/* cohere-disable\u00a0test-quiet,\uFEFFplugin/not-selected -- keep */\nconst a = 1;\n", "/* cohere-disable\u00a0plugin/not-selected -- keep */\nconst a = 1;\n", false, 1},
 	} {
-		t.Run(fixture.name, func(t *testing.T) {
-			t.Parallel()
-			root := t.TempDir()
+		test.Run(fixture.name, func(test *testing.T) {
+			test.Parallel()
+			root := test.TempDir()
 			rules := deadDirectiveRules()
 			if fixture.filtered {
 				rules = rules[1:]
 			}
 			lint := func(source string) []rule.Diagnostic {
-				return walkDeadDirectiveFixture(t, deadDirectiveGraph(t, root, source), rules).Diagnostics
+				return walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, source), rules).Diagnostics
 			}
 			findings := lint(fixture.source)
 			if len(findings) != fixture.want {
-				t.Fatalf("got %d findings, want %d: %v", len(findings), fixture.want, diagnosticKeys(findings))
+				test.Fatalf("got %d findings, want %d: %v", len(findings), fixture.want, diagnosticKeys(findings))
 			}
 			for _, finding := range findings {
 				if finding.RuleName != "unused-disable" || finding.Message.Id != "unusedDisable" || len(finding.Fixes) != 1 {
-					t.Fatalf("want one fixable unused-disable finding, got %+v", finding)
+					test.Fatalf("want one fixable unused-disable finding, got %+v", finding)
 				}
 				comment := fixture.source[finding.Range.Pos():finding.Range.End()]
 				if !strings.HasPrefix(comment, "//") && !strings.HasPrefix(comment, "/*") {
-					t.Fatalf("range is not the comment: %q", comment)
+					test.Fatalf("range is not the comment: %q", comment)
 				}
 			}
 			fixed, err := edit.FixText(filepath.Join(root, "main.ts"), fixture.source, func(fileName, text string) ([]edit.Proposal, error) {
 				return edit.ProposalsFrom(lint(text)), nil
 			}, 2)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			if fixed.Text != fixture.fixed {
-				t.Fatalf("fixed text\n got %q\nwant %q", fixed.Text, fixture.fixed)
+				test.Fatalf("fixed text\n got %q\nwant %q", fixed.Text, fixture.fixed)
 			}
 			if after := lint(fixed.Text); len(after) != 0 {
-				t.Fatalf("%d findings after fix, want 0", len(after))
+				test.Fatalf("%d findings after fix, want 0", len(after))
 			}
 		})
 	}
@@ -117,28 +117,28 @@ func TestDeadDisableFindingsAndFixes(t *testing.T) {
 
 // A cached live name remains live when the same comment has a dead name. The cold run plants
 // a withheld finding, and the warm run must replay it by rule, not merely mark the whole comment used.
-func TestDeadDisableFindingsSurviveReplay(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
+func TestDeadDisableFindingsSurviveReplay(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
 	source := "// cohere-disable-next-line test-quiet, test-live -- needed\ndebugger;\n"
-	graph := deadDirectiveGraph(t, root, source)
+	graph := deadDirectiveGraph(test, root, source)
 	rules := deadDirectiveRules()
 	key := program.HashRuleSet([]string{"dead-directive-fixture"})
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
-	cold := walkDeadDirectiveFixture(t, graph, rules)
+	cold := walkDeadDirectiveFixture(test, graph, rules)
 	cache := recording.Recorded()
 	if len(cache.Entries) != 1 || len(cache.Entries[0].Withheld) != 1 {
-		t.Fatalf("want 1 cached file with 1 withheld finding, got %+v", cache.Entries)
+		test.Fatalf("want 1 cached file with 1 withheld finding, got %+v", cache.Entries)
 	}
 	graph.FindingsReuse = program.NewFindingsReuse(key, cache, program.PathAnchor{})
-	warm := walkDeadDirectiveFixture(t, graph, rules)
+	warm := walkDeadDirectiveFixture(test, graph, rules)
 	if warm.FilesReplayed != 1 {
-		t.Fatalf("replayed %d files, want 1", warm.FilesReplayed)
+		test.Fatalf("replayed %d files, want 1", warm.FilesReplayed)
 	}
 	for _, result := range []program.Result{cold, warm} {
 		if result.Coverage.Suppressed != 1 || len(result.Diagnostics) != 1 {
-			t.Fatalf("want 1 withheld and 1 dead finding, got %+v", result)
+			test.Fatalf("want 1 withheld and 1 dead finding, got %+v", result)
 		}
 		fixed, err := edit.FixText(filepath.Join(root, "main.ts"), source, func(fileName, text string) ([]edit.Proposal, error) {
 			if text != source {
@@ -147,19 +147,19 @@ func TestDeadDisableFindingsSurviveReplay(t *testing.T) {
 			return edit.ProposalsFrom(result.Diagnostics), nil
 		}, 2)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if want := "// cohere-disable-next-line test-live -- needed\ndebugger;\n"; fixed.Text != want {
-			t.Fatalf("replay fixed %q, want %q", fixed.Text, want)
+			test.Fatalf("replay fixed %q, want %q", fixed.Text, want)
 		}
 	}
 }
 
 // These are the wire keys from the adjudication. The real abbreviation rule exempts them, so
 // their directives are dead, while a planted abbreviated binding proves the selected rule fires.
-func TestDeadDisableWireKeysUseTheRealAbbreviationRule(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
+func TestDeadDisableWireKeysUseTheRealAbbreviationRule(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
 	// The rule judges a property name where its declaration is ours (#nweav21): at the interface, where
 	// the two directives below are live, and never again at a literal key filling that declaration, where
 	// all three are dead. last_modified carries no directive at the interface, since snake case isn't this
@@ -172,26 +172,26 @@ func TestDeadDisableWireKeysUseTheRealAbbreviationRule(t *testing.T) {
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\ndurationMs: 2,\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nmax: 3,\n};\n"
 	subject := nexus.ConsistencyNoAbbreviatedIdentifier
-	full := walkDeadDirectiveFixture(t, deadDirectiveGraph(t, root, source), []rule.Rule{subject})
+	full := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, source), []rule.Rule{subject})
 	if len(full.Diagnostics) != 3 || full.Coverage.Suppressed != 2 {
-		t.Fatalf("got %d wire-key findings and %d withheld, want 3 dead at the literal and 2 live at the interface", len(full.Diagnostics), full.Coverage.Suppressed)
+		test.Fatalf("got %d wire-key findings and %d withheld, want 3 dead at the literal and 2 live at the interface", len(full.Diagnostics), full.Coverage.Suppressed)
 	}
 	for _, finding := range full.Diagnostics {
 		if finding.RuleName != "unused-disable" || len(finding.Fixes) != 1 {
-			t.Fatalf("want a fixable dead directive, got %+v", finding)
+			test.Fatalf("want a fixable dead directive, got %+v", finding)
 		}
 	}
-	filtered := walkDeadDirectiveFixture(t, deadDirectiveGraph(t, root, source), deadDirectiveRules()[:1])
+	filtered := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, source), deadDirectiveRules()[:1])
 	if len(filtered.Diagnostics) != 0 {
-		t.Fatalf("filtered run reported %d findings, want 0", len(filtered.Diagnostics))
+		test.Fatalf("filtered run reported %d findings, want 0", len(filtered.Diagnostics))
 	}
 	live := "// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- needed\nconst max = 1;\n"
-	suppressed := walkDeadDirectiveFixture(t, deadDirectiveGraph(t, root, live), []rule.Rule{subject})
+	suppressed := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, live), []rule.Rule{subject})
 	if len(suppressed.Diagnostics) != 0 || suppressed.Coverage.Suppressed != 1 {
-		t.Fatalf("live directive: %d findings, %d withheld; want 0 and 1", len(suppressed.Diagnostics), suppressed.Coverage.Suppressed)
+		test.Fatalf("live directive: %d findings, %d withheld; want 0 and 1", len(suppressed.Diagnostics), suppressed.Coverage.Suppressed)
 	}
-	control := walkDeadDirectiveFixture(t, deadDirectiveGraph(t, root, "const max = 1;\n"), []rule.Rule{subject})
+	control := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, "const max = 1;\n"), []rule.Rule{subject})
 	if len(control.Diagnostics) != 1 || control.Diagnostics[0].RuleName != subject.Name {
-		t.Fatalf("stripped binding control: want 1 abbreviation finding, got %+v", control.Diagnostics)
+		test.Fatalf("stripped binding control: want 1 abbreviation finding, got %+v", control.Diagnostics)
 	}
 }

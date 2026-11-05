@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestImportRequireNodeNamespaceFires(t *testing.T) {
-	t.Parallel()
+func TestImportRequireNodeNamespaceFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -54,16 +54,16 @@ func TestImportRequireNodeNamespaceFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ImportRequireNodeNamespace, "probe.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestImportRequireNodeNamespaceStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestImportRequireNodeNamespaceStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -103,16 +103,16 @@ func TestImportRequireNodeNamespaceStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ImportRequireNodeNamespace, "probe.ts", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestExpectedAlias(t *testing.T) {
-	t.Parallel()
+func TestExpectedAlias(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]string{
 		"node:fs":             "NodeFileSystem",
@@ -126,7 +126,7 @@ func TestExpectedAlias(t *testing.T) {
 	}
 	for source, want := range cases {
 		if got := expectedAlias(source); got != want {
-			t.Errorf("expectedAlias(%q) = %q, want %q", source, got, want)
+			test.Errorf("expectedAlias(%q) = %q, want %q", source, got, want)
 		}
 	}
 }
@@ -138,14 +138,14 @@ func TestExpectedAlias(t *testing.T) {
 // `'node:fs'` left the whole suite green: a rewrite that breaks every import it touches, invisible
 // to the tests. A fix is the one part of a rule that changes source, so it is the one part where an
 // id assertion proves the least.
-func TestTheNodePrefixFixWritesTheSpecifierItPromises(t *testing.T) {
-	t.Parallel()
+func TestTheNodePrefixFixWritesTheSpecifierItPromises(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, ImportRequireNodeNamespace, "app/Probe.ts",
+	result := rule_testing.Run(test, ImportRequireNodeNamespace, "app/Probe.ts",
 		"import * as NodeFileSystem from 'fs';\n")
 
-	rule_testing.ExpectFindings(t, result, "requireNodePrefix")
-	rule_testing.ExpectFixedSource(t, result,
+	rule_testing.ExpectFindings(test, result, "requireNodePrefix")
+	rule_testing.ExpectFixedSource(test, result,
 		"import * as NodeFileSystem from 'node:fs';\n")
 }
 
@@ -160,8 +160,8 @@ func TestTheNodePrefixFixWritesTheSpecifierItPromises(t *testing.T) {
 // finding pointed at the alias name where the original reports the whole `* as alias` specifier,
 // column 13 against 8, while the prefix finding pointed at the specifier where the original reports
 // the declaration.
-func TestImportRequireNodeNamespaceNamesTheModuleAndPointsWhereTheOriginalDoes(t *testing.T) {
-	t.Parallel()
+func TestImportRequireNodeNamespaceNamesTheModuleAndPointsWhereTheOriginalDoes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name     string
@@ -192,22 +192,22 @@ func TestImportRequireNodeNamespaceNamesTheModuleAndPointsWhereTheOriginalDoes(t
 				"from 'node:child_process'",
 			"import * as NodeChildProcess from 'child_process';"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := rule_testing.Run(t, ImportRequireNodeNamespace, "probe.ts", testCase.source)
+			result := rule_testing.Run(test, ImportRequireNodeNamespace, "probe.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			if diagnostic.Message.Id != testCase.wantId {
-				t.Errorf("message id is %q, want %q", diagnostic.Message.Id, testCase.wantId)
+				test.Errorf("message id is %q, want %q", diagnostic.Message.Id, testCase.wantId)
 			}
 			if diagnostic.Message.Description != testCase.wantText {
-				t.Errorf("description is\n%q\nwant\n%q", diagnostic.Message.Description, testCase.wantText)
+				test.Errorf("description is\n%q\nwant\n%q", diagnostic.Message.Description, testCase.wantText)
 			}
 			if span := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]; span != testCase.wantSpan {
-				t.Errorf("the finding covers %q, want %q", span, testCase.wantSpan)
+				test.Errorf("the finding covers %q, want %q", span, testCase.wantSpan)
 			}
 		})
 	}

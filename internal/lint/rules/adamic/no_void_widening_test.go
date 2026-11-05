@@ -20,35 +20,35 @@ func voidWideningSubject() rule.Rule {
 	return rule.Rule{Name: "adamic/no-void-widening", Run: func(rule.Context, any) rule.Listeners { return nil }}
 }
 
-func TestNoVoidWidening(t *testing.T) {
-	t.Parallel()
+func TestNoVoidWidening(test *testing.T) {
+	test.Parallel()
 	files, err := filepath.Glob("testdata/void-widening/*.ts")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(files) != 59 {
-		t.Fatalf("got %d fixtures, want 59", len(files))
+		test.Fatalf("got %d fixtures, want 59", len(files))
 	}
 	for _, file := range files {
-		t.Run(filepath.Base(file), func(t *testing.T) {
-			t.Parallel()
+		test.Run(filepath.Base(file), func(test *testing.T) {
+			test.Parallel()
 			contents, err := os.ReadFile(file)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			source := string(contents)
-			if count := typeErrorCount(t, source); count != 0 {
-				t.Fatalf("type diagnostics: %d, want 0", count)
+			if count := typeErrorCount(test, source); count != 0 {
+				test.Fatalf("type diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(t, voidWideningSubject(), source)
+			result := runAdamic(test, voidWideningSubject(), source)
 			if strings.HasPrefix(filepath.Base(file), "legal-") {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				// Plant the same runtime hole in every quiet fixture. Its assertion must detect it.
 				source += "\n{ const make: () => void = () => 'x'; const wider: () => number | void = make; const next = wider(); if (next) console.log(next.toFixed(1)); }\n"
-				rule_testing.ExpectFindings(t, runAdamic(t, voidWideningSubject(), source), "voidWidening")
+				rule_testing.ExpectFindings(test, runAdamic(test, voidWideningSubject(), source), "voidWidening")
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "voidWidening")
+			rule_testing.ExpectFindings(test, result, "voidWidening")
 			span := "make"
 			switch filepath.Base(file) {
 			case "array.ts", "object.ts", "tuple.ts", "map.ts", "promise-any.ts", "promise-union.ts", "mutable-promise.ts", "promise-union-origin.ts":
@@ -62,12 +62,12 @@ func TestNoVoidWidening(t *testing.T) {
 			case "received.ts":
 				span = "consume"
 			}
-			expectSpans(t, source, result, span)
+			expectSpans(test, source, result, span)
 			if len(result.Diagnostics) == 1 {
 				text := result.Diagnostics[0].Message.Description
 				for _, part := range []string{span, "void", "return"} {
 					if !strings.Contains(text, part) {
-						t.Errorf("message %q lacks %q", text, part)
+						test.Errorf("message %q lacks %q", text, part)
 					}
 				}
 			}

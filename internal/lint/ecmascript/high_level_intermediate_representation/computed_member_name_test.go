@@ -20,8 +20,8 @@ import (
 //
 // The empty name is the right answer rather than a fallback. The name feeds `classifyFunction`,
 // which asks whether it reads as a component or a hook, and a computed key is neither.
-func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
-	t.Parallel()
+func TestLoweringAClassMemberWithAComputedName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -46,8 +46,8 @@ func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 				FileName: "/test.tsx",
 				PathKey:  "/test.tsx",
@@ -70,7 +70,7 @@ func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
 			source.AsNode().ForEachChild(walk)
 
 			if lowered == 0 {
-				t.Fatal("no function lowered, so this case did not reach the code it is about")
+				test.Fatal("no function lowered, so this case did not reach the code it is about")
 			}
 		})
 	}
@@ -80,8 +80,8 @@ func TestLoweringAClassMemberWithAComputedName(t *testing.T) {
 //
 // Asserted separately from the crash above, because a fix that returned the source text would stop
 // the panic and start classifying `[Symbol.for('Foo')]` as a component.
-func TestAComputedMemberNameLowersToNoName(t *testing.T) {
-	t.Parallel()
+func TestAComputedMemberNameLowersToNoName(test *testing.T) {
+	test.Parallel()
 
 	source := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.tsx",
@@ -93,7 +93,7 @@ func TestAComputedMemberNameLowersToNoName(t *testing.T) {
 	walk = func(node *ast.Node) bool {
 		if ast.IsFunctionLike(node) && functionBody(node) != nil {
 			if name := functionName(node); name != "" {
-				t.Errorf("a computed member name lowered to %q; a name here reaches classifyFunction "+
+				test.Errorf("a computed member name lowered to %q; a name here reaches classifyFunction "+
 					"and `Symbol.for('Foo')` would read as a component", name)
 			}
 			checked++
@@ -104,6 +104,6 @@ func TestAComputedMemberNameLowersToNoName(t *testing.T) {
 	source.AsNode().ForEachChild(walk)
 
 	if checked == 0 {
-		t.Fatal("no function was checked, so this test measured nothing")
+		test.Fatal("no function was checked, so this test measured nothing")
 	}
 }

@@ -8,8 +8,8 @@ import (
 
 const forDirectionFile = "/repository/source/Loop.ts"
 
-func TestForDirectionFires(t *testing.T) {
-	t.Parallel()
+func TestForDirectionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -47,16 +47,16 @@ func TestForDirectionFires(t *testing.T) {
 		{"a parenthesized condition", "export function run() { for(let i = 0; (i < 10); i--) {} }\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile, testCase.sourceText),
 				"incorrectDirection")
 		})
 	}
 }
 
-func TestForDirectionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestForDirectionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -107,9 +107,9 @@ func TestForDirectionStaysSilent(t *testing.T) {
 		{"a while loop is not this rule's business", "export function run() { let i = 0; while(i < 10) { i--; } }\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ForDirection, forDirectionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ForDirection, forDirectionFile, testCase.sourceText))
 		})
 	}
 }
@@ -134,29 +134,29 @@ func TestForDirectionStaysSilent(t *testing.T) {
 //
 // The return is kept: it makes the single-report behavior local rather than a property a reader
 // has to reconstruct, and one line is cheaper than this comment.
-func TestForDirectionReportsOncePerLoop(t *testing.T) {
-	t.Parallel()
+func TestForDirectionReportsOncePerLoop(test *testing.T) {
+	test.Parallel()
 
 	// The same counter on both sides. Qualifies on the left only, since the wrong direction
 	// differs by side and one update cannot be both.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { for(let i = 0; i < i; i--) {} }\n"), "incorrectDirection")
 
 	// Different counters, one modified. Qualifies on the left only.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; i--) {} }\n"), "incorrectDirection")
 
 	// Both counters modified, still one finding. The right-hand operand does not qualify: for
 	// `i < j` the wrong direction on the right is an increment, and `j--` is a decrement.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; i--, j--) {} }\n"), "incorrectDirection")
 
 	// The right-hand operand in isolation, which is what pins the direction mapping rather than
 	// leaving it inferred from the case above.
-	rule_testing.ExpectClean(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; j--) {} }\n"))
 
 	// And the shape that does qualify on the right, so the mapping is pinned in both directions.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ForDirection, forDirectionFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ForDirection, forDirectionFile,
 		"export function run() { let j = 0; for(let i = 0; i < j; j++) {} }\n"), "incorrectDirection")
 }

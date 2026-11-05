@@ -10,7 +10,7 @@ import (
 // view spells it warn, as the settings do; an error stays an error. Both count as type errors, since
 // both gate.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, and acceptFinding counts into activeSummary
-func TestASwiftWarningIsAWarning(t *testing.T) {
+func TestASwiftWarningIsAWarning(test *testing.T) {
 	saved, savedSummary := activeOutput, activeSummary
 	defer func() { activeOutput, activeSummary = saved, savedSummary }()
 	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
@@ -21,23 +21,23 @@ func TestASwiftWarningIsAWarning(t *testing.T) {
 		record := &engineFindingRecord{Source: "compiler", File: "Sources/A.swift", Line: 3, Column: 7,
 			Severity: severity, Rule: "VariableNeverMutated", Message: "never mutated"}
 		if err := run.acceptFinding(record); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	want := "Sources/A.swift:3:7 warn #VariableNeverMutated never mutated\n" +
 		"Sources/A.swift:3:7 error #VariableNeverMutated never mutated\n"
 	if out.String() != want {
-		t.Errorf("findings:\n got  %q\n want %q", out.String(), want)
+		test.Errorf("findings:\n got  %q\n want %q", out.String(), want)
 	}
 	if activeSummary.TypeErrors != 2 {
-		t.Errorf("counted %d type errors, want both", activeSummary.TypeErrors)
+		test.Errorf("counted %d type errors, want both", activeSummary.TypeErrors)
 	}
 }
 
 // TestASwiftGapSaysItself is the footer's wording for files nothing checked: the count and the kinds,
 // since the notes that name the files are --verbose's.
-func TestASwiftGapSaysItself(t *testing.T) {
-	t.Parallel()
+func TestASwiftGapSaysItself(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		withoutRecord, unreadable int
 		want                      string
@@ -48,7 +48,7 @@ func TestASwiftGapSaysItself(t *testing.T) {
 		{0, 0, ""},
 	} {
 		if got := engineUncheckedFiles(testCase.withoutRecord, testCase.unreadable); got != testCase.want {
-			t.Errorf("engineUncheckedFiles(%d, %d) = %q, want %q", testCase.withoutRecord, testCase.unreadable, got, testCase.want)
+			test.Errorf("engineUncheckedFiles(%d, %d) = %q, want %q", testCase.withoutRecord, testCase.unreadable, got, testCase.want)
 		}
 	}
 }

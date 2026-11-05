@@ -31,14 +31,14 @@ func stringPointer(value string) *string { return &value }
 // A nil `optionsJson` is upstream writing no `options` at all, which reaches a rule configured as a
 // bare severity as nil, so it is passed through as nil rather than as an empty object. The two are
 // different inputs to the decoder and both have to work.
-func decodeUselessComputedKeyOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeUselessComputedKeyOptionsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return nil
 	}
 	decoded, err := DecodeNoUselessComputedKeyOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+		test.Fatalf("decoding options %q: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -157,20 +157,20 @@ var noUselessComputedKeyFiringCases = []noUselessComputedKeyCase{
 // The last two are what a message-id assertion cannot see, and this rule is precisely the shape
 // where that matters -- a fixer replacing a constructed span can be anchored correctly, report the
 // right id, and still write the wrong bytes.
-func TestNoUselessComputedKeyFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUselessComputedKeyFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
-				testCase.source, decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUselessComputedKey, uselessComputedKeyFile,
+				testCase.source, decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.properties))
 			for i := range wantIds {
 				wantIds[i] = "unnecessarilyComputedProperty"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// Upstream asserts `data: { property }`, which renders into its message as
 			// `Unnecessarily computed property [{{property}}] found.`. Assert the rendered prefix
@@ -181,7 +181,7 @@ func TestNoUselessComputedKeyFires(t *testing.T) {
 				want := "Unnecessarily computed property [" + property + "] found."
 				got := result.Diagnostics[i].Message.Description
 				if !strings.HasPrefix(got, want) {
-					t.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+					test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
 				}
 			}
 
@@ -190,13 +190,13 @@ func TestNoUselessComputedKeyFires(t *testing.T) {
 				// decline is the assertion.
 				for i, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d proposes %d fixes; upstream declines to fix this case",
+						test.Errorf("finding %d proposes %d fixes; upstream declines to fix this case",
 							i, len(diagnostic.Fixes))
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, *testCase.fixedSource)
+			rule_testing.ExpectFixedSource(test, result, *testCase.fixedSource)
 		})
 	}
 }
@@ -206,15 +206,15 @@ func TestNoUselessComputedKeyFires(t *testing.T) {
 // These are the false positives upstream already thought about, and several encode a distinction
 // nothing else would suggest: the four reserved names, the position dependence between a static and
 // an instance member, the bigint decline, and the plain `[x]` that computes something real.
-func TestNoUselessComputedKeyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUselessComputedKeyCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoUselessComputedKey,
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUselessComputedKey,
 				uselessComputedKeyFile, testCase.source,
-				decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson)))
+				decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -401,17 +401,17 @@ var noUselessComputedKeyAddedCases = []struct {
 }
 
 // TestNoUselessComputedKeyAddedCases covers what upstream's corpus structurally cannot.
-func TestNoUselessComputedKeyAddedCases(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyAddedCases(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noUselessComputedKeyAddedCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
-				testCase.source, decodeUselessComputedKeyOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUselessComputedKey, uselessComputedKeyFile,
+				testCase.source, decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson))
 
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("expected %d findings, got %d %v (%s)",
+				test.Fatalf("expected %d findings, got %d %v (%s)",
 					testCase.findings, len(result.Diagnostics), result.MessageIds(), testCase.reason)
 			}
 			if testCase.findings == 0 {
@@ -420,13 +420,13 @@ func TestNoUselessComputedKeyAddedCases(t *testing.T) {
 			if testCase.fixedSource == "" {
 				for i, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d proposes a fix; upstream declines here (%s)",
+						test.Errorf("finding %d proposes a fix; upstream declines here (%s)",
 							i, testCase.reason)
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.fixedSource)
+			rule_testing.ExpectFixedSource(test, result, testCase.fixedSource)
 		})
 	}
 }
@@ -436,18 +436,18 @@ func TestNoUselessComputedKeyAddedCases(t *testing.T) {
 // Upstream reports the whole member rather than the key, so `({ ['x']: 0 })` points at
 // `['x']: 0` and not at `'x'`. A message-id fixture cannot see this, and the choice between the two
 // is exactly the kind that stays green over the wrong answer.
-func TestNoUselessComputedKeySpan(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeySpan(test *testing.T) {
+	test.Parallel()
 
 	const source = "({ ['x']: 0 });"
-	result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
-	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
+	result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, source)
+	rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 
 	// `Run` does not trim its input, so the literal above is what is on disk and can be sliced
 	// directly. `RunTyped` would trim, and this rule needs no checker.
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "['x']: 0" {
-		t.Errorf("finding should point at the whole member %q, got %q", "['x']: 0", reported)
+		test.Errorf("finding should point at the whole member %q, got %q", "['x']: 0", reported)
 	}
 }
 
@@ -457,18 +457,18 @@ func TestNoUselessComputedKeySpan(t *testing.T) {
 // written as an escape in both. Reading `key.Text()` instead would cook `A` into `A`, which
 // changes what the repair writes into the file and is invisible to every other assertion here:
 // the id is the same, the count is the same, and the span is the same.
-func TestNoUselessComputedKeyReportsRawTextNotCookedText(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyReportsRawTextNotCookedText(test *testing.T) {
+	test.Parallel()
 
 	const source = "({ ['\\u0041']: 0 });"
-	result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
-	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
+	result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, source)
+	rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 
 	want := "Unnecessarily computed property ['\\u0041'] found."
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, want) {
-		t.Errorf("message should begin %q, got %q", want, got)
+		test.Errorf("message should begin %q, got %q", want, got)
 	}
-	rule_testing.ExpectFixedSource(t, result, "({ '\\u0041': 0 });")
+	rule_testing.ExpectFixedSource(test, result, "({ '\\u0041': 0 });")
 }
 
 // TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers pins the default that a generic
@@ -477,8 +477,8 @@ func TestNoUselessComputedKeyReportsRawTextNotCookedText(t *testing.T) {
 // `enforceForClassMembers` defaults to TRUE, so nil options, an empty object, and an explicit true
 // must all enforce, while only an explicit false narrows. A `DecodeOptionsInto` would answer the
 // zero value for the first two and silently disagree with upstream on both.
-func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -490,20 +490,20 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 		{"an explicit true", `{"enforceForClassMembers":true}`, true},
 		{"an explicit false", `{"enforceForClassMembers":false}`, false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			var settings NoUselessComputedKeySettings
 			if testCase.optionsJson == "" {
 				settings = DefaultNoUselessComputedKeySettings()
 			} else {
 				decoded, err := DecodeNoUselessComputedKeyOptions(json.RawMessage(testCase.optionsJson))
 				if err != nil {
-					t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+					test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
 				}
 				settings = decoded.(NoUselessComputedKeySettings)
 			}
 			if settings.EnforceForClassMembers != testCase.want {
-				t.Errorf("enforceForClassMembers should be %v, got %v",
+				test.Errorf("enforceForClassMembers should be %v, got %v",
 					testCase.want, settings.EnforceForClassMembers)
 			}
 		})
@@ -512,9 +512,9 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 	// A rule configured as a bare severity is handed nil options rather than a struct, and the
 	// zero value narrows the rule instead of disabling it. This is the nil-options fallback the
 	// brief calls for, asserted by bypassing the decoder entirely.
-	result := rule_testing.RunWithOptions(t, NoUselessComputedKey, uselessComputedKeyFile,
+	result := rule_testing.RunWithOptions(test, NoUselessComputedKey, uselessComputedKeyFile,
 		"class Foo { ['x']() {} }", nil)
-	rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
+	rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 }
 
 // TestNoUselessComputedKeyDeclinesToRepairARecoveredParse pins the bracket sanity check.
@@ -532,20 +532,20 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(t *testing.T
 //
 // No fixture asserting a message id can see this, because the id is identical either way. The
 // assertion has to be on what the finding OFFERS.
-func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(t *testing.T) {
-	t.Parallel()
+func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"({ ['x' });",
 		"({ ['x': 0 });",
 	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessComputedKey, uselessComputedKeyFile, source)
-			rule_testing.ExpectFindings(t, result, "unnecessarilyComputedProperty")
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, source)
+			rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 			for i, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d proposes %d fixes on a recovered parse; the bracket span "+
+					test.Errorf("finding %d proposes %d fixes on a recovered parse; the bracket span "+
 						"is not delimited by brackets, so any repair would corrupt the file",
 						i, len(diagnostic.Fixes))
 				}

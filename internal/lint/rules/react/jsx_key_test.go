@@ -55,8 +55,8 @@ const jsxKeyFile = "/repository/source/JsxKey.tsx"
 // unconditionally, and both are clean cases upstream, so both are recorded as clean and their
 // silence here is a real measurement of our rule rather than an inherited one.
 
-func TestJsxKeyFires(t *testing.T) {
-	t.Parallel()
+func TestJsxKeyFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -155,17 +155,17 @@ func TestJsxKeyFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := decodeJsxKeyOptionsForTest(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, testCase.sourceText, options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestJsxKeyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestJsxKeyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -278,11 +278,11 @@ func TestJsxKeyStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := decodeJsxKeyOptionsForTest(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, testCase.sourceText, options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -293,11 +293,11 @@ func TestJsxKeyStaysSilent(t *testing.T) {
 // decoder owns the nil path, which is what a bare `"error"` configuration produces, and because a
 // fixture building the struct directly would stop exercising the decoder the moment one of these
 // options grows a non-zero default.
-func decodeJsxKeyOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
+func decodeJsxKeyOptionsForTest(test *testing.T, raw string) any {
+	test.Helper()
 	options, err := DecodeJsxKeyOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", raw, err)
+		test.Fatalf("decoding options %q: %v", raw, err)
 	}
 	return options
 }
@@ -315,8 +315,8 @@ func decodeJsxKeyOptionsForTest(t *testing.T, raw string) any {
 //
 // Every want below is the slice upstream underlines, taken from the installed build's reported
 // columns rather than from reading the source.
-func TestJsxKeySpans(t *testing.T) {
-	t.Parallel()
+func TestJsxKeySpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -358,19 +358,19 @@ func TestJsxKeySpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			options := decodeJsxKeyOptionsForTest(t, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, testCase.sourceText, options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			options := decodeJsxKeyOptionsForTest(test, testCase.rawOptions)
+			result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, testCase.sourceText, options)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("want %d findings, got %d: %v", len(testCase.want),
+				test.Fatalf("want %d findings, got %d: %v", len(testCase.want),
 					len(result.Diagnostics), result.MessageIds())
 			}
 			// `rule_testing.RunWithOptions` does not trim, so the source on disk is this literal.
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.want[index] {
-					t.Errorf("finding %d span: got %q, want %q", index, reported, testCase.want[index])
+					test.Errorf("finding %d span: got %q, want %q", index, reported, testCase.want[index])
 				}
 			}
 		})
@@ -387,8 +387,8 @@ func TestJsxKeySpans(t *testing.T) {
 //
 // Three distinct duplicate groups, so a map with three entries has six possible orders and only one
 // is correct.
-func TestJsxKeyDuplicateOrderIsStable(t *testing.T) {
-	t.Parallel()
+func TestJsxKeyDuplicateOrderIsStable(test *testing.T) {
+	test.Parallel()
 
 	const source = "[<a key=\"one\"/>, <b key=\"two\"/>, <c key=\"one\"/>, <d key=\"three\"/>," +
 		" <e key=\"two\"/>, <f key=\"three\"/>];"
@@ -402,15 +402,15 @@ func TestJsxKeyDuplicateOrderIsStable(t *testing.T) {
 	// nothing. Go randomises map order per run, and with three entries a single run agrees with
 	// insertion order about one time in six.
 	for attempt := 0; attempt < 12; attempt++ {
-		options := decodeJsxKeyOptionsForTest(t, "{\"warnOnDuplicates\":true}")
-		result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, source, options)
+		options := decodeJsxKeyOptionsForTest(test, "{\"warnOnDuplicates\":true}")
+		result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, source, options)
 		if len(result.Diagnostics) != len(want) {
-			t.Fatalf("want %d findings, got %d", len(want), len(result.Diagnostics))
+			test.Fatalf("want %d findings, got %d", len(want), len(result.Diagnostics))
 		}
 		for index, diagnostic := range result.Diagnostics {
 			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != want[index] {
-				t.Fatalf("attempt %d, finding %d: got %q, want %q", attempt, index, reported, want[index])
+				test.Fatalf("attempt %d, finding %d: got %q, want %q", attempt, index, reported, want[index])
 			}
 		}
 	}
@@ -422,11 +422,11 @@ func TestJsxKeyDuplicateOrderIsStable(t *testing.T) {
 // upstream's defaults here because all three options are false. The test exists because that
 // coincidence is not obvious from the code and a later option with a true default would break it
 // silently.
-func TestJsxKeyHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestJsxKeyHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, "[<App />];", nil)
-	rule_testing.ExpectFindings(t, result, "missingArrayKey")
+	result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, "[<App />];", nil)
+	rule_testing.ExpectFindings(test, result, "missingArrayKey")
 
 	// And the three option-gated judgments stay OFF, which is the half a nil-options bug would
 	// turn on rather than off.
@@ -435,7 +435,7 @@ func TestJsxKeyHandlesNilOptions(t *testing.T) {
 		"[<App {...obj} key=\"k\" />];",
 		"[<span key=\"a\"/>, <span key=\"a\"/>];",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, JsxKey, jsxKeyFile, source, nil))
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, source, nil))
 	}
 }
 
@@ -444,8 +444,8 @@ func TestJsxKeyHandlesNilOptions(t *testing.T) {
 // Upstream registers no filename predicate. Only the three JSX-capable extensions are exercised,
 // because a `.ts` file cannot parse `[<App />]` as JSX at all and its silence would say nothing
 // about the rule.
-func TestJsxKeyHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestJsxKeyHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "[<App />];"
 	for _, fileName := range []string{
@@ -453,10 +453,10 @@ func TestJsxKeyHasNoFileGate(t *testing.T) {
 		"/repository/source/Probe.jsx",
 		"/repository/source/Probe.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, JsxKey, fileName, source, nil)
-			rule_testing.ExpectFindings(t, result, "missingArrayKey")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, JsxKey, fileName, source, nil)
+			rule_testing.ExpectFindings(test, result, "missingArrayKey")
 		})
 	}
 }

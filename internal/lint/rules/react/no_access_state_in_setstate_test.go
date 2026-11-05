@@ -24,8 +24,8 @@ import (
 // measurement.
 const noAccessStateInSetstateFile = "/repository/source/NoAccessStateInSetstate.tsx"
 
-func TestNoAccessStateInSetstateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(state => ({value: state.value + 1}))\n          }\n        });\n      "},
@@ -40,16 +40,16 @@ func TestNoAccessStateInSetstateStaysSilent(t *testing.T) {
 		{"upstream valid 9", "\n        class StateContainer extends Container {\n          anything() {\n            return this.setState({value: this.state.value + 1})\n          }\n        };\n      "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestNoAccessStateInSetstateFires(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -66,10 +66,10 @@ func TestNoAccessStateInSetstateFires(t *testing.T) {
 		{"upstream invalid 8", "\n        class Hello extends React.Component {\n          onClick() {\n            this.setState(this.state, () => console.log(this.state));\n          }\n        }\n      ", []string{"useCallback"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -81,8 +81,8 @@ func TestNoAccessStateInSetstateFires(t *testing.T) {
 // message-id assertion cannot see this, and the three routes to a finding anchor on three
 // different recorded nodes, so an anchor mistake on the variable or method route would be invisible
 // from the direct one.
-func TestNoAccessStateInSetstateSpans(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText, reported string }{
 		{
@@ -102,16 +102,16 @@ func TestNoAccessStateInSetstateSpans(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.reported {
-				t.Fatalf("finding points at %q, wanted %q", reported, testCase.reported)
+				test.Fatalf("finding points at %q, wanted %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -122,27 +122,27 @@ func TestNoAccessStateInSetstateSpans(t *testing.T) {
 // Asserted against a literal typed here rather than against the rule's own constant: comparing a
 // finding to the constant it was reported with moves both sides together under mutation and passes
 // either way.
-func TestNoAccessStateInSetstateMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+	result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"class Hello extends React.Component {\n  onClick() {\n    this.setState({value: this.state.value + 1});\n  }\n}")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	want := "Use callback in setState when referencing the previous state. React batches state " +
 		"updates, so `this.state` read while building the next state is whatever was there before " +
 		"the pending updates applied, and two updates in one batch will read the same stale value. " +
 		"The callback form is handed the state React is about to apply."
 	if result.Diagnostics[0].Message.Description != want {
-		t.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
 	}
 	if result.Diagnostics[0].Message.Id != "useCallback" {
-		t.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
+		test.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
 	}
 	// This rule proposes no repair, and upstream ships none either.
 	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatal("this rule must propose no repair")
+		test.Fatal("this rule must propose no repair")
 	}
 }
 
@@ -153,8 +153,8 @@ func TestNoAccessStateInSetstateMessageText(t *testing.T) {
 // the imported corpus can tell a rule that reports per access from one that reports per call, and
 // the method route reporting TWICE AT THE SAME SPAN is bookkeeping a reader would reasonably
 // "correct" into deduplication.
-func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -212,15 +212,15 @@ func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -233,8 +233,8 @@ func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(t *testing.T) {
 //
 // This is the discrimination most likely to be "fixed" by a later reader into name resolution,
 // which would report code upstream calls clean.
-func TestNoAccessStateInSetstateScopeIdentity(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateScopeIdentity(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -262,15 +262,15 @@ func TestNoAccessStateInSetstateScopeIdentity(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -281,16 +281,16 @@ func TestNoAccessStateInSetstateScopeIdentity(t *testing.T) {
 // position one and clean in position two. This pair is the rule's central discrimination and both
 // halves are in upstream's corpus; they are restated here as an adjacent pair because reading them
 // side by side is what makes the rule's judgment legible.
-func TestNoAccessStateInSetstateFirstArgumentOnly(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateFirstArgumentOnly(test *testing.T) {
+	test.Parallel()
 
-	clean := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+	clean := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"var Hello = createReactClass({\n  onClick: function() {\n    this.setState({}, () => console.log(this.state));\n  }\n});")
-	rule_testing.ExpectClean(t, clean)
+	rule_testing.ExpectClean(test, clean)
 
-	reports := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+	reports := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"var Hello = createReactClass({\n  onClick: function() {\n    this.setState(this.state, () => console.log(this.state));\n  }\n});")
-	rule_testing.ExpectFindings(t, reports, "useCallback")
+	rule_testing.ExpectFindings(test, reports, "useCallback")
 }
 
 // TestNoAccessStateInSetstateOnlyStateIsMatched pins the property name.
@@ -299,16 +299,16 @@ func TestNoAccessStateInSetstateFirstArgumentOnly(t *testing.T) {
 // because nothing here writes a `this.<something else>` access inside a `setState` argument.
 // Measured against the installed build: `this.props` is silent, so the name comparison is
 // load-bearing rather than decorative and this rule is about state specifically.
-func TestNoAccessStateInSetstateOnlyStateIsMatched(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateOnlyStateIsMatched(test *testing.T) {
+	test.Parallel()
 
-	silent := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+	silent := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"class Hello extends React.Component {\n  onClick() {\n    this.setState({value: this.props.value + 1});\n  }\n}")
-	rule_testing.ExpectClean(t, silent)
+	rule_testing.ExpectClean(test, silent)
 
-	reports := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+	reports := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 		"class Hello extends React.Component {\n  onClick() {\n    this.setState({value: this.state.value + 1});\n  }\n}")
-	rule_testing.ExpectFindings(t, reports, "useCallback")
+	rule_testing.ExpectFindings(test, reports, "useCallback")
 }
 
 // TestNoAccessStateInSetstateIdentifierPosition pins where a recorded variable has to appear.
@@ -324,8 +324,8 @@ func TestNoAccessStateInSetstateOnlyStateIsMatched(t *testing.T) {
 // state variable straight to `setState` is exactly the mistake this rule exists to catch, and
 // upstream misses it because its identifier arm never looks at a bare argument. Reproduced rather
 // than improved on, because widening it changes which files report.
-func TestNoAccessStateInSetstateIdentifierPosition(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateIdentifierPosition(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -353,15 +353,15 @@ func TestNoAccessStateInSetstateIdentifierPosition(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -375,8 +375,8 @@ func TestNoAccessStateInSetstateIdentifierPosition(t *testing.T) {
 //
 // Both measured reporting against the installed build. Upstream's own corpus writes `v + 1` only
 // through the `this.state.value + 1` direct route, where the climb is not consulted.
-func TestNoAccessStateInSetstateBinaryExpressionClimb(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateBinaryExpressionClimb(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{
@@ -389,11 +389,11 @@ func TestNoAccessStateInSetstateBinaryExpressionClimb(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "useCallback")
+			rule_testing.ExpectFindings(test, result, "useCallback")
 		})
 	}
 }
@@ -418,8 +418,8 @@ func TestNoAccessStateInSetstateBinaryExpressionClimb(t *testing.T) {
 //
 // The class-property rows are a third distinction: upstream's `else if` requires a
 // FunctionExpression, so a property holding an ARROW is silent and one holding a `function` reports.
-func TestNoAccessStateInSetstateMethodRoute(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateMethodRoute(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -477,19 +477,19 @@ func TestNoAccessStateInSetstateMethodRoute(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
 			ids := make([]string, testCase.findings)
 			for index := range ids {
 				ids[index] = "useCallback"
 			}
-			rule_testing.ExpectFindings(t, result, ids...)
+			rule_testing.ExpectFindings(test, result, ids...)
 		})
 	}
 }
@@ -498,8 +498,8 @@ func TestNoAccessStateInSetstateMethodRoute(t *testing.T) {
 //
 // Both mutants over these lines survived until these rows existed, and both distinguishing inputs
 // were measured silent against the installed build.
-func TestNoAccessStateInSetstateObjectPatternGates(t *testing.T) {
-	t.Parallel()
+func TestNoAccessStateInSetstateObjectPatternGates(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -522,15 +522,15 @@ func TestNoAccessStateInSetstateObjectPatternGates(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoAccessStateInSetstate, noAccessStateInSetstateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoAccessStateInSetstate, noAccessStateInSetstateFile,
 				testCase.sourceText)
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }

@@ -23,8 +23,8 @@ import (
  * And `x += JSON`, which ESLint follows into x and the tracker does not, since x then holds a string.
  * Their own tests say what the rule does instead.
  */
-func TestNoObjCallsAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsAgreesWithESLint(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		origin string
@@ -197,14 +197,14 @@ func TestNoObjCallsAgreesWithESLint(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTyped(t, NoObjCalls, "input.ts", testCase.code)
+		result := rule_testing.RunTyped(test, NoObjCalls, "input.ts", testCase.code)
 		source := result.SourceFile.Text()
 		var got []string
 		for _, diagnostic := range result.Diagnostics {
 			got = append(got, diagnostic.Message.Id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
 		}
 		if strings.Join(got, "\n") != strings.Join(testCase.want, "\n") {
-			t.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, testCase.want)
+			test.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, testCase.want)
 		}
 	}
 }

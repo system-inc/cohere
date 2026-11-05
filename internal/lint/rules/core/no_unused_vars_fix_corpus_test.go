@@ -39,8 +39,8 @@ var noUnusedVarsFixCorpusDivergences = map[int]struct {
 
 // noUnusedVarsFixTsconfig is the corpus tsconfig, for a JSX row with the pragma and fragment name upstream's
 // parser options gave and the .tsx file in its include.
-func noUnusedVarsFixTsconfig(t *testing.T, row noUnusedVarsFixCorpusCase) string {
-	t.Helper()
+func noUnusedVarsFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase) string {
+	test.Helper()
 	if !row.jsx {
 		return noUnusedVarsOptionsCorpusTsconfig
 	}
@@ -49,7 +49,7 @@ func noUnusedVarsFixTsconfig(t *testing.T, row noUnusedVarsFixCorpusCase) string
 		Include         []string       `json:"include"`
 	}
 	if err := json.Unmarshal([]byte(noUnusedVarsOptionsCorpusTsconfig), &configuration); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	configuration.CompilerOptions["jsx"] = "react"
 	if row.jsxFactory != "" {
@@ -61,7 +61,7 @@ func noUnusedVarsFixTsconfig(t *testing.T, row noUnusedVarsFixCorpusCase) string
 	configuration.Include = []string{"file.tsx"}
 	encoded, err := json.Marshal(configuration)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return string(encoded)
 }
@@ -89,8 +89,8 @@ func applyFixesOnce(source string, fixes []rule.Fix) string {
 	return output + source[cursor:]
 }
 
-func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	upstream := 0
 	for _, row := range noUnusedVarsFixCorpus {
@@ -99,7 +99,7 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 		}
 	}
 	if upstream != noUnusedVarsFixCorpusUpstreamRows {
-		t.Fatalf("the corpus holds %d upstream rows, and upstream has %d", upstream, noUnusedVarsFixCorpusUpstreamRows)
+		test.Fatalf("the corpus holds %d upstream rows, and upstream has %d", upstream, noUnusedVarsFixCorpusUpstreamRows)
 	}
 
 	for _, row := range noUnusedVarsFixCorpus {
@@ -107,21 +107,21 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+				test.Fatalf("decoding %q: %v", row.options, err)
 			}
 			fileName := "file.ts"
 			if row.jsx {
 				fileName = "file.tsx"
 			}
-			configuration := noUnusedVarsFixTsconfig(t, row)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnusedVars, map[string]string{fileName: row.source}, fileName, options,
+			configuration := noUnusedVarsFixTsconfig(test, row)
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{fileName: row.source}, fileName, options,
 				func(directory string) {
 					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-						t.Fatal(err)
+						test.Fatal(err)
 					}
 				})
 
@@ -156,12 +156,12 @@ func TestNoUnusedVarsFixUpstreamCorpus(t *testing.T) {
 				want, wantOutput = divergence.cohere, divergence.output
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(want) {
-				t.Fatalf("the rule reports %q, and the corpus records %q", reported, want)
+				test.Fatalf("the rule reports %q, and the corpus records %q", reported, want)
 			}
 			if output != wantOutput {
-				t.Fatalf("one pass of the fixes writes %q, and the corpus records %q", output, wantOutput)
+				test.Fatalf("one pass of the fixes writes %q, and the corpus records %q", output, wantOutput)
 			}
-			rule_testing.RecordAssertedCase(t, result)
+			rule_testing.RecordAssertedCase(test, result)
 		})
 	}
 }

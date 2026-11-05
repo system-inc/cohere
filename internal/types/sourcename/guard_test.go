@@ -184,26 +184,26 @@ func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []ts
 }
 
 // tsDecisions loads every package of the module and finds every `.ts` decision outside this package.
-func tsDecisions(t *testing.T) []tsDecision {
-	t.Helper()
+func tsDecisions(test *testing.T) []tsDecision {
+	test.Helper()
 	moduleRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	// Syntax alone, which reads every file go list selects and compiles nothing (#qnnnkbf).
 	loaded, err := gotypes.Parse(gotypes.Config{Directory: moduleRoot}, "./...")
 	if err != nil {
-		t.Fatalf("loading the module: %v", err)
+		test.Fatalf("loading the module: %v", err)
 	}
 	count := 0
 	for _, loadedPackage := range loaded {
 		for _, problem := range loadedPackage.Errors {
-			t.Log(problem)
+			test.Log(problem)
 			count++
 		}
 	}
 	if count > 0 {
-		t.Fatalf("%d errors loading the module, so the walk would read a partial tree", count)
+		test.Fatalf("%d errors loading the module, so the walk would read a partial tree", count)
 	}
 	var found []tsDecision
 	for _, loadedPackage := range loaded {
@@ -213,7 +213,7 @@ func tsDecisions(t *testing.T) []tsDecision {
 		for index, file := range loadedPackage.Syntax {
 			relative, err := filepath.Rel(moduleRoot, loadedPackage.Files[index])
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			found = append(found, tsDecisionsIn(loadedPackage.Fset, file, filepath.ToSlash(relative))...)
 		}
@@ -228,27 +228,27 @@ func tsDecisions(t *testing.T) []tsDecision {
 // is decided as the same file named `.ts` would be (#6mhafvb). One that doesn't fails here by file and
 // line, unless it is on the allowed list with its reason. And every allowed entry still exists, so the
 // list can't keep a reason for a decision that has gone.
-func TestEveryTypeScriptExtensionDecisionTreatsAdamicAsTypeScript(t *testing.T) {
-	t.Parallel()
+func TestEveryTypeScriptExtensionDecisionTreatsAdamicAsTypeScript(test *testing.T) {
+	test.Parallel()
 	seen := map[string]bool{}
-	for _, decision := range tsDecisions(t) {
+	for _, decision := range tsDecisions(test) {
 		seen[decision.key()] = true
 		if _, isAllowed := tsDecisionsAllowed[decision.key()]; !isAllowed {
-			t.Errorf("%s:%d: %s (%q): ask sourcename.TreatedAs, or add %q to tsDecisionsAllowed with why it can't be an Adamic file",
+			test.Errorf("%s:%d: %s (%q): ask sourcename.TreatedAs, or add %q to tsDecisionsAllowed with why it can't be an Adamic file",
 				decision.file, decision.line, decision.how, decision.literal, decision.key())
 		}
 	}
 	for key := range tsDecisionsAllowed {
 		if !seen[key] {
-			t.Errorf("tsDecisionsAllowed names %q, which no longer exists: remove it", key)
+			test.Errorf("tsDecisionsAllowed names %q, which no longer exists: remove it", key)
 		}
 	}
 }
 
 // The guard sees each kind of decision it exists for, and passes each once it asks TreatedAs: the control
 // that the module-wide pass above is a walk that could have failed.
-func TestTheTypeScriptExtensionGuardSeesEachKindOfDecision(t *testing.T) {
-	t.Parallel()
+func TestTheTypeScriptExtensionGuardSeesEachKindOfDecision(test *testing.T) {
+	test.Parallel()
 	source := `package probe
 func probe(name, extension string) {
 	_ = strings.HasSuffix(name, ".test.ts")
@@ -272,7 +272,7 @@ func probe(name, extension string) {
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, "probe.go", source, 0)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var lines []string
 	for _, decision := range tsDecisionsIn(fileSet, file, "probe.go") {
@@ -280,6 +280,6 @@ func probe(name, extension string) {
 	}
 	want := []string{"3 .test.ts", "5 .ts", "7 .ts", "9 .ts", "10 \\.ts$", "13 .ts", "18 GetScriptKindFromFileName"}
 	if !slices.Equal(lines, want) {
-		t.Fatalf("the guard found %v, want %v", lines, want)
+		test.Fatalf("the guard found %v, want %v", lines, want)
 	}
 }

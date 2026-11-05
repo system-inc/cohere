@@ -17,8 +17,8 @@ import (
 // is an instruction entering the graph and not arriving in the tree. Conservation is the property
 // upstream's own conversion has and the property every downstream pass depends on: a pass that reads
 // the tree to decide what a scope depends on cannot see an instruction the converter dropped.
-func TestBuildReactiveFunctionShapes(t *testing.T) {
-	t.Parallel()
+func TestBuildReactiveFunctionShapes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name           string
@@ -36,11 +36,11 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 		{name: "logical", valueTerminals: 1, reactiveExtra: 1,
 			source: `function f(a) { const x = a && a.b; return x; }`},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, _ := rangesFor(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, _ := rangesFor(test, testCase.source)
 			if function == nil {
-				t.Fatal("the source did not lower to a function, so every assertion below would " +
+				test.Fatal("the source did not lower to a function, so every assertion below would " +
 					"pass vacuously")
 			}
 
@@ -57,7 +57,7 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 				}
 			}
 			if graphInstructions == 0 {
-				t.Fatal("the graph holds no instructions, so conservation is trivially satisfied " +
+				test.Fatal("the graph holds no instructions, so conservation is trivially satisfied " +
 					"and this case measures nothing")
 			}
 
@@ -65,29 +65,29 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 			// lowering stops emitting a ternary as a value terminal, this test would otherwise
 			// quietly start applying the wrong assertion below and still pass.
 			if valueTerminals != testCase.valueTerminals {
-				t.Fatalf("this case claims valueTerminals=%d but its lowering says %d; the "+
+				test.Fatalf("this case claims valueTerminals=%d but its lowering says %d; the "+
 					"claim decides which assertion applies, so a stale one hides a real change",
 					testCase.valueTerminals, valueTerminals)
 			}
 
 			tree, result := BuildReactiveFunction(function)
 			if tree == nil {
-				t.Fatal("BuildReactiveFunction returned no tree for a function that lowered")
+				test.Fatal("BuildReactiveFunction returned no tree for a function that lowered")
 			}
 
 			if result.DoubleEmitted != 0 {
-				t.Errorf("%d block(s) emitted twice; a block reached from two places must be "+
+				test.Errorf("%d block(s) emitted twice; a block reached from two places must be "+
 					"scheduled by its parent and broken to, not walked again",
 					result.DoubleEmitted)
 			}
 			if result.UnmatchedGotos != 0 {
-				t.Errorf("%d goto(s) found no enclosing construct to break to, so the tree names a "+
+				test.Errorf("%d goto(s) found no enclosing construct to break to, so the tree names a "+
 					"target that is not on the control-flow stack", result.UnmatchedGotos)
 			}
 
 			wantInstructions := graphInstructions + testCase.reactiveExtra
 			if result.Instructions != wantInstructions {
-				t.Errorf("reactive tree holds %d instructions, want %d from %d graph instructions "+
+				test.Errorf("reactive tree holds %d instructions, want %d from %d graph instructions "+
 					"plus %d reconstructed terminal instruction(s)", result.Instructions,
 					wantInstructions, graphInstructions, testCase.reactiveExtra)
 			}
@@ -95,8 +95,8 @@ func TestBuildReactiveFunctionShapes(t *testing.T) {
 	}
 }
 
-func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
-	t.Parallel()
+func TestBuildReactiveFunctionOptionalValue(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -106,11 +106,11 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 		{name: "single link", source: `function f(a) { return a?.b; }`, want: 1},
 		{name: "nested links", source: `function f(a) { return a?.b?.c; }`, want: 2},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, _ := rangesFor(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, _ := rangesFor(test, testCase.source)
 			if function == nil {
-				t.Fatal("source did not lower")
+				test.Fatal("source did not lower")
 			}
 
 			graphOptionals := 0
@@ -126,16 +126,16 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 				}
 			}
 			if graphOptionals != testCase.want {
-				t.Fatalf("graph holds %d Optional terminals, want %d; the test no longer reaches "+
+				test.Fatalf("graph holds %d Optional terminals, want %d; the test no longer reaches "+
 					"the reconstruction path", graphOptionals, testCase.want)
 			}
 
 			tree, result := BuildReactiveFunction(function)
 			if tree == nil {
-				t.Fatal("BuildReactiveFunction returned no tree")
+				test.Fatal("BuildReactiveFunction returned no tree")
 			}
 			if result.DoubleEmitted != 0 {
-				t.Fatalf("reconstructing the chain emitted %d block(s) twice", result.DoubleEmitted)
+				test.Fatalf("reconstructing the chain emitted %d block(s) twice", result.DoubleEmitted)
 			}
 
 			values, statementIfs := 0, 0
@@ -151,7 +151,7 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 					if optional, ok := value.(*ReactiveOptionalValue); ok {
 						values++
 						if _, ok := optional.Value.(*ReactiveSequenceValue); !ok {
-							t.Errorf("optional value wraps %T, want the test/consequent sequence", optional.Value)
+							test.Errorf("optional value wraps %T, want the test/consequent sequence", optional.Value)
 						}
 					}
 					traverse()
@@ -164,14 +164,14 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 				},
 			})
 			if values != testCase.want {
-				t.Errorf("tree holds %d ReactiveOptionalValue nodes, want %d", values, testCase.want)
+				test.Errorf("tree holds %d ReactiveOptionalValue nodes, want %d", values, testCase.want)
 			}
 			if statementIfs != 0 {
-				t.Errorf("optional expression became %d statement-level if(s)", statementIfs)
+				test.Errorf("optional expression became %d statement-level if(s)", statementIfs)
 			}
 			for identifier := range joinPhis {
 				if !defined[identifier] {
-					t.Errorf("optional join phi %d is read after the expression but never defined in the tree",
+					test.Errorf("optional join phi %d is read after the expression but never defined in the tree",
 						identifier)
 				}
 			}
@@ -179,8 +179,8 @@ func TestBuildReactiveFunctionOptionalValue(t *testing.T) {
 	}
 }
 
-func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
-	t.Parallel()
+func TestBuildReactiveFunctionTernaryValue(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -190,11 +190,11 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 		{name: "single conditional", source: `function f(a, b, c) { return a ? b : c; }`, want: 1},
 		{name: "nested conditional", source: `function f(a, b, c, d, e) { return a ? (b ? c : d) : e; }`, want: 2},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, _ := rangesFor(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, _ := rangesFor(test, testCase.source)
 			if function == nil {
-				t.Fatal("source did not lower")
+				test.Fatal("source did not lower")
 			}
 
 			graphTernaries := 0
@@ -210,15 +210,15 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 				}
 			}
 			if graphTernaries != testCase.want {
-				t.Fatalf("graph holds %d Ternary terminals, want %d; the test no longer reaches "+
+				test.Fatalf("graph holds %d Ternary terminals, want %d; the test no longer reaches "+
 					"the reconstruction path", graphTernaries, testCase.want)
 			}
 			tree, result := BuildReactiveFunction(function)
 			if tree == nil {
-				t.Fatal("BuildReactiveFunction returned no tree")
+				test.Fatal("BuildReactiveFunction returned no tree")
 			}
 			if result.DoubleEmitted != 0 {
-				t.Fatalf("reconstructing the conditional emitted %d block(s) twice", result.DoubleEmitted)
+				test.Fatalf("reconstructing the conditional emitted %d block(s) twice", result.DoubleEmitted)
 			}
 
 			values, statementIfs := 0, 0
@@ -234,7 +234,7 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 					if conditional, ok := value.(*ReactiveTernaryValue); ok {
 						values++
 						if conditional.Test == nil || conditional.Consequent == nil || conditional.Alternate == nil {
-							t.Error("conditional value does not contain its test and both arms")
+							test.Error("conditional value does not contain its test and both arms")
 						}
 					}
 					traverse()
@@ -247,14 +247,14 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 				},
 			})
 			if values != testCase.want {
-				t.Errorf("tree holds %d ReactiveTernaryValue nodes, want %d", values, testCase.want)
+				test.Errorf("tree holds %d ReactiveTernaryValue nodes, want %d", values, testCase.want)
 			}
 			if statementIfs != 0 {
-				t.Errorf("conditional expression became %d statement-level if(s)", statementIfs)
+				test.Errorf("conditional expression became %d statement-level if(s)", statementIfs)
 			}
 			for identifier := range joinPhis {
 				if !defined[identifier] {
-					t.Errorf("conditional join phi %d is read after the expression but never defined in the tree",
+					test.Errorf("conditional join phi %d is read after the expression but never defined in the tree",
 						identifier)
 				}
 			}
@@ -266,10 +266,10 @@ func TestBuildReactiveFunctionTernaryValue(t *testing.T) {
 // exposed the wrong logical arm. The `?? []` right block contains both ArrayExpression and a final
 // LoadLocal; rebuilding only the final value drops the allocation, which in turn removes the scope
 // declaration that the validator needs.
-func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
-	t.Parallel()
+func TestBuildReactiveFunctionLogicalKeepsRightPrefix(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 		function Component(props) {
 			const data = useMemo(() => {
 				return props.items.edges.nodes ?? [];
@@ -278,7 +278,7 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
 		}
 	`)
 	if len(function.Functions) != 1 {
-		t.Fatalf("component holds %d nested functions, want the useMemo callback", len(function.Functions))
+		test.Fatalf("component holds %d nested functions, want the useMemo callback", len(function.Functions))
 	}
 	callback := function.Functions[0]
 
@@ -294,16 +294,16 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
 		}
 	}
 	if graphArrays != 1 || graphLogicals != 1 {
-		t.Fatalf("callback graph has %d arrays and %d logical terminals, want one of each; the "+
+		test.Fatalf("callback graph has %d arrays and %d logical terminals, want one of each; the "+
 			"fixture no longer pins the lost-prefix shape", graphArrays, graphLogicals)
 	}
 
 	tree, result := BuildReactiveFunction(callback)
 	if tree == nil {
-		t.Fatal("BuildReactiveFunction returned no callback tree")
+		test.Fatal("BuildReactiveFunction returned no callback tree")
 	}
 	if result.DoubleEmitted != 0 {
-		t.Fatalf("reconstructing the logical emitted %d block(s) twice", result.DoubleEmitted)
+		test.Fatalf("reconstructing the logical emitted %d block(s) twice", result.DoubleEmitted)
 	}
 
 	treeArrays, treeLogicals := 0, 0
@@ -321,10 +321,10 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
 		},
 	})
 	if treeLogicals != graphLogicals {
-		t.Errorf("tree holds %d logical values, want %d", treeLogicals, graphLogicals)
+		test.Errorf("tree holds %d logical values, want %d", treeLogicals, graphLogicals)
 	}
 	if treeArrays != graphArrays {
-		t.Errorf("tree holds %d array allocations, want all %d from the graph", treeArrays, graphArrays)
+		test.Errorf("tree holds %d array allocations, want all %d from the graph", treeArrays, graphArrays)
 	}
 }
 
@@ -348,14 +348,14 @@ func TestBuildReactiveFunctionLogicalKeepsRightPrefix(t *testing.T) {
 // The corpus numbers in this file's comments were taken at 400 files with the same walk
 // `forEachCorpusFunction` performs, WITH terminals built. A number taken from a different
 // denominator, or from a graph at a different pipeline stage, is not comparable to them.
-func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
-	t.Parallel()
+func TestBuildReactiveFunctionCorpusConservation(test *testing.T) {
+	test.Parallel()
 
 	converted, lostWithValueTerminal, lostWithScopedLoopValue, lostWithout := 0, 0, 0, 0
 	doubleEmitted, unmatchedGotos := 0, 0
 	elidedScopeBreaks, nonImplicitScopeBreaks := 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		// Bring the graph to the state the pipeline actually delivers before converting it.
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
@@ -398,7 +398,7 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	})
 
 	if converted < 100 {
-		t.Fatalf("only %d functions converted; the corpus walk is not reaching real source and "+
+		test.Fatalf("only %d functions converted; the corpus walk is not reaching real source and "+
 			"every count below would be a fact about the harness", converted)
 	}
 
@@ -420,16 +420,16 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	)
 	if lostWithValueTerminal != knownLostWithValueTerminal ||
 		lostWithScopedLoopValue != knownLostWithScopedLoop || lostWithout != 0 {
-		t.Errorf("instruction loss: composite-value=%d (want %d), scoped-loop-value=%d (want %d), "+
+		test.Errorf("instruction loss: composite-value=%d (want %d), scoped-loop-value=%d (want %d), "+
 			"unattributed=%d (want 0)", lostWithValueTerminal, knownLostWithValueTerminal,
 			lostWithScopedLoopValue, knownLostWithScopedLoop, lostWithout)
 	}
 	if doubleEmitted != knownDoubleEmitted {
-		t.Errorf("double-emitted blocks=%d, want %d; the remaining population is the declared "+
+		test.Errorf("double-emitted blocks=%d, want %d; the remaining population is the declared "+
 			"composite-value gap", doubleEmitted, knownDoubleEmitted)
 	}
 	if unmatchedGotos != 0 {
-		t.Errorf("unmatched gotos=%d, want 0; React-compatible reverse postorder closed this gap",
+		test.Errorf("unmatched gotos=%d, want 0; React-compatible reverse postorder closed this gap",
 			unmatchedGotos)
 	}
 
@@ -438,16 +438,16 @@ func TestBuildReactiveFunctionCorpusConservation(t *testing.T) {
 	// state this pass was in before the set existed, when it emitted 2,842 `break` statements the
 	// source does not contain. Upstream omits every one of them.
 	if elidedScopeBreaks == 0 {
-		t.Errorf("no break to a scope fallthrough was elided across %d functions holding 2,874 "+
+		test.Errorf("no break to a scope fallthrough was elided across %d functions holding 2,874 "+
 			"scope terminals; the set is not being populated, so the tree carries invented breaks",
 			converted)
 	}
 	if nonImplicitScopeBreaks != 0 {
-		t.Errorf("non-implicit scope breaks=%d, want 0; upstream treats this shape as impossible",
+		test.Errorf("non-implicit scope breaks=%d, want 0; upstream treats this shape as impossible",
 			nonImplicitScopeBreaks)
 	}
 
-	t.Logf("converted=%d lostWithValueTerminal=%d lostWithScopedLoopValue=%d lostWithout=%d "+
+	test.Logf("converted=%d lostWithValueTerminal=%d lostWithScopedLoopValue=%d lostWithout=%d "+
 		"doubleEmitted=%d unmatchedGotos=%d elidedScopeBreaks=%d nonImplicitScopeBreaks=%d",
 		converted, lostWithValueTerminal, lostWithScopedLoopValue, lostWithout, doubleEmitted, unmatchedGotos,
 		elidedScopeBreaks, nonImplicitScopeBreaks)
@@ -492,19 +492,19 @@ func hasScopeTerminalInLoopValueBlock(function *Function) bool {
 // `ReactiveFunctionGaps` exists to be asserted on, for the reason its own comment gives: a gap that
 // closes silently is an improvement nobody can point at, and a gap that opens silently is a
 // regression nobody can either.
-func TestReactiveFunctionGapsAreDeclared(t *testing.T) {
-	t.Parallel()
+func TestReactiveFunctionGapsAreDeclared(test *testing.T) {
+	test.Parallel()
 
 	gaps := ReactiveFunctionGaps()
 	if len(gaps) != 4 {
-		t.Fatalf("expected 4 declared gaps, found %d; a gap was added or closed without this "+
+		test.Fatalf("expected 4 declared gaps, found %d; a gap was added or closed without this "+
 			"test and its consumers being updated", len(gaps))
 	}
 
 	seen := map[ReactiveFunctionGap]bool{}
 	for _, gap := range gaps {
 		if seen[gap] {
-			t.Errorf("gap %v is listed twice", gap)
+			test.Errorf("gap %v is listed twice", gap)
 		}
 		seen[gap] = true
 	}
@@ -515,7 +515,7 @@ func TestReactiveFunctionGapsAreDeclared(t *testing.T) {
 		ReactiveFunctionGapValueExpressions,
 	} {
 		if !seen[required] {
-			t.Errorf("gap %v is declared as a constant but not returned by ReactiveFunctionGaps, "+
+			test.Errorf("gap %v is declared as a constant but not returned by ReactiveFunctionGaps, "+
 				"so nothing asserts on it", required)
 		}
 	}

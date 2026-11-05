@@ -32,8 +32,8 @@ var preferReduceTypeParameterModules = map[string]string{
 // files carry no import or export and so are global scripts whose `declare const tuple` merges
 // across files. Under that merge upstream's valid case 10 reports, which reads exactly like a
 // wrong case in upstream's own corpus and is an artifact of how it was measured.
-func TestPreferReduceTypeParameterStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferReduceTypeParameterStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"new (class Mine {\n  reduce() {}\n})().reduce(() => {}, 1 as any);\n",
@@ -82,9 +82,9 @@ func TestPreferReduceTypeParameterStaysSilent(t *testing.T) {
 		"declare const a: number[];\na.reduceRight((x, s) => x.concat(s), [] as number[]);\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferReduceTypeParameterCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, PreferReduceTypeParameter,
+		test.Run(preferReduceTypeParameterCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, PreferReduceTypeParameter,
 				preferReduceTypeParameterFilesFor(sourceText), preferReduceTypeParameterFile))
 		})
 	}
@@ -111,8 +111,8 @@ func preferReduceTypeParameterFilesFor(sourceText string) map[string]string {
 // build over the TRIMMED source, because the harness writes each fixture as
 // `strings.TrimSpace(source)+"\n"` and comparing against the untrimmed literal fails on the
 // trailing bytes alone.
-func TestPreferReduceTypeParameterFires(t *testing.T) {
-	t.Parallel()
+func TestPreferReduceTypeParameterFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -248,12 +248,12 @@ func TestPreferReduceTypeParameterFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferReduceTypeParameterCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, PreferReduceTypeParameter,
+		test.Run(preferReduceTypeParameterCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, PreferReduceTypeParameter,
 				preferReduceTypeParameterFilesFor(testCase.sourceText), preferReduceTypeParameterFile)
 
-			rule_testing.ExpectFindings(t, result, "preferTypeParameter")
+			rule_testing.ExpectFindings(test, result, "preferTypeParameter")
 
 			// The harness writes the fixture trimmed, so both the span slice and the expected
 			// rewrite are against that text rather than the Go literal above.
@@ -262,17 +262,17 @@ func TestPreferReduceTypeParameterFires(t *testing.T) {
 
 			gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
+				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
 			if diagnostic.Message.Description != testCase.wantMessage {
-				t.Fatalf("message: expected %q, got %q", testCase.wantMessage,
+				test.Fatalf("message: expected %q, got %q", testCase.wantMessage,
 					diagnostic.Message.Description)
 			}
 			if diagnostic.Message.Id != "preferTypeParameter" {
-				t.Fatalf("message id: expected %q, got %q", "preferTypeParameter", diagnostic.Message.Id)
+				test.Fatalf("message id: expected %q, got %q", "preferTypeParameter", diagnostic.Message.Id)
 			}
 
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }

@@ -33,8 +33,8 @@ func consistencyNoBareThrowCaseName(index int) string {
 // The constructor name is asserted because it is the only part of the message that varies, and a
 // file throwing two different built-ins produces two findings under one id that nothing else
 // separates.
-func TestNoBareThrowFires(t *testing.T) {
-	t.Parallel()
+func TestNoBareThrowFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		fileName   string
@@ -143,20 +143,20 @@ func TestNoBareThrowFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistencyNoBareThrowCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoBareThrow, testCase.fileName, testCase.sourceText)
+		test.Run(consistencyNoBareThrowCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoBareThrow, testCase.fileName, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantSpans))
 			for index := range wantIds {
 				wantIds[index] = "bareThrow"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
 				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 
 				// Against a literal built here rather than against the rule's own message: a test
@@ -165,7 +165,7 @@ func TestNoBareThrowFires(t *testing.T) {
 				// to policy/messages, so this row also proves the move changed no word.
 				want := consistencyNoBareThrowWording(testCase.wantNames[index])
 				if result.Diagnostics[index].Message.Description != want {
-					t.Errorf("finding %d reads %q, want %q", index,
+					test.Errorf("finding %d reads %q, want %q", index,
 						result.Diagnostics[index].Message.Description, want)
 				}
 			}
@@ -187,27 +187,27 @@ func consistencyNoBareThrowWording(constructorName string) string {
 //
 // Not parallel: it swaps the catalog every render reads with policy.UseMessages, so a test rendering beside
 // it finds only this one entry (a parallel run failed rules/base with "has no message", #nxgt2ca).
-func TestNoBareThrowRendersAnEditedEntry(t *testing.T) {
+func TestNoBareThrowRendersAnEditedEntry(test *testing.T) {
 	original, err := fs.ReadFile(policy.MessageFiles(), "consistency-no-bare-throw.json")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	edited := strings.Replace(string(original), "which names no declared failure", "which names no failure anyone declared", 1)
 	if edited == string(original) {
-		t.Fatal("the anchor is not in the entry, so the edit would not apply")
+		test.Fatal("the anchor is not in the entry, so the edit would not apply")
 	}
 	catalog, err := policy.LoadMessages(fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	restore := policy.UseMessages(catalog)
 	defer restore()
 
-	result := rule_testing.Run(t, ConsistencyNoBareThrow, "/repository/source/modules/thing/Service.ts",
+	result := rule_testing.Run(test, ConsistencyNoBareThrow, "/repository/source/modules/thing/Service.ts",
 		"export function f(): void { throw new TypeError('x'); }")
-	rule_testing.ExpectFindings(t, result, "bareThrow")
+	rule_testing.ExpectFindings(test, result, "bareThrow")
 	if got := result.Diagnostics[0].Message.Description; !strings.Contains(got, "This throws a bare `TypeError`, which names no failure anyone declared.") {
-		t.Errorf("the finding reads %q, without the edit", got)
+		test.Errorf("the finding reads %q, without the edit", got)
 	}
 }
 
@@ -223,8 +223,8 @@ func TestNoBareThrowRendersAnEditedEntry(t *testing.T) {
 // directory, `schema-tools` looks like the schema builder, and `NotBaseError.ts` ends in the capture
 // path's filename without its separator. All four report, which is what proves these gates are
 // segment tests rather than substring ones.
-func TestNoBareThrowStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoBareThrowStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		fileName   string
@@ -368,9 +368,9 @@ func TestNoBareThrowStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistencyNoBareThrowCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoBareThrow,
+		test.Run(consistencyNoBareThrowCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoBareThrow,
 				testCase.fileName, testCase.sourceText))
 		})
 	}
@@ -388,8 +388,8 @@ func TestNoBareThrowStaysSilent(t *testing.T) {
 //
 // The malformed rows are ours rather than the original's. Its parser refuses those files outright,
 // so it never meets a throw with nothing thrown; ours recovers and hands the walk one.
-func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(t *testing.T) {
-	t.Parallel()
+func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(test *testing.T) {
+	test.Parallel()
 
 	for name, sourceText := range map[string]string{
 		"propertyAccess": "export function f(): void { throw someError.message; }",
@@ -403,9 +403,9 @@ func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(t *testing.T) {
 		"throwNothing":   "export function f(): void { throw; }",
 		"unclosedNew":    "export function f(): void { throw new Error( }",
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.Run(t, ConsistencyNoBareThrow, "/repository/source/modules/thing/Service.ts", sourceText)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.Run(test, ConsistencyNoBareThrow, "/repository/source/modules/thing/Service.ts", sourceText)
 		})
 	}
 }
@@ -420,21 +420,21 @@ func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(t *testing.T) {
 // The harness normalizes the filename it is given before building the program, so a fixture cannot
 // reach the rule with a backslash path and this cannot be proven through `Run`. It is asserted
 // against the helper instead, which is the layer that actually decides it.
-func TestNoBareThrowNormalizesThePathSeparator(t *testing.T) {
-	t.Parallel()
+func TestNoBareThrowNormalizesThePathSeparator(test *testing.T) {
+	test.Parallel()
 
 	// A file that MUST be exempt, spelled both ways. The forward-slash spelling is the one a real
 	// run produces and is covered by the silent corpus above; this asserts the gate itself rather
 	// than the harness.
 	if !consistencyNoBareThrowFileIsExempt("/repository/libraries/base/source/foundation/errors/BaseError.ts") {
-		t.Error("the capture path is not exempt with forward slashes")
+		test.Error("the capture path is not exempt with forward slashes")
 	}
 	if consistencyNoBareThrowFileIsExempt("/repository/source/modules/thing/Service.ts") {
-		t.Error("an ordinary path is exempt when it should not be")
+		test.Error("an ordinary path is exempt when it should not be")
 	}
 	// The control that gives the row above meaning: a backslash spelling of the SAME capture-path
 	// file is not exempt, which is exactly why the rule normalizes before asking.
 	if consistencyNoBareThrowFileIsExempt(`\repository\libraries\base\source\foundation\errors\BaseError.ts`) {
-		t.Error("a backslash path matched a gate, so normalization would be unnecessary")
+		test.Error("a backslash path matched a gate, so normalization would be unnecessary")
 	}
 }

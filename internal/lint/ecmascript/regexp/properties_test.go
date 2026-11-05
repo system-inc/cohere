@@ -67,11 +67,11 @@ func propertySource(name, escape string, shape int) string {
 	}
 	return "^(?:" + atom + ")$"
 }
-func oracleProperties(t *testing.T, probes []propertyProbe) []propertyAnswer {
-	t.Helper()
+func oracleProperties(test *testing.T, probes []propertyProbe) []propertyAnswer {
+	test.Helper()
 	input, err := json.Marshal(probes)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	cmd := exec.Command("node", "-e", propertyOracle)
 	cmd.Stdin = bytes.NewReader(input)
@@ -79,11 +79,11 @@ func oracleProperties(t *testing.T, probes []propertyProbe) []propertyAnswer {
 	cmd.Stderr = &stderr
 	output, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("Node oracle: %v: %s", err, stderr.String())
+		test.Fatalf("Node oracle: %v: %s", err, stderr.String())
 	}
 	var answers []propertyAnswer
 	if err = json.Unmarshal(output, &answers); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return answers
 }
@@ -120,14 +120,14 @@ func compareProperty(name string, points []rune, bits []string) (int, string) {
 //go:embed testdata/unicode-property-names.txt
 var acceptedPropertyNames string
 
-func TestUnicodePropertiesNode(t *testing.T) {
-	t.Parallel()
+func TestUnicodePropertiesNode(test *testing.T) {
+	test.Parallel()
 	if unicode.Version != unicodeproperties.Version {
-		t.Fatalf("Go Unicode %s; property tables %s", unicode.Version, unicodeproperties.Version)
+		test.Fatalf("Go Unicode %s; property tables %s", unicode.Version, unicodeproperties.Version)
 	}
 	names := strings.Fields(acceptedPropertyNames)
 	if !slices.Equal(names, unicodeproperties.Names()) {
-		t.Fatal("generated names differ from the pinned Node-accepted inventory")
+		test.Fatal("generated names differ from the pinned Node-accepted inventory")
 	}
 
 	probes := []propertyProbe{}
@@ -139,36 +139,36 @@ func TestUnicodePropertiesNode(t *testing.T) {
 		}
 		probes = append(probes, propertyProbe{name, propertyPoints(rs)})
 	}
-	answers := oracleProperties(t, probes)
+	answers := oracleProperties(test, probes)
 	checks, tested := 0, 0
 	for i, a := range answers {
 		// Not parallel: each subtest updates counts that the parent logs after the loop.
-		t.Run(a.Name, func(t *testing.T) {
+		test.Run(a.Name, func(test *testing.T) {
 			tested++
 			if !a.Accepted {
-				t.Fatal("table admits a property Node rejects")
+				test.Fatal("table admits a property Node rejects")
 			}
 			n, why := compareProperty(a.Name, probes[i].Points, a.Bits)
 			checks += n
 			if why != "" {
-				t.Fatal(why)
+				test.Fatal(why)
 			}
 		})
 	}
-	t.Logf("table spellings=%d tested spellings=%d patterns=%d membership checks=%d", len(names), tested, tested*12, checks)
+	test.Logf("table spellings=%d tested spellings=%d patterns=%d membership checks=%d", len(names), tested, tested*12, checks)
 }
 
-func TestUnicodePropertiesFresh(t *testing.T) {
-	t.Parallel()
+func TestUnicodePropertiesFresh(test *testing.T) {
+	test.Parallel()
 	cmd := exec.Command("go", "run", "../../../../unicodeproperties/internal/generate", "-check", "-output", "../../../../unicodeproperties/tables_generated.go")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("freshness: %v: %s", err, output)
+		test.Fatalf("freshness: %v: %s", err, output)
 	}
 }
 
-func TestUnicodePropertySyntaxNode(t *testing.T) {
-	t.Parallel()
+func TestUnicodePropertySyntaxNode(test *testing.T) {
+	test.Parallel()
 	type fixture struct{ Source, Flags string }
 	fixtures := []fixture{
 		{`^[\p{Script=Greek}-]$`, "u"},
@@ -202,28 +202,28 @@ func TestUnicodePropertySyntaxNode(t *testing.T) {
 		Subjects []string
 	}{fixtures, subjects})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	cmd := exec.Command("node", "-e", `const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`)
 	cmd.Stdin = bytes.NewReader(input)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("Node: %v: %s", err, output)
+		test.Fatalf("Node: %v: %s", err, output)
 	}
 	var answers []struct {
 		Accepted bool
 		Bits     []bool
 	}
 	if err = json.Unmarshal(output, &answers); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	checks := 0
 	for i, f := range fixtures {
 		// Not parallel: each subtest updates the membership count that the parent logs after the loop.
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+		test.Run(fmt.Sprintf("%d", i), func(test *testing.T) {
 			re, err := Compile(f.Source, f.Flags)
 			if (err == nil) != answers[i].Accepted {
-				t.Fatalf("/%s/%s compile=%v Node accepted=%t", f.Source, f.Flags, err, answers[i].Accepted)
+				test.Fatalf("/%s/%s compile=%v Node accepted=%t", f.Source, f.Flags, err, answers[i].Accepted)
 			}
 			if err != nil {
 				return
@@ -232,10 +232,10 @@ func TestUnicodePropertySyntaxNode(t *testing.T) {
 				got := re.Test(subject)
 				checks++
 				if got != answers[i].Bits[j] {
-					t.Fatalf("/%s/%s vs %q: Go=%t Node=%t", f.Source, f.Flags, subject, got, answers[i].Bits[j])
+					test.Fatalf("/%s/%s vs %q: Go=%t Node=%t", f.Source, f.Flags, subject, got, answers[i].Bits[j])
 				}
 			}
 		})
 	}
-	t.Logf("syntax fixtures=%d subjects=%d membership checks=%d", len(fixtures), len(subjects), checks)
+	test.Logf("syntax fixtures=%d subjects=%d membership checks=%d", len(fixtures), len(subjects), checks)
 }

@@ -10,23 +10,23 @@ import (
 
 // constantCasingFingerprintOf is the rule's program fingerprint over a fixture, read through the Program the
 // walk hands the rule, viewed under its own reads.
-func constantCasingFingerprintOf(t *testing.T, files map[string]string, subject string) [sha256.Size]byte {
-	t.Helper()
-	return constantCasingFingerprintWithOptions(t, files, subject, nil)
+func constantCasingFingerprintOf(test *testing.T, files map[string]string, subject string) [sha256.Size]byte {
+	test.Helper()
+	return constantCasingFingerprintWithOptions(test, files, subject, nil)
 }
 
 // constantCasingFingerprintWithOptions is constantCasingFingerprintOf under the rule's options.
-func constantCasingFingerprintWithOptions(t *testing.T, files map[string]string, subject string, options any) [sha256.Size]byte {
-	t.Helper()
+func constantCasingFingerprintWithOptions(test *testing.T, files map[string]string, subject string, options any) [sha256.Size]byte {
+	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := ConsistencyRequireConstantCasing
 	probe.Run = func(ctx rule.Context, options any) rule.Listeners {
 		fingerprint = ConsistencyRequireConstantCasing.ProgramFingerprint(ctx.Program, options)
 		return nil
 	}
-	rule_testing.RunTypedFiles(t, probe, files, subject)
+	rule_testing.RunTypedFiles(test, probe, files, subject)
 	if fingerprint == ([sha256.Size]byte{}) {
-		t.Fatal("the probe never ran, so no fingerprint was read")
+		test.Fatal("the probe never ran, so no fingerprint was read")
 	}
 	return fingerprint
 }
@@ -34,8 +34,8 @@ func constantCasingFingerprintWithOptions(t *testing.T, files map[string]string,
 // The fingerprint is the whole of what a file's verdict reads beyond the file and its types (#f96cnry),
 // proven both ways. Whatever changes who takes which name from a file, or which directories a computed
 // import roots, moves it. An edit that changes neither leaves it, so the findings cache replays across it.
-func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(test *testing.T) {
+	test.Parallel()
 	const source = "/repository/source/Source.ts"
 	const reader = "/repository/source/Reader.ts"
 	const other = "/repository/source/Other.ts"
@@ -55,7 +55,7 @@ func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(t *
 		files[path] = text
 		return files
 	}
-	original := constantCasingFingerprintOf(t, base, source)
+	original := constantCasingFingerprintOf(test, base, source)
 
 	moves := map[string]map[string]string{
 		"a new importer of an exported name": with(other, "import { otherPath } from './Source';\nexport const Other = otherPath;\n"),
@@ -69,8 +69,8 @@ func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(t *
 		"a computed import removed": with(loader, "export const load = (code: string) => code;\n"),
 	}
 	for name, files := range moves {
-		if constantCasingFingerprintOf(t, files, source) == original {
-			t.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
+		if constantCasingFingerprintOf(test, files, source) == original {
+			test.Errorf("%s left the fingerprint unchanged, so a stale finding would replay", name)
 		}
 	}
 
@@ -84,8 +84,8 @@ func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(t *
 			"export const load = (code: string) => import(`./translations/${code}`);\nexport const two = 2;\n"),
 	}
 	for name, files := range holds {
-		if constantCasingFingerprintOf(t, files, source) != original {
-			t.Errorf("%s moved the fingerprint, so files whose verdict cannot change would not replay", name)
+		if constantCasingFingerprintOf(test, files, source) != original {
+			test.Errorf("%s moved the fingerprint, so files whose verdict cannot change would not replay", name)
 		}
 	}
 }
@@ -94,8 +94,8 @@ func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(t *
 // the file, and the findings cache's key already holds the config that sets it (#f96cnry). So different
 // options give the same fingerprint, and hashing them would only cost replays. The control: the same
 // options do change the verdict, so the equality below is not a rule that ignored its options.
-func TestConsistencyRequireConstantCasingFingerprintDoesNotHashItsOptions(t *testing.T) {
-	t.Parallel()
+func TestConsistencyRequireConstantCasingFingerprintDoesNotHashItsOptions(test *testing.T) {
+	test.Parallel()
 	const source = "/repository/source/Settings.ts"
 	files := map[string]string{
 		source:                         "export const runtime = 'edge';\n",
@@ -103,14 +103,14 @@ func TestConsistencyRequireConstantCasingFingerprintDoesNotHashItsOptions(t *tes
 	}
 	framework := ConsistencyRequireConstantCasingOptions{FrameworkConstantNames: []string{"runtime"}}
 
-	if constantCasingFingerprintWithOptions(t, files, source, nil) != constantCasingFingerprintWithOptions(t, files, source, framework) {
-		t.Fatal("the options moved the fingerprint, though nothing the index reads depends on them")
+	if constantCasingFingerprintWithOptions(test, files, source, nil) != constantCasingFingerprintWithOptions(test, files, source, framework) {
+		test.Fatal("the options moved the fingerprint, though nothing the index reads depends on them")
 	}
 
-	without := rule_testing.RunTypedFiles(t, ConsistencyRequireConstantCasing, files, source)
-	with := rule_testing.RunTypedFilesWithOptions(t, ConsistencyRequireConstantCasing, files, source, framework)
+	without := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, files, source)
+	with := rule_testing.RunTypedFilesWithOptions(test, ConsistencyRequireConstantCasing, files, source, framework)
 	if len(without.Diagnostics) == 0 || len(with.Diagnostics) != 0 {
-		t.Fatalf("control: the option should silence `runtime`, got %d findings without it and %d with it",
+		test.Fatalf("control: the option should silence `runtime`, got %d findings without it and %d with it",
 			len(without.Diagnostics), len(with.Diagnostics))
 	}
 }

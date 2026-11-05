@@ -34,42 +34,42 @@ import (
 // reads the program through a context and defines no rule still fails here: such a helper takes a
 // rule.Program, and every call site then names ctx.Program. And a declaration in a comment is not a
 // declaration: only a ProgramReads key in a composite literal counts.
-func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
-	t.Parallel()
+func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(test *testing.T) {
+	test.Parallel()
 
-	ruleFiles := ruleSourceFiles(t)
+	ruleFiles := ruleSourceFiles(test)
 	if len(ruleFiles) == 0 {
 		// A check that found nothing to check passes for the wrong reason, which is the same shape
 		// as the defect it guards against.
-		t.Fatal("found no rule source files, so this test proved nothing")
+		test.Fatal("found no rule source files, so this test proved nothing")
 	}
-	helpers := programHelperReads(t, append(append(append([]string{}, ruleFiles...), checkingSourceFiles(t)...),
-		ruleInterfaceSourceFiles(t)...))
+	helpers := programHelperReads(test, append(append(append([]string{}, ruleFiles...), checkingSourceFiles(test)...),
+		ruleInterfaceSourceFiles(test)...))
 
 	sawProgramReader := false
 	for _, path := range ruleFiles {
-		facts := readProgramFacts(t, path, helpers)
+		facts := readProgramFacts(test, path, helpers)
 		if !facts.readsProgram {
 			continue
 		}
 		sawProgramReader = true
 
 		if !facts.definesRule {
-			t.Errorf("%s reads the program through a rule.Context and defines no rule, so the rules "+
+			test.Errorf("%s reads the program through a rule.Context and defines no rule, so the rules "+
 				"calling it read the program without naming it and nothing makes them declare it. "+
 				"Take a rule.Program instead, so each call site names ctx.Program", path)
 			continue
 		}
 		for _, unseen := range facts.unseenCallees {
-			t.Errorf("%s hands its Program to %s, which this cannot read, so its reads cannot be counted",
+			test.Errorf("%s hands its Program to %s, which this cannot read, so its reads cannot be counted",
 				path, unseen)
 		}
 		if missing := facts.reads &^ facts.declared; missing != 0 {
-			t.Errorf("%s reads %s through ctx.Program and does not declare it (declares %s), so a findings "+
+			test.Errorf("%s reads %s through ctx.Program and does not declare it (declares %s), so a findings "+
 				"cache would replay its findings after what it read had changed", path, missing, facts.declared)
 		}
 		if extra := facts.declared &^ facts.reads; extra != 0 {
-			t.Errorf("%s declares %s and reads none of it, which keeps it out of a cache it could join; "+
+			test.Errorf("%s declares %s and reads none of it, which keeps it out of a cache it could join; "+
 				"declare %s", path, extra, facts.reads)
 		}
 	}
@@ -77,7 +77,7 @@ func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
 	if !sawProgramReader {
 		// Dozens of rules read the program today. Zero would mean the search is looking in the wrong
 		// place rather than that the tree got cleaner.
-		t.Fatal("no rule source reads ctx.Program, which is implausible: this check is " +
+		test.Fatal("no rule source reads ctx.Program, which is implausible: this check is " +
 			"looking at the wrong files")
 	}
 }
@@ -86,8 +86,8 @@ func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(t *testing.T) {
 //
 // Each source is a shape this guard could misjudge, written to a file and read the way the guard
 // reads the tree, so the guard is shown able to fail rather than only shown passing.
-func TestReadProgramFactsSeesCodeNotComments(t *testing.T) {
-	t.Parallel()
+func TestReadProgramFactsSeesCodeNotComments(test *testing.T) {
+	test.Parallel()
 
 	helpers := map[string]programRead{"type_checking.IsPromiseLike": readsCompilerOptions | readsDefaultLibrary,
 		"probe.fingerprint": readsCompilerOptions}
@@ -153,18 +153,18 @@ var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { 
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			path := filepath.Join(t.TempDir(), "probe.go")
+			path := filepath.Join(test.TempDir(), "probe.go")
 			if err := os.WriteFile(path, []byte(testCase.source), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
-			got := readProgramFacts(t, path, helpers)
+			got := readProgramFacts(test, path, helpers)
 			if got.readsProgram != testCase.want.readsProgram || got.definesRule != testCase.want.definesRule ||
 				got.reads != testCase.want.reads || got.declared != testCase.want.declared ||
 				strings.Join(got.unseenCallees, ",") != strings.Join(testCase.want.unseenCallees, ",") {
-				t.Errorf("got %+v, want %+v", got, testCase.want)
+				test.Errorf("got %+v, want %+v", got, testCase.want)
 			}
 		})
 	}
@@ -285,13 +285,13 @@ func usesOf(node ast.Node, packageName string, isProgram func(ast.Expr) bool) pr
 
 // programHelperReads is what every function taking a rule.Program reads of it, followed through the
 // functions it hands the Program on to, to a fixed point. Keyed `package.Function`.
-func programHelperReads(t *testing.T, paths []string) map[string]programRead {
-	t.Helper()
+func programHelperReads(test *testing.T, paths []string) map[string]programRead {
+	test.Helper()
 	uses := map[string]programUse{}
 	for _, path := range paths {
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 		if err != nil {
-			t.Fatalf("parsing %s: %v", path, err)
+			test.Fatalf("parsing %s: %v", path, err)
 		}
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
@@ -348,12 +348,12 @@ func programHelperReads(t *testing.T, paths []string) map[string]programRead {
 //
 // Names of rule.Context parameters are collected first, since a rule may call its context anything;
 // ctx and context are added for the rare function literal whose parameter types are elided.
-func readProgramFacts(t *testing.T, path string, helpers map[string]programRead) programFacts {
-	t.Helper()
+func readProgramFacts(test *testing.T, path string, helpers map[string]programRead) programFacts {
+	test.Helper()
 
 	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
-		t.Fatalf("parsing %s: %v", path, err)
+		test.Fatalf("parsing %s: %v", path, err)
 	}
 
 	contextNames := map[string]bool{"ctx": true, "context": true}
@@ -460,27 +460,27 @@ func isRuleSelector(expression ast.Expr, name string) bool {
 }
 
 // ruleSourceFiles lists the non-test Go files under internal/lint/rules.
-func ruleSourceFiles(t *testing.T) []string {
-	t.Helper()
-	return goSourceFilesUnder(t, "../lint/rules")
+func ruleSourceFiles(test *testing.T) []string {
+	test.Helper()
+	return goSourceFilesUnder(test, "../lint/rules")
 }
 
 // ruleInterfaceSourceFiles lists the non-test Go files of the rule package, whose helpers taking a
 // Program (rule.FingerprintPath) read it for the rules that call them.
-func ruleInterfaceSourceFiles(t *testing.T) []string {
-	t.Helper()
-	return goSourceFilesUnder(t, "../lint/rule")
+func ruleInterfaceSourceFiles(test *testing.T) []string {
+	test.Helper()
+	return goSourceFilesUnder(test, "../lint/rule")
 }
 
 // checkingSourceFiles lists the non-test Go files of the shared type-checking helpers, which take a
 // rule.Program from the rules that call them.
-func checkingSourceFiles(t *testing.T) []string {
-	t.Helper()
-	return goSourceFilesUnder(t, "../lint/checking")
+func checkingSourceFiles(test *testing.T) []string {
+	test.Helper()
+	return goSourceFilesUnder(test, "../lint/checking")
 }
 
-func goSourceFilesUnder(t *testing.T, root string) []string {
-	t.Helper()
+func goSourceFilesUnder(test *testing.T, root string) []string {
+	test.Helper()
 
 	var found []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -494,7 +494,7 @@ func goSourceFilesUnder(t *testing.T, root string) []string {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking %s: %v", root, err)
+		test.Fatalf("walking %s: %v", root, err)
 	}
 	return found
 }

@@ -28,8 +28,8 @@ func (engine *countingEngine) Enumerate(root string) (formatfiles.Enumeration, e
 // The format walk begun beside the graph build is the walk the fix phase would have made (#679s763): taken
 // for the same engine and root, it equals a walk made on the spot, and it is taken once. A walk of another
 // root, or by another engine, is made on the spot.
-func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(t *testing.T) {
-	root := t.TempDir()
+func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
+	root := test.TempDir()
 	for name, contents := range map[string]string{
 		"a.ts":          "export const a = 1;\n",
 		"notes.md":      "# Notes\n",
@@ -45,40 +45,40 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(t *testing.T) {
 	} {
 		path := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	resolving, err := native.NewResolving(root)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	t.Cleanup(func() { aheadFormatWalk = nil })
+	test.Cleanup(func() { aheadFormatWalk = nil })
 
 	direct, err := resolving.Enumerate(root)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(direct.Files) < 5 {
-		t.Fatalf("the fixture's walk found %d files, too few for a match to prove anything", len(direct.Files))
+		test.Fatalf("the fixture's walk found %d files, too few for a match to prove anything", len(direct.Files))
 	}
 
 	engine := &countingEngine{Resolving: resolving}
 	startFormatWalkAhead(engine, root, nil)
 	taken, err := enumerateFormatTree(engine, root)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if engine.walks != 1 {
-		t.Fatalf("the engine walked %d times for one walk begun ahead and taken", engine.walks)
+		test.Fatalf("the engine walked %d times for one walk begun ahead and taken", engine.walks)
 	}
 	if !reflect.DeepEqual(taken, direct) {
-		t.Fatalf("the walk begun ahead differs from a direct walk\nahead:  %+v\ndirect: %+v", taken, direct)
+		test.Fatalf("the walk begun ahead differs from a direct walk\nahead:  %+v\ndirect: %+v", taken, direct)
 	}
 	if _, err := enumerateFormatTree(engine, root); err != nil || engine.walks != 2 {
-		t.Errorf("a second call took the same walk again (%d walks)", engine.walks)
+		test.Errorf("a second call took the same walk again (%d walks)", engine.walks)
 	}
 
 	startFormatWalkAhead(engine, root, nil)
@@ -86,9 +86,9 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(t *testing.T) {
 	<-aheadFormatWalk.done
 	other := &countingEngine{Resolving: resolving}
 	if _, err := enumerateFormatTree(other, root); err != nil || other.walks != 1 {
-		t.Errorf("another engine took the walk begun for this one (%d walks of its own)", other.walks)
+		test.Errorf("another engine took the walk begun for this one (%d walks of its own)", other.walks)
 	}
 	if _, err := enumerateFormatTree(engine, filepath.Join(root, "other")); err != nil || engine.walks != 4 {
-		t.Errorf("a walk of another root was taken from the walk begun ahead (%d walks)", engine.walks)
+		test.Errorf("a walk of another root was taken from the walk begun ahead (%d walks)", engine.walks)
 	}
 }

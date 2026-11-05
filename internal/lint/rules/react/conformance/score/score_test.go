@@ -53,15 +53,15 @@ const fixtureRoot = "../testdata/fixtures"
 // What it proves, precisely: the join from corpus to fixture to program to rule to finding to
 // comparison to verdict is closed, on real input, with a real type graph. Everything else in this
 // package is categorisation, and categorisation cannot tell you it is wired to anything.
-func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
-	t.Parallel()
+func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
+	test.Parallel()
 	if testing.Short() {
-		t.Skip("builds a TypeScript program per fixture")
+		test.Skip("builds a TypeScript program per fixture")
 	}
 
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+		test.Fatalf("loading the corpus: %v", err)
 	}
 
 	subject := Rules["globals"]
@@ -76,26 +76,26 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 	// rule rather than on the filename is what keeps them out, and the gap between 11 and 23 is a
 	// concrete measure of how wrong a filename join would have been for this one rule.
 	if len(scored) != 11 {
-		t.Errorf("selected %d pure globals fixtures, want 11", len(scored))
+		test.Errorf("selected %d pure globals fixtures, want 11", len(scored))
 	}
 	if len(scored) == 0 {
-		t.Fatal("no fixtures selected, so this test would prove nothing")
+		test.Fatal("no fixtures selected, so this test would prove nothing")
 	}
 
 	counts := map[react_conformance.Verdict]int{}
 	var detail []string
 	for _, fixture := range scored {
-		result, analyzeErr := Analyze(subject, fixture, t.TempDir())
+		result, analyzeErr := Analyze(subject, fixture, test.TempDir())
 		verdict := react_conformance.Classify(fixture, result, analyzeErr)
 		counts[verdict.Verdict]++
 		detail = append(detail, "  "+fixture.Name+": "+string(verdict.Verdict))
 	}
 
-	t.Logf("react/globals against React's own goldens: %d passed, %d failed, %d excluded as stated divergences, of %d",
+	test.Logf("react/globals against React's own goldens: %d passed, %d failed, %d excluded as stated divergences, of %d",
 		counts[react_conformance.VerdictPassed], counts[react_conformance.VerdictFailed],
 		counts[react_conformance.VerdictStatedDivergence], len(scored))
 	for _, line := range detail {
-		t.Log(line)
+		test.Log(line)
 	}
 
 	// Zero failed is the assertion that matters, and it is a stronger claim than a pass count.
@@ -105,7 +105,7 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 	// inside its stated scope, which is the only outcome in this harness that is a defect in cohere
 	// rather than a fact about the corpus.
 	if counts[react_conformance.VerdictFailed] != 0 {
-		t.Errorf("react/globals failed %d fixtures inside its own stated scope", counts[react_conformance.VerdictFailed])
+		test.Errorf("react/globals failed %d fixtures inside its own stated scope", counts[react_conformance.VerdictFailed])
 	}
 
 	// And the honest half: today the rule passes none of them. Asserted so the zero is a recorded
@@ -113,10 +113,10 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 	// day a scope decision closes one of these divergences, this test fails and someone updates the
 	// number deliberately instead of the improvement passing unnoticed.
 	if got := counts[react_conformance.VerdictPassed]; got != 0 {
-		t.Errorf("react/globals now passes %d of React's own goldens, was 0; update this number and the statedDivergences entries it came from", got)
+		test.Errorf("react/globals now passes %d of React's own goldens, was 0; update this number and the statedDivergences entries it came from", got)
 	}
 	if got := counts[react_conformance.VerdictStatedDivergence]; got != 11 {
-		t.Errorf("stated divergences among the pure globals fixtures = %d, want 11", got)
+		test.Errorf("stated divergences among the pure globals fixtures = %d, want 11", got)
 	}
 }
 
@@ -125,15 +125,15 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(t *testing.T) {
 // A harness that scored everything as a pass would satisfy the floor above. This gives the same
 // machinery a rule that reports nothing and requires the fixtures to fail, so pass and fail are
 // both shown to be reachable through the real path rather than through constructed doubles.
-func TestScoringHarnessCanFail(t *testing.T) {
-	t.Parallel()
+func TestScoringHarnessCanFail(test *testing.T) {
+	test.Parallel()
 	if testing.Short() {
-		t.Skip("builds a TypeScript program per fixture")
+		test.Skip("builds a TypeScript program per fixture")
 	}
 
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+		test.Fatalf("loading the corpus: %v", err)
 	}
 
 	silent := RuleUnderTest{Upstream: "globals", Rule: rule.Rule{
@@ -150,10 +150,10 @@ func TestScoringHarnessCanFail(t *testing.T) {
 		if !complete || len(rules) != 1 || rules[0] != "globals" {
 			continue
 		}
-		result, analyzeErr := Analyze(silent, fixture, t.TempDir())
+		result, analyzeErr := Analyze(silent, fixture, test.TempDir())
 		verdict := react_conformance.Classify(fixture, result, analyzeErr)
 		if verdict.Verdict == react_conformance.VerdictPassed {
-			t.Errorf("%s: a rule that reports nothing scored a pass", fixture.Name)
+			test.Errorf("%s: a rule that reports nothing scored a pass", fixture.Name)
 		}
 		checked++
 		if checked >= 3 {
@@ -161,7 +161,7 @@ func TestScoringHarnessCanFail(t *testing.T) {
 		}
 	}
 	if checked == 0 {
-		t.Fatal("checked nothing, so this proves nothing")
+		test.Fatal("checked nothing, so this proves nothing")
 	}
 }
 
@@ -171,11 +171,11 @@ func TestScoringHarnessCanFail(t *testing.T) {
 // checkable: the upstream text must be one the corpus actually contains, and it must attribute back
 // to the rule the id belongs to. An entry that fails either half is a join made by resemblance, and
 // it would manufacture failures on fixtures the rule never had a chance at.
-func TestUpstreamMessageJoinIsNotByResemblance(t *testing.T) {
-	t.Parallel()
+func TestUpstreamMessageJoinIsNotByResemblance(test *testing.T) {
+	test.Parallel()
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+		test.Fatalf("loading the corpus: %v", err)
 	}
 
 	present := map[string]bool{}
@@ -187,22 +187,22 @@ func TestUpstreamMessageJoinIsNotByResemblance(t *testing.T) {
 
 	for id, message := range Rules["globals"].Messages {
 		if !present[message.Text] {
-			t.Errorf("%s maps to %q, which no golden in the corpus contains", id, message.Text)
+			test.Errorf("%s maps to %q, which no golden in the corpus contains", id, message.Text)
 		}
 		category, found := react_conformance.CategoryForMessage(message.Text)
 		if !found {
-			t.Errorf("%s maps to a message with no category", id)
+			test.Errorf("%s maps to a message with no category", id)
 			continue
 		}
 		heading, _ := react_conformance.HeadingForCategory(category)
 		if heading != message.Heading {
-			t.Errorf("%s claims heading %q but category %s prints %q", id, message.Heading, category, heading)
+			test.Errorf("%s claims heading %q but category %s prints %q", id, message.Heading, category, heading)
 		}
 		if !strings.Contains(strings.ToLower(id), "global") {
 			continue
 		}
 		if ruleName, _ := react_conformance.RuleForCategory(category); ruleName != "globals" {
-			t.Errorf("%s attributes to rule %q rather than globals", id, ruleName)
+			test.Errorf("%s attributes to rule %q rather than globals", id, ruleName)
 		}
 	}
 }

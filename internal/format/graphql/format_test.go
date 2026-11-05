@@ -140,44 +140,44 @@ func formatOptionSets() map[string]formatoptions.Options {
 	}
 }
 
-func TestFormatMatchesTheFork(t *testing.T) {
-	t.Parallel()
+func TestFormatMatchesTheFork(test *testing.T) {
+	test.Parallel()
 	for optionsName, options := range formatOptionSets() {
 		oracle, err := prettier.New(options)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		for _, testCase := range formatCases {
 			expected, err := oracle.Format("Probe.graphql", testCase.source)
 			if err != nil {
-				t.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
+				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
 			}
 			if expected == testCase.source {
-				t.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
+				test.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
 			}
 			for _, substring := range testCase.contains {
 				if !strings.Contains(expected, substring) {
-					t.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
+					test.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
 				}
 			}
 			actual, err := Format(testCase.source, options)
 			if err != nil {
-				t.Errorf("%s (%s): %v", testCase.name, optionsName, err)
+				test.Errorf("%s (%s): %v", testCase.name, optionsName, err)
 				continue
 			}
 			if actual != expected {
-				t.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
+				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", testCase.name, optionsName, expected, actual)
 			}
 		}
 	}
 }
 
 // The option sets have to change the output somewhere, or running under them proves nothing.
-func TestOptionSetsChangeTheOutput(t *testing.T) {
-	t.Parallel()
+func TestOptionSetsChangeTheOutput(test *testing.T) {
+	test.Parallel()
 	defaults, err := Format(formatCases[2].source, formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for optionsName, options := range formatOptionSets() {
 		if optionsName == "defaults" {
@@ -193,51 +193,51 @@ func TestOptionSetsChangeTheOutput(t *testing.T) {
 			}
 		}
 		if !changed {
-			t.Errorf("%s printed every case as the defaults do", optionsName)
+			test.Errorf("%s printed every case as the defaults do", optionsName)
 		}
 	}
 	if !strings.Contains(defaults, "{ k: 1, l: { m: 2 } }") {
-		t.Errorf("bracketSpacing true lost its spaces:\n%s", defaults)
+		test.Errorf("bracketSpacing true lost its spaces:\n%s", defaults)
 	}
 }
 
 // What graphql-js refuses, both refuse: an empty selection set, an empty argument list, and a description
 // on a shorthand query.
-func TestFormatRefusesWhatTheForkRefuses(t *testing.T) {
-	t.Parallel()
+func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
+	test.Parallel()
 	oracle, err := prettier.New(formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, source := range []string{"query { }\n", "query { a() }\n", "\"description\" { a }\n", "type T { a: }\n"} {
 		if _, err := oracle.Format("Probe.graphql", source); err == nil {
-			t.Fatalf("the oracle accepted %q", source)
+			test.Fatalf("the oracle accepted %q", source)
 		}
 		if formatted, err := Format(source, formatoptions.Default()); err == nil {
-			t.Errorf("%q was printed instead of refused:\n%s", source, formatted)
+			test.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
 }
 
 // PrintToDoc is the same doc without its trailing hardline, which is what the TypeScript embed lays out.
-func TestPrintToDocIsFormatWithoutTheTrailingHardline(t *testing.T) {
-	t.Parallel()
+func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
+	test.Parallel()
 	options := formatoptions.Default()
 	for _, testCase := range formatCases {
 		formatted, err := Format(testCase.source, options)
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		document, err := PrintToDoc(testCase.source, options)
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		printed := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
 		if printed != strings.TrimSuffix(formatted, "\n") {
-			t.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
+			test.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
 		}
 	}
 	if _, err := PrintToDoc("query { }", options); err == nil {
-		t.Error("PrintToDoc printed an empty selection set instead of refusing it")
+		test.Error("PrintToDoc printed an empty selection set instead of refusing it")
 	}
 }

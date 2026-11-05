@@ -26,14 +26,14 @@ func harnessSource(source string) string {
 // The assertion is on the rendered message rather than only the id, because the message names the
 // unsafe variables and their order, and that list is the rule's actual output. A rule finding the
 // right function while naming the wrong variable passes an id fixture.
-func TestNoLoopFuncFires(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range loopFuncFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "unsafeRefs")
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "unsafeRefs")
 
 			// Upstream renders "...unsafe references to variable(s) 'i', 'j'." Ours says why first
 			// and names the same list in the same order, so the assertion is on that list, spelled
@@ -41,7 +41,7 @@ func TestNoLoopFuncFires(t *testing.T) {
 			wantSuffix := "The unsafe reference is to " + testCase.unsafeVariables + "."
 			got := result.Diagnostics[0].Message.Description
 			if !strings.HasSuffix(got, wantSuffix) {
-				t.Errorf("message: got %q, want it to end with %q", got, wantSuffix)
+				test.Errorf("message: got %q, want it to end with %q", got, wantSuffix)
 			}
 		})
 	}
@@ -52,14 +52,14 @@ func TestNoLoopFuncFires(t *testing.T) {
 // This half carries the discrimination. A rule that reports any function inside a loop passes most
 // of the firing table and fails here on every `let` case, every `const` case, every undeclared
 // name, every immediately invoked function, and every variable nothing ever writes.
-func TestNoLoopFuncStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range loopFuncCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source))
 		})
 	}
 }
@@ -69,8 +69,8 @@ func TestNoLoopFuncStaysSilent(t *testing.T) {
 // Upstream reports on the function node, so the span runs from the function's first token to its
 // last. No message-id fixture can see this, and the rule carries no fix, so this is the only thing
 // that pins it.
-func TestNoLoopFuncSpans(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -100,15 +100,15 @@ func TestNoLoopFuncSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "unsafeRefs")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			// Sliced out of the source the harness wrote, not out of the Go literal.
 			onDisk := harnessSource(testCase.source)
 			got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != testCase.want {
-				t.Errorf("span: got %q, want %q", got, testCase.want)
+				test.Errorf("span: got %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -120,28 +120,28 @@ func TestNoLoopFuncSpans(t *testing.T) {
 // Asserted against literals typed here rather than against the rule's own constant, because
 // comparing a diagnostic to the constant it was built from is an equality both sides of which move
 // together under mutation.
-func TestNoLoopFuncMessage(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, "for (var i=0; i<l; i++) { (function() { i; }) }")
-	rule_testing.ExpectFindings(t, result, "unsafeRefs")
+	result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, "for (var i=0; i<l; i++) { (function() { i; }) }")
+	rule_testing.ExpectFindings(test, result, "unsafeRefs")
 	message := result.Diagnostics[0].Message
 
 	if message.Id != "unsafeRefs" {
-		t.Errorf("message id: got %q, want %q", message.Id, "unsafeRefs")
+		test.Errorf("message id: got %q, want %q", message.Id, "unsafeRefs")
 	}
 	const wantPrefix = "This function is created inside a loop and closes over a variable the loop reassigns,"
 	if !strings.HasPrefix(message.Description, wantPrefix) {
-		t.Errorf("description: got %q, want it to start with %q", message.Description, wantPrefix)
+		test.Errorf("description: got %q, want it to start with %q", message.Description, wantPrefix)
 	}
 	const wantSuffix = "The unsafe reference is to 'i'."
 	if !strings.HasSuffix(message.Description, wantSuffix) {
-		t.Errorf("description: got %q, want it to end with %q", message.Description, wantSuffix)
+		test.Errorf("description: got %q, want it to end with %q", message.Description, wantSuffix)
 	}
 	// The interpolated tail must not be doubled or mangled, which a prefix and a suffix check
 	// together cannot see on their own. One occurrence of the variable name is the property meant.
 	if strings.Count(message.Description, "'i'") != 1 {
-		t.Errorf("description names 'i' %d times, want 1: %q",
+		test.Errorf("description names 'i' %d times, want 1: %q",
 			strings.Count(message.Description, "'i'"), message.Description)
 	}
 }
@@ -152,19 +152,19 @@ func TestNoLoopFuncMessage(t *testing.T) {
 // missing its guard goes silently inert instead of announcing itself. Every StaysSilent case would
 // then pass vacuously. This asserts the plain harness produces nothing on an input the typed
 // harness reports, so a later revert of the guard fails loudly rather than going quiet.
-func TestNoLoopFuncRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "for (var i=0; i<l; i++) { (function() { i; }) }"
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, source), "unsafeRefs")
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, source), "unsafeRefs")
 
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoLoopFunc, loopFuncFile, source))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoLoopFunc, loopFuncFile, source))
 
 	if !NoLoopFunc.NeedsTypeChecker {
-		t.Error("the rule must declare NeedsTypeChecker, or the live run hands it a nil checker")
+		test.Error("the rule must declare NeedsTypeChecker, or the live run hands it a nil checker")
 	}
 }
 
@@ -182,8 +182,8 @@ func TestNoLoopFuncRequiresTheTypedHarness(t *testing.T) {
 // that write and then re-enter the inner loop.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoLoopFuncBorderIsTheOutermostLoop(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncBorderIsTheOutermostLoop(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -213,13 +213,13 @@ func TestNoLoopFuncBorderIsTheOutermostLoop(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "unsafeRefs")
+				rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -239,8 +239,8 @@ func TestNoLoopFuncBorderIsTheOutermostLoop(t *testing.T) {
 // reports.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -265,13 +265,13 @@ func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "unsafeRefs")
+				rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -293,8 +293,8 @@ func TestNoLoopFuncLetDeclarationStopsTheBorderClimb(t *testing.T) {
 // a function there IS in the loop, and only the initializer is outside.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -334,13 +334,13 @@ func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "unsafeRefs")
+				rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -363,8 +363,8 @@ func TestNoLoopFuncHeadPositionsThatAreOutsideTheLoop(t *testing.T) {
 // still reports, and names the variable once rather than twice.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoLoopFuncPropertyNamesAreNotReferences(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncPropertyNamesAreNotReferences(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -394,18 +394,18 @@ func TestNoLoopFuncPropertyNamesAreNotReferences(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if !testCase.fires {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unsafeRefs")
+			rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			const want = "The unsafe reference is to 'u'."
 			got := result.Diagnostics[0].Message.Description
 			if !strings.HasSuffix(got, want) {
-				t.Errorf("message: got %q, want it to end with %q", got, want)
+				test.Errorf("message: got %q, want it to end with %q", got, want)
 			}
 		})
 	}
@@ -427,8 +427,8 @@ func TestNoLoopFuncPropertyNamesAreNotReferences(t *testing.T) {
 // whichever declaration carries it rather than only on a canonical one.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoLoopFuncMergedVariableDeclarations(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncMergedVariableDeclarations(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -453,13 +453,13 @@ func TestNoLoopFuncMergedVariableDeclarations(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "unsafeRefs")
+				rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -475,12 +475,12 @@ func TestNoLoopFuncMergedVariableDeclarations(t *testing.T) {
 // the gap to matter a loop boundary would have to fall inside it. What this row does pin is the
 // behaviour itself, a `let` declared in a loop body with a write after the inner loop, measured
 // against the installed eslint 10.8.1 build.
-func TestNoLoopFuncLetStatementRangeIncludesItsSemicolon(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncLetStatementRangeIncludesItsSemicolon(test *testing.T) {
+	test.Parallel()
 
 	const source = "for (var a=0;a<3;a++) { let x; for (var b=0;b<3;b++) { (function(){ x; }) } x = 1; }"
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, source), "unsafeRefs")
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, source), "unsafeRefs")
 }
 
 // TestNoLoopFuncDestructuredBindingsCarryTheirKind covers a false positive the corpus cannot see.
@@ -498,8 +498,8 @@ func TestNoLoopFuncLetStatementRangeIncludesItsSemicolon(t *testing.T) {
 // The `var` row is what keeps the repair honest: the climb must read the kind, not assume safety.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncDestructuredBindingsCarryTheirKind(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -534,13 +534,13 @@ func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "unsafeRefs")
+				rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -560,8 +560,8 @@ func TestNoLoopFuncDestructuredBindingsCarryTheirKind(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build: all eleven rows report, and before the
 // listener was widened cohere reported two of them.
-func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncJudgesEveryMethodLikeShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -581,14 +581,14 @@ func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "unsafeRefs")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			const want = "The unsafe reference is to 'u'."
 			got := result.Diagnostics[0].Message.Description
 			if !strings.HasSuffix(got, want) {
-				t.Errorf("message: got %q, want it to end with %q", got, want)
+				test.Errorf("message: got %q, want it to end with %q", got, want)
 			}
 		})
 	}
@@ -601,8 +601,8 @@ func TestNoLoopFuncJudgesEveryMethodLikeShape(t *testing.T) {
 // them must stay silent for the same reasons a plain function expression would.
 //
 // Measured against the installed eslint 10.8.1 build: silent on all of them.
-func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -617,10 +617,10 @@ func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source))
 		})
 	}
 }
@@ -633,19 +633,19 @@ func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build: the inner arrow is NOT reported, because its
 // containing function is the method rather than the loop, and only the method itself is.
-func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(test *testing.T) {
+	test.Parallel()
 
 	const source = "var u; for (var i=0;i<3;i++) { g({ m() { return () => u; } }); } u = 1;"
-	result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, source)
-	rule_testing.ExpectFindings(t, result, "unsafeRefs")
+	result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, source)
+	rule_testing.ExpectFindings(test, result, "unsafeRefs")
 
 	// The finding is on the method, not on the arrow inside it.
 	onDisk := harnessSource(source)
 	got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	const want = "m() { return () => u; }"
 	if got != want {
-		t.Errorf("span: got %q, want %q", got, want)
+		test.Errorf("span: got %q, want %q", got, want)
 	}
 }
 
@@ -665,8 +665,8 @@ func TestNoLoopFuncNestedClosureInsideAMethodAnchorsOnTheMethod(t *testing.T) {
 // if someone narrowed either of them to match an upstream node boundary.
 //
 // Asserted here so the choice cannot be quietly narrowed back to upstream's node boundaries.
-func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncMethodSpanIncludesTheName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -696,14 +696,14 @@ func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "unsafeRefs")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			onDisk := harnessSource(testCase.source)
 			got := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if got != testCase.want {
-				t.Errorf("span: got %q, want %q", got, testCase.want)
+				test.Errorf("span: got %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -711,17 +711,17 @@ func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 	// The convention, asserted across two rules rather than described. `require-yield` anchors on
 	// the same node for the same reason and predates this rule; if either is narrowed to an
 	// upstream node boundary, this stops holding.
-	t.Run("require-yield anchors a method the same way", func(t *testing.T) {
-		t.Parallel()
+	test.Run("require-yield anchors a method the same way", func(test *testing.T) {
+		test.Parallel()
 		const source = "const o = { *onStatement(sql) { return 1; } };"
-		result := rule_testing.Run(t, RequireYield, loopFuncFile, source)
+		result := rule_testing.Run(test, RequireYield, loopFuncFile, source)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("expected 1 finding from require-yield, got %d", len(result.Diagnostics))
+			test.Fatalf("expected 1 finding from require-yield, got %d", len(result.Diagnostics))
 		}
 		got := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		const want = "*onStatement(sql) { return 1; }"
 		if got != want {
-			t.Errorf("require-yield span: got %q, want %q", got, want)
+			test.Errorf("require-yield span: got %q, want %q", got, want)
 		}
 	})
 }
@@ -734,8 +734,8 @@ func TestNoLoopFuncMethodSpanIncludesTheName(t *testing.T) {
 //
 // Measured against the installed eslint 10.8.1 build: the plain arrow is clean and the async one
 // reports, so the condition is load-bearing rather than defensive.
-func TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -760,13 +760,13 @@ func TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "unsafeRefs")
+				rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -779,8 +779,8 @@ func TestNoLoopFuncAsyncImmediatelyInvokedIsNotSkipped(t *testing.T) {
 // function past the iteration. Upstream's corpus has the skipped row and not the other one.
 //
 // Measured against the installed eslint 10.8.1 build, both rows.
-func TestNoLoopFuncNamedImmediatelyInvokedReachableByName(t *testing.T) {
-	t.Parallel()
+func TestNoLoopFuncNamedImmediatelyInvokedReachableByName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -800,13 +800,13 @@ func TestNoLoopFuncNamedImmediatelyInvokedReachableByName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoLoopFunc, loopFuncFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoLoopFunc, loopFuncFile, testCase.source)
 			if testCase.fires {
-				rule_testing.ExpectFindings(t, result, "unsafeRefs")
+				rule_testing.ExpectFindings(test, result, "unsafeRefs")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}

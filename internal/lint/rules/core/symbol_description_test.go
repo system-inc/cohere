@@ -15,8 +15,8 @@ const symbolDescriptionFile = "/repository/source/SymbolDescription.ts"
 //
 // Every case string was verified byte against byte against the upstream file by script, and every
 // verdict was reproduced by driving the installed eslint at 10.8.1 before being written here.
-func TestSymbolDescriptionFires(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -27,10 +27,10 @@ func TestSymbolDescriptionFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText), "expected")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText), "expected")
 		})
 	}
 }
@@ -41,8 +41,8 @@ func TestSymbolDescriptionFires(t *testing.T) {
 // The second case is worth naming separately: `Symbol(foo)` passes an argument whose value is not
 // knowable, and upstream counts arguments rather than inspecting them. So a description that is
 // empty at run time is not this rule's business, which is a decision rather than a gap.
-func TestSymbolDescriptionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -57,9 +57,9 @@ func TestSymbolDescriptionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
 		})
 	}
 }
@@ -69,8 +69,8 @@ func TestSymbolDescriptionStaysSilent(t *testing.T) {
 //
 // The parenthesized callee is the one that needs the skip: espree gives parentheses no node, so
 // upstream's `isCallee` already sees through them, and it reports `(Symbol)()` at columns 1 to 11.
-func TestSymbolDescriptionFiresOnCasesBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionFiresOnCasesBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -87,14 +87,14 @@ func TestSymbolDescriptionFiresOnCasesBeyondTheCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "expected"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText), wantIds...)
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText), wantIds...)
 		})
 	}
 }
@@ -107,8 +107,8 @@ func TestSymbolDescriptionFiresOnCasesBeyondTheCorpus(t *testing.T) {
 // clean because the check is `arguments.length === 0` and neither has zero arguments, so a spread
 // that expands to nothing is not seen. And `globalThis.Symbol()` is clean because the identifier
 // there is a property rather than the callee.
-func TestSymbolDescriptionStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -125,9 +125,9 @@ func TestSymbolDescriptionStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
 		})
 	}
 }
@@ -136,8 +136,8 @@ func TestSymbolDescriptionStaysSilentOnCasesBeyondTheCorpus(t *testing.T) {
 // rather than from the corpus. Measured: `Symbol();` reports columns 1 to 9 and `(Symbol)();`
 // reports columns 1 to 11, which are the whole call expression in both cases including the
 // parentheses around the callee.
-func TestSymbolDescriptionSpansTheCall(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionSpansTheCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -150,16 +150,16 @@ func TestSymbolDescriptionSpansTheCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantReported {
-				t.Errorf("the finding points at %q, want %q", reported, testCase.wantReported)
+				test.Errorf("the finding points at %q, want %q", reported, testCase.wantReported)
 			}
 		})
 	}
@@ -171,30 +171,30 @@ func TestSymbolDescriptionSpansTheCall(t *testing.T) {
 //
 // This asserts the typed harness is required, so a later revert to `rule_testing.Run` fails loudly
 // here rather than turning the whole clean set into a vacuous green.
-func TestSymbolDescriptionRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, "Symbol();"), "expected")
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, SymbolDescription, symbolDescriptionFile, "Symbol();"))
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, "Symbol();"), "expected")
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, SymbolDescription, symbolDescriptionFile, "Symbol();"))
 }
 
 // The message text is asserted against a literal typed here rather than against the rule's own
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
-func TestSymbolDescriptionMessage(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, "Symbol();")
+	result := rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, "Symbol();")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "expected" {
-		t.Errorf("message id is %q, want %q", got, "expected")
+		test.Errorf("message id is %q, want %q", got, "expected")
 	}
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This creates a symbol with no description") {
-		t.Errorf("message description starts %q, which is not the sentence this rule reports", got)
+		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 }
 
@@ -204,8 +204,8 @@ func TestSymbolDescriptionMessage(t *testing.T) {
 // A mutation dropping `callee.Text() != "Symbol"` survived every other fixture in this file, because
 // nothing above reached the rule with a global that is not `Symbol`. Each of these resolves to the
 // standard library exactly as `Symbol` does and each is clean upstream, measured.
-func TestSymbolDescriptionStaysSilentOnOtherGlobals(t *testing.T) {
-	t.Parallel()
+func TestSymbolDescriptionStaysSilentOnOtherGlobals(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -222,9 +222,9 @@ func TestSymbolDescriptionStaysSilentOnOtherGlobals(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
 		})
 	}
 }

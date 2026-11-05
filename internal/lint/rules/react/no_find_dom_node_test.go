@@ -29,8 +29,8 @@ const findDOMNodeFile = "/repository/source/FindDomNode.tsx"
 // transcribed, then compared byte against byte. None of the eleven contains a backslash or a
 // backtick, so a Go raw string carries each one unchanged; that was checked rather than assumed,
 // because the tool writing a fixture is exactly what has cooked escapes for three previous porters.
-func TestNoFindDOMNodeFires(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -97,10 +97,10 @@ func TestNoFindDOMNodeFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
 		})
 	}
 }
@@ -112,8 +112,8 @@ func TestNoFindDOMNodeFires(t *testing.T) {
 // nothing else here. The fifth is the other discrimination that matters, `SomeModule.findDOMNode`,
 // which pins that the receiver is checked against a fixed set of three names rather than accepted
 // as any namespace.
-func TestNoFindDOMNodeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -161,10 +161,10 @@ func TestNoFindDOMNodeStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
 		})
 	}
 }
@@ -175,8 +175,8 @@ func TestNoFindDOMNodeStaysSilent(t *testing.T) {
 // receivers, both unparenthesized and both in a component method. So it protects almost none of the
 // discriminations the rule makes, and everything below exists because a mutation or a probe showed
 // the imports could not see it.
-func TestNoFindDOMNodeFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeFiresOnCasesUpstreamDoesNotShip(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -221,17 +221,17 @@ func TestNoFindDOMNodeFiresOnCasesUpstreamDoesNotShip(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, testCase.sourceText), "noFindDOMNode")
 		})
 	}
 }
 
 // The silent cases upstream does not ship. Each was run on oxlint and produced zero findings.
-func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -268,10 +268,10 @@ func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, testCase.sourceText))
 		})
 	}
 }
@@ -282,8 +282,8 @@ func TestNoFindDOMNodeStaysSilentOnCasesUpstreamDoesNotShip(t *testing.T) {
 // the *literal node's* span, so `ReactDOM["findDOMNode"](this)` underlines thirteen bytes including
 // the quotes rather than the eleven of the cooked name. A port reporting the name inside the quotes
 // would be off by one on each side, and every assertion in the two tests above would still pass.
-func TestNoFindDOMNodeReportsTheNameNode(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeReportsTheNameNode(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -303,16 +303,16 @@ func TestNoFindDOMNodeReportsTheNameNode(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noFindDOMNode")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noFindDOMNode")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("reported span = %q, want %q", reported, testCase.want)
+				test.Fatalf("reported span = %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -322,8 +322,8 @@ func TestNoFindDOMNodeReportsTheNameNode(t *testing.T) {
 //
 // Every imported fail case carries exactly one finding, so nothing there can catch a rule that
 // reports the first violation and stops, or one that reports per file.
-func TestNoFindDOMNodeReportsEachCallSeparately(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeReportsEachCallSeparately(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = `class C {
                 a() { findDOMNode(this); }
@@ -331,40 +331,40 @@ func TestNoFindDOMNodeReportsEachCallSeparately(t *testing.T) {
                 c() { React.findDOMNode(this); }
             }`
 
-	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "noFindDOMNode", "noFindDOMNode", "noFindDOMNode")
+	result := rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "noFindDOMNode", "noFindDOMNode", "noFindDOMNode")
 	for index, diagnostic := range result.Diagnostics {
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != "findDOMNode" {
-			t.Fatalf("finding %d reported %q, want %q", index, reported, "findDOMNode")
+			test.Fatalf("finding %d reported %q, want %q", index, reported, "findDOMNode")
 		}
 	}
 }
 
 // A nested call reports at both levels, so the outer match does not consume the inner one.
-func TestNoFindDOMNodeReportsANestedCall(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeReportsANestedCall(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = `findDOMNode(ReactDOM.findDOMNode(this));`
 
-	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "noFindDOMNode", "noFindDOMNode")
+	result := rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "noFindDOMNode", "noFindDOMNode")
 }
 
 // The rendered message is asserted exactly rather than by substring, because a fixture whose
 // predicate is weaker than the property it guards is not a guard.
-func TestNoFindDOMNodeMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoFindDOMNode, findDOMNodeFile, `findDOMNode(this);`)
+	result := rule_testing.Run(test, NoFindDOMNode, findDOMNodeFile, `findDOMNode(this);`)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noFindDOMNode" {
-		t.Fatalf("message id = %q, want %q", got, "noFindDOMNode")
+		test.Fatalf("message id = %q, want %q", got, "noFindDOMNode")
 	}
 	if got := result.Diagnostics[0].Message.Description; got != messageNoFindDOMNode.Description {
-		t.Fatalf("message description = %q, want %q", got, messageNoFindDOMNode.Description)
+		test.Fatalf("message description = %q, want %q", got, messageNoFindDOMNode.Description)
 	}
 }
 
@@ -375,13 +375,13 @@ func TestNoFindDOMNodeMessageText(t *testing.T) {
 // goes completely quiet. Asserting the flag directly fails loudly instead. The rule genuinely does
 // not need it: oxc's `run` reads only the callee's syntax, and the measured behavior on a shadowing
 // parameter and on an aliased import proves no resolution happens.
-func TestNoFindDOMNodeDoesNotNeedTheTypeChecker(t *testing.T) {
-	t.Parallel()
+func TestNoFindDOMNodeDoesNotNeedTheTypeChecker(test *testing.T) {
+	test.Parallel()
 
 	if NoFindDOMNode.NeedsTypeChecker {
-		t.Fatal("no-find-dom-node declares the type checker; it decides on syntax alone")
+		test.Fatal("no-find-dom-node declares the type checker; it decides on syntax alone")
 	}
 	if NoFindDOMNode.Name != "react/no-find-dom-node" {
-		t.Fatalf("rule name = %q, want %q", NoFindDOMNode.Name, "no-find-dom-node")
+		test.Fatalf("rule name = %q, want %q", NoFindDOMNode.Name, "no-find-dom-node")
 	}
 }

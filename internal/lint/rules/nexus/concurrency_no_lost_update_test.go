@@ -143,8 +143,8 @@ func concurrencyNoLostUpdateSource(lines ...string) string {
 // reporting half is Kirk's four shapes from the ruling, then the paths that reach them; the silent
 // half starts with the shapes upstream `require-atomic-updates` reported on ahra (39 findings, none a
 // read-modify-write), reduced, then the near misses the conditions exist to separate.
-func TestConcurrencyNoLostUpdate(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoLostUpdate(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -407,58 +407,58 @@ func TestConcurrencyNoLostUpdate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, testCase.source)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
 			ids := make([]string, testCase.findings)
 			for index := range ids {
 				ids[index] = concurrencyNoLostUpdateId
 			}
-			rule_testing.ExpectFindings(t, result, ids...)
+			rule_testing.ExpectFindings(test, result, ids...)
 		})
 	}
 }
 
 // The finding spans the whole assignment and names the target as written, so the reader is not left
 // to work out which write on the line loses the update.
-func TestConcurrencyNoLostUpdateNamesTheTarget(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoLostUpdateNamesTheTarget(test *testing.T) {
+	test.Parallel()
 
 	source := concurrencyNoLostUpdateSource(
 		"export async function f() { const old = state.count; await save(); state.count = old + 1; }")
-	result := rule_testing.RunTyped(t, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, source)
-	rule_testing.ExpectFindings(t, result, concurrencyNoLostUpdateId)
+	result := rule_testing.RunTyped(test, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, source)
+	rule_testing.ExpectFindings(test, result, concurrencyNoLostUpdateId)
 
 	diagnostic := result.Diagnostics[0]
 	text := result.SourceFile.Text()
 	if got := text[diagnostic.Range.Pos():diagnostic.Range.End()]; strings.TrimSpace(got) != "state.count = old + 1" {
-		t.Fatalf("span: got %q", got)
+		test.Fatalf("span: got %q", got)
 	}
 	if !strings.Contains(diagnostic.Message.Description, "computed from `state.count` as it was") {
-		t.Fatalf("message does not name the target: %q", diagnostic.Message.Description)
+		test.Fatalf("message does not name the target: %q", diagnostic.Message.Description)
 	}
 }
 
 // A store write's finding spans the write call and names the read call whose stale answer it builds
 // on, since the entry has no name of its own to quote.
-func TestConcurrencyNoLostUpdateNamesTheStoreRead(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoLostUpdateNamesTheStoreRead(test *testing.T) {
+	test.Parallel()
 
 	source := concurrencyNoLostUpdateSource(
 		"export async function f(accountKey: string) { const account = getAccount(accountKey); await save(); updateAccount(accountKey, { ...account }); }")
-	result := rule_testing.RunTyped(t, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, source)
-	rule_testing.ExpectFindings(t, result, concurrencyNoLostUpdateId)
+	result := rule_testing.RunTyped(test, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, source)
+	rule_testing.ExpectFindings(test, result, concurrencyNoLostUpdateId)
 
 	diagnostic := result.Diagnostics[0]
 	text := result.SourceFile.Text()
 	if got := text[diagnostic.Range.Pos():diagnostic.Range.End()]; strings.TrimSpace(got) != "updateAccount(accountKey, { ...account })" {
-		t.Fatalf("span: got %q", got)
+		test.Fatalf("span: got %q", got)
 	}
 	if !strings.Contains(diagnostic.Message.Description, "computed from what `getAccount(accountKey)` returned") {
-		t.Fatalf("message does not name the read: %q", diagnostic.Message.Description)
+		test.Fatalf("message does not name the read: %q", diagnostic.Message.Description)
 	}
 }

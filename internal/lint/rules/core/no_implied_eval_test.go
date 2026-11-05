@@ -76,9 +76,9 @@ declare var global: ImpliedEvalGlobalObject;
 `
 
 // runImpliedEvalWithGlobals runs a case in a program that declares the browser globals.
-func runImpliedEvalWithGlobals(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
+func runImpliedEvalWithGlobals(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, NoImpliedEval, map[string]string{
 		"globals.d.ts": impliedEvalAmbientGlobals,
 		"subject.ts":   source,
 	}, "subject.ts")
@@ -86,9 +86,9 @@ func runImpliedEvalWithGlobals(t *testing.T, source string) rule_testing.Result 
 
 // runImpliedEvalWithoutGlobals runs a case in a program that declares none of them, which is what
 // upstream expresses as an absent or empty `globals` block.
-func runImpliedEvalWithoutGlobals(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
+func runImpliedEvalWithoutGlobals(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, NoImpliedEval, map[string]string{
 		"subject.ts": source,
 	}, "subject.ts")
 }
@@ -98,8 +98,8 @@ func runImpliedEvalWithoutGlobals(t *testing.T, source string) rule_testing.Resu
 //
 // The sources are upstream's, taken by evaluating its test module and rendering each string through
 // a Go quoter, so no case here was retyped and none could have been silently cooked on the way in.
-func TestNoImpliedEvalFires(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -182,10 +182,10 @@ func TestNoImpliedEvalFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -193,8 +193,8 @@ func TestNoImpliedEvalFires(t *testing.T) {
 // TestNoImpliedEvalStaysSilentWithGlobalsDeclared carries the 58 valid cases whose root name
 // upstream declared as a global. These are silent for a reason other than the global test: the
 // argument is a function, the call is not a call at all, or the property name does not match.
-func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ source string }{
 		{source: "setTimeout();"},
@@ -258,10 +258,10 @@ func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -272,8 +272,8 @@ func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(t *testing.T) {
 // This is the half of the corpus the rule reads the checker for. Twelve of these are shadows
 // specifically, in every shape that can produce one: a function declaration, a block-scoped const, a
 // parameter, and a nested function whose shadow sits in an enclosing scope.
-func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ source string }{
 		{source: "setTimeout;"},
@@ -318,10 +318,10 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithoutGlobals(t, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithoutGlobals(test, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -348,8 +348,8 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(t *testing.T) {
 // If it ever needs closing, the smallest honest version follows a `const` binding whose initializer
 // is already a string by the syntactic test. That covers the first case and not the second, and it
 // is a much smaller thing than the evaluator.
-func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -363,12 +363,12 @@ func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, testCase.source)
+			rule_testing.ExpectClean(test, result)
 			if len(testCase.upstreamIds) == 0 {
-				t.Errorf("case records no upstream verdict, so the divergence is undocumented")
+				test.Errorf("case records no upstream verdict, so the divergence is undocumented")
 			}
 		})
 	}
@@ -399,8 +399,8 @@ func TestNoImpliedEvalDivergesFromUpstreamOnStaticValues(t *testing.T) {
 // It costs nothing on this tree: `globalThis` appears in no eval-like call anywhere in ahra, and
 // both shapes are ones upstream itself reports at any current ecma version, which is every version
 // this codebase compiles under.
-func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -423,12 +423,12 @@ func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(t *testing.T) 
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, testCase.source)
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, testCase.source)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 			if testCase.upstreamEcmaVersion == "" {
-				t.Errorf("case records no upstream version gate, so the divergence is undocumented")
+				test.Errorf("case records no upstream version gate, so the divergence is undocumented")
 			}
 		})
 	}
@@ -451,8 +451,8 @@ func TestNoImpliedEvalReportsGlobalThisUpstreamGatesByEcmaVersion(t *testing.T) 
 // eslint 10.8.1 with each name declared: `document.setTimeout('x')`, `navigator.setTimeout('x')` and
 // `top.setTimeout('x')` all report zero, while `window.setTimeout('x')` reports one, with nothing
 // else changed between the runs.
-func TestNoImpliedEvalDeclinesAGlobalReceiverOutsideTheCandidateSet(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalDeclinesAGlobalReceiverOutsideTheCandidateSet(test *testing.T) {
+	test.Parallel()
 
 	// A program declaring three globals that are NOT global-object candidates, each carrying a
 	// method with an eval-like name. Without these declarations the receiver would be declined for
@@ -474,25 +474,25 @@ declare var top: ImpliedEvalOrdinaryObject;
 		"top.execScript('x = 1;')",
 	}
 	for _, source := range silent {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, NoImpliedEval, map[string]string{
 				"globals.d.ts": nonCandidateGlobals,
 				"subject.ts":   source,
 			}, "subject.ts")
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// The control for the four cases above: the same shape with a candidate receiver reports, so
 	// their silence is the name check rather than the program being wrong or the rule being inert.
-	t.Run("control: a candidate receiver in the same program reports", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
+	test.Run("control: a candidate receiver in the same program reports", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedFiles(test, NoImpliedEval, map[string]string{
 			"globals.d.ts": nonCandidateGlobals + impliedEvalAmbientGlobals,
 			"subject.ts":   "window.setTimeout('x = 1;')",
 		}, "subject.ts")
-		rule_testing.ExpectFindings(t, result, "impliedEval")
+		rule_testing.ExpectFindings(test, result, "impliedEval")
 	})
 }
 
@@ -513,8 +513,8 @@ declare var top: ImpliedEvalOrdinaryObject;
 //
 // Found by mutation: removing the guard survived all 175 imported cases, because the corpus writes
 // no bracketed variable key anywhere.
-func TestNoImpliedEvalDeclinesAVariableBracketKey(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalDeclinesAVariableBracketKey(test *testing.T) {
+	test.Parallel()
 
 	silent := []string{
 		"window[setTimeout]('x = 1;')",
@@ -522,19 +522,19 @@ func TestNoImpliedEvalDeclinesAVariableBracketKey(t *testing.T) {
 		"self[setTimeout]('x = 1;')",
 	}
 	for _, source := range silent {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// The control: the same receiver and the same property, spelled as a string, reports. Without
 	// this the four cases above would pass equally well against a rule that had gone inert.
-	t.Run("control: the same property as a string key reports", func(t *testing.T) {
-		t.Parallel()
-		result := runImpliedEvalWithGlobals(t, "window['setTimeout']('x = 1;')")
-		rule_testing.ExpectFindings(t, result, "impliedEval")
+	test.Run("control: the same property as a string key reports", func(test *testing.T) {
+		test.Parallel()
+		result := runImpliedEvalWithGlobals(test, "window['setTimeout']('x = 1;')")
+		rule_testing.ExpectFindings(test, result, "impliedEval")
 	})
 }
 
@@ -552,8 +552,8 @@ func TestNoImpliedEvalDeclinesAVariableBracketKey(t *testing.T) {
 // the four candidates. Measured against eslint 10.8.1 with `window`, `document`, `foo` and
 // `setTimeout` declared: `window.document.setTimeout('x')` and `window.foo.setTimeout('x')` report
 // zero, `window.window.setTimeout('x')` reports one.
-func TestNoImpliedEvalStopsTheReceiverWalkAtANonCandidateLink(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalStopsTheReceiverWalkAtANonCandidateLink(test *testing.T) {
+	test.Parallel()
 
 	// The candidate object carries a `document` property so the middle link resolves to a real
 	// settled name rather than to nothing, which is what makes this test the link check and not the
@@ -570,9 +570,9 @@ declare var window: ImpliedEvalChainObject;
 declare var self: ImpliedEvalChainObject;
 `
 
-	run := func(t *testing.T, source string) rule_testing.Result {
-		t.Helper()
-		return rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
+	run := func(test *testing.T, source string) rule_testing.Result {
+		test.Helper()
+		return rule_testing.RunTypedFiles(test, NoImpliedEval, map[string]string{
 			"globals.d.ts": chainGlobals,
 			"subject.ts":   source,
 		}, "subject.ts")
@@ -585,9 +585,9 @@ declare var self: ImpliedEvalChainObject;
 		"window.document['setTimeout']('x = 1;')",
 	}
 	for _, source := range silent {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, run(t, source))
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, run(test, source))
 		})
 	}
 
@@ -597,9 +597,9 @@ declare var self: ImpliedEvalChainObject;
 		"window.window.setTimeout('x = 1;')",
 		"self.self.setInterval('x = 1;')",
 	} {
-		t.Run("control: "+source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, run(t, source), "impliedEval")
+		test.Run("control: "+source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, run(test, source), "impliedEval")
 		})
 	}
 }
@@ -623,8 +623,8 @@ declare var self: ImpliedEvalChainObject;
 //
 // The unwrap is a loop rather than a single step because the wrapping nests, and the nil check is
 // written out rather than delegated to `ast.SkipParentheses`, which dereferences its argument.
-func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(test *testing.T) {
+	test.Parallel()
 
 	firing := []string{
 		"setTimeout(('x = 1;'))",
@@ -635,10 +635,10 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
 		"window.setTimeout(('x = 1;'))",
 	}
 	for _, source := range firing {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, source)
-			rule_testing.ExpectFindings(t, result, "impliedEval")
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, source)
+			rule_testing.ExpectFindings(test, result, "impliedEval")
 		})
 	}
 
@@ -648,9 +648,9 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
 		"setTimeout((foo))",
 		"setTimeout((function() {}))",
 	} {
-		t.Run("control: "+source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runImpliedEvalWithGlobals(t, source))
+		test.Run("control: "+source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runImpliedEvalWithGlobals(test, source))
 		})
 	}
 }
@@ -671,8 +671,8 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheArgument(t *testing.T) {
 //
 // Only the chain ROOT can carry parentheses. A middle link cannot: `window.(self).setTimeout` is not
 // syntax, so the unwrap inside the walk loop matters on the first turn and is inert afterwards.
-func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(test *testing.T) {
+	test.Parallel()
 
 	firing := []string{
 		"(window).setTimeout('x = 1;')",
@@ -682,19 +682,19 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(t *testing.T) {
 		"(self).setInterval('x = 1;')",
 	}
 	for _, source := range firing {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, source)
-			rule_testing.ExpectFindings(t, result, "impliedEval")
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, source)
+			rule_testing.ExpectFindings(test, result, "impliedEval")
 		})
 	}
 
 	// The control: a parenthesized receiver that is not a global-object candidate stays silent, so
 	// the cases above are the unwrap reaching a candidate rather than parentheses being waved
 	// through.
-	t.Run("control: a parenthesized non-candidate receiver stays silent", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, runImpliedEvalWithGlobals(t, "(foo).setTimeout('x = 1;')"))
+	test.Run("control: a parenthesized non-candidate receiver stays silent", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, runImpliedEvalWithGlobals(test, "(foo).setTimeout('x = 1;')"))
 	})
 }
 
@@ -710,23 +710,23 @@ func TestNoImpliedEvalReadsThroughParenthesesOnTheReceiver(t *testing.T) {
 // per node. `NeedsTypeChecker` governs the registration path only: a `rule.Context` built by hand
 // still arrives with a nil checker, and `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` builds
 // exactly that.
-func TestNoImpliedEvalRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoImpliedEval.NeedsTypeChecker {
-		t.Fatalf("this rule resolves an identifier to its declaration and must declare NeedsTypeChecker")
+		test.Fatalf("this rule resolves an identifier to its declaration and must declare NeedsTypeChecker")
 	}
 
 	// The untyped harness hands the rule a nil checker. It must decline rather than guess.
-	if result := rule_testing.Run(t, NoImpliedEval, "input.ts", `setTimeout("x = 1;");`); len(result.Diagnostics) != 0 {
-		t.Errorf("the untyped harness must produce no findings, got %d", len(result.Diagnostics))
+	if result := rule_testing.Run(test, NoImpliedEval, "input.ts", `setTimeout("x = 1;");`); len(result.Diagnostics) != 0 {
+		test.Errorf("the untyped harness must produce no findings, got %d", len(result.Diagnostics))
 	}
 
 	// The control for that zero: the same source through the typed harness, in a program that
 	// declares the global, reaches one finding. Without this the assertion above would pass equally
 	// well against a rule that had stopped working entirely.
-	if result := runImpliedEvalWithGlobals(t, `setTimeout("x = 1;");`); len(result.Diagnostics) != 1 {
-		t.Errorf("the typed harness must reach one finding, got %d", len(result.Diagnostics))
+	if result := runImpliedEvalWithGlobals(test, `setTimeout("x = 1;");`); len(result.Diagnostics) != 1 {
+		test.Errorf("the typed harness must reach one finding, got %d", len(result.Diagnostics))
 	}
 }
 
@@ -739,8 +739,8 @@ func TestNoImpliedEvalRequiresTheTypedHarness(t *testing.T) {
 //
 // The other shapes here are calls whose callee is a bare keyword rather than a name, which reach the
 // listener as ordinary call expressions and have crashed rules in this tree before.
-func TestNoImpliedEvalDoesNotCrashOnACallWithNoArguments(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalDoesNotCrashOnACallWithNoArguments(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"setTimeout();",
@@ -751,11 +751,11 @@ func TestNoImpliedEvalDoesNotCrashOnACallWithNoArguments(t *testing.T) {
 		"const x = (function () {})();",
 	}
 	for _, source := range sources {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
 			// Not asserting the verdict, only that the rule survives the shape. A panic here takes
 			// every rule's verdict on the file, not just this one's.
-			runImpliedEvalWithGlobals(t, source)
+			runImpliedEvalWithGlobals(test, source)
 		})
 	}
 }
@@ -766,8 +766,8 @@ func TestNoImpliedEvalDoesNotCrashOnACallWithNoArguments(t *testing.T) {
 // node or rendering the wrong sentence passes a complete fixture pair while being wrong. Upstream
 // reports the CallExpression rather than the callee or the argument, and this asserts that by
 // slicing the source with the finding's own range.
-func TestNoImpliedEvalReportsTheWholeCallAndSaysWhy(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalReportsTheWholeCallAndSaysWhy(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source      string
@@ -796,11 +796,11 @@ func TestNoImpliedEvalReportsTheWholeCallAndSaysWhy(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runImpliedEvalWithGlobals(t, testCase.source)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runImpliedEvalWithGlobals(test, testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 
@@ -808,19 +808,19 @@ func TestNoImpliedEvalReportsTheWholeCallAndSaysWhy(t *testing.T) {
 			// span offsets index this same string.
 			reported := testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.wantSpan {
-				t.Errorf("finding points at %q, want %q", reported, testCase.wantSpan)
+				test.Errorf("finding points at %q, want %q", reported, testCase.wantSpan)
 			}
 			if diagnostic.Message.Id != testCase.wantId {
-				t.Errorf("message id is %q, want %q", diagnostic.Message.Id, testCase.wantId)
+				test.Errorf("message id is %q, want %q", diagnostic.Message.Id, testCase.wantId)
 			}
 			for _, phrase := range testCase.wantPhrases {
 				if !strings.Contains(diagnostic.Message.Description, phrase) {
-					t.Errorf("description does not mention %q: %s", phrase, diagnostic.Message.Description)
+					test.Errorf("description does not mention %q: %s", phrase, diagnostic.Message.Description)
 				}
 			}
 			// The description must say why rather than restate the rule name.
 			if len(diagnostic.Message.Description) < 40 {
-				t.Errorf("description is too short to explain the problem: %q", diagnostic.Message.Description)
+				test.Errorf("description is too short to explain the problem: %q", diagnostic.Message.Description)
 			}
 		})
 	}

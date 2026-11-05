@@ -21,11 +21,11 @@ import (
 //   - a kind only a.ts listened for is not called on b.ts, which has that kind and listens for nothing;
 //   - a.ts's suppression does not silence the finding at the same place in b.ts;
 //   - each file's notes are its own, not a running total.
-func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
-	t.Parallel()
+func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
+	test.Parallel()
 	// The same layout in each file, so a finding in b.ts or c.ts sits where a.ts's directive covers.
 	declarations := "export const first = 1;\nexport function second(): void {}\n"
-	directory := writeProject(t, map[string]string{
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json":       minimalConfig,
 		"CohereSettings.json": `{"rules": {"test-run-crashes-on-a": "error", "test-listener-crashes-on-a": "error", "test-functions-only-in-a": "error", "test-notes": "error"}}`,
 		"a.ts":                "// cohere-disable-next-line test-run-crashes-on-a -- covers a.ts alone\n" + declarations,
@@ -34,14 +34,14 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	if graph.Workers() != 1 {
-		t.Fatalf("the walk has %d workers, so files need not meet each other's leftovers", graph.Workers())
+		test.Fatalf("the walk has %d workers, so files need not meet each other's leftovers", graph.Workers())
 	}
 	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+		test.Fatalf("loading the config: %v", err)
 	}
 
 	isA := func(ctx rule.Context) bool { return filepath.Base(ctx.SourceFile.FileName().AsString()) == "a.ts" }
@@ -90,7 +90,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{runCrashes, listenerCrashes, functionsOnlyInA, notes})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 
 	reported := map[string][]string{}
@@ -104,7 +104,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 		"c.ts": {"test-listener-crashes-on-a: saw a constant", "test-run-crashes-on-a: saw a constant"},
 	}
 	if !reflect.DeepEqual(reported, want) {
-		t.Errorf("the findings by file are %v, want %v", reported, want)
+		test.Errorf("the findings by file are %v, want %v", reported, want)
 	}
 
 	crashed := []string{}
@@ -112,7 +112,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 		crashed = append(crashed, crash.RuleName+" on "+filepath.Base(crash.FileName))
 	}
 	if want := []string{"test-run-crashes-on-a on a.ts", "test-listener-crashes-on-a on a.ts"}; !sameMembers(crashed, want) {
-		t.Errorf("the crashes are %v, want %v", crashed, want)
+		test.Errorf("the crashes are %v, want %v", crashed, want)
 	}
 
 	wantNotes := map[string]program.RuleNotes{}
@@ -120,22 +120,22 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(t *testing.T) {
 		wantNotes[filepath.Join(directory, file)] = program.RuleNotes{"test-notes": {"constant": 1}}
 	}
 	if !reflect.DeepEqual(result.Notes, wantNotes) {
-		t.Errorf("the notes are %v, want %v", result.Notes, wantNotes)
+		test.Errorf("the notes are %v, want %v", result.Notes, wantNotes)
 	}
 }
 
 // A Context is good only while its file is dispatched. A rule that kept its Report and called it after the
 // walk would file a finding against whatever file the worker held, so the call panics, naming the rule,
 // instead of filing one anywhere.
-func TestAReportKeptPastItsFilePanicsNamingTheRule(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestAReportKeptPastItsFilePanicsNamingTheRule(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"main.ts":       "export const kept = 1;\n",
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	var kept func(rule.Diagnostic)
@@ -147,19 +147,19 @@ func TestAReportKeptPastItsFilePanicsNamingTheRule(t *testing.T) {
 		},
 	}
 	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{keeper}); err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 	if kept == nil {
-		t.Fatal("the rule never ran, so there is no Report to call late")
+		test.Fatal("the rule never ran, so there is no Report to call late")
 	}
 
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
-			t.Fatal("a Report called after its file's dispatch filed a finding instead of panicking")
+			test.Fatal("a Report called after its file's dispatch filed a finding instead of panicking")
 		}
 		if message, _ := recovered.(string); !strings.Contains(message, "test-keeps-its-report") {
-			t.Errorf("the panic does not name the rule: %v", recovered)
+			test.Errorf("the panic does not name the rule: %v", recovered)
 		}
 	}()
 	kept(rule.Diagnostic{Message: rule.Message{Id: "late", Description: "too late"}})

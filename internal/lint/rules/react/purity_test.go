@@ -40,9 +40,9 @@ const purityImpureFunctionsInRenderNewMutability = "// @validateNoImpureFunction
 // checker is what makes `internal/utilities/hir` resolve a shadowed binding to its declaration instead
 // of to a global, and without it `const Math = {random: () => 1}` lowers to `LoadGlobal Math` and
 // this rule reports an input React passes. `TestPurityRequiresTheTypedHarness` pins that.
-func runPurityFixture(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTyped(t, Purity, "fixture.tsx", source)
+func runPurityFixture(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTyped(test, Purity, "fixture.tsx", source)
 }
 
 // TestPurityFiresOnTheVendoredCorpus runs both fixtures verbatim.
@@ -50,8 +50,8 @@ func runPurityFixture(t *testing.T, source string) rule_testing.Result {
 // Three findings each, one per impure call, which is what React's own rule produces on these exact
 // strings and what the golden records. The second fixture differs only by a second pragma, and this
 // rule reads no pragma at all, so the two are expected to agree.
-func TestPurityFiresOnTheVendoredCorpus(t *testing.T) {
-	t.Parallel()
+func TestPurityFiresOnTheVendoredCorpus(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -61,10 +61,10 @@ func TestPurityFiresOnTheVendoredCorpus(t *testing.T) {
 		{"the same source under the new mutation aliasing model", purityImpureFunctionsInRenderNewMutability},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPurityFixture(t, testCase.source)
-			rule_testing.ExpectFindings(t, result,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPurityFixture(test, testCase.source)
+			rule_testing.ExpectFindings(test, result,
 				messagePurityImpureCallId, messagePurityImpureCallId, messagePurityImpureCallId)
 		})
 	}
@@ -76,8 +76,8 @@ func TestPurityFiresOnTheVendoredCorpus(t *testing.T) {
 // Reading them is not enough and it has cost three porters. The failure is a TOOL cooking an escape
 // on the way in, so the fixture sits in the suite asserting the opposite of upstream while
 // compiling and going green.
-func TestPurityFixturesMatchTheVendoredCorpusByte(t *testing.T) {
-	t.Parallel()
+func TestPurityFixturesMatchTheVendoredCorpusByte(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		constant string
@@ -89,20 +89,20 @@ func TestPurityFixturesMatchTheVendoredCorpusByte(t *testing.T) {
 
 	directory := filepath.Join("conformance", "testdata", "fixtures")
 	for _, testCase := range cases {
-		t.Run(testCase.fileName, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.fileName, func(test *testing.T) {
+			test.Parallel()
 			vendored, err := os.ReadFile(filepath.Join(directory, testCase.fileName))
 			if err != nil {
-				t.Fatalf("reading the vendored fixture: %v", err)
+				test.Fatalf("reading the vendored fixture: %v", err)
 			}
 			if string(vendored) != testCase.constant {
-				t.Errorf("the constant and the vendored file differ\n constant: %q\n vendored: %q",
+				test.Errorf("the constant and the vendored file differ\n constant: %q\n vendored: %q",
 					testCase.constant, string(vendored))
 			}
 		})
 	}
 	if len(cases) != 2 {
-		t.Errorf("checked %d fixtures, want the 2 whose golden expects this rule's diagnostic", len(cases))
+		test.Errorf("checked %d fixtures, want the 2 whose golden expects this rule's diagnostic", len(cases))
 	}
 }
 
@@ -111,8 +111,8 @@ func TestPurityFixturesMatchTheVendoredCorpusByte(t *testing.T) {
 // Each `source` was run through React's own rule and each REPORTED with the finding count asserted
 // here. The comment on each names what it separates, because a case whose verdict nothing else
 // depends on is a case that will be deleted by the next reader.
-func TestPurityFiresOnMeasuredInputs(t *testing.T) {
-	t.Parallel()
+func TestPurityFiresOnMeasuredInputs(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -336,14 +336,14 @@ func TestPurityFiresOnMeasuredInputs(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPurityFixture(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPurityFixture(test, testCase.source)
 			want := make([]string, testCase.want)
 			for index := range want {
 				want[index] = messagePurityImpureCallId
 			}
-			rule_testing.ExpectFindings(t, result, want...)
+			rule_testing.ExpectFindings(test, result, want...)
 		})
 	}
 }
@@ -353,8 +353,8 @@ func TestPurityFiresOnMeasuredInputs(t *testing.T) {
 // These are the cases that catch a port, and every one was run through React's own rule and came
 // back with no diagnostic. Several look like they should report, and the comment says why they do
 // not, because a reader who thinks a silence is a bug will helpfully repair it into a divergence.
-func TestPurityStaysSilentOnMeasuredInputs(t *testing.T) {
-	t.Parallel()
+func TestPurityStaysSilentOnMeasuredInputs(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -520,9 +520,9 @@ func TestPurityStaysSilentOnMeasuredInputs(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runPurityFixture(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runPurityFixture(test, testCase.source))
 		})
 	}
 }
@@ -533,20 +533,20 @@ func TestPurityStaysSilentOnMeasuredInputs(t *testing.T) {
 // per-finding text reads as a surviving mutant with no visible cause. The literal here is typed
 // rather than built from the rule's own constants, because comparing a diagnostic to the constant
 // it was reported with is an equality both sides of which move together under mutation.
-func TestPurityMessageNamesTheBuiltin(t *testing.T) {
-	t.Parallel()
+func TestPurityMessageNamesTheBuiltin(test *testing.T) {
+	test.Parallel()
 
-	result := runPurityFixture(t, "function Component() {\n  const d = Date.now();\n  return <div>{d}</div>;\n}\n")
+	result := runPurityFixture(test, "function Component() {\n  const d = Date.now();\n  return <div>{d}</div>;\n}\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	got := result.Diagnostics[0].Message.Description
 	const wantPrefix = "`Date.now` is an impure function. Calling an impure function during render makes"
 	if !strings.HasPrefix(got, wantPrefix) {
-		t.Errorf("the message does not name the builtin\n got: %q\nwant prefix: %q", got, wantPrefix)
+		test.Errorf("the message does not name the builtin\n got: %q\nwant prefix: %q", got, wantPrefix)
 	}
 	if strings.Contains(got, "``") || strings.Contains(got, "`Date.now`` ") {
-		t.Errorf("the message has a doubled backtick: %q", got)
+		test.Errorf("the message has a doubled backtick: %q", got)
 	}
 }
 
@@ -556,12 +556,12 @@ func TestPurityMessageNamesTheBuiltin(t *testing.T) {
 // Written because a rule printing one fixed name would pass every count assertion in this file. The
 // corpus fixture has all three builtins in one component, so this reads the three rendered messages
 // and requires each name once.
-func TestPurityMessageNamesEachBuiltinSeparately(t *testing.T) {
-	t.Parallel()
+func TestPurityMessageNamesEachBuiltinSeparately(test *testing.T) {
+	test.Parallel()
 
-	result := runPurityFixture(t, purityImpureFunctionsInRender)
+	result := runPurityFixture(test, purityImpureFunctionsInRender)
 	if len(result.Diagnostics) != 3 {
-		t.Fatalf("got %d findings, want 3", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 3", len(result.Diagnostics))
 	}
 	want := map[string]bool{"`Date.now`": false, "`performance.now`": false, "`Math.random`": false}
 	for _, diagnostic := range result.Diagnostics {
@@ -573,7 +573,7 @@ func TestPurityMessageNamesEachBuiltinSeparately(t *testing.T) {
 	}
 	for name, found := range want {
 		if !found {
-			t.Errorf("no finding named %s; the canonical name is not per finding", name)
+			test.Errorf("no finding named %s; the canonical name is not per finding", name)
 		}
 	}
 }
@@ -584,16 +584,16 @@ func TestPurityMessageNamesEachBuiltinSeparately(t *testing.T) {
 // count assertion elsewhere cannot see which one the merge kept. React prints `Date.now`, measured
 // on that exact input, and this pins it: a merge that took the other operand would still report
 // once and would name the wrong builtin.
-func TestPurityMergesAConditionalAlias(t *testing.T) {
-	t.Parallel()
+func TestPurityMergesAConditionalAlias(test *testing.T) {
+	test.Parallel()
 
-	result := runPurityFixture(t, "function Component(props: {c: boolean}) {\n  let r = Math.random;\n  if (props.c) { r = Date.now; }\n  const x = r();\n  return <div>{x}</div>;\n}\n")
+	result := runPurityFixture(test, "function Component(props: {c: boolean}) {\n  let r = Math.random;\n  if (props.c) { r = Date.now; }\n  const x = r();\n  return <div>{x}</div>;\n}\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	got := result.Diagnostics[0].Message.Description
 	if !strings.HasPrefix(got, "`Date.now` is an impure function.") {
-		t.Errorf("the merge kept the wrong operand: %q", got)
+		test.Errorf("the merge kept the wrong operand: %q", got)
 	}
 }
 
@@ -606,8 +606,8 @@ func TestPurityMergesAConditionalAlias(t *testing.T) {
 // The harness writes `strings.TrimSpace(contents)+"\n"`, so a source with a leading newline sits one
 // byte off its Go literal. Every source here is written without one, and the slice is taken from
 // the same string the harness was handed.
-func TestPurityPointsAtTheCall(t *testing.T) {
-	t.Parallel()
+func TestPurityPointsAtTheCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -643,17 +643,17 @@ func TestPurityPointsAtTheCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPurityFixture(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPurityFixture(test, testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			written := strings.TrimSpace(testCase.source) + "\n"
 			diagnostic := result.Diagnostics[0]
 			got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.want {
-				t.Errorf("the finding points at %q, want %q", got, testCase.want)
+				test.Errorf("the finding points at %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -669,16 +669,16 @@ func TestPurityPointsAtTheCall(t *testing.T) {
 // The plain harness hands the rule a nil checker, and the rule returns early rather than reporting,
 // so this asserts silence on an input the typed harness reports. A revert that dropped the
 // declaration would make the shadow case above red, and this makes the mechanism explicit.
-func TestPurityRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPurityRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "function Component() {\n  const d = Date.now();\n  return <div>{d}</div>;\n}\n"
 
-	typed := runPurityFixture(t, source)
+	typed := runPurityFixture(test, source)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("the typed harness got %d findings, want 1", len(typed.Diagnostics))
+		test.Fatalf("the typed harness got %d findings, want 1", len(typed.Diagnostics))
 	}
 
-	untyped := rule_testing.Run(t, Purity, "fixture.tsx", source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, Purity, "fixture.tsx", source)
+	rule_testing.ExpectClean(test, untyped)
 }

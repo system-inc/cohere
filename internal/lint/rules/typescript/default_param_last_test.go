@@ -14,8 +14,8 @@ const defaultParamLastFile = "/repository/source/Parameters.ts"
 // per finding, so the counts here are read off rather than recovered: 45 inputs producing 54
 // findings. Every case was replayed through the installed @typescript-eslint build before it was
 // written here, and all 45 agreed with the corpus on count and on span.
-func TestDefaultParamLastFires(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -229,10 +229,10 @@ func TestDefaultParamLastFires(t *testing.T) {
 			"const o = { get x(a = 1, b: number) { return 1; } };", []string{"shouldBeLast"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -241,8 +241,8 @@ func TestDefaultParamLastFires(t *testing.T) {
 // verbatim, plus the clean side of every decision the fires table exercises. Upstream's clean cases
 // are the false positives it already thought about; the added ones cover the two places our tree
 // differs from the one upstream reads.
-func TestDefaultParamLastStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -380,10 +380,10 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 			"function foo(a: number, b: number, c = 1, d = 2) {}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -403,8 +403,8 @@ func TestDefaultParamLastStaysSilent(t *testing.T) {
 //
 // rule_testing.Run does not trim, so the literal here and the file on disk are the same bytes and the
 // slice is not offset. The typed harness would trim; this rule needs no checker.
-func TestDefaultParamLastSpans(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -568,17 +568,17 @@ func TestDefaultParamLastSpans(t *testing.T) {
 			[]string{"a = 1", "c = 2"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			for index, wantText := range testCase.wantTexts {
 				diagnostic := result.Diagnostics[index]
 				gotText := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotText != wantText {
-					t.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
+					test.Errorf("finding %d spans %q, want %q", index, gotText, wantText)
 				}
 			}
 		})
@@ -591,24 +591,24 @@ func TestDefaultParamLastSpans(t *testing.T) {
 //
 // The rule interpolates nothing, so there is no rendered text and no format string to guard; a
 // rule.Message is {Id, Description} and both halves are asserted directly.
-func TestDefaultParamLastMessageReadsAsWritten(t *testing.T) {
-	t.Parallel()
+func TestDefaultParamLastMessageReadsAsWritten(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, DefaultParamLast, defaultParamLastFile,
+	result := rule_testing.Run(test, DefaultParamLast, defaultParamLastFile,
 		"function foo(a = 1, b: number) {}")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	message := result.Diagnostics[0].Message
 	if message.Id != "shouldBeLast" {
-		t.Errorf("message id is %q, want %q", message.Id, "shouldBeLast")
+		test.Errorf("message id is %q, want %q", message.Id, "shouldBeLast")
 	}
 	// The description says why the code is wrong rather than restating the rule name. Asserted on
 	// the opening clause and on the closing one, so a mutation to either end is visible.
 	if !strings.HasPrefix(message.Description, "A parameter with a default sits before a parameter") {
-		t.Errorf("description opens with %q", message.Description)
+		test.Errorf("description opens with %q", message.Description)
 	}
 	if !strings.HasSuffix(message.Description, "where omitting it is what selects the default.") {
-		t.Errorf("description closes with %q", message.Description)
+		test.Errorf("description closes with %q", message.Description)
 	}
 }

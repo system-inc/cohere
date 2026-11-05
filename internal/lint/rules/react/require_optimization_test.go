@@ -34,8 +34,8 @@ const requireOptimizationFile = "/repository/source/RequireOptimization.tsx"
 // a bare severity, which is what hands a real rule nil options.
 
 // TestRequireOptimizationFires runs upstream's reporting cases.
-func TestRequireOptimizationFires(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -54,10 +54,10 @@ func TestRequireOptimizationFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runRequireOptimization(t, testCase.sourceText, testCase.rawOptions)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runRequireOptimization(test, testCase.sourceText, testCase.rawOptions)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -68,8 +68,8 @@ func TestRequireOptimizationFires(t *testing.T) {
 // expression and an arrow are all exempt by design upstream, with the comment "Stateless Functional
 // Components cannot be optimized (yet)". That is why this rule is portable without the component
 // registry, and these three are what pin it.
-func TestRequireOptimizationStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -94,9 +94,9 @@ func TestRequireOptimizationStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runRequireOptimization(t, testCase.sourceText, testCase.rawOptions))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runRequireOptimization(test, testCase.sourceText, testCase.rawOptions))
 		})
 	}
 }
@@ -107,13 +107,13 @@ func TestRequireOptimizationStaysSilent(t *testing.T) {
 // what members it declares, and what decorators it carries, and every one of those is on the AST.
 // `TestRequireOptimizationNeedsNoChecker` pins that a reporting case is identical under both
 // harnesses, so a later reader adding `NeedsTypeChecker` has to justify it.
-func runRequireOptimization(t *testing.T, sourceText string, rawOptions string) rule_testing.Result {
-	t.Helper()
+func runRequireOptimization(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
+	test.Helper()
 	decoded, err := DecodeRequireOptimizationOptions([]byte(rawOptions))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", rawOptions, err)
+		test.Fatalf("decoding %q: %v", rawOptions, err)
 	}
-	return rule_testing.RunWithOptions(t, RequireOptimization, requireOptimizationFile, sourceText, decoded)
+	return rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile, sourceText, decoded)
 }
 
 // TestRequireOptimizationObjectArmReproducesUpstreamsAccident pins the strangest thing here.
@@ -128,8 +128,8 @@ func runRequireOptimization(t *testing.T, sourceText string, rawOptions string) 
 // port that had written the intuitive rule, "an object with no shouldComponentUpdate", would pass
 // them and then report on nearly every `createReactClass` in a real codebase. Every row below was
 // measured on the installed build before it was written here.
-func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -152,9 +152,9 @@ func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
 }
@@ -164,8 +164,8 @@ func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(t *testing.T) {
 // Each row was run against the installed build before it was written. The class-expression row and
 // the two property-spelling rows are the ones a port is most likely to get wrong in the widening
 // direction, because all three read as obviously equivalent to a shape upstream does exempt.
-func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -235,9 +235,9 @@ func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) 
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
 }
@@ -248,8 +248,8 @@ func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(t *testing.T) 
 // near-miss rows below reports. The configured arm compares the decorator expression's own `name`,
 // which only an Identifier has, so `@pure` exempts and `@pure()` does not. Every verdict measured on
 // the installed build.
-func TestRequireOptimizationDecoratorArms(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationDecoratorArms(test *testing.T) {
+	test.Parallel()
 
 	const preamble = "declare const reactMixin: any;\ndeclare const PureRenderMixin: any;\ndeclare const SomeOtherMixin: any;\ndeclare const other: any;\ndeclare const Component: any;\ndeclare const pure: any;\ndeclare const bar: any;\n"
 	cases := []struct {
@@ -269,9 +269,9 @@ func TestRequireOptimizationDecoratorArms(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, testCase.rawOptions), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, testCase.rawOptions), testCase.wantIds...)
 		})
 	}
 }
@@ -287,8 +287,8 @@ func TestRequireOptimizationDecoratorArms(t *testing.T) {
 // The text is sliced from the source the harness wrote rather than from the literal, and `Run` does
 // not trim, so the two agree here; the slice is taken from the harness output anyway so a later
 // switch to the typed harness cannot silently shift it.
-func TestRequireOptimizationSpans(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -362,17 +362,17 @@ func TestRequireOptimizationSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runRequireOptimization(t, testCase.sourceText, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runRequireOptimization(test, testCase.sourceText, "")
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			source := result.SourceFile.Text()
 			for index, diagnostic := range result.Diagnostics {
 				got := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.wantTexts[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
 				}
 			}
 		})
@@ -386,19 +386,19 @@ func TestRequireOptimizationSpans(t *testing.T) {
 // against a literal typed in this file rather than against the rule's own constant, because
 // comparing a diagnostic to the constant it was reported with is an equality whose two sides move
 // together under mutation.
-func TestRequireOptimizationMessageReadsAsWritten(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationMessageReadsAsWritten(test *testing.T) {
+	test.Parallel()
 
-	result := runRequireOptimization(t, "declare const React: any;\nclass C extends React.Component {}\n", "")
+	result := runRequireOptimization(test, "declare const React: any;\nclass C extends React.Component {}\n", "")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Id != "noShouldComponentUpdate" {
-		t.Errorf("id is %q", result.Diagnostics[0].Message.Id)
+		test.Errorf("id is %q", result.Diagnostics[0].Message.Id)
 	}
 	if !strings.HasPrefix(result.Diagnostics[0].Message.Description,
 		"This class component re-renders whenever its parent does") {
-		t.Errorf("description reads %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("description reads %q", result.Diagnostics[0].Message.Description)
 	}
 }
 
@@ -407,8 +407,8 @@ func TestRequireOptimizationMessageReadsAsWritten(t *testing.T) {
 // The empty-input row is the one with no upstream counterpart and the reason the decoder is
 // hand-written: `rule.DecodeOptionsInto` errors there, and a bare `"error"` configuration hands a
 // rule exactly that.
-func TestRequireOptimizationDecodesItsOptions(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationDecodesItsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -423,22 +423,22 @@ func TestRequireOptimizationDecodesItsOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeRequireOptimizationOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.raw, err)
+				test.Fatalf("decoding %q: %v", testCase.raw, err)
 			}
 			settings, ok := decoded.(RequireOptimizationOptions)
 			if !ok {
-				t.Fatalf("decoded to %T", decoded)
+				test.Fatalf("decoded to %T", decoded)
 			}
 			if len(settings.AllowDecorators) != len(testCase.want) {
-				t.Fatalf("decoded %d decorators, want %d", len(settings.AllowDecorators), len(testCase.want))
+				test.Fatalf("decoded %d decorators, want %d", len(settings.AllowDecorators), len(testCase.want))
 			}
 			for index, name := range testCase.want {
 				if settings.AllowDecorators[index] != name {
-					t.Errorf("decorator %d is %q, want %q", index, settings.AllowDecorators[index], name)
+					test.Errorf("decorator %d is %q, want %q", index, settings.AllowDecorators[index], name)
 				}
 			}
 		})
@@ -446,14 +446,14 @@ func TestRequireOptimizationDecodesItsOptions(t *testing.T) {
 }
 
 // TestRequireOptimizationRejectsMalformedOptions asserts the decoder surfaces bad input.
-func TestRequireOptimizationRejectsMalformedOptions(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationRejectsMalformedOptions(test *testing.T) {
+	test.Parallel()
 
 	if _, err := DecodeRequireOptimizationOptions([]byte(`{"allowDecorators":`)); err == nil {
-		t.Fatal("truncated JSON decoded without error")
+		test.Fatal("truncated JSON decoded without error")
 	}
 	if _, err := DecodeRequireOptimizationOptions([]byte(`"error"`)); err == nil {
-		t.Fatal("a string decoded into the options struct without error")
+		test.Fatal("a string decoded into the options struct without error")
 	}
 }
 
@@ -463,24 +463,24 @@ func TestRequireOptimizationRejectsMalformedOptions(t *testing.T) {
 // yields the zero value. Here that IS the default, an empty allow list, so nil must behave exactly
 // like an absent option object. Asserted rather than assumed, because a rule whose default was not
 // the zero value would be silently inverted on this path.
-func TestRequireOptimizationHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
-	reporting := rule_testing.RunWithOptions(t, RequireOptimization, requireOptimizationFile,
+	reporting := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
 		"declare const React: any;\nclass C extends React.Component {}\n", nil)
-	rule_testing.ExpectFindings(t, reporting, "noShouldComponentUpdate")
+	rule_testing.ExpectFindings(test, reporting, "noShouldComponentUpdate")
 
-	clean := rule_testing.RunWithOptions(t, RequireOptimization, requireOptimizationFile,
+	clean := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
 		"declare const React: any;\nclass C extends React.PureComponent {}\n", nil)
-	rule_testing.ExpectClean(t, clean)
+	rule_testing.ExpectClean(test, clean)
 
 	// The rows above cannot see the allow list at all, because neither carries a decorator, so a
 	// mutant giving the nil path a non-empty list survived them. This is the case that separates
 	// "nil means no decorators are allowed" from any other default: a bare decorator must still
 	// report when nothing configured it.
-	decorated := rule_testing.RunWithOptions(t, RequireOptimization, requireOptimizationFile,
+	decorated := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
 		"declare const pure: any;\ndeclare const Component: any;\n@pure\nclass C extends Component {}\n", nil)
-	rule_testing.ExpectFindings(t, decorated, "noShouldComponentUpdate")
+	rule_testing.ExpectFindings(test, decorated, "noShouldComponentUpdate")
 }
 
 // TestRequireOptimizationNeedsNoChecker pins that this rule is syntactic.
@@ -488,18 +488,18 @@ func TestRequireOptimizationHandlesNilOptions(t *testing.T) {
 // Every question it asks is on the AST: what the class extends, what members it declares, what
 // decorators it carries. The typed harness must therefore produce the identical verdict, and a later
 // reader adding `NeedsTypeChecker` has to explain why this stopped being true.
-func TestRequireOptimizationNeedsNoChecker(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationNeedsNoChecker(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\nclass C extends React.Component {}\n"
 
-	untyped := rule_testing.RunWithOptions(t, RequireOptimization, requireOptimizationFile, source,
+	untyped := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile, source,
 		RequireOptimizationOptions{})
-	rule_testing.ExpectFindings(t, untyped, "noShouldComponentUpdate")
+	rule_testing.ExpectFindings(test, untyped, "noShouldComponentUpdate")
 
-	typed := rule_testing.RunTypedWithOptions(t, RequireOptimization, requireOptimizationFile, source,
+	typed := rule_testing.RunTypedWithOptions(test, RequireOptimization, requireOptimizationFile, source,
 		RequireOptimizationOptions{})
-	rule_testing.ExpectFindings(t, typed, "noShouldComponentUpdate")
+	rule_testing.ExpectFindings(test, typed, "noShouldComponentUpdate")
 }
 
 // TestRequireOptimizationHasNoFileGate reports in a `.ts` file, not only in `.tsx`.
@@ -510,19 +510,19 @@ func TestRequireOptimizationNeedsNoChecker(t *testing.T) {
 //
 // The source deliberately carries no JSX, because JSX in a `.ts` file is a syntax error and a case
 // that failed to parse would produce silence for a reason that has nothing to do with a gate.
-func TestRequireOptimizationHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\nclass C extends React.Component {}\n"
 	for _, fileName := range []string{
 		"/repository/source/RequireOptimization.tsx",
 		"/repository/source/RequireOptimization.ts",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, RequireOptimization, fileName, source,
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, RequireOptimization, fileName, source,
 				RequireOptimizationOptions{})
-			rule_testing.ExpectFindings(t, result, "noShouldComponentUpdate")
+			rule_testing.ExpectFindings(test, result, "noShouldComponentUpdate")
 		})
 	}
 }
@@ -542,8 +542,8 @@ func TestRequireOptimizationHasNoFileGate(t *testing.T) {
 // list. They are in the reporting test above now. Writing them here as clean would have been the
 // port brief's exact failure: a fixture encoding my belief rather than upstream's behavior, sitting
 // in the silent list asserting the opposite of the truth.
-func TestRequireOptimizationSurvivesShapesThatWouldPanic(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationSurvivesShapesThatWouldPanic(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"declare function createReactClass(spec: any): any;\ncreateReactClass();\n",
@@ -555,9 +555,9 @@ func TestRequireOptimizationSurvivesShapesThatWouldPanic(t *testing.T) {
 	}
 
 	for index, sourceText := range sources {
-		t.Run(string(rune('a'+index)), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runRequireOptimization(t, sourceText, ""))
+		test.Run(string(rune('a'+index)), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runRequireOptimization(test, sourceText, ""))
 		})
 	}
 }
@@ -569,8 +569,8 @@ func TestRequireOptimizationSurvivesShapesThatWouldPanic(t *testing.T) {
 // clean fixtures. The rule was right and the expectation was wrong, which is the direction worth
 // recording: the object arm's exemptions are a closed list, and "this object is obviously not a
 // real component" is not on it.
-func TestRequireOptimizationObjectArmReportsWithoutAFunction(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationObjectArmReportsWithoutAFunction(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -582,9 +582,9 @@ func TestRequireOptimizationObjectArmReportsWithoutAFunction(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, ""),
 				"noShouldComponentUpdate")
 		})
 	}
@@ -597,8 +597,8 @@ func TestRequireOptimizationObjectArmReportsWithoutAFunction(t *testing.T) {
 // `createReactClass` and cohere reads no React settings to change it. A mutant dropping the gate
 // entirely survived the rest of this suite, because nothing in the corpus writes a call to anything
 // other than `createReactClass`. Every verdict below was measured on the installed build.
-func TestRequireOptimizationCreateReactClassSpellings(t *testing.T) {
-	t.Parallel()
+func TestRequireOptimizationCreateReactClassSpellings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -616,9 +616,9 @@ func TestRequireOptimizationCreateReactClassSpellings(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runRequireOptimization(t, testCase.sourceText, ""), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, ""), testCase.wantIds...)
 		})
 	}
 }

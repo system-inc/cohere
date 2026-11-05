@@ -42,8 +42,8 @@ var lenientOptionRules = map[string]bool{
 var optionListModes = []string{`"always"`, `"as-needed"`, `"never"`, `"functions"`, `"anyOrder"`, `"^[a-z]+$"`}
 
 // TestEveryDecoderRefusesAnUnknownTopLevelKey probes the object every decoder reads first.
-func TestEveryDecoderRefusesAnUnknownTopLevelKey(t *testing.T) {
-	t.Parallel()
+func TestEveryDecoderRefusesAnUnknownTopLevelKey(test *testing.T) {
+	test.Parallel()
 	probed, lenient, skipped := 0, 0, []string{}
 	for _, registration := range rule.Registered() {
 		name := registration.Rule.Name
@@ -59,28 +59,28 @@ func TestEveryDecoderRefusesAnUnknownTopLevelKey(t *testing.T) {
 		if lenientOptionRules[name] {
 			lenient++
 			if err != nil {
-				t.Errorf("%s: upstream's schema leaves its options object open, and %s was refused: %v", name, probe, err)
+				test.Errorf("%s: upstream's schema leaves its options object open, and %s was refused: %v", name, probe, err)
 			}
 			continue
 		}
 		probed++
 		if err == nil {
-			t.Errorf("%s: %s decoded, and the unknown key was dropped without a word", name, probe)
+			test.Errorf("%s: %s decoded, and the unknown key was dropped without a word", name, probe)
 			continue
 		}
 		if !strings.Contains(err.Error(), unknownOptionKey) {
-			t.Errorf("%s: %s was refused, but not for the key: %v", name, probe, err)
+			test.Errorf("%s: %s was refused, but not for the key: %v", name, probe, err)
 		}
 	}
-	t.Logf("%d decoders refused the unknown key, %d accepted it as upstream does, %d have no baseline here: %v",
+	test.Logf("%d decoders refused the unknown key, %d accepted it as upstream does, %d have no baseline here: %v",
 		probed, lenient, len(skipped), skipped)
 	if lenient != len(lenientOptionRules) {
-		t.Errorf("probed %d of the %d lenient rules, so a lenient rule was renamed or lost its decoder", lenient, len(lenientOptionRules))
+		test.Errorf("probed %d of the %d lenient rules, so a lenient rule was renamed or lost its decoder", lenient, len(lenientOptionRules))
 	}
 	// About 190 registrations carry a decoder. Under 150 probed means the baselines stopped decoding
 	// for most of them, and the refusals above stopped meaning anything.
 	if probed < 150 {
-		t.Fatalf("only %d decoders were probed, so this check proved little", probed)
+		test.Fatalf("only %d decoders were probed, so this check proved little", probed)
 	}
 }
 
@@ -144,35 +144,35 @@ var nestedOptionCases = []nestedOptionCase{
 	{rule: "nexus/consistency-no-shouting", baseline: `{"allow": ["NASA"]}`, probe: `{"Allow": ["NASA"]}`, refusal: "Allow"},
 }
 
-func TestEveryNestedOptionObjectRefusesAnUnknownKey(t *testing.T) {
-	t.Parallel()
+func TestEveryNestedOptionObjectRefusesAnUnknownKey(test *testing.T) {
+	test.Parallel()
 	registrations := map[string]rule.Registration{}
 	for _, registration := range rule.Registered() {
 		registrations[registration.Rule.Name] = registration
 	}
 	for _, testCase := range nestedOptionCases {
-		t.Run(testCase.rule+" "+testCase.refusal, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.rule+" "+testCase.refusal, func(test *testing.T) {
+			test.Parallel()
 			registration, registered := registrations[testCase.rule]
 			if !registered {
-				t.Fatalf("%s is not registered under that name", testCase.rule)
+				test.Fatalf("%s is not registered under that name", testCase.rule)
 			}
 			decode := registration.Decode
 			if decode == nil {
 				decode = registration.DecodeOptionList
 			}
 			if decode == nil {
-				t.Fatalf("%s registers neither Decode nor DecodeOptionList", testCase.rule)
+				test.Fatalf("%s registers neither Decode nor DecodeOptionList", testCase.rule)
 			}
 			if _, err := decode([]byte(testCase.baseline)); err != nil {
-				t.Fatalf("baseline %s was refused, so the probe could be refused for that instead: %v", testCase.baseline, err)
+				test.Fatalf("baseline %s was refused, so the probe could be refused for that instead: %v", testCase.baseline, err)
 			}
 			_, err := decode([]byte(testCase.probe))
 			if err == nil {
-				t.Fatalf("%s decoded, and %q did nothing", testCase.probe, testCase.refusal)
+				test.Fatalf("%s decoded, and %q did nothing", testCase.probe, testCase.refusal)
 			}
 			if !strings.Contains(err.Error(), testCase.refusal) {
-				t.Fatalf("%s was refused, but the error does not name %q: %v", testCase.probe, testCase.refusal, err)
+				test.Fatalf("%s was refused, but the error does not name %q: %v", testCase.probe, testCase.refusal, err)
 			}
 		})
 	}

@@ -37,8 +37,8 @@ import (
 //
 // Each of those is a fact about how a class reaches a cell. Reconstructing them is the work this
 // measurement is, and getting one wrong reads exactly like a port that cannot answer.
-func TestDescriptorRowsAgreeWithTheEmitters(t *testing.T) {
-	t.Parallel()
+func TestDescriptorRowsAgreeWithTheEmitters(test *testing.T) {
+	test.Parallel()
 	type counter struct{ compared, agreed int }
 	counts := map[string]*counter{"ByType": {}, "ByNamespace": {}, "Fallback": {}, "Empty": {}}
 	var disagreements []string
@@ -91,19 +91,19 @@ func TestDescriptorRowsAgreeWithTheEmitters(t *testing.T) {
 	for _, kind := range []string{"ByType", "ByNamespace", "Fallback", "Empty"} {
 		totalCompared += counts[kind].compared
 		totalAgreed += counts[kind].agreed
-		t.Logf("%-12s %3d compared, %3d agreed", kind, counts[kind].compared, counts[kind].agreed)
+		test.Logf("%-12s %3d compared, %3d agreed", kind, counts[kind].compared, counts[kind].agreed)
 	}
-	t.Logf("descriptor cells: %d compared, %d agreed, %d disagreed", totalCompared, totalAgreed, totalCompared-totalAgreed)
+	test.Logf("descriptor cells: %d compared, %d agreed, %d disagreed", totalCompared, totalAgreed, totalCompared-totalAgreed)
 
 	for _, disagreement := range disagreements {
 		if descriptorCellsTheEmittersCannotReach[strings.SplitN(disagreement, ":", 2)[0]] {
 			continue
 		}
-		t.Errorf("%s", disagreement)
+		test.Errorf("%s", disagreement)
 	}
 
 	if totalCompared == 0 {
-		t.Fatal("no cell was compared, so this test measured nothing")
+		test.Fatal("no cell was compared, so this test measured nothing")
 	}
 }
 
@@ -158,32 +158,32 @@ var descriptorCellsTheEmittersCannotReach = map[string]bool{
 }
 
 // The exemption map holds only cells that genuinely still disagree.
-func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
-	t.Parallel()
+func TestDescriptorExemptionsAreStillNeeded(test *testing.T) {
+	test.Parallel()
 	if len(descriptorCellsTheEmittersCannotReach) == 0 {
-		t.Fatal("the map is empty, so this test measured nothing")
+		test.Fatal("the map is empty, so this test measured nothing")
 	}
 
 	for cell := range descriptorCellsTheEmittersCannotReach {
 		parts := strings.Fields(cell)
 		if len(parts) != 2 {
-			t.Errorf("%q is not a `kind root/key` cell name", cell)
+			test.Errorf("%q is not a `kind root/key` cell name", cell)
 			continue
 		}
 		rootAndKey := strings.SplitN(parts[1], "/", 2)
 		if len(rootAndKey) != 2 {
-			t.Errorf("%q does not name a root and a key", cell)
+			test.Errorf("%q does not name a root and a key", cell)
 			continue
 		}
 
 		descriptor, hasRow := baseDescriptors[rootAndKey[0]]
 		if !hasRow {
-			t.Errorf("%s exempts a root with no descriptor row", cell)
+			test.Errorf("%s exempts a root with no descriptor row", cell)
 			continue
 		}
 		want, hasCell := descriptor.Absent.ByNamespace[rootAndKey[1]]
 		if !hasCell {
-			t.Errorf("%s exempts a namespace the row does not carry", cell)
+			test.Errorf("%s exempts a namespace the row does not carry", cell)
 			continue
 		}
 
@@ -198,11 +198,11 @@ func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
 		}
 		nodes := EmitGapRoot(rootAndKey[0], branch)
 		if len(nodes) == 0 {
-			t.Errorf("%s exempts a cell the emitters decline, which needs no exemption", cell)
+			test.Errorf("%s exempts a cell the emitters decline, which needs no exemption", cell)
 			continue
 		}
 		if fmt.Sprint(PropertySort(nodes)) == fmt.Sprint(want) {
-			t.Errorf("%s now agrees, so the exemption is stale and should be deleted", cell)
+			test.Errorf("%s now agrees, so the exemption is stale and should be deleted", cell)
 		}
 	}
 }
@@ -213,13 +213,13 @@ func TestDescriptorExemptionsAreStillNeeded(t *testing.T) {
 // rather than restating it: every key in the `--drop` namespace, spelled as a `text-*` class, must
 // parse as some other root. A key that parsed as `text` would reach the cell and the disagreement
 // would stop being harmless.
-func TestNoClassReachesTheTextDropCell(t *testing.T) {
-	t.Parallel()
-	forEachEngineSystem(t, func(t *testing.T, system *LoadedDesignSystem) {
+func TestNoClassReachesTheTextDropCell(test *testing.T) {
+	test.Parallel()
+	forEachEngineSystem(test, func(test *testing.T, system *LoadedDesignSystem) {
 
 		keys := system.Theme().KeysInNamespaces([]string{"--drop"})
 		if len(keys) == 0 {
-			t.Fatal("this theme declares no --drop keys, and every theme over the framework's does, so nothing reached the cell and the test proves nothing")
+			test.Fatal("this theme declares no --drop keys, and every theme over the framework's does, so nothing reached the cell and the test proves nothing")
 		}
 
 		var reachedText int
@@ -230,11 +230,11 @@ func TestNoClassReachesTheTextDropCell(t *testing.T) {
 			}
 			if parsed[0].Root == "text" {
 				reachedText++
-				t.Errorf("text-%s parses as root `text`, so it reaches the text/--drop cell the exemption calls dead", key)
+				test.Errorf("text-%s parses as root `text`, so it reaches the text/--drop cell the exemption calls dead", key)
 			}
 		}
 
-		t.Logf("--drop keys spelled as text-*: %d checked, %d reaching root text", len(keys), reachedText)
+		test.Logf("--drop keys spelled as text-*: %d checked, %d reaching root text", len(keys), reachedText)
 	})
 }
 
@@ -247,8 +247,8 @@ func TestNoClassReachesTheTextDropCell(t *testing.T) {
 //
 // Split from the unmodified measurement rather than folded into it, because the two axes have
 // different populations and a combined total would hide one of them being empty.
-func TestModifierAxesAgreeWithTheEmitters(t *testing.T) {
-	t.Parallel()
+func TestModifierAxesAgreeWithTheEmitters(test *testing.T) {
+	test.Parallel()
 	type counter struct{ compared, agreed int }
 	counts := map[string]*counter{"Alpha": {}, "Themed": {}}
 	var disagreements []string
@@ -321,9 +321,9 @@ func TestModifierAxesAgreeWithTheEmitters(t *testing.T) {
 	for _, name := range []string{"Alpha", "Themed"} {
 		totalCompared += counts[name].compared
 		totalAgreed += counts[name].agreed
-		t.Logf("%-8s %3d compared, %3d agreed", name, counts[name].compared, counts[name].agreed)
+		test.Logf("%-8s %3d compared, %3d agreed", name, counts[name].compared, counts[name].agreed)
 	}
-	t.Logf("modifier-axis cells: %d compared, %d agreed, %d disagreed", totalCompared, totalAgreed, totalCompared-totalAgreed)
+	test.Logf("modifier-axis cells: %d compared, %d agreed, %d disagreed", totalCompared, totalAgreed, totalCompared-totalAgreed)
 
 	// The same dead cell the unmodified measurement exempts, on both modifier axes. `text/--drop` is
 	// a `text-shadow` reading filed under root `text`, and no class reaches it on any axis.
@@ -331,10 +331,10 @@ func TestModifierAxesAgreeWithTheEmitters(t *testing.T) {
 		if strings.Contains(disagreement, "text/--drop") {
 			continue
 		}
-		t.Errorf("%s", disagreement)
+		test.Errorf("%s", disagreement)
 	}
 	if totalCompared == 0 {
-		t.Fatal("no modifier cell was compared, so this test measured nothing")
+		test.Fatal("no modifier cell was compared, so this test measured nothing")
 	}
 }
 
@@ -360,8 +360,8 @@ var rootConsultsTheThemeForItsModifier = map[string]bool{
 //
 // A root in the set whose axes agree is a stale entry; one outside it whose axes differ is a missing
 // entry, and either would make the measurement above pass while comparing the wrong arm.
-func TestThemedModifierRootsAreTheOnesThatDiffer(t *testing.T) {
-	t.Parallel()
+func TestThemedModifierRootsAreTheOnesThatDiffer(test *testing.T) {
+	test.Parallel()
 	var checked int
 
 	for root, descriptor := range baseDescriptors {
@@ -389,17 +389,17 @@ func TestThemedModifierRootsAreTheOnesThatDiffer(t *testing.T) {
 		}
 
 		if differs && !rootConsultsTheThemeForItsModifier[root] {
-			t.Errorf("%s reads differently on the Themed axis and is not in the set, so its cells are compared on the unmodified arm", root)
+			test.Errorf("%s reads differently on the Themed axis and is not in the set, so its cells are compared on the unmodified arm", root)
 		}
 		if !differs && rootConsultsTheThemeForItsModifier[root] {
-			t.Errorf("%s is in the set and reads the same on both axes, so the entry is stale", root)
+			test.Errorf("%s is in the set and reads the same on both axes, so the entry is stale", root)
 		}
 	}
 
-	t.Logf("gap roots with a Themed axis: %d checked, %d in the set", checked, len(rootConsultsTheThemeForItsModifier))
+	test.Logf("gap roots with a Themed axis: %d checked, %d in the set", checked, len(rootConsultsTheThemeForItsModifier))
 
 	if checked == 0 {
-		t.Fatal("no root carried a Themed axis, so this test measured nothing")
+		test.Fatal("no root carried a Themed axis, so this test measured nothing")
 	}
 }
 
@@ -427,12 +427,12 @@ func TestThemedModifierRootsAreTheOnesThatDiffer(t *testing.T) {
 //
 // This test pins the fact rather than the conclusion: if a future change makes the order derivable,
 // it fails and the conclusion above is due a re-read.
-func TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt(t *testing.T) {
-	t.Parallel()
+func TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt(test *testing.T) {
+	test.Parallel()
 	background, hasBackground := baseDescriptors["bg"]
 	border, hasBorder := baseDescriptors["border"]
 	if !hasBackground || !hasBorder {
-		t.Fatal("bg and border are the two roots this contrast is built on and one is missing")
+		test.Fatal("bg and border are the two roots this contrast is built on and one is missing")
 	}
 
 	const sharedValue = "3px"
@@ -440,10 +440,10 @@ func TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt(t *testing.T) {
 	borderType := InferDataType(sharedValue, border.TypeList)
 
 	if backgroundType == borderType {
-		t.Errorf("bg and border both infer %q as %s; the contrast this rests on is gone and the "+
+		test.Errorf("bg and border both infer %q as %s; the contrast this rests on is gone and the "+
 			"conclusion that TypeList is not derivable needs re-measuring", sharedValue, backgroundType)
 	}
-	t.Logf("%q infers as %s for bg and %s for border, decided by list order alone",
+	test.Logf("%q infers as %s for bg and %s for border, decided by list order alone",
 		sharedValue, backgroundType, borderType)
 
 	// And the emitters answer every one of those types, which is why they cannot rank them.
@@ -454,8 +454,8 @@ func TestTypeListOrderDecidesTheCellAndEmittersCannotSupplyIt(t *testing.T) {
 		}
 	}
 	if answered != len(background.TypeList) {
-		t.Errorf("the emitter answered %d of bg's %d types; this test assumes it answers all of them, "+
+		test.Errorf("the emitter answered %d of bg's %d types; this test assumes it answers all of them, "+
 			"which is what makes the ordering unrecoverable from it", answered, len(background.TypeList))
 	}
-	t.Logf("bg's emitter answers %d of %d types, so nothing in it ranks them", answered, len(background.TypeList))
+	test.Logf("bg's emitter answers %d of %d types, so nothing in it ranks them", answered, len(background.TypeList))
 }

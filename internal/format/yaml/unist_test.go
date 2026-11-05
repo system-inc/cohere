@@ -23,10 +23,10 @@ import (
 
 // forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
 // COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml-unist-parser.
-func forkRoot(t testing.TB) string {
-	t.Helper()
-	corpus.Resolve(t, "prettier-fork:node_modules/yaml-unist-parser")
-	return corpus.PrettierFork.Root(t)
+func forkRoot(test testing.TB) string {
+	test.Helper()
+	corpus.Resolve(test, "prettier-fork:node_modules/yaml-unist-parser")
+	return corpus.PrettierFork.Root(test)
 }
 
 const parseScript = `
@@ -89,14 +89,14 @@ type parsed struct {
 }
 
 // parseTrees parses every text with the real parser, a few Node processes for all of them.
-func parseTrees(t testing.TB, texts []string) []parsed {
-	t.Helper()
+func parseTrees(test testing.TB, texts []string) []parsed {
+	test.Helper()
 	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed; the parser oracle needs it")
+		test.Skip("node is not installed; the parser oracle needs it")
 	}
-	script := filepath.Join(t.TempDir(), "parse.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(parseScript, "FORK", forkRoot(t))), 0o644); err != nil {
-		t.Fatal(err)
+	script := filepath.Join(test.TempDir(), "parse.mjs")
+	if err := os.WriteFile(script, []byte(strings.ReplaceAll(parseScript, "FORK", forkRoot(test))), 0o644); err != nil {
+		test.Fatal(err)
 	}
 
 	results := make([]parsed, 0, len(texts))
@@ -107,17 +107,17 @@ func parseTrees(t testing.TB, texts []string) []parsed {
 			size += len(texts[end])
 			end++
 		}
-		results = append(results, parseBatch(t, script, texts[start:end])...)
+		results = append(results, parseBatch(test, script, texts[start:end])...)
 		start = end
 	}
 	return results
 }
 
-func parseBatch(t testing.TB, script string, texts []string) []parsed {
-	t.Helper()
+func parseBatch(test testing.TB, script string, texts []string) []parsed {
+	test.Helper()
 	encoded, err := json.Marshal(texts)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	command := exec.Command("node", "--stack-size=65500", script)
 	command.Stdin = bytes.NewReader(encoded)
@@ -125,14 +125,14 @@ func parseBatch(t testing.TB, script string, texts []string) []parsed {
 	command.Stderr = &stderr
 	output, err := command.Output()
 	if err != nil {
-		t.Fatalf("the parser oracle failed: %v\n%s", err, stderr.String())
+		test.Fatalf("the parser oracle failed: %v\n%s", err, stderr.String())
 	}
 	var raw []parseResult
 	if err := json.Unmarshal(output, &raw); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(raw) != len(texts) {
-		t.Fatalf("the parser oracle returned %d results for %d inputs", len(raw), len(texts))
+		test.Fatalf("the parser oracle returned %d results for %d inputs", len(raw), len(texts))
 	}
 	results := make([]parsed, len(texts))
 	for index, result := range raw {
@@ -144,7 +144,7 @@ func parseBatch(t testing.TB, script string, texts []string) []parsed {
 		decoder.DisallowUnknownFields()
 		var root jsonNode
 		if err := decoder.Decode(&root); err != nil {
-			t.Fatalf("decoding the tree of %q: %v", texts[index], err)
+			test.Fatalf("decoding the tree of %q: %v", texts[index], err)
 		}
 		results[index] = parsed{root: loadTree(&root, newUnitOffsets(texts[index]), nil)}
 	}
@@ -226,12 +226,12 @@ func normalizeInput(text string) (string, bool) {
 
 // TestLoaderConvertsOffsets checks the loader on astral and multi-byte text, since every position the
 // printer slices by goes through it.
-func TestLoaderConvertsOffsets(t *testing.T) {
-	t.Parallel()
+func TestLoaderConvertsOffsets(test *testing.T) {
+	test.Parallel()
 	text := "é: 🍐\n'中': \"x\"\n"
-	trees := parseTrees(t, []string{text})
+	trees := parseTrees(test, []string{text})
 	if trees[0].err != "" {
-		t.Fatal(trees[0].err)
+		test.Fatal(trees[0].err)
 	}
 	var values []string
 	var walk func(node *unist.Node)
@@ -242,7 +242,7 @@ func TestLoaderConvertsOffsets(t *testing.T) {
 		}
 		for _, child := range node.Children {
 			if child.Parent != node {
-				t.Errorf("%s's parent is not set", child.NodeType)
+				test.Errorf("%s's parent is not set", child.NodeType)
 			}
 			walk(child)
 		}
@@ -250,9 +250,9 @@ func TestLoaderConvertsOffsets(t *testing.T) {
 	walk(trees[0].root)
 	expected := []string{"é", "🍐", "'中'", "\"x\""}
 	if strings.Join(values, "|") != strings.Join(expected, "|") {
-		t.Errorf("scalars sliced by the loaded positions are %q, want %q", values, expected)
+		test.Errorf("scalars sliced by the loaded positions are %q, want %q", values, expected)
 	}
 	if !utf8.ValidString(text) {
-		t.Fatal("the fixture is not UTF-8")
+		test.Fatal("the fixture is not UTF-8")
 	}
 }

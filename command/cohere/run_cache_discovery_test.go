@@ -14,9 +14,9 @@ import (
 // would match on the next run and the verdict would replay, clean, over a file with a type error in it. The
 // record's clock starts before discovery reads anything, so that run is never recorded. Found in format's
 // review of the listed format walk (#g3046x5).
-func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(t *testing.T) {
-	t.Parallel()
-	fixture := newRunCacheFixture(t, buildCohere(t))
+func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(test *testing.T) {
+	test.Parallel()
+	fixture := newRunCacheFixture(test, buildCohere(test))
 	fixture.establishHit()
 
 	late := filepath.Join(fixture.root, "source", "late.ts")
@@ -26,19 +26,19 @@ func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(t *testing.T) {
 	if output, err := command.CombinedOutput(); err != nil && !strings.Contains(string(output), "late.ts") {
 		// A run that saw the file fails on it, which is fine; one that failed for any other reason is not.
 		if _, isExit := err.(*exec.ExitError); !isExit {
-			t.Fatalf("the run that created the file failed: %v\n%s", err, output)
+			test.Fatalf("the run that created the file failed: %v\n%s", err, output)
 		}
 	}
 	if _, err := os.Stat(late); err != nil {
-		t.Fatalf("the instrument created no file, so nothing below is about it: %v", err)
+		test.Fatalf("the instrument created no file, so nothing below is about it: %v", err)
 	}
 
 	output, _ := fixture.run(true)
 	if isRunCacheReplay(output) {
-		t.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict that never saw it:\n%s", output)
+		test.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict that never saw it:\n%s", output)
 	}
 	if !strings.Contains(output, "late.ts") {
-		t.Errorf("the file with a type error in it was not reported:\n%s", output)
+		test.Errorf("the file with a type error in it was not reported:\n%s", output)
 	}
 }
 
@@ -46,17 +46,17 @@ func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(t *testing.T) {
 // file created after discovery listed its directory is not in that run's format universe. The run is never
 // recorded, since the clock started before the listing, so the next run walks again, finds the file and formats
 // it, rather than replaying a verdict that never saw it.
-func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(t *testing.T) {
-	t.Parallel()
-	fixture := newRunCacheFixture(t, buildCohere(t))
+func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
+	test.Parallel()
+	fixture := newRunCacheFixture(test, buildCohere(test))
 	formatting := func(environment ...string) string {
-		t.Helper()
+		test.Helper()
 		command := exec.Command(fixture.binary, verboseArguments(nil)...)
 		command.Dir = fixture.root
 		command.Env = append(append([]string{"HOME=" + fixture.home}, environment...), withoutHome(os.Environ())...)
 		output, err := command.CombinedOutput()
 		if _, isExit := err.(*exec.ExitError); err != nil && !isExit {
-			t.Fatalf("running cohere: %v\n%s", err, output)
+			test.Fatalf("running cohere: %v\n%s", err, output)
 		}
 		return string(output)
 	}
@@ -65,21 +65,21 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(t *testing.T) {
 	formatting()
 	formatting()
 	if output := formatting(); !isRunCacheReplay(output) {
-		t.Fatalf("an unchanged, formatted tree did not replay, so nothing below can show a change was noticed:\n%s", output)
+		test.Fatalf("an unchanged, formatted tree did not replay, so nothing below can show a change was noticed:\n%s", output)
 	}
 
 	late := filepath.Join(fixture.root, "docs", "late.md")
 	unformatted := "#   Late\n\n\n\nA paragraph.\n"
 	formatting("COHERE_TEST_CREATE_AFTER_DISCOVERY="+late, "COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT="+unformatted)
 	if contents, err := os.ReadFile(late); err != nil || string(contents) == "" {
-		t.Fatalf("the instrument created no file, so nothing below is about it: %v", err)
+		test.Fatalf("the instrument created no file, so nothing below is about it: %v", err)
 	}
 
 	if output := formatting(); isRunCacheReplay(output) {
-		t.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict whose walk never saw it:\n%s", output)
+		test.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict whose walk never saw it:\n%s", output)
 	}
 	if contents, _ := os.ReadFile(late); string(contents) == unformatted {
-		t.Errorf("the file created after discovery's listing was never formatted:\n%s", contents)
+		test.Errorf("the file created after discovery's listing was never formatted:\n%s", contents)
 	}
 }
 

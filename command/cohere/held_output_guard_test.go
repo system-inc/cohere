@@ -217,22 +217,22 @@ func failHeldOutput(report string) {
 // run. The sleep is five minutes, so it outlasts the watch at any load seen, and the test kills it by the
 // pid the report names. The bound on firing is two minutes, a hang detector, with go test's -timeout behind
 // it.
-func TestAHeldOutputNamesItsHolder(t *testing.T) {
-	t.Parallel()
+func TestAHeldOutputNamesItsHolder(test *testing.T) {
+	test.Parallel()
 	if os.Getenv("COHERE_HELD_OUTPUT_HELPER") == "1" {
 		watchForHeldOutput(2*time.Second, 200*time.Millisecond, failHeldOutput)
 		exec.Command("/bin/sh", "-c", "sleep 300 & echo started").CombinedOutput()
-		t.Fatal("the command's output closed while its background sleep still held it")
+		test.Fatal("the command's output closed while its background sleep still held it")
 	}
 	if runtime.GOOS == "windows" {
-		t.Skip("lsof names a pipe's holders, and Windows has no lsof")
+		test.Skip("lsof names a pipe's holders, and Windows has no lsof")
 	}
 
 	helper := exec.Command(os.Args[0], "-test.run=^TestAHeldOutputNamesItsHolder$", "-test.count=1")
 	helper.Env = append(os.Environ(), "COHERE_HELD_OUTPUT_HELPER=1")
-	outputFile, err := os.Create(t.TempDir() + "/output")
+	outputFile, err := os.Create(test.TempDir() + "/output")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	defer outputFile.Close()
 	// A file, not a buffer: the helper's sleep inherits whatever the helper writes to, and a buffer's pipe
@@ -249,18 +249,18 @@ func TestAHeldOutputNamesItsHolder(t *testing.T) {
 		}
 	}
 	if err == nil {
-		t.Fatalf("the helper passed, so the watch never fired:\n%s", output)
+		test.Fatalf("the helper passed, so the watch never fired:\n%s", output)
 	}
 	if elapsed := time.Since(started); elapsed > heldOutputFiringBound {
-		t.Errorf("the watch took %s to fire on a 2s deadline, past the %s that says it hung rather than ran slow",
+		test.Errorf("the watch took %s to fire on a 2s deadline, past the %s that says it hung rather than ran slow",
 			elapsed, heldOutputFiringBound)
 	}
 	for _, want := range []string{"held output: a command exited", "TestAHeldOutputNamesItsHolder", "sleep 300"} {
 		if !bytes.Contains(output, []byte(want)) {
-			t.Errorf("the report does not say %q:\n%s", want, output)
+			test.Errorf("the report does not say %q:\n%s", want, output)
 		}
 	}
 	if bytes.Contains(output, []byte(" lsof:")) {
-		t.Errorf("the report names the lsof that asked, which is this process's own running child:\n%s", output)
+		test.Errorf("the report names the lsof that asked, which is this process's own running child:\n%s", output)
 	}
 }

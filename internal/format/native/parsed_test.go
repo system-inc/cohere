@@ -24,9 +24,9 @@ const parsedCorpusVariable = "COHERE_PARSE_FROM_CORPUS"
 // @system_cohere_lint_fix in review. Every TypeScript file of the fixtures and of any tree the variable names is
 // formatted twice, with the tree the engine hands its transform and with none, and the outputs, or the errors,
 // must be equal. A tree of other bytes is offered too, and must be refused, printing what no tree prints.
-func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(t *testing.T) {
-	t.Parallel()
-	roots := []string{moduleRootOf(t)}
+func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T) {
+	test.Parallel()
+	roots := []string{moduleRootOf(test)}
 	if extra := os.Getenv(parsedCorpusVariable); extra != "" {
 		roots = append(roots, filepath.SplitList(extra)...)
 	}
@@ -35,7 +35,7 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(t *testing.T) {
 	for _, fileName := range typeScriptFilesUnder(roots) {
 		contents, err := os.ReadFile(fileName)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		text := string(contents)
 
@@ -53,18 +53,18 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(t *testing.T) {
 		reparsed, reparseError := formatter.Format(fileName, text)
 		fromTree, treeError := formatter.FormatParsed(fileName, text, guards)
 		if fromTree != reparsed || errorText(treeError) != errorText(reparseError) {
-			t.Errorf("%s: formatting from the guard's tree printed another result than parsing again", fileName)
+			test.Errorf("%s: formatting from the guard's tree printed another result than parsing again", fileName)
 		}
 		mutant := estree.ParseSourceFile(fileName, " "+text)
 		if fromMutant, mutantError := formatter.FormatParsed(fileName, text, mutant); fromMutant != reparsed ||
 			errorText(mutantError) != errorText(reparseError) {
-			t.Errorf("%s: a tree of other bytes was not refused", fileName)
+			test.Errorf("%s: a tree of other bytes was not refused", fileName)
 		}
 		compared++
 	}
-	t.Logf("%d TypeScript files formatted from the guard's tree and from a parse of their own", compared)
+	test.Logf("%d TypeScript files formatted from the guard's tree and from a parse of their own", compared)
 	if compared < 50 {
-		t.Fatalf("only %d files were compared, too few for agreement to mean anything", compared)
+		test.Fatalf("only %d files were compared, too few for agreement to mean anything", compared)
 	}
 }
 
@@ -76,11 +76,11 @@ func errorText(err error) string {
 }
 
 // moduleRootOf is the module's root, where the fixtures are.
-func moduleRootOf(t *testing.T) string {
-	t.Helper()
+func moduleRootOf(test *testing.T) string {
+	test.Helper()
 	directory, err := os.Getwd()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for {
 		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
@@ -88,7 +88,7 @@ func moduleRootOf(t *testing.T) string {
 		}
 		parent := filepath.Dir(directory)
 		if parent == directory {
-			t.Fatal("no go.mod above the test's directory")
+			test.Fatal("no go.mod above the test's directory")
 		}
 		directory = parent
 	}

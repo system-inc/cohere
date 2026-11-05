@@ -11,8 +11,8 @@ import (
 // against the installed build first and every one reproduced, so the counts here are measured.
 const noObjectTypeAsDefaultPropFile = "/repository/source/NoObjectTypeAsDefaultProp.tsx"
 
-func TestNoObjectTypeAsDefaultPropStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoObjectTypeAsDefaultPropStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n      function Foo({\n        bar = emptyFunction,\n      }) {\n        return null;\n      }\n    "},
@@ -26,10 +26,10 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(t *testing.T) {
 		{"upstream valid 8", "\n      export default function NotAComponent({foo = {}}) {}\n    "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -39,8 +39,8 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(t *testing.T) {
 // twice, so a message-id assertion could not see an interpolation defect at all: the id and the
 // count stay right while the text goes wrong. Each expected string was captured from the
 // installed build rather than composed here.
-func TestNoObjectTypeAsDefaultPropFires(t *testing.T) {
-	t.Parallel()
+func TestNoObjectTypeAsDefaultPropFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -81,15 +81,15 @@ func TestNoObjectTypeAsDefaultPropFires(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Description != testCase.wantMessages[index] {
-					t.Errorf("finding %d renders\n  got  %q\n  want %q",
+					test.Errorf("finding %d renders\n  got  %q\n  want %q",
 						index, diagnostic.Message.Description, testCase.wantMessages[index])
 				}
 			}
@@ -117,8 +117,8 @@ func TestNoObjectTypeAsDefaultPropFires(t *testing.T) {
 //
 // The parenthesized rows exist because our parser keeps a node upstream's parser folds away, so
 // they are a shape upstream's corpus structurally cannot express.
-func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -172,17 +172,17 @@ func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNo
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp,
 				noObjectTypeAsDefaultPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("installed build reports %d findings, this rule reports %d",
+				test.Fatalf("installed build reports %d findings, this rule reports %d",
 					len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Description != testCase.wantMessages[index] {
-					t.Errorf("finding %d renders\n  got  %q\n  want %q",
+					test.Errorf("finding %d renders\n  got  %q\n  want %q",
 						index, diagnostic.Message.Description, testCase.wantMessages[index])
 				}
 			}
@@ -195,21 +195,21 @@ func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNo
 // Upstream reports on `prop.value`, which is the whole assignment pattern rather than just the
 // offending value, so the span covers the name, the equals sign and the default. Measured by
 // slicing the installed build's reported range out of the source on 2026-08-27.
-func TestNoObjectTypeAsDefaultPropAnchorsOnTheWholeAssignment(t *testing.T) {
-	t.Parallel()
+func TestNoObjectTypeAsDefaultPropAnchorsOnTheWholeAssignment(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "function C({a = {}, b = []}) { return <div/>; }"
 	wantSpans := []string{"a = {}", "b = []"}
 
-	result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
+	result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
 		sourceText)
 	if len(result.Diagnostics) != len(wantSpans) {
-		t.Fatalf("want %d findings, got %d", len(wantSpans), len(result.Diagnostics))
+		test.Fatalf("want %d findings, got %d", len(wantSpans), len(result.Diagnostics))
 	}
 	for index, diagnostic := range result.Diagnostics {
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != wantSpans[index] {
-			t.Errorf("finding %d points at %q, want %q", index, reported, wantSpans[index])
+			test.Errorf("finding %d points at %q, want %q", index, reported, wantSpans[index])
 		}
 	}
 }
@@ -220,20 +220,20 @@ func TestNoObjectTypeAsDefaultPropAnchorsOnTheWholeAssignment(t *testing.T) {
 // The rule declares NeedsTypeChecker because its component detector resolves a bare `createElement`
 // through the checker. A typed rule run on the plain harness receives a nil checker and, without
 // the guard, would answer a narrower question while every quiet fixture passed vacuously.
-func TestNoObjectTypeAsDefaultPropRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoObjectTypeAsDefaultPropRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "function C({a = {}}) { return <div/>; }"
 
 	// The control. On the typed harness this reports, so the zero below means the guard fired
 	// rather than that the input was uninteresting.
-	typed := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
+	typed := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
 		sourceText)
-	rule_testing.ExpectFindings(t, typed, "forbiddenTypeDefaultParam")
+	rule_testing.ExpectFindings(test, typed, "forbiddenTypeDefaultParam")
 
-	untyped := rule_testing.Run(t, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
+	untyped := rule_testing.Run(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
 		sourceText)
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate pins the absence of the gate three siblings in
@@ -243,18 +243,18 @@ func TestNoObjectTypeAsDefaultPropRequiresTheTypedHarness(t *testing.T) {
 // authority has no filename condition anywhere. The source returns null rather than JSX so a `.ts`
 // file parses cleanly and the parser's opinion cannot be mistaken for the rule's; the `.ts` row is
 // exactly the file a `.tsx` gate would have silenced.
-func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "function C({a = {}}) { return null; }\n"
 	for _, fileName := range []string{
 		"/repository/source/Suffix.tsx",
 		"/repository/source/Suffix.ts",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp, fileName, sourceText)
-			rule_testing.ExpectFindings(t, result, "forbiddenTypeDefaultParam")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, fileName, sourceText)
+			rule_testing.ExpectFindings(test, result, "forbiddenTypeDefaultParam")
 		})
 	}
 }
@@ -276,8 +276,8 @@ func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(t *testing.T) {
 // The divergence is deliberate, one-directional, and confined to the human-readable half of the
 // finding. If this is ever judged wrong, the fix is in `destructuredPropertyName` and this test is
 // the record of what upstream actually did.
-func TestNoObjectTypeAsDefaultPropRendersRealKeyNamesWhereUpstreamSaysUndefined(t *testing.T) {
-	t.Parallel()
+func TestNoObjectTypeAsDefaultPropRendersRealKeyNamesWhereUpstreamSaysUndefined(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name             string
@@ -339,18 +339,18 @@ func TestNoObjectTypeAsDefaultPropRendersRealKeyNamesWhereUpstreamSaysUndefined(
 		"React. Use a variable reference instead of object literal."
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoObjectTypeAsDefaultProp,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp,
 				noObjectTypeAsDefaultPropFile, testCase.sourceText)
 
 			// Every row reports, including the two that diverge. That is the half with no
 			// divergence and it is asserted first, because it is the half that matters.
-			rule_testing.ExpectFindings(t, result, "forbiddenTypeDefaultParam")
+			rule_testing.ExpectFindings(test, result, "forbiddenTypeDefaultParam")
 
 			want := testCase.wantMessageStart + messageTail
 			if result.Diagnostics[0].Message.Description != want {
-				t.Errorf("renders\n  got  %q\n  want %q",
+				test.Errorf("renders\n  got  %q\n  want %q",
 					result.Diagnostics[0].Message.Description, want)
 			}
 		})

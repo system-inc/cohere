@@ -10,8 +10,8 @@ import (
 	"github.com/system-inc/cohere/mutation_aliasing"
 )
 
-func TestCustomHookEffectsFollowModuleBindings(t *testing.T) {
-	t.Parallel()
+func TestCustomHookEffectsFollowModuleBindings(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, prefix, callee, parameters string
 		frozen                           bool
@@ -30,8 +30,8 @@ func TestCustomHookEffectsFollowModuleBindings(t *testing.T) {
 		{"unresolved", "", "useData", "", false},
 		{"disabled", "// @enableAssumeHooksFollowRulesOfReact:false\nimport {useData} from './hooks';", "useData", "", false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			alias := ""
 			if testCase.name == "local alias" {
 				alias = "const getData = useData;"
@@ -62,25 +62,25 @@ func TestCustomHookEffectsFollowModuleBindings(t *testing.T) {
 								frozenArgument = frozenArgument || effect.Kind == mutation_aliasing.AliasingEffectFreeze
 							}
 							if frozenResult != testCase.frozen || frozenArgument != testCase.frozen {
-								t.Errorf("frozen result=%t argument=%t; want both %t", frozenResult, frozenArgument, testCase.frozen)
+								test.Errorf("frozen result=%t argument=%t; want both %t", frozenResult, frozenArgument, testCase.frozen)
 							}
 						}
 					})
 				}}
 			}}
-			rule_testing.RunTypedFiles(t, probe, map[string]string{
+			rule_testing.RunTypedFiles(test, probe, map[string]string{
 				"/hooks.ts":    `export function useData(value) {return value;} export function getData(value) {return value;} export default useData;`,
 				"/fixture.tsx": source,
 			}, "/fixture.tsx")
 			if visited != 1 {
-				t.Fatalf("visited %d calls, want one", visited)
+				test.Fatalf("visited %d calls, want one", visited)
 			}
 		})
 	}
 }
 
-func TestCustomHookPropertyAliasPreservesManualMemoization(t *testing.T) {
-	t.Parallel()
+func TestCustomHookPropertyAliasPreservesManualMemoization(test *testing.T) {
+	test.Parallel()
 	const source = `import {useCallback} from 'react'; import {useData} from './hooks';
 function Component() {
 const data = useData();
@@ -99,11 +99,11 @@ return <div onClick={callback}/>;
 		{"missing dependency", strings.ReplaceAll(source, "[data]", "[]"), true},
 		{"no later mutation", strings.ReplaceAll(source, "mutate(value);", ""), false},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			findings, lowered := findingsForSource(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			findings, lowered := findingsForSource(test, testCase.source)
 			if !lowered || (len(findings) != 0) != testCase.fires {
-				t.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)
+				test.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)
 			}
 		})
 	}
@@ -113,8 +113,8 @@ return <div onClick={callback}/>;
 // in a function asks whether its callee is a module hook, and each ask used to walk every
 // instruction to build its own table. Five calls, three of them hooks reached through an import,
 // a namespace and a local alias, must share one build.
-func TestCalleeProducersAreBuiltOncePerFunction(t *testing.T) {
-	t.Parallel()
+func TestCalleeProducersAreBuiltOncePerFunction(test *testing.T) {
+	test.Parallel()
 	calls := 0
 	var builds []int
 	probe := rule.Rule{Name: "callee-producers", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -137,7 +137,7 @@ func TestCalleeProducersAreBuiltOncePerFunction(t *testing.T) {
 			})
 		}}
 	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/hooks.ts": `export function useData(value) {return value;} export function getData(value) {return value;}`,
 		"/fixture.tsx": `import {useData, getData} from './hooks'; import * as Hooks from './hooks';
 function Component() {
@@ -150,9 +150,9 @@ function Component() {
 }`,
 	}, "/fixture.tsx")
 	if calls != 5 {
-		t.Fatalf("lowered %d calls, want five", calls)
+		test.Fatalf("lowered %d calls, want five", calls)
 	}
 	if len(builds) != 1 || builds[0] != 1 {
-		t.Fatalf("built the producer table %v times for one function, want once", builds)
+		test.Fatalf("built the producer table %v times for one function, want once", builds)
 	}
 }

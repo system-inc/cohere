@@ -19,19 +19,19 @@ import (
 // package's claim has to be measured through this package's code.
 //
 //	COHERE_CORPUS_LIST=/path/to/list COHERE_CORPUS_OUT=/path/to/dir go test ./internal/prettier/ -run TestCorpus -v
-func TestCorpus(t *testing.T) {
-	t.Parallel()
+func TestCorpus(test *testing.T) {
+	test.Parallel()
 
 	listPath := os.Getenv("COHERE_CORPUS_LIST")
 	outDirectory := os.Getenv("COHERE_CORPUS_OUT")
 	if listPath == "" || outDirectory == "" {
-		t.Skip("set COHERE_CORPUS_LIST and COHERE_CORPUS_OUT")
+		test.Skip("set COHERE_CORPUS_LIST and COHERE_CORPUS_OUT")
 	}
 
-	engine := newTestEngine(t)
+	engine := newTestEngine(test)
 	listBytes, err := os.ReadFile(listPath)
 	if err != nil {
-		t.Fatalf("reading the list: %v", err)
+		test.Fatalf("reading the list: %v", err)
 	}
 
 	var formatted, failed, refused int
@@ -51,19 +51,19 @@ func TestCorpus(t *testing.T) {
 		text, formatError := engine.Format(path, string(source))
 		if formatError != nil {
 			failed++
-			t.Errorf("%s: %v", path, formatError)
+			test.Errorf("%s: %v", path, formatError)
 			continue
 		}
 		flat := strings.ReplaceAll(strings.TrimPrefix(path, "/"), "/", "_")
 		if err := os.WriteFile(filepath.Join(outDirectory, flat), []byte(text), 0o644); err != nil {
-			t.Fatalf("writing %s: %v", flat, err)
+			test.Fatalf("writing %s: %v", flat, err)
 		}
 		formatted++
 	}
 
 	// A corpus run that formatted nothing is vacuous, and it reads exactly like a clean one.
 	if formatted == 0 {
-		t.Fatalf("the corpus formatted no files at all (refused %d, failed %d)", refused, failed)
+		test.Fatalf("the corpus formatted no files at all (refused %d, failed %d)", refused, failed)
 	}
-	t.Logf("formatted=%d failed=%d refused=%d", formatted, failed, refused)
+	test.Logf("formatted=%d failed=%d refused=%d", formatted, failed, refused)
 }

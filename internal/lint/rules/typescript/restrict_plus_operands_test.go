@@ -38,8 +38,8 @@ const restrictPlusOperandsFile = "file.ts"
 func restrictPlusOperandsBool(value bool) *bool { return &value }
 
 // TestRestrictPlusOperandsStaysSilent is upstream's valid list, each under its own options.
-func TestRestrictPlusOperandsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -106,10 +106,10 @@ func TestRestrictPlusOperandsStaysSilent(t *testing.T) {
 		{"upstream valid 57", "\nconst f = (a: string | number, b: string | number) => a + b;\n      ", RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true), AllowBoolean: restrictPlusOperandsBool(true), AllowNullish: restrictPlusOperandsBool(true), AllowNumberAndString: restrictPlusOperandsBool(true), AllowRegExp: restrictPlusOperandsBool(true)}},
 		{"upstream valid 58", "let foo = '1' + 1n;", RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(true)}}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -119,8 +119,8 @@ func TestRestrictPlusOperandsStaysSilent(t *testing.T) {
 // Several cases report TWICE, once per operand, and those are the ones that pin the ordering between
 // the two passes: an expression whose operands are each individually impossible reports both operands
 // and never the pair, because the pair pass is gated on the first pass having found nothing.
-func TestRestrictPlusOperandsFires(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -189,10 +189,10 @@ func TestRestrictPlusOperandsFires(t *testing.T) {
 		{"upstream invalid 58", "\nconst f = (a: any, b: unknown) => a + b;\n      ", RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true), AllowBoolean: restrictPlusOperandsBool(true), AllowNullish: restrictPlusOperandsBool(true), AllowRegExp: restrictPlusOperandsBool(true)}, []string{"invalid"}},
 		{"upstream invalid 59", "let foo = '1' + 1n;", RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}, []string{"mismatched"}}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -207,8 +207,8 @@ func TestRestrictPlusOperandsFires(t *testing.T) {
 //
 // The expectations are the strings the INSTALLED rule produced for these inputs, which were
 // themselves checked against upstream's recorded `data` for all 56 findings that carry it.
-func TestRestrictPlusOperandsMessages(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -270,15 +270,15 @@ func TestRestrictPlusOperandsMessages(t *testing.T) {
 		{"upstream invalid 58", "\nconst f = (a: any, b: unknown) => a + b;\n      ", RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true), AllowBoolean: restrictPlusOperandsBool(true), AllowNullish: restrictPlusOperandsBool(true), AllowRegExp: restrictPlusOperandsBool(true)}, []string{"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `unknown`."}},
 		{"upstream invalid 59", "let foo = '1' + 1n;", RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}, []string{"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `string` + `bigint`."}}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, want := range testCase.wantMessages {
 				if got := result.Diagnostics[index].Message.Description; got != want {
-					t.Errorf("finding %d reads\n%q\nwant\n%q", index, got, want)
+					test.Errorf("finding %d reads\n%q\nwant\n%q", index, got, want)
 				}
 			}
 		})
@@ -296,8 +296,8 @@ func TestRestrictPlusOperandsMessages(t *testing.T) {
 //
 // The expected text is sliced from upstream's recorded columns, then compared against the text our
 // finding actually covers.
-func TestRestrictPlusOperandsSpans(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -313,11 +313,11 @@ func TestRestrictPlusOperandsSpans(t *testing.T) {
 		{"upstream invalid 16", "let foo = 1n + 1;", nil, []string{"1n + 1"}},
 		{"upstream invalid 43", "\nlet foo: string | undefined;\nfoo += 'some data';\n      ", RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false), AllowBoolean: restrictPlusOperandsBool(false), AllowNullish: restrictPlusOperandsBool(false), AllowNumberAndString: restrictPlusOperandsBool(false), AllowRegExp: restrictPlusOperandsBool(false), SkipCompoundAssignments: false}, []string{"foo"}}}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			// The harness trims the fixture before building the program, so slice the text the
 			// harness actually wrote rather than the literal above.
@@ -325,7 +325,7 @@ func TestRestrictPlusOperandsSpans(t *testing.T) {
 			for index, want := range testCase.wantSpans {
 				reported := source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != want {
-					t.Errorf("finding %d points at %q, want %q", index, reported, want)
+					test.Errorf("finding %d points at %q, want %q", index, reported, want)
 				}
 			}
 		})
@@ -346,59 +346,59 @@ func TestRestrictPlusOperandsSpans(t *testing.T) {
 //   - an ABSENT key falls back to true rather than to the zero value
 //   - an explicit `false` is distinguishable from an absent key, which is why the fields are *bool
 //   - a rule configured as a bare "error", which arrives as NIL options, gets the defaults
-func TestRestrictPlusOperandsDecoder(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsDecoder(test *testing.T) {
+	test.Parallel()
 
-	decode := func(t *testing.T, raw string) restrictPlusOperandsSettings {
-		t.Helper()
+	decode := func(test *testing.T, raw string) restrictPlusOperandsSettings {
+		test.Helper()
 		decoded, err := rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()(json.RawMessage(raw))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		return restrictPlusOperandsSettingsFrom(decoded)
 	}
 
-	t.Run("an empty object leaves every allow at its true default", func(t *testing.T) {
-		t.Parallel()
-		got := decode(t, `{}`)
+	test.Run("an empty object leaves every allow at its true default", func(test *testing.T) {
+		test.Parallel()
+		got := decode(test, `{}`)
 		if got != DefaultRestrictPlusOperandsSettings() {
-			t.Errorf("got %+v, want the defaults %+v", got, DefaultRestrictPlusOperandsSettings())
+			test.Errorf("got %+v, want the defaults %+v", got, DefaultRestrictPlusOperandsSettings())
 		}
 	})
 
-	t.Run("nil options are the defaults rather than the zero struct", func(t *testing.T) {
-		t.Parallel()
+	test.Run("nil options are the defaults rather than the zero struct", func(test *testing.T) {
+		test.Parallel()
 		if got := restrictPlusOperandsSettingsFrom(nil); got != DefaultRestrictPlusOperandsSettings() {
-			t.Errorf("got %+v, want the defaults %+v", got, DefaultRestrictPlusOperandsSettings())
+			test.Errorf("got %+v, want the defaults %+v", got, DefaultRestrictPlusOperandsSettings())
 		}
 	})
 
-	t.Run("an explicit false is carried through", func(t *testing.T) {
-		t.Parallel()
-		got := decode(t, `{"allowNumberAndString": false}`)
+	test.Run("an explicit false is carried through", func(test *testing.T) {
+		test.Parallel()
+		got := decode(test, `{"allowNumberAndString": false}`)
 		if got.allowNumberAndString {
-			t.Error("allowNumberAndString decoded as true from an explicit false")
+			test.Error("allowNumberAndString decoded as true from an explicit false")
 		}
 		if !got.allowAny || !got.allowBoolean || !got.allowNullish || !got.allowRegExp {
-			t.Errorf("setting one option to false disturbed the others: %+v", got)
+			test.Errorf("setting one option to false disturbed the others: %+v", got)
 		}
 	})
 
-	t.Run("the decoded options reach the rule and change its verdict", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the decoded options reach the rule and change its verdict", func(test *testing.T) {
+		test.Parallel()
 		// The end-to-end half. Byte-identical source, opposite verdicts, separated only by what
 		// came off the wire.
 		const source = "let foo = '1' + 1;"
 
-		permissive := decode(t, `{}`)
-		strict := decode(t, `{"allowNumberAndString": false}`)
+		permissive := decode(test, `{}`)
+		strict := decode(test, `{"allowNumberAndString": false}`)
 		if permissive.allowNumberAndString == strict.allowNumberAndString {
-			t.Fatal("the two configurations decode the same, so this proves nothing")
+			test.Fatal("the two configurations decode the same, so this proves nothing")
 		}
 
-		rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, source,
+		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, source,
 			RestrictPlusOperandsOptions{}))
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile, source,
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, source,
 			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}), "mismatched")
 	})
 }
@@ -412,8 +412,8 @@ func TestRestrictPlusOperandsDecoder(t *testing.T) {
 //
 // The plural rendering also pins the ORDER, which is upstream's and is not alphabetical: `null` and
 // `undefined` are both gated on allowNullish and sit on either side of `RegExp`.
-func TestRestrictPlusOperandsStringLikeRenderings(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsStringLikeRenderings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -442,10 +442,10 @@ func TestRestrictPlusOperandsStringLikeRenderings(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := restrictPlusOperandsStringLike(testCase.settings); got != testCase.want {
-				t.Errorf("rendered\n%q\nwant\n%q", got, testCase.want)
+				test.Errorf("rendered\n%q\nwant\n%q", got, testCase.want)
 			}
 		})
 	}
@@ -453,17 +453,17 @@ func TestRestrictPlusOperandsStringLikeRenderings(t *testing.T) {
 
 // TestRestrictPlusOperandsRequiresTheTypedHarness asserts the rule declares the checker and that the
 // plain harness cannot prove it, so a later revert to rule_testing.Run fails loudly.
-func TestRestrictPlusOperandsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !RestrictPlusOperands.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
 
 	const source = "let foo = 1n + 1;"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, RestrictPlusOperands, restrictPlusOperandsFile, source), "bigintAndNumber")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, RestrictPlusOperands, restrictPlusOperandsFile, source))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, RestrictPlusOperands, restrictPlusOperandsFile, source), "bigintAndNumber")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, RestrictPlusOperands, restrictPlusOperandsFile, source))
 }
 
 // TestRestrictPlusOperandsSurvivesMalformedExpressions runs the rule over `+` shapes where an
@@ -473,8 +473,8 @@ func TestRestrictPlusOperandsRequiresTheTypedHarness(t *testing.T) {
 // and `+` is among the most common tokens in any tree, so this rule is offered far more nodes than
 // most. The shapes are deliberately malformed, because error recovery synthesizes nodes that
 // well-formed source never produces.
-func TestRestrictPlusOperandsSurvivesMalformedExpressions(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsSurvivesMalformedExpressions(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"const x = 1 + ;\n",
@@ -498,11 +498,11 @@ func TestRestrictPlusOperandsSurvivesMalformedExpressions(t *testing.T) {
 	}
 
 	for index, source := range sources {
-		t.Run(fmt.Sprintf("shape-%d", index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(fmt.Sprintf("shape-%d", index), func(test *testing.T) {
+			test.Parallel()
 			// A panic fails the test. Findings are deliberately unasserted: what the rule concludes
 			// about a malformed shape belongs in its own fixture.
-			rule_testing.RunTyped(t, RestrictPlusOperands, restrictPlusOperandsFile, source)
+			rule_testing.RunTyped(test, RestrictPlusOperands, restrictPlusOperandsFile, source)
 		})
 	}
 }
@@ -525,28 +525,28 @@ func TestRestrictPlusOperandsSurvivesMalformedExpressions(t *testing.T) {
 //	number | {} + 1n        [invalid] against [invalid bigintAndNumber]   distinguishes
 //
 // The non-distinguishing row is kept below as the control that makes that visible.
-func TestRestrictPlusOperandsIndividualComplaintSuppressesThePair(t *testing.T) {
-	t.Parallel()
+func TestRestrictPlusOperandsIndividualComplaintSuppressesThePair(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an impossible operand suppresses the bigint pair complaint", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
+	test.Run("an impossible operand suppresses the bigint pair complaint", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile,
 			"declare const a: number | {};\nconst x = a + 1n;", nil)
-		rule_testing.ExpectFindings(t, result, "invalid")
+		rule_testing.ExpectFindings(test, result, "invalid")
 	})
 
-	t.Run("the mismatched arm is off by default, so this shape cannot see the gate", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
+	test.Run("the mismatched arm is off by default, so this shape cannot see the gate", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile,
 			"declare const a: string | symbol;\nconst x = a + 1;", nil)
-		rule_testing.ExpectFindings(t, result, "invalid")
+		rule_testing.ExpectFindings(test, result, "invalid")
 	})
 
-	t.Run("with the mismatched arm on, the same suppression holds", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTypedWithOptions(t, RestrictPlusOperands, restrictPlusOperandsFile,
+	test.Run("with the mismatched arm on, the same suppression holds", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile,
 			"declare const a: string | symbol;\nconst x = a + 1;",
 			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)})
-		rule_testing.ExpectFindings(t, result, "invalid")
+		rule_testing.ExpectFindings(test, result, "invalid")
 	})
 }

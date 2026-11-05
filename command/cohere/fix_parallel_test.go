@@ -25,7 +25,7 @@ import (
 // with proposals (serial from the start), and markdown, CSS and JSON, which have no rules to ask. Run under
 // -race, it is also the race test: the printers run side by side here as they do on a first run.
 // Not parallel: it sets the package-level parallelFormatWorkers, which the fix phase's format pass reads
-func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
+func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 	files := map[string]string{
 		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"error\" } }\n",
 		"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
@@ -41,24 +41,24 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 		files[fmt.Sprintf("source/Tidy%02d.ts", index)] = fmt.Sprintf("export const tidy%d = %d;\n", index, index)
 	}
 
-	run := func(t *testing.T, workers int, write bool) (string, map[string]string) {
-		t.Helper()
-		graph, directory := buildNarrowFixtureGraph(t, files)
+	run := func(test *testing.T, workers int, write bool) (string, map[string]string) {
+		test.Helper()
+		graph, directory := buildNarrowFixtureGraph(test, files)
 		location := projectLocation{
 			Root:               directory,
 			ConfigFileName:     filepath.Join(directory, "tsconfig.json"),
 			LintConfigFileName: filepath.Join(directory, "CohereSettings.json"),
 		}
 		if _, err := configureLint(graph, location, nil); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		engine, err := native.NewResolving(directory)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		enumeration, err := engine.Enumerate(directory)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 
 		previous := parallelFormatWorkers
@@ -69,7 +69,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 			func() (edit.Transform, []string) { return formatTransform(engine), enumeration.Files }, wholeTreeScope(),
 			graph.Anchor.Root(), 0, write, nil)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		described := summary.String()
 		for _, changed := range summary.ChangedFiles {
@@ -83,7 +83,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 		for name := range files {
 			contents, err := os.ReadFile(filepath.Join(directory, name))
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			onDisk[name] = string(contents)
 		}
@@ -91,21 +91,21 @@ func TestTheParallelFormatPassMatchesTheSerialOne(t *testing.T) {
 	}
 
 	for _, write := range []bool{false, true} {
-		serial, serialDisk := run(t, 0, write)
-		parallel, parallelDisk := run(t, 8, write)
+		serial, serialDisk := run(test, 0, write)
+		parallel, parallelDisk := run(test, 8, write)
 		if serial != parallel {
-			t.Errorf("write=%v: the parallel pass reported differently:\n--- serial\n%s\n--- parallel\n%s", write, serial, parallel)
+			test.Errorf("write=%v: the parallel pass reported differently:\n--- serial\n%s\n--- parallel\n%s", write, serial, parallel)
 		}
 		if !reflect.DeepEqual(serialDisk, parallelDisk) {
 			for name := range serialDisk {
 				if serialDisk[name] != parallelDisk[name] {
-					t.Errorf("write=%v: %s differs on disk:\n--- serial\n%s--- parallel\n%s", write, name, serialDisk[name], parallelDisk[name])
+					test.Errorf("write=%v: %s differs on disk:\n--- serial\n%s--- parallel\n%s", write, name, serialDisk[name], parallelDisk[name])
 				}
 			}
 		}
 		// The control that the comparison could fail: the tree must have had something to change.
 		if write && serialDisk["Ugly.ts"] == files["Ugly.ts"] {
-			t.Fatalf("the writing run changed nothing, so the comparison proves nothing:\n%s", serial)
+			test.Fatalf("the writing run changed nothing, so the comparison proves nothing:\n%s", serial)
 		}
 	}
 }
@@ -120,8 +120,8 @@ func stripRoot(text string, root string) string {
 // The pass's own sorting: a file with proposals is never attempted, a file whose attempt asked for its
 // rules is left to the serial path, a file that failed keeps its failure for the serial loop to report in
 // order, and every other file is done.
-func TestFormatInParallelLeavesTheRulesToTheSerialPath(t *testing.T) {
-	t.Parallel()
+func TestFormatInParallelLeavesTheRulesToTheSerialPath(test *testing.T) {
+	test.Parallel()
 	fileNames := []string{"/a.ts", "/b.ts", "/c.ts", "/d.md"}
 	byFileName := map[string][]edit.Proposal{"/a.ts": {{RuleName: "no-debugger"}}}
 	failure := errors.New("does not parse")
@@ -142,16 +142,16 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(t *testing.T) {
 	})
 
 	if attempted["/a.ts"] {
-		t.Error("a file with proposals was attempted off the serial path")
+		test.Error("a file with proposals was attempted off the serial path")
 	}
 	if attempts[0].done || attempts[1].done {
-		t.Errorf("a file with proposals or one that asked for its rules was marked done: %+v %+v", attempts[0], attempts[1])
+		test.Errorf("a file with proposals or one that asked for its rules was marked done: %+v %+v", attempts[0], attempts[1])
 	}
 	if !attempts[2].done || !errors.Is(attempts[2].err, failure) {
-		t.Errorf("a failure was not kept for the serial loop to report: %+v", attempts[2])
+		test.Errorf("a failure was not kept for the serial loop to report: %+v", attempts[2])
 	}
 	if !attempts[3].done || attempts[3].result.FileName != "/d.md" || attempts[3].err != nil {
-		t.Errorf("a file with nothing to ask was not done: %+v", attempts[3])
+		test.Errorf("a file with nothing to ask was not done: %+v", attempts[3])
 	}
 }
 
@@ -159,9 +159,9 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(t *testing.T) {
 // same one (#679s763): for a file the walk proposed nothing for, and for the bytes the walk read. A result
 // computed from other bytes than the program holds, a file edited between the two reads, is discarded, and so
 // is one for a file with a proposal; the file then takes the path it always took.
-func TestASpeculativeFormatResultStandsOnlyForTheWalksBytes(t *testing.T) {
-	t.Parallel()
-	graph, directory := buildNarrowFixtureGraph(t, map[string]string{"A.ts": "export const a = 1;\n"})
+func TestASpeculativeFormatResultStandsOnlyForTheWalksBytes(test *testing.T) {
+	test.Parallel()
+	graph, directory := buildNarrowFixtureGraph(test, map[string]string{"A.ts": "export const a = 1;\n"})
 	fileName := filepath.Join(directory, "A.ts")
 	speculation := func(read string) *formatSpeculation {
 		done := make(chan struct{})
@@ -174,13 +174,13 @@ func TestASpeculativeFormatResultStandsOnlyForTheWalksBytes(t *testing.T) {
 	}
 
 	if _, kept := speculation("export const a = 1;\n").keepable(nil, graph)[fileName]; !kept {
-		t.Fatal("a result computed from the walk's own bytes was discarded, so nothing below is about the bytes")
+		test.Fatal("a result computed from the walk's own bytes was discarded, so nothing below is about the bytes")
 	}
 	if _, kept := speculation("export const a = 2;\n").keepable(nil, graph)[fileName]; kept {
-		t.Error("a result computed from other bytes than the walk read was kept")
+		test.Error("a result computed from other bytes than the walk read was kept")
 	}
 	proposals := map[string][]edit.Proposal{fileName: {{RuleName: "no-debugger"}}}
 	if _, kept := speculation("export const a = 1;\n").keepable(proposals, graph)[fileName]; kept {
-		t.Error("a result for a file the walk proposed a fix for was kept")
+		test.Error("a result for a file the walk proposed a fix for was kept")
 	}
 }

@@ -22,29 +22,29 @@ func (recorder *errorRecorder) Errorf(format string, arguments ...any) {
 	recorder.messages = append(recorder.messages, fmt.Sprintf(format, arguments...))
 }
 
-func exitErrorOf(t *testing.T, script string) *exec.ExitError {
-	t.Helper()
+func exitErrorOf(test *testing.T, script string) *exec.ExitError {
+	test.Helper()
 	var exitError *exec.ExitError
 	if err := exec.Command("sh", "-c", script).Run(); !errors.As(err, &exitError) {
-		t.Fatalf("sh -c %q ended with %v, want an exit error", script, err)
+		test.Fatalf("sh -c %q ended with %v, want an exit error", script, err)
 	}
 	return exitError
 }
 
 // A child a signal ended is named as killed, by its signal, and a child that chose its exit is not.
-func TestChildExitCodeNamesTheSignalThatEndedAChild(t *testing.T) {
-	t.Parallel()
+func TestChildExitCodeNamesTheSignalThatEndedAChild(test *testing.T) {
+	test.Parallel()
 
-	killed := &errorRecorder{TB: t}
-	if code := childExitCode(killed, exitErrorOf(t, "kill -KILL $$")); code != -1 {
-		t.Errorf("a killed child read as exit %d, want -1", code)
+	killed := &errorRecorder{TB: test}
+	if code := childExitCode(killed, exitErrorOf(test, "kill -KILL $$")); code != -1 {
+		test.Errorf("a killed child read as exit %d, want -1", code)
 	}
 	if len(killed.messages) != 1 || !strings.Contains(killed.messages[0], "killed by signal 9 (killed)") {
-		t.Errorf("a killed child was reported as %q", killed.messages)
+		test.Errorf("a killed child was reported as %q", killed.messages)
 	}
 
-	chose := &errorRecorder{TB: t}
-	if code := childExitCode(chose, exitErrorOf(t, "exit 3")); code != 3 || len(chose.messages) != 0 {
-		t.Errorf("a child that exited 3 read as %d with %q", code, chose.messages)
+	chose := &errorRecorder{TB: test}
+	if code := childExitCode(chose, exitErrorOf(test, "exit 3")); code != 3 || len(chose.messages) != 0 {
+		test.Errorf("a child that exited 3 read as %d with %q", code, chose.messages)
 	}
 }

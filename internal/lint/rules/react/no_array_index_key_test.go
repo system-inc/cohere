@@ -30,8 +30,8 @@ const noArrayIndexKeyFile = "/repository/source/Keys.tsx"
 // place this file departs from raw strings and the reason is mechanical.
 
 // TestNoArrayIndexKeyFires runs the forty-one failing cases from upstream.
-func TestNoArrayIndexKeyFires(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -152,10 +152,10 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -165,8 +165,8 @@ func TestNoArrayIndexKeyFires(t *testing.T) {
 // These are the false positives upstream already thought about, and several are near misses rather
 // than obvious passes: a key built from the item rather than the index, an index used as a
 // subscript rather than as the key, and a callback with too few parameters to have an index at all.
-func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -233,10 +233,10 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -247,16 +247,16 @@ func TestNoArrayIndexKeyStaysSilent(t *testing.T) {
 // later revert of the declaration would leave most fixtures green while silently losing that arm.
 // The listener guards on a nil checker, so the plain harness makes the whole rule silent rather
 // than crashing, which is the quieter and more dangerous failure.
-func TestNoArrayIndexKeyRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "foo.map((bar, i) => <Foo key={i} />)\n"
 
-	typed := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, source)
-	rule_testing.ExpectFindings(t, typed, "noArrayIndex")
+	typed := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, source)
+	rule_testing.ExpectFindings(test, typed, "noArrayIndex")
 
-	untyped := rule_testing.Run(t, NoArrayIndexKey, noArrayIndexKeyFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, NoArrayIndexKey, noArrayIndexKeyFile, source)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestNoArrayIndexKeyHasNoFileSuffixGate pins that no filename decides anything.
@@ -270,12 +270,12 @@ func TestNoArrayIndexKeyRequiresTheTypedHarness(t *testing.T) {
 // (internal/rule_testing/program.go:30), so a .jsx or .js fixture is not in the program at all and
 // the run fails before any rule is offered a file. Weakening the rule to make such a fixture pass
 // would turn a fact about the harness into a fact about the rule.
-func TestNoArrayIndexKeyHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	source := "foo.map((bar, i) => <Foo key={i} />)\n"
-	result := rule_testing.RunTyped(t, NoArrayIndexKey, "/repository/source/Suffix.tsx", source)
-	rule_testing.ExpectFindings(t, result, "noArrayIndex")
+	result := rule_testing.RunTyped(test, NoArrayIndexKey, "/repository/source/Suffix.tsx", source)
+	rule_testing.ExpectFindings(test, result, "noArrayIndex")
 }
 
 // TestNoArrayIndexKeyIteratorMethods pins the ten methods and the position each one's index sits at.
@@ -284,8 +284,8 @@ func TestNoArrayIndexKeyHasNoFileSuffixGate(t *testing.T) {
 // index is the third parameter, and a port using position one everywhere is silent exactly where
 // upstream is silent, so only the two-parameter fold separates them. The corpus does test both
 // folds, and the near-miss rows below are not in it.
-func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyIteratorMethods(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -318,10 +318,10 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -338,8 +338,8 @@ func TestNoArrayIndexKeyIteratorMethods(t *testing.T) {
 // No `ExpectFindings` fixture can see a panic, so these are as much a crash test as a behaviour
 // test, and the two answers differ: the computed form is silent upstream and the call-as-callee
 // form reports, so a guard that declined both would be wrong in one direction.
-func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyCalleeShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -364,10 +364,10 @@ func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -378,8 +378,8 @@ func TestNoArrayIndexKeyCalleeShapes(t *testing.T) {
 // so a destructuring pattern and a default value are both silent. The default row is the surprising
 // one: `(bar, i = 0)` reads as an index to a human and is an assignment pattern to the parser.
 // Both measured against the installed build.
-func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyParameterShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -393,10 +393,10 @@ func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -408,8 +408,8 @@ func TestNoArrayIndexKeyParameterShapes(t *testing.T) {
 // index to a key; and an element access is not one of the five shapes even though the index is
 // plainly inside it. A port that generalized any of these would report on code upstream leaves
 // alone, and nothing in the corpus writes `Number(i)` or `i.toFixed()`.
-func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyKeyExpressionShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name    string
@@ -448,15 +448,15 @@ func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			attribute := "key"
 			if testCase.key != "" {
 				attribute = "key=" + testCase.key
 			}
 			source := "foo.map((bar, i) => <Foo " + attribute + " />)\n"
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, source)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, source)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -467,8 +467,8 @@ func TestNoArrayIndexKeyKeyExpressionShapes(t *testing.T) {
 // every imported case and gets the first row here wrong. The last two rows are the other half of
 // the stack: a name is in scope only inside its own callback, so the same identifier is clean
 // before and after.
-func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyStackBehaviour(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -503,10 +503,10 @@ func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -517,8 +517,8 @@ func TestNoArrayIndexKeyStackBehaviour(t *testing.T) {
 // finds the collection and pushes nothing. Upstream detects this by the receiver's name, and the
 // last row shows how narrow that test is: any other receiver keeps the ordinary argument order, so
 // the same two-argument shape is silent.
-func TestNoArrayIndexKeyReactChildren(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyReactChildren(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -548,10 +548,10 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -561,8 +561,8 @@ func TestNoArrayIndexKeyReactChildren(t *testing.T) {
 // The imported form is the only part of this rule that needs the type checker: upstream resolves
 // the bare name through its own variable index and requires the import's source to be exactly
 // `react`. The last row is what that requirement buys, and nothing in the corpus writes it.
-func TestNoArrayIndexKeyCreateElement(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyCreateElement(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -625,10 +625,10 @@ func TestNoArrayIndexKeyCreateElement(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -641,8 +641,8 @@ func TestNoArrayIndexKeyCreateElement(t *testing.T) {
 //
 // `RunTyped` writes `strings.TrimSpace(source) + "\n"` to disk, so the expectation is sliced from
 // the same transform rather than from the Go literal, which would be one byte off.
-func TestNoArrayIndexKeySpans(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeySpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -666,17 +666,17 @@ func TestNoArrayIndexKeySpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayIndexKey, noArrayIndexKeyFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
 			written := strings.TrimSpace(testCase.sourceText) + "\n"
 			diagnostic := result.Diagnostics[0]
 			got := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if got != testCase.wantText {
-				t.Errorf("span text = %q, wanted %q", got, testCase.wantText)
+				test.Errorf("span text = %q, wanted %q", got, testCase.wantText)
 			}
 		})
 	}
@@ -687,13 +687,13 @@ func TestNoArrayIndexKeySpans(t *testing.T) {
 // A rule.Message is {Id, Description} with no interpolation, so there is nothing to render.
 // Asserted against a literal typed here rather than against the rule's own constant, which would
 // move on both sides under mutation and could not fail.
-func TestNoArrayIndexKeyMessage(t *testing.T) {
-	t.Parallel()
+func TestNoArrayIndexKeyMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageNoArrayIndexKey.Id != "noArrayIndex" {
-		t.Errorf("message id = %q", messageNoArrayIndexKey.Id)
+		test.Errorf("message id = %q", messageNoArrayIndexKey.Id)
 	}
 	if len(messageNoArrayIndexKey.Description) < 80 {
-		t.Errorf("description is too short to say why: %q", messageNoArrayIndexKey.Description)
+		test.Errorf("description is too short to say why: %q", messageNoArrayIndexKey.Description)
 	}
 }

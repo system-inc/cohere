@@ -28,8 +28,8 @@ const noRedundantShouldComponentUpdateFile = "/repository/source/Pure.tsx"
 //
 // The three valid cases are all the same shape with Component in place of PureComponent, which is
 // exactly the distinction the shelf's IsEs6ComponentClass would erase.
-func TestNoRedundantShouldComponentUpdateFires(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText    string
@@ -44,24 +44,24 @@ func TestNoRedundantShouldComponentUpdateFires(t *testing.T) {
 		{"\n        var Foo = class extends PureComponent {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ", []string{"noShouldCompUpdate"}, "Foo"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 			// The name is interpolated into the message, so an id assertion cannot see it and a
 			// wrong derivation would ship green. Asserted as a prefix of the rendered text against
 			// a literal built here rather than against the rule's own format string, since a
 			// comparison to the rule's own constant moves with it under mutation.
 			wantPrefix := testCase.componentName + " extends PureComponent and also writes shouldComponentUpdate."
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, wantPrefix) {
-				t.Fatalf("message was %q, wanted it to start %q", result.Diagnostics[0].Message.Description, wantPrefix)
+				test.Fatalf("message was %q, wanted it to start %q", result.Diagnostics[0].Message.Description, wantPrefix)
 			}
 		})
 	}
 }
 
-func TestNoRedundantShouldComponentUpdateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\n        class Foo extends React.Component {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ",
@@ -69,10 +69,10 @@ func TestNoRedundantShouldComponentUpdateStaysSilent(t *testing.T) {
 		"\n        function Foo() {\n          return class Bar extends React.Component {\n            shouldComponentUpdate() {\n              return true;\n            }\n          };\n        }\n      ",
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -86,8 +86,8 @@ func TestNoRedundantShouldComponentUpdateStaysSilent(t *testing.T) {
 // This is the test that separates this rule from react.IsEs6ComponentClass, which accepts Component
 // and PureComponent alike. Routing through the shelf would report upstream's first valid case, and
 // the three imported valid cases are all one shape, so they cannot show the boundary on their own.
-func TestNoRedundantShouldComponentUpdateBaseClassBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateBaseClassBoundary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -131,10 +131,10 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(t *testing.T) {
 		{"nor does a doubly parenthesized one", "class Foo implements ((PureComponent)) { shouldComponentUpdate() { return true; } }", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -148,8 +148,8 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(t *testing.T) {
 // The two silent lines are not a special case and would be easy to "fix" into a defect: upstream's
 // getPropertyName reads nameNode.name, a field only an Identifier and a PrivateIdentifier carry, so
 // a string key and a computed key both yield the empty string mechanically.
-func TestNoRedundantShouldComponentUpdateMemberShapes(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateMemberShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -168,10 +168,10 @@ func TestNoRedundantShouldComponentUpdateMemberShapes(t *testing.T) {
 		{"the method written twice reports once, because upstream stops at the first match", "class Foo extends PureComponent { shouldComponentUpdate() {} shouldComponentUpdate() {} }", []string{"noShouldCompUpdate"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }
@@ -185,8 +185,8 @@ func TestNoRedundantShouldComponentUpdateMemberShapes(t *testing.T) {
 //
 // The message is compared against a literal built here rather than against the rule's own format
 // string, because a comparison to the rule's own constant moves with it under mutation.
-func TestNoRedundantShouldComponentUpdateNameDerivation(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateNameDerivation(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -201,13 +201,13 @@ func TestNoRedundantShouldComponentUpdateNameDerivation(t *testing.T) {
 		{"nor does one on the right of an assignment", "let a: unknown; a = class extends PureComponent { shouldComponentUpdate() {} };", ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "noShouldCompUpdate")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "noShouldCompUpdate")
 			wantPrefix := testCase.wantName + " extends PureComponent and also writes shouldComponentUpdate."
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, wantPrefix) {
-				t.Fatalf("message was %q, wanted it to start %q", result.Diagnostics[0].Message.Description, wantPrefix)
+				test.Fatalf("message was %q, wanted it to start %q", result.Diagnostics[0].Message.Description, wantPrefix)
 			}
 		})
 	}
@@ -219,29 +219,29 @@ func TestNoRedundantShouldComponentUpdateNameDerivation(t *testing.T) {
 // expression assigned to a variable spans from `class` to the closing brace and excludes the
 // declaration prefix. A rule anchoring on the method would pass every fixture above while pointing
 // somewhere the reader was never shown.
-func TestNoRedundantShouldComponentUpdateSpan(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateSpan(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a declaration reports on the whole class", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a declaration reports on the whole class", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "class Foo extends PureComponent { shouldComponentUpdate() {} }"
-		result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
-		rule_testing.ExpectFindings(t, result, "noShouldCompUpdate")
+		result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
+		rule_testing.ExpectFindings(test, result, "noShouldCompUpdate")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != sourceText {
-			t.Fatalf("reported on %q, wanted the whole class", reported)
+			test.Fatalf("reported on %q, wanted the whole class", reported)
 		}
 	})
 
-	t.Run("a class expression reports on the expression, not the declaration", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a class expression reports on the expression, not the declaration", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "var Foo = class extends PureComponent { shouldComponentUpdate() {} };"
 		const want = "class extends PureComponent { shouldComponentUpdate() {} }"
-		result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
-		rule_testing.ExpectFindings(t, result, "noShouldCompUpdate")
+		result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
+		rule_testing.ExpectFindings(test, result, "noShouldCompUpdate")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != want {
-			t.Fatalf("reported on %q, wanted %q", reported, want)
+			test.Fatalf("reported on %q, wanted %q", reported, want)
 		}
 	})
 }
@@ -254,8 +254,8 @@ func TestNoRedundantShouldComponentUpdateSpan(t *testing.T) {
 //
 // This rule never touches JSX, so all four are reachable here, unlike no_namespace.go where the
 // typed harness cannot build a JavaScript program.
-func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "class Foo extends PureComponent { shouldComponentUpdate() { return true; } }"
 	for _, fileName := range []string{
@@ -264,10 +264,10 @@ func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Pure.js",
 		"/repository/source/Pure.jsx",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, fileName, sourceText)
-			rule_testing.ExpectFindings(t, result, "noShouldCompUpdate")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, fileName, sourceText)
+			rule_testing.ExpectFindings(test, result, "noShouldCompUpdate")
 		})
 	}
 }
@@ -286,8 +286,8 @@ func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(t *testing.T) {
 //
 // The computed keys here are deliberately mixed with a real reporting member in the second case, so
 // the test also shows the walk reaching past the computed member rather than merely surviving it.
-func TestNoRedundantShouldComponentUpdateDoesNotPanicOnComputedMembers(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantShouldComponentUpdateDoesNotPanicOnComputedMembers(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -301,10 +301,10 @@ func TestNoRedundantShouldComponentUpdateDoesNotPanicOnComputedMembers(t *testin
 		{"a numeric key", "class Foo extends PureComponent { 1() {} }", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.findings...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
 }

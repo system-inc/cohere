@@ -17,8 +17,8 @@ declare const rex: Dog;
 
 // TestInvariantMutableFiresOnEveryProvenHole: each case is a probe tsc 6.0.3 accepts and Node fails on,
 // and the finding sits on the value being widened.
-func TestInvariantMutableFiresOnEveryProvenHole(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableFiresOnEveryProvenHole(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -180,19 +180,19 @@ interface Named { readonly label: string }
 const kennel: { pet: Dog } & Named = { pet: rex, label: 'kennel' };
 const pen: { pet: Animal } = kennel;`, "kennel"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, InvariantMutable, fixture.source)
-			rule_testing.ExpectFindings(t, result, "mutableWidening")
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(test, result, "mutableWidening")
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
 
 // TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough: read-only targets, fresh literals, the
 // same type, and a class instance (nominal-class's) are not this rule's holes.
-func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		// h14
 		"a readonly array": animals + `const dogs: Dog[] = [rex]; const all: readonly Animal[] = dogs;`,
@@ -254,9 +254,9 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 		"a branded primitive":                           `declare const brand: unique symbol; type Slot = string & { readonly [brand]?: () => 'value' }; const text: Slot = 'Hello'; const wide: string & { readonly [brand]?: () => string } = text;`,
 		"an intersection with the same array":           animals + `declare const tagged: Animal[] & { readonly tag: 'kennel' }; const wide: Animal[] & { readonly tag: string } = tagged;`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, InvariantMutable, source))
 		})
 	}
 }
@@ -264,8 +264,8 @@ func TestInvariantMutableStaysCleanWhereNothingCanBeWrittenThrough(t *testing.T)
 // TestInvariantMutableFiresWhereAReadOnlySlotIsMadeWritable: shape 1 of #gvzdft9, six-probes.tgz's s1. A
 // read-only property is covariant, so it may hold a Dog behind `Animal`, and a writable view of it lets a Cat in;
 // tsc 6.0.3 accepts it, and Node throws `bark is not a function`.
-func TestInvariantMutableFiresWhereAReadOnlySlotIsMadeWritable(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableFiresWhereAReadOnlySlotIsMadeWritable(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -280,11 +280,11 @@ const open: { readonly kennel: { pet: Animal } } = yard;`, "yard"},
 		// six-probes.tgz's s1b: a read-only string may hold a literal, so `sounds[dog.kind]` stops being a function.
 		"a primitive, under a slot assignable back": {`declare const source: { pet: { readonly name: string } }; const wide: { pet: { name: string } } = source;`, "source"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, InvariantMutable, fixture.source)
-			rule_testing.ExpectFindings(t, result, "readonlyMadeWritable")
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(test, result, "readonlyMadeWritable")
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
@@ -292,8 +292,8 @@ const open: { readonly kennel: { pet: Animal } } = yard;`, "yard"},
 // TestInvariantMutableFiresWhereADestructuringAssignmentWidens: shape 2 of #gvzdft9, six-probes.tgz's s2. Each
 // target of an assignment pattern is a slot the value's part is put into, so `[animals] = [dogs]` is
 // `animals = dogs`; tsc 6.0.3 accepts it, and Node throws `dogs[1].bark is not a function`.
-func TestInvariantMutableFiresWhereADestructuringAssignmentWidens(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableFiresWhereADestructuringAssignmentWidens(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -308,18 +308,18 @@ func TestInvariantMutableFiresWhereADestructuringAssignmentWidens(t *testing.T) 
 		"after a spread in a literal value": {animals + `const dogs: Dog[] = [rex]; declare const cats: Animal[][]; let all: Animal[] = []; [all] = [...cats, dogs];`, "dogs"},
 		"a nested pattern from a tuple":     {animals + `declare const pair: [Dog[]]; let all: Animal[] = []; [[all]] = [pair];`, "pair"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, InvariantMutable, fixture.source)
-			rule_testing.ExpectFindings(t, result, "mutableWidening")
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(test, result, "mutableWidening")
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
 
 // TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrough: shape 2's near-misses.
-func TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrough(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrough(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		"the same type":     animals + `const dogs: Dog[] = [rex]; let same: Dog[] = []; [same] = [dogs];`,
 		"a readonly target": animals + `const dogs: Dog[] = [rex]; let view: readonly Animal[] = []; [view] = [dogs];`,
@@ -327,9 +327,9 @@ func TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrou
 		// A rest element is an array the pattern builds, no one else's.
 		"a rest element": animals + `const dogs: Dog[] = [rex]; let rest: Animal[] = []; [...rest] = dogs;`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, InvariantMutable, source))
 		})
 	}
 }
@@ -337,8 +337,8 @@ func TestInvariantMutableStaysCleanWhereADestructuringAssignmentCannotWriteThrou
 // TestInvariantMutableFiresWhereASpreadSharesAMutablePart: shape 3 of #gvzdft9, six-interface.tgz's s3 and s3b. A
 // spread copies the top level only, so what the copy's slots hold is the original's, and a wider view writes
 // into it; tsc 6.0.3 accepts it, and Node throws `bark is not a function`.
-func TestInvariantMutableFiresWhereASpreadSharesAMutablePart(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableFiresWhereASpreadSharesAMutablePart(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -352,18 +352,18 @@ func TestInvariantMutableFiresWhereASpreadSharesAMutablePart(t *testing.T) {
 		"a map returning what someone holds":                  {animals + `const kennels: { pets: Dog[] }[] = [{ pets: [rex] }]; const all: { pets: Animal[] }[] = [...kennels.map((kennel) => kennel)];`, "kennels.map((kennel) => kennel)"},
 		"a map returning what someone holds, at its own slot": {`const kennels: { kind: 'dog' }[] = [{ kind: 'dog' }]; const all: { kind: string }[] = [...kennels.map((kennel) => kennel)];`, "kennels.map((kennel) => kennel)"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, InvariantMutable, fixture.source)
-			rule_testing.ExpectFindings(t, result, "mutableWidening")
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(test, result, "mutableWidening")
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
 
 // TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable: shape 3's near-misses.
-func TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		// s3c: written again after the spread, so the copy holds the later value.
 		"a property written after":   animals + `const holder = { pets: [rex] }; const view: { pets: Animal[] } = { ...holder, pets: [] };`,
@@ -375,9 +375,9 @@ func TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable(t *testing.
 		// A map whose callback returns fresh literals builds its elements too: nobody else holds them.
 		"a spread of fresh mapped elements": `interface Row { section: 'doctrine' | 'soul' } const pages = ['a']; const rows: Row[] = [...pages.map((page) => ({ section: 'doctrine' as const }))];`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, InvariantMutable, source))
 		})
 	}
 }
@@ -385,8 +385,8 @@ func TestInvariantMutableStaysCleanWhereASpreadSharesNothingWritable(t *testing.
 // TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter: shape 5 of #gvzdft9, six-interface.tgz's s5 and
 // s5b. tsc compares a method's parameters in both directions, so a method taking only a Dog passes as one taking
 // any Animal; tsc 6.0.3 accepts it, and a Cat passed through the wider type is `bark is not a function` in Node.
-func TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -402,11 +402,11 @@ func TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter(t *testing.T) 
 		// A default takes `undefined` as well, and still not a Cat.
 		"a defaulted parameter": {animals + `interface Sink { put(animal?: Animal): void } class Kennel { put(dog: Dog = rex): void { dog.bark(); } } const sink: Sink = new Kennel();`, "new Kennel()"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, InvariantMutable, fixture.source)
-			rule_testing.ExpectFindings(t, result, "methodParameterNarrowed")
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(test, result, "methodParameterNarrowed")
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
@@ -414,8 +414,8 @@ func TestInvariantMutableFiresWhereAMethodTakesANarrowerParameter(t *testing.T) 
 // TestInvariantMutableFiresWhereAMethodReturnsWhatItHolds: #y0ejf6a, return-probe.tgz's r1 to r4. A method hands back
 // a container its object still holds, so a Cat pushed through the wider return fills it; tsc 6.0.3 accepts each, and
 // Node throws `bark is not a function`.
-func TestInvariantMutableFiresWhereAMethodReturnsWhatItHolds(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableFiresWhereAMethodReturnsWhatItHolds(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -427,18 +427,18 @@ func TestInvariantMutableFiresWhereAMethodReturnsWhatItHolds(t *testing.T) {
 		// One return that builds and one that does not: the method can hand back what it holds.
 		"one return of two held": {animals + `interface Pound { all(fresh: boolean): Animal[] } class Kennel { dogs: Dog[] = [rex]; all(fresh: boolean): Dog[] { if(fresh) { return []; } return this.dogs; } } const pound: Pound = new Kennel();`, "new Kennel()"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, InvariantMutable, fixture.source)
-			rule_testing.ExpectFindings(t, result, "mutableWidening")
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(test, result, "mutableWidening")
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
 
 // TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven: shape 5's near-misses.
-func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		// s5c: a wider parameter takes whatever the view passes.
 		"a wider parameter":   animals + `interface DogSink { put(dog: Dog): void } const sink: DogSink = { put(animal: Animal) { animal.name; } };`,
@@ -491,9 +491,9 @@ func TestInvariantMutableStaysCleanWhereAMethodTakesWhatItIsGiven(t *testing.T) 
 		"a literal's method building":       animals + `interface Pound { all(): Animal[] } const pound: Pound = { all() { return [rex]; } };`,
 		"an iterator's next()":              animals + `declare const dogs: Iterator<Dog>; const all: Iterator<Animal> = dogs;`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, InvariantMutable, source))
 		})
 	}
 }
@@ -510,8 +510,8 @@ declare const rex: Dog;
 // TestInvariantMutableFiresWhereASlotHoldsAClassInstance: #5y54eyj, class-probe.tgz. nominal-class accepts a Dog as an
 // Animal, rightly for the value, so the slot holding it is this rule's; tsc 6.0.3 accepts each, and Node throws
 // `bark is not a function`.
-func TestInvariantMutableFiresWhereASlotHoldsAClassInstance(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableFiresWhereASlotHoldsAClassInstance(test *testing.T) {
+	test.Parallel()
 	for name, fixture := range map[string]struct {
 		source string
 		span   string
@@ -528,19 +528,19 @@ func TestInvariantMutableFiresWhereASlotHoldsAClassInstance(t *testing.T) {
 		// c4-method-parameter
 		"a method's parameter": {classAnimals + `interface Sink { put(animal: Animal): void } const sink: Sink = { put(dog: Dog) { dog.bark(); } };`, "put", "methodParameterNarrowed"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := runAdamic(t, InvariantMutable, fixture.source)
-			rule_testing.ExpectFindings(t, result, fixture.id)
-			expectSpans(t, fixture.source, result, fixture.span)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamic(test, InvariantMutable, fixture.source)
+			rule_testing.ExpectFindings(test, result, fixture.id)
+			expectSpans(test, fixture.source, result, fixture.span)
 		})
 	}
 }
 
 // TestInvariantMutableStaysCleanWhereAClassInstanceIsOnlyRead: #5y54eyj's near-misses, and the pair nominal-class
 // reports itself.
-func TestInvariantMutableStaysCleanWhereAClassInstanceIsOnlyRead(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableStaysCleanWhereAClassInstanceIsOnlyRead(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		// n1, n2, n3
 		"a readonly array":    classAnimals + `const dogs: Dog[] = [rex]; const all: readonly Animal[] = dogs;`,
@@ -550,16 +550,16 @@ func TestInvariantMutableStaysCleanWhereAClassInstanceIsOnlyRead(t *testing.T) {
 		// n4: Box<Dog> is no Box<Animal>, which is nominal-class's finding on the same pair.
 		"another type argument": classAnimals + `const boxes: Box<Dog>[] = [new Box(rex)]; const all: Box<Animal>[] = boxes;`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, InvariantMutable, source))
 		})
 	}
 }
 
 // TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly: the near-misses of shape 1.
-func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(test *testing.T) {
+	test.Parallel()
 	for name, source := range map[string]string{
 		"read-only both sides":        animals + `declare const kennel: { readonly pet: Animal }; const view: { readonly pet: Animal } = kennel;`,
 		"a literal type":              `declare const circle: { readonly kind: 'Circle' }; const shape: { kind: 'Circle' } = circle;`,
@@ -569,32 +569,32 @@ func TestInvariantMutableStaysCleanWhereAReadOnlySlotStaysReadOnly(t *testing.T)
 		// s1c: a library getter throws on the write before anything is stored.
 		"a library getter": `const pattern = /dog/; const view: { source: string } = pattern;`,
 	} {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runAdamic(t, InvariantMutable, source))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runAdamic(test, InvariantMutable, source))
 		})
 	}
 }
 
 // TestInvariantMutableStaysCleanOnAdamicsPrograms: Adamic 0.1 compiles all ten.
-func TestInvariantMutableStaysCleanOnAdamicsPrograms(t *testing.T) {
-	t.Parallel()
-	expectProgramsClean(t, InvariantMutable)
+func TestInvariantMutableStaysCleanOnAdamicsPrograms(test *testing.T) {
+	test.Parallel()
+	expectProgramsClean(test, InvariantMutable)
 }
 
 // TestInvariantMutableNamesTheSlot: the message says which part can be written through and both types
 // there, since `'Dog[]' is seen as 'Animal[]'` alone does not say where to put the `readonly`.
-func TestInvariantMutableNamesTheSlot(t *testing.T) {
-	t.Parallel()
+func TestInvariantMutableNamesTheSlot(test *testing.T) {
+	test.Parallel()
 	source := animals + `
 const kennel: { readonly dogs: Dog[] } = { dogs: [rex] };
 const pen: { readonly dogs: Animal[] } = kennel;`
-	result := runAdamic(t, InvariantMutable, source)
-	rule_testing.ExpectFindings(t, result, "mutableWidening")
+	result := runAdamic(test, InvariantMutable, source)
+	rule_testing.ExpectFindings(test, result, "mutableWidening")
 	description := result.Diagnostics[0].Message.Description
 	for _, want := range []string{"`kennel.dogs[]`", "'Dog'", "'Animal'"} {
 		if !strings.Contains(description, want) {
-			t.Errorf("the message does not name %s: %s", want, description)
+			test.Errorf("the message does not name %s: %s", want, description)
 		}
 	}
 }

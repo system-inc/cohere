@@ -33,14 +33,14 @@ type yodaCase struct {
 func yodaStringPointer(value string) *string { return &value }
 
 // decodeYodaOptionsForTest routes a case's options through the shipped decoder.
-func decodeYodaOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeYodaOptionsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return nil
 	}
 	decoded, err := DecodeYodaOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+		test.Fatalf("decoding options %q: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -214,20 +214,20 @@ var yodaFiringCases = []yodaCase{
 // right side and the right operator, and that the repair writes exactly what upstream's output
 // says. The last is the one that matters most for a fixer, because a repair anchored correctly can
 // still write the wrong bytes and no message assertion can see it.
-func TestYodaFires(t *testing.T) {
-	t.Parallel()
+func TestYodaFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range yodaFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, Yoda, yodaFile, testCase.source,
-				decodeYodaOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, Yoda, yodaFile, testCase.source,
+				decodeYodaOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.findings))
 			for i := range wantIds {
 				wantIds[i] = "expected"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for i, finding := range testCase.findings {
 				// Upstream's template is
@@ -237,19 +237,19 @@ func TestYodaFires(t *testing.T) {
 				want := "Expected literal to be on the " + finding.expectedSide +
 					" side of " + finding.operator + "."
 				if got := result.Diagnostics[i].Message.Description; !strings.HasPrefix(got, want) {
-					t.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+					test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
 				}
 			}
 
 			if testCase.fixedSource == nil {
 				for i, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d proposes a fix; upstream declines this case", i)
+						test.Errorf("finding %d proposes a fix; upstream declines this case", i)
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, *testCase.fixedSource)
+			rule_testing.ExpectFixedSource(test, result, *testCase.fixedSource)
 		})
 	}
 }
@@ -260,14 +260,14 @@ func TestYodaFires(t *testing.T) {
 // most likely to be wrong: the range test compares two operands structurally, orders the two
 // bounds, and requires the whole thing to be parenthesised, and a port getting any of the three
 // wrong passes the other cases.
-func TestYodaStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestYodaStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range yodaCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, Yoda, yodaFile,
-				testCase.source, decodeYodaOptionsForTest(t, testCase.optionsJson)))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, Yoda, yodaFile,
+				testCase.source, decodeYodaOptionsForTest(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -359,16 +359,16 @@ var yodaTypeScriptCases = []struct {
 }
 
 // TestYodaTypeScriptOperandsSurviveTheFix covers what upstream's corpus structurally cannot.
-func TestYodaTypeScriptOperandsSurviveTheFix(t *testing.T) {
-	t.Parallel()
+func TestYodaTypeScriptOperandsSurviveTheFix(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range yodaTypeScriptCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, Yoda, yodaFile, testCase.source,
-				decodeYodaOptionsForTest(t, testCase.optionsJson))
-			rule_testing.ExpectFindings(t, result, "expected")
-			rule_testing.ExpectFixedSource(t, result, testCase.fixedSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, Yoda, yodaFile, testCase.source,
+				decodeYodaOptionsForTest(test, testCase.optionsJson))
+			rule_testing.ExpectFindings(test, result, "expected")
+			rule_testing.ExpectFixedSource(test, result, testCase.fixedSource)
 		})
 	}
 }
@@ -383,14 +383,14 @@ func TestYodaTypeScriptOperandsSurviveTheFix(t *testing.T) {
 // Added because a mutation widening that predicate to accept every operator survived all 156
 // corpus cases: upstream writes no `>` range anywhere, so nothing imported can tell a working
 // restriction from an absent one. Each verdict was measured against the installed rule.
-func TestYodaRangeTestRequiresLessThanOperators(t *testing.T) {
-	t.Parallel()
+func TestYodaRangeTestRequiresLessThanOperators(test *testing.T) {
+	test.Parallel()
 
-	options := decodeYodaOptionsForTest(t, `["never",{"exceptRange":true}]`)
+	options := decodeYodaOptionsForTest(test, `["never",{"exceptRange":true}]`)
 
 	// The control: a genuine range test, exempt.
-	rule_testing.ExpectClean(t,
-		rule_testing.RunWithOptions(t, Yoda, yodaFile, "if (0 <= x && x < 1) {}", options))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunWithOptions(test, Yoda, yodaFile, "if (0 <= x && x < 1) {}", options))
 
 	for _, source := range []string{
 		"if (1 > x && x > 0) {}",
@@ -399,10 +399,10 @@ func TestYodaRangeTestRequiresLessThanOperators(t *testing.T) {
 		"if (1 >= x || x >= 0) {}",
 		"if (0 < x && x > 1) {}",
 	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, Yoda, yodaFile, source, options), "expected")
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunWithOptions(test, Yoda, yodaFile, source, options), "expected")
 		})
 	}
 }
@@ -410,15 +410,15 @@ func TestYodaRangeTestRequiresLessThanOperators(t *testing.T) {
 // TestDecodeYodaOptions pins the list shapes the config layer delivers and the ones it must refuse.
 // The second element is where `exceptRange` and `onlyEquality` live, and it used to be dropped by
 // the config layer, so the row reading it is the one that matters.
-func TestDecodeYodaOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeYodaOptions(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeYodaOptions([]byte(`["always", {"exceptRange": true, "onlyEquality": true}]`))
 	if err != nil {
-		t.Fatalf("upstream's spelling was refused: %v", err)
+		test.Fatalf("upstream's spelling was refused: %v", err)
 	}
 	if settings := decoded.(YodaSettings); !settings.Always || !settings.ExceptRange || !settings.OnlyEquality {
-		t.Errorf("the second element was not read: %+v", settings)
+		test.Errorf("the second element was not read: %+v", settings)
 	}
 
 	for _, raw := range []string{
@@ -433,7 +433,7 @@ func TestDecodeYodaOptions(t *testing.T) {
 		`["sometimes"]`,
 	} {
 		if decoded, err := DecodeYodaOptions([]byte(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }

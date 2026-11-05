@@ -27,8 +27,8 @@ func asTheRelationHarnessWroteIt(text string) string {
 // Three rows taught this port something it would not have written from the source alone: `| null`
 // reports where `| null | undefined` does not, `void` reports while `any` and `unknown` do not,
 // and a decorator written without parentheses does not match at all.
-func TestRelationMustBeOptional(t *testing.T) {
-	t.Parallel()
+func TestRelationMustBeOptional(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -168,13 +168,13 @@ func TestRelationMustBeOptional(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, CorrectnessRequireOptionalRelation,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, CorrectnessRequireOptionalRelation,
 				correctnessRequireOptionalRelationFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheRelationHarnessWroteIt(testCase.sourceText)
@@ -182,11 +182,11 @@ func TestRelationMustBeOptional(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 				if reported.Message.Description != testCase.wantMessages[findingIndex] {
-					t.Errorf("finding %d reads %q, wanted %q", findingIndex,
+					test.Errorf("finding %d reads %q, wanted %q", findingIndex,
 						reported.Message.Description, testCase.wantMessages[findingIndex])
 				}
 			}
@@ -199,13 +199,13 @@ func TestRelationMustBeOptional(t *testing.T) {
 // The listener starts with a nil check, and the shim answers nil from a type query on a nil checker
 // rather than panicking, so a rule missing that guard goes silent rather than crashing. A vacuous
 // green is the more dangerous of the two because nothing announces it.
-func TestRelationMustBeOptionalRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRelationMustBeOptionalRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const OrmManyToOne: any;\ndeclare class Profile {}\n" +
 		"class E { @OrmManyToOne() profile: Profile; }\n"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, CorrectnessRequireOptionalRelation,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, CorrectnessRequireOptionalRelation,
 		correctnessRequireOptionalRelationFile, sourceText))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, CorrectnessRequireOptionalRelation,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireOptionalRelation,
 		correctnessRequireOptionalRelationFile, sourceText), "mustBeOptional")
 }

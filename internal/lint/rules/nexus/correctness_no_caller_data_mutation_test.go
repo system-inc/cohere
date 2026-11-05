@@ -38,9 +38,9 @@ func correctnessNoCallerDataMutationSource(lines ...string) string {
 	return correctnessNoCallerDataMutationPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoCallerDataMutationRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoCallerDataMutation, map[string]string{
+func correctnessNoCallerDataMutationRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoCallerDataMutation, map[string]string{
 		correctnessNoCallerDataMutationFile:     sourceText,
 		correctnessNoCallerDataMutationHostFile: correctnessNoCallerDataMutationHost,
 	}, correctnessNoCallerDataMutationFile)
@@ -48,8 +48,8 @@ func correctnessNoCallerDataMutationRun(t *testing.T, sourceText string) rule_te
 
 // correctnessNoCallerDataMutationExpect asserts the reported text in source order, and that no
 // finding carries a fix.
-func correctnessNoCallerDataMutationExpect(t *testing.T, result rule_testing.Result, want ...string) {
-	t.Helper()
+func correctnessNoCallerDataMutationExpect(test *testing.T, result rule_testing.Result, want ...string) {
+	test.Helper()
 	// The shared assertion by message id, which proves the rule can fire; the checks below hold each
 	// finding's exact text.
 	if len(want) > 0 {
@@ -57,7 +57,7 @@ func correctnessNoCallerDataMutationExpect(t *testing.T, result rule_testing.Res
 		for index := range wantIds {
 			wantIds[index] = correctnessNoCallerDataMutationId
 		}
-		rule_testing.ExpectFindings(t, result, wantIds...)
+		rule_testing.ExpectFindings(test, result, wantIds...)
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -67,19 +67,19 @@ func correctnessNoCallerDataMutationExpect(t *testing.T, result rule_testing.Res
 	var got []string
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != correctnessNoCallerDataMutationId {
-			t.Fatalf("unexpected message id %q", diagnostic.Message.Id)
+			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
+			test.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
 		}
 	}
 }
@@ -107,21 +107,21 @@ func correctnessNoCallerDataMutationAddUsage(fixed bool) string {
 	)
 }
 
-func TestCorrectnessNoCallerDataMutationFiresOnAddUsage(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationFiresOnAddUsage(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationAddUsage(false))
-	correctnessNoCallerDataMutationExpect(t, result, "into.inputTokens", "into.outputTokens", "into.dollars")
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationAddUsage(false))
+	correctnessNoCallerDataMutationExpect(test, result, "into.inputTokens", "into.outputTokens", "into.dollars")
 }
 
-func TestCorrectnessNoCallerDataMutationStaysSilentOnFixedAddUsage(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationStaysSilentOnFixedAddUsage(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationAddUsage(true)))
+	rule_testing.ExpectClean(test, correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationAddUsage(true)))
 }
 
-func TestCorrectnessNoCallerDataMutationFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -223,17 +223,17 @@ func TestCorrectnessNoCallerDataMutationFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(testCase.lines...))
-			correctnessNoCallerDataMutationExpect(t, result, testCase.want...)
+			result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(testCase.lines...))
+			correctnessNoCallerDataMutationExpect(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoCallerDataMutationStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -383,10 +383,10 @@ func TestCorrectnessNoCallerDataMutationStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(testCase.lines...)))
 		})
 	}
 }
@@ -411,24 +411,24 @@ var correctnessNoCallerDataMutationHubs = strings.Join([]string{
 
 // A write through a parameter whose declared type is process state is exempt, through an interface, a
 // class and a type alias, and through a collection method as well as an assignment.
-func TestCorrectnessNoCallerDataMutationExemptsProcessState(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationExemptsProcessState(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 		correctnessNoCallerDataMutationHubs,
 		"export function observe(observer: ObserverInterface) { observer.count += 1; observer.names.push('x'); }",
 		"export function feed(hub: FeedHub) { hub.count = 2; }",
 		"export function report(hub: ReportHubType) { hub.count++; }",
 	))
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // The match is exact: only the tagged type itself. Each of these is a different type, so each write
 // reports, in the same file as the exempt ones (#dz42gce).
-func TestCorrectnessNoCallerDataMutationProcessStateIsExact(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationProcessStateIsExact(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 		correctnessNoCallerDataMutationHubs,
 		"export function plain(state: PlainInterface) { state.count = 1; }",
 		"export function union(state: ObserverInterface | PlainInterface) { state.count = 1; }",
@@ -438,21 +438,21 @@ func TestCorrectnessNoCallerDataMutationProcessStateIsExact(t *testing.T) {
 		"export function extended(state: ExtendedObserverInterface) { state.count = 1; }",
 		"export function optional(state?: ObserverInterface) { if(state) { state.count = 1; } }",
 	))
-	correctnessNoCallerDataMutationExpect(t, result,
+	correctnessNoCallerDataMutationExpect(test, result,
 		"state.count", "state.count", "state.count", "state.names.push", "states.push", "state.count", "state.count")
 }
 
 // A bare tag is reported where it is written, and it exempts nothing: the write through its type
 // still reports.
-func TestCorrectnessNoCallerDataMutationReportsABareProcessStateTag(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationReportsABareProcessStateTag(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 		"/** The hub. @processState */",
 		"interface BareHubInterface { count: number }",
 		"export function touch(hub: BareHubInterface) { hub.count = 1; }",
 	))
-	rule_testing.ExpectFindings(t, result, "processStateWithoutReason", correctnessNoCallerDataMutationId)
+	rule_testing.ExpectFindings(test, result, "processStateWithoutReason", correctnessNoCallerDataMutationId)
 }
 
 // correctnessNoCallerDataMutationContracts declares out-parameters by contract the ways the tag is
@@ -478,10 +478,10 @@ var correctnessNoCallerDataMutationContracts = strings.Join([]string{
 // A write through the tagged parameter is exempt in an override, which may rename it, in an override
 // of that override, and in an implementation of a tagged interface method, through an assignment, an
 // update and a collection call. Another parameter of the same method still reports (#tnn31qs).
-func TestCorrectnessNoCallerDataMutationExemptsAnOutParameterByContract(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationExemptsAnOutParameterByContract(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 		correctnessNoCallerDataMutationContracts,
 		"export class SendEmails extends ScheduledExecutable {",
 		"    protected run(job: JobRecordInterface, context: JobContextInterface): void {",
@@ -500,16 +500,16 @@ func TestCorrectnessNoCallerDataMutationExemptsAnOutParameterByContract(t *testi
 		"    process(record: JobRecordInterface): void { record.status = 'done'; }",
 		"}",
 	))
-	correctnessNoCallerDataMutationExpect(t, result, "context.seen.push")
+	correctnessNoCallerDataMutationExpect(test, result, "context.seen.push")
 }
 
 // What the tag does not reach: a method that shares the tagged method's name and parameter names but
 // overrides nothing, one that shares an interface method's name without implementing it, the tagged
 // parameter's neighbour, a plain function, and a parameter at another position under the tagged name.
-func TestCorrectnessNoCallerDataMutationOutParameterIsExact(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationOutParameterIsExact(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 		correctnessNoCallerDataMutationContracts,
 		"export class LooksAlike {",
 		"    run(entity: JobRecordInterface, context: JobContextInterface): void { entity.status = 'x'; use(context); }",
@@ -522,14 +522,14 @@ func TestCorrectnessNoCallerDataMutationOutParameterIsExact(t *testing.T) {
 		"}",
 		"export function free(entity: JobRecordInterface): void { entity.status = 'x'; }",
 	))
-	correctnessNoCallerDataMutationExpect(t, result, "entity.status", "record.status", "entity.seen.push", "entity.status")
+	correctnessNoCallerDataMutationExpect(test, result, "entity.status", "record.status", "entity.seen.push", "entity.status")
 }
 
 // The tagged method itself honors its own tag, for the named parameter only.
-func TestCorrectnessNoCallerDataMutationHonorsAMethodsOwnContract(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationHonorsAMethodsOwnContract(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 		"export class Totals {",
 		"    /** @mutates into the caller hands its running total to be added to */",
 		"    add(into: UsageInterface, from: UsageInterface): void {",
@@ -538,13 +538,13 @@ func TestCorrectnessNoCallerDataMutationHonorsAMethodsOwnContract(t *testing.T) 
 		"    }",
 		"}",
 	))
-	correctnessNoCallerDataMutationExpect(t, result, "from.inputTokens")
+	correctnessNoCallerDataMutationExpect(test, result, "from.inputTokens")
 }
 
 // A tag without a reason, and one naming no parameter of its method, are each reported where they are
 // written and exempt nothing, so the override's write still reports.
-func TestCorrectnessNoCallerDataMutationReportsAnUnusableMutatesTag(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationReportsAnUnusableMutatesTag(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name string
@@ -555,10 +555,10 @@ func TestCorrectnessNoCallerDataMutationReportsAnUnusableMutatesTag(t *testing.T
 		{"a misspelled parameter", "/** @mutates entitty the scheduler persists it */", "mutatesUnknownParameter"},
 		{"no parameter at all", "/** @mutates */", "mutatesUnknownParameter"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+			result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 				"interface JobRecordInterface { status: string }",
 				"abstract class Base {",
 				"    "+testCase.tag,
@@ -568,15 +568,15 @@ func TestCorrectnessNoCallerDataMutationReportsAnUnusableMutatesTag(t *testing.T
 				"    run(entity: JobRecordInterface): void { entity.status = 'x'; }",
 				"}",
 			))
-			rule_testing.ExpectFindings(t, result, testCase.want, correctnessNoCallerDataMutationId)
+			rule_testing.ExpectFindings(test, result, testCase.want, correctnessNoCallerDataMutationId)
 		})
 	}
 }
 
 // Each identity fixture is also a control for its fresh-object counterpart below: changing the
 // source of an element must change whether the write is reported (#c7r06cq).
-func TestCorrectnessNoCallerDataMutationArrayIdentity(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationArrayIdentity(test *testing.T) {
+	test.Parallel()
 
 	for _, expression := range []string{
 		"entries.filter(entry => entry.position > 0)",
@@ -592,10 +592,10 @@ func TestCorrectnessNoCallerDataMutationArrayIdentity(t *testing.T) {
 		"entries.concat(entries[0]!)",
 		"entries.slice().map(entry => entry).filter(entry => true)",
 	} {
-		t.Run(expression, func(t *testing.T) {
-			t.Parallel()
+		test.Run(expression, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+			result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 				"export function settle(entries: EntryInterface[]) {",
 				"    const queue: EntryInterface[] = "+expression+";",
 				"    const alias = queue;",
@@ -605,14 +605,14 @@ func TestCorrectnessNoCallerDataMutationArrayIdentity(t *testing.T) {
 				"    alias.at(-1)!.status = 'done';",
 				"}",
 			))
-			correctnessNoCallerDataMutationExpect(t, result,
+			correctnessNoCallerDataMutationExpect(test, result,
 				"entry.position", "entry.status", "alias[0]!.status", "alias.find(entry => true)!.position", "alias.at(-1)!.status")
 		})
 	}
 }
 
-func TestCorrectnessNoCallerDataMutationArrayFreshObjects(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationArrayFreshObjects(test *testing.T) {
+	test.Parallel()
 
 	for _, expression := range []string{
 		"entries.map(entry => ({ ...entry }))",
@@ -623,8 +623,8 @@ func TestCorrectnessNoCallerDataMutationArrayFreshObjects(t *testing.T) {
 		"[...entries.map(entry => ({ ...entry }))]",
 		"entries.map(entry => ({ ...entry })).concat([])",
 	} {
-		t.Run(expression, func(t *testing.T) {
-			t.Parallel()
+		test.Run(expression, func(test *testing.T) {
+			test.Parallel()
 
 			fixture := func(source string) string {
 				return correctnessNoCallerDataMutationSource(
@@ -637,16 +637,16 @@ func TestCorrectnessNoCallerDataMutationArrayFreshObjects(t *testing.T) {
 					"}",
 				)
 			}
-			rule_testing.ExpectClean(t, correctnessNoCallerDataMutationRun(t, fixture(expression)))
+			rule_testing.ExpectClean(test, correctnessNoCallerDataMutationRun(test, fixture(expression)))
 			// Plant: the same four writes now land on the original elements.
-			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture("entries.map(entry => entry)")),
+			correctnessNoCallerDataMutationExpect(test, correctnessNoCallerDataMutationRun(test, fixture("entries.map(entry => entry)")),
 				"entry.status", "queue[0]!.position", "queue.find(entry => true)!.status", "queue.at(0)!.position")
 		})
 	}
 }
 
-func TestCorrectnessNoCallerDataMutationArrayBoundaries(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationArrayBoundaries(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name string
@@ -668,37 +668,37 @@ func TestCorrectnessNoCallerDataMutationArrayBoundaries(t *testing.T) {
 		{"concat fresh slot", "const queue = [{ status: '', position: 0 }].concat(entries); queue[0]!.status = 'done';", nil},
 		{"last fresh slot", "const queue = [...entries, { status: '', position: 0 }]; queue.at(-1)!.status = 'done';", nil},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			fixture := func(body string) string {
 				return correctnessNoCallerDataMutationSource("export function settle(entries: EntryInterface[]) { " + body + " }")
 			}
-			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture(testCase.body)), testCase.want...)
+			correctnessNoCallerDataMutationExpect(test, correctnessNoCallerDataMutationRun(test, fixture(testCase.body)), testCase.want...)
 			// Plant for every silent boundary, in the same function and with the same parameter.
 			if len(testCase.want) == 0 {
-				correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture("entries[0]!.status = 'done';")), "entries[0]!.status")
+				correctnessNoCallerDataMutationExpect(test, correctnessNoCallerDataMutationRun(test, fixture("entries[0]!.status = 'done';")), "entries[0]!.status")
 			}
 		})
 	}
 }
 
 // A reduced DataJunkDelete progress record: the queue is new, the windows are the caller's.
-func TestCorrectnessNoCallerDataMutationJunkDeleteWindows(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationJunkDeleteWindows(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(
+	result := correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(
 		"interface WindowInterface { rowsDeleted: number; finished: boolean }",
 		"export function runJunkDeleteWindows(state: { windows: WindowInterface[] }, rows: number) {",
 		"    const queue = state.windows.filter(window => !window.finished).sort((a, b) => a.rowsDeleted - b.rowsDeleted);",
 		"    for(const window of queue) { window.rowsDeleted += rows; window.finished = true; }",
 		"}",
 	))
-	correctnessNoCallerDataMutationExpect(t, result, "window.rowsDeleted", "window.finished")
+	correctnessNoCallerDataMutationExpect(test, result, "window.rowsDeleted", "window.finished")
 }
 
-func TestCorrectnessNoCallerDataMutationArrayDataKinds(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationArrayDataKinds(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -715,21 +715,21 @@ func TestCorrectnessNoCallerDataMutationArrayDataKinds(t *testing.T) {
 		{"process state", "/** @processState progress is shared by the process */ interface State { entries: EntryInterface[] } export function touch(state: State) { const queue = state.entries.slice(); queue[0]!.position++; }", nil},
 		{"out parameter", "export class Job {\n /** @mutates state the scheduler saves progress */\n run(state: { entries: EntryInterface[] }) { const queue = state.entries.filter(entry => true); for(const entry of queue) entry.position++; } }", nil},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(testCase.source)), testCase.want...)
+			correctnessNoCallerDataMutationExpect(test, correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(testCase.source)), testCase.want...)
 			if len(testCase.want) == 0 {
 				// Plant a caller-owned element write beside the silent fixture.
-				correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, correctnessNoCallerDataMutationSource(testCase.source,
+				correctnessNoCallerDataMutationExpect(test, correctnessNoCallerDataMutationRun(test, correctnessNoCallerDataMutationSource(testCase.source,
 					"export function plant(entries: EntryInterface[]) { entries.slice()[0]!.status = 'done'; }")), "entries.slice()[0]!.status")
 			}
 		})
 	}
 }
 
-func TestCorrectnessNoCallerDataMutationArrayRemoval(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCallerDataMutationArrayRemoval(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name string
@@ -750,18 +750,18 @@ func TestCorrectnessNoCallerDataMutationArrayRemoval(t *testing.T) {
 		{"destructured reassignment", "const queue = state.windows.slice(); let window = queue.shift(); ({ window } = { window: { rowsDeleted: 0, finished: false } }); window.finished = true;", nil},
 		{"mixed origins", "const queue = state.windows.slice(); const fresh = [{ rowsDeleted: 0, finished: false }]; let window = queue.shift(); window = fresh.shift(); if(window) window.finished = true;", nil},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			fixture := func(body string) string {
 				return correctnessNoCallerDataMutationSource(
 					"interface WindowInterface { rowsDeleted: number; finished: boolean }",
 					"export async function runJunkDeleteWindows(state: { windows: WindowInterface[] }, rows: number, statementLimit: number) { "+body+" }")
 			}
-			correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture(testCase.body)), testCase.want...)
+			correctnessNoCallerDataMutationExpect(test, correctnessNoCallerDataMutationRun(test, fixture(testCase.body)), testCase.want...)
 			if len(testCase.want) == 0 {
 				// Plant: replacing the fresh source with caller elements makes the write observable.
-				correctnessNoCallerDataMutationExpect(t, correctnessNoCallerDataMutationRun(t, fixture("const queue = state.windows.slice(); queue.shift()!.finished = true;")), "queue.shift()!.finished")
+				correctnessNoCallerDataMutationExpect(test, correctnessNoCallerDataMutationRun(test, fixture("const queue = state.windows.slice(); queue.shift()!.finished = true;")), "queue.shift()!.finished")
 			}
 		})
 	}

@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestNoHeadElementReports(t *testing.T) {
-	t.Parallel()
+func TestNoHeadElementReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -35,16 +35,16 @@ func TestNoHeadElementReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoHeadElement, testCase.fileName, testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoHeadElement.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoHeadElement, testCase.fileName, testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoHeadElement.Id)
 		})
 	}
 }
 
-func TestNoHeadElementIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoHeadElementIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -84,10 +84,10 @@ export const C = () => <Head><title>x</title></Head>;`,
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoHeadElement, testCase.fileName, testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoHeadElement, testCase.fileName, testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

@@ -19,8 +19,8 @@ const unnecessaryTypeConstraintFile = "/repository/source/no_unnecessary_type_co
 // multiple-snapshot artifact: this rule has one snapshot file with 21 location headers, and
 // aligning them against the inputs in order shows `<T extends any, U extends any>` printed
 // twice, once for each parameter. That is the whole of the discrepancy.
-func TestNoUnnecessaryTypeConstraintFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeConstraintFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -48,22 +48,22 @@ func TestNoUnnecessaryTypeConstraintFires(t *testing.T) {
 		{"type Data<T extends unknown> = {};", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noUnnecessaryTypeConstraint"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
 // TestNoUnnecessaryTypeConstraintStaysSilent is upstream's twelve passing inputs, verbatim,
 // plus the constraint kinds neighbouring `any` that a reader expects to behave the same way.
-func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeConstraintStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function data() {}",
@@ -97,9 +97,9 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
 		"function data<T extends (unknown)>() {}",
 	}
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, sourceText))
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, sourceText))
 		})
 	}
 }
@@ -133,8 +133,8 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(t *testing.T) {
 // `rule_testing.ExpectFixedSource` applies fixes and this rule proposes none, so the repair is applied
 // here by hand. The application is deliberately trivial: one suggestion carrying one fix, sliced
 // into the source. Anything cleverer would be testing the applier rather than the rule.
-func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		fileName   string
@@ -168,11 +168,11 @@ func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) 
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+" in "+testCase.fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, testCase.fileName, testCase.sourceText)
+		test.Run(testCase.sourceText+" in "+testCase.fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryTypeConstraint, testCase.fileName, testCase.sourceText)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("wanted at least one diagnostic to carry a suggestion, got none")
+				test.Fatalf("wanted at least one diagnostic to carry a suggestion, got none")
 			}
 
 			// Applied back to front so an earlier rewrite cannot move the offsets a later one was
@@ -181,14 +181,14 @@ func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) 
 			for index := len(result.Diagnostics) - 1; index >= 0; index-- {
 				suggestions := result.Diagnostics[index].Suggestions
 				if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
-					t.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
+					test.Fatalf("wanted one suggestion carrying one fix, got %d suggestions", len(suggestions))
 				}
 				fix := suggestions[0].Fixes[0]
 				source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
 			}
 
 			if source != testCase.wantSource {
-				t.Errorf("the repair wrote\n  %q\nwant\n  %q", source, testCase.wantSource)
+				test.Errorf("the repair wrote\n  %q\nwant\n  %q", source, testCase.wantSource)
 			}
 		})
 	}
@@ -207,8 +207,8 @@ func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(t *testing.T) 
 // `messageNoUnnecessaryTypeConstraint`, deliberately. Comparing a diagnostic to the constant the
 // rule reports with is equality that looks correct and cannot fail: both sides move together under
 // any edit to the constant, so the assertion tracks the rule instead of guarding it.
-func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(t *testing.T) {
-	t.Parallel()
+func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -222,30 +222,30 @@ func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts), len(result.Diagnostics))
+				test.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts), len(result.Diagnostics))
 			}
 			for index, wantText := range testCase.wantTexts {
 				diagnostic := result.Diagnostics[index]
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != wantText {
-					t.Errorf("finding %d points at %q, want %q", index, reported, wantText)
+					test.Errorf("finding %d points at %q, want %q", index, reported, wantText)
 				}
 				if diagnostic.Message.Id != "noUnnecessaryTypeConstraint" {
-					t.Errorf("finding %d has id %q", index, diagnostic.Message.Id)
+					test.Errorf("finding %d has id %q", index, diagnostic.Message.Id)
 				}
 				if len(diagnostic.Suggestions) != 1 ||
 					diagnostic.Suggestions[0].Message.Id != "removeTheConstraint" {
-					t.Errorf("finding %d does not carry the removal suggestion", index)
+					test.Errorf("finding %d does not carry the removal suggestion", index)
 				}
 				// A suggestion is not a fix, and the difference is the whole reason this rule does
 				// not rewrite files unattended. If the repair ever moves into Fixes, the engine
 				// starts applying a comma-dependent rewrite without anyone agreeing to it.
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d carries %d applicable fixes; the repair must stay a suggestion",
+					test.Errorf("finding %d carries %d applicable fixes; the repair must stay a suggestion",
 						index, len(diagnostic.Fixes))
 				}
 			}

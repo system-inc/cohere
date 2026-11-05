@@ -26,8 +26,8 @@ import (
 )
 
 // lowerTypedForSSA lowers the first function in code with a real type checker attached.
-func lowerTypedForSSA(t *testing.T, code string) *Function {
-	t.Helper()
+func lowerTypedForSSA(test *testing.T, code string) *Function {
+	test.Helper()
 	var lowered *Function
 	probe := rule.Rule{
 		Name:             "ssa-test-harness",
@@ -36,7 +36,7 @@ func lowerTypedForSSA(t *testing.T, code string) *Function {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ctx.TypeChecker == nil {
-						t.Fatal("the harness produced no type checker, so this test would prove nothing")
+						test.Fatal("the harness produced no type checker, so this test would prove nothing")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
 						if lowered == nil {
@@ -47,20 +47,20 @@ func lowerTypedForSSA(t *testing.T, code string) *Function {
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "probe.tsx", code)
+	rule_testing.RunTyped(test, probe, "probe.tsx", code)
 	if lowered == nil {
-		t.Fatal("nothing lowered")
+		test.Fatal("nothing lowered")
 	}
 	return lowered
 }
 
 // cohereEverywhere checks the SSA invariants on a function and every nested function.
-func cohereEverywhere(t *testing.T, function *Function) {
-	t.Helper()
+func cohereEverywhere(test *testing.T, function *Function) {
+	test.Helper()
 	var each func(*Function)
 	each = func(f *Function) {
 		for _, violation := range VerifySSA(f) {
-			t.Errorf("SSA violation: %s", violation.Detail)
+			test.Errorf("SSA violation: %s", violation.Detail)
 		}
 		for _, nested := range f.Functions {
 			each(nested)
@@ -69,44 +69,44 @@ func cohereEverywhere(t *testing.T, function *Function) {
 	each(function)
 }
 
-func TestSSAMatchesReactSpecFixtures(t *testing.T) {
-	t.Parallel()
+func TestSSAMatchesReactSpecFixtures(test *testing.T) {
+	test.Parallel()
 
 	for _, src := range []string{
 		"export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n",
 		"export function f(){ let x = 1; while (x < 10) { x = x + 1; } return x; }\n",
 		"export function f(){ let x = 1; try { x = 2; } finally { x = 3; } return x; }\n",
 	} {
-		fn := lowerTypedForSSA(t, src)
+		fn := lowerTypedForSSA(test, src)
 		Construct(fn)
-		t.Logf("SRC %s\n%s", src, Print(fn))
+		test.Logf("SRC %s\n%s", src, Print(fn))
 		if v := VerifySSA(fn); len(v) > 0 {
 			for _, one := range v {
-				t.Errorf("VIOLATION: %s", one)
+				test.Errorf("VIOLATION: %s", one)
 			}
 		}
-		t.Logf("stats %+v", CollectSSAStats(fn))
+		test.Logf("stats %+v", CollectSSAStats(fn))
 	}
 }
 
 // Deliberately corrupt a correct SSA function four different ways and confirm
 // VerifySSA reports each one. A checker that has never been shown to fail is
 // not evidence that the property holds.
-func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
-	t.Parallel()
+func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
+	test.Parallel()
 
 	build := func() *Function {
-		fn := lowerTypedForSSA(t, "export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n")
+		fn := lowerTypedForSSA(test, "export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n")
 		Construct(fn)
 		if v := VerifySSA(fn); len(v) != 0 {
-			t.Fatalf("baseline should be clean, got %v", v)
+			test.Fatalf("baseline should be clean, got %v", v)
 		}
 		return fn
 	}
 
 	// 1. Misplace a phi: move it from the join to a block that does not dominate its uses.
-	t.Run("phi moved off the join", func(t *testing.T) {
-		t.Parallel()
+	test.Run("phi moved off the join", func(test *testing.T) {
+		test.Parallel()
 		fn := build()
 		var moved *Phi
 		var from, to *BasicBlock
@@ -123,20 +123,20 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 			}
 		}
 		if moved == nil || to == nil {
-			t.Skip("no phi to move")
+			test.Skip("no phi to move")
 		}
 		from.Phis = nil
 		to.Phis = append(to.Phis, moved)
 		v := VerifySSA(fn)
 		if len(v) == 0 {
-			t.Fatal("moving a phi off its join was NOT detected")
+			test.Fatal("moving a phi off its join was NOT detected")
 		}
-		t.Logf("detected: %v", v)
+		test.Logf("detected: %v", v)
 	})
 
 	// 2. Point a use at a value defined on a sibling branch.
-	t.Run("use reads a sibling branch definition", func(t *testing.T) {
-		t.Parallel()
+	test.Run("use reads a sibling branch definition", func(test *testing.T) {
+		test.Parallel()
 		fn := build()
 		var join *BasicBlock
 		for _, b := range fn.Blocks {
@@ -146,7 +146,7 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 			}
 		}
 		if join == nil || len(join.Instructions) == 0 {
-			t.Skip("no join")
+			test.Skip("no join")
 		}
 		// Rewrite the first use in the join to one predecessor's definition.
 		operand := join.Phis[0].Operands.At(PhiOperandsInOrder(join.Phis[0])[0])
@@ -164,14 +164,14 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 		}
 		v := VerifySSA(fn)
 		if len(v) == 0 {
-			t.Fatal("a use reading a non-dominating sibling definition was NOT detected")
+			test.Fatal("a use reading a non-dominating sibling definition was NOT detected")
 		}
-		t.Logf("detected: %v", v)
+		test.Logf("detected: %v", v)
 	})
 
 	// 3. Define one value twice.
-	t.Run("value defined twice", func(t *testing.T) {
-		t.Parallel()
+	test.Run("value defined twice", func(test *testing.T) {
+		test.Parallel()
 		fn := build()
 		var first, second *Instruction
 		for _, b := range fn.Blocks {
@@ -185,41 +185,41 @@ func TestSSAVerifierDetectsEachViolationClass(t *testing.T) {
 			}
 		}
 		if first == nil || second == nil {
-			t.Skip("too few instructions")
+			test.Skip("too few instructions")
 		}
 		second.LValue.Identifier = first.LValue.Identifier
 		v := VerifySSA(fn)
 		if len(v) == 0 {
-			t.Fatal("a doubly-defined value was NOT detected")
+			test.Fatal("a doubly-defined value was NOT detected")
 		}
-		t.Logf("detected: %v", v)
+		test.Logf("detected: %v", v)
 	})
 
 	// 4. Read a value before it is defined within one block. Rather than hunting for an existing
 	// use, rewrite the FIRST instruction's value to a LoadLocal of the LAST instruction's result,
 	// which is unambiguously a backwards read inside one block.
-	t.Run("use before definition in the same block", func(t *testing.T) {
-		t.Parallel()
+	test.Run("use before definition in the same block", func(test *testing.T) {
+		test.Parallel()
 		fn := build()
 		entry, _ := fn.Block(fn.Entry)
 		if len(entry.Instructions) < 3 {
-			t.Skip("entry too short")
+			test.Skip("entry too short")
 		}
 		last := fn.Instructions[entry.Instructions[len(entry.Instructions)-1]]
 		first := fn.Instructions[entry.Instructions[0]]
 		first.Value = &LoadLocal{Place: Place{Identifier: last.LValue.Identifier}}
 		v := VerifySSA(fn)
 		if len(v) == 0 {
-			t.Fatal("a use before its definition was NOT detected")
+			test.Fatal("a use before its definition was NOT detected")
 		}
-		t.Logf("detected: %v", v)
+		test.Logf("detected: %v", v)
 	})
 }
 
 // Constructs the corpus sample did not contain, plus the loop shapes most likely
 // to break a construction that only looks right on straight-line code.
-func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
-	t.Parallel()
+func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, code string }{
 		{"for-in", "export function f(o: any){ let n = 0; for (const k in o) { n = n + 1; } return n; }\n"},
@@ -241,17 +241,17 @@ func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
 		{"destructuring", "export function f(o: {a: number, b: number}){ let { a, b } = o; if (a > b) { a = b; } return a + b; }\n"},
 	}
 	for _, one := range cases {
-		t.Run(one.name, func(t *testing.T) {
-			t.Parallel()
-			fn := lowerTypedForSSA(t, one.code)
+		test.Run(one.name, func(test *testing.T) {
+			test.Parallel()
+			fn := lowerTypedForSSA(test, one.code)
 			if fn == nil {
-				t.Fatal("did not lower")
+				test.Fatal("did not lower")
 			}
 			Construct(fn)
 			var each func(*Function)
 			each = func(f *Function) {
 				for _, v := range VerifySSA(f) {
-					t.Errorf("violation: %s", v.Detail)
+					test.Errorf("violation: %s", v.Detail)
 				}
 				for _, n := range f.Functions {
 					each(n)
@@ -259,7 +259,7 @@ func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
 			}
 			each(fn)
 			st := CollectSSAStats(fn)
-			t.Logf("phis=%d named=%d uses=%d", st.Phis, st.NamedValues, st.Uses)
+			test.Logf("phis=%d named=%d uses=%d", st.Phis, st.NamedValues, st.Uses)
 		})
 	}
 }
@@ -273,8 +273,8 @@ func TestSSAAcrossEveryControlFlowConstruct(t *testing.T) {
 //
 // Rather than list the variants, which would itself drift, this reflects over a constructed
 // instance of every value the printer knows about, which is the same closed set.
-func TestMutatingVisitorCoversEveryValue(t *testing.T) {
-	t.Parallel()
+func TestMutatingVisitorCoversEveryValue(test *testing.T) {
+	test.Parallel()
 
 	place := func(id static_single_assignment.IdentifierId) Place { return Place{Identifier: id} }
 	values := []InstructionValue{
@@ -346,13 +346,13 @@ func TestMutatingVisitorCoversEveryValue(t *testing.T) {
 			}{p.Identifier, role})
 		})
 		if len(byValue) != len(byPointer) {
-			t.Errorf("%T: EachPlace yielded %d places, EachPlacePointer yielded %d",
+			test.Errorf("%T: EachPlace yielded %d places, EachPlacePointer yielded %d",
 				value, len(byValue), len(byPointer))
 			continue
 		}
 		for index := range byValue {
 			if byValue[index] != byPointer[index] {
-				t.Errorf("%T: place %d differs: value=%+v pointer=%+v",
+				test.Errorf("%T: place %d differs: value=%+v pointer=%+v",
 					value, index, byValue[index], byPointer[index])
 			}
 		}
@@ -363,8 +363,8 @@ func TestMutatingVisitorCoversEveryValue(t *testing.T) {
 //
 // Phi.Operands is kept sorted by predecessor block id whatever order operands are set in, and
 // PhiOperandsInOrder reads the ids in that order; this fails if either stops holding.
-func TestPhiOperandsAreDeterministic(t *testing.T) {
-	t.Parallel()
+func TestPhiOperandsAreDeterministic(test *testing.T) {
+	test.Parallel()
 
 	phi := &Phi{Place: Place{Identifier: 9}}
 	phi.Operands.Set(7, Place{Identifier: 3})
@@ -374,11 +374,11 @@ func TestPhiOperandsAreDeterministic(t *testing.T) {
 	for attempt := 0; attempt < 50; attempt++ {
 		got := PhiOperandsInOrder(phi)
 		if len(got) != len(want) {
-			t.Fatalf("got %d operands, want %d", len(got), len(want))
+			test.Fatalf("got %d operands, want %d", len(got), len(want))
 		}
 		for index := range want {
 			if got[index] != want[index] {
-				t.Fatalf("attempt %d: got %v, want %v", attempt, got, want)
+				test.Fatalf("attempt %d: got %v, want %v", attempt, got, want)
 			}
 		}
 	}
@@ -398,8 +398,8 @@ func TestPhiOperandsAreDeterministic(t *testing.T) {
 //
 // Asserted as a fixpoint rather than a count, because the property that matters is "running it again
 // changes nothing" and that survives every legitimate change to phi placement.
-func TestConstructionIsIdempotent(t *testing.T) {
-	t.Parallel()
+func TestConstructionIsIdempotent(test *testing.T) {
+	test.Parallel()
 
 	firstPhis, secondPhis := 0, 0
 	firstStale, secondStale := 0, 0
@@ -441,7 +441,7 @@ func TestConstructionIsIdempotent(t *testing.T) {
 		return phis, stale
 	}
 
-	forEachCorpusFunction(t, 300, func(function *Function, ranges *mutation_aliasing.MutableRanges,
+	forEachCorpusFunction(test, 300, func(function *Function, ranges *mutation_aliasing.MutableRanges,
 		scopes *ReactiveScopes) {
 		phis, stale := countStale(function)
 		firstPhis += phis
@@ -453,18 +453,18 @@ func TestConstructionIsIdempotent(t *testing.T) {
 	})
 
 	if firstPhis == 0 {
-		t.Fatal("the corpus produced no phis, so running construction twice proves nothing")
+		test.Fatal("the corpus produced no phis, so running construction twice proves nothing")
 	}
 	if secondPhis != firstPhis {
-		t.Errorf("a second construction changed the phi count from %d to %d; the pass appends "+
+		test.Errorf("a second construction changed the phi count from %d to %d; the pass appends "+
 			"rather than reconciles, so phis from the previous run must be dropped first",
 			firstPhis, secondPhis)
 	}
 	if secondStale != firstStale {
-		t.Errorf("a second construction changed the count of phis naming an undefined operand "+
+		test.Errorf("a second construction changed the count of phis naming an undefined operand "+
 			"from %d to %d", firstStale, secondStale)
 	}
-	t.Logf("stable across two runs: %d phis, %d naming an undefined operand", firstPhis, firstStale)
+	test.Logf("stable across two runs: %d phis, %d naming an undefined operand", firstPhis, firstStale)
 }
 
 // Construction is not re-run after the inline, because upstream runs it once and after both.
@@ -487,24 +487,24 @@ func TestConstructionIsIdempotent(t *testing.T) {
 var constructAfterInline = regexp.MustCompile(
 	`(?s)Inline[A-Za-z]*InvokedFunctionExpressions[A-Za-z]*\(function\)[^}]*?Construct\(function\)`)
 
-func TestConstructionIsNotReRunAfterTheInline(t *testing.T) {
-	t.Parallel()
+func TestConstructionIsNotReRunAfterTheInline(test *testing.T) {
+	test.Parallel()
 
 	paths, err := filepath.Glob("*.go")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, path := range paths {
 		source, err := os.ReadFile(path)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		// This file names the pattern in prose.
 		if filepath.Base(path) == "ssa_test.go" {
 			continue
 		}
 		if constructAfterInline.Match(source) {
-			t.Errorf("%s re-runs Construct after the inline; upstream runs single static "+
+			test.Errorf("%s re-runs Construct after the inline; upstream runs single static "+
 				"assignment once, AFTER the splice, and a second run destroys the phis the copy "+
 				"carried", path)
 		}

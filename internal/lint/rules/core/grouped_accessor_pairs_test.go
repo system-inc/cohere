@@ -17,14 +17,14 @@ const groupedAccessorPairsFile = "/repository/source/GroupedAccessorPairs.ts"
 // does and what hands the rule nil. That row is what the decoder exists for: upstream's first
 // option defaults to "anyOrder", so a decoder yielding a zero value would hand the rule an empty
 // string matching no arm and silently drop the order check.
-func decodedGroupedAccessorPairsOptions(t *testing.T, raw string) any {
-	t.Helper()
+func decodedGroupedAccessorPairsOptions(test *testing.T, raw string) any {
+	test.Helper()
 	if raw == "" {
 		return nil
 	}
 	options, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return options
 }
@@ -34,8 +34,8 @@ func decodedGroupedAccessorPairsOptions(t *testing.T, raw string) any {
 //
 // 79 clean cases and 57 reporting ones. Upstream ships 14 more behind `enforceForTSTypes`, which
 // are in `TestGroupedAccessorPairsTypeMembers`.
-func TestGroupedAccessorPairsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -123,18 +123,18 @@ func TestGroupedAccessorPairsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
-				groupedAccessorPairsFile, testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options)))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, GroupedAccessorPairs,
+				groupedAccessorPairsFile, testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options)))
 		})
 	}
 }
 
 // Every reporting case, with its own message ids in upstream's own order. Nine of them report
 // more than once, so the counts are upstream data rather than an assumption.
-func TestGroupedAccessorPairsFires(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -201,10 +201,10 @@ func TestGroupedAccessorPairsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
-				groupedAccessorPairsFile, testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options)),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, GroupedAccessorPairs,
+				groupedAccessorPairsFile, testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options)),
 				testCase.wantIds...)
 		})
 	}
@@ -222,8 +222,8 @@ func TestGroupedAccessorPairsFires(t *testing.T) {
 // Every expectation here was measured against the installed eslint at 10.8.1 rather than read off
 // this rule. Pointing at the whole member instead is a defensible reading of the same rule with
 // an identical message id, and no id fixture could tell the two apart.
-func TestGroupedAccessorPairsSpans(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -286,17 +286,17 @@ func TestGroupedAccessorPairsSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
-				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if testCase.index >= len(result.Diagnostics) {
-				t.Fatalf("want a finding at index %d, got %d findings", testCase.index, len(result.Diagnostics))
+				test.Fatalf("want a finding at index %d, got %d findings", testCase.index, len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[testCase.index]
 			source := result.SourceFile.Text()
 			if got := source[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
-				t.Errorf("finding %d points at %q, want %q", testCase.index, got, testCase.wantSpan)
+				test.Errorf("finding %d points at %q, want %q", testCase.index, got, testCase.wantSpan)
 			}
 		})
 	}
@@ -310,8 +310,8 @@ func TestGroupedAccessorPairsSpans(t *testing.T) {
 // a string key pairing with a computed literal one, a non-literal computed key, a method signature
 // of the same name between the pair, a duplicate getter, and a type literal nested in an interface.
 // The span column is the measured one, the accessor head, as for class members.
-func TestGroupedAccessorPairsTypeMembers(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsTypeMembers(test *testing.T) {
+	test.Parallel()
 
 	const enforced = `["anyOrder", {"enforceForTSTypes": true}]`
 	cases := []struct {
@@ -348,18 +348,18 @@ func TestGroupedAccessorPairsTypeMembers(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText+" "+testCase.options, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
-				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
+		test.Run(testCase.sourceText+" "+testCase.options, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if testCase.wantId == "" {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			diagnostic := result.Diagnostics[0]
 			if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
-				t.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
+				test.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
 			}
 		})
 	}
@@ -370,8 +370,8 @@ func TestGroupedAccessorPairsTypeMembers(t *testing.T) {
 // The last row is the kept divergence the rule's doc comment names: upstream renders a non-literal
 // computed signature key as `getter 'null'`, and this renders it as the bare `getter` a class
 // accessor with the same key gets upstream too.
-func TestGroupedAccessorPairsTypeMemberMessageText(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsTypeMemberMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -385,15 +385,15 @@ func TestGroupedAccessorPairsTypeMemberMessageText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
-				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Errorf("message %q, want %q", got, testCase.want)
+				test.Errorf("message %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -402,8 +402,8 @@ func TestGroupedAccessorPairsTypeMemberMessageText(t *testing.T) {
 // The decoder is the line with no upstream counterpart, and this rule is the shape the brief
 // warns about: the first option is a bare string whose default is "anyOrder", so a decoder
 // yielding a zero value hands the rule an empty string matching no arm.
-func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeGroupedAccessorPairsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -419,18 +419,18 @@ func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(testCase.raw))
 			if err != nil {
-				t.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, err)
 			}
 			options, isOptions := decoded.(GroupedAccessorPairsOptions)
 			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than GroupedAccessorPairsOptions", decoded)
+				test.Fatalf("the decoder returned %T rather than GroupedAccessorPairsOptions", decoded)
 			}
 			if string(options.Order) != testCase.want {
-				t.Errorf("the order decodes to %q, want %q", options.Order, testCase.want)
+				test.Errorf("the order decodes to %q, want %q", options.Order, testCase.want)
 			}
 		})
 	}
@@ -441,8 +441,8 @@ func TestDecodeGroupedAccessorPairsOptions(t *testing.T) {
 // Upstream gets that refusal from its schema before the rule runs. There is no schema layer here,
 // so it lives in the decoder, and a rule silently reading an unknown string as "anyOrder" would
 // be the inert shape the config layer's own doc comment describes.
-func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing.T) {
-	t.Parallel()
+func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{
 		`["sideways"]`, `["GetBeforeSet"]`, `[""]`, `[123]`,
@@ -453,10 +453,10 @@ func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing
 		`["getBeforeSet", {"enforceForTypes": false}]`,
 		`["getBeforeSet", {"enforceForTSTypes": false}, "anyOrder"]`,
 	} {
-		t.Run(raw, func(t *testing.T) {
-			t.Parallel()
+		test.Run(raw, func(test *testing.T) {
+			test.Parallel()
 			if _, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw)); err == nil {
-				t.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
+				test.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
 			}
 		})
 	}
@@ -465,15 +465,15 @@ func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(t *testing
 // A rule configured as bare "error" reaches Run with nil rather than with an options struct. This
 // asserts nil behaves as "anyOrder" rather than as no arm at all, which is the defect the
 // hand-rolled decoder exists to prevent and which no fixture routing through the decoder can see.
-func TestGroupedAccessorPairsWithNilOptionsDefaultsToAnyOrder(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsWithNilOptionsDefaultsToAnyOrder(test *testing.T) {
+	test.Parallel()
 
 	// Ungrouped reports under every order, including the default.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, GroupedAccessorPairs,
 		groupedAccessorPairsFile, "({ get a(){}, b:1, set a(foo){} })", nil), "notGrouped")
 	// Grouped but set-before-get is clean under anyOrder and would report under getBeforeSet, so
 	// this row is what separates the default from the other two arms.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, GroupedAccessorPairs,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, GroupedAccessorPairs,
 		groupedAccessorPairsFile, "({ set a(foo){}, get a(){} })", nil))
 }
 
@@ -486,8 +486,8 @@ func TestGroupedAccessorPairsWithNilOptionsDefaultsToAnyOrder(t *testing.T) {
 // The naming has five forms and they are the reason this test is long: a plain `getter 'a'`, a
 // bare `getter` when the key is computed and cannot be named, a `static setter 'a'`, and a
 // `private getter #p` which carries no quotes at all.
-func TestGroupedAccessorPairsMessageText(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -565,21 +565,21 @@ func TestGroupedAccessorPairsMessageText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
-				testCase.sourceText, decodedGroupedAccessorPairsOptions(t, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
+				testCase.sourceText, decodedGroupedAccessorPairsOptions(test, testCase.options))
 			if testCase.index >= len(result.Diagnostics) {
-				t.Fatalf("want a finding at index %d, got %d findings", testCase.index, len(result.Diagnostics))
+				test.Fatalf("want a finding at index %d, got %d findings", testCase.index, len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[testCase.index]
 			if diagnostic.Message.Id != testCase.wantId {
-				t.Errorf("finding %d is %q, want %q", testCase.index, diagnostic.Message.Id, testCase.wantId)
+				test.Errorf("finding %d is %q, want %q", testCase.index, diagnostic.Message.Id, testCase.wantId)
 			}
 			// Equality rather than a prefix or a contains: an interpolated message is exactly
 			// where a weaker predicate stops being a guard.
 			if diagnostic.Message.Description != testCase.wantText {
-				t.Errorf("rendered:\n  %q\nwant:\n  %q", diagnostic.Message.Description, testCase.wantText)
+				test.Errorf("rendered:\n  %q\nwant:\n  %q", diagnostic.Message.Description, testCase.wantText)
 			}
 		})
 	}
@@ -596,8 +596,8 @@ func TestGroupedAccessorPairsMessageText(t *testing.T) {
 // The fourth row is the control. Two computed keys spelled the same way DO pair, through upstream's
 // token-list comparison, so a rule that simply declined every computed key would pass the first
 // three for the wrong reason.
-func TestGroupedAccessorPairsComputedKeysDoNotPairWithStaticOnes(t *testing.T) {
-	t.Parallel()
+func TestGroupedAccessorPairsComputedKeysDoNotPairWithStaticOnes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -612,15 +612,15 @@ func TestGroupedAccessorPairsComputedKeysDoNotPairWithStaticOnes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, GroupedAccessorPairs, groupedAccessorPairsFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, GroupedAccessorPairs, groupedAccessorPairsFile,
 				testCase.sourceText, nil)
 			if testCase.wantIds == nil {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }

@@ -79,13 +79,13 @@ var noUnusedVarsUpstreamJsxReports = []string{
 // without the rule containing the word JSX anywhere. The one place JSX genuinely needed handling
 // was the opposite direction: the factory import exemption, which has its own fixture and which
 // these cases would not have caught.
-func TestNoUnusedVarsStaysSilentOnUpstreamJsxCleanCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsStaysSilentOnUpstreamJsxCleanCases(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range noUnusedVarsUpstreamJsxClean {
-		result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source)
+		result := rule_testing.RunTyped(test, NoUnusedVars, "a.tsx", source)
 		if len(result.Diagnostics) != 0 {
-			t.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
+			test.Errorf("want clean, got %d findings for %q", len(result.Diagnostics), source)
 		}
 	}
 }
@@ -94,13 +94,13 @@ func TestNoUnusedVarsStaysSilentOnUpstreamJsxCleanCases(t *testing.T) {
 //
 // An exact zero-silence assertion rather than a count with a gap list, because there are no gaps
 // here: 17 of 17 report. If that ever stops being true this fails and names the case.
-func TestNoUnusedVarsFiresOnUpstreamJsxReportingCases(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsFiresOnUpstreamJsxReportingCases(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range noUnusedVarsUpstreamJsxReports {
-		result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source)
+		result := rule_testing.RunTyped(test, NoUnusedVars, "a.tsx", source)
 		if len(result.Diagnostics) == 0 {
-			t.Errorf("want at least one finding, got none for %q", source)
+			test.Errorf("want at least one finding, got none for %q", source)
 		}
 	}
 }
@@ -111,18 +111,18 @@ func TestNoUnusedVarsFiresOnUpstreamJsxReportingCases(t *testing.T) {
 // The first real-tree run of this rule produced 512 findings and roughly 470 were a React import in
 // a file containing markup. Nothing in the 51 JSX corpus cases covers that shape, so a change that
 // re-opened it would pass every case above.
-func TestNoUnusedVarsJsxDoesNotReopenTheFactoryExemption(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsJsxDoesNotReopenTheFactoryExemption(test *testing.T) {
+	test.Parallel()
 
 	const source = "import React from 'react';\nexport const A = () => <div />;\n"
-	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
-		t.Errorf("the JSX factory import must stay exempt; got %d findings", len(result.Diagnostics))
+	if result := rule_testing.RunTyped(test, NoUnusedVars, "a.tsx", source); len(result.Diagnostics) != 0 {
+		test.Errorf("the JSX factory import must stay exempt; got %d findings", len(result.Diagnostics))
 	}
 	// The control: a genuinely unused import in the same file still reports, so the case above
 	// cannot be passing because the rule went silent on `.tsx` altogether.
 	const control = "import React from 'react';\nimport { unused } from './m';\nexport const A = () => <div />;\n"
-	if result := rule_testing.RunTyped(t, NoUnusedVars, "a.tsx", control); len(result.Diagnostics) != 1 {
-		t.Errorf("control: an unused import beside the factory must report; got %d",
+	if result := rule_testing.RunTyped(test, NoUnusedVars, "a.tsx", control); len(result.Diagnostics) != 1 {
+		test.Errorf("control: an unused import beside the factory must report; got %d",
 			len(result.Diagnostics))
 	}
 }

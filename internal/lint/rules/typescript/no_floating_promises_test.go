@@ -53,8 +53,8 @@ type noFloatingPromisesSuggestion struct {
 // The last row is the control, and it is the same verdict upstream's invalid cases 83 through 85
 // assert with that exact path, which is why this is a harness-naming artifact rather than a
 // divergence. Cases naming a path therefore run under it.
-func runNoFloatingPromises(t *testing.T, sourceText string, options any) rule_testing.Result {
-	t.Helper()
+func runNoFloatingPromises(test *testing.T, sourceText string, options any) rule_testing.Result {
+	test.Helper()
 	fileName := noFloatingPromisesFile
 	if parsed, ok := options.(NoFloatingPromisesOptions); ok {
 		for _, specifier := range parsed.AllowForKnownSafeCalls {
@@ -64,9 +64,9 @@ func runNoFloatingPromises(t *testing.T, sourceText string, options any) rule_te
 		}
 	}
 	if options == nil {
-		return rule_testing.RunTypedWithOptions(t, NoFloatingPromises, fileName, sourceText, nil)
+		return rule_testing.RunTypedWithOptions(test, NoFloatingPromises, fileName, sourceText, nil)
 	}
-	return rule_testing.RunTypedWithOptions(t, NoFloatingPromises, fileName, sourceText, options)
+	return rule_testing.RunTypedWithOptions(test, NoFloatingPromises, fileName, sourceText, options)
 }
 
 // applyNoFloatingPromisesSuggestion rewrites source with one suggestion's fixes, latest range
@@ -75,22 +75,22 @@ func runNoFloatingPromises(t *testing.T, sourceText string, options any) rule_te
 // Back to front matters here rather than being defensive: the parenthesizing repairs carry TWO
 // fixes, an insert before the statement and an insert after the expression, and applying them in
 // source order would shift the second one's offset by the length of the first.
-func applyNoFloatingPromisesSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyNoFloatingPromisesSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.SliceStable(fixes, func(i, j int) bool { return fixes[i].Range.Pos() > fixes[j].Range.Pos() })
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(source) || start > end {
-			t.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
 		}
 		source = source[:start] + fix.Text + source[end:]
 	}
 	return source
 }
 
-func TestNoFloatingPromisesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -171,16 +171,16 @@ func TestNoFloatingPromisesStaysSilent(t *testing.T) {
 		{"upstream valid case 71", "\ninterface MyThenable {\n  then(onFulfilled: () => void, onRejected: () => void): MyThenable;\n}\n\ndeclare function createMyThenable(): MyThenable;\n\ncreateMyThenable();\n    ", nil},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoFloatingPromises(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoFloatingPromises(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestNoFloatingPromisesFires(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -287,16 +287,16 @@ func TestNoFloatingPromisesFires(t *testing.T) {
 		{"upstream invalid case 96", "\n<Promise<number>>{};\n      ", nil, []string{"floatingVoid"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoFloatingPromises(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoFloatingPromises(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestNoFloatingPromisesSuggestionsRewriteTheSource(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -384,11 +384,11 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(t *testing.T) {
 		{"upstream invalid case 96", "\n<Promise<number>>{};\n      ", nil, [][]noFloatingPromisesSuggestion{{{"floatingFixVoid", "\nvoid (<Promise<number>>{});\n      "}, {"floatingFixAwait", "\nawait (<Promise<number>>{});\n      "}}}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoFloatingPromises(t, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoFloatingPromises(test, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.suggestions) {
-				t.Fatalf("want %d findings, got %d", len(testCase.suggestions), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.suggestions), len(result.Diagnostics))
 			}
 			// The harness trims the fixture before building the program, so every offset the rule
 			// computed is against the trimmed text rather than against the literal above. The expected
@@ -398,16 +398,16 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(t *testing.T) {
 			for diagnosticIndex, wantSuggestions := range testCase.suggestions {
 				gotSuggestions := result.Diagnostics[diagnosticIndex].Suggestions
 				if len(gotSuggestions) != len(wantSuggestions) {
-					t.Fatalf("finding %d offers %d suggestions, want %d", diagnosticIndex, len(gotSuggestions), len(wantSuggestions))
+					test.Fatalf("finding %d offers %d suggestions, want %d", diagnosticIndex, len(gotSuggestions), len(wantSuggestions))
 				}
 				for suggestionIndex, want := range wantSuggestions {
 					got := gotSuggestions[suggestionIndex]
 					if got.Message.Id != want.messageId {
-						t.Errorf("finding %d suggestion %d has id %q, want %q", diagnosticIndex, suggestionIndex, got.Message.Id, want.messageId)
+						test.Errorf("finding %d suggestion %d has id %q, want %q", diagnosticIndex, suggestionIndex, got.Message.Id, want.messageId)
 					}
-					applied := applyNoFloatingPromisesSuggestion(t, source, got)
+					applied := applyNoFloatingPromisesSuggestion(test, source, got)
 					if applied != strings.TrimSpace(want.output) {
-						t.Errorf("finding %d suggestion %d rewrote the source to\n%q\nwant\n%q", diagnosticIndex, suggestionIndex, applied, strings.TrimSpace(want.output))
+						test.Errorf("finding %d suggestion %d rewrote the source to\n%q\nwant\n%q", diagnosticIndex, suggestionIndex, applied, strings.TrimSpace(want.output))
 					}
 				}
 			}
@@ -435,8 +435,8 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(t *testing.T) {
 // The third row is a real divergence and it is recorded in the rule's doc comment: `@typescript-
 // eslint` is SILENT on `(p.catch)(() => {})` because ESTree has no parenthesized-expression node,
 // and tsgolint reports because typescript-go keeps one. tsgolint wins, so the report is deliberate.
-func TestNoFloatingPromisesMeasuredParentheses(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesMeasuredParentheses(test *testing.T) {
+	test.Parallel()
 
 	prelude := "declare const p: Promise<number>;\n"
 	cases := []struct {
@@ -453,14 +453,14 @@ func TestNoFloatingPromisesMeasuredParentheses(t *testing.T) {
 		{"parens around a then callee make the handler invisible", "(p.then)(() => {}, () => {});", []string{"floatingVoid"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoFloatingPromises(t, prelude+"async function wrapper() {\n  "+testCase.body+"\n}\n", nil)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoFloatingPromises(test, prelude+"async function wrapper() {\n  "+testCase.body+"\n}\n", nil)
 			if testCase.wantIds == nil {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -473,43 +473,43 @@ func TestNoFloatingPromisesMeasuredParentheses(t *testing.T) {
 // statements, so nothing in it separates "reports once because it groups" from "reports once
 // because there is one statement". A TRIPLE does, and every position is read rather than the count
 // alone.
-func TestNoFloatingPromisesReportsOncePerStatement(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesReportsOncePerStatement(test *testing.T) {
+	test.Parallel()
 
 	triple := "declare const a: Promise<number>;\ndeclare const b: Promise<number>;\ndeclare const c: Promise<number>;\n"
 
-	grouped := runNoFloatingPromises(t, triple+"[a, b, c];\n", nil)
-	rule_testing.ExpectFindings(t, grouped, "floatingPromiseArrayVoid")
+	grouped := runNoFloatingPromises(test, triple+"[a, b, c];\n", nil)
+	rule_testing.ExpectFindings(test, grouped, "floatingPromiseArrayVoid")
 	if got := len(grouped.Diagnostics[0].Suggestions); got != 0 {
-		t.Errorf("the promise-array finding offers %d suggestions, want none", got)
+		test.Errorf("the promise-array finding offers %d suggestions, want none", got)
 	}
-	if got := sourceOf(t, triple+"[a, b, c];\n", grouped, 0); got != "[a, b, c];" {
-		t.Errorf("the promise-array finding points at %q, want the whole statement", got)
+	if got := sourceOf(test, triple+"[a, b, c];\n", grouped, 0); got != "[a, b, c];" {
+		test.Errorf("the promise-array finding points at %q, want the whole statement", got)
 	}
 
-	separate := runNoFloatingPromises(t, triple+"a;\nb;\nc;\n", nil)
-	rule_testing.ExpectFindings(t, separate, "floatingVoid", "floatingVoid", "floatingVoid")
+	separate := runNoFloatingPromises(test, triple+"a;\nb;\nc;\n", nil)
+	rule_testing.ExpectFindings(test, separate, "floatingVoid", "floatingVoid", "floatingVoid")
 	for index, want := range []string{"a;", "b;", "c;"} {
-		if got := sourceOf(t, triple+"a;\nb;\nc;\n", separate, index); got != want {
-			t.Errorf("finding %d points at %q, want %q", index, got, want)
+		if got := sourceOf(test, triple+"a;\nb;\nc;\n", separate, index); got != want {
+			test.Errorf("finding %d points at %q, want %q", index, got, want)
 		}
 	}
 
 	// Promise.all of a triple is ONE floating CALL, not a promise array: the argument is handled by
 	// Promise.all and the call's own result is what floats.
-	aggregated := runNoFloatingPromises(t, "Promise.all([Promise.resolve(1), Promise.resolve(2), Promise.resolve(3)]);\n", nil)
-	rule_testing.ExpectFindings(t, aggregated, "floatingVoid")
+	aggregated := runNoFloatingPromises(test, "Promise.all([Promise.resolve(1), Promise.resolve(2), Promise.resolve(3)]);\n", nil)
+	rule_testing.ExpectFindings(test, aggregated, "floatingVoid")
 }
 
 // sourceOf slices the trimmed source with a finding's own range, which is the only assertion that
 // can see WHERE a finding points.
-func sourceOf(t *testing.T, sourceText string, result rule_testing.Result, index int) string {
-	t.Helper()
+func sourceOf(test *testing.T, sourceText string, result rule_testing.Result, index int) string {
+	test.Helper()
 	trimmed := strings.TrimSpace(sourceText)
 	diagnostic := result.Diagnostics[index]
 	start, end := diagnostic.Range.Pos(), diagnostic.Range.End()
 	if start < 0 || end > len(trimmed) || start > end {
-		t.Fatalf("finding %d has range [%d,%d) over %d bytes", index, start, end, len(trimmed))
+		test.Fatalf("finding %d has range [%d,%d) over %d bytes", index, start, end, len(trimmed))
 	}
 	return trimmed[start:end]
 }
@@ -520,8 +520,8 @@ func sourceOf(t *testing.T, sourceText string, result rule_testing.Result, index
 // Comparing a finding to the constant it was built from is equality that moves under mutation:
 // both sides change together and the assertion stays green. These strings are typed from
 // upstream's source instead, so a reworded message fails.
-func TestNoFloatingPromisesMessagesReadAsUpstreamWrote(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesMessagesReadAsUpstreamWrote(test *testing.T) {
+	test.Parallel()
 
 	wantById := map[string]string{
 		"floating":                            "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
@@ -544,16 +544,16 @@ func TestNoFloatingPromisesMessagesReadAsUpstreamWrote(t *testing.T) {
 		buildFloatingFixVoidMessage(),
 	}
 	if len(got) != len(wantById) {
-		t.Fatalf("the rule builds %d messages, want %d", len(got), len(wantById))
+		test.Fatalf("the rule builds %d messages, want %d", len(got), len(wantById))
 	}
 	for _, message := range got {
 		want, ok := wantById[message.Id]
 		if !ok {
-			t.Errorf("the rule reports an id upstream does not have: %q", message.Id)
+			test.Errorf("the rule reports an id upstream does not have: %q", message.Id)
 			continue
 		}
 		if message.Description != want {
-			t.Errorf("message %q reads\n%q\nwant\n%q", message.Id, message.Description, want)
+			test.Errorf("message %q reads\n%q\nwant\n%q", message.Id, message.Description, want)
 		}
 	}
 }
@@ -571,22 +571,22 @@ func TestNoFloatingPromisesMessagesReadAsUpstreamWrote(t *testing.T) {
 // The guard could not be written while this rule lived behind the tsgolint adapter, because the
 // adapter set NeedsTypeChecker on everything it wrapped and the listener was upstream's. Absorbing
 // the rule made the nil case reachable AND made the listener ours, so the guard is written here.
-func TestNoFloatingPromisesRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoFloatingPromises.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
 	if NoFloatingPromises.ProgramReads&rule.ReadsDefaultLibrary == 0 {
-		t.Fatal("the rule stopped declaring ReadsDefaultLibrary, and IsPromiseLike asks whether a declaration is the default library's")
+		test.Fatal("the rule stopped declaring ReadsDefaultLibrary, and IsPromiseLike asks whether a declaration is the default library's")
 	}
 
 	source := "declare const p: Promise<number>;\np;\n"
-	typed := runNoFloatingPromises(t, source, nil)
-	rule_testing.ExpectFindings(t, typed, "floatingVoid")
+	typed := runNoFloatingPromises(test, source, nil)
+	rule_testing.ExpectFindings(test, typed, "floatingVoid")
 
-	untyped := rule_testing.Run(t, NoFloatingPromises, noFloatingPromisesFile, source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, NoFloatingPromises, noFloatingPromisesFile, source)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestNoFloatingPromisesThenableNeedsTwoFunctionParameters pins upstream's deliberate narrowing of
@@ -602,8 +602,8 @@ func TestNoFloatingPromisesRequiresTheTypedHarness(t *testing.T) {
 // because the corpus's `checkThenables` cases all declare a two-function `then`. Each row below was
 // measured against `@typescript-eslint` before being written here, and both references agree on
 // all five.
-func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -617,15 +617,15 @@ func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(t *testing.T) {
 		{"two function parameters", "declare const t: { then(onOk: () => void, onErr: () => void): void };\nt;\n", []string{"floatingVoid"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoFloatingPromises(t, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoFloatingPromises(test, testCase.sourceText,
 				NoFloatingPromisesOptions{CheckThenables: type_checking.Ref(true)})
 			if testCase.wantIds == nil {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -648,22 +648,22 @@ func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(t *testing.T) {
 // The cross-file case is why this rule's findings are keyed on the type fingerprint rather than the
 // linted file alone. `type_checking.IsPromiseLike` asks about the default library on the core path of
 // every promise test, and enum resolution reaches the declaring module.
-func TestNoFloatingPromisesResolvesAStaticMemberName(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesResolvesAStaticMemberName(test *testing.T) {
+	test.Parallel()
 
 	sameFile := "enum Methods {\n  Catch = 'catch',\n}\ndeclare const p: Promise<number>;\np[Methods.Catch](() => {});\n"
-	rule_testing.ExpectClean(t, runNoFloatingPromises(t, sameFile, nil))
+	rule_testing.ExpectClean(test, runNoFloatingPromises(test, sameFile, nil))
 
-	crossFile := rule_testing.RunTypedFilesWithOptions(t, NoFloatingPromises, map[string]string{
+	crossFile := rule_testing.RunTypedFilesWithOptions(test, NoFloatingPromises, map[string]string{
 		"methods.ts":           "export enum Methods {\n  Catch = 'catch',\n}\n",
 		noFloatingPromisesFile: "import { Methods } from './methods';\ndeclare const p: Promise<number>;\np[Methods.Catch](() => {});\n",
 	}, noFloatingPromisesFile, nil)
-	rule_testing.ExpectClean(t, crossFile)
+	rule_testing.ExpectClean(test, crossFile)
 
 	// The control: the same shape with a key that resolves to something else still reports, so the
 	// two clean verdicts above are resolution rather than a blanket exemption for computed keys.
 	other := "enum Methods {\n  Finally = 'finally',\n}\ndeclare const p: Promise<number>;\np[Methods.Finally](() => {});\n"
-	rule_testing.ExpectFindings(t, runNoFloatingPromises(t, other, nil), "floatingVoid")
+	rule_testing.ExpectFindings(test, runNoFloatingPromises(test, other, nil), "floatingVoid")
 }
 
 // TestDecodeNoFloatingPromisesOptions routes configuration through the rule's own exported decoder,
@@ -677,109 +677,109 @@ func TestNoFloatingPromisesResolvesAStaticMemberName(t *testing.T) {
 // The `ignoreVoid` rows are the ones that matter most. Its default is TRUE, so a decoder binding it
 // to a plain bool would turn every unconfigured run into an explicit `ignoreVoid: false`, inverting
 // almost the whole corpus. It stays a pointer end to end so that absent and false stay different.
-func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoFloatingPromisesOptions(test *testing.T) {
+	test.Parallel()
 
-	decode := func(t *testing.T, raw string) NoFloatingPromisesOptions {
-		t.Helper()
+	decode := func(test *testing.T, raw string) NoFloatingPromisesOptions {
+		test.Helper()
 		decoded, err := DecodeNoFloatingPromisesOptions([]byte(raw))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		options, ok := decoded.(NoFloatingPromisesOptions)
 		if !ok {
-			t.Fatalf("the decoder returned %T, want NoFloatingPromisesOptions", decoded)
+			test.Fatalf("the decoder returned %T, want NoFloatingPromisesOptions", decoded)
 		}
 		return options
 	}
 
-	t.Run("an empty object leaves every pointer nil so the rule's own defaults apply", func(t *testing.T) {
-		t.Parallel()
-		options := decode(t, `{}`)
+	test.Run("an empty object leaves every pointer nil so the rule's own defaults apply", func(test *testing.T) {
+		test.Parallel()
+		options := decode(test, `{}`)
 		if options.IgnoreVoid != nil || options.IgnoreIIFE != nil || options.CheckThenables != nil {
-			t.Errorf("an empty object should leave the three booleans nil, got %v %v %v",
+			test.Errorf("an empty object should leave the three booleans nil, got %v %v %v",
 				options.IgnoreVoid, options.IgnoreIIFE, options.CheckThenables)
 		}
 	})
 
-	t.Run("an explicit false is not the same as absent", func(t *testing.T) {
-		t.Parallel()
-		options := decode(t, `{"ignoreVoid": false}`)
+	test.Run("an explicit false is not the same as absent", func(test *testing.T) {
+		test.Parallel()
+		options := decode(test, `{"ignoreVoid": false}`)
 		if options.IgnoreVoid == nil {
-			t.Fatal("an explicit ignoreVoid should decode to a non-nil pointer")
+			test.Fatal("an explicit ignoreVoid should decode to a non-nil pointer")
 		}
 		if *options.IgnoreVoid {
-			t.Error("ignoreVoid decoded to true, want false")
+			test.Error("ignoreVoid decoded to true, want false")
 		}
 	})
 
-	t.Run("a bare string specifier lands in the inline list", func(t *testing.T) {
-		t.Parallel()
-		options := decode(t, `{"allowForKnownSafePromises": ["SafePromise"]}`)
+	test.Run("a bare string specifier lands in the inline list", func(test *testing.T) {
+		test.Parallel()
+		options := decode(test, `{"allowForKnownSafePromises": ["SafePromise"]}`)
 		if len(options.AllowForKnownSafePromises) != 0 {
-			t.Errorf("a bare string should not become a structured specifier, got %v", options.AllowForKnownSafePromises)
+			test.Errorf("a bare string should not become a structured specifier, got %v", options.AllowForKnownSafePromises)
 		}
 		if len(options.AllowForKnownSafePromisesInline) != 1 || options.AllowForKnownSafePromisesInline[0] != "SafePromise" {
-			t.Errorf("the inline list reads %v, want [SafePromise]", options.AllowForKnownSafePromisesInline)
+			test.Errorf("the inline list reads %v, want [SafePromise]", options.AllowForKnownSafePromisesInline)
 		}
 	})
 
-	t.Run("from is translated from its string spelling to the enum", func(t *testing.T) {
-		t.Parallel()
-		options := decode(t, `{"allowForKnownSafePromises":[{"from":"lib","name":"PromiseLike"}]}`)
+	test.Run("from is translated from its string spelling to the enum", func(test *testing.T) {
+		test.Parallel()
+		options := decode(test, `{"allowForKnownSafePromises":[{"from":"lib","name":"PromiseLike"}]}`)
 		if len(options.AllowForKnownSafePromises) != 1 {
-			t.Fatalf("want one specifier, got %d", len(options.AllowForKnownSafePromises))
+			test.Fatalf("want one specifier, got %d", len(options.AllowForKnownSafePromises))
 		}
 		specifier := options.AllowForKnownSafePromises[0]
 		if specifier.From != type_checking.TypeOrValueSpecifierFromLib {
-			t.Errorf("from decoded to %v, want the lib enum", specifier.From)
+			test.Errorf("from decoded to %v, want the lib enum", specifier.From)
 		}
 		// A bare string name widens to a one-element slice rather than erroring.
 		if len(specifier.Name) != 1 || specifier.Name[0] != "PromiseLike" {
-			t.Errorf("name decoded to %v, want [PromiseLike]", specifier.Name)
+			test.Errorf("name decoded to %v, want [PromiseLike]", specifier.Name)
 		}
 	})
 
-	t.Run("an unrecognized from is dropped rather than silently meaning file", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unrecognized from is dropped rather than silently meaning file", func(test *testing.T) {
+		test.Parallel()
 		// `file` is the zero value of the enum, so a decoder that merely failed to set From would
 		// turn a typo into a file specifier. This asserts the specifier is skipped instead.
-		options := decode(t, `{"allowForKnownSafeCalls":[{"from":"module","name":"it"}]}`)
+		options := decode(test, `{"allowForKnownSafeCalls":[{"from":"module","name":"it"}]}`)
 		if len(options.AllowForKnownSafeCalls) != 0 {
-			t.Errorf("an unrecognized from should be dropped, got %v", options.AllowForKnownSafeCalls)
+			test.Errorf("an unrecognized from should be dropped, got %v", options.AllowForKnownSafeCalls)
 		}
 	})
 
-	t.Run("both wire forms coexist in one array", func(t *testing.T) {
-		t.Parallel()
-		options := decode(t, `{"allowForKnownSafeCalls":["it",{"from":"package","name":["it","test"],"package":"node:test"}]}`)
+	test.Run("both wire forms coexist in one array", func(test *testing.T) {
+		test.Parallel()
+		options := decode(test, `{"allowForKnownSafeCalls":["it",{"from":"package","name":["it","test"],"package":"node:test"}]}`)
 		if len(options.AllowForKnownSafeCallsInline) != 1 || options.AllowForKnownSafeCallsInline[0] != "it" {
-			t.Errorf("the inline list reads %v, want [it]", options.AllowForKnownSafeCallsInline)
+			test.Errorf("the inline list reads %v, want [it]", options.AllowForKnownSafeCallsInline)
 		}
 		if len(options.AllowForKnownSafeCalls) != 1 {
-			t.Fatalf("want one structured specifier, got %d", len(options.AllowForKnownSafeCalls))
+			test.Fatalf("want one structured specifier, got %d", len(options.AllowForKnownSafeCalls))
 		}
 		specifier := options.AllowForKnownSafeCalls[0]
 		if specifier.From != type_checking.TypeOrValueSpecifierFromPackage || specifier.Package != "node:test" {
-			t.Errorf("the structured specifier reads %+v, want a node:test package specifier", specifier)
+			test.Errorf("the structured specifier reads %+v, want a node:test package specifier", specifier)
 		}
 		if len(specifier.Name) != 2 {
-			t.Errorf("name decoded to %v, want two entries", specifier.Name)
+			test.Errorf("name decoded to %v, want two entries", specifier.Name)
 		}
 	})
 
-	t.Run("a decoded allowlist actually reaches the rule", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a decoded allowlist actually reaches the rule", func(test *testing.T) {
+		test.Parallel()
 		// The decoder can be right and the wiring still wrong, so one end-to-end row runs a real
 		// input through the decoded options rather than through a struct built here.
 		source := "type SafePromise = Promise<number> & { __linterBrands?: string };\ndeclare const p: SafePromise;\np;\n"
-		rule_testing.ExpectFindings(t, runNoFloatingPromises(t, source, nil), "floatingVoid")
+		rule_testing.ExpectFindings(test, runNoFloatingPromises(test, source, nil), "floatingVoid")
 
 		decoded, err := DecodeNoFloatingPromisesOptions([]byte(`{"allowForKnownSafePromises":[{"from":"file","name":"SafePromise"}]}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
-		rule_testing.ExpectClean(t, runNoFloatingPromises(t, source, decoded))
+		rule_testing.ExpectClean(test, runNoFloatingPromises(test, source, decoded))
 	})
 }
 
@@ -798,8 +798,8 @@ func TestDecodeNoFloatingPromisesOptions(t *testing.T) {
 // without testing anything. That is measured, not assumed: a local object with a promise-returning
 // method reports `floatingVoid`, and the same call through a declared module reports nothing in
 // either import form.
-func TestNoFloatingPromisesResolvesThroughANamespaceImport(t *testing.T) {
-	t.Parallel()
+func TestNoFloatingPromisesResolvesThroughANamespaceImport(test *testing.T) {
+	test.Parallel()
 
 	const runnerModule = "export function describe(name: string, action: () => void): Promise<void> {\n" +
 		"  return Promise.resolve();\n" +
@@ -814,9 +814,9 @@ func TestNoFloatingPromisesResolvesThroughANamespaceImport(t *testing.T) {
 		},
 	}
 
-	runWith := func(t *testing.T, entry string) rule_testing.Result {
-		t.Helper()
-		return rule_testing.RunTypedFilesWithOptions(t, NoFloatingPromises, map[string]string{
+	runWith := func(test *testing.T, entry string) rule_testing.Result {
+		test.Helper()
+		return rule_testing.RunTypedFilesWithOptions(test, NoFloatingPromises, map[string]string{
 			"runner.ts":            runnerModule,
 			noFloatingPromisesFile: entry,
 		}, noFloatingPromisesFile, options)
@@ -824,12 +824,12 @@ func TestNoFloatingPromisesResolvesThroughANamespaceImport(t *testing.T) {
 
 	// The control comes first, because it is what proves the other two mean anything: same module,
 	// same namespace, a name the allowlist does not carry.
-	rule_testing.ExpectFindings(t,
-		runWith(t, "import * as Runner from './runner';\nRunner.teardown();\n"), "floatingVoid")
+	rule_testing.ExpectFindings(test,
+		runWith(test, "import * as Runner from './runner';\nRunner.teardown();\n"), "floatingVoid")
 
-	rule_testing.ExpectClean(t,
-		runWith(t, "import { describe } from './runner';\ndescribe('...', () => {});\n"))
+	rule_testing.ExpectClean(test,
+		runWith(test, "import { describe } from './runner';\ndescribe('...', () => {});\n"))
 
-	rule_testing.ExpectClean(t,
-		runWith(t, "import * as Runner from './runner';\nRunner.describe('...', () => {});\n"))
+	rule_testing.ExpectClean(test,
+		runWith(test, "import * as Runner from './runner';\nRunner.describe('...', () => {});\n"))
 }

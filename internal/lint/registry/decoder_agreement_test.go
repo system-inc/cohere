@@ -31,7 +31,7 @@ import (
 // Not parallel: it reads the process-wide counter rule.OptionsAsReads before and after each rule's run to
 // tell whether the run reached its options, so a parallel test calling OptionsAs at the same moment would
 // make an unreached rule look reached.
-func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
+func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(test *testing.T) {
 	exercised := 0
 	refused := 0
 	var unreached []string
@@ -49,7 +49,7 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 		readsBefore := rule.OptionsAsReads.Load()
 		// Not parallel: its parent reads rule.OptionsAsReads right after this subtest returns, so the run
 		// must have finished by then.
-		t.Run(subject.Name, func(t *testing.T) {
+		test.Run(subject.Name, func(test *testing.T) {
 			defer func() {
 				recovered := recover()
 				if recovered == nil {
@@ -57,22 +57,22 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 				}
 				message := fmt.Sprint(recovered)
 				if strings.Contains(message, "registration's Decode") {
-					t.Fatalf("%s: %s", subject.Name, message)
+					test.Fatalf("%s: %s", subject.Name, message)
 				}
 				// Any other panic is the crash corpus's business, not this test's.
 			}()
 			if subject.NeedsTypeChecker {
-				rule_testing.RunTypedWithOptions(t, subject, "/repository/source/Probe.tsx", "export const value = 1;\n", decoded)
+				rule_testing.RunTypedWithOptions(test, subject, "/repository/source/Probe.tsx", "export const value = 1;\n", decoded)
 				return
 			}
-			rule_testing.RunWithOptions(t, subject, "/repository/source/Probe.tsx", "export const value = 1;\n", decoded)
+			rule_testing.RunWithOptions(test, subject, "/repository/source/Probe.tsx", "export const value = 1;\n", decoded)
 		})
 		if rule.OptionsAsReads.Load() == readsBefore && !optionsReadUnreachableOnProbe[subject.Name] {
 			unreached = append(unreached, subject.Name)
 		}
 	}
 	if len(unreached) > 0 {
-		t.Errorf("%d rules ran with decoded options without reaching rule.OptionsAs on the probe source, "+
+		test.Errorf("%d rules ran with decoded options without reaching rule.OptionsAs on the probe source, "+
 			"so the agreement check never looked at them: %v. Read options at the top of Run, or name the "+
 			"rule in optionsReadUnreachableOnProbe with why", len(unreached), unreached)
 	}
@@ -82,14 +82,14 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(t *testing.T) {
 	}
 	for name := range optionsReadUnreachableOnProbe {
 		if !registered[name] {
-			t.Errorf("optionsReadUnreachableOnProbe names %s, which is not registered", name)
+			test.Errorf("optionsReadUnreachableOnProbe names %s, which is not registered", name)
 		}
 	}
 	// About 110 registrations carry a decoder today. Under 80 exercised means the empty input stopped
 	// decoding for most of them, or the walk is reading the wrong list, rather than that the tree
 	// lost its options.
 	if exercised < 80 {
-		t.Fatalf("only %d decoders produced options to hand their rule (%d refused the empty input), "+
+		test.Fatalf("only %d decoders produced options to hand their rule (%d refused the empty input), "+
 			"so this check proved little", exercised, refused)
 	}
 }
@@ -161,14 +161,14 @@ var optionsReachControl = rule.Rule{
 // because the counter moves on every run.
 // Not parallel: it asserts the process-wide counter rule.OptionsAsReads does not move across a run, which
 // a parallel test calling OptionsAs would break.
-func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(t *testing.T) {
+func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(test *testing.T) {
 	before := rule.OptionsAsReads.Load()
-	rule_testing.RunWithOptions(t, optionsReachControl, "/repository/source/Probe.tsx", "export const value = 1;\n", optionsReachControlOptions{})
+	rule_testing.RunWithOptions(test, optionsReachControl, "/repository/source/Probe.tsx", "export const value = 1;\n", optionsReachControlOptions{})
 	if rule.OptionsAsReads.Load() != before {
-		t.Fatal("the control moved the counter on a source with no class, so the counter cannot tell reached from run")
+		test.Fatal("the control moved the counter on a source with no class, so the counter cannot tell reached from run")
 	}
-	rule_testing.RunWithOptions(t, optionsReachControl, "/repository/source/Probe.tsx", "export class Probe {}\n", optionsReachControlOptions{})
+	rule_testing.RunWithOptions(test, optionsReachControl, "/repository/source/Probe.tsx", "export class Probe {}\n", optionsReachControlOptions{})
 	if rule.OptionsAsReads.Load() == before {
-		t.Fatal("the control did not move the counter on a class, so the counter is not counting")
+		test.Fatal("the control did not move the counter on a class, so the counter is not counting")
 	}
 }

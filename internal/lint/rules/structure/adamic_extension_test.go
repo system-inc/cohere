@@ -9,27 +9,27 @@ import (
 
 // A hook file named in Adamic is named by the same rule as a `.ts` one: `User.a` lacks the Request
 // suffix and `UserRequest.a` has it (#kwt1htp).
-func TestNetworkRequireHookRequestSuffixNamesAnAdamicFileAsTypeScript(t *testing.T) {
-	t.Parallel()
+func TestNetworkRequireHookRequestSuffixNamesAnAdamicFileAsTypeScript(test *testing.T) {
+	test.Parallel()
 	source := requestSuffixDeclarations + "export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 	for _, fileName := range []string{plainNamedFile, requestSuffixFile} {
-		rule_testing.ExpectSameFindings(t,
-			rule_testing.Run(t, NetworkRequireHookRequestSuffix, fileName, source),
-			rule_testing.Run(t, NetworkRequireHookRequestSuffix, strings.TrimSuffix(fileName, ".ts")+".a", source))
+		rule_testing.ExpectSameFindings(test,
+			rule_testing.Run(test, NetworkRequireHookRequestSuffix, fileName, source),
+			rule_testing.Run(test, NetworkRequireHookRequestSuffix, strings.TrimSuffix(fileName, ".ts")+".a", source))
 	}
 }
 
 // An Adamic `ButtonTheme.a` is a theme file as `ButtonTheme.ts` is, so its values bound a component's
 // props the same way (#kwt1htp).
-func TestBoundaryNoProjectThemeValueReadsAnAdamicThemeFile(t *testing.T) {
-	t.Parallel()
+func TestBoundaryNoProjectThemeValueReadsAnAdamicThemeFile(test *testing.T) {
+	test.Parallel()
 	source := "export const a = <Button variant=\"Emphasized\" />;\n"
-	rule_testing.ExpectSameFindings(t,
-		rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
+	rule_testing.ExpectSameFindings(test,
+		rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
 			themeFilePath:   buttonThemeSource,
 			libraryFilePath: source,
 		}, libraryFilePath),
-		rule_testing.RunTypedFiles(t, BoundaryNoProjectThemeValue, map[string]string{
+		rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
 			strings.TrimSuffix(themeFilePath, ".ts") + ".a": buttonThemeSource,
 			libraryFilePath: source,
 		}, libraryFilePath))

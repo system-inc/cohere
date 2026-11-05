@@ -18,8 +18,8 @@ const extraLabelFile = "/repository/source/ExtraLabel.ts"
 // serialising what it received, then rendering these literals from that JSON, so no case here
 // was retyped and no escape sequence was ever hand-written. The generator refuses any case
 // containing a byte outside printable ASCII, which is what would let a cooked escape through.
-func TestNoExtraLabelFires(t *testing.T) {
-	t.Parallel()
+func TestNoExtraLabelFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -47,10 +47,10 @@ func TestNoExtraLabelFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText), "unexpected")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoExtraLabel, extraLabelFile, testCase.sourceText), "unexpected")
 		})
 	}
 }
@@ -63,8 +63,8 @@ func TestNoExtraLabelFires(t *testing.T) {
 // The two continue cases pin the switch frame: a switch is breakable but cannot be continued, so
 // upstream stops the search there and leaves the label alone rather than reporting a jump whose
 // label is load bearing.
-func TestNoExtraLabelStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExtraLabelStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -88,10 +88,10 @@ func TestNoExtraLabelStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoExtraLabel, extraLabelFile, testCase.sourceText))
 		})
 	}
 }
@@ -102,8 +102,8 @@ func TestNoExtraLabelStaysSilent(t *testing.T) {
 // assertion that can see a fixer repairing the right span with the wrong text. The comment cases
 // are the interesting half: a comment before the keyword or after the label sits outside the
 // removal span and the repair is still offered.
-func TestNoExtraLabelFixes(t *testing.T) {
-	t.Parallel()
+func TestNoExtraLabelFixes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -128,10 +128,10 @@ func TestNoExtraLabelFixes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText), testCase.wantSource)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoExtraLabel, extraLabelFile, testCase.sourceText), testCase.wantSource)
 		})
 	}
 }
@@ -142,8 +142,8 @@ func TestNoExtraLabelFixes(t *testing.T) {
 // inside the span the removal would delete, so applying the repair unattended would destroy it.
 // Asserting the source is UNCHANGED is the only thing that can see a port which repairs a case
 // upstream refuses to touch, since the finding itself is identical either way.
-func TestNoExtraLabelDeclinesToFixOverAComment(t *testing.T) {
-	t.Parallel()
+func TestNoExtraLabelDeclinesToFixOverAComment(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -156,17 +156,17 @@ func TestNoExtraLabelDeclinesToFixOverAComment(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unexpected")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExtraLabel, extraLabelFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unexpected")
 			// The decline is asserted as the ABSENCE of a proposal rather than through
 			// ExpectFixedSource, which refuses a result carrying no fixes rather than treating it
 			// as an unchanged rewrite. Asserting the count is what separates a withheld repair from
 			// one that lands and happens to write the same bytes.
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("expected no repair to be offered over a comment, got %d",
+					test.Errorf("expected no repair to be offered over a comment, got %d",
 						len(diagnostic.Fixes))
 				}
 			}
@@ -181,26 +181,26 @@ func TestNoExtraLabelDeclinesToFixOverAComment(t *testing.T) {
 // the start of the line. Every ExpectFindings assertion above is satisfied by a rule reporting the
 // whole `break A;` statement, so the span is the only thing separating the two readings, and a
 // reader shown the statement would not be shown the token the repair deletes.
-func TestNoExtraLabelPointsAtTheLabel(t *testing.T) {
-	t.Parallel()
+func TestNoExtraLabelPointsAtTheLabel(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoExtraLabel, extraLabelFile, "A: while (a) break A;")
-	rule_testing.ExpectFindings(t, result, "unexpected")
+	result := rule_testing.Run(test, NoExtraLabel, extraLabelFile, "A: while (a) break A;")
+	rule_testing.ExpectFindings(test, result, "unexpected")
 
 	source := result.SourceFile.Text()
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "A" {
-		t.Fatalf("expected the finding to point at the label, pointed at %q", reported)
+		test.Fatalf("expected the finding to point at the label, pointed at %q", reported)
 	}
 	// Upstream's column 20 is one-based, so the label sits at offset 19.
 	if result.Diagnostics[0].Range.Pos() != 19 {
-		t.Errorf("expected the label after the keyword at offset 19, reported at offset %d",
+		test.Errorf("expected the label after the keyword at offset 19, reported at offset %d",
 			result.Diagnostics[0].Range.Pos())
 	}
 	// The message is asserted against a literal rather than against the rule's own constant, since
 	// comparing to the constant moves both sides together under mutation.
 	if result.Diagnostics[0].Message.Id != "unexpected" {
-		t.Errorf("expected the message id \"unexpected\", got %q", result.Diagnostics[0].Message.Id)
+		test.Errorf("expected the message id \"unexpected\", got %q", result.Diagnostics[0].Message.Id)
 	}
 }
 
@@ -219,8 +219,8 @@ func TestNoExtraLabelPointsAtTheLabel(t *testing.T) {
 // Every expectation here was measured against ESLint's own Linter rather than derived, and the two
 // reporting cases were checked by column as well as by count: upstream reports at column 52 and 55
 // respectively, which are the labels inside and after the function rather than the outer one.
-func TestNoExtraLabelStopsAtALabeledBlockOfTheSameName(t *testing.T) {
-	t.Parallel()
+func TestNoExtraLabelStopsAtALabeledBlockOfTheSameName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -234,14 +234,14 @@ func TestNoExtraLabelStopsAtALabeledBlockOfTheSameName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "unexpected"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoExtraLabel, extraLabelFile, testCase.sourceText), expected...)
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoExtraLabel, extraLabelFile, testCase.sourceText), expected...)
 		})
 	}
 }

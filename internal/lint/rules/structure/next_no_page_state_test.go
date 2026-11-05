@@ -12,8 +12,8 @@ const pageStateDeclarations = "import React from 'react';\n" +
 	"declare function useState(initial?: unknown): [unknown, (value: unknown) => void];\n" +
 	"declare function useReducer(reducer: unknown, initial?: unknown): [unknown, unknown];\n"
 
-func TestNextNoPageStateFires(t *testing.T) {
-	t.Parallel()
+func TestNextNoPageStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -48,16 +48,16 @@ func TestNextNoPageStateFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NextNoPageState, pageStateFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NextNoPageState, pageStateFile,
 				pageStateDeclarations+testCase.sourceText), "pageStateRemounts")
 		})
 	}
 }
 
-func TestNextNoPageStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNextNoPageStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -125,9 +125,9 @@ func TestNextNoPageStateStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NextNoPageState, testCase.fileName,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NextNoPageState, testCase.fileName,
 				pageStateDeclarations+testCase.sourceText))
 		})
 	}

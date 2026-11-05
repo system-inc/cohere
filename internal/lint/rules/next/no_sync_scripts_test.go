@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestNoSyncScriptsReports(t *testing.T) {
-	t.Parallel()
+func TestNoSyncScriptsReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -37,16 +37,16 @@ func TestNoSyncScriptsReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
-			rule_testing.ExpectFindings(t, result, messageNoSyncScripts.Id)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSyncScripts, "Component.tsx", testCase.source)
+			rule_testing.ExpectFindings(test, result, messageNoSyncScripts.Id)
 		})
 	}
 }
 
-func TestNoSyncScriptsIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoSyncScriptsIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -90,10 +90,10 @@ export const C = () => <Script src="/a.js" />;`,
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSyncScripts, "Component.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSyncScripts, "Component.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

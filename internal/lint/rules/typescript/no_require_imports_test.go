@@ -25,14 +25,14 @@ type requireImportsCase struct {
 // rather than building the struct, so that the string-to-regexp compilation and the `allowAsImport`
 // default are themselves under test. A case with no options is handed nil, which is what a rule
 // configured as a bare "error" actually receives.
-func decodeRequireImportsOptions(t *testing.T, optionsText string) any {
-	t.Helper()
+func decodeRequireImportsOptions(test *testing.T, optionsText string) any {
+	test.Helper()
 	if optionsText == "" {
 		return nil
 	}
 	decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(optionsText))
 	if err != nil {
-		t.Fatalf("decoding the options %s: %v", optionsText, err)
+		test.Fatalf("decoding the options %s: %v", optionsText, err)
 	}
 	return decoded
 }
@@ -44,8 +44,8 @@ func decodeRequireImportsOptions(t *testing.T, optionsText string) any {
 // doubled report: the two `lib5`/`lib6` cases hold two declarators with a `require` in each, and the
 // `configValidator` case holds two statements with a `require` in each. Every other input reports
 // once, recovered by aligning each snapshot entry on the source line it prints.
-func TestNoRequireImportsFires(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []requireImportsCase{
 		{sourceText: "var lib = require('lib');", options: "", findings: 1},
@@ -81,15 +81,15 @@ func TestNoRequireImportsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			expected := make([]string, testCase.findings)
 			for index := range expected {
 				expected[index] = "noRequireImports"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
@@ -99,8 +99,8 @@ func TestNoRequireImportsFires(t *testing.T) {
 // qualified-name form of import-equals, which produces no external module reference node. The
 // `createRequire` and `let require = bazz` cases each declare a real local binding, which is the
 // only thing that makes a genuine `require` call silent. The remainder exercise the two options.
-func TestNoRequireImportsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []requireImportsCase{
 		{sourceText: "import { l } from 'lib';", options: ""},
@@ -140,11 +140,11 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRequireImports,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRequireImports,
 				requireImportsFile, testCase.sourceText,
-				decodeRequireImportsOptions(t, testCase.options)))
+				decodeRequireImportsOptions(test, testCase.options)))
 		})
 	}
 }
@@ -156,8 +156,8 @@ func TestNoRequireImportsStaysSilent(t *testing.T) {
 // inner `TSExternalModuleReference`. Both carry the same message id, so every id fixture above stays
 // green over the wrong choice. The expected strings here are typed literals rather than anything
 // derived from the rule, so a mutation cannot move both sides together.
-func TestNoRequireImportsSpans(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -198,17 +198,17 @@ func TestNoRequireImportsSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			if len(result.Diagnostics) != len(testCase.reported) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.reported[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.reported[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.reported[index])
 				}
 			}
 		})
@@ -218,23 +218,23 @@ func TestNoRequireImportsSpans(t *testing.T) {
 // TestNoRequireImportsMessage asserts the message a reader sees, against literals typed here rather
 // than against the rule's own constant. Comparing to the constant is equality that looks correct and
 // moves with the rule under mutation, so it proves nothing.
-func TestNoRequireImportsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
+	result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
 		"var lib = require('lib');", nil)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Id != "noRequireImports" {
-		t.Errorf("message id is %q, want %q", result.Diagnostics[0].Message.Id, "noRequireImports")
+		test.Errorf("message id is %q, want %q", result.Diagnostics[0].Message.Id, "noRequireImports")
 	}
 	if !strings.HasPrefix(result.Diagnostics[0].Message.Description,
 		"This loads a module with a CommonJS `require` call.") {
-		t.Errorf("message description begins %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("message description begins %q", result.Diagnostics[0].Message.Description)
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Errorf("the rule offers a repair; upstream marks its fixer pending and ships none")
+		test.Errorf("the rule offers a repair; upstream marks its fixer pending and ships none")
 	}
 }
 
@@ -242,8 +242,8 @@ func TestNoRequireImportsMessage(t *testing.T) {
 // exercises, each pinned by running `oxlint` on the input rather than by reading oxc's source. The
 // corpus writes no parenthesized callee and no escaped path, so every one of these would have been a
 // silent divergence in either direction.
-func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -366,12 +366,12 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("got %d findings, want %d (%s)",
+				test.Fatalf("got %d findings, want %d (%s)",
 					len(result.Diagnostics), testCase.findings, testCase.reasoning)
 			}
 		})
@@ -381,92 +381,92 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(t *testing.T) {
 // TestNoRequireImportsRequiresTheTypedHarness asserts that the rule genuinely declines when handed
 // no checker, so a later revert of the nil guard fails loudly rather than reporting on every
 // `require` in the file regardless of shadowing.
-func TestNoRequireImportsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoRequireImports.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow test cannot work without it")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow test cannot work without it")
 	}
-	result := rule_testing.RunWithOptions(t, NoRequireImports, requireImportsFile,
+	result := rule_testing.RunWithOptions(test, NoRequireImports, requireImportsFile,
 		"var lib = require('lib');", nil)
 	if len(result.Diagnostics) != 0 {
-		t.Errorf("the untyped harness produced %d findings; the nil-checker guard is missing",
+		test.Errorf("the untyped harness produced %d findings; the nil-checker guard is missing",
 			len(result.Diagnostics))
 	}
 }
 
 // TestDecodeNoRequireImportsOptions pins the decoder itself, which is where the default inversion
 // and the pattern compilation live and where upstream has no counterpart to compare against.
-func TestDecodeNoRequireImportsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoRequireImportsOptions(test *testing.T) {
+	test.Parallel()
 
-	t.Run("an absent allowAsImport is false", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an absent allowAsImport is false", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(json.RawMessage(`{}`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if options.AllowAsImport {
-			t.Error("allowAsImport defaulted to true; both upstreams default it to false")
+			test.Error("allowAsImport defaulted to true; both upstreams default it to false")
 		}
 		if len(options.Allow) != 0 {
-			t.Errorf("allow decoded %d patterns from an empty object", len(options.Allow))
+			test.Errorf("allow decoded %d patterns from an empty object", len(options.Allow))
 		}
 	})
 
-	t.Run("patterns compile", func(t *testing.T) {
-		t.Parallel()
+	test.Run("patterns compile", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["/package\\.json$", "^some-package$"] }`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if len(options.Allow) != 2 {
-			t.Fatalf("compiled %d patterns, want 2", len(options.Allow))
+			test.Fatalf("compiled %d patterns, want 2", len(options.Allow))
 		}
 		if !options.Allow[0].Test("../packages/package.json") {
-			t.Error("the escaped-dot pattern did not match a path upstream permits")
+			test.Error("the escaped-dot pattern did not match a path upstream permits")
 		}
 		if options.Allow[0].Test("./package.jsonc") {
-			t.Error("the anchored pattern matched a path upstream reports")
+			test.Error("the anchored pattern matched a path upstream reports")
 		}
 	})
 
 	// #7mztrdd: a lookbehind used to be the pattern dropped here, because RE2 refuses one. It is
 	// read as JavaScript reads it now, and in Node new RegExp("(?<=x)y", "u") tests true on "xy".
-	t.Run("a pattern RE2 refuses compiles as JavaScript", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a pattern RE2 refuses compiles as JavaScript", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["(?<=x)y"] }`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if len(options.Allow) != 1 {
-			t.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(options.Allow))
+			test.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(options.Allow))
 		}
 		if !options.Allow[0].Test("xy") {
-			t.Error("the lookbehind did not match a path JavaScript matches")
+			test.Error("the lookbehind did not match a path JavaScript matches")
 		}
 	})
 
 	// In Node, new RegExp("(", "u") throws "Unterminated group", which is what upstream does at
 	// rule creation; here the entry is dropped.
-	t.Run("a pattern JavaScript cannot compile is dropped rather than failing the run", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a pattern JavaScript cannot compile is dropped rather than failing the run", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoRequireImportsOptions(
 			json.RawMessage(`{ "allow": ["(", "^ok$"] }`))
 		if err != nil {
-			t.Fatalf("decoding: %v", err)
+			test.Fatalf("decoding: %v", err)
 		}
 		options, _ := decoded.(NoRequireImportsOptions)
 		if len(options.Allow) != 1 {
-			t.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(options.Allow))
+			test.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(options.Allow))
 		}
 		if !options.Allow[0].Test("ok") {
-			t.Error("the surviving pattern is not the compilable one")
+			test.Error("the surviving pattern is not the compilable one")
 		}
 	})
 }
@@ -480,8 +480,8 @@ func TestDecodeNoRequireImportsOptions(t *testing.T) {
 // arm a KindNoSubstitutionTemplateLiteral, so an unguarded AsStringLiteral is an unchecked interface
 // conversion that takes the whole linter down. Measured by removing the kind test and watching this
 // input panic with `ast.nodeData is *ast.NoSubstitutionTemplateLiteral, not *ast.StringLiteral`.
-func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsSurvivesMalformedImportEquals(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -511,12 +511,12 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// The assertion is that this returns at all. A panic here fails the test by crashing it,
 			// which is the only signal available for this class of guard.
-			rule_testing.RunTypedWithOptions(t, NoRequireImports, requireImportsFile,
-				testCase.sourceText, decodeRequireImportsOptions(t, testCase.options))
+			rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 		})
 	}
 }
@@ -533,8 +533,8 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(t *testing.T) {
 // call beside a `declare global` block and is SILENT beside a plain `function require(...)`, even
 // though both put a declaration in a source file. An ambient declaration declares a name that
 // already exists rather than introducing a binding, and the ambient flag is what separates them.
-func TestNoRequireImportsAcrossDeclarationOrderings(t *testing.T) {
-	t.Parallel()
+func TestNoRequireImportsAcrossDeclarationOrderings(test *testing.T) {
+	test.Parallel()
 
 	const ambientTypes = "declare function require(id: string): any;\n"
 
@@ -616,11 +616,11 @@ func TestNoRequireImportsAcrossDeclarationOrderings(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, NoRequireImports, testCase.files, "Subject.ts")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, NoRequireImports, testCase.files, "Subject.ts")
 			if len(result.Diagnostics) != testCase.findings {
-				t.Fatalf("got %d findings, want %d (%s)",
+				test.Fatalf("got %d findings, want %d (%s)",
 					len(result.Diagnostics), testCase.findings, testCase.reasoning)
 			}
 		})

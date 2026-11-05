@@ -23,8 +23,8 @@ useImperativeHandle: typeof useImperativeHandle};
 export default React;
 }`
 
-func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
-	t.Parallel()
+func TestEffectHookSignaturesFollowImportOrigin(test *testing.T) {
+	test.Parallel()
 	for _, hook := range []string{"useEffect", "useLayoutEffect", "useInsertionEffect", "useImperativeHandle"} {
 		for _, testCase := range []struct {
 			name       string
@@ -41,8 +41,8 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 			{"shadow", `import {%s as effect} from 'react';`, "effect", "effect: (callback: unknown, dependencies: unknown[]) => unknown", false},
 			{"unrelated", `import {%s as effect} from './unrelated';`, "effect", "", false},
 		} {
-			t.Run(hook+"/"+testCase.name, func(t *testing.T) {
-				t.Parallel()
+			test.Run(hook+"/"+testCase.name, func(test *testing.T) {
+				test.Parallel()
 				prefix := strings.ReplaceAll(testCase.prefix, "%s", hook)
 				source := prefix + ` function Component(` + testCase.parameters + `) { return ` + testCase.callee + `(() => {}, []); }`
 				visited := 0
@@ -73,7 +73,7 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 									origin = call.CalleeOrigin
 								}
 								if (origin.Module == "react" && origin.Export == hook) != testCase.frozen {
-									t.Errorf("origin=%+v; want React hook=%t", origin, testCase.frozen)
+									test.Errorf("origin=%+v; want React hook=%t", origin, testCase.frozen)
 								}
 								frozen := 0
 								result := mutation_aliasing.EffectValueMutable
@@ -95,28 +95,28 @@ func TestEffectHookSignaturesFollowImportOrigin(t *testing.T) {
 									}
 								}
 								if frozen != wantFrozen || result != wantResult {
-									t.Errorf("frozen arguments=%d result=%v, want %d and %v", frozen, result, wantFrozen, wantResult)
+									test.Errorf("frozen arguments=%d result=%v, want %d and %v", frozen, result, wantFrozen, wantResult)
 								}
 							}
 						})
 					}}
 				}}
-				rule_testing.RunTypedFiles(t, probe, map[string]string{
+				rule_testing.RunTypedFiles(test, probe, map[string]string{
 					"/react.d.ts":   reactiveDeclarations + effectHookDeclarations,
 					"/barrel.ts":    fmt.Sprintf("export {%s} from 'react';", hook),
 					"/unrelated.ts": fmt.Sprintf("export function %s(callback: unknown, dependencies: unknown[]) {return {callback, dependencies};}", hook),
 					"/fixture.tsx":  source,
 				}, "/fixture.tsx")
 				if visited != 1 {
-					t.Fatalf("visited %d calls, want one", visited)
+					test.Fatalf("visited %d calls, want one", visited)
 				}
 			})
 		}
 	}
 }
 
-func TestImperativeHandleDoesNotPromoteStableSetter(t *testing.T) {
-	t.Parallel()
+func TestImperativeHandleDoesNotPromoteStableSetter(test *testing.T) {
+	test.Parallel()
 	const source = `import React from 'react'; function Component({ref,value}) {
 const reference=React.useRef(null);
 const [state,setState]=React.useState(false);
@@ -132,18 +132,18 @@ return <button ref={reference} onClick={callback}>{state}</button>;
 		{"without handle", strings.Replace(source, "React.useImperativeHandle(ref,()=>({focus:()=>reference.current?.focus()}));", "", 1), 0},
 		{"missing dependency", strings.Replace(source, "setState(false)", "setState(value)", 1), 1},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			findings, lowered := findingsForSource(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			findings, lowered := findingsForSource(test, testCase.source)
 			if !lowered || len(findings) != testCase.findings {
-				t.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
+				test.Fatalf("lowered=%t findings=%v, want %d findings", lowered, findings, testCase.findings)
 			}
 		})
 	}
 }
 
-func TestEffectHookDoesNotPromoteStableSetter(t *testing.T) {
-	t.Parallel()
+func TestEffectHookDoesNotPromoteStableSetter(test *testing.T) {
+	test.Parallel()
 	const source = `import React from 'react'; import {useNotifications} from './hooks';
 function Component(props: {items?: number[]}) {
 const notifications = useNotifications();
@@ -165,8 +165,8 @@ return <div onClick={callback}>{items.map(item => <span>{item}</span>)}</div>;
 		{"no effect", strings.ReplaceAll(source, "React.useEffect(() => {if (value) return; items.forEach(item => notifications.remove(item));}, [items, value, notifications]);", ""), false},
 		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			findings, markers := 0, 0
 			probe := rule.Rule{Name: "effect-hook-memoization", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
@@ -187,12 +187,12 @@ return <div onClick={callback}>{items.map(item => <span>{item}</span>)}</div>;
 					})
 				}}
 			}}
-			rule_testing.RunTypedFiles(t, probe, map[string]string{"/react.d.ts": reactiveDeclarations + effectHookDeclarations, "/fixture.tsx": testCase.source}, "/fixture.tsx")
+			rule_testing.RunTypedFiles(test, probe, map[string]string{"/react.d.ts": reactiveDeclarations + effectHookDeclarations, "/fixture.tsx": testCase.source}, "/fixture.tsx")
 			if markers == 0 {
-				t.Fatal("no memo markers exercised")
+				test.Fatal("no memo markers exercised")
 			}
 			if (findings != 0) != testCase.fires {
-				t.Fatalf("findings=%d want fires=%t", findings, testCase.fires)
+				test.Fatalf("findings=%d want fires=%t", findings, testCase.fires)
 			}
 		})
 	}

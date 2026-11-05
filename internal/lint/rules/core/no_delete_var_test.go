@@ -8,8 +8,8 @@ import (
 
 const deleteVarFile = "/repository/source/Thing.ts"
 
-func TestNoDeleteVarFires(t *testing.T) {
-	t.Parallel()
+func TestNoDeleteVarFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -22,16 +22,16 @@ func TestNoDeleteVarFires(t *testing.T) {
 		{"a parameter", "export function run(value: number) {\n    delete value;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoDeleteVar, deleteVarFile, testCase.sourceText),
 				"unexpectedDeleteVar")
 		})
 	}
 }
 
-func TestNoDeleteVarStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDeleteVarStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -49,9 +49,9 @@ func TestNoDeleteVarStaysSilent(t *testing.T) {
 		{"no delete at all", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoDeleteVar, deleteVarFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDeleteVar, deleteVarFile, testCase.sourceText))
 		})
 	}
 }

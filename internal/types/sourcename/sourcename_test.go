@@ -8,8 +8,8 @@ import (
 
 // An Adamic name reads as the same name ending in .ts, and every other name as itself: a directory, a name
 // that is only the extension, and names that merely contain ".a" are not Adamic.
-func TestAnAdamicNameIsTreatedAsTypeScript(t *testing.T) {
-	t.Parallel()
+func TestAnAdamicNameIsTreatedAsTypeScript(test *testing.T) {
+	test.Parallel()
 	for name, want := range map[string]string{
 		"/repo/Dog.a":         "/repo/Dog.ts",
 		"Dog.test.a":          "Dog.test.ts",
@@ -24,10 +24,10 @@ func TestAnAdamicNameIsTreatedAsTypeScript(t *testing.T) {
 		"/repo/lib/libfoo.ab": "/repo/lib/libfoo.ab",
 	} {
 		if got := sourcename.TreatedAs(name); got != want {
-			t.Errorf("TreatedAs(%q) = %q, want %q", name, got, want)
+			test.Errorf("TreatedAs(%q) = %q, want %q", name, got, want)
 		}
 		if got := sourcename.IsAdamic(name); got != (want != name) {
-			t.Errorf("IsAdamic(%q) = %t", name, got)
+			test.Errorf("IsAdamic(%q) = %t", name, got)
 		}
 	}
 }

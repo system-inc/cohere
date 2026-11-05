@@ -23,8 +23,8 @@ const preferExponentiationOperatorFile = "/repository/source/PreferExponentiatio
 // withholds the repair: a wrong argument count, a spread argument, or a comment anywhere inside the
 // call. Those are asserted as declines, because a fixer that repairs a case upstream refuses to
 // touch is a defect no message-id fixture can see.
-func TestPreferExponentiationOperatorFires(t *testing.T) {
-	t.Parallel()
+func TestPreferExponentiationOperatorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -211,18 +211,18 @@ func TestPreferExponentiationOperatorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, testCase.name)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "useExponentiation"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			if got := result.Diagnostics[0].Message.Description; got != messagePreferExponentiationOperator.Description {
-				t.Fatalf("the reported description is not the rule's own:\n got %q", got)
+				test.Fatalf("the reported description is not the rule's own:\n got %q", got)
 			}
 
 			fixCount := 0
@@ -231,12 +231,12 @@ func TestPreferExponentiationOperatorFires(t *testing.T) {
 			}
 			if !testCase.fixable {
 				if fixCount != 0 {
-					t.Fatalf("upstream declines to fix this case, but the rule proposed %d fix(es)", fixCount)
+					test.Fatalf("upstream declines to fix this case, but the rule proposed %d fix(es)", fixCount)
 				}
 				return
 			}
 			if fixCount == 0 {
-				t.Fatalf("upstream fixes this case and the rule proposed no repair")
+				test.Fatalf("upstream fixes this case and the rule proposed no repair")
 			}
 			if testCase.overlapping {
 				// The repair exists and is asserted elsewhere, one call at a time. See
@@ -246,13 +246,13 @@ func TestPreferExponentiationOperatorFires(t *testing.T) {
 			// The typed harness writes each fixture as TrimSpace(source)+"\n", and
 			// ExpectFixedSource compares the whole rewritten file, so upstream's output is
 			// transformed the same way the input was rather than the rule being padded to match.
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }
 
-func TestPreferExponentiationOperatorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferExponentiationOperatorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"Object.pow(a, b)",
@@ -279,11 +279,11 @@ func TestPreferExponentiationOperatorStaysSilent(t *testing.T) {
 	}
 
 	for _, sourceText := range cases {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, sourceText)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -296,8 +296,8 @@ func TestPreferExponentiationOperatorStaysSilent(t *testing.T) {
 // depends on: `as` binds LOOSER than every arithmetic operator, so a `**` expression under an
 // as-expression parent has to be wrapped. The shared precedence table used by the fixer carries
 // that correction, and if it were ever reverted this case would fail.
-func TestPreferExponentiationOperatorTypeScriptShapes(t *testing.T) {
-	t.Parallel()
+func TestPreferExponentiationOperatorTypeScriptShapes(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name      string
@@ -307,12 +307,12 @@ func TestPreferExponentiationOperatorTypeScriptShapes(t *testing.T) {
 		{"Math.pow(a as any, b)", "(a as any)**b"},
 		{"Math.pow(a, b) as any", "(a**b) as any"},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, testCase.name)
-			rule_testing.ExpectFindings(t, result, "useExponentiation")
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(testCase.wantFixed)+"\n")
+			rule_testing.ExpectFindings(test, result, "useExponentiation")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(testCase.wantFixed)+"\n")
 		})
 	}
 }
@@ -337,19 +337,19 @@ func TestPreferExponentiationOperatorTypeScriptShapes(t *testing.T) {
 //
 // These rows assert SILENCE, so if resolution ever gains the ability to follow an alias, this test
 // fails and the divergence note above is what needs revisiting.
-func TestPreferExponentiationOperatorAliasDivergence(t *testing.T) {
-	t.Parallel()
+func TestPreferExponentiationOperatorAliasDivergence(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"const {pow} = Math; pow(a, b);",
 		"const {pow: p} = Math; p(a, b);",
 		"const p = Math.pow; p(a, b);",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, sourceText)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -366,18 +366,18 @@ func TestPreferExponentiationOperatorAliasDivergence(t *testing.T) {
 // So the divergence is four alias forms rather than three, and the probe that suggested otherwise
 // was reading a symbol the rule never consults. Recorded here as reporting-silence rather than
 // quietly deleted, because a wrong claim in a test is worse than a missing one.
-func TestPreferExponentiationOperatorObjectAliasDiverges(t *testing.T) {
-	t.Parallel()
+func TestPreferExponentiationOperatorObjectAliasDiverges(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"const M = Math; M.pow(a, b);",
 		"var M = Math; M.pow(a, b);",
 	} {
-		t.Run(sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferExponentiationOperator,
+		test.Run(sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferExponentiationOperator,
 				preferExponentiationOperatorFile, sourceText)
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -394,23 +394,23 @@ func TestPreferExponentiationOperatorObjectAliasDiverges(t *testing.T) {
 // call at a time. Upstream's own output for the nested case is a single pass that rewrites the
 // outer call only, leaving the inner ones for the next pass, which is what its `output` field
 // records.
-func TestPreferExponentiationOperatorNestedCallsReportSeparately(t *testing.T) {
-	t.Parallel()
+func TestPreferExponentiationOperatorNestedCallsReportSeparately(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, PreferExponentiationOperator,
+	result := rule_testing.RunTyped(test, PreferExponentiationOperator,
 		preferExponentiationOperatorFile, "Math.pow(Math.pow(a, b), Math.pow(c, d))")
-	rule_testing.ExpectFindings(t, result, "useExponentiation", "useExponentiation", "useExponentiation")
+	rule_testing.ExpectFindings(test, result, "useExponentiation", "useExponentiation", "useExponentiation")
 
 	// Each finding carries its own repair, and each is correct in isolation. The innermost two are
 	// checked separately, since those spans do not overlap each other.
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 1 {
-			t.Fatalf("expected one fix per finding, got %d", len(diagnostic.Fixes))
+			test.Fatalf("expected one fix per finding, got %d", len(diagnostic.Fixes))
 		}
 	}
 
-	inner := rule_testing.RunTyped(t, PreferExponentiationOperator,
+	inner := rule_testing.RunTyped(test, PreferExponentiationOperator,
 		preferExponentiationOperatorFile, "Math.pow(a, b)")
-	rule_testing.ExpectFindings(t, inner, "useExponentiation")
-	rule_testing.ExpectFixedSource(t, inner, "a**b\n")
+	rule_testing.ExpectFindings(test, inner, "useExponentiation")
+	rule_testing.ExpectFixedSource(test, inner, "a**b\n")
 }

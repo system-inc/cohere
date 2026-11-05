@@ -13,18 +13,18 @@ import (
 // A recording file system notes every path it is asked about, present or absent, and refuses to write.
 // The absences are the half a cache most easily forgets: a design system that looked for an entry
 // point and missed it changes when that file is created (#pyhm2t2).
-func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(t *testing.T) {
-	t.Parallel()
-	root, err := filepath.EvalSymlinks(t.TempDir())
+func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(test *testing.T) {
+	test.Parallel()
+	root, err := filepath.EvalSymlinks(test.TempDir())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	project := filepath.ToSlash(filepath.Join(root, "project"))
 	if err := os.MkdirAll(project+"/source", 0o755); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := os.WriteFile(project+"/source/theme.css", []byte("@import 'tailwindcss';"), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	recording := NewRecordingFS(osvfs.FS())
 
@@ -49,25 +49,25 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(t *testing.T) {
 		"/project/source/theme.css present",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Errorf("recorded:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+		test.Errorf("recorded:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 
 	// A present file keeps the size and modification time it had when read, so a cache hashing it
 	// later can tell it moved in between; an absent one has neither.
 	info, err := os.Stat(project + "/source/theme.css")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, read := range recording.Reads() {
 		switch {
 		case strings.HasSuffix(read.Path, "/source/theme.css"):
 			if read.Size != info.Size() || read.ModifiedNanoseconds != info.ModTime().UnixNano() {
-				t.Errorf("the stylesheet recorded size %d and time %d, want %d and %d",
+				test.Errorf("the stylesheet recorded size %d and time %d, want %d and %d",
 					read.Size, read.ModifiedNanoseconds, info.Size(), info.ModTime().UnixNano())
 			}
 		case !read.Present:
 			if read.Size != 0 || read.ModifiedNanoseconds != 0 {
-				t.Errorf("absent %s recorded a size or a time", read.Path)
+				test.Errorf("absent %s recorded a size or a time", read.Path)
 			}
 		}
 	}
@@ -80,7 +80,7 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(t *testing.T) {
 		func() {
 			defer func() {
 				if recover() == nil {
-					t.Errorf("%s was allowed through a recording file system", name)
+					test.Errorf("%s was allowed through a recording file system", name)
 				}
 			}()
 			write()

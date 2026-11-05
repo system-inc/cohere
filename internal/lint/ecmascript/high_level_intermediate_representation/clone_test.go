@@ -22,8 +22,8 @@ import (
 // The source holds what reaches the copy's edge cases: phis from a branch and a loop, a try, nested
 // functions with captures, a memo callback that gets inlined, a hook call with a callback nested in
 // its scope, and a finding upstream reports.
-func TestCloneFunctionSharesNothingAPassWrites(t *testing.T) {
-	t.Parallel()
+func TestCloneFunctionSharesNothingAPassWrites(test *testing.T) {
+	test.Parallel()
 	const source = `import * as React from 'react';
 declare function makeArray(): unknown[];
 declare const store: { subscribe: (listener: () => void) => () => void; get: () => number };
@@ -57,32 +57,32 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
 				forgetIdentifierSlabs(original)
 				forgetIdentifierSlabs(untouched)
 				if !reflect.DeepEqual(original, untouched) {
-					t.Fatal("two lowerings of one function differ, so this test cannot tell a shared write from noise")
+					test.Fatal("two lowerings of one function differ, so this test cannot tell a shared write from noise")
 				}
 
 				clone := CloneFunction(original)
 				if !reflect.DeepEqual(clone, original) {
-					t.Fatal("the copy differs from the function it copies")
+					test.Fatal("the copy differs from the function it copies")
 				}
 				fromClone := AnalyzePreservedManualMemoization(clone, ctx.TypeChecker)
 
 				if !reflect.DeepEqual(original, untouched) {
-					t.Error("the pipeline run over the copy changed the original")
+					test.Error("the pipeline run over the copy changed the original")
 				}
 				direct := Lower(node, ctx.TypeChecker)
 				Construct(direct)
 				fromLowering := AnalyzePreservedManualMemoization(direct, ctx.TypeChecker)
 				if len(fromLowering) == 0 {
-					t.Error("the fixture produced no finding, so the comparison below proves nothing about the copy")
+					test.Error("the fixture produced no finding, so the comparison below proves nothing about the copy")
 				}
 				if !reflect.DeepEqual(fromClone, fromLowering) {
-					t.Errorf("findings from the copy %v differ from a fresh lowering's %v", fromClone, fromLowering)
+					test.Errorf("findings from the copy %v differ from a fresh lowering's %v", fromClone, fromLowering)
 				}
 				visited++
 			})
 		}}
 	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts": reactiveDeclarations + `
 declare module 'react' {
 export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T;
@@ -91,7 +91,7 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 	if visited != 1 {
-		t.Fatalf("visited %d functions, want one", visited)
+		test.Fatalf("visited %d functions, want one", visited)
 	}
 }
 

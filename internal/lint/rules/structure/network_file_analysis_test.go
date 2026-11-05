@@ -37,8 +37,8 @@ var networkAnalysisProbe = rule.Rule{
 
 const networkImport = "import { networkService } from '@structure/source/services/network/NetworkService';\n"
 
-func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
-	t.Parallel()
+func TestNetworkFileAnalysisFindsHooks(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -72,18 +72,18 @@ func TestNetworkFileAnalysisFindsHooks(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
-				t.Fatalf("want %d hooks, got %d", testCase.wantCount, len(result.Diagnostics))
+				test.Fatalf("want %d hooks, got %d", testCase.wantCount, len(result.Diagnostics))
 			}
 		})
 	}
 }
 
-func TestNetworkFileAnalysisStaysEmpty(t *testing.T) {
-	t.Parallel()
+func TestNetworkFileAnalysisStaysEmpty(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -131,17 +131,17 @@ func TestNetworkFileAnalysisStaysEmpty(t *testing.T) {
 		{"an empty file", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText))
 		})
 	}
 }
 
 // Export detection and parameter capture are what the dependent rules read, so they are pinned here
 // rather than discovered three times.
-func TestNetworkFileAnalysisRecordsShape(t *testing.T) {
-	t.Parallel()
+func TestNetworkFileAnalysisRecordsShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -166,14 +166,14 @@ func TestNetworkFileAnalysisRecordsShape(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, networkAnalysisProbe, networkFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one hook, got %d", len(result.Diagnostics))
+				test.Fatalf("want one hook, got %d", len(result.Diagnostics))
 			}
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
-				t.Fatalf("got %q, want %q", got, testCase.want)
+				test.Fatalf("got %q, want %q", got, testCase.want)
 			}
 		})
 	}

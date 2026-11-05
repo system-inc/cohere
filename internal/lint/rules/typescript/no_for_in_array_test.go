@@ -49,8 +49,8 @@ export {};
 //
 // Every one was additionally driven through `@typescript-eslint` 8.67.0 on a real program before it
 // became a fixture, and both references produced the same verdict and the same span on all of them.
-func TestNoForInArrayFires(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -76,9 +76,9 @@ func TestNoForInArrayFires(t *testing.T) {
 		{"object with a number index and a numeric length", "\ndeclare const obj: {\n  [key: number]: number;\n  length: 1;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n      "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoForInArray,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoForInArray,
 				noForInArrayFile, testCase.sourceText), "forInViolation")
 		})
 	}
@@ -90,8 +90,8 @@ func TestNoForInArrayFires(t *testing.T) {
 // the rule looks for and NO `length`, so it passes; the same object with `length: 1` added is a
 // failing case in the table above. That pair is the only thing in either corpus proving the length
 // half of the predicate is load-bearing rather than decorative.
-func TestNoForInArrayStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -103,9 +103,9 @@ func TestNoForInArrayStaysSilent(t *testing.T) {
 		{"object with a number index and no length", "\ndeclare const obj: {\n  [key: number]: number;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n    "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoForInArray,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoForInArray,
 				noForInArrayFile, testCase.sourceText))
 		})
 	}
@@ -129,8 +129,8 @@ func TestNoForInArrayStaysSilent(t *testing.T) {
 // too, alongside a plain-array control that fires, so the zero is a verdict rather than a broken
 // harness. tsgolint could not be run directly for the same reason oxlint cannot, but the two
 // implementations are line-for-line the same predicate.
-func TestNoForInArrayNeedsBothHalvesOfThePredicate(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayNeedsBothHalvesOfThePredicate(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -147,9 +147,9 @@ func TestNoForInArrayNeedsBothHalvesOfThePredicate(t *testing.T) {
 		{"number index with a length method", "declare const o: { [k: number]: string; length(): number };\nfor (const k in o) {\n  console.log(k);\n}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoForInArray,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoForInArray,
 				noForInArrayFile, testCase.sourceText))
 		})
 	}
@@ -161,8 +161,8 @@ func TestNoForInArrayNeedsBothHalvesOfThePredicate(t *testing.T) {
 // Splitting them out is what keeps them honest. Run under the single-file harness both pass too, by
 // reporting nothing where a finding IS expected, so they would have sat in the clean list asserting
 // the exact opposite of upstream while the suite stayed green.
-func TestNoForInArrayDomCollections(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayDomCollections(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -172,13 +172,13 @@ func TestNoForInArrayDomCollections(t *testing.T) {
 		{"node list", "\ndeclare const arrayLike: NodeList;\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, NoForInArray, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, NoForInArray, map[string]string{
 				"ForIn.ts":      testCase.sourceText,
 				"DomGlobals.ts": domGlobals,
 			}, "ForIn.ts")
-			rule_testing.ExpectFindings(t, result, "forInViolation")
+			rule_testing.ExpectFindings(test, result, "forInViolation")
 		})
 	}
 }
@@ -197,8 +197,8 @@ func TestNoForInArrayDomCollections(t *testing.T) {
 //
 // Upstream's line numbers are 1-based against text that begins with a newline, and the harness
 // trims the source before parsing, so each expected line shifts up by one here.
-func TestNoForInArrayReportsTheLoopHead(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayReportsTheLoopHead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name                             string
@@ -225,13 +225,13 @@ func TestNoForInArrayReportsTheLoopHead(t *testing.T) {
 		{"object with a number index and a numeric length", "\ndeclare const obj: {\n  [key: number]: number;\n  length: 1;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n      ", 6, 1, 6, 23},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// The harness trims the source, so offsets are against the trimmed text.
 			sourceText := strings.TrimSpace(testCase.sourceText)
-			result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile, sourceText)
+			result := rule_testing.RunTyped(test, NoForInArray, noForInArrayFile, sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding to assert a span against, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding to assert a span against, got %d", len(result.Diagnostics))
 			}
 
 			finding := result.Diagnostics[0]
@@ -239,7 +239,7 @@ func TestNoForInArrayReportsTheLoopHead(t *testing.T) {
 			endLine, endColumn := lineAndColumnOf(sourceText, finding.Range.End())
 			if startLine != testCase.line || startColumn != testCase.column ||
 				endLine != testCase.endLine || endColumn != testCase.endColumn {
-				t.Fatalf("finding spans %d:%d-%d:%d, want %d:%d-%d:%d\n  reported text: %q",
+				test.Fatalf("finding spans %d:%d-%d:%d, want %d:%d-%d:%d\n  reported text: %q",
 					startLine, startColumn, endLine, endColumn,
 					testCase.line, testCase.column, testCase.endLine, testCase.endColumn,
 					sourceText[finding.Range.Pos():finding.Range.End()])
@@ -249,10 +249,10 @@ func TestNoForInArrayReportsTheLoopHead(t *testing.T) {
 			// upstream's own numbers were misread, so this checks the shape independently.
 			reported := sourceText[finding.Range.Pos():finding.Range.End()]
 			if !strings.HasPrefix(reported, "for") {
-				t.Fatalf("a for-in head should begin at the `for` keyword, got %q", reported)
+				test.Fatalf("a for-in head should begin at the `for` keyword, got %q", reported)
 			}
 			if strings.Contains(reported, "console.log") {
-				t.Fatalf("the loop body leaked into the reported head: %q", reported)
+				test.Fatalf("the loop body leaked into the reported head: %q", reported)
 			}
 		})
 	}
@@ -278,19 +278,19 @@ func lineAndColumnOf(sourceText string, offset int) (int, int) {
 // into a for-of changes what the loop binds, from a string key to a value. A later edit adding a
 // repair would be a real behavior change against oxlint, and without this it would go unnoticed:
 // every assertion above is satisfied by a finding that also carries a fix.
-func TestNoForInArrayCarriesNoRepair(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayCarriesNoRepair(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile,
+	result := rule_testing.RunTyped(test, NoForInArray, noForInArrayFile,
 		"for (const x in [3, 4, 5]) {\n  console.log(x);\n}")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("this rule must not offer a fix, got %d", len(result.Diagnostics[0].Fixes))
+		test.Fatalf("this rule must not offer a fix, got %d", len(result.Diagnostics[0].Fixes))
 	}
 	if len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatalf("this rule must not offer a suggestion, got %d", len(result.Diagnostics[0].Suggestions))
+		test.Fatalf("this rule must not offer a suggestion, got %d", len(result.Diagnostics[0].Suggestions))
 	}
 }
 
@@ -299,28 +299,28 @@ func TestNoForInArrayCarriesNoRepair(t *testing.T) {
 // The string is compared against a literal typed here rather than against the rule's own message
 // constant, because comparing a finding to the constant it was built from is an equality that moves
 // on both sides under mutation and therefore guards nothing.
-func TestNoForInArrayMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile,
+	result := rule_testing.RunTyped(test, NoForInArray, noForInArrayFile,
 		"for (const x in [3, 4, 5]) {\n  console.log(x);\n}")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 
 	finding := result.Diagnostics[0]
 	if finding.RuleName != "@typescript-eslint/no-for-in-array" {
-		t.Fatalf("rule reported under %q, which no config entry enables and no suppression comment "+
+		test.Fatalf("rule reported under %q, which no config entry enables and no suppression comment "+
 			"could silence; upstream's own spelling carries a stray -rule suffix", finding.RuleName)
 	}
 	if finding.Message.Id != "forInViolation" {
-		t.Fatalf("message id is %q, want %q", finding.Message.Id, "forInViolation")
+		test.Fatalf("message id is %q, want %q", finding.Message.Id, "forInViolation")
 	}
 	const wantDescription = "For-in loops over arrays skips holes, returns indices as strings, " +
 		"and may visit the prototype chain or other enumerable properties. Use a more robust " +
 		"iteration method such as for-of or array.forEach instead."
 	if finding.Message.Description != wantDescription {
-		t.Fatalf("message text drifted from both upstreams:\n  got  %q\n  want %q",
+		test.Fatalf("message text drifted from both upstreams:\n  got  %q\n  want %q",
 			finding.Message.Description, wantDescription)
 	}
 }
@@ -338,25 +338,25 @@ func TestNoForInArrayMessageText(t *testing.T) {
 // because the shim's type queries return nil rather than panicking. Without the guard this rule
 // would not crash under a nil checker, it would go silent, and every fixture above would pass having
 // proven nothing.
-func TestNoForInArrayRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoForInArrayRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoForInArray.NeedsTypeChecker {
-		t.Fatal("this rule asks the checker what a type is; without NeedsTypeChecker it would be " +
+		test.Fatal("this rule asks the checker what a type is; without NeedsTypeChecker it would be " +
 			"handed a nil checker and go silent on every input while every fixture still passed")
 	}
 
 	// Drive the listener with a checker-less Context. It must return rather than reach the checker,
 	// and this is the only path that reaches that branch, since registration always supplies one.
-	typed := rule_testing.RunTyped(t, NoForInArray, noForInArrayFile, "declare const arr: number[];\nfor (const key in arr) {\n}\n")
+	typed := rule_testing.RunTyped(test, NoForInArray, noForInArrayFile, "declare const arr: number[];\nfor (const key in arr) {\n}\n")
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+		test.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}
 
 	listeners := NoForInArray.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
 	listener, hasListener := listeners[ast.KindForInStatement]
 	if !hasListener {
-		t.Fatal("the rule stopped listening on for-in statements")
+		test.Fatal("the rule stopped listening on for-in statements")
 	}
 	for _, statement := range typed.SourceFile.Statements.Nodes {
 		if statement.Kind == ast.KindForInStatement {

@@ -44,14 +44,14 @@ type noMeaninglessVoidOperatorRow struct {
 }
 
 // noMeaninglessVoidOperatorOptionsFor routes a case's options through the rule's own decoder.
-func noMeaninglessVoidOperatorOptionsFor(t *testing.T, optionsJson string) any {
-	t.Helper()
+func noMeaninglessVoidOperatorOptionsFor(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return DefaultNoMeaninglessVoidOperatorSettings()
 	}
 	decoded, err := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", optionsJson, err)
+		test.Fatalf("decoding %s: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -61,14 +61,14 @@ func noMeaninglessVoidOperatorOptionsFor(t *testing.T, optionsJson string) any {
 // The harness applies fixes and has no suggestion support, so the checkNever branch's repair would
 // otherwise go entirely unasserted. That branch is exactly the one where a mistake matters most,
 // since it is the half upstream refuses to apply unattended.
-func applyNoMeaninglessVoidOperatorSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyNoMeaninglessVoidOperatorSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool { return fixes[first].Range.Pos() > fixes[second].Range.Pos() })
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(source) || start > end {
-			t.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
 		}
 		source = source[:start] + fix.Text + source[end:]
 	}
@@ -554,15 +554,15 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 	}
 }
 
-func TestNoMeaninglessVoidOperatorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoMeaninglessVoidOperatorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for index, testCase := range noMeaninglessVoidOperatorSilentRows() {
-		t.Run(noMeaninglessVoidOperatorCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMeaninglessVoidOperator,
+		test.Run(noMeaninglessVoidOperatorCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMeaninglessVoidOperator,
 				noMeaninglessVoidOperatorFile, testCase.sourceText,
-				noMeaninglessVoidOperatorOptionsFor(t, testCase.optionsJson)))
+				noMeaninglessVoidOperatorOptionsFor(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -570,21 +570,21 @@ func TestNoMeaninglessVoidOperatorStaysSilent(t *testing.T) {
 // Every row asserts the span, the whole rendered message, and the repair. The message matters more
 // here than on most rules: the type branch interpolates `typeToString`, so one rule renders "on
 // void", "on undefined", "on never" and "on void | undefined" for different inputs.
-func TestNoMeaninglessVoidOperatorFires(t *testing.T) {
-	t.Parallel()
+func TestNoMeaninglessVoidOperatorFires(test *testing.T) {
+	test.Parallel()
 
 	for index, testCase := range noMeaninglessVoidOperatorFiringRows() {
-		t.Run(noMeaninglessVoidOperatorCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoMeaninglessVoidOperator,
+		test.Run(noMeaninglessVoidOperatorCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoMeaninglessVoidOperator,
 				noMeaninglessVoidOperatorFile, testCase.sourceText,
-				noMeaninglessVoidOperatorOptionsFor(t, testCase.optionsJson))
+				noMeaninglessVoidOperatorOptionsFor(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
@@ -592,50 +592,50 @@ func TestNoMeaninglessVoidOperatorFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
 				}
 
 				switch want.wantRepair {
 				case "Fix":
 					if len(diagnostic.Suggestions) != 0 {
-						t.Fatalf("finding %d: the fix branch must offer no suggestion, got %d",
+						test.Fatalf("finding %d: the fix branch must offer no suggestion, got %d",
 							position, len(diagnostic.Suggestions))
 					}
 					if len(diagnostic.Fixes) != 1 {
-						t.Fatalf("finding %d: expected one fix, got %d", position, len(diagnostic.Fixes))
+						test.Fatalf("finding %d: expected one fix, got %d", position, len(diagnostic.Fixes))
 					}
 				case "None":
 					if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-						t.Fatalf("finding %d: a void that is not a whole statement must offer no repair, "+
+						test.Fatalf("finding %d: a void that is not a whole statement must offer no repair, "+
 							"got %d fixes and %d suggestions", position, len(diagnostic.Fixes),
 							len(diagnostic.Suggestions))
 					}
 				case "Suggestion":
 					if len(diagnostic.Fixes) != 0 {
-						t.Fatalf("finding %d: the suggestion branch must apply nothing unattended, got %d fixes",
+						test.Fatalf("finding %d: the suggestion branch must apply nothing unattended, got %d fixes",
 							position, len(diagnostic.Fixes))
 					}
 					if len(diagnostic.Suggestions) != 1 {
-						t.Fatalf("finding %d: expected one suggestion, got %d", position, len(diagnostic.Suggestions))
+						test.Fatalf("finding %d: expected one suggestion, got %d", position, len(diagnostic.Suggestions))
 					}
 					suggestion := diagnostic.Suggestions[0]
 					if suggestion.Message.Description != want.wantSuggestionDescription {
-						t.Fatalf("finding %d suggestion text: expected %q, got %q",
+						test.Fatalf("finding %d suggestion text: expected %q, got %q",
 							position, want.wantSuggestionDescription, suggestion.Message.Description)
 					}
 					if suggestion.Message.Id != "removeVoid" {
-						t.Fatalf("finding %d suggestion id: got %q", position, suggestion.Message.Id)
+						test.Fatalf("finding %d suggestion id: got %q", position, suggestion.Message.Id)
 					}
-					applied := applyNoMeaninglessVoidOperatorSuggestion(t, onDisk, suggestion)
+					applied := applyNoMeaninglessVoidOperatorSuggestion(test, onDisk, suggestion)
 					if applied != want.wantSuggestion {
-						t.Fatalf("finding %d suggestion applied: expected %q, got %q",
+						test.Fatalf("finding %d suggestion applied: expected %q, got %q",
 							position, want.wantSuggestion, applied)
 					}
 				default:
-					t.Fatalf("finding %d: unknown repair %q", position, want.wantRepair)
+					test.Fatalf("finding %d: unknown repair %q", position, want.wantRepair)
 				}
 			}
 
@@ -643,22 +643,22 @@ func TestNoMeaninglessVoidOperatorFires(t *testing.T) {
 			// against anything this rule produced. For the double void it is neither finding's own
 			// rewrite, so a row compares the composition. A row with no fix composes to nothing.
 			if testCase.wantComposedFix != "" {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantComposedFix)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantComposedFix)
 			}
 		})
 	}
 }
 
 // Both of upstream's directions are carried whole, so a bad filter cannot quietly empty either.
-func TestNoMeaninglessVoidOperatorCorpusIsWhole(t *testing.T) {
-	t.Parallel()
+func TestNoMeaninglessVoidOperatorCorpusIsWhole(test *testing.T) {
+	test.Parallel()
 
 	counts := map[string]int{}
 	for _, row := range append(noMeaninglessVoidOperatorSilentRows(), noMeaninglessVoidOperatorFiringRows()...) {
 		counts[row.origin]++
 	}
 	if counts["upstream-valid"] != 22 || counts["upstream-invalid"] != 21 {
-		t.Fatalf("upstream's 8.71.0 file has 22 valid and 21 invalid rows, the corpus carries %d and %d",
+		test.Fatalf("upstream's 8.71.0 file has 22 valid and 21 invalid rows, the corpus carries %d and %d",
 			counts["upstream-valid"], counts["upstream-invalid"])
 	}
 }
@@ -669,8 +669,8 @@ func TestNoMeaninglessVoidOperatorCorpusIsWhole(t *testing.T) {
 // decoder would work by luck. The decoder is hand-rolled anyway and tested anyway, because the
 // coincidence is not a property of the option surface: adding one default-true key would make the
 // generic path silently wrong, and this test is what would notice.
-func TestDecodeNoMeaninglessVoidOperatorOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoMeaninglessVoidOperatorOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name string
@@ -682,18 +682,18 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(t *testing.T) {
 		{name: "explicitFalse", raw: `{"checkNever": false}`, want: false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(testCase.raw))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.raw, err)
+				test.Fatalf("decoding %s: %v", testCase.raw, err)
 			}
 			options, isOptions := decoded.(NoMeaninglessVoidOperatorOptions)
 			if !isOptions {
-				t.Fatalf("the decoder returned %T rather than the options struct", decoded)
+				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
 			}
 			if options.CheckNever != testCase.want {
-				t.Fatalf("checkNever: expected %v, got %v", testCase.want, options.CheckNever)
+				test.Fatalf("checkNever: expected %v, got %v", testCase.want, options.CheckNever)
 			}
 		})
 	}
@@ -705,20 +705,20 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(t *testing.T) {
 // rule through the decoder, so nothing there can see the fallback. The separating input is a call
 // returning `never`: silent under the default, reporting when checkNever is on. Since 8.71 it has to
 // be a call, because `void x` on a `never` name is a non-call finding under either setting.
-func TestNoMeaninglessVoidOperatorFallsBackToTheDefaultOnNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoMeaninglessVoidOperatorFallsBackToTheDefaultOnNilOptions(test *testing.T) {
+	test.Parallel()
 
 	const neverArgument = "declare function fail(): never;\nvoid fail();"
 
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoMeaninglessVoidOperator,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMeaninglessVoidOperator,
 		noMeaninglessVoidOperatorFile, neverArgument, nil))
 
 	// The control: the same input with checkNever on must report, so the silence above is the
 	// default being applied rather than the rule being inert.
-	reported := rule_testing.RunTypedWithOptions(t, NoMeaninglessVoidOperator,
+	reported := rule_testing.RunTypedWithOptions(test, NoMeaninglessVoidOperator,
 		noMeaninglessVoidOperatorFile, neverArgument,
 		NoMeaninglessVoidOperatorOptions{CheckNever: true})
-	rule_testing.ExpectFindings(t, reported, "meaninglessVoidOperator")
+	rule_testing.ExpectFindings(test, reported, "meaninglessVoidOperator")
 }
 
 // TestNoMeaninglessVoidOperatorNeedsTheTypedHarness pins the checker declaration.
@@ -726,13 +726,13 @@ func TestNoMeaninglessVoidOperatorFallsBackToTheDefaultOnNilOptions(t *testing.T
 // Under the plain harness the checker is nil, this rule returns immediately, and every clean
 // fixture would pass having proven nothing. Asserting the declaration means a later revert fails
 // loudly rather than going vacuously green.
-func TestNoMeaninglessVoidOperatorNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoMeaninglessVoidOperatorNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoMeaninglessVoidOperator.NeedsTypeChecker {
-		t.Fatal("the rule resolves the argument's type, so it must declare NeedsTypeChecker")
+		test.Fatal("the rule resolves the argument's type, so it must declare NeedsTypeChecker")
 	}
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoMeaninglessVoidOperator,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoMeaninglessVoidOperator,
 		noMeaninglessVoidOperatorFile, "function foo() {}\nvoid foo();"))
 }

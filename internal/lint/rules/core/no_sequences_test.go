@@ -17,11 +17,11 @@ const sequencesFile = "/repository/source/Sequences.ts"
 // the one line of this rule with no upstream counterpart: it has to turn an absent key into `true`
 // where the generic helper would hand back a zero-value struct reading as `false`. A struct-built
 // fixture states its own answer and cannot see that.
-func decodedSequenceOptions(t *testing.T, raw string) any {
-	t.Helper()
+func decodedSequenceOptions(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeNoSequencesOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", raw, err)
+		test.Fatalf("decoding %s: %v", raw, err)
 	}
 	return decoded
 }
@@ -36,8 +36,8 @@ func decodedSequenceOptions(t *testing.T, raw string) any {
 // Extracted by evaluating the tester with a stubbed RuleTester and serialising what it was handed,
 // so no source string in this file was retyped. The columns are upstream's, converted from
 // one-based columns to zero-based byte offsets at the assertion.
-func TestNoSequencesFires(t *testing.T) {
-	t.Parallel()
+func TestNoSequencesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -56,16 +56,16 @@ func TestNoSequencesFires(t *testing.T) {
 		{"(1), 2", nil, 4},
 		{"((1)) , (2)", nil, 7},
 		{"while((1) , 2);", nil, 11},
-		{"var foo = (1, 2);", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 13},
-		{"(0,eval)(\"foo()\");", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 3},
-		{"foo(a, (b, c), d);", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 10},
-		{"do {} while ((doSomething(), !!test));", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 28},
-		{"for (; (doSomething(), !!test); );", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 22},
-		{"if ((doSomething(), !!test));", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 19},
-		{"switch ((doSomething(), val)) {}", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 23},
-		{"while ((doSomething(), !!test));", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 22},
-		{"with ((doSomething(), val)) {}", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 21},
-		{"a => ((doSomething(), a))", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 21},
+		{"var foo = (1, 2);", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 13},
+		{"(0,eval)(\"foo()\");", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 3},
+		{"foo(a, (b, c), d);", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 10},
+		{"do {} while ((doSomething(), !!test));", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 28},
+		{"for (; (doSomething(), !!test); );", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 22},
+		{"if ((doSomething(), !!test));", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 19},
+		{"switch ((doSomething(), val)) {}", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 23},
+		{"while ((doSomething(), !!test));", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 22},
+		{"with ((doSomething(), val)) {}", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 21},
+		{"a => ((doSomething(), a))", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 21},
 
 		// Beyond the corpus. Chained commas are one node upstream and several here, so these pin the
 		// count as well as the position: measured against the installed rule, both report exactly
@@ -102,8 +102,8 @@ func TestNoSequencesFires(t *testing.T) {
 		// false` clean cases establish: the outer sequence is the initializer and is exempt, the
 		// inner one's parent is that sequence rather than the statement, and it reports. Measured
 		// against the installed rule at column 8.
-		{"for ((a, b), c; ; );", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 8},
-		{"for (;; (a, b), c);", decodedSequenceOptions(t, `{"allowInParentheses": false}`), 11},
+		{"for ((a, b), c; ; );", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 8},
+		{"for (;; (a, b), c);", decodedSequenceOptions(test, `{"allowInParentheses": false}`), 11},
 
 		// The arrow body needs two parenthesis nodes where every other position needs one, because
 		// its parentheses are part of the expression rather than a statement's grammar. The corpus
@@ -139,17 +139,17 @@ func TestNoSequencesFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, "unexpectedCommaExpression")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoSequences, sequencesFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, "unexpectedCommaExpression")
 
 			// Upstream's columns are one-based; the diagnostic carries a zero-based offset. Every
 			// fixture here is one line, so the column is the offset plus one.
 			wantOffset := testCase.column - 1
 			gotRange := result.Diagnostics[0].Range
 			if gotRange.Pos() != wantOffset {
-				t.Errorf("reported at offset %d, want %d (upstream column %d)",
+				test.Errorf("reported at offset %d, want %d (upstream column %d)",
 					gotRange.Pos(), wantOffset, testCase.column)
 			}
 
@@ -157,7 +157,7 @@ func TestNoSequencesFires(t *testing.T) {
 			// assertion that can see a range that is the right width in the wrong place.
 			reported := testCase.sourceText[gotRange.Pos():gotRange.End()]
 			if reported != "," {
-				t.Errorf("reported text %q, want a comma", reported)
+				test.Errorf("reported text %q, want a comma", reported)
 			}
 		})
 	}
@@ -166,8 +166,8 @@ func TestNoSequencesFires(t *testing.T) {
 // The clean cases are what separate the comma OPERATOR from the four separators spelled the same
 // way: array elements, object properties, argument lists, and the declarators of one `var`. Each is
 // a class of false positive a rule matching on the token would ship.
-func TestNoSequencesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoSequencesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -187,10 +187,10 @@ func TestNoSequencesStaysSilent(t *testing.T) {
 		{"while ((doSomething(), !!test));", nil},
 		{"with ((doSomething(), val)) {}", nil},
 		{"a => ((doSomething(), a))", nil},
-		{"var foo = (1, 2);", decodedSequenceOptions(t, `{}`)},
-		{"var foo = (1, 2);", decodedSequenceOptions(t, `{"allowInParentheses": true}`)},
-		{"for ((i = 0, j = 0); test; );", decodedSequenceOptions(t, `{"allowInParentheses": false}`)},
-		{"for (; test; (i++, j++));", decodedSequenceOptions(t, `{"allowInParentheses": false}`)},
+		{"var foo = (1, 2);", decodedSequenceOptions(test, `{}`)},
+		{"var foo = (1, 2);", decodedSequenceOptions(test, `{"allowInParentheses": true}`)},
+		{"for ((i = 0, j = 0); test; );", decodedSequenceOptions(test, `{"allowInParentheses": false}`)},
+		{"for (; test; (i++, j++));", decodedSequenceOptions(test, `{"allowInParentheses": false}`)},
 		{"const foo = () => { return ((bar = 123), 10) }", nil},
 		{"const foo = () => (((bar = 123), 10));", nil},
 
@@ -201,7 +201,7 @@ func TestNoSequencesStaysSilent(t *testing.T) {
 
 		// The exemption reaches through two parenthesis levels as well as one, because upstream's
 		// comparison is made on a tree where parentheses are not nodes at all. Measured silent.
-		{"for (((i = 0, j = 0)); test; );", decodedSequenceOptions(t, `{"allowInParentheses": false}`)},
+		{"for (((i = 0, j = 0)); test; );", decodedSequenceOptions(test, `{"allowInParentheses": false}`)},
 
 		// A three-element chain in each exempt position. These are the cases a mutation sweep found
 		// and the imported corpus could not, because upstream never writes a chain longer than two.
@@ -246,10 +246,10 @@ func TestNoSequencesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText, testCase.options))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunWithOptions(test, NoSequences, sequencesFile, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -262,8 +262,8 @@ func TestNoSequencesStaysSilent(t *testing.T) {
 // earlier-then-later. Identical count, identical spans, and invisible downstream because the
 // reporter sorts by position. Asserting the order here would pin the divergence as if it were the
 // decision, which it is not.
-func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
-	t.Parallel()
+func TestNoSequencesReportsBothHalvesOfANestedPair(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -276,11 +276,11 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoSequences, sequencesFile, testCase.sourceText,
-				decodedSequenceOptions(t, `{"allowInParentheses": false}`))
-			rule_testing.ExpectFindings(t, result,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoSequences, sequencesFile, testCase.sourceText,
+				decodedSequenceOptions(test, `{"allowInParentheses": false}`))
+			rule_testing.ExpectFindings(test, result,
 				"unexpectedCommaExpression", "unexpectedCommaExpression")
 
 			got := []int{}
@@ -289,11 +289,11 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
 			}
 			sort.Ints(got)
 			if len(got) != len(testCase.wantOffset) {
-				t.Fatalf("reported %d findings, want %d", len(got), len(testCase.wantOffset))
+				test.Fatalf("reported %d findings, want %d", len(got), len(testCase.wantOffset))
 			}
 			for index := range got {
 				if got[index] != testCase.wantOffset[index] {
-					t.Errorf("offsets %v, want %v", got, testCase.wantOffset)
+					test.Errorf("offsets %v, want %v", got, testCase.wantOffset)
 					break
 				}
 			}
@@ -307,56 +307,56 @@ func TestNoSequencesReportsBothHalvesOfANestedPair(t *testing.T) {
 // allowed, and NIL OPTIONS -- which is what the live config produces for a rule configured as bare
 // "error" -- must mean allowed. That last one is the case no fixture routed through the decoder can
 // reach, because it is the shape the config layer produces when the decoder is never called.
-func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
-	t.Parallel()
+func TestNoSequencesOptionDefaultsToAllowingParentheses(test *testing.T) {
+	test.Parallel()
 
 	parenthesized := "var foo = (1, 2);"
 
-	t.Run("nil options, the shape the live config produces", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized, nil))
+	test.Run("nil options, the shape the live config produces", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoSequences, sequencesFile, parenthesized, nil))
 	})
 
-	t.Run("an empty object", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
-			decodedSequenceOptions(t, `{}`)))
+	test.Run("an empty object", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoSequences, sequencesFile, parenthesized,
+			decodedSequenceOptions(test, `{}`)))
 	})
 
-	t.Run("a zero-value struct still allows", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a zero-value struct still allows", func(test *testing.T) {
+		test.Parallel()
 		// Not a redundant spelling of the empty object: this is the value `rule.DecodeOptionsInto`
 		// would have produced, and it is the reason the field is a pointer. If AllowInParentheses
 		// were a plain bool this case would report and every other fixture would stay green.
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoSequences, sequencesFile, parenthesized,
 			NoSequencesOptions{}))
 	})
 
-	t.Run("explicitly false", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoSequences, sequencesFile, parenthesized,
-			decodedSequenceOptions(t, `{"allowInParentheses": false}`)), "unexpectedCommaExpression")
+	test.Run("explicitly false", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoSequences, sequencesFile, parenthesized,
+			decodedSequenceOptions(test, `{"allowInParentheses": false}`)), "unexpectedCommaExpression")
 	})
 
-	t.Run("empty input decodes to the default rather than erroring", func(t *testing.T) {
-		t.Parallel()
+	test.Run("empty input decodes to the default rather than erroring", func(test *testing.T) {
+		test.Parallel()
 		decoded, err := DecodeNoSequencesOptions(nil)
 		if err != nil {
-			t.Fatalf("decoding empty input: %v", err)
+			test.Fatalf("decoding empty input: %v", err)
 		}
 		options, ok := decoded.(NoSequencesOptions)
 		if !ok {
-			t.Fatalf("decoded to %T, want NoSequencesOptions", decoded)
+			test.Fatalf("decoded to %T, want NoSequencesOptions", decoded)
 		}
 		if !options.allowInParentheses() {
-			t.Error("empty input decoded to disallowing parentheses, which inverts the rule")
+			test.Error("empty input decoded to disallowing parentheses, which inverts the rule")
 		}
 	})
 
-	t.Run("malformed input is an error rather than a silent default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("malformed input is an error rather than a silent default", func(test *testing.T) {
+		test.Parallel()
 		if _, err := DecodeNoSequencesOptions([]byte("[")); err == nil {
-			t.Error("malformed options decoded without an error")
+			test.Error("malformed options decoded without an error")
 		}
 	})
 }
@@ -364,28 +364,28 @@ func TestNoSequencesOptionDefaultsToAllowingParentheses(t *testing.T) {
 // The message is a value with no interpolation, so there is nothing to render and the assertion is
 // on the constant's own fields. Asserted against literals typed here rather than against the rule's
 // own constant, which would move with it under mutation.
-func TestNoSequencesMessage(t *testing.T) {
-	t.Parallel()
+func TestNoSequencesMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageUnexpectedCommaExpression.Id != "unexpectedCommaExpression" {
-		t.Errorf("message id is %q", messageUnexpectedCommaExpression.Id)
+		test.Errorf("message id is %q", messageUnexpectedCommaExpression.Id)
 	}
 	if messageUnexpectedCommaExpression.Description == "" {
-		t.Error("message carries no description")
+		test.Error("message carries no description")
 	}
 }
 
 // A guard against the decoder growing a second spelling of the same option, which is how a serde
 // alias silently widens a rule. Upstream's schema names exactly one property and forbids the rest,
 // so a misspelling is refused by name, as ESLint refuses it (#4a4yse4); it used to be ignored.
-func TestNoSequencesDecoderRefusesAMisspelledKey(t *testing.T) {
-	t.Parallel()
+func TestNoSequencesDecoderRefusesAMisspelledKey(test *testing.T) {
+	test.Parallel()
 
 	if _, err := DecodeNoSequencesOptions([]byte(`{"allowInParentheses": false}`)); err != nil {
-		t.Fatalf("baseline: upstream's spelling was refused: %v", err)
+		test.Fatalf("baseline: upstream's spelling was refused: %v", err)
 	}
 	_, err := DecodeNoSequencesOptions([]byte(`{"allowInParenthesis": false}`))
 	if err == nil || !strings.Contains(err.Error(), "allowInParenthesis") {
-		t.Fatalf("want a refusal naming the misspelled key, got %v", err)
+		test.Fatalf("want a refusal naming the misspelled key, got %v", err)
 	}
 }

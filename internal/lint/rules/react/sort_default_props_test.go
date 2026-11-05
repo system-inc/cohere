@@ -24,20 +24,20 @@ const sortDefaultPropsFile = "/repository/source/SortDefaultProps.tsx"
 // than an empty payload, so it is mapped to the empty payload the config layer would actually hand
 // a rule configured as a bare "error". Keeping the two distinguishable in the rows makes the
 // generated table readable; collapsing them here keeps the decoder receiving what it will see.
-func sortDefaultPropsDecode(t *testing.T, raw string) any {
-	t.Helper()
+func sortDefaultPropsDecode(test *testing.T, raw string) any {
+	test.Helper()
 	if raw == `""` {
 		raw = ""
 	}
 	decoded, err := DecodeSortDefaultPropsOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %s returned %v", raw, err)
+		test.Fatalf("decoding %s returned %v", raw, err)
 	}
 	return decoded
 }
 
-func TestSortDefaultPropsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText, rawOptions string }{
 		{"upstream valid 0", "\n        var First = createReactClass({\n          render: function() {\n            return <div />;\n          }\n        });\n      ", ""},
@@ -59,17 +59,17 @@ func TestSortDefaultPropsStaysSilent(t *testing.T) {
 		{"upstream valid 16", "\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n\n        First.defaultProps = {\n            a: PropTypes.any,\n            onBar: PropTypes.func,\n            onFoo: PropTypes.func,\n            z: PropTypes.string,\n        };\n      ", ""},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, testCase.rawOptions))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, testCase.rawOptions))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestSortDefaultPropsFires(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, rawOptions string
@@ -90,11 +90,11 @@ func TestSortDefaultPropsFires(t *testing.T) {
 		{"upstream invalid 12", "\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n\n        First.defaultProps = {\n            a: PropTypes.any,\n            z: PropTypes.string,\n            onFoo: PropTypes.func,\n            onBar: PropTypes.func,\n        };\n      ", "", []string{"propsNotSorted", "propsNotSorted"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, testCase.rawOptions))
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, testCase.rawOptions))
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -112,8 +112,8 @@ func TestSortDefaultPropsFires(t *testing.T) {
 // Upstream's corpus writes no mixed-quoting object, so nothing imported can distinguish a port
 // comparing raw text from one comparing resolved names. Reproduced rather than corrected, because
 // comparing resolved names would change the verdict on every quoted key in the tree.
-func TestSortDefaultPropsRawKeyTextComparison(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsRawKeyTextComparison(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -152,15 +152,15 @@ func TestSortDefaultPropsRawKeyTextComparison(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }
@@ -171,8 +171,8 @@ func TestSortDefaultPropsRawKeyTextComparison(t *testing.T) {
 // element becomes the accumulator without being compared to anything. A spread therefore splits the
 // object into independently sorted runs rather than being skipped over. Measured: `{b, ...x, a}` is
 // clean while both `{...x, b, a}` and `{b, a, ...x}` report.
-func TestSortDefaultPropsSpreadRestartsTheRun(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsSpreadRestartsTheRun(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -195,15 +195,15 @@ func TestSortDefaultPropsSpreadRestartsTheRun(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }
@@ -214,8 +214,8 @@ func TestSortDefaultPropsSpreadRestartsTheRun(t *testing.T) {
 // past the offender, so `{c, b, a}` reports twice, both measured against the same `c`. A port that
 // resynced would report once and pass every imported case, because upstream's longest failing
 // object has a single inversion.
-func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -248,15 +248,15 @@ func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			ids := make([]string, testCase.findings)
 			for index := range ids {
 				ids[index] = "propsNotSorted"
 			}
-			rule_testing.ExpectFindings(t, result, ids...)
+			rule_testing.ExpectFindings(test, result, ids...)
 		})
 	}
 }
@@ -266,18 +266,18 @@ func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(t *testing.T) {
 // `{B: 1, a: 2}` is SORTED by default, because uppercase letters sort before lowercase, and
 // UNSORTED once case is folded. Both measured. A pair that inverts is the only kind that can tell a
 // working option from one that is read and discarded.
-func TestSortDefaultPropsIgnoreCase(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsIgnoreCase(test *testing.T) {
+	test.Parallel()
 
-	sensitive := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
+	sensitive := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
 		"class C extends React.Component { static defaultProps = { B: 1, a: 2 }; }",
-		sortDefaultPropsDecode(t, `""`))
-	rule_testing.ExpectClean(t, sensitive)
+		sortDefaultPropsDecode(test, `""`))
+	rule_testing.ExpectClean(test, sensitive)
 
-	folded := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
+	folded := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
 		"class C extends React.Component { static defaultProps = { B: 1, a: 2 }; }",
-		sortDefaultPropsDecode(t, `{"ignoreCase": true}`))
-	rule_testing.ExpectFindings(t, folded, "propsNotSorted")
+		sortDefaultPropsDecode(test, `{"ignoreCase": true}`))
+	rule_testing.ExpectFindings(test, folded, "propsNotSorted")
 }
 
 // TestSortDefaultPropsWhichObjectsAreReached pins the two routes and three shapes that are not.
@@ -286,8 +286,8 @@ func TestSortDefaultPropsIgnoreCase(t *testing.T) {
 // rule accepts, and the object is right there in the return, and it is still silent. Upstream looks
 // at the property's VALUE rather than at a return statement, so a method never reaches the check.
 // Measured.
-func TestSortDefaultPropsWhichObjectsAreReached(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsWhichObjectsAreReached(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -330,15 +330,15 @@ func TestSortDefaultPropsWhichObjectsAreReached(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }
@@ -349,32 +349,32 @@ func TestSortDefaultPropsWhichObjectsAreReached(t *testing.T) {
 // reader is shown the key that is in the wrong place. No message here interpolates, but the text is
 // asserted against a literal typed here rather than against the rule's own constant, which would
 // move both sides together under mutation.
-func TestSortDefaultPropsSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "class C extends React.Component { static defaultProps = { b: 1, a: 2 }; }"
-	result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile, source,
-		sortDefaultPropsDecode(t, `""`))
+	result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile, source,
+		sortDefaultPropsDecode(test, `""`))
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	onDisk := strings.TrimSpace(source) + "\n"
 	reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "a: 2" {
-		t.Fatalf("finding points at %q, wanted %q", reported, "a: 2")
+		test.Fatalf("finding points at %q, wanted %q", reported, "a: 2")
 	}
 	want := "Default prop declarations should be sorted alphabetically. A sorted list is one a " +
 		"reader can scan for a name instead of reading end to end, and it keeps two people adding " +
 		"a default in the same week from colliding in the same spot."
 	if result.Diagnostics[0].Message.Description != want {
-		t.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
 	}
 	if result.Diagnostics[0].Message.Id != "propsNotSorted" {
-		t.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
+		test.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
 	}
 	// Upstream commented its fixer out along with `fixable: 'code'`, so there is no repair to port.
 	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatal("upstream ships no repair for this rule and neither does this port")
+		test.Fatal("upstream ships no repair for this rule and neither does this port")
 	}
 }
 
@@ -384,8 +384,8 @@ func TestSortDefaultPropsSpanAndMessage(t *testing.T) {
 // and this option defaults to FALSE so the zero value happens to be right. That is worth pinning
 // rather than relying on, because the sibling rule in this package needed a pointer decoder for
 // exactly the opposite reason.
-func TestDecodeSortDefaultPropsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeSortDefaultPropsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, raw string
@@ -397,30 +397,30 @@ func TestDecodeSortDefaultPropsOptions(t *testing.T) {
 		{"an explicit true folds case", `{"ignoreCase": true}`, true},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeSortDefaultPropsOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("decode returned %v", err)
+				test.Fatalf("decode returned %v", err)
 			}
 			options, isOptions := decoded.(SortDefaultPropsOptions)
 			if !isOptions {
-				t.Fatalf("decode returned %T", decoded)
+				test.Fatalf("decode returned %T", decoded)
 			}
 			if options.IgnoreCase != testCase.want {
-				t.Fatalf("ignoreCase is %v, wanted %v", options.IgnoreCase, testCase.want)
+				test.Fatalf("ignoreCase is %v, wanted %v", options.IgnoreCase, testCase.want)
 			}
 		})
 	}
 }
 
 // TestSortDefaultPropsNilOptionsUsesTheDefault bypasses the decoder entirely.
-func TestSortDefaultPropsNilOptionsUsesTheDefault(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsNilOptionsUsesTheDefault(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, SortDefaultProps, sortDefaultPropsFile,
+	result := rule_testing.RunTyped(test, SortDefaultProps, sortDefaultPropsFile,
 		"class C extends React.Component { static defaultProps = { b: 1, a: 2 }; }")
-	rule_testing.ExpectFindings(t, result, "propsNotSorted")
+	rule_testing.ExpectFindings(test, result, "propsNotSorted")
 }
 
 // TestSortDefaultPropsRequiresTheTypedHarness asserts the checker is genuinely needed.
@@ -428,20 +428,20 @@ func TestSortDefaultPropsNilOptionsUsesTheDefault(t *testing.T) {
 // Only the identifier route needs resolution, so the typed harness is asserted through that route
 // specifically: `GetSymbolAtLocation` on a nil checker returns nil rather than crashing, which
 // would make this rule quietly narrower rather than obviously broken.
-func TestSortDefaultPropsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !SortDefaultProps.NeedsTypeChecker {
-		t.Fatal("the identifier route resolves through the checker and must declare it")
+		test.Fatal("the identifier route resolves through the checker and must declare it")
 	}
 	source := "const props = { b: 1, a: 2 };\nclass C extends React.Component {}\nC.defaultProps = props;"
-	untyped := rule_testing.RunWithOptions(t, SortDefaultProps, sortDefaultPropsFile, source,
+	untyped := rule_testing.RunWithOptions(test, SortDefaultProps, sortDefaultPropsFile, source,
 		DefaultSortDefaultPropsOptions())
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile, source,
+	typed := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile, source,
 		DefaultSortDefaultPropsOptions())
-	rule_testing.ExpectFindings(t, typed, "propsNotSorted")
+	rule_testing.ExpectFindings(test, typed, "propsNotSorted")
 }
 
 // TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey guards a large false positive class.
@@ -457,8 +457,8 @@ func TestSortDefaultPropsRequiresTheTypedHarness(t *testing.T) {
 //
 // Upstream cannot see this because its `getText(node)` returns a node's own text with trivia
 // already excluded; the hazard is entirely ours.
-func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{
@@ -471,11 +471,11 @@ func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -485,8 +485,8 @@ func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(t *testing.T) {
 // Upstream accepts `getDefaultProps` alongside `defaultProps` in both arms, and a mutation dropping
 // it survived because upstream's corpus writes the name only as a METHOD, which is silent for a
 // different reason. As a field or an assignment it reports, both measured.
-func TestSortDefaultPropsGetDefaultPropsSpelling(t *testing.T) {
-	t.Parallel()
+func TestSortDefaultPropsGetDefaultPropsSpelling(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -509,15 +509,15 @@ func TestSortDefaultPropsGetDefaultPropsSpelling(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, SortDefaultProps, sortDefaultPropsFile,
-				testCase.sourceText, sortDefaultPropsDecode(t, `""`))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, SortDefaultProps, sortDefaultPropsFile,
+				testCase.sourceText, sortDefaultPropsDecode(test, `""`))
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "propsNotSorted")
+			rule_testing.ExpectFindings(test, result, "propsNotSorted")
 		})
 	}
 }

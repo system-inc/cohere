@@ -36,16 +36,16 @@ func implicitReturnConfiguration(noImplicitReturns bool, strict bool) string {
 }
 
 // typeScriptImplicitReturns is the spans TypeScript reports as TS7030 for the fixture with the flag on
-func typeScriptImplicitReturns(t *testing.T, source string, strict bool) []string {
-	t.Helper()
-	directory := t.TempDir()
+func typeScriptImplicitReturns(test *testing.T, source string, strict bool) []string {
+	test.Helper()
+	directory := test.TempDir()
 	text := strings.TrimSpace(source) + "\n"
 	for name, contents := range map[string]string{
 		"Case.ts":       text,
 		"tsconfig.json": implicitReturnConfiguration(true, strict),
 	} {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	graph, err := program.Build(program.Options{
@@ -54,7 +54,7 @@ func typeScriptImplicitReturns(t *testing.T, source string, strict bool) []strin
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the oracle's program: %v", err)
+		test.Fatalf("building the oracle's program: %v", err)
 	}
 	spans := []string{}
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -72,14 +72,14 @@ func typeScriptImplicitReturns(t *testing.T, source string, strict bool) []strin
 }
 
 // ruleImplicitReturns is the spans the rule reports for the fixture with the flag off
-func ruleImplicitReturns(t *testing.T, source string, strict bool, noImplicitReturns bool) []string {
-	t.Helper()
-	result := rule_testing.RunTypedFilesWithSetup(t, CorrectnessNoImplicitReturn,
+func ruleImplicitReturns(test *testing.T, source string, strict bool, noImplicitReturns bool) []string {
+	test.Helper()
+	result := rule_testing.RunTypedFilesWithSetup(test, CorrectnessNoImplicitReturn,
 		map[string]string{"Case.ts": source}, "Case.ts",
 		func(directory string) {
 			configuration := implicitReturnConfiguration(noImplicitReturns, strict)
 			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		})
 	text := strings.TrimSpace(source) + "\n"
@@ -240,47 +240,47 @@ export function run(flag: boolean): void {
 }`, true, 0},
 }
 
-func TestCorrectnessNoImplicitReturnReportsWhatTypeScriptDoes(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImplicitReturnReportsWhatTypeScriptDoes(test *testing.T) {
+	test.Parallel()
 
 	for _, fixture := range implicitReturnFixtures {
-		t.Run(fixture.name, func(t *testing.T) {
-			t.Parallel()
-			typeScript := typeScriptImplicitReturns(t, fixture.source, fixture.strict)
+		test.Run(fixture.name, func(test *testing.T) {
+			test.Parallel()
+			typeScript := typeScriptImplicitReturns(test, fixture.source, fixture.strict)
 			if len(typeScript) != fixture.want {
-				t.Fatalf("TypeScript reports %d TS7030 (%q), and the fixture says %d", len(typeScript), typeScript, fixture.want)
+				test.Fatalf("TypeScript reports %d TS7030 (%q), and the fixture says %d", len(typeScript), typeScript, fixture.want)
 			}
-			reported := ruleImplicitReturns(t, fixture.source, fixture.strict, false)
+			reported := ruleImplicitReturns(test, fixture.source, fixture.strict, false)
 			if strings.Join(reported, "\x00") != strings.Join(typeScript, "\x00") {
-				t.Errorf("the rule reports %q, and TypeScript reports %q", reported, typeScript)
+				test.Errorf("the rule reports %q, and TypeScript reports %q", reported, typeScript)
 			}
 		})
 	}
 }
 
 // Where the tsconfig turns the flag on, the type check already reports these, so the rule stands down
-func TestCorrectnessNoImplicitReturnStandsDownWhenTheFlagIsOn(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImplicitReturnStandsDownWhenTheFlagIsOn(test *testing.T) {
+	test.Parallel()
 
 	control := implicitReturnFixtures[0]
-	if reported := ruleImplicitReturns(t, control.source, true, false); len(reported) != 1 {
-		t.Fatalf("the control reports %q with the flag off, so the next assertion would prove nothing", reported)
+	if reported := ruleImplicitReturns(test, control.source, true, false); len(reported) != 1 {
+		test.Fatalf("the control reports %q with the flag off, so the next assertion would prove nothing", reported)
 	}
-	if reported := ruleImplicitReturns(t, control.source, true, true); len(reported) != 0 {
-		t.Errorf("the rule reports %q with noImplicitReturns on, where the type check already does", reported)
+	if reported := ruleImplicitReturns(test, control.source, true, true); len(reported) != 0 {
+		test.Errorf("the rule reports %q with noImplicitReturns on, where the type check already does", reported)
 	}
 }
 
 // The fixture pair through the default harness, whose tsconfig is strict and leaves the flag off
-func TestCorrectnessNoImplicitReturnFixturePair(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoImplicitReturnFixturePair(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, CorrectnessNoImplicitReturn, "Case.ts", implicitReturnFixtures[0].source),
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, CorrectnessNoImplicitReturn, "Case.ts", implicitReturnFixtures[0].source),
 		"implicitReturn")
 	for _, fixture := range implicitReturnFixtures {
 		if fixture.want == 0 && fixture.strict {
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, CorrectnessNoImplicitReturn, "Case.ts", fixture.source))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessNoImplicitReturn, "Case.ts", fixture.source))
 		}
 	}
 }

@@ -23,8 +23,8 @@ import (
  * pattern ESLint evaluates by calling String.raw, and which reference.ConstantStringIn declines, as it
  * declines every built-in call. Its own test says what the rule does instead.
  */
-func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestNoUselessBackreferenceAgreesWithESLint(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		origin string
@@ -241,7 +241,7 @@ func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTypedVerbatimWithOptions(t, NoUselessBackreference, "input.ts", testCase.code, nil)
+		result := rule_testing.RunTypedVerbatimWithOptions(test, NoUselessBackreference, "input.ts", testCase.code, nil)
 		source := result.SourceFile.Text()
 		got := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -252,7 +252,7 @@ func TestNoUselessBackreferenceAgreesWithESLint(t *testing.T) {
 		sort.Strings(got)
 		sort.Strings(want)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, want)
+			test.Errorf("case %d (%s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.code, got, want)
 		}
 	}
 }

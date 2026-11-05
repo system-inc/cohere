@@ -28,8 +28,8 @@ type consistencyNoConsoleFinding struct {
 // The destructuring row is worth reading twice. `const { log } = console` is a genuine hole in the
 // rule, since it is exactly the aliasing the member-access anchor exists to catch, and it is
 // reproduced rather than closed because the rule is the specification.
-func TestNoConsoleStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConsoleStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -60,9 +60,9 @@ func TestNoConsoleStaysSilent(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistencyNoConsoleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText))
+		test.Run(consistencyNoConsoleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText))
 		})
 	}
 }
@@ -73,8 +73,8 @@ func TestNoConsoleStaysSilent(t *testing.T) {
 // rows are the ones that matter: upstream renders `console.log` for `console['error']`, because its
 // ternary only reads an Identifier property and falls back to the literal word. A port that
 // helpfully read the string literal would diverge on a message nobody would think to check.
-func TestNoConsoleFires(t *testing.T) {
-	t.Parallel()
+func TestNoConsoleFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -212,30 +212,30 @@ func TestNoConsoleFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistencyNoConsoleCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText)
+		test.Run(consistencyNoConsoleCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range wantIds {
 				wantIds[position] = "consistencyNoConsole"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for position, want := range testCase.wantFindings {
 				diagnostic := result.Diagnostics[position]
 				gotSpan := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
 				}
 
 				// No repair. Upstream ships none and says why: replacing a console call means
 				// naming what failed, which is the judgment the rule cannot make.
 				if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-					t.Fatalf("finding %d: expected no repair, got %d fixes and %d suggestions",
+					test.Fatalf("finding %d: expected no repair, got %d fixes and %d suggestions",
 						position, len(diagnostic.Fixes), len(diagnostic.Suggestions))
 				}
 			}
@@ -262,8 +262,8 @@ func TestNoConsoleFires(t *testing.T) {
 //
 // The sibling rule `no-global-container` has the same shape and the same behaviour, found the same
 // way. It is a property of every base rule that keys on an identifier's spelling.
-func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
-	t.Parallel()
+func TestNoConsoleReportsAnyBindingNamedConsole(test *testing.T) {
+	test.Parallel()
 
 	reporting := []string{
 		"function f() { const console = { log(){} }; console.log('x'); }",
@@ -271,9 +271,9 @@ func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
 		"function f(console: { log(x: string): void }) { console.log('x'); }",
 	}
 	for index, sourceText := range reporting {
-		t.Run("reports"+strconv.Itoa(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText),
+		test.Run("reports"+strconv.Itoa(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText),
 				"consistencyNoConsole")
 		})
 	}
@@ -286,9 +286,9 @@ func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
 		"class A { console = { log(){} }; m() { this.console.log('x'); } }",
 	}
 	for index, sourceText := range clean {
-		t.Run("clean"+strconv.Itoa(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText))
+		test.Run("clean"+strconv.Itoa(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText))
 		})
 	}
 }
@@ -310,8 +310,8 @@ func TestNoConsoleReportsAnyBindingNamedConsole(t *testing.T) {
 // reports on. That is the measurement this test records; it is not re-run here because it needs the
 // source repository on disk, and a test that silently skips when a path is missing would be worse
 // than a note.
-func TestNoConsoleMatchesTheSourceRepository(t *testing.T) {
-	t.Parallel()
+func TestNoConsoleMatchesTheSourceRepository(test *testing.T) {
+	test.Parallel()
 
-	t.Log("port 567, real rule 560, difference is 7 eslint-disable-next-line sites in 3 files")
+	test.Log("port 567, real rule 560, difference is 7 eslint-disable-next-line sites in 3 files")
 }

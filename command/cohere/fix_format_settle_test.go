@@ -14,29 +14,29 @@ import (
 //
 // One writing run must leave nothing for the check: the fix the printed text triggers lands in the
 // same run, and the fixed text is formatted again.
-func TestOneFixFormatRunSettlesAPrintedArrow(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
-	root := t.TempDir()
-	writeTree(t, root, map[string]string{
+func TestOneFixFormatRunSettlesAPrintedArrow(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
 		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"nexus/consistency-no-multiline-arrow-function":"error"}}`,
 		"NexusCohereSettings.json": `{"format":{"tabWidth":4,"singleQuote":true,"printWidth":120,"ignore":[]}}`,
 		"Probe.ts":                 "export function register(listener: () => void): void {\n    listener();\n}\n\nregister(() => { console.log('ready'); });\n",
 	})
 
-	output, code := runCohere(t, binary, root, "--fix", "--format", "Probe.ts")
+	output, code := runCohere(test, binary, root, "--fix", "--format", "Probe.ts")
 	if code != 0 {
-		t.Fatalf("the writing run exited %d:\n%s", code, output)
+		test.Fatalf("the writing run exited %d:\n%s", code, output)
 	}
-	written := readForTest(t, filepath.Join(root, "Probe.ts"))
+	written := readForTest(test, filepath.Join(root, "Probe.ts"))
 	if !strings.Contains(written, "register(function() {\n    console.log('ready');\n});") {
-		t.Fatalf("the arrow the printer broke across lines was not repaired in the same run:\n%s\noutput:\n%s", written, output)
+		test.Fatalf("the arrow the printer broke across lines was not repaired in the same run:\n%s\noutput:\n%s", written, output)
 	}
 
-	output, code = runCohere(t, binary, root, "--no-fix", "--format", "Probe.ts")
+	output, code = runCohere(test, binary, root, "--no-fix", "--format", "Probe.ts")
 	if code != 0 || !strings.Contains(output, "0 files would change") {
-		t.Fatalf("one --fix --format run left work for the next, exit %d:\n%s", code, output)
+		test.Fatalf("one --fix --format run left work for the next, exit %d:\n%s", code, output)
 	}
 }
 
@@ -48,11 +48,11 @@ func TestOneFixFormatRunSettlesAPrintedArrow(t *testing.T) {
 // a library file holding a `debugger` was on record, so the library's own `--fix --format` removed the
 // statement and wrote the result unformatted. A rule switched on after a file was recorded is the same
 // case in one repository.
-func TestAFixToARecordedFileIsFormatted(t *testing.T) {
-	t.Parallel()
-	binary := buildCohere(t)
-	root := t.TempDir()
-	writeTree(t, root, map[string]string{
+func TestAFixToARecordedFileIsFormatted(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
 		"tsconfig.json":            fixScopeTsconfig,
 		"CohereSettings.json":      `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"off"}}`,
 		"NexusCohereSettings.json": `{"format":{"ignore":[]}}`,
@@ -61,28 +61,28 @@ func TestAFixToARecordedFileIsFormatted(t *testing.T) {
 
 	// No rule asks for a fix, so the formatted file is recorded at its own bytes (the settings files are
 	// formatted alongside it).
-	output, code := runCohere(t, binary, root, "--fix", "--format")
-	if code != 0 || readForTest(t, filepath.Join(root, "Producer.ts")) != "export function value(): number {\n  debugger;\n  return 1;\n}\n" {
-		t.Fatalf("the run before the rule changed the formatted file, exit %d:\n%s", code, output)
+	output, code := runCohere(test, binary, root, "--fix", "--format")
+	if code != 0 || readForTest(test, filepath.Join(root, "Producer.ts")) != "export function value(): number {\n  debugger;\n  return 1;\n}\n" {
+		test.Fatalf("the run before the rule changed the formatted file, exit %d:\n%s", code, output)
 	}
-	output, _ = runCohere(t, binary, root, "--no-fix", "--format")
+	output, _ = runCohere(test, binary, root, "--no-fix", "--format")
 	if !strings.Contains(output, "0 of 4 files not on record as formatted") {
-		t.Fatalf("the file was not on record before the rule:\n%s", output)
+		test.Fatalf("the file was not on record before the rule:\n%s", output)
 	}
 
-	writeTree(t, root, map[string]string{
+	writeTree(test, root, map[string]string{
 		"CohereSettings.json": `{"extends":"./NexusCohereSettings.json","rules":{"no-debugger":"error"}}`,
 	})
-	output, code = runCohere(t, binary, root, "--fix", "--format")
+	output, code = runCohere(test, binary, root, "--fix", "--format")
 	if code != 0 {
-		t.Fatalf("the writing run exited %d:\n%s", code, output)
+		test.Fatalf("the writing run exited %d:\n%s", code, output)
 	}
-	if got := readForTest(t, filepath.Join(root, "Producer.ts")); got != "export function value(): number {\n  return 1;\n}\n" {
-		t.Fatalf("the fix to a recorded file was written unformatted:\n%q\noutput:\n%s", got, output)
+	if got := readForTest(test, filepath.Join(root, "Producer.ts")); got != "export function value(): number {\n  return 1;\n}\n" {
+		test.Fatalf("the fix to a recorded file was written unformatted:\n%q\noutput:\n%s", got, output)
 	}
 
-	output, code = runCohere(t, binary, root, "--no-fix", "--format")
+	output, code = runCohere(test, binary, root, "--no-fix", "--format")
 	if code != 0 || !strings.Contains(output, "0 files would change") {
-		t.Fatalf("one --fix --format run left a recorded file's fix for the next, exit %d:\n%s", code, output)
+		test.Fatalf("one --fix --format run left a recorded file's fix for the next, exit %d:\n%s", code, output)
 	}
 }

@@ -27,8 +27,8 @@ import (
  * Each finding is its text and byte offset. The fixed column is the whole file after ESLint's fixes,
  * applied as its verifyAndFix applies them, or empty where ESLint offers none.
  */
-func TestPreferObjectSpreadAgreesWithESLint(t *testing.T) {
-	t.Parallel()
+func TestPreferObjectSpreadAgreesWithESLint(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		origin  string
@@ -144,7 +144,7 @@ func TestPreferObjectSpreadAgreesWithESLint(t *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTypedVerbatimWithOptions(t, PreferObjectSpread, "input.ts", testCase.code, nil)
+		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferObjectSpread, "input.ts", testCase.code, nil)
 		source := result.SourceFile.Text()
 		got := []string{}
 		fixes := 0
@@ -156,16 +156,16 @@ func TestPreferObjectSpreadAgreesWithESLint(t *testing.T) {
 		sort.Strings(got)
 		sort.Strings(want)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") {
-			t.Errorf("case %d (%s, %s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.options, testCase.code, got, want)
+			test.Errorf("case %d (%s, %s): %q\n got: %q\nwant: %q", index, testCase.origin, testCase.options, testCase.code, got, want)
 			continue
 		}
 
 		fixed := ""
 		if fixes > 0 {
-			fixed = fixToConvergence(t, testCase.code)
+			fixed = fixToConvergence(test, testCase.code)
 		}
 		if fixed != testCase.fixed {
-			t.Errorf("case %d (%s, %s): %q\nfixed to: %q\n  ESLint: %q", index, testCase.origin, testCase.options, testCase.code, fixed, testCase.fixed)
+			test.Errorf("case %d (%s, %s): %q\nfixed to: %q\n  ESLint: %q", index, testCase.origin, testCase.options, testCase.code, fixed, testCase.fixed)
 		}
 	}
 }
@@ -174,10 +174,10 @@ func TestPreferObjectSpreadAgreesWithESLint(t *testing.T) {
 // finding's fixes together, in source order, skipping a finding whose fixes start before the last one
 // applied ends, then the rule runs again over the result, until a pass fixes nothing or ten have run.
 // Nested calls fix outside in this way, as ESLint's own answer for them shows.
-func fixToConvergence(t *testing.T, code string) string {
-	t.Helper()
+func fixToConvergence(test *testing.T, code string) string {
+	test.Helper()
 	for pass := 0; pass < 10; pass++ {
-		result := rule_testing.RunTypedVerbatimWithOptions(t, PreferObjectSpread, "input.ts", code, nil)
+		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferObjectSpread, "input.ts", code, nil)
 		type finding struct {
 			start, end int
 			fixes      []rule.Fix

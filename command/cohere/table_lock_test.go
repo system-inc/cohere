@@ -13,13 +13,13 @@ import (
 
 // A run that reads the table waits while another run holds its lock, and reads the moment the lock is
 // released. Without the hold the wait returns at once, which is what makes the wait here mean something.
-func TestARunReadingTheTableWaitsForTheWriter(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestARunReadingTheTableWaitsForTheWriter(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	release, taken := holdTableReadLock(directory, time.Second)
 	release()
 	if !taken {
-		t.Fatal("with nobody holding the lock the read lock was not taken")
+		test.Fatal("with nobody holding the lock the read lock was not taken")
 	}
 
 	releaseWriter := holdTableLock(directory)
@@ -31,7 +31,7 @@ func TestARunReadingTheTableWaitsForTheWriter(t *testing.T) {
 	}()
 	select {
 	case <-finished:
-		t.Fatal("the read lock was taken while the writer still held the lock")
+		test.Fatal("the read lock was taken while the writer still held the lock")
 	case <-time.After(200 * time.Millisecond):
 	}
 	releasedAt := time.Now()
@@ -39,21 +39,21 @@ func TestARunReadingTheTableWaitsForTheWriter(t *testing.T) {
 	select {
 	case taken := <-finished:
 		if !taken {
-			t.Error("the read lock reported giving up, though the writer released well inside the bound")
+			test.Error("the read lock reported giving up, though the writer released well inside the bound")
 		}
-		t.Logf("read %s after the release", time.Since(releasedAt))
+		test.Logf("read %s after the release", time.Since(releasedAt))
 	case <-time.After(5 * time.Second):
-		t.Fatal("the read lock was not taken after the writer released it")
+		test.Fatal("the read lock was not taken after the writer released it")
 	}
 }
 
 // A writer waits for a reader holding the lock shared, so no file is renamed under a read in progress.
-func TestAWriterWaitsForAReader(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestAWriterWaitsForAReader(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	releaseReader, taken := holdTableReadLock(directory, time.Second)
 	if !taken {
-		t.Fatal("the read lock was not taken")
+		test.Fatal("the read lock was not taken")
 	}
 	written := make(chan struct{})
 	go func() {
@@ -62,55 +62,55 @@ func TestAWriterWaitsForAReader(t *testing.T) {
 	}()
 	select {
 	case <-written:
-		t.Fatal("the writer took the lock while a reader held it")
+		test.Fatal("the writer took the lock while a reader held it")
 	case <-time.After(200 * time.Millisecond):
 	}
 	releaseReader()
 	select {
 	case <-written:
 	case <-time.After(5 * time.Second):
-		t.Fatal("the writer did not take the lock after the reader released it")
+		test.Fatal("the writer did not take the lock after the reader released it")
 	}
 }
 
 // A writer that never finishes costs the next run its bound and no more, and the run goes ahead.
-func TestAStuckWriterCostsTheNextRunItsBound(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestAStuckWriterCostsTheNextRunItsBound(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	release := holdTableLock(directory)
 	defer release()
 	start := time.Now()
 	if releaseReader, taken := holdTableReadLock(directory, 100*time.Millisecond); taken {
 		releaseReader()
-		t.Fatal("the read lock was taken while the writer still held the lock")
+		test.Fatal("the read lock was taken while the writer still held the lock")
 	}
 	if waited := time.Since(start); waited < 100*time.Millisecond || waited > 5*time.Second {
-		t.Errorf("waited %s for a bound of 100ms", waited)
+		test.Errorf("waited %s for a bound of 100ms", waited)
 	}
 }
 
 // A lone run, with a lock file left by an earlier run and nobody holding it, pays an open and a lock.
 // Not parallel: it times a thousand lock round trips against a one millisecond bound, which tests competing
 // for the CPU in parallel would blow
-func TestALoneRunPaysAlmostNothingToWait(t *testing.T) {
-	directory := t.TempDir()
+func TestALoneRunPaysAlmostNothingToWait(test *testing.T) {
+	directory := test.TempDir()
 	holdTableLock(directory)()
 	if _, err := os.Stat(tableLockPath(directory)); err != nil {
-		t.Fatalf("the writer left no lock file, so this measures the missing-file path: %v", err)
+		test.Fatalf("the writer left no lock file, so this measures the missing-file path: %v", err)
 	}
 	const rounds = 1000
 	start := time.Now()
 	for range rounds {
 		release, taken := holdTableReadLock(directory, tableWriterWait)
 		if !taken {
-			t.Fatal("the read lock gave up with nobody holding it")
+			test.Fatal("the read lock gave up with nobody holding it")
 		}
 		release()
 	}
 	perRun := time.Since(start) / rounds
-	t.Logf("%s per lone run", perRun)
+	test.Logf("%s per lone run", perRun)
 	if perRun > time.Millisecond {
-		t.Errorf("a lone run's lock costs %s, want microseconds", perRun)
+		test.Errorf("a lone run's lock costs %s, want microseconds", perRun)
 	}
 }
 
@@ -121,8 +121,8 @@ func TestALoneRunPaysAlmostNothingToWait(t *testing.T) {
 // it sees them disagree, and this test fails.
 // Not parallel: it needs its reader to overlap at least half of 60 timed writes, which tests competing for
 // the CPU in parallel can starve
-func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(t *testing.T) {
-	directory := t.TempDir()
+func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
+	directory := test.TempDir()
 	identity := cacheTableIdentity()
 	const writes = 60
 	marker := func(index int) string { return fmt.Sprintf("write %d", index) }
@@ -173,13 +173,13 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(t *testing.T) {
 	}
 	select {
 	case err := <-writerError:
-		t.Fatalf("writing: %v", err)
+		test.Fatalf("writing: %v", err)
 	default:
 	}
 	if reads < writes/2 {
-		t.Fatalf("only %d reads saw both files across %d writes, so the reader barely overlapped the writer", reads, writes)
+		test.Fatalf("only %d reads saw both files across %d writes, so the reader barely overlapped the writer", reads, writes)
 	}
 	if disagreements > 0 {
-		t.Errorf("%d of %d reads saw a run beside findings from another write", disagreements, reads)
+		test.Errorf("%d of %d reads saw a run beside findings from another write", disagreements, reads)
 	}
 }

@@ -18,8 +18,8 @@ const (
 	upstreamFail = "\n\t\t\t      import { Head } from \"next/document\";\n\n\t\t\t      class Test {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Head>\n\t\t\t              <title>My page title</title>\n\t\t\t            </Head>\n\t\t\t          );\n\t\t\t        }\n\t\t\t      }"
 )
 
-func TestNoTitleInDocumentHeadReports(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadReports(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -85,20 +85,20 @@ func TestNoTitleInDocumentHeadReports(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
 			ids := make([]string, testCase.want)
 			for index := range ids {
 				ids[index] = messageNoTitleInDocumentHead.Id
 			}
-			rule_testing.ExpectFindings(t, result, ids...)
+			rule_testing.ExpectFindings(test, result, ids...)
 		})
 	}
 }
 
-func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadIsSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -214,10 +214,10 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -226,30 +226,30 @@ func TestNoTitleInDocumentHeadIsSilent(t *testing.T) {
 // `jsx_opening_element.name.span()` rather than the `<title>` that eslint blames. A message-id
 // assertion cannot see where a finding lands, and pointing at the title instead would satisfy every
 // case above.
-func TestNoTitleInDocumentHeadPointsAtTheTagName(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadPointsAtTheTagName(test *testing.T) {
+	test.Parallel()
 
 	source := "import { Head as PageHead } from \"next/document\";\nexport const C = () => <PageHead><title>x</title></PageHead>;"
 
-	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", source)
-	rule_testing.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
+	result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", source)
+	rule_testing.ExpectFindings(test, result, messageNoTitleInDocumentHead.Id)
 
 	diagnostic := result.Diagnostics[0]
 	reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != "PageHead" {
-		t.Fatalf("want the tag name %q, got %q", "PageHead", reported)
+		test.Fatalf("want the tag name %q, got %q", "PageHead", reported)
 	}
 }
 
 // The message is asserted whole rather than by substring, because a substring predicate is weaker
 // than the property it guards and has gone green over a wrong message in this tree before.
-func TestNoTitleInDocumentHeadMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoTitleInDocumentHeadMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoTitleInDocumentHead, "pages/_document.tsx", upstreamFail)
-	rule_testing.ExpectFindings(t, result, messageNoTitleInDocumentHead.Id)
+	result := rule_testing.RunTyped(test, NoTitleInDocumentHead, "pages/_document.tsx", upstreamFail)
+	rule_testing.ExpectFindings(test, result, messageNoTitleInDocumentHead.Id)
 
 	if !strings.HasPrefix(messageNoTitleInDocumentHead.Description, "A <title> here is emitted") {
-		t.Fatalf("message description changed shape: %q", messageNoTitleInDocumentHead.Description)
+		test.Fatalf("message description changed shape: %q", messageNoTitleInDocumentHead.Description)
 	}
 }

@@ -27,8 +27,8 @@ const shadowRestrictedNamesFile = "/repository/source/ShadowRestrictedNames.ts"
 // reports six times. That single input is most of this rule's declaration-site coverage, which is
 // why a port that finds only variable declarations still passes a suite asserting one finding per
 // input and fails this one loudly.
-func TestNoShadowRestrictedNamesFires(t *testing.T) {
-	t.Parallel()
+func TestNoShadowRestrictedNamesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -85,14 +85,14 @@ func TestNoShadowRestrictedNamesFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "shadowingRestrictedName"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
 				wantIds...)
 		})
 	}
@@ -104,8 +104,8 @@ func TestNoShadowRestrictedNamesFires(t *testing.T) {
 // name test. `var undefined;` is legal and harmless because the binding keeps the global's value,
 // and it stops being harmless the moment anything writes to it. Distinguishing the two needs to
 // know which declaration a later `undefined = 5` binds to, which is why this rule reads the checker.
-func TestNoShadowRestrictedNamesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoShadowRestrictedNamesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -136,10 +136,10 @@ func TestNoShadowRestrictedNamesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
 		})
 	}
 }
@@ -149,8 +149,8 @@ func TestNoShadowRestrictedNamesStaysSilent(t *testing.T) {
 // Our option is spelled the other way round, `AllowGlobalThis`, so that the Go zero value is
 // upstream's default of reporting it. A struct field named `ReportGlobalThis` would default to
 // false and silently turn off a third of the rule for every caller who passed no options.
-func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(t *testing.T) {
-	t.Parallel()
+func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -162,9 +162,9 @@ func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoShadowRestrictedNames,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoShadowRestrictedNames,
 				shadowRestrictedNamesFile, testCase.sourceText,
 				NoShadowRestrictedNamesOptions{AllowGlobalThis: true}))
 		})
@@ -183,8 +183,8 @@ func TestNoShadowRestrictedNamesRespectsAllowGlobalThis(t *testing.T) {
 // that produced it. That distinction is what makes the `class globalThis {}` case worth listing:
 // reporting the class declaration and reporting its name both produce one finding with the id
 // `shadowingRestrictedName`, and only the slice tells them apart.
-func TestNoShadowRestrictedNamesPointsAtTheName(t *testing.T) {
-	t.Parallel()
+func TestNoShadowRestrictedNamesPointsAtTheName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -209,17 +209,17 @@ func TestNoShadowRestrictedNamesPointsAtTheName(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoShadowRestrictedNames,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoShadowRestrictedNames,
 				shadowRestrictedNamesFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.want))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.want[index] {
-					t.Errorf("finding %d points at %q, want %q", index, reported, testCase.want[index])
+					test.Errorf("finding %d points at %q, want %q", index, reported, testCase.want[index])
 				}
 			}
 		})
@@ -232,8 +232,8 @@ func TestNoShadowRestrictedNamesPointsAtTheName(t *testing.T) {
 // write to this symbol", so it never had to exercise the shapes a write can take. Ours computes
 // that answer, so every shape is a place the carve-out could be silently too generous, and a
 // too-generous carve-out is the quiet direction: the rule simply stops reporting.
-func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoShadowRestrictedNamesCarveOutBoundary(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name       string
@@ -274,14 +274,14 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 	}
 
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "shadowingRestrictedName"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText),
 				wantIds...)
 		})
 	}
@@ -321,10 +321,10 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 	}
 
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTyped(test, NoShadowRestrictedNames, shadowRestrictedNamesFile, testCase.sourceText))
 		})
 	}
 }
@@ -335,17 +335,17 @@ func TestNoShadowRestrictedNamesCarveOutBoundary(t *testing.T) {
 // reports, so a revert to the plain harness would not go silent the way most type-aware rules do;
 // it would go *loud*, turning upstream's clean `var undefined;` into a finding. Either direction is
 // a defect, and asserting the difference here names which one it is.
-func TestNoShadowRestrictedNamesNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoShadowRestrictedNamesNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "var undefined; doSomething(undefined);"
 
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText))
+	rule_testing.ExpectClean(test,
+		rule_testing.RunTyped(test, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText))
 
-	withoutChecker := rule_testing.Run(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
+	withoutChecker := rule_testing.Run(test, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
 	if len(withoutChecker.Diagnostics) != 1 {
-		t.Fatalf("the untyped harness produced %d findings, want 1; the carve-out is supposed to "+
+		test.Fatalf("the untyped harness produced %d findings, want 1; the carve-out is supposed to "+
 			"decline without a checker rather than guess", len(withoutChecker.Diagnostics))
 	}
 }
@@ -363,21 +363,21 @@ func TestNoShadowRestrictedNamesNeedsTheTypedHarness(t *testing.T) {
 // `KindVariableDeclaration`, treats either as the anchor of that write, carves out neither, and
 // reports twice. Confirmed against our checker before the rule was written: the two declarations
 // have distinct pointers and the write resolves to the inner one.
-func TestNoShadowRestrictedNamesReportsTheWrittenBindingNotItsNamesake(t *testing.T) {
-	t.Parallel()
+func TestNoShadowRestrictedNamesReportsTheWrittenBindingNotItsNamesake(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "var undefined; function f() { var undefined; undefined = 1; }"
 
 	// Byte 34 is the inner declaration's name; byte 4 is the outer one's, 30 bytes earlier.
 	const innerNamePosition = 34
 
-	result := rule_testing.RunTyped(t, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
+	result := rule_testing.RunTyped(test, NoShadowRestrictedNames, shadowRestrictedNamesFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1; two would mean the carve-out matched on declaration "+
+		test.Fatalf("got %d findings, want 1; two would mean the carve-out matched on declaration "+
 			"kind rather than on node identity", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Range.Pos(); got != innerNamePosition {
-		t.Errorf("the finding starts at byte %d, want %d; the outer declaration is bare and never "+
+		test.Errorf("the finding starts at byte %d, want %d; the outer declaration is bare and never "+
 			"written to, so reporting it rather than the inner one is the defect this asserts", got,
 			innerNamePosition)
 	}

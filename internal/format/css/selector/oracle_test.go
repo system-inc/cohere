@@ -323,16 +323,16 @@ var selectorFixtures = []selectorFixture{
 // A corpus selector the library cannot parse is counted, and the test fails if that count passes a
 // tenth of the corpus: an oracle that rejects everything would otherwise read as perfect agreement.
 // The inline fixtures each say which way the library must go.
-func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 
 	type input = oracleInput
 	var inputs []input
 	corpusFiles := 0
 	vendored, err := filepath.Abs(filepath.Join("..", "testdata", "prettier", "css"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	for _, corpus := range append([]string{vendored}, strings.Split(os.Getenv("COHERE_CSS_CORPORA"), ":")...) {
 		corpus = strings.TrimSpace(corpus)
@@ -365,11 +365,11 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("walking %s: %v", corpus, err)
+			test.Fatalf("walking %s: %v", corpus, err)
 		}
 	}
 	if corpusFiles == 0 {
-		t.Fatalf("no .css files under %s or COHERE_CSS_CORPORA", vendored)
+		test.Fatalf("no .css files under %s or COHERE_CSS_CORPORA", vendored)
 	}
 	malformed := map[string]bool{}
 	for _, fixture := range selectorFixtures {
@@ -378,7 +378,7 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 		malformed[name] = fixture.malformed
 	}
 
-	records := runSelectorOracle(t, root, inputs)
+	records := runSelectorOracle(test, root, inputs)
 
 	seenFixtures := map[string]bool{}
 	seenCorpusText := map[string]bool{}
@@ -387,7 +387,7 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	refusedFiles := map[string]string{}
@@ -439,7 +439,7 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 	}
 	for _, fixture := range selectorFixtures {
 		if !seenFixtures["fixture: "+fixture.name] {
-			t.Errorf("the oracle printed nothing for fixture %q", fixture.name)
+			test.Errorf("the oracle printed nothing for fixture %q", fixture.name)
 		}
 	}
 	for name, cssError := range refusedFiles {
@@ -448,21 +448,21 @@ func TestParseAgreesWithPostcssSelectorParser(t *testing.T) {
 			continue // a COHERE_CSS_CORPORA file Prettier refuses has no selectors, which is all it means
 		}
 		if _, named := prettierRefusedFixtures[filepath.ToSlash(relative)]; !named {
-			t.Errorf("%s: Prettier's parse refuses it (%s), and it isn't named in prettierRefusedFixtures", relative, cssError)
+			test.Errorf("%s: Prettier's parse refuses it (%s), and it isn't named in prettierRefusedFixtures", relative, cssError)
 		}
 	}
 	for relative, reason := range prettierRefusedFixtures {
 		if _, refused := refusedFiles[filepath.Join(vendored, filepath.FromSlash(relative))]; !refused {
-			t.Errorf("%s is named as refused by Prettier (%s), and Prettier's parse now accepts it: take it off the list", relative, reason)
+			test.Errorf("%s is named as refused by Prettier (%s), and Prettier's parse now accepts it: take it off the list", relative, reason)
 		}
 	}
-	t.Logf("%d corpus files (%d refused whole by Prettier's parse) gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
+	test.Logf("%d corpus files (%d refused whole by Prettier's parse) gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
 		corpusFiles, len(refusedFiles), corpusSelectors, corpusDuplicates, len(selectorFixtures), identical, refusedByBoth, different, corpusRefused)
 	if corpusSelectors == 0 {
-		t.Errorf("the corpus gave no selectors")
+		test.Errorf("the corpus gave no selectors")
 	}
 	if corpusRefused > corpusSelectors/10 {
-		t.Errorf("the library refused %d of %d corpus selectors; the comparison is thinner than it looks", corpusRefused, corpusSelectors)
+		test.Errorf("the library refused %d of %d corpus selectors; the comparison is thinner than it looks", corpusRefused, corpusSelectors)
 	}
 }
 
@@ -484,13 +484,13 @@ type oracleInput struct {
 }
 
 // runSelectorOracle runs the oracle script on inputs and returns its records in order.
-func runSelectorOracle(t *testing.T, root string, inputs []oracleInput) []map[string]any {
-	t.Helper()
+func runSelectorOracle(test *testing.T, root string, inputs []oracleInput) []map[string]any {
+	test.Helper()
 	var stdin bytes.Buffer
 	for _, each := range inputs {
 		encoded, err := json.Marshal(each)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -515,7 +515,7 @@ func runSelectorOracle(t *testing.T, root string, inputs []oracleInput) []map[st
 			if runError != nil {
 				break // the last line a killed process was writing
 			}
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		records = append(records, each)
 	}
@@ -528,10 +528,10 @@ func runSelectorOracle(t *testing.T, root string, inputs []oracleInput) []map[st
 		}
 		for _, each := range inputs {
 			if !answered[each.Name] {
-				t.Fatalf("node: %v, stopping at %s %q\n%s", runError, each.Name, each.Text, stderr.String())
+				test.Fatalf("node: %v, stopping at %s %q\n%s", runError, each.Name, each.Text, stderr.String())
 			}
 		}
-		t.Fatalf("node: %v\n%s", runError, stderr.String())
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	return records
 }
@@ -550,13 +550,13 @@ var randomSelectorPieces = []string{
 // COHERE_PRETTIER_FORK names the fork; COHERE_SELECTOR_RANDOM sets the count (default 20000). The seed is
 // fixed, so a failure reproduces. A selector Go refuses with ErrLoopsForever is not sent to the library,
 // which would hang on it; the run's deadline catches one Go wrongly lets through.
-func TestParseAgreesOnRandomSelectors(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestParseAgreesOnRandomSelectors(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	count := 20000
 	if value := os.Getenv("COHERE_SELECTOR_RANDOM"); value != "" {
 		if _, err := fmt.Sscan(value, &count); err != nil {
-			t.Fatalf("COHERE_SELECTOR_RANDOM: %v", err)
+			test.Fatalf("COHERE_SELECTOR_RANDOM: %v", err)
 		}
 	}
 	random := rand.New(rand.NewPCG(2, 3))
@@ -578,9 +578,9 @@ func TestParseAgreesOnRandomSelectors(t *testing.T) {
 		}
 		inputs = append(inputs, oracleInput{Name: fmt.Sprint(len(inputs)), Text: text.String()})
 	}
-	records := runSelectorOracle(t, root, inputs)
+	records := runSelectorOracle(test, root, inputs)
 	if len(records) != len(inputs) {
-		t.Fatalf("%d inputs and %d records", len(inputs), len(records))
+		test.Fatalf("%d inputs and %d records", len(inputs), len(records))
 	}
 	parsed, refused, different := 0, 0, 0
 	messages := map[string]int{}
@@ -605,7 +605,7 @@ func TestParseAgreesOnRandomSelectors(t *testing.T) {
 		if difference != "" {
 			different++
 			if different <= 20 {
-				t.Errorf("%q: %s", text, difference)
+				test.Errorf("%q: %s", text, difference)
 			}
 			continue
 		}
@@ -615,12 +615,12 @@ func TestParseAgreesOnRandomSelectors(t *testing.T) {
 			parsed++
 		}
 	}
-	t.Logf("%d random selectors (%d more skipped as ErrLoopsForever): %d parsed alike, %d refused alike, %d different", len(inputs), loopsForever, parsed, refused, different)
+	test.Logf("%d random selectors (%d more skipped as ErrLoopsForever): %d parsed alike, %d refused alike, %d different", len(inputs), loopsForever, parsed, refused, different)
 	for message, times := range messages {
-		t.Logf("  %5d refused with %q", times, message)
+		test.Logf("  %5d refused with %q", times, message)
 	}
 	if parsed < len(inputs)/10 {
-		t.Errorf("only %d of %d random selectors parsed; the comparison is mostly of refusals", parsed, len(inputs))
+		test.Errorf("only %d of %d random selectors parsed; the comparison is mostly of refusals", parsed, len(inputs))
 	}
 }
 

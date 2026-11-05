@@ -41,8 +41,8 @@ const willUpdateSetStateFile = "/repository/source/WillUpdate.tsx"
 // So the case is pinned as reporting, which is upstream's answer under the configuration we can
 // actually produce, and the reasoning is here so the next reader does not delete the case or break
 // the rule to green it.
-func TestNoWillUpdateSetStateFires(t *testing.T) {
-	t.Parallel()
+func TestNoWillUpdateSetStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -134,11 +134,11 @@ func TestNoWillUpdateSetStateFires(t *testing.T) {
 		{"an UNSAFE prefixed lifecycle upstream silences with a React version setting", "\n                    class Hello extends React.Component {\n                      UNSAFE_componentWillUpdate() {\n                        this.setState({\n                          data: data\n                        });\n                      }\n                    }\n                  ", ""}}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
-				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
-			rule_testing.ExpectFindings(t, result, "noSetStateInComponentWillUpdate")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoWillUpdateSetState, willUpdateSetStateFile,
+				testCase.sourceText, noMethodSetStateOptions(test, testCase.option))
+			rule_testing.ExpectFindings(test, result, "noSetStateInComponentWillUpdate")
 		})
 	}
 }
@@ -155,8 +155,8 @@ func TestNoWillUpdateSetStateFires(t *testing.T) {
 // The rest are ours: the component gate, the two factory names our shelf accepts and this rule's
 // upstream does not, the two neighbouring lifecycle names, four callee shapes, the absence of any
 // call-graph analysis, both parenthesized forms, and a tagged template.
-func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoWillUpdateSetStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -241,11 +241,11 @@ func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
 		{"a tagged template on setState, which is no call expression", "class Hello extends React.Component {\n  componentWillUpdate() { this.setState`x`; }\n}\n", ""}}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoWillUpdateSetState, willUpdateSetStateFile,
-				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoWillUpdateSetState, willUpdateSetStateFile,
+				testCase.sourceText, noMethodSetStateOptions(test, testCase.option))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -262,8 +262,8 @@ func TestNoWillUpdateSetStateStaysSilent(t *testing.T) {
 // The message text is compared with equality rather than `strings.Contains`, because a predicate
 // weaker than the property it guards is not a guard: a doubled or truncated rendering contains the
 // needle and stays green.
-func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
-	t.Parallel()
+func TestNoWillUpdateSetStateReportsAtTheCallee(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -283,23 +283,23 @@ func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoWillUpdateSetState, willUpdateSetStateFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			reported := testCase.sourceText[finding.Range.Pos():finding.Range.End()]
 			if reported != testCase.wantText {
-				t.Errorf("reported span is %q, want %q", reported, testCase.wantText)
+				test.Errorf("reported span is %q, want %q", reported, testCase.wantText)
 			}
 			if got := finding.Message.Description; got != messageNoSetStateInComponentWillUpdate.Description {
-				t.Errorf("rendered description is %q, want %q", got,
+				test.Errorf("rendered description is %q, want %q", got,
 					messageNoSetStateInComponentWillUpdate.Description)
 			}
 			if !strings.HasPrefix(finding.Message.Description, "Updating state from ") {
-				t.Errorf("description does not open by naming the mistake: %q",
+				test.Errorf("description does not open by naming the mistake: %q",
 					finding.Message.Description)
 			}
 		})
@@ -312,18 +312,18 @@ func TestNoWillUpdateSetStateReportsAtTheCallee(t *testing.T) {
 // reading its options with an unchecked type assertion panics on every real file while every
 // fixture using `RunWithOptions` stays green. This asserts the plain harness works, which is the
 // shape the linter actually runs in for a rule configured with a bare severity.
-func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(t *testing.T) {
-	t.Parallel()
+func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(test *testing.T) {
+	test.Parallel()
 
 	const callbackSource = "class Hello extends React.Component {\n" +
 		"  componentWillUpdate() { on(function() { this.setState({}); }); }\n}\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoWillUpdateSetState, willUpdateSetStateFile,
 		callbackSource))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoWillUpdateSetState,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoWillUpdateSetState,
 		willUpdateSetStateFile, callbackSource,
-		noMethodSetStateOptions(t, "disallow-in-func")),
+		noMethodSetStateOptions(test, "disallow-in-func")),
 		"noSetStateInComponentWillUpdate")
 }
 
@@ -333,12 +333,12 @@ func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(t *testing.T) {
 // calls produces two findings. This lives in its own test rather than the table above because
 // `ExpectFindings` takes one id per finding and the table asserts exactly one. Measured on the
 // release binary, which prints two diagnostics for this source at two different columns.
-func TestNoWillUpdateSetStateReportsEachCallSite(t *testing.T) {
-	t.Parallel()
+func TestNoWillUpdateSetStateReportsEachCallSite(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoWillUpdateSetState, willUpdateSetStateFile,
+	result := rule_testing.Run(test, NoWillUpdateSetState, willUpdateSetStateFile,
 		"class Hello extends React.Component {\n"+
 			"  componentWillUpdate() { this.setState({}); this.setState({}); }\n}\n")
-	rule_testing.ExpectFindings(t, result, "noSetStateInComponentWillUpdate",
+	rule_testing.ExpectFindings(test, result, "noSetStateInComponentWillUpdate",
 		"noSetStateInComponentWillUpdate")
 }

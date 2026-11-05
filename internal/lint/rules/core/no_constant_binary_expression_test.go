@@ -10,8 +10,8 @@ const constantBinaryFile = "/repository/source/Compare.ts"
 
 const constantBinaryDeclarations = "declare let a: any, b: any;\n"
 
-func TestNoConstantBinaryExpressionFires(t *testing.T) {
-	t.Parallel()
+func TestNoConstantBinaryExpressionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -78,16 +78,16 @@ func TestNoConstantBinaryExpressionFires(t *testing.T) {
 		{"two fresh objects loosely compared", "export const v = ({}) == ({});\n", "bothAlwaysNew"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoConstantBinaryExpression, constantBinaryFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoConstantBinaryExpression, constantBinaryFile,
 				constantBinaryDeclarations+testCase.sourceText), testCase.wantId)
 		})
 	}
 }
 
-func TestNoConstantBinaryExpressionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConstantBinaryExpressionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -122,9 +122,9 @@ func TestNoConstantBinaryExpressionStaysSilent(t *testing.T) {
 		{"nothing binary at all", "export const value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoConstantBinaryExpression, constantBinaryFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoConstantBinaryExpression, constantBinaryFile,
 				constantBinaryDeclarations+testCase.sourceText))
 		})
 	}
@@ -135,20 +135,20 @@ func TestNoConstantBinaryExpressionStaysSilent(t *testing.T) {
 // Worth its own test because a rule that silently lacks an option is indistinguishable from one
 // whose option is off, and the difference surfaces only when someone turns it on. That is the exact
 // shape use-isnan shipped with.
-func TestNoConstantBinaryExpressionRelationalArm(t *testing.T) {
-	t.Parallel()
+func TestNoConstantBinaryExpressionRelationalArm(test *testing.T) {
+	test.Parallel()
 
 	source := constantBinaryDeclarations + "export const v = 1 < 2;\n"
 
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoConstantBinaryExpression, constantBinaryFile, source,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile, source,
 		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: false}))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoConstantBinaryExpression, constantBinaryFile, source,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile, source,
 		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}),
 		"constantRelationalComparison")
 
 	// A variable operand is not a literal, so the arm stays silent even when enabled.
-	rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoConstantBinaryExpression, constantBinaryFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile,
 		constantBinaryDeclarations+"export const v = a < 2;\n",
 		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}))
 }

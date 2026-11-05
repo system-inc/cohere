@@ -31,8 +31,8 @@ const noArrowFunctionLifecycleFile = "/repository/source/NoArrowFunctionLifecycl
 // test rather than only the judgment. `ExpectFixedSource` replays the fixes into the source and
 // compares the whole rewritten file, so a repair with the right text over the wrong span fails
 // here even though its message id is correct.
-func TestNoArrowFunctionLifecycleFires(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -487,25 +487,25 @@ func TestNoArrowFunctionLifecycleFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "lifecycle"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			if testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+				rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 			}
 		})
 	}
 }
 
 // TestNoArrowFunctionLifecycleStaysSilent runs every case this port declines.
-func TestNoArrowFunctionLifecycleStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -775,10 +775,10 @@ func TestNoArrowFunctionLifecycleStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -789,8 +789,8 @@ func TestNoArrowFunctionLifecycleStaysSilent(t *testing.T) {
 // instance list alone, so two of these four invert against the naive reading. Upstream's corpus
 // writes only the reporting halves, so a port using one combined list would pass every imported
 // case while reporting two shapes upstream ignores. All four measured on the installed build.
-func TestNoArrowFunctionLifecycleStaticSplit(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleStaticSplit(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -804,13 +804,13 @@ func TestNoArrowFunctionLifecycleStaticSplit(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
 			if testCase.wantFires {
-				rule_testing.ExpectFindings(t, result, "lifecycle")
+				rule_testing.ExpectFindings(test, result, "lifecycle")
 			} else {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 			}
 		})
 	}
@@ -827,8 +827,8 @@ func TestNoArrowFunctionLifecycleStaticSplit(t *testing.T) {
 // correct. The typed-parameter row is the one our tree actually contains and upstream's corpus
 // structurally cannot: rendering an annotated parameter by name alone would drop the annotation the
 // way a shipped fixer once widened eight declarations to `any`.
-func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -849,15 +849,15 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "lifecycle")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "lifecycle")
 
 			// The finding is real; the repair is what is withheld. Asserting the absence of a fix
 			// is the whole point, and no message-id fixture can see it.
 			if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-				t.Fatalf("a repair was offered for a parameter that cannot be rendered by name: %v", fixes)
+				test.Fatalf("a repair was offered for a parameter that cannot be rendered by name: %v", fixes)
 			}
 		})
 	}
@@ -874,20 +874,20 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(t *testing.T) {
 // The remaining rows are what the rewrite must keep: a decorator, an accessibility modifier and the
 // JSDoc above the field all sit before the key, outside the replaced head, and a comment after the
 // `=>` still travels into the block as upstream's corpus asserts.
-func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(test *testing.T) {
+	test.Parallel()
 
-	t.Run("a comment before the arrow declines", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a comment before the arrow declines", func(test *testing.T) {
+		test.Parallel()
 		for _, sourceText := range []string{
 			"class H extends React.Component {\n  render = /* c */ () => {\n    return <div />;\n  };\n}\n",
 			"class H extends React.Component {\n  render /* c */ = () => {\n    return <div />;\n  };\n}\n",
 			"class H extends React.Component {\n  render = () /* c */ => {\n    return <div />;\n  };\n}\n",
 		} {
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, sourceText)
-			rule_testing.ExpectFindings(t, result, "lifecycle")
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, sourceText)
+			rule_testing.ExpectFindings(test, result, "lifecycle")
 			if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-				t.Fatalf("a repair was offered that would delete a comment in the head of %q", sourceText)
+				test.Fatalf("a repair was offered that would delete a comment in the head of %q", sourceText)
 			}
 		}
 	})
@@ -909,11 +909,11 @@ func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "lifecycle")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "lifecycle")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -923,17 +923,17 @@ func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(t *testing.T) {
 // The message interpolates the property name, so an id assertion cannot see anything the format
 // string does. Asserted against a literal typed here rather than against the rule's own constant,
 // which would move with any mutation of it.
-func TestNoArrowFunctionLifecycleMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile,
+	result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile,
 		"class H extends React.Component { componentDidMount = () => {}; render() { return <div />; } }")
-	rule_testing.ExpectFindings(t, result, "lifecycle")
+	rule_testing.ExpectFindings(test, result, "lifecycle")
 
 	const want = "componentDidMount is a React lifecycle method, and should not be an arrow " +
 		"function or in a class field. Use an instance method instead."
 	if got := result.Diagnostics[0].Message.Description; got != want {
-		t.Fatalf("message is %q, want %q", got, want)
+		test.Fatalf("message is %q, want %q", got, want)
 	}
 }
 
@@ -947,8 +947,8 @@ func TestNoArrowFunctionLifecycleMessageText(t *testing.T) {
 // repair. An earlier version of this test covered only the concise-body path, and a mutant moving
 // the block-body anchor from the property to the arrow survived every fixture, because no other
 // assertion in the suite looks at where a block-body finding points. Each site is a row here now.
-func TestNoArrowFunctionLifecycleAnchor(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleAnchor(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -978,15 +978,15 @@ func TestNoArrowFunctionLifecycleAnchor(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "lifecycle")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "lifecycle")
 
 			fixture := strings.TrimSpace(testCase.sourceText) + "\n"
 			span := result.Diagnostics[0].Range
 			if got := fixture[span.Pos():span.End()]; got != testCase.want {
-				t.Fatalf("finding spans %q, want %q", got, testCase.want)
+				test.Fatalf("finding spans %q, want %q", got, testCase.want)
 			}
 		})
 	}
@@ -996,16 +996,16 @@ func TestNoArrowFunctionLifecycleAnchor(t *testing.T) {
 //
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue. Upstream has no
 // such gate anywhere, and a lifecycle arrow with no JSX in it needs no JSX file.
-func TestNoArrowFunctionLifecycleHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoArrowFunctionLifecycleHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "class H extends React.Component { componentDidMount = () => {}; }"
 
 	for _, suffix := range []string{".tsx", ".ts"} {
-		t.Run(suffix, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoArrowFunctionLifecycle, "/repository/source/SuffixProbe"+suffix, source)
-			rule_testing.ExpectFindings(t, result, "lifecycle")
+		test.Run(suffix, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoArrowFunctionLifecycle, "/repository/source/SuffixProbe"+suffix, source)
+			rule_testing.ExpectFindings(test, result, "lifecycle")
 		})
 	}
 }

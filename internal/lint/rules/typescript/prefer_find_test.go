@@ -27,14 +27,14 @@ type preferFindFinding struct {
 // a suggestion, so without this the thing it offers would go unasserted. The ordering is
 // load-bearing here rather than decorative: a ternary case carries THREE edits over three ranges in
 // one expression, so applying them front to back would shift the two that follow.
-func applyPreferFindSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyPreferFindSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool { return fixes[first].Range.Pos() > fixes[second].Range.Pos() })
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(source) || start > end {
-			t.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
 		}
 		source = source[:start] + fix.Text + source[end:]
 	}
@@ -46,8 +46,8 @@ func applyPreferFindSuggestion(t *testing.T, source string, suggestion rule.Sugg
 // All nineteen of upstream's passing inputs, extracted by parsing the clone's test file with the
 // TypeScript compiler. Every one was run through the installed 8.x build against a real program,
 // which reported nothing and produced no parse error on any of them.
-func TestPreferFindStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestPreferFindStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"\ninterface JerkCode<T> {\n  filter(predicate: (item: T) => boolean): JerkCode<T>;\n}\n\ndeclare const jerkCode: JerkCode<string>;\n\njerkCode.filter(item => item === 'aha')[0];\n    ",
@@ -71,9 +71,9 @@ func TestPreferFindStaysSilentOnUpstreamPassCases(t *testing.T) {
 		"\n(Math.random() < 0.5\n  ? [1, 2, 3].find(x => true)\n  : [1, 2, 3].filter(x => true))[0];\n    ",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferFindCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferFind,
+		test.Run(preferFindCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferFind,
 				preferFindFile, sourceText))
 		})
 	}
@@ -88,8 +88,8 @@ func TestPreferFindStaysSilentOnUpstreamPassCases(t *testing.T) {
 //
 // The harness writes each fixture as `strings.TrimSpace(source)+"\n"`, so both the span slices and
 // the expected rewrites are against that trimmed text rather than the Go literal.
-func TestPreferFindFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestPreferFindFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -265,15 +265,15 @@ func TestPreferFindFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(preferFindCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, PreferFind, preferFindFile, testCase.sourceText)
+		test.Run(preferFindCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, PreferFind, preferFindFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position := range wantIds {
 				wantIds[position] = "preferFind"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			for position, want := range testCase.wantFindings {
@@ -281,28 +281,28 @@ func TestPreferFindFiresOnUpstreamFailCases(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != "Prefer .find(...) instead of .filter(...)[0]." {
-					t.Fatalf("finding %d message: got %q", position, diagnostic.Message.Description)
+					test.Fatalf("finding %d message: got %q", position, diagnostic.Message.Description)
 				}
 
 				// The repair is offered, never applied. `filter(...)[0]` and `find(...)` produce
 				// the same value and DIFFERENT types, so an unattended rewrite can break a build.
 				if len(diagnostic.Fixes) != 0 {
-					t.Fatalf("finding %d: the repair must be a suggestion, got %d fixes",
+					test.Fatalf("finding %d: the repair must be a suggestion, got %d fixes",
 						position, len(diagnostic.Fixes))
 				}
 				if len(diagnostic.Suggestions) != 1 {
-					t.Fatalf("finding %d: expected one suggestion, got %d", position, len(diagnostic.Suggestions))
+					test.Fatalf("finding %d: expected one suggestion, got %d", position, len(diagnostic.Suggestions))
 				}
 				suggestion := diagnostic.Suggestions[0]
 				if suggestion.Message.Description != "Use .find(...) instead of .filter(...)[0]." {
-					t.Fatalf("finding %d suggestion text: got %q", position, suggestion.Message.Description)
+					test.Fatalf("finding %d suggestion text: got %q", position, suggestion.Message.Description)
 				}
-				applied := applyPreferFindSuggestion(t, onDisk, suggestion)
+				applied := applyPreferFindSuggestion(test, onDisk, suggestion)
 				if applied != want.wantSuggestion {
-					t.Fatalf("finding %d suggestion applied: expected %q, got %q",
+					test.Fatalf("finding %d suggestion applied: expected %q, got %q",
 						position, want.wantSuggestion, applied)
 				}
 			}
@@ -314,14 +314,14 @@ func TestPreferFindFiresOnUpstreamFailCases(t *testing.T) {
 //
 // Under the plain harness the checker is nil and every listener returns immediately, so the clean
 // fixtures would pass having proven nothing.
-func TestPreferFindNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestPreferFindNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !PreferFind.NeedsTypeChecker {
-		t.Fatal("the rule resolves the filtered receiver's type, so it must declare NeedsTypeChecker")
+		test.Fatal("the rule resolves the filtered receiver's type, so it must declare NeedsTypeChecker")
 	}
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferFind, preferFindFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferFind, preferFindFile,
 		"declare const arr: string[];\narr.filter(item => item === 'a')[0];"))
 }
 
@@ -336,8 +336,8 @@ func TestPreferFindNeedsTheTypedHarness(t *testing.T) {
 // count test, which upstream writes as `arguments.length !== 1`.
 //
 // All five were measured clean on the installed 8.x build before being written here.
-func TestPreferFindStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestPreferFindStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"declare const arr: string[];\narr.filter(x => true).indexOf('a');",
@@ -347,9 +347,9 @@ func TestPreferFindStaysSilentOnShapesTheCorpusDoesNotWrite(t *testing.T) {
 		"declare const arr: string[];\narr.filter(x => true).at(0, 1);",
 	}
 	for index, sourceText := range cases {
-		t.Run(preferFindCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, PreferFind, preferFindFile, sourceText))
+		test.Run(preferFindCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferFind, preferFindFile, sourceText))
 		})
 	}
 }

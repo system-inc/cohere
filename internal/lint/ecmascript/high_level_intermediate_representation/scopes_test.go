@@ -18,16 +18,16 @@ import (
 //
 // Typed for the reason `disjointFor` is: a checker-less lowering never emits `StoreContext`, so a
 // plain harness would make several assertions below pass vacuously.
-func scopesFor(t *testing.T, source string) (*Function, *ReactiveScopes) {
-	t.Helper()
-	function, ranges := rangesFor(t, source)
+func scopesFor(test *testing.T, source string) (*Function, *ReactiveScopes) {
+	test.Helper()
+	function, ranges := rangesFor(test, source)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 	return function, AssignReactiveScopesWithSets(function, ranges, set)
 }
 
 // scopeOfName returns the scope holding the LAST value a named binding takes.
-func scopeOfName(t *testing.T, function *Function, scopes *ReactiveScopes, name string) ScopeId {
-	t.Helper()
+func scopeOfName(test *testing.T, function *Function, scopes *ReactiveScopes, name string) ScopeId {
+	test.Helper()
 	var target static_single_assignment.IdentifierId
 	found := false
 	for id, identifier := range function.Identifiers {
@@ -39,7 +39,7 @@ func scopeOfName(t *testing.T, function *Function, scopes *ReactiveScopes, name 
 		}
 	}
 	if !found {
-		t.Fatalf("no identifier named %q, so this test measured nothing", name)
+		test.Fatalf("no identifier named %q, so this test measured nothing", name)
 	}
 	return scopes.ScopeOf(target)
 }
@@ -60,8 +60,8 @@ func scopeOfName(t *testing.T, function *Function, scopes *ReactiveScopes, name 
 // sentinel and a naive minimum drags the hull's start to zero. `firstUnset` and `runOfUnsets`
 // separate the adoption branch from the skip branch, which are two different behaviours sharing one
 // `if/else if`.
-func TestScopeHullMatchesReact(t *testing.T) {
-	t.Parallel()
+func TestScopeHullMatchesReact(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -81,8 +81,8 @@ func TestScopeHullMatchesReact(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// Build a function whose identifiers carry exactly these ranges, and a set unioning
 			// them into one class. Synthetic rather than lowered, because the point is to pin the
 			// merge arithmetic against React's, and a lowered input cannot be made to produce an
@@ -103,11 +103,11 @@ func TestScopeHullMatchesReact(t *testing.T) {
 
 			scopes := AssignReactiveScopesWithSets(function, ranges, set)
 			if scopes.Len() != 1 {
-				t.Fatalf("got %d scopes, want exactly 1; the class did not form", scopes.Len())
+				test.Fatalf("got %d scopes, want exactly 1; the class did not form", scopes.Len())
 			}
 			got := scopes.RangeOf(scopes.Ids()[0])
 			if got != testCase.want {
-				t.Errorf("hull = [%d,%d), want [%d,%d) -- this is React's own answer for this input",
+				test.Errorf("hull = [%d,%d), want [%d,%d) -- this is React's own answer for this input",
 					got.Start, got.End, testCase.want.Start, testCase.want.End)
 			}
 		})
@@ -119,8 +119,8 @@ func TestScopeHullMatchesReact(t *testing.T) {
 // The whole reason the merge is written as an `if/else if` rather than as `min` is the unset
 // sentinel, and a reader simplifying it would not obviously be wrong. This asserts the specific
 // input on which the two spellings differ, so the simplification cannot land silently.
-func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
-	t.Parallel()
+func TestScopeHullIsNotAPlainMinimum(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil}}
 	ranges := &mutation_aliasing.MutableRanges{}
@@ -133,11 +133,11 @@ func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	got := scopes.RangeOf(scopes.Ids()[0])
 	if got.Start == 0 {
-		t.Fatal("the unset member dragged the hull's start to zero, which is a plain minimum " +
+		test.Fatal("the unset member dragged the hull's start to zero, which is a plain minimum " +
 			"rather than upstream's guarded merge; zero is the UNSET sentinel, not a position")
 	}
 	if got != (mutation_aliasing.MutableRange{Start: 4, End: 6}) {
-		t.Errorf("hull = [%d,%d), want [4,6)", got.Start, got.End)
+		test.Errorf("hull = [%d,%d), want [4,6)", got.Start, got.End)
 	}
 }
 
@@ -151,8 +151,8 @@ func TestScopeHullIsNotAPlainMinimum(t *testing.T) {
 // every member of a class reaches the same scope object. A pass that minted one scope per value
 // would compile, would assign a scope to everything, and would be wrong in the way that matters --
 // the consumer asks "are these two memoized together" and would always hear no.
-func TestScopeIsOnePerEquivalenceClass(t *testing.T) {
-	t.Parallel()
+func TestScopeIsOnePerEquivalenceClass(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil, nil, nil}}
 	ranges := &mutation_aliasing.MutableRanges{}
@@ -166,16 +166,16 @@ func TestScopeIsOnePerEquivalenceClass(t *testing.T) {
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	if scopes.Len() != 2 {
-		t.Fatalf("got %d scopes for 2 classes over 5 values; a scope must name a class", scopes.Len())
+		test.Fatalf("got %d scopes for 2 classes over 5 values; a scope must name a class", scopes.Len())
 	}
 	if a, b, c := scopes.ScopeOf(1), scopes.ScopeOf(2), scopes.ScopeOf(3); a != b || b != c {
-		t.Errorf("values 1,2,3 are one class but got scopes %d,%d,%d", a, b, c)
+		test.Errorf("values 1,2,3 are one class but got scopes %d,%d,%d", a, b, c)
 	}
 	if d, e := scopes.ScopeOf(4), scopes.ScopeOf(5); d != e {
-		t.Errorf("values 4,5 are one class but got scopes %d,%d", d, e)
+		test.Errorf("values 4,5 are one class but got scopes %d,%d", d, e)
 	}
 	if scopes.ScopeOf(1) == scopes.ScopeOf(4) {
-		t.Error("two separate classes were given one scope, which is a false merge")
+		test.Error("two separate classes were given one scope, which is a false merge")
 	}
 }
 
@@ -184,8 +184,8 @@ func TestScopeIsOnePerEquivalenceClass(t *testing.T) {
 // Upstream's `identifier.scope` stays null for a value `findDisjointMutableValues` never admitted,
 // and the consumer at bundle line 45732 branches on `identifier.scope == null`. Zero is that null
 // here, which is why zero is not a valid ScopeId.
-func TestScopeAbsentValueHasNoScope(t *testing.T) {
-	t.Parallel()
+func TestScopeAbsentValueHasNoScope(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
 	ranges := &mutation_aliasing.MutableRanges{}
@@ -197,10 +197,10 @@ func TestScopeAbsentValueHasNoScope(t *testing.T) {
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	if got := scopes.ScopeOf(3); got != 0 {
-		t.Errorf("an unscoped value answered scope %d, want 0; zero is the absent scope", got)
+		test.Errorf("an unscoped value answered scope %d, want 0; zero is the absent scope", got)
 	}
 	if scopes.ScopeOf(1) == 0 {
-		t.Error("a scoped value answered zero, which makes the absent sentinel unreadable")
+		test.Error("a scoped value answered zero, which makes the absent sentinel unreadable")
 	}
 }
 
@@ -210,8 +210,8 @@ func TestScopeAbsentValueHasNoScope(t *testing.T) {
 // and it is not incidental: after this pass a member reports its CLASS's span rather than its own,
 // because entangled values are memoized as one unit and therefore live as one unit. A port that
 // assigned scopes and left ranges alone would satisfy every other test in this file.
-func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
-	t.Parallel()
+func TestScopeMemberRangesAreRewrittenToTheHull(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
 	ranges := &mutation_aliasing.MutableRanges{}
@@ -227,19 +227,19 @@ func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
 	want := mutation_aliasing.MutableRange{Start: 1, End: 9}
 	for _, id := range []static_single_assignment.IdentifierId{1, 2} {
 		if got := rewritten.Get(id); got != want {
-			t.Errorf("value %d reports [%d,%d) after entanglement, want the hull [%d,%d)",
+			test.Errorf("value %d reports [%d,%d) after entanglement, want the hull [%d,%d)",
 				id, got.Start, got.End, want.Start, want.End)
 		}
 	}
 
 	// The INPUT table is deliberately not modified, which is where this differs from upstream.
 	if got := ranges.Get(1); got != (mutation_aliasing.MutableRange{Start: 3, End: 5}) {
-		t.Errorf("the input range table was mutated to [%d,%d); this pass must leave it alone so a "+
+		test.Errorf("the input range table was mutated to [%d,%d); this pass must leave it alone so a "+
 			"caller can still see the pre-entanglement range", got.Start, got.End)
 	}
 	// A value with no scope is absent from the rewritten view.
 	if got := rewritten.Get(3); got.IsSet() {
-		t.Errorf("an unscoped value appears in the rewritten ranges as [%d,%d)", got.Start, got.End)
+		test.Errorf("an unscoped value appears in the rewritten ranges as [%d,%d)", got.Start, got.End)
 	}
 }
 
@@ -253,8 +253,8 @@ func TestScopeMemberRangesAreRewrittenToTheHull(t *testing.T) {
 // iteration cannot leak into the answer. Ids are handed out in that order, so a scope id is stable.
 // A pass whose partition is right but whose keys move between runs produces a table that differs
 // every time, which is the shape that makes a cache non-reproducible without ever being wrong.
-func TestScopeAssignmentIsDeterministic(t *testing.T) {
-	t.Parallel()
+func TestScopeAssignmentIsDeterministic(test *testing.T) {
+	test.Parallel()
 
 	const source = `
 		function Component(props) {
@@ -265,26 +265,26 @@ func TestScopeAssignmentIsDeterministic(t *testing.T) {
 			return <div>{items}{other}</div>;
 		}
 	`
-	_, first := scopesFor(t, source)
+	_, first := scopesFor(test, source)
 	if first.Len() == 0 {
-		t.Fatal("no scopes formed, so this test measured nothing")
+		test.Fatal("no scopes formed, so this test measured nothing")
 	}
 	for attempt := 0; attempt < 8; attempt++ {
-		_, again := scopesFor(t, source)
+		_, again := scopesFor(test, source)
 		if again.Len() != first.Len() {
-			t.Fatalf("run %d produced %d scopes, first run produced %d", attempt, again.Len(), first.Len())
+			test.Fatalf("run %d produced %d scopes, first run produced %d", attempt, again.Len(), first.Len())
 		}
 		for index, id := range first.Ids() {
 			if again.Ids()[index] != id {
-				t.Fatalf("run %d assigned scope ids in a different order", attempt)
+				test.Fatalf("run %d assigned scope ids in a different order", attempt)
 			}
 			firstRange, againRange := first.RangeOf(id), again.RangeOf(id)
 			if firstRange != againRange {
-				t.Fatalf("run %d gave scope %d range [%d,%d), first run gave [%d,%d)",
+				test.Fatalf("run %d gave scope %d range [%d,%d), first run gave [%d,%d)",
 					attempt, id, againRange.Start, againRange.End, firstRange.Start, firstRange.End)
 			}
 			if len(first.MembersOf(id)) != len(again.MembersOf(id)) {
-				t.Fatalf("run %d gave scope %d a different membership", attempt, id)
+				test.Fatalf("run %d gave scope %d a different membership", attempt, id)
 			}
 		}
 	}
@@ -301,8 +301,8 @@ func TestScopeAssignmentIsDeterministic(t *testing.T) {
 // Counted rather than argued: every member appears in exactly one scope, and the members summed
 // across scopes equal the set's size. A pass that revisited would double-count; one that iterated to
 // convergence could not finish this test at all.
-func TestScopeAssignmentIsASinglePass(t *testing.T) {
-	t.Parallel()
+func TestScopeAssignmentIsASinglePass(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{}
 	ranges := &mutation_aliasing.MutableRanges{}
@@ -325,7 +325,7 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	if scopes.Len() != classes {
-		t.Fatalf("got %d scopes for %d classes", scopes.Len(), classes)
+		test.Fatalf("got %d scopes for %d classes", scopes.Len(), classes)
 	}
 
 	seen := map[static_single_assignment.IdentifierId]ScopeId{}
@@ -333,7 +333,7 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 	for _, id := range scopes.Ids() {
 		for _, member := range scopes.MembersOf(id) {
 			if previous, already := seen[member]; already {
-				t.Fatalf("value %d appears in scope %d and again in scope %d; the walk revisited",
+				test.Fatalf("value %d appears in scope %d and again in scope %d; the walk revisited",
 					member, previous, id)
 			}
 			seen[member] = id
@@ -341,7 +341,7 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 		}
 	}
 	if total != set.Size() {
-		t.Errorf("scopes hold %d members but the set has %d; the walk is not one pass over each",
+		test.Errorf("scopes hold %d members but the set has %d; the walk is not one pass over each",
 			total, set.Size())
 	}
 }
@@ -351,10 +351,10 @@ func TestScopeAssignmentIsASinglePass(t *testing.T) {
 // `Construct` is not idempotent in this package, which is a trap a caller can walk into; this pass
 // is, because it reads two tables and writes a third rather than mutating its input. Asserted rather
 // than assumed, because the property is what makes the input table safe to reuse.
-func TestScopeAssignmentIsIdempotent(t *testing.T) {
-	t.Parallel()
+func TestScopeAssignmentIsIdempotent(test *testing.T) {
+	test.Parallel()
 
-	function, ranges := rangesFor(t, `
+	function, ranges := rangesFor(test, `
 		function Component(props) {
 			const items = [];
 			items.push(props.value);
@@ -367,34 +367,34 @@ func TestScopeAssignmentIsIdempotent(t *testing.T) {
 	second := AssignReactiveScopesWithSets(function, ranges, set)
 
 	if first.Len() != second.Len() {
-		t.Fatalf("second run produced %d scopes, first produced %d", second.Len(), first.Len())
+		test.Fatalf("second run produced %d scopes, first produced %d", second.Len(), first.Len())
 	}
 	for _, id := range first.Ids() {
 		if first.RangeOf(id) != second.RangeOf(id) {
-			t.Errorf("scope %d moved between runs", id)
+			test.Errorf("scope %d moved between runs", id)
 		}
 	}
 }
 
 // TestScopeHandlesANilFunction pins the degenerate inputs.
-func TestScopeHandlesANilFunction(t *testing.T) {
-	t.Parallel()
+func TestScopeHandlesANilFunction(test *testing.T) {
+	test.Parallel()
 
 	if got := AssignReactiveScopes(nil); got == nil || got.Len() != 0 {
-		t.Error("a nil function must produce an empty table rather than a nil one or a panic")
+		test.Error("a nil function must produce an empty table rather than a nil one or a panic")
 	}
 	var empty *ReactiveScopes
 	if empty.ScopeOf(1) != 0 || empty.Len() != 0 || empty.MembersOf(1) != nil {
-		t.Error("the nil table must read as empty rather than panicking")
+		test.Error("the nil table must read as empty rather than panicking")
 	}
 	if got := empty.RangeOf(1); got.IsSet() {
-		t.Error("the nil table must answer the unset range")
+		test.Error("the nil table must answer the unset range")
 	}
 	if got := empty.MemberRanges(); got == nil || got.Len() != 0 {
-		t.Error("the nil table's rewritten ranges must be empty rather than nil")
+		test.Error("the nil table's rewritten ranges must be empty rather than nil")
 	}
 	if got := ValidateScopes(nil, nil); got != nil {
-		t.Errorf("validating nothing returned %v", got)
+		test.Errorf("validating nothing returned %v", got)
 	}
 }
 
@@ -419,8 +419,8 @@ func TestScopeHandlesANilFunction(t *testing.T) {
 // `MembersOf` would assume, and the equivalence rests entirely on `Sets` continuing to allocate. A
 // change there would make this load-bearing again with nothing to announce it. This test pins what
 // IS observable -- that membership is stable and complete -- rather than pretending to pin the copy.
-func TestScopeMembersOfIsStableAcrossCalls(t *testing.T) {
-	t.Parallel()
+func TestScopeMembersOfIsStableAcrossCalls(test *testing.T) {
+	test.Parallel()
 
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil}}
 	ranges := &mutation_aliasing.MutableRanges{}
@@ -435,19 +435,19 @@ func TestScopeMembersOfIsStableAcrossCalls(t *testing.T) {
 
 	first := scopes.MembersOf(scope)
 	if len(first) != 3 {
-		t.Fatalf("got %d members, want 3", len(first))
+		test.Fatalf("got %d members, want 3", len(first))
 	}
 	second := scopes.MembersOf(scope)
 	for index := range first {
 		if first[index] != second[index] {
-			t.Errorf("membership moved between reads at index %d", index)
+			test.Errorf("membership moved between reads at index %d", index)
 		}
 	}
 	// Membership must be complete and must agree with the per-value index, which is the property a
 	// consumer actually depends on.
 	for _, member := range first {
 		if scopes.ScopeOf(member) != scope {
-			t.Errorf("value %d is listed in scope %d but indexes to %d",
+			test.Errorf("value %d is listed in scope %d but indexes to %d",
 				member, scope, scopes.ScopeOf(member))
 		}
 	}
@@ -458,12 +458,12 @@ func TestScopeMembersOfIsStableAcrossCalls(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // corpusScopeStats walks the corpus once and returns what every measurement below reads.
-func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, widths, sizes []int,
+func corpusScopeStats(test *testing.T, limit int) (functions, scopes, members int, widths, sizes []int,
 	invalidHulls, emptyHulls, pastMax, someUnset, allUnset, widthOneMulti int) {
-	t.Helper()
+	test.Helper()
 
 	var files []string
-	err := filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -473,14 +473,14 @@ func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, 
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking the corpus: %v", err)
+		test.Fatalf("walking the corpus: %v", err)
 	}
 	sort.Strings(files)
 	if len(files) > limit {
 		files = files[:limit]
 	}
 	if len(files) < 10 {
-		t.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
+		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
 	}
 
 	for _, path := range files {
@@ -496,7 +496,7 @@ func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, 
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ctx.TypeChecker == nil {
-							t.Fatal("the typed harness handed this probe a nil checker, so every " +
+							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -550,7 +550,7 @@ func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, 
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: string(contents)}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: string(contents)}, fileName)
 	}
 	return
 }
@@ -577,36 +577,36 @@ func corpusScopeStats(t *testing.T, limit int) (functions, scopes, members int, 
 //
 // The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus,
 // which moves when the tree does.
-func TestScopeWidthAndMembershipAgree(t *testing.T) {
-	t.Parallel()
+func TestScopeWidthAndMembershipAgree(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 
-	functions, scopes, members, widths, sizes, _, _, _, _, _, widthOneMulti := corpusScopeStats(t, 400)
+	functions, scopes, members, widths, sizes, _, _, _, _, _, widthOneMulti := corpusScopeStats(test, 400)
 
 	sort.Ints(widths)
 	sort.Ints(sizes)
-	t.Logf("functions=%d scopes=%d members=%d", functions, scopes, members)
+	test.Logf("functions=%d scopes=%d members=%d", functions, scopes, members)
 	if len(widths) > 0 {
-		t.Logf("width p50=%d p90=%d max=%d", widths[len(widths)/2], widths[len(widths)*90/100],
+		test.Logf("width p50=%d p90=%d max=%d", widths[len(widths)/2], widths[len(widths)*90/100],
 			widths[len(widths)-1])
 	}
 	if len(sizes) > 0 {
-		t.Logf("size p50=%d p90=%d max=%d", sizes[len(sizes)/2], sizes[len(sizes)*90/100],
+		test.Logf("size p50=%d p90=%d max=%d", sizes[len(sizes)/2], sizes[len(sizes)*90/100],
 			sizes[len(sizes)-1])
 	}
 
 	if functions < 100 {
-		t.Fatalf("only %d functions were lowered; this test measured almost nothing", functions)
+		test.Fatalf("only %d functions were lowered; this test measured almost nothing", functions)
 	}
 	if scopes == 0 {
-		t.Fatal("no scope was created, so the pass is inert")
+		test.Fatal("no scope was created, so the pass is inert")
 	}
 
 	// The headline. A multi-member scope whose hull is one instruction wide is the signature of
 	// over-merging: several values cannot genuinely share a span too narrow to contain them.
 	if widthOneMulti != 0 {
-		t.Errorf("%d scopes hold several values in a one-instruction span, which is the shape of "+
+		test.Errorf("%d scopes hold several values in a one-instruction span, which is the shape of "+
 			"catastrophic over-merging: values swept together into a hull too narrow to hold them",
 			widthOneMulti)
 	}
@@ -614,15 +614,15 @@ func TestScopeWidthAndMembershipAgree(t *testing.T) {
 	// Two-sided. A pass that merged everything into one enormous scope would satisfy the check
 	// above trivially, so the distribution has to show both populations really exist.
 	if len(widths) > 0 && widths[len(widths)-1] < 5 {
-		t.Errorf("the widest scope spans %d instructions; real code entangles over longer spans, "+
+		test.Errorf("the widest scope spans %d instructions; real code entangles over longer spans, "+
 			"which suggests hulls are not being computed", widths[len(widths)-1])
 	}
 	if len(sizes) > 0 && sizes[len(sizes)/2] > 3 {
-		t.Errorf("the median scope holds %d values; most values in real code are independent, so "+
+		test.Errorf("the median scope holds %d values; most values in real code are independent, so "+
 			"this suggests over-merging", sizes[len(sizes)/2])
 	}
 	if len(sizes) > 0 && sizes[len(sizes)-1] < 5 {
-		t.Errorf("the largest scope holds %d values, which suggests classes are not reaching this "+
+		test.Errorf("the largest scope holds %d values, which suggests classes are not reaching this "+
 			"pass intact", sizes[len(sizes)-1])
 	}
 }
@@ -642,36 +642,36 @@ func TestScopeWidthAndMembershipAgree(t *testing.T) {
 // This test is the guard against a future change to `InferMutableRanges` widening that unset
 // population until a whole class falls into it. It fails loudly rather than the pass emitting a
 // scope whose range describes nothing.
-func TestScopeRangesSatisfyUpstreamsInvariant(t *testing.T) {
-	t.Parallel()
+func TestScopeRangesSatisfyUpstreamsInvariant(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 
 	functions, scopes, _, _, _, invalidHulls, emptyHulls, pastMax, someUnset, allUnset, _ :=
-		corpusScopeStats(t, 400)
+		corpusScopeStats(test, 400)
 
-	t.Logf("functions=%d scopes=%d someMemberUnset=%d allMembersUnset=%d",
+	test.Logf("functions=%d scopes=%d someMemberUnset=%d allMembersUnset=%d",
 		functions, scopes, someUnset, allUnset)
-	t.Logf("emptyHulls=%d invalidHulls=%d pastMaxInstruction=%d", emptyHulls, invalidHulls, pastMax)
+	test.Logf("emptyHulls=%d invalidHulls=%d pastMaxInstruction=%d", emptyHulls, invalidHulls, pastMax)
 
 	if scopes == 0 {
-		t.Fatal("no scope was created, so this test measured nothing")
+		test.Fatal("no scope was created, so this test measured nothing")
 	}
 	if emptyHulls != 0 {
-		t.Errorf("%d scopes hull to an empty range, which upstream treats as a compiler bug and "+
+		test.Errorf("%d scopes hull to an empty range, which upstream treats as a compiler bug and "+
 			"raises on; every member of those classes must have had an unset range", emptyHulls)
 	}
 	if invalidHulls != 0 {
-		t.Errorf("%d scopes hull to an inverted range (end <= start), which no combination of valid "+
+		test.Errorf("%d scopes hull to an inverted range (end <= start), which no combination of valid "+
 			"member ranges can produce", invalidHulls)
 	}
 	if pastMax != 0 {
-		t.Errorf("%d scopes violate upstream's invariant as ValidateScopes reports it", pastMax)
+		test.Errorf("%d scopes violate upstream's invariant as ValidateScopes reports it", pastMax)
 	}
 	// Two-sided: the mixed classes are what the `start === 0` branch exists for, and a corpus with
 	// none of them would leave that branch unmeasured rather than proven correct.
 	if someUnset == 0 {
-		t.Log("no class mixes set and unset member ranges on this corpus, so upstream's " +
+		test.Log("no class mixes set and unset member ranges on this corpus, so upstream's " +
 			"`start === 0` adoption branch is exercised only by TestScopeHullMatchesReact")
 	}
 }
@@ -694,12 +694,12 @@ func TestScopeRangesSatisfyUpstreamsInvariant(t *testing.T) {
 //
 // Upstream RAISES here (`CompilerError.invariant`, bundle line 32271). This returns the offenders
 // instead, so the assertion is on which scopes are named rather than on a panic.
-func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
-	t.Parallel()
+func TestValidateScopesCatchesAnEmptyHull(test *testing.T) {
+	test.Parallel()
 
 	// A function with real instructions, so maxInstruction is non-zero and the third condition is
 	// not what fires. Without this the test would pass for the wrong reason.
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 		function Component(props) {
 			const items = [];
 			items.push(props.value);
@@ -718,19 +718,19 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 
 	scopes := AssignReactiveScopesWithSets(function, handmade, set)
 	if scopes.Len() != 1 {
-		t.Fatalf("got %d scopes, want 1", scopes.Len())
+		test.Fatalf("got %d scopes, want 1", scopes.Len())
 	}
 	if got := scopes.RangeOf(scopes.Ids()[0]); got.IsSet() {
-		t.Fatalf("the all-unset class hulled to [%d,%d); React hulls it to [0,0)", got.Start, got.End)
+		test.Fatalf("the all-unset class hulled to [%d,%d); React hulls it to [0,0)", got.Start, got.End)
 	}
 
 	invalid := ValidateScopes(function, scopes)
 	if len(invalid) != 1 {
-		t.Fatalf("ValidateScopes named %d scopes, want 1; the empty hull must be reported because "+
+		test.Fatalf("ValidateScopes named %d scopes, want 1; the empty hull must be reported because "+
 			"upstream treats it as a compiler bug and raises", len(invalid))
 	}
 	if invalid[0] != scopes.Ids()[0] {
-		t.Errorf("ValidateScopes named scope %d, want %d", invalid[0], scopes.Ids()[0])
+		test.Errorf("ValidateScopes named scope %d, want %d", invalid[0], scopes.Ids()[0])
 	}
 
 	// Two-sided: a valid hull over the same function must NOT be named, or the check above would
@@ -741,7 +741,7 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 	validSet := &DisjointSet{}
 	validSet.Union([]static_single_assignment.IdentifierId{unsetA, unsetB})
 	if named := ValidateScopes(function, AssignReactiveScopesWithSets(function, valid, validSet)); len(named) != 0 {
-		t.Errorf("a valid scope was named as invalid: %v", named)
+		test.Errorf("a valid scope was named as invalid: %v", named)
 	}
 }
 
@@ -763,10 +763,10 @@ func TestValidateScopesCatchesAnEmptyHull(t *testing.T) {
 //
 // Upstream carries the two tests as independent disjuncts for this reason, and reproducing them as
 // one collapsed check would be a silent narrowing.
-func TestValidateScopesCatchesAStartOfZeroWithARealEnd(t *testing.T) {
-	t.Parallel()
+func TestValidateScopesCatchesAStartOfZeroWithARealEnd(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 		function Component(props) {
 			const items = [];
 			items.push(props.value);
@@ -782,13 +782,13 @@ func TestValidateScopesCatchesAStartOfZeroWithARealEnd(t *testing.T) {
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	hull := scopes.RangeOf(scopes.Ids()[0])
 	if hull.Start != 0 || hull.End != 5 {
-		t.Fatalf("hull = [%d,%d), want [0,5); this test needs a zero start with a real end, which "+
+		test.Fatalf("hull = [%d,%d), want [0,5); this test needs a zero start with a real end, which "+
 			"is the only shape the start check alone can condemn", hull.Start, hull.End)
 	}
 
 	named := ValidateScopes(function, scopes)
 	if len(named) != 1 {
-		t.Fatalf("ValidateScopes named %d scopes for a hull of [0,5), want 1; a scope starting at "+
+		test.Fatalf("ValidateScopes named %d scopes for a hull of [0,5), want 1; a scope starting at "+
 			"the unset sentinel describes no position and upstream raises on it", len(named))
 	}
 }
@@ -797,10 +797,10 @@ func TestValidateScopesCatchesAStartOfZeroWithARealEnd(t *testing.T) {
 //
 // A hull with a real start and a zero end cannot arise from the merge -- the end only ever grows --
 // but the condition is upstream's and is written as two independent tests, so it is scored as two.
-func TestValidateScopesCatchesAnEndOfZero(t *testing.T) {
-	t.Parallel()
+func TestValidateScopesCatchesAnEndOfZero(test *testing.T) {
+	test.Parallel()
 
-	function, _ := rangesFor(t, `
+	function, _ := rangesFor(test, `
 		function Component(props) {
 			const items = [];
 			items.push(props.value);
@@ -814,17 +814,17 @@ func TestValidateScopesCatchesAnEndOfZero(t *testing.T) {
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
 	if named := ValidateScopes(function, scopes); len(named) != 1 {
-		t.Errorf("ValidateScopes named %d scopes for a hull ending at zero, want 1", len(named))
+		test.Errorf("ValidateScopes named %d scopes for a hull ending at zero, want 1", len(named))
 	}
 }
 
 // TestScopeGapsAreDeclared pins the gap list, so closing one is a visible event.
-func TestScopeGapsAreDeclared(t *testing.T) {
-	t.Parallel()
+func TestScopeGapsAreDeclared(test *testing.T) {
+	test.Parallel()
 
 	gaps := ScopeGaps()
 	if len(gaps) != 1 || gaps[0] != ScopeGapPostAlignmentWidening {
-		t.Errorf("ScopeGaps() = %v; a change here means a gap opened or closed and the package "+
+		test.Errorf("ScopeGaps() = %v; a change here means a gap opened or closed and the package "+
 			"comment plus the consumers must be re-read", gaps)
 	}
 }
@@ -835,13 +835,13 @@ func TestScopeGapsAreDeclared(t *testing.T) {
 // that partition exactly: same number of classes, same membership. A pass that merged two classes
 // while hulling them would produce plausible ranges and a wrong answer, and no range assertion could
 // see it.
-func TestScopeMatchesTheDisjointSetPartition(t *testing.T) {
-	t.Parallel()
+func TestScopeMatchesTheDisjointSetPartition(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 
 	var files []string
-	filepath.Walk(corpusRoot(t), func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -869,7 +869,7 @@ func TestScopeMatchesTheDisjointSetPartition(t *testing.T) {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ctx.TypeChecker == nil {
-							t.Fatal("nil checker: this comparison would be vacuous")
+							test.Fatal("nil checker: this comparison would be vacuous")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
 							function := Lower(functionNode, ctx.TypeChecker)
@@ -883,23 +883,23 @@ func TestScopeMatchesTheDisjointSetPartition(t *testing.T) {
 
 							classes := set.Sets()
 							if len(classes) != assigned.Len() {
-								t.Fatalf("%s: %d classes became %d scopes", fileName,
+								test.Fatalf("%s: %d classes became %d scopes", fileName,
 									len(classes), assigned.Len())
 							}
 							for index, class := range classes {
 								scope := assigned.Ids()[index]
 								got := assigned.MembersOf(scope)
 								if len(got) != len(class) {
-									t.Fatalf("%s: class %d holds %d values, its scope holds %d",
+									test.Fatalf("%s: class %d holds %d values, its scope holds %d",
 										fileName, index, len(class), len(got))
 								}
 								for member := range class {
 									if got[member] != class[member] {
-										t.Fatalf("%s: scope %d membership diverged from its class",
+										test.Fatalf("%s: scope %d membership diverged from its class",
 											fileName, scope)
 									}
 									if assigned.ScopeOf(class[member]) != scope {
-										t.Fatalf("%s: value %d is in class %d but indexes to scope %d",
+										test.Fatalf("%s: value %d is in class %d but indexes to scope %d",
 											fileName, class[member], index, assigned.ScopeOf(class[member]))
 									}
 								}
@@ -910,11 +910,11 @@ func TestScopeMatchesTheDisjointSetPartition(t *testing.T) {
 				}
 			},
 		}
-		rule_testing.RunTypedFiles(t, probe, map[string]string{fileName: string(contents)}, fileName)
+		rule_testing.RunTypedFiles(test, probe, map[string]string{fileName: string(contents)}, fileName)
 	}
 
 	if compared < 100 {
-		t.Fatalf("only %d classes were compared; this test measured almost nothing", compared)
+		test.Fatalf("only %d classes were compared; this test measured almost nothing", compared)
 	}
-	t.Logf("compared %d classes against their scopes", compared)
+	test.Logf("compared %d classes against their scopes", compared)
 }

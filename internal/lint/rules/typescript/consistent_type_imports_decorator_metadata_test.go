@@ -57,26 +57,26 @@ export function GraphQlMethod(): MethodDecorator { return () => {}; }
 export function GraphQlArgument(): ParameterDecorator { return () => {}; }
 `
 
-func runDecoratorMetadata(t *testing.T, subject string, emitDecoratorMetadata bool) rule_testing.Result {
-	t.Helper()
+func runDecoratorMetadata(test *testing.T, subject string, emitDecoratorMetadata bool) rule_testing.Result {
+	test.Helper()
 	enabled := "false"
 	if emitDecoratorMetadata {
 		enabled = "true"
 	}
-	return rule_testing.RunTypedFilesWithSetupAndOptions(t, ConsistentTypeImports, map[string]string{
+	return rule_testing.RunTypedFilesWithSetupAndOptions(test, ConsistentTypeImports, map[string]string{
 		"FormServiceTypes.ts": decoratorMetadataTypes,
 		"decorators.ts":       decoratorMetadataDecorators,
 		"FormComponent.ts":    subject,
 	}, "FormComponent.ts", DefaultConsistentTypeImportsOptions(), func(directory string) {
 		config := []byte(fmt.Sprintf(decoratorMetadataConfig, enabled))
 		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), config, 0o644); err != nil {
-			t.Fatalf("writing the decorator metadata tsconfig: %v", err)
+			test.Fatalf("writing the decorator metadata tsconfig: %v", err)
 		}
 	})
 }
 
-func TestConsistentTypeImportsKeepsDecoratorMetadataReferences(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsKeepsDecoratorMetadataReferences(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -204,28 +204,28 @@ export class FormComponentData {
 			ids: []string{"typeOverValue"},
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runDecoratorMetadata(t, testCase.source, true)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runDecoratorMetadata(test, testCase.source, true)
 			if len(testCase.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 
 	// The control. Without the option nothing reaches run time, so the class import that is silent
 	// above is an ordinary type-only import and reports.
-	t.Run("the same constructor without emitDecoratorMetadata reports", func(t *testing.T) {
-		t.Parallel()
-		result := runDecoratorMetadata(t, `import { GraphQlObjectType } from './decorators';
+	test.Run("the same constructor without emitDecoratorMetadata reports", func(test *testing.T) {
+		test.Parallel()
+		result := runDecoratorMetadata(test, `import { GraphQlObjectType } from './decorators';
 import { FormComponentCreateInput } from './FormServiceTypes';
 @GraphQlObjectType()
 export class FormComponentData {
     constructor(input: FormComponentCreateInput) { void input; }
 }
 `, false)
-		rule_testing.ExpectFindings(t, result, "typeOverValue")
+		rule_testing.ExpectFindings(test, result, "typeOverValue")
 	})
 }

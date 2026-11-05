@@ -11,8 +11,8 @@ const selfAssignFile = "/repository/source/Assign.ts"
 const selfAssignDeclarations = "declare let a: any, b: any, c: any, i: number;\n" +
 	"declare const o: any;\ndeclare function f(): any;\n"
 
-func TestNoSelfAssignFires(t *testing.T) {
-	t.Parallel()
+func TestNoSelfAssignFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -63,8 +63,8 @@ func TestNoSelfAssignFires(t *testing.T) {
 		{"a property after a spread", "export function run() { ({ a } = { ...b, a }); }\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// Spelled as an explicit list rather than a count, so this reads as ExpectFindings
 			// like every other rule's pair. The count form was equivalent and TestEveryRuleShips-
 			// AFixturePair could not see it: the guard looks for a call to ExpectFindings, and a
@@ -74,14 +74,14 @@ func TestNoSelfAssignFires(t *testing.T) {
 			for index := range expected {
 				expected[index] = "selfAssignment"
 			}
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoSelfAssign, selfAssignFile,
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoSelfAssign, selfAssignFile,
 				selfAssignDeclarations+testCase.sourceText), expected...)
 		})
 	}
 }
 
-func TestNoSelfAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoSelfAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -148,24 +148,24 @@ func TestNoSelfAssignStaysSilent(t *testing.T) {
 		{"no assignment at all", "export const value = 1;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoSelfAssign, selfAssignFile,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoSelfAssign, selfAssignFile,
 				selfAssignDeclarations+testCase.sourceText))
 		})
 	}
 }
 
 // decodedNoSelfAssign runs the registered decoder over raw option JSON, the way the config layer does
-func decodedNoSelfAssign(t *testing.T, raw string) any {
-	t.Helper()
+func decodedNoSelfAssign(test *testing.T, raw string) any {
+	test.Helper()
 	var input []byte
 	if raw != "" {
 		input = []byte(raw)
 	}
 	decoded, err := DecodeNoSelfAssignOptions(input)
 	if err != nil {
-		t.Fatalf("decoding %q: %v", raw, err)
+		test.Fatalf("decoding %q: %v", raw, err)
 	}
 	return decoded
 }
@@ -174,8 +174,8 @@ func decodedNoSelfAssign(t *testing.T, raw string) any {
 //
 // The default is true, so the interesting inputs are the ones that must keep it true: no options,
 // a bare severity, and an empty object, which a zero-value decode would quietly turn off.
-func TestNoSelfAssignPropsOption(t *testing.T) {
-	t.Parallel()
+func TestNoSelfAssignPropsOption(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -195,27 +195,27 @@ func TestNoSelfAssignPropsOption(t *testing.T) {
 		{"a pattern with props off", `{"props": false}`, "export function run() { [a, o.b] = [a, o.b]; }\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			expected := make([]string, testCase.wantCount)
 			for index := range expected {
 				expected[index] = "selfAssignment"
 			}
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoSelfAssign, selfAssignFile,
-				selfAssignDeclarations+testCase.sourceText, decodedNoSelfAssign(t, testCase.options)), expected...)
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoSelfAssign, selfAssignFile,
+				selfAssignDeclarations+testCase.sourceText, decodedNoSelfAssign(test, testCase.options)), expected...)
 		})
 	}
 }
 
 // TestNoSelfAssignRefusesUnknownOptions holds the decoder to upstream's `additionalProperties: false`.
-func TestNoSelfAssignRefusesUnknownOptions(t *testing.T) {
-	t.Parallel()
+func TestNoSelfAssignRefusesUnknownOptions(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{`{"prop": false}`, `{"Props": false}`, `{"props": "no"}`, `false`} {
-		t.Run(raw, func(t *testing.T) {
-			t.Parallel()
+		test.Run(raw, func(test *testing.T) {
+			test.Parallel()
 			if _, err := DecodeNoSelfAssignOptions([]byte(raw)); err == nil {
-				t.Errorf("decoded %s, expected it refused", raw)
+				test.Errorf("decoded %s, expected it refused", raw)
 			}
 		})
 	}

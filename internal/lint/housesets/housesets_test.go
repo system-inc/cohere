@@ -12,31 +12,31 @@ import (
 // Detection is from the program, per file (#j6p9t1g): each case is a project on disk, built the way a run
 // builds it, so the imports and the JSX fact are the compiler's own.
 
-func buildProject(t *testing.T, files map[string]string) (string, *program.Graph) {
-	t.Helper()
-	root := t.TempDir()
+func buildProject(test *testing.T, files map[string]string) (string, *program.Graph) {
+	test.Helper()
+	root := test.TempDir()
 	if _, written := files["tsconfig.json"]; !written {
 		files["tsconfig.json"] = `{"compilerOptions": {"jsx": "preserve", "strict": true, "noEmit": true, "skipLibCheck": true}, "include": ["**/*"]}`
 	}
 	for name, contents := range files {
 		path := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return root, graph
 }
 
-func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(t *testing.T) {
-	t.Parallel()
-	root, graph := buildProject(t, map[string]string{
+func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(test *testing.T) {
+	test.Parallel()
+	root, graph := buildProject(test, map[string]string{
 		// react is a dependency, and that alone applies nothing.
 		"package.json":             `{"dependencies": {"react": "19.2.0", "next": "16.0.0"}, "scripts": {"react": "echo react"}}`,
 		"source/Imports.tsx":       "import { useState } from 'react';\nexport function useCount() { return useState(0); }\n",
@@ -53,17 +53,17 @@ func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(t *testing.T) {
 	for _, file := range graph.ProjectFiles() {
 		relative, _ := filepath.Rel(root, file.FileName().AsString())
 		if detection.ReactFiles[file.FileName().AsString()] != want[relative] {
-			t.Errorf("%s: react=%v, want %v", relative, detection.ReactFiles[file.FileName().AsString()], want[relative])
+			test.Errorf("%s: react=%v, want %v", relative, detection.ReactFiles[file.FileName().AsString()], want[relative])
 		}
 	}
 	// next is in package.json and imported nowhere, so no file is Next's.
 	if len(detection.NextFiles) != 0 {
-		t.Errorf("next applied with no import of it: %v", detection.NextFiles)
+		test.Errorf("next applied with no import of it: %v", detection.NextFiles)
 	}
 }
 
-func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(t *testing.T) {
-	t.Parallel()
+func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(test *testing.T) {
+	test.Parallel()
 	files := map[string]string{
 		"app/layout.tsx":                 "import type { Metadata } from 'next';\nexport const metadata: Metadata = {};\n",
 		"app/page.tsx":                   "export default function Page() { return <main />; }\n",
@@ -75,7 +75,7 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(t *testing.T)
 		"node_modules/next/link.d.ts":    "declare const Link: (properties: { href: string; children?: unknown }) => unknown;\nexport default Link;\n",
 		"node_modules/next/package.json": `{"name": "next", "types": "index.d.ts"}`,
 	}
-	root, graph := buildProject(t, files)
+	root, graph := buildProject(test, files)
 	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	want := map[string]bool{"app/layout.tsx": true, "app/page.tsx": true, "app/api/health/route.ts": true, "middleware.ts": true, "source/Link.tsx": true}
 	for _, file := range graph.ProjectFiles() {
@@ -84,42 +84,42 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(t *testing.T)
 			continue
 		}
 		if detection.NextFiles[file.FileName().AsString()] != want[relative] {
-			t.Errorf("%s: next=%v, want %v", relative, detection.NextFiles[file.FileName().AsString()], want[relative])
+			test.Errorf("%s: next=%v, want %v", relative, detection.NextFiles[file.FileName().AsString()], want[relative])
 		}
 	}
 
 	// The control: the same app/ directory in a program that never imports next is just a directory.
 	delete(files, "app/layout.tsx")
 	delete(files, "source/Link.tsx")
-	root, graph = buildProject(t, files)
+	root, graph = buildProject(test, files)
 	if detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, ""); len(detection.NextFiles) != 0 {
-		t.Errorf("an app/ directory with no import of next applied cohere:next: %v", detection.NextFiles)
+		test.Errorf("an app/ directory with no import of next applied cohere:next: %v", detection.NextFiles)
 	}
 }
 
-func TestTailwindIsDetectedFromTheStylesheetAndSkippedByNameWithoutOne(t *testing.T) {
-	t.Parallel()
-	root, graph := buildProject(t, map[string]string{
+func TestTailwindIsDetectedFromTheStylesheetAndSkippedByNameWithoutOne(test *testing.T) {
+	test.Parallel()
+	root, graph := buildProject(test, map[string]string{
 		"index.ts":        "export const x = 1;\n",
 		"app/globals.css": "@import \"tailwindcss\";\n",
 	})
 	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	if detection.TailwindEntryPoint != filepath.Join(root, "app", "globals.css") {
-		t.Errorf("entry %q, want app/globals.css", detection.TailwindEntryPoint)
+		test.Errorf("entry %q, want app/globals.css", detection.TailwindEntryPoint)
 	}
 
-	root, graph = buildProject(t, map[string]string{
+	root, graph = buildProject(test, map[string]string{
 		"index.ts":        "export const x = 1;\n",
 		"app/globals.css": "body { margin: 0; }\n",
 	})
 	detection = Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	if detection.TailwindEntryPoint != "" || !strings.Contains(detection.TailwindSkipped, "app/globals.css does not import tailwindcss") {
-		t.Errorf("a plain stylesheet applied tailwind: %+v", detection)
+		test.Errorf("a plain stylesheet applied tailwind: %+v", detection)
 	}
 
-	root, graph = buildProject(t, map[string]string{"index.ts": "export const x = 1;\n"})
+	root, graph = buildProject(test, map[string]string{"index.ts": "export const x = 1;\n"})
 	detection = Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	if detection.TailwindEntryPoint != "" || !strings.Contains(detection.TailwindSkipped, "no Tailwind stylesheet") {
-		t.Errorf("no stylesheet must skip tailwind by name: %+v", detection)
+		test.Errorf("no stylesheet must skip tailwind by name: %+v", detection)
 	}
 }

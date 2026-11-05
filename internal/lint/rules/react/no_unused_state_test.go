@@ -20,8 +20,8 @@ import (
 // dropped.
 const noUnusedStateFile = "/repository/source/NoUnusedState.tsx"
 
-func TestNoUnusedStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n        function StatelessFnUnaffectedTest(props) {\n          return <SomeComponent foo={props.foo} />;\n        };\n      "},
@@ -98,16 +98,16 @@ func TestNoUnusedStateStaysSilent(t *testing.T) {
 		{"upstream valid 72", "\n        class Component extends React.Component {\n          static getDerivedStateFromProps = ({value, disableAnimation}: ToggleProps, {isControlled, isOn}: ToggleState) => {\n            return { isControlled, isOn };\n          };\n\n          render() {\n            const { isControlled, isOn } = this.state;\n            return <div>{isControlled ? 'controlled' : ''}{isOn ? 'on' : ''}</div>;\n          }\n        }\n      "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestNoUnusedStateFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -144,10 +144,10 @@ func TestNoUnusedStateFires(t *testing.T) {
 		{"upstream invalid 29", "\n        class Foo extends Component {\n          state = {\n            thisStateAliasPropUnused,\n            thisStateAliasRestPropUnused,\n            thisDestructStateAliasPropUnused,\n            thisDestructStateAliasRestPropUnused,\n            thisDestructStateDestructRestPropUnused,\n            thisSetStatePropUnused,\n            thisSetStateRestPropUnused,\n          } as unknown\n\n          constructor() {\n            // other methods of defining state props\n            ((this as unknown).state as unknown) = { thisStatePropUnused } as unknown;\n            ((this as unknown).setState as unknown)({ thisStateDestructPropUnused } as unknown);\n            ((this as unknown).setState as unknown)(state => ({ thisDestructStateDestructPropUnused } as unknown));\n          }\n\n          thisStateAlias() {\n            const state = (this as unknown).state as unknown;\n\n            (state as unknown).thisStateAliasProp as unknown;\n            const { ...thisStateAliasRest } = state as unknown;\n            (thisStateAliasRest as unknown).thisStateAliasRestProp as unknown;\n          }\n\n          thisDestructStateAlias() {\n            const { state } = this as unknown;\n\n            (state as unknown).thisDestructStateAliasProp as unknown;\n            const { ...thisDestructStateAliasRest } = state as unknown;\n            (thisDestructStateAliasRest as unknown).thisDestructStateAliasRestProp as unknown;\n          }\n\n          thisSetState() {\n            ((this as unknown).setState as unknown)(state => (state as unknown).thisSetStateProp as unknown);\n            ((this as unknown).setState as unknown)(({ ...thisSetStateRest }) => (thisSetStateRest as unknown).thisSetStateRestProp as unknown);\n          }\n\n          render() {\n            ((this as unknown).state as unknown).thisStateProp as unknown;\n            const { thisStateDestructProp } = (this as unknown).state as unknown;\n            const { state: { thisDestructStateDestructProp, ...thisDestructStateDestructRest } } = this as unknown;\n            (thisDestructStateDestructRest as unknown).thisDestructStateDestructRestProp as unknown;\n\n            return null;\n          }\n        }\n      ", []string{"unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -160,8 +160,8 @@ func TestNoUnusedStateFires(t *testing.T) {
 // act on, because the read is visible in the source and the rule simply cannot see it.
 //
 // All four measured against the installed build on 2026-08-27, each beside a control that reports.
-func TestNoUnusedStateGiveUpConditions(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateGiveUpConditions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -194,14 +194,14 @@ func TestNoUnusedStateGiveUpConditions(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -212,8 +212,8 @@ func TestNoUnusedStateGiveUpConditions(t *testing.T) {
 // and the third row proves the key is read correctly rather than merely suppressing the report:
 // reading `"b"` still reports `a`. Without that row a rule that treated every computed access as a
 // blanket give-up would pass the first two.
-func TestNoUnusedStateComputedLiteralIsARead(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateComputedLiteralIsARead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -236,14 +236,14 @@ func TestNoUnusedStateComputedLiteralIsARead(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -257,8 +257,8 @@ func TestNoUnusedStateComputedLiteralIsARead(t *testing.T) {
 //
 // The renaming row is the one that separates the two designs: reading Name would record `z` rather
 // than `a`, so `a` would report as unused. Measured silent upstream.
-func TestNoUnusedStateDestructuringIsARead(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateDestructuringIsARead(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{
@@ -283,10 +283,10 @@ func TestNoUnusedStateDestructuringIsARead(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -301,8 +301,8 @@ func TestNoUnusedStateDestructuringIsARead(t *testing.T) {
 // Every place this rule reads a name off a binding is kind-guarded. These rows drive each of them
 // with a pattern in the position a name is expected. No `ExpectFindings` assertion can see a panic,
 // so the assertion here is simply that the run completes.
-func TestNoUnusedStateDoesNotPanicOnBindingPatterns(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateDoesNotPanicOnBindingPatterns(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{
@@ -327,11 +327,11 @@ func TestNoUnusedStateDoesNotPanicOnBindingPatterns(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// Reaching the end of this subtest is the assertion. A panic in the rule would fail the
 			// test rather than being swallowed, because the harness does not recover.
-			rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+			rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 		})
 	}
 }
@@ -346,8 +346,8 @@ func TestNoUnusedStateDoesNotPanicOnBindingPatterns(t *testing.T) {
 //
 // The lifecycle list is EXACT. A method with the same two-parameter shape and a different name does
 // not alias its second parameter, so a read through it does not count. Measured.
-func TestNoUnusedStateUpdaterAndLifecycleParameters(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateUpdaterAndLifecycleParameters(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -390,14 +390,14 @@ func TestNoUnusedStateUpdaterAndLifecycleParameters(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -410,8 +410,8 @@ func TestNoUnusedStateUpdaterAndLifecycleParameters(t *testing.T) {
 // failing cases, which is how this was found rather than reasoned about.
 //
 // All five measured against the installed build on 2026-08-27.
-func TestNoUnusedStateLiteralKeyKinds(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateLiteralKeyKinds(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -444,14 +444,14 @@ func TestNoUnusedStateLiteralKeyKinds(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -467,8 +467,8 @@ func TestNoUnusedStateLiteralKeyKinds(t *testing.T) {
 // Two of these were found only by a corpus case failing rather than by reading: the assertion on an
 // updater's arrow BODY, and the assertion on the setState RECEIVER inside an already-unwrapped
 // callee. Each row was measured reporting against the installed build.
-func TestNoUnusedStateTypeAssertionsAreUnwrapped(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateTypeAssertionsAreUnwrapped(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{
@@ -497,10 +497,10 @@ func TestNoUnusedStateTypeAssertionsAreUnwrapped(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -511,31 +511,31 @@ func TestNoUnusedStateTypeAssertionsAreUnwrapped(t *testing.T) {
 // assignment, so a reader is shown the declaration to delete. The key name is interpolated, so the
 // text is asserted in full against a literal typed here rather than against the rule's own builder,
 // which would move both sides together under mutation.
-func TestNoUnusedStateSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "class C extends React.Component { constructor(p){ super(p); this.state = { alpha: 1 }; } render(){ return null; } }"
-	result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, source)
+	result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "alpha: 1" {
-		t.Fatalf("finding points at %q, wanted %q", reported, "alpha: 1")
+		test.Fatalf("finding points at %q, wanted %q", reported, "alpha: 1")
 	}
 	want := "Unused state field: 'alpha'. Nothing in this component reads it, so every write to " +
 		"it re-renders for a value no one looks at, and a reader has to search the whole class " +
 		"before they can be sure it is dead."
 	if result.Diagnostics[0].Message.Description != want {
-		t.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
 	}
 	if result.Diagnostics[0].Message.Id != "unusedStateField" {
-		t.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
+		test.Fatalf("id is %q", result.Diagnostics[0].Message.Id)
 	}
 	// Upstream marks this rule not fixable and neither does this port: deleting a state field is
 	// not a spelling change, since the write that set it may have a side effect.
 	if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-		t.Fatal("this rule must propose no repair")
+		test.Fatal("this rule must propose no repair")
 	}
 }
 
@@ -544,17 +544,17 @@ func TestNoUnusedStateSpanAndMessage(t *testing.T) {
 // The accumulator is a slice rather than a map for exactly this reason. A map would make the order
 // depend on Go's randomisation, which produces a test that passes most of the time and is therefore
 // worse than no test.
-func TestNoUnusedStateFindingOrderIsSourceOrder(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateFindingOrderIsSourceOrder(test *testing.T) {
+	test.Parallel()
 
 	source := "class C extends React.Component { state = { zeta: 1, alpha: 2, mid: 3 }; render(){ return null; } }"
-	result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, source)
-	rule_testing.ExpectFindings(t, result, "unusedStateField", "unusedStateField", "unusedStateField")
+	result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, source)
+	rule_testing.ExpectFindings(test, result, "unusedStateField", "unusedStateField", "unusedStateField")
 	want := []string{"zeta", "alpha", "mid"}
 	for index, name := range want {
 		reported := source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 		if !strings.HasPrefix(reported, name) {
-			t.Fatalf("finding %d points at %q, wanted one starting %q", index, reported, name)
+			test.Fatalf("finding %d points at %q, wanted one starting %q", index, reported, name)
 		}
 	}
 }
@@ -565,8 +565,8 @@ func TestNoUnusedStateFindingOrderIsSourceOrder(t *testing.T) {
 // object handed to the `createReactClass` factory. `React.createClass` is silent because the factory
 // name comes from a setting whose default is `createReactClass` and upstream's own harness never
 // sets it, which is the same measurement this package's `no-access-state-in-setstate` records.
-func TestNoUnusedStateWhichComponentsAreJudged(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateWhichComponentsAreJudged(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -619,14 +619,14 @@ func TestNoUnusedStateWhichComponentsAreJudged(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -636,16 +636,16 @@ func TestNoUnusedStateWhichComponentsAreJudged(t *testing.T) {
 // Upstream climbs to the nearest enclosing function and records the fields only when that function
 // is the constructor, so the same assignment written in another method contributes nothing.
 // Measured both ways against the installed build.
-func TestNoUnusedStateStateAssignmentOnlyCountsInTheConstructor(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateStateAssignmentOnlyCountsInTheConstructor(test *testing.T) {
+	test.Parallel()
 
-	inConstructor := rule_testing.Run(t, NoUnusedState, noUnusedStateFile,
+	inConstructor := rule_testing.Run(test, NoUnusedState, noUnusedStateFile,
 		"class C extends React.Component { constructor(p){ super(p); this.state = { a: 1 }; } render(){ return null; } }")
-	rule_testing.ExpectFindings(t, inConstructor, "unusedStateField")
+	rule_testing.ExpectFindings(test, inConstructor, "unusedStateField")
 
-	inAnotherMethod := rule_testing.Run(t, NoUnusedState, noUnusedStateFile,
+	inAnotherMethod := rule_testing.Run(test, NoUnusedState, noUnusedStateFile,
 		"class C extends React.Component { f(){ this.state = { a: 1 }; } render(){ return null; } }")
-	rule_testing.ExpectClean(t, inAnotherMethod)
+	rule_testing.ExpectClean(test, inAnotherMethod)
 }
 
 // TestNoUnusedStateLifecycleParameterGates pins three conditions that survived the sweep.
@@ -660,8 +660,8 @@ func TestNoUnusedStateStateAssignmentOnlyCountsInTheConstructor(t *testing.T) {
 //
 // All three rows report upstream, which means each guard is what keeps the port from being wider
 // than the rule it reproduces.
-func TestNoUnusedStateLifecycleParameterGates(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateLifecycleParameterGates(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -689,14 +689,14 @@ func TestNoUnusedStateLifecycleParameterGates(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -712,8 +712,8 @@ func TestNoUnusedStateLifecycleParameterGates(t *testing.T) {
 //
 // All four measured against the installed build on 2026-08-27. The static requirement, the two
 // parameter minimum, and the name comparison are each load-bearing on this path.
-func TestNoUnusedStateDerivedStateAsAClassProperty(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateDerivedStateAsAClassProperty(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -741,14 +741,14 @@ func TestNoUnusedStateDerivedStateAsAClassProperty(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -766,15 +766,15 @@ func TestNoUnusedStateDerivedStateAsAClassProperty(t *testing.T) {
 //
 // A mutation reading the FIRST statement instead survived the whole imported corpus, because every
 // one of upstream's factory cases has a single-statement body.
-func TestNoUnusedStateGetInitialStateReadsOnlyTheLastStatement(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateGetInitialStateReadsOnlyTheLastStatement(test *testing.T) {
+	test.Parallel()
 
-	earlyReturn := rule_testing.Run(t, NoUnusedState, noUnusedStateFile,
+	earlyReturn := rule_testing.Run(test, NoUnusedState, noUnusedStateFile,
 		"var C = createReactClass({ getInitialState: function(){ if (x) { return { early: 1 }; } return { late: 1 }; }, render: function(){ return null; } });")
-	rule_testing.ExpectFindings(t, earlyReturn, "unusedStateField")
+	rule_testing.ExpectFindings(test, earlyReturn, "unusedStateField")
 	reported := earlyReturn.Diagnostics[0].Message.Description
 	if !strings.Contains(reported, "'late'") {
-		t.Fatalf("the finding names %q, wanted the field from the LAST return", reported)
+		test.Fatalf("the finding names %q, wanted the field from the LAST return", reported)
 	}
 }
 
@@ -787,8 +787,8 @@ func TestNoUnusedStateGetInitialStateReadsOnlyTheLastStatement(t *testing.T) {
 //
 // The static row matters separately: `static state = {}` is a class-level constant rather than
 // component state, and reporting its keys as unused state would be wrong about what the code means.
-func TestNoUnusedStateClassPropertyGates(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateClassPropertyGates(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -811,14 +811,14 @@ func TestNoUnusedStateClassPropertyGates(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }
@@ -830,8 +830,8 @@ func TestNoUnusedStateClassPropertyGates(t *testing.T) {
 // the installed build, and the direction matters: without the check a read of ANOTHER object's
 // `state` would silence this rule, which is a false negative rather than a false positive and
 // therefore invisible in a findings count.
-func TestNoUnusedStateReceiverMustBeThis(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedStateReceiverMustBeThis(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -854,14 +854,14 @@ func TestNoUnusedStateReceiverMustBeThis(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnusedState, noUnusedStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnusedState, noUnusedStateFile, testCase.sourceText)
 			if testCase.findings == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "unusedStateField")
+			rule_testing.ExpectFindings(test, result, "unusedStateField")
 		})
 	}
 }

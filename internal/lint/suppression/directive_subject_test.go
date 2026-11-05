@@ -23,8 +23,8 @@ func init() {
 // The control is the same index asked the same question for an ordinary rule name: every row that
 // says a directive-subject finding escapes also asserts that an ordinary finding at the same offset
 // is suppressed, so a Suppresses that had simply stopped working would fail here rather than pass.
-func TestADirectiveCannotSilenceTheFindingAboutItself(t *testing.T) {
-	t.Parallel()
+func TestADirectiveCannotSilenceTheFindingAboutItself(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -44,23 +44,23 @@ func TestADirectiveCannotSilenceTheFindingAboutItself(t *testing.T) {
 		{"cohere spelling behaves the same", "x; // cohere-disable-line", 0, 3, false},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			index := Build(testCase.source)
 			offset := offsetOfLine(testCase.source, testCase.line) + testCase.column
 			if !strings.HasPrefix(testCase.source[offset:], "/") {
-				t.Fatalf("offset %d does not sit on a comment in %q", offset, testCase.source)
+				test.Fatalf("offset %d does not sit on a comment in %q", offset, testCase.source)
 			}
 
 			got := index.Suppresses(directiveSubjectProbeRule, offset)
 			if got != testCase.wantSilence {
-				t.Fatalf("directive-subject finding at line %d: suppressed=%v, want %v", testCase.line, got, testCase.wantSilence)
+				test.Fatalf("directive-subject finding at line %d: suppressed=%v, want %v", testCase.line, got, testCase.wantSilence)
 			}
 
 			// The control: an ordinary rule at the same offset is covered by whatever covers that line.
 			// Every case here has a blanket directive reaching the line, so it must be silenced.
 			if !Build(testCase.source).Suppresses("probe/ordinary-rule", offset) {
-				t.Fatalf("control: an ordinary rule at the same offset was not suppressed, so this case proves nothing")
+				test.Fatalf("control: an ordinary rule at the same offset was not suppressed, so this case proves nothing")
 			}
 		})
 	}
@@ -68,8 +68,8 @@ func TestADirectiveCannotSilenceTheFindingAboutItself(t *testing.T) {
 
 // TestRecognizeAgreesWithBuild pins directives.Recognize to the index Build produces, in every
 // honored spelling, and refuses the near misses that Build refuses.
-func TestRecognizeAgreesWithBuild(t *testing.T) {
-	t.Parallel()
+func TestRecognizeAgreesWithBuild(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		comment  string
@@ -100,7 +100,7 @@ func TestRecognizeAgreesWithBuild(t *testing.T) {
 	for _, testCase := range cases {
 		word, honored := directives.Recognize(testCase.comment)
 		if word != testCase.wantWord || honored != (testCase.wantWord != "") {
-			t.Errorf("Recognize(%q) = %q, %v; want %q", testCase.comment, word, honored, testCase.wantWord)
+			test.Errorf("Recognize(%q) = %q, %v; want %q", testCase.comment, word, honored, testCase.wantWord)
 		}
 
 		// Agreement with the index: a recognized disable produces a directive, and a refused comment
@@ -108,12 +108,12 @@ func TestRecognizeAgreesWithBuild(t *testing.T) {
 		built := Build(testCase.comment + "\n").Directives()
 		isDisable := testCase.wantWord != "" && testCase.wantWord != directives.ScopeWordEnable
 		if isDisable != (len(built) == 1) {
-			t.Errorf("Build(%q) found %d directives, but Recognize said %q", testCase.comment, len(built), testCase.wantWord)
+			test.Errorf("Build(%q) found %d directives, but Recognize said %q", testCase.comment, len(built), testCase.wantWord)
 		}
 		if testCase.wantWord == directives.ScopeWordEnable {
 			closed := Build("/* eslint-disable */\n" + testCase.comment + "\nx\n").Directives()
 			if len(closed) != 1 || closed[0].EndLine != 1 {
-				t.Errorf("%q was recognized as an enable but did not close a block", testCase.comment)
+				test.Errorf("%q was recognized as an enable but did not close a block", testCase.comment)
 			}
 		}
 	}

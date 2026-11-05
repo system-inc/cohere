@@ -76,9 +76,9 @@ type optionReadFindings struct {
 
 // findUnreadOptionFields loads the packages matching patterns and reports each option field no
 // non-test file reads.
-func findUnreadOptionFields(t *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionReadFindings {
-	t.Helper()
-	loaded := loadRules(t, moduleRoot, patterns...)
+func findUnreadOptionFields(test *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionReadFindings {
+	test.Helper()
+	loaded := loadRules(test, moduleRoot, patterns...)
 
 	// Every field an option decode reaches, by its declaring object.
 	fields := map[*types.Var]optionField{}
@@ -264,13 +264,13 @@ func selectedField(info *types.Info, expression ast.Expr) *types.Var {
 }
 
 // TestEveryOptionFieldARuleDecodesIsRead is the guard over the rules tree.
-func TestEveryOptionFieldARuleDecodesIsRead(t *testing.T) {
-	t.Parallel()
+func TestEveryOptionFieldARuleDecodesIsRead(test *testing.T) {
+	test.Parallel()
 	rulesRoot, err := filepath.Abs("../rules")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	findings := findUnreadOptionFields(t, "../../..", rulesRoot, "./internal/lint/rules/...")
+	findings := findUnreadOptionFields(test, "../../..", rulesRoot, "./internal/lint/rules/...")
 
 	unread := map[string]bool{}
 	for _, field := range findings.unread {
@@ -278,32 +278,32 @@ func TestEveryOptionFieldARuleDecodesIsRead(t *testing.T) {
 		if _, decided := unreadOptionFields[field.key]; decided {
 			continue
 		}
-		t.Errorf("%s %s is decoded from a config and nothing reads it, so setting it changes nothing. Port "+
+		test.Errorf("%s %s is decoded from a config and nothing reads it, so setting it changes nothing. Port "+
 			"what upstream does with it, or, if every value it can take already behaves as upstream does, "+
 			"name it in unreadOptionFields with that decision", field.position, field.key)
 	}
 	for key := range unreadOptionFields {
 		if !unread[key] {
-			t.Errorf("unreadOptionFields names %s, which is read now or no longer decoded; remove the entry", key)
+			test.Errorf("unreadOptionFields names %s, which is read now or no longer decoded; remove the entry", key)
 		}
 	}
 
 	// The floor is the control against a walk that loaded nothing or a matcher that stopped matching.
-	t.Logf("%d option fields reachable from a decode, %d unread", len(findings.fields), len(findings.unread))
+	test.Logf("%d option fields reachable from a decode, %d unread", len(findings.fields), len(findings.unread))
 	if len(findings.fields) < 400 {
-		t.Fatalf("found only %d option fields, so this walk examined too little to mean anything", len(findings.fields))
+		test.Fatalf("found only %d option fields, so this walk examined too little to mean anything", len(findings.fields))
 	}
 }
 
 // TestTheOptionReadGuardSeesAnUnreadField runs the same walk over a planted package, so a clean result
 // above is a measurement rather than a matcher that never matches.
-func TestTheOptionReadGuardSeesAnUnreadField(t *testing.T) {
-	t.Parallel()
+func TestTheOptionReadGuardSeesAnUnreadField(test *testing.T) {
+	test.Parallel()
 	plantedRoot, err := filepath.Abs("testdata/optionreads")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	findings := findUnreadOptionFields(t, "../../..", plantedRoot, "./internal/lint/registry/testdata/optionreads")
+	findings := findUnreadOptionFields(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optionreads")
 
 	unread := map[string]bool{}
 	for _, field := range findings.unread {
@@ -319,12 +319,12 @@ func TestTheOptionReadGuardSeesAnUnreadField(t *testing.T) {
 	}
 	for key := range want {
 		if !unread[key] {
-			t.Errorf("the planted unread field %s was not found; unread: %v", key, findings.unread)
+			test.Errorf("the planted unread field %s was not found; unread: %v", key, findings.unread)
 		}
 	}
 	for key := range unread {
 		if !want[key] {
-			t.Errorf("%s was reported unread, and the planted package reads it", key)
+			test.Errorf("%s was reported unread, and the planted package reads it", key)
 		}
 	}
 	// Control: the read ones are in the walk at all, so their silence above is a read and not an absence.
@@ -334,7 +334,7 @@ func TestTheOptionReadGuardSeesAnUnreadField(t *testing.T) {
 	}
 	for _, key := range []string{"plantedOptions.Read", "plantedOptions.DefaultedThenRead", "plantedNested.DeepRead", "plantedEmbedded.PromotedRead", "plantedListEntry.EntryRead", "plantedSelfDecoding.Mode"} {
 		if !seen[key] {
-			t.Errorf("the planted read field %s was not collected, so its silence proves nothing", key)
+			test.Errorf("the planted read field %s was not collected, so its silence proves nothing", key)
 		}
 	}
 }

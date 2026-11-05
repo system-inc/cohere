@@ -214,13 +214,13 @@ var mediaQueryFixtures = []mediaQueryFixture{
 // A corpus params string the library throws on is counted, and the test fails if that count passes a
 // tenth of the corpus params, or if the corpus yields none: an oracle that rejects everything, or a
 // corpus that reaches nothing, would otherwise read as agreement.
-func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
-	t.Parallel()
+func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
+	test.Parallel()
 	corpora := os.Getenv("COHERE_CSS_CORPORA")
 	if corpora == "" {
-		t.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-media-query-parser")
+		test.Skip("set COHERE_CSS_CORPORA to compare the parser against postcss-media-query-parser")
 	}
-	root := corpus.PrettierFork.Root(t)
+	root := corpus.PrettierFork.Root(test)
 
 	type input struct {
 		Name   string `json:"name"`
@@ -260,11 +260,11 @@ func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("walking %s: %v", corpus, err)
+			test.Fatalf("walking %s: %v", corpus, err)
 		}
 	}
 	if corpusFiles == 0 {
-		t.Fatalf("no .css files under %s", corpora)
+		test.Fatalf("no .css files under %s", corpora)
 	}
 	throws := map[string]bool{}
 	for _, fixture := range mediaQueryFixtures {
@@ -277,7 +277,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
 	for _, each := range inputs {
 		encoded, err := json.Marshal(each)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -288,7 +288,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 
 	var records []map[string]any
@@ -298,7 +298,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
 		}
 		var each map[string]any
 		if err := json.Unmarshal([]byte(line), &each); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		records = append(records, each)
 	}
@@ -307,7 +307,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	for _, want := range records {
@@ -347,16 +347,16 @@ func TestParseAgreesWithPostcssMediaQueryParser(t *testing.T) {
 			identical++
 		}
 	}
-	t.Logf("%d compared (%d params from %d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus params refused",
+	test.Logf("%d compared (%d params from %d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus params refused",
 		len(records), corpusParams, corpusFiles, fixturesSeen, identical, refusedByBoth, different, corpusRefused)
 	if fixturesSeen != len(mediaQueryFixtures) {
-		t.Errorf("the oracle answered %d of %d fixtures", fixturesSeen, len(mediaQueryFixtures))
+		test.Errorf("the oracle answered %d of %d fixtures", fixturesSeen, len(mediaQueryFixtures))
 	}
 	if corpusParams == 0 {
-		t.Errorf("the corpus reached parseMediaQuery with no params; the comparison rests on fixtures alone")
+		test.Errorf("the corpus reached parseMediaQuery with no params; the comparison rests on fixtures alone")
 	}
 	if corpusRefused > corpusParams/10 {
-		t.Errorf("the library refused %d of %d corpus params; the comparison is thinner than it looks", corpusRefused, corpusParams)
+		test.Errorf("the library refused %d of %d corpus params; the comparison is thinner than it looks", corpusRefused, corpusParams)
 	}
 }
 

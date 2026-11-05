@@ -56,17 +56,17 @@ type derivedEffectCase struct {
 // `reactStub` and `otherModuleStub` are `set_state_in_effect_test.go`'s, shared rather than copied:
 // the two rules ask the checker the same two questions through the same two helpers, so a stub that
 // drifted between them would make one rule's fixtures stop testing the other's predicate.
-func runNoDerivingStateInEffects(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, NoDerivingStateInEffects, map[string]string{
+func runNoDerivingStateInEffects(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, NoDerivingStateInEffects, map[string]string{
 		"react.d.ts": reactStub,
 		"other.d.ts": otherModuleStub,
 		"a.tsx":      source,
 	}, "a.tsx")
 }
 
-func TestNoDerivingStateInEffectsFires(t *testing.T) {
-	t.Parallel()
+func TestNoDerivingStateInEffectsFires(test *testing.T) {
+	test.Parallel()
 
 	// Written as a literal rather than referenced through the rule's own message constant, so the
 	// assertion cannot move together with the code it guards.
@@ -100,20 +100,20 @@ func TestNoDerivingStateInEffectsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDerivingStateInEffects(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDerivingStateInEffects(test, testCase.source)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = noDerivingStateInEffects
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
 
-func TestNoDerivingStateInEffectsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDerivingStateInEffectsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []derivedEffectCase{
 		{
@@ -222,9 +222,9 @@ func TestNoDerivingStateInEffectsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoDerivingStateInEffects(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoDerivingStateInEffects(test, testCase.source))
 		})
 	}
 }
@@ -246,8 +246,8 @@ func TestNoDerivingStateInEffectsStaysSilent(t *testing.T) {
 // keyed by identifier, which reads as though a literal written at the call site cannot be a
 // candidate. Lowering assigns both to temporaries first, so by the time the pass runs they are
 // identifiers. The judgment is not syntactic and this pins it.
-func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
-	t.Parallel()
+func TestNoDerivingStateInEffectsMeasuredCases(test *testing.T) {
+	test.Parallel()
 
 	const noDerivingStateInEffects = "noDerivingStateInEffects"
 
@@ -324,14 +324,14 @@ func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDerivingStateInEffects(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDerivingStateInEffects(test, testCase.source)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = noDerivingStateInEffects
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
@@ -348,8 +348,8 @@ func TestNoDerivingStateInEffectsMeasuredCases(t *testing.T) {
 // `rule_testing.RunTypedFiles` writes `strings.TrimSpace(contents)+"\n"`, so a fixture carrying a
 // leading newline sits one byte off from its literal and an assertion built from the literal reports
 // a span shifted by one while the rule is correct.
-func TestNoDerivingStateInEffectsPointsAtTheSetterCall(t *testing.T) {
-	t.Parallel()
+func TestNoDerivingStateInEffectsPointsAtTheSetterCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -379,20 +379,20 @@ func TestNoDerivingStateInEffectsPointsAtTheSetterCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoDerivingStateInEffects(t, testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoDerivingStateInEffects(test, testCase.source)
 			if len(result.Diagnostics) != len(testCase.wantText) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.wantText), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.wantText), len(result.Diagnostics))
 			}
 			written := strings.TrimSpace(testCase.source) + "\n"
 			for index, want := range testCase.wantText {
 				span := result.Diagnostics[index].Range
 				if span.Pos() < 0 || span.End() > len(written) || span.Pos() >= span.End() {
-					t.Fatalf("finding %d range %d..%d is outside the %d byte file", index, span.Pos(), span.End(), len(written))
+					test.Fatalf("finding %d range %d..%d is outside the %d byte file", index, span.Pos(), span.End(), len(written))
 				}
 				if got := written[span.Pos():span.End()]; got != want {
-					t.Errorf("finding %d points at %q, want %q", index, got, want)
+					test.Errorf("finding %d points at %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -405,15 +405,15 @@ func TestNoDerivingStateInEffectsPointsAtTheSetterCall(t *testing.T) {
 // directly. Asserted against literals typed here rather than against the rule's own constant:
 // comparing a diagnostic to the constant it was reported with is equality that moves on both sides
 // under mutation, which is how a message-text mutant survives a test that looks correct.
-func TestNoDerivingStateInEffectsMessage(t *testing.T) {
-	t.Parallel()
+func TestNoDerivingStateInEffectsMessage(test *testing.T) {
+	test.Parallel()
 
-	result := runNoDerivingStateInEffects(t, "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n")
+	result := runNoDerivingStateInEffects(test, "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
 	if got := result.Diagnostics[0].Message.Id; got != "noDerivingStateInEffects" {
-		t.Errorf("message id is %q, want %q", got, "noDerivingStateInEffects")
+		test.Errorf("message id is %q, want %q", got, "noDerivingStateInEffects")
 	}
 	const wantDescription = "This effect exists only to copy a value into state that was already computable " +
 		"from the values it depends on. React renders once with the stale state, runs the effect, " +
@@ -422,7 +422,7 @@ func TestNoDerivingStateInEffectsMessage(t *testing.T) {
 		"plain constant beside the values it derives from. If the derivation is expensive, wrap " +
 		"that constant in `useMemo` rather than storing it in state."
 	if got := result.Diagnostics[0].Message.Description; got != wantDescription {
-		t.Errorf("message description is:\n%q\nwant:\n%q", got, wantDescription)
+		test.Errorf("message description is:\n%q\nwant:\n%q", got, wantDescription)
 	}
 }
 
@@ -433,29 +433,29 @@ func TestNoDerivingStateInEffectsMessage(t *testing.T) {
 // returns nil rather than crashing, so a rule that lost its guard would go SILENT rather than
 // panic. Silence is the more dangerous failure because every StaysSilent case in this file would
 // still pass.
-func TestNoDerivingStateInEffectsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoDerivingStateInEffectsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n"
 
-	typed := runNoDerivingStateInEffects(t, source)
+	typed := runNoDerivingStateInEffects(test, source)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("typed harness: expected 1 finding, got %d", len(typed.Diagnostics))
+		test.Fatalf("typed harness: expected 1 finding, got %d", len(typed.Diagnostics))
 	}
 
 	// The untyped harness hands the rule a nil checker. The guard makes that silence rather than a
 	// panic, and this asserts the silence so the guard's own mutant has something to fail.
-	untyped := rule_testing.Run(t, NoDerivingStateInEffects, "a.tsx", source)
-	rule_testing.ExpectClean(t, untyped)
+	untyped := rule_testing.Run(test, NoDerivingStateInEffects, "a.tsx", source)
+	rule_testing.ExpectClean(test, untyped)
 }
 
 // TestNoDerivingStateInEffectsJudgesOnlyWhatReactCompiles pins the component-or-hook gate
 // (#1pmwkmv), with the same two rows as set-state-in-effect's: a plain function is not compiled, so
 // it is silent, and a component nested inside one still is.
-func TestNoDerivingStateInEffectsJudgesOnlyWhatReactCompiles(t *testing.T) {
-	t.Parallel()
+func TestNoDerivingStateInEffectsJudgesOnlyWhatReactCompiles(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, runNoDerivingStateInEffects(t, "import {useEffect, useState} from \"./react\";\n\nexport function deriveName(initialName: string) {\n  const [name, setName] = useState('');\n  useEffect(() => {\n    setName(initialName);\n  }, [initialName]);\n  return name;\n}\n"))
+	rule_testing.ExpectClean(test, runNoDerivingStateInEffects(test, "import {useEffect, useState} from \"./react\";\n\nexport function deriveName(initialName: string) {\n  const [name, setName] = useState('');\n  useEffect(() => {\n    setName(initialName);\n  }, [initialName]);\n  return name;\n}\n"))
 
-	rule_testing.ExpectFindings(t, runNoDerivingStateInEffects(t, "import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component({initialName}: {initialName: string}) {\n    const [name, setName] = useState('');\n    useEffect(() => {\n      setName(initialName);\n    }, [initialName]);\n    return <div>{name}</div>;\n  }\n  return Component;\n}\n"), "noDerivingStateInEffects")
+	rule_testing.ExpectFindings(test, runNoDerivingStateInEffects(test, "import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component({initialName}: {initialName: string}) {\n    const [name, setName] = useState('');\n    useEffect(() => {\n      setName(initialName);\n    }, [initialName]);\n    return <div>{name}</div>;\n  }\n  return Component;\n}\n"), "noDerivingStateInEffects")
 }

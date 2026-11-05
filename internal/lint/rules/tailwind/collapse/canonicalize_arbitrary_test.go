@@ -10,13 +10,13 @@ import (
 // whose real signature declares a property outside its group's universe is a class the pass never weighs,
 // and the bail it should have caused goes missing. Every listed class on three themes, against the
 // properties of upstream's own signature.
-func TestListedUniversesHoldUpstreamsProperties(t *testing.T) {
-	t.Parallel()
+func TestListedUniversesHoldUpstreamsProperties(test *testing.T) {
+	test.Parallel()
 	for _, oracle := range signatureOracles {
-		t.Run(oracle.name, func(t *testing.T) {
-			t.Parallel()
-			entryPoint, entries := readSignatureOracle(t, oracle.file)
-			index := buildClassListIndex(oracleSystem(t, entryPoint))
+		test.Run(oracle.name, func(test *testing.T) {
+			test.Parallel()
+			entryPoint, entries := readSignatureOracle(test, oracle.file)
+			index := buildClassListIndex(oracleSystem(test, entryPoint))
 
 			groupOf := map[string]*classListGroup{}
 			for _, group := range index.groups {
@@ -52,9 +52,9 @@ func TestListedUniversesHoldUpstreamsProperties(t *testing.T) {
 				if len(shown) > 40 {
 					shown = shown[:40]
 				}
-				t.Errorf("%d listed classes fall outside the index, starting with:\n  %s", len(outside), strings.Join(shown, "\n  "))
+				test.Errorf("%d listed classes fall outside the index, starting with:\n  %s", len(outside), strings.Join(shown, "\n  "))
 			}
-			t.Logf("%d listed classes checked in %d groups", checked, len(index.groups))
+			test.Logf("%d listed classes checked in %d groups", checked, len(index.groups))
 		})
 	}
 }

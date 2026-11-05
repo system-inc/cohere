@@ -50,8 +50,8 @@ func preferArrowCallbackOf(optionJson string) any {
 // absence of fixes, not as an unchanged string.
 //
 //	72 reporting cases (14 of them declines), 39 clean cases.
-func TestPreferArrowCallbackFires(t *testing.T) {
-	t.Parallel()
+func TestPreferArrowCallbackFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -137,9 +137,9 @@ func TestPreferArrowCallbackFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, PreferArrowCallback, preferArrowCallbackFile, testCase.source, testCase.settings)
+		result := rule_testing.RunTypedWithOptions(test, PreferArrowCallback, preferArrowCallbackFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 			continue
@@ -148,7 +148,7 @@ func TestPreferArrowCallbackFires(t *testing.T) {
 		for range testCase.findings {
 			expected = append(expected, messagePreferArrowCallbackPreferArrowCallback.Id)
 		}
-		rule_testing.ExpectFindings(t, result, expected...)
+		rule_testing.ExpectFindings(test, result, expected...)
 
 		proposed := 0
 		for _, diagnostic := range result.Diagnostics {
@@ -157,7 +157,7 @@ func TestPreferArrowCallbackFires(t *testing.T) {
 		switch {
 		case testCase.declinesRepair:
 			if proposed != 0 {
-				t.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
+				test.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
 					testCase.source, proposed)
 			}
 		case testCase.fixed != nil:
@@ -165,14 +165,14 @@ func TestPreferArrowCallbackFires(t *testing.T) {
 			// carries a trailing newline the corpus string does not. The expectation is normalised
 			// the same way rather than baking a "\n" into 72 literals, which would make them stop
 			// matching the corpus and defeat the byte verification.
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(*testCase.fixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(*testCase.fixed)+"\n")
 		}
 	}
 }
 
 // TestPreferArrowCallbackStaysSilent carries upstream's clean cases.
-func TestPreferArrowCallbackStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestPreferArrowCallbackStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -220,8 +220,8 @@ func TestPreferArrowCallbackStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, PreferArrowCallback, preferArrowCallbackFile, testCase.source, testCase.settings)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunTypedWithOptions(test, PreferArrowCallback, preferArrowCallbackFile, testCase.source, testCase.settings)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -251,8 +251,8 @@ func TestPreferArrowCallbackStaysSilent(t *testing.T) {
 //	foo(function() { arguments; });                       clean,   the implicit binding is used
 //	foo(function() { function inner() { arguments; } });  REPORTS, it belongs to `inner`
 //	foo(function(arguments) { arguments; });              REPORTS, the parameter shadows it
-func TestPreferArrowCallbackSelfReferenceIsResolvedNotMatched(t *testing.T) {
-	t.Parallel()
+func TestPreferArrowCallbackSelfReferenceIsResolvedNotMatched(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -269,10 +269,10 @@ func TestPreferArrowCallbackSelfReferenceIsResolvedNotMatched(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, PreferArrowCallback, preferArrowCallbackFile,
+		result := rule_testing.RunTypedWithOptions(test, PreferArrowCallback, preferArrowCallbackFile,
 			testCase.source, nil)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q: expected %d findings, got %d %v",
+			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, testCase.findings, len(result.Diagnostics), result.MessageIds())
 		}
 	}
@@ -305,8 +305,8 @@ func TestPreferArrowCallbackSelfReferenceIsResolvedNotMatched(t *testing.T) {
 // The third row is the one that pins the arm's actual judgment rather than just its safety: a
 // function in callee position is not a callback, and getting that backwards would report every
 // immediately-constructed function in the tree.
-func TestPreferArrowCallbackHandlesNewExpressions(t *testing.T) {
-	t.Parallel()
+func TestPreferArrowCallbackHandlesNewExpressions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -324,15 +324,15 @@ func TestPreferArrowCallbackHandlesNewExpressions(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, PreferArrowCallback, preferArrowCallbackFile,
+		result := rule_testing.RunTypedWithOptions(test, PreferArrowCallback, preferArrowCallbackFile,
 			testCase.source, nil)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q: expected %d findings, got %d %v",
+			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, testCase.findings, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
 		if testCase.fixed != nil {
-			rule_testing.ExpectFixedSource(t, result, strings.TrimSpace(*testCase.fixed)+"\n")
+			rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(*testCase.fixed)+"\n")
 		}
 	}
 }

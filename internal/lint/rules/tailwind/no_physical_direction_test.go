@@ -8,8 +8,8 @@ import (
 
 const physicalDirectionFile = "/repository/source/components/Thing.tsx"
 
-func TestNoPhysicalDirectionFires(t *testing.T) {
-	t.Parallel()
+func TestNoPhysicalDirectionFires(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -60,20 +60,20 @@ func TestNoPhysicalDirectionFires(t *testing.T) {
 		{"the scroll area string", "export const c = 'before:absolute before:top-1/2 before:left-1/2 before:size-full';\n", 1},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoPhysicalDirection, physicalDirectionFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoPhysicalDirection, physicalDirectionFile, testCase.sourceText)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "useLogicalClass"
 			}
-			rule_testing.ExpectFindings(t, result, expected...)
+			rule_testing.ExpectFindings(test, result, expected...)
 		})
 	}
 }
 
-func TestNoPhysicalDirectionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoPhysicalDirectionStaysSilent(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		fileName   string
@@ -119,10 +119,10 @@ func TestNoPhysicalDirectionStaysSilent(t *testing.T) {
 		{"a javascript file", "/repository/source/Thing.js", "export const c = 'flex ml-4';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoPhysicalDirection, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoPhysicalDirection, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

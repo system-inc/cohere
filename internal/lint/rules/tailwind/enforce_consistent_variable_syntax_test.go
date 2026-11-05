@@ -13,14 +13,14 @@ import (
 //
 // `rule_testing.Run` rather than the class-order program harness, because the question is entirely about
 // how a class is spelled and this rule declares no ProgramReads.
-func runVariableSyntaxFixture(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.Run(t, EnforceConsistentVariableSyntax, "Component.tsx", source)
+func runVariableSyntaxFixture(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.Run(test, EnforceConsistentVariableSyntax, "Component.tsx", source)
 }
 
 // TestEnforceConsistentVariableSyntaxReports covers what upstream reports.
-func TestEnforceConsistentVariableSyntaxReports(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentVariableSyntaxReports(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name       string
 		source     string
@@ -71,15 +71,15 @@ func TestEnforceConsistentVariableSyntaxReports(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runVariableSyntaxFixture(t, testCase.source)
-			rule_testing.ExpectFindings(t, result, "variableSyntax")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runVariableSyntaxFixture(test, testCase.source)
+			rule_testing.ExpectFindings(test, result, "variableSyntax")
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("expected a finding")
+				test.Fatal("expected a finding")
 			}
 			if !strings.Contains(result.Diagnostics[0].Message.Description, testCase.correction) {
-				t.Errorf("the message does not name the correction %q: %s",
+				test.Errorf("the message does not name the correction %q: %s",
 					testCase.correction, result.Diagnostics[0].Message.Description)
 			}
 		})
@@ -87,8 +87,8 @@ func TestEnforceConsistentVariableSyntaxReports(t *testing.T) {
 }
 
 // TestEnforceConsistentVariableSyntaxStaysSilent covers what upstream leaves alone.
-func TestEnforceConsistentVariableSyntaxStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentVariableSyntaxStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -126,27 +126,27 @@ func TestEnforceConsistentVariableSyntaxStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runVariableSyntaxFixture(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runVariableSyntaxFixture(test, testCase.source))
 		})
 	}
 }
 
 // TestEnforceConsistentVariableSyntaxVariableForm pins the configured direction.
-func TestEnforceConsistentVariableSyntaxVariableForm(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentVariableSyntaxVariableForm(test *testing.T) {
+	test.Parallel()
 	variableForm := EnforceConsistentVariableSyntaxOptions{Syntax: variableSyntaxVariable}
 
-	reported := rule_testing.RunWithOptions(t, EnforceConsistentVariableSyntax, "Component.tsx",
+	reported := rule_testing.RunWithOptions(test, EnforceConsistentVariableSyntax, "Component.tsx",
 		`const element = <div className="text-(--my-var)" />;`, variableForm)
-	rule_testing.ExpectFindings(t, reported, "variableSyntax")
+	rule_testing.ExpectFindings(test, reported, "variableSyntax")
 	if len(reported.Diagnostics) > 0 &&
 		!strings.Contains(reported.Diagnostics[0].Message.Description, "text-[var(--my-var)]") {
-		t.Errorf("expected the bracketed call form: %s", reported.Diagnostics[0].Message.Description)
+		test.Errorf("expected the bracketed call form: %s", reported.Diagnostics[0].Message.Description)
 	}
 
-	silent := rule_testing.RunWithOptions(t, EnforceConsistentVariableSyntax, "Component.tsx",
+	silent := rule_testing.RunWithOptions(test, EnforceConsistentVariableSyntax, "Component.tsx",
 		`const element = <div className="text-[var(--my-var)]" />;`, variableForm)
-	rule_testing.ExpectClean(t, silent)
+	rule_testing.ExpectClean(test, silent)
 }

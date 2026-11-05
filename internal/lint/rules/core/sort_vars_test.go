@@ -56,8 +56,8 @@ func pointerTo(value string) *string { return &value }
 // absence of fixes, not as an unchanged string.
 //
 //	25 reporting cases (9 of them declines), 36 clean cases.
-func TestSortVarsFires(t *testing.T) {
-	t.Parallel()
+func TestSortVarsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -96,9 +96,9 @@ func TestSortVarsFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, SortVars, sortVarsFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 			continue
@@ -107,7 +107,7 @@ func TestSortVarsFires(t *testing.T) {
 		for range testCase.findings {
 			expected = append(expected, messageSortVarsSortVars.Id)
 		}
-		rule_testing.ExpectFindings(t, result, expected...)
+		rule_testing.ExpectFindings(test, result, expected...)
 
 		proposed := 0
 		for _, diagnostic := range result.Diagnostics {
@@ -116,18 +116,18 @@ func TestSortVarsFires(t *testing.T) {
 		switch {
 		case testCase.declinesRepair:
 			if proposed != 0 {
-				t.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
+				test.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
 					testCase.source, proposed)
 			}
 		case testCase.fixed != nil:
-			rule_testing.ExpectFixedSource(t, result, *testCase.fixed)
+			rule_testing.ExpectFixedSource(test, result, *testCase.fixed)
 		}
 	}
 }
 
 // TestSortVarsStaysSilent carries upstream's clean cases.
-func TestSortVarsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestSortVarsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -172,8 +172,8 @@ func TestSortVarsStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, SortVars, sortVarsFile, testCase.source, testCase.settings)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -198,8 +198,8 @@ func TestSortVarsStaysSilent(t *testing.T) {
 //
 // The last row is the one the mutation needed. The four above it are the control: without them a
 // rule that declined everything would pass the template row and prove nothing.
-func TestSortVarsLiteralSetDecidesFixability(t *testing.T) {
-	t.Parallel()
+func TestSortVarsLiteralSetDecidesFixability(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -218,9 +218,9 @@ func TestSortVarsLiteralSetDecidesFixability(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, SortVars, sortVarsFile, testCase.source, nil)
+		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, nil)
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%q: expected exactly 1 finding, got %d %v",
+			test.Errorf("%q: expected exactly 1 finding, got %d %v",
 				testCase.source, len(result.Diagnostics), result.MessageIds())
 			continue
 		}
@@ -230,12 +230,12 @@ func TestSortVarsLiteralSetDecidesFixability(t *testing.T) {
 		}
 		if testCase.fixed == nil {
 			if proposed != 0 {
-				t.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
+				test.Errorf("%q: upstream declines to repair this, so the rule must propose no fix, got %d",
 					testCase.source, proposed)
 			}
 			continue
 		}
-		rule_testing.ExpectFixedSource(t, result, *testCase.fixed)
+		rule_testing.ExpectFixedSource(test, result, *testCase.fixed)
 	}
 }
 
@@ -255,8 +255,8 @@ func TestSortVarsLiteralSetDecidesFixability(t *testing.T) {
 // `" a"` and its token span is `"a"`.
 //
 // Every expectation is what the installed rule produced.
-func TestSortVarsRepairKeepsTheTextBetweenDeclarators(t *testing.T) {
-	t.Parallel()
+func TestSortVarsRepairKeepsTheTextBetweenDeclarators(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -280,11 +280,11 @@ func TestSortVarsRepairKeepsTheTextBetweenDeclarators(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, SortVars, sortVarsFile, testCase.source, nil)
+		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, nil)
 		if len(result.Diagnostics) == 0 {
-			t.Errorf("%q: expected a finding, got none", testCase.source)
+			test.Errorf("%q: expected a finding, got none", testCase.source)
 			continue
 		}
-		rule_testing.ExpectFixedSource(t, result, testCase.fixed)
+		rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 	}
 }

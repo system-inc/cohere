@@ -31,8 +31,8 @@ import (
 //
 // Scored by mutation: setting `hooks` back to `react/rules-of-hooks` SURVIVED the entire suite
 // before this test existed, and so did corrupting an unwired rule's value. Both are caught now.
-func TestShippedRuleNamesAreRegistered(t *testing.T) {
-	t.Parallel()
+func TestShippedRuleNamesAreRegistered(test *testing.T) {
+	test.Parallel()
 	registered := map[string]bool{}
 	var names []string
 	for _, registeredRule := range All() {
@@ -42,7 +42,7 @@ func TestShippedRuleNamesAreRegistered(t *testing.T) {
 	sort.Strings(names)
 
 	if len(registered) == 0 {
-		t.Fatal("the registry is empty, so this test would pass vacuously")
+		test.Fatal("the registry is empty, so this test would pass vacuously")
 	}
 
 	for upstream, cohereName := range react_conformance.ShippedRules {
@@ -56,6 +56,6 @@ func TestShippedRuleNamesAreRegistered(t *testing.T) {
 		if bare := strings.TrimPrefix(cohereName, "react/"); bare != cohereName && registered[bare] {
 			hint = "; the rule registers BARE as " + bare + ", with no `react/` namespace"
 		}
-		t.Errorf("ShippedRules[%q] = %q, which no rule registers%s", upstream, cohereName, hint)
+		test.Errorf("ShippedRules[%q] = %q, which no rule registers%s", upstream, cohereName, hint)
 	}
 }

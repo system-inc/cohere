@@ -9,12 +9,12 @@ import (
 )
 
 // gitIn runs git in a test repository and returns its trimmed output.
-func gitIn(t *testing.T, directory string, arguments ...string) string {
-	t.Helper()
+func gitIn(test *testing.T, directory string, arguments ...string) string {
+	test.Helper()
 
 	output, err := gitRun(directory, arguments...)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return output
 }
@@ -31,68 +31,68 @@ func gitRun(directory string, arguments ...string) (string, error) {
 
 // repositoryWithSideCommit returns a repository checked out at its first commit, the hash of that
 // commit, and the hash of a second commit on a branch the checkout does not contain.
-func repositoryWithSideCommit(t *testing.T) (directory string, checkedOut string, notContained string) {
-	t.Helper()
+func repositoryWithSideCommit(test *testing.T) (directory string, checkedOut string, notContained string) {
+	test.Helper()
 
-	directory = t.TempDir()
-	gitIn(t, directory, "init", "--quiet")
+	directory = test.TempDir()
+	gitIn(test, directory, "init", "--quiet")
 
-	writeFile(t, filepath.Join(directory, "first.txt"), "first\n")
-	gitIn(t, directory, "add", "first.txt")
-	gitIn(t, directory, "commit", "--quiet", "-m", "first")
-	checkedOut = gitIn(t, directory, "rev-parse", "HEAD")
+	writeFile(test, filepath.Join(directory, "first.txt"), "first\n")
+	gitIn(test, directory, "add", "first.txt")
+	gitIn(test, directory, "commit", "--quiet", "-m", "first")
+	checkedOut = gitIn(test, directory, "rev-parse", "HEAD")
 
-	gitIn(t, directory, "checkout", "--quiet", "-b", "side")
-	writeFile(t, filepath.Join(directory, "second.txt"), "second\n")
-	gitIn(t, directory, "add", "second.txt")
-	gitIn(t, directory, "commit", "--quiet", "-m", "second")
-	notContained = gitIn(t, directory, "rev-parse", "HEAD")
+	gitIn(test, directory, "checkout", "--quiet", "-b", "side")
+	writeFile(test, filepath.Join(directory, "second.txt"), "second\n")
+	gitIn(test, directory, "add", "second.txt")
+	gitIn(test, directory, "commit", "--quiet", "-m", "second")
+	notContained = gitIn(test, directory, "rev-parse", "HEAD")
 
-	gitIn(t, directory, "checkout", "--quiet", checkedOut)
+	gitIn(test, directory, "checkout", "--quiet", checkedOut)
 	return directory, checkedOut, notContained
 }
 
 // TestReleaseProceedsFromACommitContainingTheMinimum is the positive half. Without it, a check that
 // refused everything would pass the controls below.
-func TestReleaseProceedsFromACommitContainingTheMinimum(t *testing.T) {
-	t.Parallel()
+func TestReleaseProceedsFromACommitContainingTheMinimum(test *testing.T) {
+	test.Parallel()
 
-	directory, checkedOut, _ := repositoryWithSideCommit(t)
+	directory, checkedOut, _ := repositoryWithSideCommit(test)
 
 	if err := requireAncestor(directory, checkedOut, "the reason"); err != nil {
-		t.Fatalf("a checkout containing the minimum was refused: %v", err)
+		test.Fatalf("a checkout containing the minimum was refused: %v", err)
 	}
 }
 
 // TestReleaseRefusesACommitMissingTheMinimum is the known-dirty control: the minimum exists in the
 // repository but not in the history being released, and the refusal says why.
-func TestReleaseRefusesACommitMissingTheMinimum(t *testing.T) {
-	t.Parallel()
+func TestReleaseRefusesACommitMissingTheMinimum(test *testing.T) {
+	test.Parallel()
 
-	directory, _, notContained := repositoryWithSideCommit(t)
+	directory, _, notContained := repositoryWithSideCommit(test)
 
 	err := requireAncestor(directory, notContained, "the reason it matters")
 	if err == nil {
-		t.Fatal("a checkout missing the minimum was allowed to release")
+		test.Fatal("a checkout missing the minimum was allowed to release")
 	}
 	if !strings.Contains(err.Error(), "the reason it matters") {
-		t.Fatalf("the refusal does not carry the reason: %v", err)
+		test.Fatalf("the refusal does not carry the reason: %v", err)
 	}
 }
 
 // TestReleaseRefusesWhenGitCannotTell holds the third exit code. A minimum git has never seen,
 // which is what a shallow clone looks like, must not read as a pass.
-func TestReleaseRefusesWhenGitCannotTell(t *testing.T) {
-	t.Parallel()
+func TestReleaseRefusesWhenGitCannotTell(test *testing.T) {
+	test.Parallel()
 
-	directory, _, _ := repositoryWithSideCommit(t)
+	directory, _, _ := repositoryWithSideCommit(test)
 
 	err := requireAncestor(directory, strings.Repeat("0", 40), "the reason")
 	if err == nil {
-		t.Fatal("a minimum git could not find was treated as present")
+		test.Fatal("a minimum git could not find was treated as present")
 	}
 	if !strings.Contains(err.Error(), "could not tell") {
-		t.Fatalf("an undecidable check was reported as a plain refusal: %v", err)
+		test.Fatalf("an undecidable check was reported as a plain refusal: %v", err)
 	}
 }
 
@@ -100,21 +100,21 @@ func TestReleaseRefusesWhenGitCannotTell(t *testing.T) {
 // drive requireAncestor directly and would pass with the call deleted from Build. A repository that
 // never contained MinimumReleaseCommit must be refused before anything is compiled. It pins a compiler
 // correctly, because Build reads the pin first and would otherwise refuse on that instead.
-func TestBuildRefusesBeforeTheMinimum(t *testing.T) {
-	t.Parallel()
+func TestBuildRefusesBeforeTheMinimum(test *testing.T) {
+	test.Parallel()
 
-	fixture := moduleWithCompiler(t)
+	fixture := moduleWithCompiler(test)
 
-	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: t.TempDir()})
+	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: test.TempDir()})
 	if err == nil {
-		t.Fatal("Build released from a repository that never contained the minimum commit")
+		test.Fatal("Build released from a repository that never contained the minimum commit")
 	}
 	// Refused for the minimum, by name. Any earlier refusal also returns an error, and passed this test
 	// unnoticed when the copyright check first stopped the fixture on a missing license.
 	if !strings.Contains(err.Error(), ShortCommit(MinimumReleaseCommit)) {
-		t.Fatalf("Build refused, but not for the minimum commit: %v", err)
+		test.Fatalf("Build refused, but not for the minimum commit: %v", err)
 	}
 	if !strings.Contains(err.Error(), ShortCommit(MinimumReleaseCommit)) {
-		t.Fatalf("Build failed, but not on the minimum commit: %v", err)
+		test.Fatalf("Build failed, but not on the minimum commit: %v", err)
 	}
 }

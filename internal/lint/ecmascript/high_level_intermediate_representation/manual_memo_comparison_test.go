@@ -14,8 +14,8 @@ import (
 // Getting that backwards produces a rule that accepts every under-specified dependency and reports
 // every over-specified one -- exactly inverted, and passing any test that only checks "unequal paths
 // disagree".
-func TestCompareManualMemoDependenciesAsymmetry(t *testing.T) {
-	t.Parallel()
+func TestCompareManualMemoDependenciesAsymmetry(test *testing.T) {
+	test.Parallel()
 
 	local := func(identifier static_single_assignment.IdentifierId, properties ...string) ManualMemoDependency {
 		path := make([]DependencyPathEntry, 0, len(properties))
@@ -71,10 +71,10 @@ func TestCompareManualMemoDependenciesAsymmetry(t *testing.T) {
 			want:     CompareDependencyOk,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if got := CompareManualMemoDependencies(testCase.inferred, testCase.source); got != testCase.want {
-				t.Errorf("got %v, want %v", got, testCase.want)
+				test.Errorf("got %v, want %v", got, testCase.want)
 			}
 		})
 	}
@@ -88,8 +88,8 @@ func TestCompareManualMemoDependenciesAsymmetry(t *testing.T) {
 //
 // The control matters here more than usual: the same shape with a different property name must be
 // `Ok`, or the case below passes because deeper paths are rejected generally.
-func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(t *testing.T) {
-	t.Parallel()
+func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(test *testing.T) {
+	test.Parallel()
 
 	path := func(properties ...string) []DependencyPathEntry {
 		entries := make([]DependencyPathEntry, 0, len(properties))
@@ -106,7 +106,7 @@ func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(t *testing.T) {
 		ManualMemoDependency{Root: root, Path: path("ref")},
 	)
 	if refCase != CompareDependencyRefAccessDifference {
-		t.Errorf("a deeper inferred path through `current` returned %v, want a ref-access "+
+		test.Errorf("a deeper inferred path through `current` returned %v, want a ref-access "+
 			"difference; a prefix match through a ref proves nothing", refCase)
 	}
 
@@ -116,7 +116,7 @@ func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(t *testing.T) {
 		ManualMemoDependency{Root: root, Path: path("ref")},
 	)
 	if control != CompareDependencyOk {
-		t.Fatalf("the control returned %v, want ok; the ref case above is therefore not testing "+
+		test.Fatalf("the control returned %v, want ok; the ref case above is therefore not testing "+
 			"the ref exception but the depth rule", control)
 	}
 
@@ -126,7 +126,7 @@ func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(t *testing.T) {
 		ManualMemoDependency{Root: root, Path: path("ref", "current")},
 	)
 	if exact != CompareDependencyOk {
-		t.Errorf("identical paths through `current` returned %v, want ok; the exception is about "+
+		test.Errorf("identical paths through `current` returned %v, want ok; the exception is about "+
 			"partial matches, not about refs generally", exact)
 	}
 }
@@ -137,22 +137,22 @@ func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(t *testing.T) {
 // recomputes on a different set of changes than `a.b`. Upstream reports it immediately rather than
 // letting the depth rule decide, because it is a difference regardless of what the rest of the path
 // does.
-func TestCompareManualMemoDependenciesComparesOptionality(t *testing.T) {
-	t.Parallel()
+func TestCompareManualMemoDependenciesComparesOptionality(test *testing.T) {
+	test.Parallel()
 
 	root := ManualMemoRoot{Place: Place{Identifier: 1}}
 	optional := ManualMemoDependency{Root: root, Path: []DependencyPathEntry{{Property: "a", Optional: true}}}
 	plain := ManualMemoDependency{Root: root, Path: []DependencyPathEntry{{Property: "a"}}}
 
 	if got := CompareManualMemoDependencies(optional, plain); got != CompareDependencyPathDifference {
-		t.Errorf("an optional inferred read against a non-optional source returned %v, want a path "+
+		test.Errorf("an optional inferred read against a non-optional source returned %v, want a path "+
 			"difference", got)
 	}
 	if got := CompareManualMemoDependencies(plain, optional); got != CompareDependencyPathDifference {
-		t.Errorf("the reverse returned %v, want a path difference", got)
+		test.Errorf("the reverse returned %v, want a path difference", got)
 	}
 	if got := CompareManualMemoDependencies(optional, optional); got != CompareDependencyOk {
-		t.Errorf("two optional reads of the same property returned %v, want ok", got)
+		test.Errorf("two optional reads of the same property returned %v, want ok", got)
 	}
 }
 
@@ -160,8 +160,8 @@ func TestCompareManualMemoDependenciesComparesOptionality(t *testing.T) {
 //
 // A global is compared by name and a local by identifier, and the two kinds never match each other
 // -- a global has no identifier in this function to compare against.
-func TestCompareManualMemoDependenciesGlobalRoots(t *testing.T) {
-	t.Parallel()
+func TestCompareManualMemoDependenciesGlobalRoots(test *testing.T) {
+	test.Parallel()
 
 	globalRoot := func(name string) ManualMemoDependency {
 		return ManualMemoDependency{Root: ManualMemoRoot{IsGlobal: true, Name: name}}
@@ -169,18 +169,18 @@ func TestCompareManualMemoDependenciesGlobalRoots(t *testing.T) {
 	localRoot := ManualMemoDependency{Root: ManualMemoRoot{Place: Place{Identifier: 1}}}
 
 	if got := CompareManualMemoDependencies(globalRoot("Math"), globalRoot("Math")); got != CompareDependencyOk {
-		t.Errorf("two globals of the same name returned %v, want ok", got)
+		test.Errorf("two globals of the same name returned %v, want ok", got)
 	}
 	if got := CompareManualMemoDependencies(globalRoot("Math"), globalRoot("Date")); got != CompareDependencyRootDifference {
-		t.Errorf("two globals of different names returned %v, want a root difference", got)
+		test.Errorf("two globals of different names returned %v, want a root difference", got)
 	}
 	if got := CompareManualMemoDependencies(globalRoot("Math"), localRoot); got != CompareDependencyRootDifference {
-		t.Errorf("a global against a local returned %v, want a root difference", got)
+		test.Errorf("a global against a local returned %v, want a root difference", got)
 	}
 	// A local whose identifier happens to be zero must not match a global by accident.
 	zeroLocal := ManualMemoDependency{Root: ManualMemoRoot{Place: Place{Identifier: 0}}}
 	if got := CompareManualMemoDependencies(zeroLocal, globalRoot("")); got != CompareDependencyRootDifference {
-		t.Errorf("a zero-identifier local against an unnamed global returned %v, want a root "+
+		test.Errorf("a zero-identifier local against an unnamed global returned %v, want a root "+
 			"difference; the kinds must not collapse on zero values", got)
 	}
 }
@@ -190,8 +190,8 @@ func TestCompareManualMemoDependenciesGlobalRoots(t *testing.T) {
 // A dependency is compared against every source entry and reported only if none matched. The
 // reported reason is the strongest disagreement seen, so a root difference against one entry does
 // not mask a ref-access difference against another.
-func TestMergeCompareDependencyResultsTakesTheMostSpecific(t *testing.T) {
-	t.Parallel()
+func TestMergeCompareDependencyResultsTakesTheMostSpecific(test *testing.T) {
+	test.Parallel()
 
 	results := []CompareDependencyResult{
 		CompareDependencyOk,
@@ -207,10 +207,10 @@ func TestMergeCompareDependencyResultsTakesTheMostSpecific(t *testing.T) {
 				want = second
 			}
 			if got := MergeCompareDependencyResults(first, second); got != want {
-				t.Errorf("merge(%v, %v) = %v, want %v", first, second, got, want)
+				test.Errorf("merge(%v, %v) = %v, want %v", first, second, got, want)
 			}
 			if got := MergeCompareDependencyResults(second, first); got != want {
-				t.Errorf("merge is not commutative for (%v, %v)", first, second)
+				test.Errorf("merge is not commutative for (%v, %v)", first, second)
 			}
 		}
 	}
@@ -220,7 +220,7 @@ func TestMergeCompareDependencyResultsTakesTheMostSpecific(t *testing.T) {
 	for _, result := range results {
 		name := result.String()
 		if seen[name] {
-			t.Errorf("two results print as %q", name)
+			test.Errorf("two results print as %q", name)
 		}
 		seen[name] = true
 	}

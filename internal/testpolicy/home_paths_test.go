@@ -9,8 +9,8 @@ import (
 )
 
 // TestHomePathsFindsAPlantedHomePath is the checker against planted literals, each beside its control.
-func TestHomePathsFindsAPlantedHomePath(t *testing.T) {
-	t.Parallel()
+func TestHomePathsFindsAPlantedHomePath(test *testing.T) {
+	test.Parallel()
 	// Not a machine path: every case is a planted source, read by the checker and never by the filesystem.
 	cases := []struct {
 		name   string
@@ -33,19 +33,19 @@ func TestHomePathsFindsAPlantedHomePath(t *testing.T) {
 	for _, testCase := range cases {
 		found, err := HomePaths("planted_test.go", []byte("package p\n\n"+testCase.source+"\n"))
 		if err != nil {
-			t.Fatalf("%s: %v", testCase.name, err)
+			test.Fatalf("%s: %v", testCase.name, err)
 		}
 		if len(found) != testCase.want {
-			t.Errorf("%s: found %d, expected %d: %v", testCase.name, len(found), testCase.want, found)
+			test.Errorf("%s: found %d, expected %d: %v", testCase.name, len(found), testCase.want, found)
 		}
 	}
 }
 
 // TestNoCohereTestNamesAHomeDirectory holds the module to reading outside code by name (#sycrdr6).
-func TestNoCohereTestNamesAHomeDirectory(t *testing.T) {
-	t.Parallel()
+func TestNoCohereTestNamesAHomeDirectory(test *testing.T) {
+	test.Parallel()
 	found := []HomePath{}
-	root, _ := eachTestFile(t, func(path string, source []byte) error {
+	root, _ := eachTestFile(test, func(path string, source []byte) error {
 		inFile, err := HomePaths(path, source)
 		found = append(found, inFile...)
 		return err
@@ -62,7 +62,7 @@ func TestNoCohereTestNamesAHomeDirectory(t *testing.T) {
 	}
 	sort.Strings(files)
 	for _, file := range files {
-		t.Errorf("%s names a home directory. Ask for the code by name through internal/corpus, or, for a literal "+
+		test.Errorf("%s names a home directory. Ask for the code by name through internal/corpus, or, for a literal "+
 			"that only looks like one, say why above it with %q:\n%s", file, NotAMachinePathMarker, strings.Join(lines[file], "\n"))
 	}
 }

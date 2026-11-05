@@ -19,8 +19,8 @@ const (
 //
 // These are the files that lost prerendering, each line as the tree has it. Three are async and two
 // are not, and both shapes are here because the listener sees a function declaration either way.
-func TestNextNoNearMissRouteExportFiresOnThePhiWebSites(t *testing.T) {
-	t.Parallel()
+func TestNextNoNearMissRouteExportFiresOnThePhiWebSites(test *testing.T) {
+	test.Parallel()
 
 	sites := []struct {
 		filePath string
@@ -33,20 +33,20 @@ func TestNextNoNearMissRouteExportFiresOnThePhiWebSites(t *testing.T) {
 		{"/www-phi-health/app/(main-layout)/stack/[[...variant]]/page.tsx", "export function generateStaticParameters() {"},
 	}
 	for _, site := range sites {
-		t.Run(site.filePath, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextNoNearMissRouteExport, site.filePath, site.line+"\n    return [];\n}")
-			rule_testing.ExpectFindings(t, result, "nearMissRouteExport")
+		test.Run(site.filePath, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextNoNearMissRouteExport, site.filePath, site.line+"\n    return [];\n}")
+			rule_testing.ExpectFindings(test, result, "nearMissRouteExport")
 			if !strings.Contains(result.Diagnostics[0].Message.Description, "Rename it to `generateStaticParams`.") {
-				t.Errorf("the message does not name the contract export: %q", result.Diagnostics[0].Message.Description)
+				test.Errorf("the message does not name the contract export: %q", result.Diagnostics[0].Message.Description)
 			}
 		})
 	}
 }
 
 // TestNextNoNearMissRouteExportFires covers each of the four ways an export misses by one step.
-func TestNextNoNearMissRouteExportFires(t *testing.T) {
-	t.Parallel()
+func TestNextNoNearMissRouteExportFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -83,12 +83,12 @@ func TestNextNoNearMissRouteExportFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextNoNearMissRouteExport, testCase.filePath, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextNoNearMissRouteExport, testCase.filePath, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			if testCase.wantNamed != "" && !strings.Contains(result.Diagnostics[0].Message.Description, "Rename it to `"+testCase.wantNamed+"`.") {
-				t.Errorf("want the message to name %q: %q", testCase.wantNamed, result.Diagnostics[0].Message.Description)
+				test.Errorf("want the message to name %q: %q", testCase.wantNamed, result.Diagnostics[0].Message.Description)
 			}
 		})
 	}
@@ -99,8 +99,8 @@ func TestNextNoNearMissRouteExportFires(t *testing.T) {
 //
 // The short-name rows are why the typo distance scales: `all` is one edit from `alt` and `SET` one
 // from `GET`, and both are plausible exports Next simply does not read.
-func TestNextNoNearMissRouteExportStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNextNoNearMissRouteExportStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -155,27 +155,27 @@ export function generateImageMetadata() { return []; }`},
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NextNoNearMissRouteExport, testCase.filePath, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NextNoNearMissRouteExport, testCase.filePath, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestNextNoNearMissRouteExportAnchorsOnTheName asserts the finding sits on the exported name, which
 // is the token an author renames.
-func TestNextNoNearMissRouteExportAnchorsOnTheName(t *testing.T) {
-	t.Parallel()
+func TestNextNoNearMissRouteExportAnchorsOnTheName(test *testing.T) {
+	test.Parallel()
 
 	source := "export async function generateStaticParameters() { return []; }"
-	result := rule_testing.Run(t, NextNoNearMissRouteExport, nearMissPageFile, source)
+	result := rule_testing.Run(test, NextNoNearMissRouteExport, nearMissPageFile, source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
 	onDisk := strings.TrimSpace(source) + "\n"
 	diagnostic := result.Diagnostics[0]
 	if got := strings.TrimSpace(onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]); got != "generateStaticParameters" {
-		t.Errorf("the finding spans %q, want the exported name", got)
+		test.Errorf("the finding spans %q, want the exported name", got)
 	}
 }

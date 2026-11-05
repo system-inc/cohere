@@ -28,8 +28,8 @@ const objectConstructorFile = "/repository/source/ObjectConstructor.ts"
 // a global off through ESLint's own configuration surface, which has no analogue here, and it is
 // clean upstream for a reason that is not about the rule. It is recorded here rather than silently
 // dropped.
-func TestNoObjectConstructorFires(t *testing.T) {
-	t.Parallel()
+func TestNoObjectConstructorFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -88,40 +88,40 @@ func TestNoObjectConstructorFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(strings.Join(strings.Fields(testCase.sourceText), " "), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+		test.Run(strings.Join(strings.Fields(testCase.sourceText), " "), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoObjectConstructor, objectConstructorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
 			if diagnostic.Message.Id != "preferLiteral" {
-				t.Fatalf("message id was %q", diagnostic.Message.Id)
+				test.Fatalf("message id was %q", diagnostic.Message.Id)
 			}
 
 			// Which suggestion arm fired. The two differ only by a leading semicolon in the
 			// replacement, and applying the wrong one produces source that parses as a call.
 			if len(diagnostic.Suggestions) != 1 {
-				t.Fatalf("wanted one suggestion, got %d", len(diagnostic.Suggestions))
+				test.Fatalf("wanted one suggestion, got %d", len(diagnostic.Suggestions))
 			}
 			suggestion := diagnostic.Suggestions[0]
 			if suggestion.Message.Id != testCase.suggestionId {
-				t.Fatalf("suggestion id was %q, wanted %q", suggestion.Message.Id, testCase.suggestionId)
+				test.Fatalf("suggestion id was %q, wanted %q", suggestion.Message.Id, testCase.suggestionId)
 			}
 
 			// The repair itself, asserted by APPLYING it and comparing the whole resulting source
 			// rather than by comparing the fix text: a fix writing the right string over the wrong
 			// span passes a text comparison and is a real defect.
 			if len(suggestion.Fixes) != 1 {
-				t.Fatalf("wanted one fix, got %d", len(suggestion.Fixes))
+				test.Fatalf("wanted one fix, got %d", len(suggestion.Fixes))
 			}
 			fix := suggestion.Fixes[0]
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			rewritten := onDisk[:fix.Range.Pos()] + fix.Text + onDisk[fix.Range.End():]
 			wantOnDisk := strings.TrimSpace(testCase.wantAfterFix) + "\n"
 			if rewritten != wantOnDisk {
-				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, wantOnDisk)
+				test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, wantOnDisk)
 			}
 		})
 	}
@@ -134,8 +134,8 @@ func TestNoObjectConstructorFires(t *testing.T) {
 // the callee is a member access rather than the identifier, which is narrower than "evaluates to
 // Object" and is upstream's own reading. The last two are a shadowed `Object`, in a parameter and in
 // a `var`.
-func TestNoObjectConstructorStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoObjectConstructorStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -148,9 +148,9 @@ func TestNoObjectConstructorStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjectConstructor,
 				objectConstructorFile, testCase.sourceText))
 		})
 	}
@@ -162,40 +162,40 @@ func TestNoObjectConstructorStaysSilent(t *testing.T) {
 // parenthesized callee is a different node in ESTree as well. Measured on eslint 10.8.1: `(Object)()`
 // reports nothing. Every other rule in this batch skips parentheses, so this is written down rather
 // than left for the next reader to "fix".
-func TestNoObjectConstructorDeclinesAParenthesizedCallee(t *testing.T) {
-	t.Parallel()
+func TestNoObjectConstructorDeclinesAParenthesizedCallee(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjectConstructor, objectConstructorFile,
 		"(Object)();"))
 }
 
 // The typed harness is required, and a revert to the plain one must fail loudly.
-func TestNoObjectConstructorNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoObjectConstructorNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const source = "Object();"
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjectConstructor, objectConstructorFile,
 		source), "preferLiteral")
 
-	if got := len(rule_testing.Run(t, NoObjectConstructor, objectConstructorFile,
+	if got := len(rule_testing.Run(test, NoObjectConstructor, objectConstructorFile,
 		source).Diagnostics); got != 0 {
-		t.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
+		test.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
 			"and this test no longer measures what it claims", got)
 	}
 }
 
 // The message, asserted against literals typed here rather than the rule's own constants.
-func TestNoObjectConstructorReportsWhyItMatters(t *testing.T) {
-	t.Parallel()
+func TestNoObjectConstructorReportsWhyItMatters(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile, "Object();")
+	result := rule_testing.RunTyped(test, NoObjectConstructor, objectConstructorFile, "Object();")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	const wantPrefix = "This calls the `Object` constructor with no argument"
 	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, wantPrefix) {
-		t.Fatalf("description was %q", got)
+		test.Fatalf("description was %q", got)
 	}
 }
 
@@ -208,10 +208,10 @@ func TestNoObjectConstructorReportsWhyItMatters(t *testing.T) {
 //
 // Asserted as silence so that a later change making it report fails loudly and gets re-argued,
 // rather than sliding in as an improvement nobody measured.
-func TestNoObjectConstructorDeclinesInsideAWithBlock(t *testing.T) {
-	t.Parallel()
+func TestNoObjectConstructorDeclinesInsideAWithBlock(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjectConstructor, objectConstructorFile,
 		"with (obj) Object();"))
 }
 
@@ -225,8 +225,8 @@ func TestNoObjectConstructorDeclinesInsideAWithBlock(t *testing.T) {
 // The span is the whole call, measured on eslint 10.8.1. The optional row is the one that separates
 // the two readings most clearly: `const obj = Object?.();` reports columns 13 through 23, which
 // covers `Object?.()` and not the six characters of the callee.
-func TestNoObjectConstructorReportsTheWholeCall(t *testing.T) {
-	t.Parallel()
+func TestNoObjectConstructorReportsTheWholeCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -241,17 +241,17 @@ func TestNoObjectConstructorReportsTheWholeCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoObjectConstructor, objectConstructorFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoObjectConstructor, objectConstructorFile,
 				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			got := result.Diagnostics[0].Range
 			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
-				t.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
+				test.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
 					got.Pos(), got.End(), onDisk[got.Pos():got.End()],
 					testCase.wantPos, testCase.wantEnd, onDisk[testCase.wantPos:testCase.wantEnd])
 			}

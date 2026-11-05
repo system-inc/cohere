@@ -61,7 +61,7 @@ var codeIndentedFixtures = []string{
 	"    a\\\n    b",
 }
 
-func TestCodeIndentedEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, codeIndentedFixtures)
+func TestCodeIndentedEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, codeIndentedFixtures)
 }

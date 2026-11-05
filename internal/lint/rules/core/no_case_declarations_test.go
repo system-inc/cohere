@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestNoCaseDeclarationsReportsLexicalDeclarations(t *testing.T) {
-	t.Parallel()
+func TestNoCaseDeclarationsReportsLexicalDeclarations(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -28,20 +28,20 @@ func TestNoCaseDeclarationsReportsLexicalDeclarations(t *testing.T) {
 		{"nested switch", `switch (a) { case 1: switch (b) { case 2: let x = 1; break; } break; }`, 1},
 		{"multiple declarators in one statement is one statement", `switch (a) { case 1: let x = 1, y = 2; break; }`, 1},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoCaseDeclarations, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoCaseDeclarations, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.want)
 			for index := range wantIds {
 				wantIds[index] = "unexpected"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 		})
 	}
 }
 
-func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(t *testing.T) {
-	t.Parallel()
+func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -64,9 +64,9 @@ func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(t *testing.T) {
 		{"declare const emits nothing", `switch (a) { case 1: declare const d: number; break; }`},
 		{"declaration outside the switch", `const outside = 1; switch (a) { case 1: break; }`},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoCaseDeclarations, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoCaseDeclarations, "file.ts", testCase.source))
 		})
 	}
 }
@@ -74,8 +74,8 @@ func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(t *testing.T) {
 // The finding must land on the declaration's own text. Anchoring at the node's Pos would start the
 // range inside the comment above it, which puts the finding on a line a disable comment for the
 // declaration cannot reach.
-func TestNoCaseDeclarationsReportsTheDeclarationWithoutTrivia(t *testing.T) {
-	t.Parallel()
+func TestNoCaseDeclarationsReportsTheDeclarationWithoutTrivia(test *testing.T) {
+	test.Parallel()
 
 	const source = `switch (a) {
   case 1:
@@ -83,20 +83,20 @@ func TestNoCaseDeclarationsReportsTheDeclarationWithoutTrivia(t *testing.T) {
     const reported = 2;
     break;
 }`
-	result := rule_testing.Run(t, NoCaseDeclarations, "file.ts", source)
-	rule_testing.ExpectFindings(t, result, "unexpected")
+	result := rule_testing.Run(test, NoCaseDeclarations, "file.ts", source)
+	rule_testing.ExpectFindings(test, result, "unexpected")
 
 	reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "const reported = 2;" {
-		t.Fatalf("reported range = %q, want %q", reported, "const reported = 2;")
+		test.Fatalf("reported range = %q, want %q", reported, "const reported = 2;")
 	}
 }
 
 // Both declarations in one clause must offer the same whole-clause repair, anchored at the first and
 // last statements rather than at the reported declaration. Anchoring on the reported statement would
 // propose two nested blocks that leave `break` outside the scope it was meant to sit in.
-func TestNoCaseDeclarationsSuggestsWrappingTheWholeClause(t *testing.T) {
-	t.Parallel()
+func TestNoCaseDeclarationsSuggestsWrappingTheWholeClause(test *testing.T) {
+	test.Parallel()
 
 	const source = `switch (a) {
   case 1:
@@ -104,31 +104,31 @@ func TestNoCaseDeclarationsSuggestsWrappingTheWholeClause(t *testing.T) {
     const second = 2;
     break;
 }`
-	result := rule_testing.Run(t, NoCaseDeclarations, "file.ts", source)
-	rule_testing.ExpectFindings(t, result, "unexpected", "unexpected")
+	result := rule_testing.Run(test, NoCaseDeclarations, "file.ts", source)
+	rule_testing.ExpectFindings(test, result, "unexpected", "unexpected")
 
 	for index, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Suggestions) != 1 {
-			t.Fatalf("finding %d: suggestions = %d, want 1", index, len(diagnostic.Suggestions))
+			test.Fatalf("finding %d: suggestions = %d, want 1", index, len(diagnostic.Suggestions))
 		}
 		suggestion := diagnostic.Suggestions[0]
 		if suggestion.Message.Id != "addBraces" {
-			t.Fatalf("finding %d: suggestion id = %q, want %q", index, suggestion.Message.Id, "addBraces")
+			test.Fatalf("finding %d: suggestion id = %q, want %q", index, suggestion.Message.Id, "addBraces")
 		}
 		if len(suggestion.Fixes) != 2 {
-			t.Fatalf("finding %d: fixes = %d, want 2", index, len(suggestion.Fixes))
+			test.Fatalf("finding %d: fixes = %d, want 2", index, len(suggestion.Fixes))
 		}
 
 		openingBrace, closingBrace := suggestion.Fixes[0], suggestion.Fixes[1]
 		if openingBrace.Text != "{ " || closingBrace.Text != " }" {
-			t.Fatalf("finding %d: fix texts = %q, %q", index, openingBrace.Text, closingBrace.Text)
+			test.Fatalf("finding %d: fix texts = %q, %q", index, openingBrace.Text, closingBrace.Text)
 		}
 		// Insertions are empty ranges, so a position is enough to say where each one lands.
 		if got := source[openingBrace.Range.Pos():]; len(got) < 3 || got[:3] != "let" {
-			t.Fatalf("finding %d: opening brace does not land before the first statement", index)
+			test.Fatalf("finding %d: opening brace does not land before the first statement", index)
 		}
 		if got := source[:closingBrace.Range.Pos()]; len(got) < 6 || got[len(got)-6:] != "break;" {
-			t.Fatalf("finding %d: closing brace does not land after the last statement", index)
+			test.Fatalf("finding %d: closing brace does not land after the last statement", index)
 		}
 	}
 }

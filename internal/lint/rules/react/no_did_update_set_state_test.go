@@ -33,8 +33,8 @@ const didUpdateSetStateFile = "/repository/source/DidUpdate.tsx"
 //
 // The option column is the raw upstream spelling: "" for an absent option, and otherwise the single
 // string upstream passes positionally.
-func TestNoDidUpdateSetStateFires(t *testing.T) {
-	t.Parallel()
+func TestNoDidUpdateSetStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -60,11 +60,11 @@ func TestNoDidUpdateSetStateFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
-			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
+				testCase.sourceText, noMethodSetStateOptions(test, testCase.option))
+			rule_testing.ExpectFindings(test, result, "noSetStateInComponentDidUpdate")
 		})
 	}
 }
@@ -85,8 +85,8 @@ func TestNoDidUpdateSetStateFires(t *testing.T) {
 // never reaches the call listener. One is a plain function with no component anywhere, which is the
 // component gate. One is an empty lifecycle body, which is the corpus checking the rule does not
 // fire on the method itself.
-func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoDidUpdateSetStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -186,11 +186,11 @@ func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
+				testCase.sourceText, noMethodSetStateOptions(test, testCase.option))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -202,8 +202,8 @@ func TestNoDidUpdateSetStateStaysSilent(t *testing.T) {
 // `MemberExpression` where we have two node kinds, and one `static_name()` where we have three key
 // spellings, so the count of things that have to be right here is larger on our side than on
 // upstream's and none of it is visible from the imported corpus.
-func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -269,11 +269,11 @@ func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, noMethodSetStateOptions(t, testCase.option))
-			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
+				testCase.sourceText, noMethodSetStateOptions(test, testCase.option))
+			rule_testing.ExpectFindings(test, result, "noSetStateInComponentDidUpdate")
 		})
 	}
 }
@@ -283,43 +283,43 @@ func TestNoDidUpdateSetStateFiresOnShapesUpstreamDoesNotWrite(t *testing.T) {
 // Every case here is one source read under both settings, so a rule that ignored the option would
 // fail rather than pass half of them vacuously. Upstream ships the halves separately, which cannot
 // see a port that hardcodes either mode.
-func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
-	t.Parallel()
+func TestNoDidUpdateSetStateOptionChangesTheAnswer(test *testing.T) {
+	test.Parallel()
 
 	nestedCallback := "\nclass Hello extends React.Component {\n  componentDidUpdate() {\n    someClass.on(function() {\n      this.setState({ data: 123 });\n    });\n  }\n}\n"
 
-	t.Run("silent by default", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-			nestedCallback, noMethodSetStateOptions(t, ""))
-		rule_testing.ExpectClean(t, result)
+	test.Run("silent by default", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
+			nestedCallback, noMethodSetStateOptions(test, ""))
+		rule_testing.ExpectClean(test, result)
 	})
 
 	// The same shape one level deeper, through an accessor rather than a method. This is the pair
 	// that pins the accessor's function scope being counted; see the clean case above.
-	t.Run("a callback inside a getter reports under disallow-in-func", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
+	test.Run("a callback inside a getter reports under disallow-in-func", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
 			"\nclass Hello extends React.Component {\n  get componentDidUpdate() {\n    someClass.on(function() {\n      this.setState({ data: 123 });\n    });\n    return 1;\n  }\n}\n",
-			noMethodSetStateOptions(t, "disallow-in-func"))
-		rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
+			noMethodSetStateOptions(test, "disallow-in-func"))
+		rule_testing.ExpectFindings(test, result, "noSetStateInComponentDidUpdate")
 	})
 
-	t.Run("reports under disallow-in-func", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-			nestedCallback, noMethodSetStateOptions(t, "disallow-in-func"))
-		rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
+	test.Run("reports under disallow-in-func", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
+			nestedCallback, noMethodSetStateOptions(test, "disallow-in-func"))
+		rule_testing.ExpectFindings(test, result, "noSetStateInComponentDidUpdate")
 	})
 
 	// A rule offered no options at all gets the zero value through the registry, which is the
 	// permissive default. Asserted rather than assumed because the decode path returns an error
 	// alongside the zero value when nothing is configured, and a rule reading the error instead of
 	// the value would invert this.
-	t.Run("no options at all reads as the default", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.Run(t, NoDidUpdateSetState, didUpdateSetStateFile, nestedCallback)
-		rule_testing.ExpectClean(t, result)
+	test.Run("no options at all reads as the default", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.Run(test, NoDidUpdateSetState, didUpdateSetStateFile, nestedCallback)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -329,8 +329,8 @@ func TestNoDidUpdateSetStateOptionChangesTheAnswer(t *testing.T) {
 // `this.setState({...})`, stopping before the parenthesis, and the snapshot shows the same for
 // every one of its eighteen diagnostics. A rule reporting the whole call passes every fixture above
 // while pointing at the wrong range, and a rule reporting only `setState` passes them too.
-func TestNoDidUpdateSetStatePointsAtTheCallee(t *testing.T) {
-	t.Parallel()
+func TestNoDidUpdateSetStatePointsAtTheCallee(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -355,15 +355,15 @@ func TestNoDidUpdateSetStatePointsAtTheCallee(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
-				testCase.sourceText, noMethodSetStateOptions(t, ""))
-			rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
+				testCase.sourceText, noMethodSetStateOptions(test, ""))
+			rule_testing.ExpectFindings(test, result, "noSetStateInComponentDidUpdate")
 			diagnostic := result.Diagnostics[0]
 			reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("finding underlines %q, want %q", reported, testCase.want)
+				test.Fatalf("finding underlines %q, want %q", reported, testCase.want)
 			}
 		})
 	}
@@ -374,20 +374,20 @@ func TestNoDidUpdateSetStatePointsAtTheCallee(t *testing.T) {
 // A `strings.Contains` predicate here would stay green through a doubled substitution, which is the
 // exact defect that shipped from another rule in this tree. There is nothing interpolated into this
 // message, which is precisely why the assertion is cheap enough to have no excuse.
-func TestNoDidUpdateSetStateMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoDidUpdateSetStateMessageText(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoDidUpdateSetState, didUpdateSetStateFile,
+	result := rule_testing.RunWithOptions(test, NoDidUpdateSetState, didUpdateSetStateFile,
 		"\nclass Hello extends React.Component {\n  componentDidUpdate() {\n    this.setState({ data: 123 });\n  }\n}\n",
-		noMethodSetStateOptions(t, ""))
-	rule_testing.ExpectFindings(t, result, "noSetStateInComponentDidUpdate")
+		noMethodSetStateOptions(test, ""))
+	rule_testing.ExpectFindings(test, result, "noSetStateInComponentDidUpdate")
 
 	description := result.Diagnostics[0].Message.Description
 	if !strings.HasPrefix(description, "Updating state from `componentDidUpdate`") {
-		t.Fatalf("message description starts %q", description)
+		test.Fatalf("message description starts %q", description)
 	}
 	if strings.Count(description, "componentDidUpdate") != 1 {
-		t.Fatalf("message names the lifecycle method %d times, want 1: %q",
+		test.Fatalf("message names the lifecycle method %d times, want 1: %q",
 			strings.Count(description, "componentDidUpdate"), description)
 	}
 }

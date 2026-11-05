@@ -27,23 +27,23 @@ func noExtraneousClassCaseName(index int) string {
 // still produce the right answer for an absent key and every fixture built from a struct would pass.
 // Going through the decoder is what puts the wire shape under test: cohere strips ESLint's
 // [severity, options] tuple, so what arrives is the bare object rather than a one-element array.
-func decodeNoExtraneousClassOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
+func decodeNoExtraneousClassOptionsForTest(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeNoExtraneousClassOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return decoded
 }
 
 // runNoExtraneousClass runs one case, with or without options.
-func runNoExtraneousClass(t *testing.T, sourceText string, options string) rule_testing.Result {
-	t.Helper()
+func runNoExtraneousClass(test *testing.T, sourceText string, options string) rule_testing.Result {
+	test.Helper()
 	if options == "" {
-		return rule_testing.Run(t, NoExtraneousClass, noExtraneousClassFile, sourceText)
+		return rule_testing.Run(test, NoExtraneousClass, noExtraneousClassFile, sourceText)
 	}
-	return rule_testing.RunWithOptions(t, NoExtraneousClass, noExtraneousClassFile, sourceText,
-		decodeNoExtraneousClassOptionsForTest(t, options))
+	return rule_testing.RunWithOptions(test, NoExtraneousClass, noExtraneousClassFile, sourceText,
+		decodeNoExtraneousClassOptionsForTest(test, options))
 }
 
 // TestNoExtraneousClassStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -57,8 +57,8 @@ func runNoExtraneousClass(t *testing.T, sourceText string, options string) rule_
 // every abstract member; ours gives all of them KindPropertyDeclaration or KindMethodDeclaration and
 // puts the difference in a modifier, so the arm that keeps a class with only an accessor or only an
 // abstract member from reporting has to read modifiers where upstream reads a node type.
-func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -82,9 +82,9 @@ func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(t *testing.T) {
 		{sourceText: "\nabstract class Foo {\n  abstract accessor prop: string;\n}\n    ", options: ""},
 	}
 	for index, testCase := range cases {
-		t.Run(noExtraneousClassCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoExtraneousClass(t, testCase.sourceText, testCase.options))
+		test.Run(noExtraneousClassCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoExtraneousClass(test, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -101,8 +101,8 @@ func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(t *testing.T) {
 // Two rows report twice, which is how a nested class is handled: the visitor fires per class body, so
 // a class declared inside a constructor is judged on its own and reported independently of the class
 // holding it.
-func TestNoExtraneousClassFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -184,18 +184,18 @@ func TestNoExtraneousClassFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noExtraneousClassCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := runNoExtraneousClass(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(noExtraneousClassCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := runNoExtraneousClass(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -214,8 +214,8 @@ func TestNoExtraneousClassFiresOnUpstreamFailCases(t *testing.T) {
 // Every verdict and every span below was measured against the installed 8.x build on that exact
 // source, with a reporting control in the same run. Two of them changed this port: the named class
 // expression, and the decorated parameter.
-func TestNoExtraneousClassOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassOnShapesUpstreamsCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -387,19 +387,19 @@ func TestNoExtraneousClassOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoExtraneousClass(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoExtraneousClass(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -413,8 +413,8 @@ func TestNoExtraneousClassOnShapesUpstreamsCorpusDoesNotWrite(t *testing.T) {
 // Every one of this rule's keys defaults to false, so a decoder that dropped all four would produce
 // the right answer for every absent key and every fixture above would still pass. This is the only
 // thing in the file that can tell a decoder that reads its input from one that does not.
-func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		raw  string
@@ -437,15 +437,15 @@ func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.raw, func(t *testing.T) {
-			t.Parallel()
-			decoded := decodeNoExtraneousClassOptionsForTest(t, testCase.raw)
+		test.Run(testCase.raw, func(test *testing.T) {
+			test.Parallel()
+			decoded := decodeNoExtraneousClassOptionsForTest(test, testCase.raw)
 			settings, isSettings := decoded.(NoExtraneousClassOptions)
 			if !isSettings {
-				t.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
+				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
 			}
 			if settings != testCase.want {
-				t.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
+				test.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
 			}
 		})
 	}
@@ -457,12 +457,12 @@ func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(t *
 // A rule named as "error" with no object is handed nil, which the type assertion in Run cannot
 // satisfy, so the fallback is the only thing between that configuration and a zero value. Every
 // other fixture here reaches the rule through the decoder and none can see this line.
-func TestNoExtraneousClassFallsBackWhenHandedNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassFallsBackWhenHandedNilOptions(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunWithOptions(t, NoExtraneousClass, noExtraneousClassFile,
+	result := rule_testing.RunWithOptions(test, NoExtraneousClass, noExtraneousClassFile,
 		"class Foo {}\n", nil)
-	rule_testing.ExpectFindings(t, result, "empty")
+	rule_testing.ExpectFindings(test, result, "empty")
 }
 
 // TestNoExtraneousClassRendersUpstreamsMessageText asserts what a reader is told, for all three.
@@ -471,8 +471,8 @@ func TestNoExtraneousClassFallsBackWhenHandedNilOptions(t *testing.T) {
 // is to get wrong is the text, and ExpectFindings compares ids and count and nothing else. The
 // wanted strings are typed as literals rather than read from the rule's own constants, because a
 // comparison against the constant moves with any mutation of it.
-func TestNoExtraneousClassRendersUpstreamsMessageText(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassRendersUpstreamsMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -496,18 +496,18 @@ func TestNoExtraneousClassRendersUpstreamsMessageText(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.wantId, func(t *testing.T) {
-			t.Parallel()
-			result := runNoExtraneousClass(t, testCase.sourceText, "")
+		test.Run(testCase.wantId, func(test *testing.T) {
+			test.Parallel()
+			result := runNoExtraneousClass(test, testCase.sourceText, "")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := result.Diagnostics[0]
 			if reported.Message.Id != testCase.wantId {
-				t.Errorf("reported id %q, wanted %q", reported.Message.Id, testCase.wantId)
+				test.Errorf("reported id %q, wanted %q", reported.Message.Id, testCase.wantId)
 			}
 			if reported.Message.Description != testCase.wantMessage {
-				t.Errorf("reported message %q, wanted %q",
+				test.Errorf("reported message %q, wanted %q",
 					reported.Message.Description, testCase.wantMessage)
 			}
 		})
@@ -527,8 +527,8 @@ func TestNoExtraneousClassRendersUpstreamsMessageText(t *testing.T) {
 // it is load bearing: upstream is silent on all four of these and reports on the legal control in
 // the same run, so a port without the arm reports where upstream does not. The grammar says one
 // thing and the parser does another, and only the parser decides what a rule sees.
-func TestNoExtraneousClassOnIllegalStaticAbstractMembers(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassOnIllegalStaticAbstractMembers(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -574,19 +574,19 @@ func TestNoExtraneousClassOnIllegalStaticAbstractMembers(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoExtraneousClass(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoExtraneousClass(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -603,8 +603,8 @@ func TestNoExtraneousClassOnIllegalStaticAbstractMembers(t *testing.T) {
 // option only with classes that really are decorated.
 //
 // Measured against the installed 8.x build with a control in the same run.
-func TestNoExtraneousClassSeparatesADecoratorFromOtherModifiers(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassSeparatesADecoratorFromOtherModifiers(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -644,19 +644,19 @@ func TestNoExtraneousClassSeparatesADecoratorFromOtherModifiers(t *testing.T) {
 	}
 	const options = `{"allowWithDecorator": true}`
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoExtraneousClass(t, testCase.sourceText, options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoExtraneousClass(test, testCase.sourceText, options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := testCase.sourceText[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -668,8 +668,8 @@ func TestNoExtraneousClassSeparatesADecoratorFromOtherModifiers(t *testing.T) {
 // @system_cohere's ruling of 2026-10-03 (#ynneze5, Base's tests): an empty class is not extraneous when
 // another class extends it, or when every value use of it goes where a constructor is expected. Each
 // silent row has a reported neighbour, so a mutant dropping or widening either shape fails here.
-func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
-	t.Parallel()
+func TestNoExtraneousClassExemptsALoadBearingEmptyClass(test *testing.T) {
+	test.Parallel()
 
 	slots := "type Constructor = new (...args: any[]) => object;\n" +
 		"declare function register(target: Constructor): void;\n" +
@@ -688,9 +688,9 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
 		{"a const-bound class expression handed only to constructor slots", slots + "const token = class Token {};\nregister(token);\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil))
 		})
 	}
 
@@ -714,9 +714,9 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(t *testing.T) {
 		{"implemented rather than extended", "class Shape {}\nclass Square implements Shape {\n  side = 1;\n}\nnew Square();\n"},
 	}
 	for _, testCase := range reported {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil), "empty")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil), "empty")
 		})
 	}
 }

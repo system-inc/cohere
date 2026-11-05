@@ -13,21 +13,21 @@ import (
 // messages, and the checker the rule cannot run without.
 
 // TestNoObjCallsFiresAndStaysQuiet is the fixture pair in its smallest form.
-func TestNoObjCallsFiresAndStaysQuiet(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsFiresAndStaysQuiet(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "Math();"), "unexpectedCall")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "let j = JSON; j();"), "unexpectedRefCall")
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "var Math; Math();"))
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "JSON.parse('{}');"))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "Math();"), "unexpectedCall")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let j = JSON; j();"), "unexpectedRefCall")
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "var Math; Math();"))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "JSON.parse('{}');"))
 }
 
 // TestNoObjCallsReportsOnlyTheNamespaceObjects pins the list as the whole discrimination.
 //
 // ESLint's corpus never calls a different global, so a tracker asked about every global would pass it
 // while reporting `parseInt()`. These resolve exactly as `Math` does and are callable.
-func TestNoObjCallsReportsOnlyTheNamespaceObjects(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsReportsOnlyTheNamespaceObjects(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"parseInt('1');",
@@ -37,7 +37,7 @@ func TestNoObjCallsReportsOnlyTheNamespaceObjects(t *testing.T) {
 		"new globalThis.Date();",
 		"new Date();",
 	} {
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", source))
 	}
 }
 
@@ -47,28 +47,28 @@ func TestNoObjCallsReportsOnlyTheNamespaceObjects(t *testing.T) {
 // only be the runtime's global, so `window.JSON()` reports here, where ESLint with no browser globals
 // configured does not know `window` and stays silent. In a project with DOM types `window` is declared
 // in its lib, and the two agree. A local named `window` is not the global in either.
-func TestNoObjCallsTakesAnUndeclaredGlobalObjectAsTheGlobal(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsTakesAnUndeclaredGlobalObjectAsTheGlobal(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "window.JSON();"), "unexpectedCall")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "var foo = self.Math; foo();"), "unexpectedRefCall")
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "function f(window: any) { window.JSON(); }"))
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "function f(globalThis: any) { globalThis.Math(); }"))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "window.JSON();"), "unexpectedCall")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "var foo = self.Math; foo();"), "unexpectedRefCall")
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "function f(window: any) { window.JSON(); }"))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "function f(globalThis: any) { globalThis.Math(); }"))
 }
 
 // TestNoObjCallsDoesNotFollowAnArithmeticAssignment pins the tracker's one departure from
 // eslint-utils, as this rule meets it: after `x += JSON`, x is a string, and the installed ESLint
 // reports `x()` as a call of JSON.
-func TestNoObjCallsDoesNotFollowAnArithmeticAssignment(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsDoesNotFollowAnArithmeticAssignment(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "let x; x += JSON; x();"))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoObjCalls, "input.ts", "let x; x ??= JSON; x();"), "unexpectedRefCall")
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let x; x += JSON; x();"))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let x; x ??= JSON; x();"), "unexpectedRefCall")
 }
 
 // TestNoObjCallsNamesTheCalleeAndTheGlobal pins what each message says, which the table's ids cannot.
-func TestNoObjCallsNamesTheCalleeAndTheGlobal(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsNamesTheCalleeAndTheGlobal(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -79,14 +79,14 @@ func TestNoObjCallsNamesTheCalleeAndTheGlobal(t *testing.T) {
 		{"(a ? JSON : b)();", []string{"a value", "`JSON`"}},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunTyped(t, NoObjCalls, "input.ts", testCase.source)
+		result := rule_testing.RunTyped(test, NoObjCalls, "input.ts", testCase.source)
 		if len(result.Diagnostics) != 1 {
-			t.Errorf("%s: %d findings, want 1", testCase.source, len(result.Diagnostics))
+			test.Errorf("%s: %d findings, want 1", testCase.source, len(result.Diagnostics))
 			continue
 		}
 		for _, want := range testCase.want {
 			if !strings.Contains(result.Diagnostics[0].Message.Description, want) {
-				t.Errorf("%s: the message %q does not name %s", testCase.source, result.Diagnostics[0].Message.Description, want)
+				test.Errorf("%s: the message %q does not name %s", testCase.source, result.Diagnostics[0].Message.Description, want)
 			}
 		}
 	}
@@ -96,31 +96,31 @@ func TestNoObjCallsNamesTheCalleeAndTheGlobal(t *testing.T) {
 //
 // Without a checker the rule cannot tell `var Math; Math();` from the global, so it reports nothing
 // at all, member calls through `globalThis` included. Every clean case would then pass vacuously.
-func TestNoObjCallsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoObjCalls.NeedsTypeChecker {
-		t.Fatal("NoObjCalls must declare NeedsTypeChecker; it tells a local from a global by asking the checker")
+		test.Fatal("NoObjCalls must declare NeedsTypeChecker; it tells a local from a global by asking the checker")
 	}
 	for _, source := range []string{"Math();", "globalThis.Math();"} {
-		rule_testing.ExpectClean(t, rule_testing.Run(t, NoObjCalls, "input.ts", source))
-		if result := rule_testing.RunTyped(t, NoObjCalls, "input.ts", source); len(result.Diagnostics) != 1 {
-			t.Errorf("%s: the typed harness must reach one finding, got %d", source, len(result.Diagnostics))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoObjCalls, "input.ts", source))
+		if result := rule_testing.RunTyped(test, NoObjCalls, "input.ts", source); len(result.Diagnostics) != 1 {
+			test.Errorf("%s: the typed harness must reach one finding, got %d", source, len(result.Diagnostics))
 		}
 	}
 }
 
 // TestNoObjCallsIsRegistered fails if a rule that passes every fixture lints no file at all.
-func TestNoObjCallsIsRegistered(t *testing.T) {
-	t.Parallel()
+func TestNoObjCallsIsRegistered(test *testing.T) {
+	test.Parallel()
 
 	for _, registration := range rule.Registered() {
 		if registration.Rule.Name == "no-obj-calls" {
 			if !registration.Rule.NeedsTypeChecker {
-				t.Error("the registered copy does not declare NeedsTypeChecker")
+				test.Error("the registered copy does not declare NeedsTypeChecker")
 			}
 			return
 		}
 	}
-	t.Fatal("no-obj-calls is absent from the registry")
+	test.Fatal("no-obj-calls is absent from the registry")
 }

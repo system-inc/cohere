@@ -34,8 +34,8 @@ const noImpliedEvalFile = "noImpliedEval.ts"
 //     checker rather than by syntax: a declared `() => void`, an object method, a `.bind()`
 //     call, and an element access resolving to a method all pass.
 //   - A callee DECLARED IN THIS FILE is exempt, which is what makes the shadowing cases clean.
-func TestNoImpliedEvalStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -90,9 +90,9 @@ func TestNoImpliedEvalStaysSilent(t *testing.T) {
 		{"upstream valid case 47", "\nfunction setTimeout() {}\n\n{\n  setTimeout(\"alert('evil!')\");\n}\n    "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
 }
@@ -107,8 +107,8 @@ func TestNoImpliedEvalStaysSilent(t *testing.T) {
 // Two message ids appear, and the split is 70 `noImpliedEvalError` to 6 `noFunctionConstructor`.
 // They are not alternatives: `new Function('x')` can only be the constructor arm, while the four
 // eval-like callees only ever produce the other, and one case produces both.
-func TestNoImpliedEvalFires(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -139,10 +139,10 @@ func TestNoImpliedEvalFires(t *testing.T) {
 		{"upstream invalid case 21", "const fn = new window['Function']();", []string{"noFunctionConstructor"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.expectedIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.expectedIds...)
 		})
 	}
 }
@@ -159,24 +159,24 @@ func TestNoImpliedEvalFires(t *testing.T) {
 // The control matters as much as the case. The same source with a class that does NOT shadow
 // `Function` still reports, so the silence below is the shadowing doing work rather than the
 // multi-file harness swallowing the rule.
-func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(test *testing.T) {
+	test.Parallel()
 
 	const shadowed = "export class Function {}\n"
 	const unrelated = "export class NotFunction {}\n"
 	const subject = "\nimport { Function } from './class';\nnew Function('foo');\n    "
 
-	t.Run("a locally declared Function shadows the constructor", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectClean(t, rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
+	test.Run("a locally declared Function shadows the constructor", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, NoImpliedEval, map[string]string{
 			"class.ts":        shadowed,
 			noImpliedEvalFile: subject,
 		}, noImpliedEvalFile))
 	})
 
-	t.Run("control: the real constructor still reports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTypedFiles(t, NoImpliedEval, map[string]string{
+	test.Run("control: the real constructor still reports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTypedFiles(test, NoImpliedEval, map[string]string{
 			"class.ts":        unrelated,
 			noImpliedEvalFile: "new Function('foo');",
 		}, noImpliedEvalFile), "noFunctionConstructor")
@@ -189,8 +189,8 @@ func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(t *testing.T) 
 // Every case here was measured against the vendored rule before it was written down, and the
 // silent ones each have a reporting neighbour so that no zero is a zero for a reason other than
 // the one claimed.
-func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(test *testing.T) {
+	test.Parallel()
 
 	reporting := []struct{ name, sourceText string }{
 		// The three receivers upstream hardcodes, plus the bare form.
@@ -207,9 +207,9 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing
 		{"a shadow confined to a nested block", "{\n  function setTimeout(x: string) {}\n}\nsetTimeout('x=1', 0);"},
 	}
 	for _, testCase := range reporting {
-		t.Run("reports/"+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
+		test.Run("reports/"+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
 		})
 	}
 
@@ -231,9 +231,9 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing
 		{"an alias to the global under a different name", "const st = setTimeout;\nst('x=1', 0);"},
 	}
 	for _, testCase := range silent {
-		t.Run("silent/"+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+		test.Run("silent/"+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
 }
@@ -244,8 +244,8 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(t *testing
 // Nothing in the rule asks whether a value is a string. `isFunction` asks the checker whether the
 // handler is callable and reports everything that is not, so a number, `null`, `unknown` and
 // `any` all report while a `.bind()` call and a `Function`-typed variable do not.
-func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(test *testing.T) {
+	test.Parallel()
 
 	reporting := []struct{ name, sourceText string }{
 		{"a number literal", "setTimeout(1, 0);"},
@@ -260,9 +260,9 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
 		{"a tagged template", "declare function tag(s: TemplateStringsArray): string;\nsetTimeout(tag`x`, 0);"},
 	}
 	for _, testCase := range reporting {
-		t.Run("reports/"+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
+		test.Run("reports/"+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
 		})
 	}
 
@@ -277,9 +277,9 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
 		{"a call with no arguments", "setTimeout();"},
 	}
 	for _, testCase := range silent {
-		t.Run("silent/"+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+		test.Run("silent/"+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
 }
@@ -300,8 +300,8 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(t *testing.T) {
 // The argument side falls the other way, which is why it is in the same test: nothing skips the
 // parens there either, but the checker sees through them, so a parenthesized string still reports
 // and a parenthesized arrow is still silent.
-func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct{ name, sourceText string }{
 		{"a parenthesized bare callee", "(setTimeout)('x=1', 0);"},
@@ -312,25 +312,25 @@ func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(t *testing.T) {
 		{"a parenthesized constructor called directly", "(Function)('a');"},
 	}
 	for _, testCase := range silent {
-		t.Run("silent/"+testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+		test.Run("silent/"+testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
 		})
 	}
 
-	t.Run("control: the same calls without parentheses report", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
+	test.Run("control: the same calls without parentheses report", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile,
 			"declare const window: any;\nwindow.setTimeout('x=1', 0);"), "noImpliedEvalError")
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile,
 			"new Function('a');"), "noFunctionConstructor")
 	})
 
-	t.Run("the ARGUMENT is judged through its parentheses", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
+	test.Run("the ARGUMENT is judged through its parentheses", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile,
 			"setTimeout(('x=1'), 0);"), "noImpliedEvalError")
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile,
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile,
 			"setTimeout((() => {}), 0);"))
 	})
 }
@@ -350,45 +350,45 @@ func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(t *testing.T) {
 // The message text is asserted against literal strings typed here rather than against the rule's
 // own message constants, because a comparison to the constant moves with the rule under mutation
 // and therefore guards nothing.
-func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(test *testing.T) {
+	test.Parallel()
 
-	t.Run("the eval-like arm points at the HANDLER", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the eval-like arm points at the HANDLER", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "declare const window: any;\nwindow.setTimeout('x = 1', 0);"
-		result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, sourceText)
+		result := rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, sourceText)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+			test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 		}
 		finding := result.Diagnostics[0]
 		trimmed := strings.TrimSpace(sourceText)
 		if reported := trimmed[finding.Range.Pos():finding.Range.End()]; reported != "'x = 1'" {
-			t.Errorf("span: want %q, got %q", "'x = 1'", reported)
+			test.Errorf("span: want %q, got %q", "'x = 1'", reported)
 		}
 		if finding.Message.Id != "noImpliedEvalError" {
-			t.Errorf("id: want %q, got %q", "noImpliedEvalError", finding.Message.Id)
+			test.Errorf("id: want %q, got %q", "noImpliedEvalError", finding.Message.Id)
 		}
 		if finding.Message.Description != "Implied eval. Consider passing a function." {
-			t.Errorf("description: got %q", finding.Message.Description)
+			test.Errorf("description: got %q", finding.Message.Description)
 		}
 	})
 
-	t.Run("the constructor arm points at the WHOLE call", func(t *testing.T) {
-		t.Parallel()
+	test.Run("the constructor arm points at the WHOLE call", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "new Function('a', 'return a');"
-		result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, sourceText)
+		result := rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, sourceText)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+			test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 		}
 		finding := result.Diagnostics[0]
 		if reported := strings.TrimSpace(sourceText)[finding.Range.Pos():finding.Range.End()]; reported != "new Function('a', 'return a')" {
-			t.Errorf("span: want %q, got %q", "new Function('a', 'return a')", reported)
+			test.Errorf("span: want %q, got %q", "new Function('a', 'return a')", reported)
 		}
 		if finding.Message.Id != "noFunctionConstructor" {
-			t.Errorf("id: want %q, got %q", "noFunctionConstructor", finding.Message.Id)
+			test.Errorf("id: want %q, got %q", "noFunctionConstructor", finding.Message.Id)
 		}
 		if finding.Message.Description != "Implied eval. Do not use the Function constructor to create functions." {
-			t.Errorf("description: got %q", finding.Message.Description)
+			test.Errorf("description: got %q", finding.Message.Description)
 		}
 	})
 
@@ -396,18 +396,18 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
 	// begins at the end of the previous line, so an untrimmed range renders with a leading
 	// newline and the indentation. Both anchors are checked because the adapter trims all three
 	// of its node-report forms and a regression could restore any one of them.
-	t.Run("leading trivia is not carried into either span", func(t *testing.T) {
-		t.Parallel()
+	test.Run("leading trivia is not carried into either span", func(test *testing.T) {
+		test.Parallel()
 		const sourceText = "function outer() {\n    setTimeout('x = 1', 0);\n    new Function('a');\n}"
-		result := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, sourceText)
+		result := rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, sourceText)
 		if len(result.Diagnostics) != 2 {
-			t.Fatalf("want 2 findings, got %d", len(result.Diagnostics))
+			test.Fatalf("want 2 findings, got %d", len(result.Diagnostics))
 		}
 		trimmed := strings.TrimSpace(sourceText)
 		want := []string{"'x = 1'", "new Function('a')"}
 		for index, expected := range want {
 			if reported := trimmed[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]; reported != expected {
-				t.Errorf("finding %d span: want %q, got %q", index, expected, reported)
+				test.Errorf("finding %d span: want %q, got %q", index, expected, reported)
 			}
 		}
 	})
@@ -426,32 +426,32 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(t *testing.T) {
 // report every one of the corpus's valid `setTimeout(fn, 0)` cases while the same-file filter let
 // each one through on a nil symbol. That is a vacuous RED rather than a vacuous green, and it is
 // what the guard below prevents.
-func TestNoImpliedEvalDeclaresItNeedsTheTypeChecker(t *testing.T) {
-	t.Parallel()
+func TestNoImpliedEvalDeclaresItNeedsTheTypeChecker(test *testing.T) {
+	test.Parallel()
 
 	if !NoImpliedEval.NeedsTypeChecker {
-		t.Error("NoImpliedEval must declare NeedsTypeChecker: every listener reads ctx.TypeChecker")
+		test.Error("NoImpliedEval must declare NeedsTypeChecker: every listener reads ctx.TypeChecker")
 	}
 	if NoImpliedEval.ProgramReads != rule.ReadsCompilerOptions|rule.ReadsDefaultLibrary {
-		t.Errorf("NoImpliedEval must declare what IsBuiltinSymbolLike reads, the compiler options and the default library; declares %s", NoImpliedEval.ProgramReads)
+		test.Errorf("NoImpliedEval must declare what IsBuiltinSymbolLike reads, the compiler options and the default library; declares %s", NoImpliedEval.ProgramReads)
 	}
 	if NoImpliedEval.Name != "@typescript-eslint/no-implied-eval" {
-		t.Errorf("registered name: want %q, got %q", "no-implied-eval", NoImpliedEval.Name)
+		test.Errorf("registered name: want %q, got %q", "no-implied-eval", NoImpliedEval.Name)
 	}
 
 	// The guard the absorption made possible. Driving both listeners with a checker-less Context must
 	// return rather than resolve anything, and this is the only path that reaches that branch, since
 	// registration always supplies a checker.
-	typed := rule_testing.RunTyped(t, NoImpliedEval, noImpliedEvalFile, "setTimeout(() => {}, 0);\n")
+	typed := rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, "setTimeout(() => {}, 0);\n")
 	if len(typed.Diagnostics) != 0 {
-		t.Fatalf("the typed harness found %d findings on a clean case, want none", len(typed.Diagnostics))
+		test.Fatalf("the typed harness found %d findings on a clean case, want none", len(typed.Diagnostics))
 	}
 
 	listeners := NoImpliedEval.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
 	for _, kind := range []ast.Kind{ast.KindCallExpression, ast.KindNewExpression} {
 		listener, hasListener := listeners[kind]
 		if !hasListener {
-			t.Fatalf("the rule stopped listening on kind %v", kind)
+			test.Fatalf("the rule stopped listening on kind %v", kind)
 		}
 		for _, statement := range typed.SourceFile.Statements.Nodes {
 			if statement.Kind != ast.KindExpressionStatement {

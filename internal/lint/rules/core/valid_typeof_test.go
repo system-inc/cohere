@@ -9,8 +9,8 @@ import (
 
 const typeofFile = "/repository/source/Thing.ts"
 
-func TestValidTypeofFires(t *testing.T) {
-	t.Parallel()
+func TestValidTypeofFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -33,16 +33,16 @@ func TestValidTypeofFires(t *testing.T) {
 		{"the global undefined", "declare const value: unknown;\nexport const Bad = typeof value !== undefined;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ValidTypeof, typeofFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, ValidTypeof, typeofFile, testCase.sourceText),
 				"invalidTypeofValue")
 		})
 	}
 }
 
-func TestValidTypeofStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestValidTypeofStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -69,15 +69,15 @@ func TestValidTypeofStaysSilent(t *testing.T) {
 		{"a plain string comparison", "declare const value: string;\nexport const Ok = value === 'array';\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, ValidTypeof, typeofFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, ValidTypeof, typeofFile, testCase.sourceText))
 		})
 	}
 }
 
-func TestValidTypeofRequireStringLiterals(t *testing.T) {
-	t.Parallel()
+func TestValidTypeofRequireStringLiterals(test *testing.T) {
+	test.Parallel()
 
 	options := ValidTypeofOptions{RequireStringLiterals: true}
 	fires := []struct {
@@ -96,10 +96,10 @@ func TestValidTypeofRequireStringLiterals(t *testing.T) {
 		{"a misspelled literal", "declare const value: unknown;\nexport const Bad = typeof value == 'invalid string';\n", "invalidTypeofValue"},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedWithOptions(t, ValidTypeof, typeofFile, testCase.sourceText, options), testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedWithOptions(test, ValidTypeof, typeofFile, testCase.sourceText, options), testCase.want)
 		})
 	}
 
@@ -113,64 +113,64 @@ func TestValidTypeofRequireStringLiterals(t *testing.T) {
 		{"typeof outside a comparison", "declare const value: unknown;\nexport const Ok = typeof value + 'thing';\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunTypedWithOptions(t, ValidTypeof, typeofFile, testCase.sourceText, options))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunTypedWithOptions(test, ValidTypeof, typeofFile, testCase.sourceText, options))
 		})
 	}
 }
 
 // The global undefined carries upstream's one suggestion, quoting it, and nothing else carries any.
-func TestValidTypeofSuggestsQuotingUndefined(t *testing.T) {
-	t.Parallel()
+func TestValidTypeofSuggestsQuotingUndefined(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "declare const value: unknown;\nexport const Bad = typeof value === undefined;\n"
-	result := rule_testing.RunTyped(t, ValidTypeof, typeofFile, sourceText)
+	result := rule_testing.RunTyped(test, ValidTypeof, typeofFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	suggestions := result.Diagnostics[0].Suggestions
 	if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 || len(result.Diagnostics[0].Fixes) != 0 {
-		t.Fatalf("wanted one suggestion carrying one fix and no automatic fix, got %d suggestions", len(suggestions))
+		test.Fatalf("wanted one suggestion carrying one fix and no automatic fix, got %d suggestions", len(suggestions))
 	}
 	if suggestions[0].Message.Id != "suggestString" {
-		t.Fatalf("wanted suggestString, got %q", suggestions[0].Message.Id)
+		test.Fatalf("wanted suggestString, got %q", suggestions[0].Message.Id)
 	}
 	fix := suggestions[0].Fixes[0]
 	rewritten := sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]
 	want := "declare const value: unknown;\nexport const Bad = typeof value === \"undefined\";\n"
 	if rewritten != want {
-		t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, want)
+		test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, want)
 	}
 
-	misspelled := rule_testing.RunTyped(t, ValidTypeof, typeofFile,
+	misspelled := rule_testing.RunTyped(test, ValidTypeof, typeofFile,
 		"declare const value: unknown;\nexport const Bad = typeof value === 'strng';\n")
 	if len(misspelled.Diagnostics) != 1 || len(misspelled.Diagnostics[0].Suggestions) != 0 {
-		t.Fatalf("a misspelled literal should report once with no suggestion")
+		test.Fatalf("a misspelled literal should report once with no suggestion")
 	}
 }
 
 // The decoder takes upstream's empty object and refuses a key upstream's schema does not declare.
-func TestValidTypeofOptionsDecode(t *testing.T) {
-	t.Parallel()
+func TestValidTypeofOptionsDecode(test *testing.T) {
+	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[ValidTypeofOptions]()
 	decoded, err := decode([]byte(`{}`))
 	if err != nil {
-		t.Fatalf("an empty object should decode: %v", err)
+		test.Fatalf("an empty object should decode: %v", err)
 	}
 	if decoded.(ValidTypeofOptions).RequireStringLiterals {
-		t.Fatalf("requireStringLiterals should default to false")
+		test.Fatalf("requireStringLiterals should default to false")
 	}
 	decoded, err = decode([]byte(`{"requireStringLiterals": true}`))
 	if err != nil || !decoded.(ValidTypeofOptions).RequireStringLiterals {
-		t.Fatalf("requireStringLiterals should decode true, got %v, %v", decoded, err)
+		test.Fatalf("requireStringLiterals should decode true, got %v, %v", decoded, err)
 	}
 	if _, err := decode([]byte(`{"requireStringLiteral": true}`)); err == nil {
-		t.Fatalf("an unknown key should be refused")
+		test.Fatalf("an unknown key should be refused")
 	}
 	if _, err := decode([]byte(`{"RequireStringLiterals": true}`)); err == nil {
-		t.Fatalf("a key spelled in a different case should be refused")
+		test.Fatalf("a key spelled in a different case should be refused")
 	}
 }

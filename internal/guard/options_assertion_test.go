@@ -24,22 +24,22 @@ import (
 // any name, in a rule package. A parameter is an options parameter when it is typed `any` and sits
 // beside a rule.Context, which is Run's shape, or when it is named `options` and typed `any`, which
 // is the shape of a helper that resolves settings for its rule.
-func TestRulesReadOptionsThroughOptionsAs(t *testing.T) {
-	t.Parallel()
+func TestRulesReadOptionsThroughOptionsAs(test *testing.T) {
+	test.Parallel()
 
-	ruleFiles := ruleSourceFiles(t)
+	ruleFiles := ruleSourceFiles(test)
 	if len(ruleFiles) == 0 {
-		t.Fatal("found no rule source files, so this test proved nothing")
+		test.Fatal("found no rule source files, so this test proved nothing")
 	}
 
 	sawOptionsReader := false
 	for _, path := range ruleFiles {
-		facts := readOptionsFacts(t, path)
+		facts := readOptionsFacts(test, path)
 		if facts.readsThroughOptionsAs {
 			sawOptionsReader = true
 		}
 		for _, position := range facts.bareAssertions {
-			t.Errorf("%s asserts its options with a bare type assertion; read them with "+
+			test.Errorf("%s asserts its options with a bare type assertion; read them with "+
 				"rule.OptionsAs[T](options), so a decoder handing over a different type fails loudly "+
 				"instead of every configured option being ignored", position)
 		}
@@ -48,7 +48,7 @@ func TestRulesReadOptionsThroughOptionsAs(t *testing.T) {
 	if !sawOptionsReader {
 		// About two hundred rules read options today. Zero would mean the search is looking in the
 		// wrong place, or at the wrong call, rather than that no rule takes options.
-		t.Fatal("no rule source calls rule.OptionsAs, which is implausible: this check is looking " +
+		test.Fatal("no rule source calls rule.OptionsAs, which is implausible: this check is looking " +
 			"at the wrong files")
 	}
 }
@@ -57,8 +57,8 @@ func TestRulesReadOptionsThroughOptionsAs(t *testing.T) {
 //
 // Each source is written to a file and read the way the guard reads the tree, so the guard is shown
 // able to fail rather than only shown passing.
-func TestReadOptionsFactsSeesBareAssertions(t *testing.T) {
-	t.Parallel()
+func TestReadOptionsFactsSeesBareAssertions(test *testing.T) {
+	test.Parallel()
 
 	testCases := []struct {
 		name        string
@@ -128,16 +128,16 @@ func probe(node any) bool { _, ok := node.(string); return ok }`,
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			path := filepath.Join(t.TempDir(), "probe.go")
+			path := filepath.Join(test.TempDir(), "probe.go")
 			if err := os.WriteFile(path, []byte(testCase.source), 0o644); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
-			facts := readOptionsFacts(t, path)
+			facts := readOptionsFacts(test, path)
 			if len(facts.bareAssertions) != testCase.bare || facts.readsThroughOptionsAs != testCase.optionsAsOk {
-				t.Errorf("got %d bare assertions and OptionsAs %v, want %d and %v",
+				test.Errorf("got %d bare assertions and OptionsAs %v, want %d and %v",
 					len(facts.bareAssertions), facts.readsThroughOptionsAs, testCase.bare, testCase.optionsAsOk)
 			}
 		})
@@ -153,13 +153,13 @@ type optionsFacts struct {
 }
 
 // readOptionsFacts parses one file and reports how it reads its options.
-func readOptionsFacts(t *testing.T, path string) optionsFacts {
-	t.Helper()
+func readOptionsFacts(test *testing.T, path string) optionsFacts {
+	test.Helper()
 
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, path, nil, 0)
 	if err != nil {
-		t.Fatalf("parsing %s: %v", path, err)
+		test.Fatalf("parsing %s: %v", path, err)
 	}
 
 	// Options parameter names, collected per function signature: an `any` parameter beside a

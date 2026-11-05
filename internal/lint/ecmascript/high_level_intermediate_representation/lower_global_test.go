@@ -8,8 +8,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestGlobalLoadsRetainBindingProvenance(t *testing.T) {
-	t.Parallel()
+func TestGlobalLoadsRetainBindingProvenance(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name       string
 		prefix     string
@@ -27,8 +27,8 @@ func TestGlobalLoadsRetainBindingProvenance(t *testing.T) {
 		{"global", "", "", GlobalBindingKindGlobal, "", "", 1},
 		{"shadowed import", `import {value} from './library';`, "value: number", GlobalBindingKindGlobal, "", "", 0},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			visited, loads := 0, 0
 			probe := rule.Rule{Name: "global-load-provenance", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
@@ -38,7 +38,7 @@ func TestGlobalLoadsRetainBindingProvenance(t *testing.T) {
 						}
 						function := Lower(node, ctx.TypeChecker)
 						if function == nil {
-							t.Fatal("function did not lower")
+							test.Fatal("function did not lower")
 						}
 						visited++
 						for _, instruction := range function.Instructions {
@@ -48,18 +48,18 @@ func TestGlobalLoadsRetainBindingProvenance(t *testing.T) {
 							}
 							loads++
 							if load.BindingKind != testCase.kind || load.Source != testCase.module || load.Imported != testCase.imported {
-								t.Errorf("load=%+v, want kind=%v source=%q imported=%q", load, testCase.kind, testCase.module, testCase.imported)
+								test.Errorf("load=%+v, want kind=%v source=%q imported=%q", load, testCase.kind, testCase.module, testCase.imported)
 							}
 						}
 					})
 				}}
 			}}
-			rule_testing.RunTypedFiles(t, probe, map[string]string{
+			rule_testing.RunTypedFiles(test, probe, map[string]string{
 				"/library.ts": `export const value = 1; export const exported = 2; export default value;`,
 				"/fixture.ts": testCase.prefix + " function Component(" + testCase.parameters + ") {return value;}",
 			}, "/fixture.ts")
 			if visited != 1 || loads != testCase.loads {
-				t.Fatalf("visited=%d loads=%d, want 1 and %d", visited, loads, testCase.loads)
+				test.Fatalf("visited=%d loads=%d, want 1 and %d", visited, loads, testCase.loads)
 			}
 		})
 	}

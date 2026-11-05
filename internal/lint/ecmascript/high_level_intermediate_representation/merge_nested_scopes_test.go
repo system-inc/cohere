@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestNestedScopeMergeMatchesEnclosingDependencies(t *testing.T) {
-	t.Parallel()
+func TestNestedScopeMergeMatchesEnclosingDependencies(test *testing.T) {
+	test.Parallel()
 	const input static_single_assignment.IdentifierId = 1
 	for _, testCase := range []struct {
 		name                      string
@@ -24,8 +24,8 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(t *testing.T) {
 		{name: "pruned bridge", prunedBridge: true, removed: 1},
 		{name: "different optionality", outer: []ReactiveScopeDependency{{Identifier: input, Path: []DependencyPathEntry{{Property: "value"}}}}, inner: []ReactiveScopeDependency{{Identifier: input, Path: []DependencyPathEntry{{Property: "value", Optional: true}}}}},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			function := NewFunction(nil, "helper", FunctionKindOther)
 			function.NewIdentifier("condition", nil, 0)
 			function.NewIdentifier("input", nil, 1)
@@ -45,13 +45,13 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(t *testing.T) {
 			}}
 			result := MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, nil)
 			if result.NestedScopesRemoved != testCase.removed || result.Merges != 0 {
-				t.Fatalf("merge result=%+v, want %d nested removals and no adjacent merges", result, testCase.removed)
+				test.Fatalf("merge result=%+v, want %d nested removals and no adjacent merges", result, testCase.removed)
 			}
 			instructions, innerScopes := 0, 0
 			VisitReactiveFunction(tree, ReactiveVisitor{
 				Instruction: func(instruction *ReactiveInstruction, traverse func()) {
 					if instruction != leaf {
-						t.Error("instruction replaced")
+						test.Error("instruction replaced")
 					}
 					instructions++
 					traverse()
@@ -61,20 +61,20 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(t *testing.T) {
 						innerScopes++
 					}
 					if len(scope.Merged) != 0 {
-						t.Error("nested removal recorded as an adjacent merge")
+						test.Error("nested removal recorded as an adjacent merge")
 					}
 					traverse()
 				},
 			})
 			if instructions != 1 || innerScopes != 1-testCase.removed {
-				t.Fatalf("instructions=%d inner scopes=%d", instructions, innerScopes)
+				test.Fatalf("instructions=%d inner scopes=%d", instructions, innerScopes)
 			}
 		})
 	}
 }
 
-func TestManualMemoizationChecksNestedScopeAfterDependencyPruning(t *testing.T) {
-	t.Parallel()
+func TestManualMemoizationChecksNestedScopeAfterDependencyPruning(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		name, parameters, arguments, dependencies string
 		fires                                     bool
@@ -83,8 +83,8 @@ func TestManualMemoizationChecksNestedScopeAfterDependencyPruning(t *testing.T) 
 		{"reactive inputs", "props", "props.theme", "enabled", false},
 		{"missing dependency", "props", "props.theme", "", true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := `import {useCallback} from 'react'; function Component(` + testCase.parameters + `) {
 const theme=mergeTheme(` + testCase.arguments + `);
 const enabled=theme.enabled===true;
@@ -92,9 +92,9 @@ const callback=useCallback(value=>[value,enabled],[` + testCase.dependencies + `
 mutate(theme.colors);
 return <div onClick={callback}/>;
 }`
-			findings, lowered := findingsForSource(t, source)
+			findings, lowered := findingsForSource(test, source)
 			if !lowered || (len(findings) > 0) != testCase.fires {
-				t.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)
+				test.Fatalf("lowered=%t findings=%v; want fires=%t", lowered, findings, testCase.fires)
 			}
 		})
 	}

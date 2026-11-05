@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestConsistencyNoUtilsFolderFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoUtilsFolderFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		fileName string
@@ -18,16 +18,16 @@ func TestConsistencyNoUtilsFolderFires(t *testing.T) {
 		{"/project/utils/nested/deep/Thing.ts", []string{"noUtils"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoUtilsFolder, testCase.fileName, "export const Value = 1;\n")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoUtilsFolder, testCase.fileName, "export const Value = 1;\n")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
-func TestConsistencyNoUtilsFolderStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoUtilsFolderStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	// The last two are the ones that matter. A substring match would flag both, and a rule that
 	// fires on the exact spelling it is asking for is worse than no rule at all.
@@ -39,10 +39,10 @@ func TestConsistencyNoUtilsFolderStaysSilent(t *testing.T) {
 		"/project/source/myutils/Thing.ts",
 	}
 	for _, fileName := range cases {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoUtilsFolder, fileName, "export const Value = 1;\n")
-			rule_testing.ExpectClean(t, result)
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoUtilsFolder, fileName, "export const Value = 1;\n")
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

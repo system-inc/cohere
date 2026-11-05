@@ -153,11 +153,11 @@ type yamlCorpus struct {
 // into each nested repository as a corpus of its own, with its own config. So the files measured are
 // the ones the formatter would be given, and not, say, the debug-symbol YAML a Swift build leaves in
 // .build, which no repository formats and the oracle's goja runtime overflows its stack on.
-func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
-	t.Helper()
+func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
+	test.Helper()
 	enumerator, err := prettier.New(formatoptions.Default())
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var corpora []yamlCorpus
 	pending := strings.Split(roots, ":")
@@ -178,7 +178,7 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
 		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(root)
 		if err != nil {
-			t.Fatalf("finding the repositories nested in %s: %v", root, err)
+			test.Fatalf("finding the repositories nested in %s: %v", root, err)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(root, nested))
@@ -186,11 +186,11 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 
 		enumeration, err := enumerator.Enumerate(root)
 		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			t.Logf("skipping %s, not yet adopted: %v", root, err)
+			test.Logf("skipping %s, not yet adopted: %v", root, err)
 			continue
 		}
 		if err != nil {
-			t.Fatalf("enumerating %s: %v", root, err)
+			test.Fatalf("enumerating %s: %v", root, err)
 		}
 		corpus := yamlCorpus{root: root}
 		for _, file := range enumeration.Files {
@@ -212,7 +212,7 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 		// only JavaScript reads) measures the printer just as well under the defaults.
 		corpus.options = formatoptions.Default()
 		if resolution, err := formatoptions.Resolve(root); err != nil {
-			t.Logf("%s: formatting with the default options: %v", root, err)
+			test.Logf("%s: formatting with the default options: %v", root, err)
 		} else {
 			corpus.options = resolution.Options
 		}
@@ -223,30 +223,30 @@ func yamlCorpora(t *testing.T, roots string) []yamlCorpus {
 	for _, corpus := range corpora {
 		measured = append(measured, fmt.Sprintf("%s (%d yaml, %d md)", corpus.root, len(corpus.yamlFiles), len(corpus.markdownFiles)))
 	}
-	t.Logf("yaml corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
+	test.Logf("yaml corpora: %d\n  %s", len(corpora), strings.Join(measured, "\n  "))
 	return corpora
 }
 
-func TestCorpusFormatMatchesOracle(t *testing.T) {
-	t.Parallel()
+func TestCorpusFormatMatchesOracle(test *testing.T) {
+	test.Parallel()
 	roots := os.Getenv("COHERE_YAML_CORPUS")
 	if roots == "" {
-		t.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
+		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
 	}
 
 	bundles, err := prettier.Bundles()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	digest, err := prettier.DigestBundles(bundles.Files)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
 		base, err := os.UserCacheDir()
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
@@ -259,7 +259,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 	}
 	syntaxErrors, tooLarge, parseDisagreements := 0, 0, 0
 	var report strings.Builder
-	for _, corpus := range yamlCorpora(t, roots) {
+	for _, corpus := range yamlCorpora(test, roots) {
 		options := corpus.options
 		newEngine := func() (*prettier.Engine, error) { return prettier.New(options) }
 
@@ -270,7 +270,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		for _, path := range corpus.yamlFiles {
 			source, err := os.ReadFile(path)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			if len(source) > oracleSizeLimit {
 				tooLarge++
@@ -282,7 +282,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			candidate.texts[path] = normalized
 			texts = append(texts, normalized)
 		}
-		for index, tree := range parseTrees(t, texts) {
+		for index, tree := range parseTrees(test, texts) {
 			candidate.trees[yamlFiles[index]] = tree
 		}
 		// TestCorpora's identity, character for character, so both share one cache.
@@ -292,14 +292,14 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			func() (differential.Formatter, error) { return candidate, nil },
 			runtime.NumCPU(), yamlCache)
 		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+			test.Fatalf("comparing %s: %v", corpus.root, err)
 		}
 		yamlFullStackReport, err := differential.Compare(corpus.root, yamlFiles,
 			func() (differential.Formatter, error) { return newEngine() },
 			func() (differential.Formatter, error) { return fullStack, nil },
 			runtime.NumCPU(), yamlCache)
 		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+			test.Fatalf("comparing %s: %v", corpus.root, err)
 		}
 
 		// The front matter of the markdown files: yaml, with a value left once trimmed.
@@ -308,7 +308,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		for _, path := range corpus.markdownFiles {
 			source, err := os.ReadFile(path)
 			if err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 			normalized, _ := normalizeInput(string(source))
 			frontMatter, _ := mdast.ParseFrontMatter(normalized)
@@ -325,7 +325,7 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 			values = append(values, value)
 		}
 		var measuredFrontMatterFiles []string
-		for index, tree := range parseTrees(t, values) {
+		for index, tree := range parseTrees(test, values) {
 			frontMatters.trees[frontMatterFiles[index]] = tree
 			// The Go parser must refuse exactly the values the real one refuses.
 			if _, err := parse(values[index], nil); (err != nil) != (tree.err != "") {
@@ -350,14 +350,14 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 		frontMatterReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
 			func() (differential.Formatter, error) { return frontMatters, nil }, runtime.NumCPU(), frontMatterCache)
 		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+			test.Fatalf("comparing %s: %v", corpus.root, err)
 		}
 		frontMatterFullStack := frontMatters
 		frontMatterFullStack.fullStack = true
 		frontMatterFullStackReport, err := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
 			func() (differential.Formatter, error) { return frontMatterFullStack, nil }, runtime.NumCPU(), frontMatterCache)
 		if err != nil {
-			t.Fatalf("comparing %s: %v", corpus.root, err)
+			test.Fatalf("comparing %s: %v", corpus.root, err)
 		}
 
 		for _, named := range []struct {
@@ -393,26 +393,26 @@ func TestCorpusFormatMatchesOracle(t *testing.T) {
 	}
 	for _, name := range measures {
 		counts := totals[name]
-		t.Logf("%s: %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%), refused %d, oracle failed %d",
+		test.Logf("%s: %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%), refused %d, oracle failed %d",
 			name, counts.identical, counts.measured, percent(counts.identical, counts.measured),
 			counts.rewriteIdentical, counts.rewriteTotal, percent(counts.rewriteIdentical, counts.rewriteTotal),
 			counts.refused, counts.oracleFailed)
 	}
-	t.Logf("front matter not measured, a YAML syntax error: %d (the Go parser disagrees on %d); yaml files not measured, over %d bytes: %d",
+	test.Logf("front matter not measured, a YAML syntax error: %d (the Go parser disagrees on %d); yaml files not measured, over %d bytes: %d",
 		syntaxErrors, parseDisagreements, oracleSizeLimit, tooLarge)
 	if parseDisagreements > 0 {
-		t.Errorf("the Go parser and the real one disagree on whether %d front matter values parse", parseDisagreements)
+		test.Errorf("the Go parser and the real one disagree on whether %d front matter values parse", parseDisagreements)
 	}
 	for index, line := range strings.SplitAfter(report.String(), "\n") {
 		if index == 30 || line == "" {
 			break
 		}
-		t.Log(strings.TrimSpace(line))
+		test.Log(strings.TrimSpace(line))
 	}
 
 	if path := os.Getenv("COHERE_YAML_REPORT"); path != "" {
 		if err := os.WriteFile(path, []byte(report.String()), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 }

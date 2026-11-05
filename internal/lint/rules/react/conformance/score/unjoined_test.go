@@ -17,14 +17,14 @@ import (
 // This enumerates the drops instead. It exists because a mutation making unjoined ids map to a
 // default message SURVIVED the whole suite: nothing could see the join's behaviour on an id outside
 // the table, in either direction.
-func TestUnjoinedMessageIdsAreEnumerated(t *testing.T) {
-	t.Parallel()
+func TestUnjoinedMessageIdsAreEnumerated(test *testing.T) {
+	test.Parallel()
 	if testing.Short() {
-		t.Skip("builds a TypeScript program per fixture")
+		test.Skip("builds a TypeScript program per fixture")
 	}
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+		test.Fatalf("loading the corpus: %v", err)
 	}
 
 	// The ids the join is EXPECTED to carry, written as literals rather than read from
@@ -63,7 +63,7 @@ func TestUnjoinedMessageIdsAreEnumerated(t *testing.T) {
 		subject := Rules[upstream]
 		// Widen the table to catch everything, then compare against the real one.
 		for _, fixture := range SelectFixtures(fixtures, upstream) {
-			raw, err := analyzeRaw(subject, fixture, t.TempDir())
+			raw, err := analyzeRaw(subject, fixture, test.TempDir())
 			if err != nil {
 				continue
 			}
@@ -83,7 +83,7 @@ func TestUnjoinedMessageIdsAreEnumerated(t *testing.T) {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		t.Logf("  dropped %3d findings: %s", dropped[key], key)
+		test.Logf("  dropped %3d findings: %s", dropped[key], key)
 	}
 	for _, k := range func() []string {
 		var o []string
@@ -93,20 +93,20 @@ func TestUnjoinedMessageIdsAreEnumerated(t *testing.T) {
 		sort.Strings(o)
 		return o
 	}() {
-		t.Logf("  OBSERVED %s x%d", k, observedIds[k])
+		test.Logf("  OBSERVED %s x%d", k, observedIds[k])
 	}
-	t.Logf("%d raw findings observed; %d distinct message ids dropped by the join", seen, len(keys))
+	test.Logf("%d raw findings observed; %d distinct message ids dropped by the join", seen, len(keys))
 
 	// The control for the zero above. `0 dropped` and `0 observed` print the same digit, and a
 	// probe that sees nothing satisfies the assertion vacuously. Measured: the wired rules emit
 	// findings on their own fixtures, so a zero below means the probe never ran.
 	if seen == 0 {
-		t.Fatal("observed no findings at all, so the dropped-id count proves nothing")
+		test.Fatal("observed no findings at all, so the dropped-id count proves nothing")
 	}
 
 	// Pinned. A new unjoined id appearing means either a rule grew a message or the join went stale,
 	// and both deserve a deliberate look rather than silent absorption into the failure count.
 	if len(keys) != 0 {
-		t.Errorf("the message join drops %d distinct ids; enumerate them above and either join or state each", len(keys))
+		test.Errorf("the message join drops %d distinct ids; enumerate them above and either join or state each", len(keys))
 	}
 }

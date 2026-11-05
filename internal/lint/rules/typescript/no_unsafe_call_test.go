@@ -22,8 +22,8 @@ func noUnsafeCallCaseName(index int) string {
 // a fixture to override it. All fifteen are clean under both settings, so nothing here depends on
 // which one is in force. The two cases where the setting DOES decide the verdict are in the
 // firing test, at the ids upstream produces under our configuration.
-func TestNoUnsafeCallStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeCallStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"function foo(x: () => void) {\n  x();\n}\n",
@@ -64,9 +64,9 @@ func TestNoUnsafeCallStaysSilent(t *testing.T) {
 		"declare function tag(strings: TemplateStringsArray): string;\ntag`hello`;\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noUnsafeCallCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUnsafeCall, noUnsafeCallFile, sourceText))
+		test.Run(noUnsafeCallCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUnsafeCall, noUnsafeCallFile, sourceText))
 		})
 	}
 }
@@ -95,8 +95,8 @@ type noUnsafeCallFinding struct {
 // than on most rules because the three anchors point at different things: a call and a tagged
 // template report on the CALLEE, so `x.a.b.c.d.e.f.g()` underlines everything but the parentheses,
 // while `new` reports on the WHOLE expression. Collapsing those would satisfy every id.
-func TestNoUnsafeCallFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeCallFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -371,15 +371,15 @@ func TestNoUnsafeCallFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noUnsafeCallCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoUnsafeCall, noUnsafeCallFile, testCase.sourceText)
+		test.Run(noUnsafeCallCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoUnsafeCall, noUnsafeCallFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so the span slices are against that text
 			// rather than the Go literal above.
@@ -389,14 +389,14 @@ func TestNoUnsafeCallFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}

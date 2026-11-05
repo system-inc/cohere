@@ -40,9 +40,9 @@ func correctnessNoCollectionMisuseSource(lines ...string) string {
 	return correctnessNoCollectionMisusePrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoCollectionMisuseRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoCollectionMisuse, map[string]string{
+func correctnessNoCollectionMisuseRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoCollectionMisuse, map[string]string{
 		correctnessNoCollectionMisuseFile: sourceText,
 	}, correctnessNoCollectionMisuseFile)
 }
@@ -55,11 +55,11 @@ type correctnessNoCollectionMisuseFinding struct {
 
 // correctnessNoCollectionMisuseExpect asserts the findings in source order, and that none carries a
 // fix.
-func correctnessNoCollectionMisuseExpect(t *testing.T, result rule_testing.Result, want []correctnessNoCollectionMisuseFinding) {
-	t.Helper()
+func correctnessNoCollectionMisuseExpect(test *testing.T, result rule_testing.Result, want []correctnessNoCollectionMisuseFinding) {
+	test.Helper()
 	// A silent case goes through the shared assertion that the rule stays quiet.
 	if len(want) == 0 {
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 		return
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
@@ -72,15 +72,15 @@ func correctnessNoCollectionMisuseExpect(t *testing.T, result rule_testing.Resul
 	for _, finding := range want {
 		wantIds = append(wantIds, finding.id)
 	}
-	rule_testing.ExpectFindings(t, sorted, wantIds...)
+	rule_testing.ExpectFindings(test, sorted, wantIds...)
 	text := result.SourceFile.Text()
 	for index, diagnostic := range diagnostics {
 		got := correctnessNoCollectionMisuseFinding{diagnostic.Message.Id, text[diagnostic.Range.Pos():diagnostic.Range.End()]}
 		if got != want[index] {
-			t.Fatalf("finding %d is %v, want %v", index, got, want[index])
+			test.Fatalf("finding %d is %v, want %v", index, got, want[index])
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 }
@@ -102,10 +102,10 @@ func correctnessNoCollectionMisuseObject(span string) correctnessNoCollectionMis
 }
 
 // The research's shape for `in`, a role looked for in a list of roles, beside its fix.
-func TestCorrectnessNoCollectionMisuseInOnArray(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCollectionMisuseInOnArray(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCollectionMisuseRun(t, correctnessNoCollectionMisuseSource(
+	result := correctnessNoCollectionMisuseRun(test, correctnessNoCollectionMisuseSource(
 		"if('Admin' in roles) use(1);",
 		"if(roles.includes('Admin')) use(1);",
 		"use(role in roles);",
@@ -113,7 +113,7 @@ func TestCorrectnessNoCollectionMisuseInOnArray(t *testing.T) {
 		"use('third' in pair);",
 		"use(('Admin') in (roles));",
 	))
-	correctnessNoCollectionMisuseExpect(t, result, []correctnessNoCollectionMisuseFinding{
+	correctnessNoCollectionMisuseExpect(test, result, []correctnessNoCollectionMisuseFinding{
 		correctnessNoCollectionMisuseIn("'Admin' in roles"),
 		correctnessNoCollectionMisuseIn("role in roles"),
 		correctnessNoCollectionMisuseIn("'third' in pair"),
@@ -123,10 +123,10 @@ func TestCorrectnessNoCollectionMisuseInOnArray(t *testing.T) {
 
 // `in` that asks for a real index or member, a left side that may hold an index, and a right side
 // that is not purely an array.
-func TestCorrectnessNoCollectionMisuseInStaysSilentOnIndexesAndMembers(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCollectionMisuseInStaysSilentOnIndexesAndMembers(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCollectionMisuseRun(t, correctnessNoCollectionMisuseSource(
+	result := correctnessNoCollectionMisuseRun(test, correctnessNoCollectionMisuseSource(
 		"use(0 in sparse);",
 		"use(index in sparse);",
 		"use('0' in roles);",
@@ -139,14 +139,14 @@ func TestCorrectnessNoCollectionMisuseInStaysSilentOnIndexesAndMembers(t *testin
 		"use('Admin' in (roles as Role[] | Record<string, number>));",
 		"use(Symbol.iterator in roles);",
 	))
-	correctnessNoCollectionMisuseExpect(t, result, nil)
+	correctnessNoCollectionMisuseExpect(test, result, nil)
 }
 
 // Every comparison whose answer cannot change, on every sized receiver, either way round.
-func TestCorrectnessNoCollectionMisuseImpossibleSizeComparison(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCollectionMisuseImpossibleSizeComparison(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCollectionMisuseRun(t, correctnessNoCollectionMisuseSource(
+	result := correctnessNoCollectionMisuseRun(test, correctnessNoCollectionMisuseSource(
 		"if(items.length < 0) use(1);",
 		"use(0 > items.length);",
 		"use(text.length === -1);",
@@ -158,7 +158,7 @@ func TestCorrectnessNoCollectionMisuseImpossibleSizeComparison(t *testing.T) {
 		"use(-1 != (items.length));",
 		"function generic<Values extends string[]>(values: Values) { use(values.length < 0); }",
 	))
-	correctnessNoCollectionMisuseExpect(t, result, []correctnessNoCollectionMisuseFinding{
+	correctnessNoCollectionMisuseExpect(test, result, []correctnessNoCollectionMisuseFinding{
 		correctnessNoCollectionMisuseSize("items.length < 0"),
 		correctnessNoCollectionMisuseSize("0 > items.length"),
 		correctnessNoCollectionMisuseSize("text.length === -1"),
@@ -174,10 +174,10 @@ func TestCorrectnessNoCollectionMisuseImpossibleSizeComparison(t *testing.T) {
 
 // Comparisons that can go either way, a length that may be undefined, and lengths that are not a
 // built-in's.
-func TestCorrectnessNoCollectionMisuseSizeComparisonStaysSilentWhenItCanChange(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCollectionMisuseSizeComparisonStaysSilentWhenItCanChange(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCollectionMisuseRun(t, correctnessNoCollectionMisuseSource(
+	result := correctnessNoCollectionMisuseRun(test, correctnessNoCollectionMisuseSource(
 		"use(items.length === 0);",
 		"use(items.length > 0);",
 		"use(items.length >= 1);",
@@ -190,14 +190,14 @@ func TestCorrectnessNoCollectionMisuseSizeComparisonStaysSilentWhenItCanChange(t
 		"use(use.length < 0);",
 		"use(count < 0);",
 	))
-	correctnessNoCollectionMisuseExpect(t, result, nil)
+	correctnessNoCollectionMisuseExpect(test, result, nil)
 }
 
 // Brackets on a Map or Set with keys that can name no member, and Object's listing methods on one.
-func TestCorrectnessNoCollectionMisuseOnMapsAndSets(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCollectionMisuseOnMapsAndSets(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCollectionMisuseRun(t, correctnessNoCollectionMisuseSource(
+	result := correctnessNoCollectionMisuseRun(test, correctnessNoCollectionMisuseSource(
 		"cache['total'] = 1;",
 		"use(cache.get('total'));",
 		"use(seen[0]);",
@@ -208,7 +208,7 @@ func TestCorrectnessNoCollectionMisuseOnMapsAndSets(t *testing.T) {
 		"use(Object.values(seen));",
 		"use(Object.getOwnPropertyNames(weak));",
 	))
-	correctnessNoCollectionMisuseExpect(t, result, []correctnessNoCollectionMisuseFinding{
+	correctnessNoCollectionMisuseExpect(test, result, []correctnessNoCollectionMisuseFinding{
 		correctnessNoCollectionMisuseBracket("cache['total']"),
 		correctnessNoCollectionMisuseBracket("seen[0]"),
 		correctnessNoCollectionMisuseBracket("lookup[index]"),
@@ -221,10 +221,10 @@ func TestCorrectnessNoCollectionMisuseOnMapsAndSets(t *testing.T) {
 
 // Keys that name real members or may, plain records, a subclass with fields of its own, a project
 // class named Map, and a local `Object`.
-func TestCorrectnessNoCollectionMisuseOnMapsAndSetsStaysSilentOnMembersAndLookalikes(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoCollectionMisuseOnMapsAndSetsStaysSilentOnMembersAndLookalikes(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoCollectionMisuseRun(t, correctnessNoCollectionMisuseSource(
+	result := correctnessNoCollectionMisuseRun(test, correctnessNoCollectionMisuseSource(
 		"use(cache['size']);",
 		"use(cache['get']);",
 		"use(cache[Symbol.iterator]);",
@@ -250,5 +250,5 @@ func TestCorrectnessNoCollectionMisuseOnMapsAndSetsStaysSilentOnMembersAndLookal
 		"    use(Object.keys(cache));",
 		"}",
 	))
-	correctnessNoCollectionMisuseExpect(t, result, nil)
+	correctnessNoCollectionMisuseExpect(test, result, nil)
 }

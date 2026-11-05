@@ -34,19 +34,19 @@ func newCapturedRun(subject rule.Rule, fileName string, otherFiles int, options 
 // an Expect helper: a replayed upstream corpus that checks each finding's span, text and message, which
 // ExpectFindings cannot express. Call it only after that comparison passed. Without it the docs capture
 // never sees the case, and rules.json never learns a message id only such a corpus asserts.
-func RecordAssertedCase(t *testing.T, result Result) {
-	t.Helper()
+func RecordAssertedCase(test *testing.T, result Result) {
+	test.Helper()
 	outcome := capture.OutcomeFindings
 	if len(result.Diagnostics) == 0 {
 		outcome = capture.OutcomeClean
 	}
-	recordCase(t, result, outcome, "")
+	recordCase(test, result, outcome, "")
 }
 
 // recordCase writes the case an assertion just passed on. Called at the end of each Expect, after every
 // check, so only an asserted outcome is ever recorded.
-func recordCase(t *testing.T, result Result, outcome string, fixedSource string) {
-	t.Helper()
+func recordCase(test *testing.T, result Result, outcome string, fixedSource string) {
+	test.Helper()
 	if result.capture == nil || result.SourceFile == nil {
 		return
 	}
@@ -62,7 +62,7 @@ func recordCase(t *testing.T, result Result, outcome string, fixedSource string)
 		encoded, err := json.Marshal(result.capture.options)
 		if err != nil {
 			// A case whose options cannot be shown cannot be an example either; the test itself passed.
-			t.Logf("docs capture: skipping a case whose options do not encode: %v", err)
+			test.Logf("docs capture: skipping a case whose options do not encode: %v", err)
 			return
 		}
 		record.Options = encoded
@@ -87,6 +87,6 @@ func recordCase(t *testing.T, result Result, outcome string, fixedSource string)
 		})
 	}
 	if err := capture.Write(record); err != nil {
-		t.Fatalf("docs capture: %v", err)
+		test.Fatalf("docs capture: %v", err)
 	}
 }

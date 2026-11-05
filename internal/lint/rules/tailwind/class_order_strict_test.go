@@ -24,20 +24,20 @@ import (
 //	const [parsed] = designSystem.parseCandidate(className);
 //	const variants = parsed?.variants?.map((variant) => designSystem.printVariant(variant)).reverse()
 //	    ?? className.match(/^(.*):/)?.[1]?.split(':') ?? [];
-func TestStrictVariantsMatchUpstream(t *testing.T) {
-	t.Parallel()
-	forEachThemeSystem(t, func(t *testing.T, designSystem DesignSystemResult) {
-		expectStrictVariantsMatchUpstream(t, designSystem)
+func TestStrictVariantsMatchUpstream(test *testing.T) {
+	test.Parallel()
+	forEachThemeSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
+		expectStrictVariantsMatchUpstream(test, designSystem)
 	})
 }
 
 // expectStrictVariantsMatchUpstream compares strict order's variants with upstream's goldens on one system.
-func expectStrictVariantsMatchUpstream(t *testing.T, designSystem DesignSystemResult) {
-	t.Helper()
+func expectStrictVariantsMatchUpstream(test *testing.T, designSystem DesignSystemResult) {
+	test.Helper()
 
 	data, err := os.ReadFile(filepath.Join("testdata", "strict_variants.json"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	var file struct {
 		Classes []struct {
@@ -46,10 +46,10 @@ func expectStrictVariantsMatchUpstream(t *testing.T, designSystem DesignSystemRe
 		} `json:"classes"`
 	}
 	if err := json.Unmarshal(data, &file); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(file.Classes) < 100 {
-		t.Fatalf("only %d classes in the goldens, too few to speak for the printer", len(file.Classes))
+		test.Fatalf("only %d classes in the goldens, too few to speak for the printer", len(file.Classes))
 	}
 
 	for _, golden := range file.Classes {
@@ -58,15 +58,15 @@ func expectStrictVariantsMatchUpstream(t *testing.T, designSystem DesignSystemRe
 			continue
 		}
 		if !slices.Equal(got, golden.Variants) {
-			t.Errorf("%s: variants %q, upstream %q", golden.ClassName, got, golden.Variants)
+			test.Errorf("%s: variants %q, upstream %q", golden.ClassName, got, golden.Variants)
 		}
 	}
 }
 
 // TestStrictOrderMatchesUpstream is upstream's own four cases for `order: "strict"`
 // (enforce-consistent-class-order.test.ts at 4.7.0), written and wanted exactly as their jsx case is.
-func TestStrictOrderMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestStrictOrderMatchesUpstream(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -92,12 +92,12 @@ func TestStrictOrderMatchesUpstream(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runClassOrderFixtureWithOptions(t,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runClassOrderFixtureWithOptions(test,
 				`export const element = <img className="`+testCase.source+`" />;`,
 				EnforceConsistentClassOrderOptions{Order: "strict"})
-			rule_testing.ExpectFixedSource(t, result, `export const element = <img className="`+testCase.want+`" />;`+"\n")
+			rule_testing.ExpectFixedSource(test, result, `export const element = <img className="`+testCase.want+`" />;`+"\n")
 		})
 	}
 }
@@ -108,12 +108,12 @@ func TestStrictOrderMatchesUpstream(t *testing.T) {
 // slot as a trailing space), and `flex block flex` becomes `block flex `, while official keeps both.
 // This rule never reaches it in practice, since a literal holding a repeat waits for
 // no-duplicate-classes before it is ordered; both paths end at `a b`.
-func TestStrictOrderKeysClassesByName(t *testing.T) {
-	t.Parallel()
+func TestStrictOrderKeysClassesByName(test *testing.T) {
+	test.Parallel()
 	if got := strictClassOrder([]string{"a", "b", "a"}, nil); !slices.Equal(got, []string{"a", "b"}) {
-		t.Errorf("strict order of a b a: %q, want upstream's [a b]", got)
+		test.Errorf("strict order of a b a: %q, want upstream's [a b]", got)
 	}
-	rule_testing.ExpectClean(t, runClassOrderFixtureWithOptions(t,
+	rule_testing.ExpectClean(test, runClassOrderFixtureWithOptions(test,
 		`export const element = <img className="flex block flex" />;`,
 		EnforceConsistentClassOrderOptions{Order: "strict"}))
 }

@@ -19,8 +19,8 @@ import (
 // is keyed under a different rule name on each side, so every finding becomes one-sided and the
 // report is a total mismatch — which is indistinguishable, in shape, from a real 130-finding
 // disagreement. A well-formed report of a comparison that did not happen.
-func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
-	t.Parallel()
+func TestRuleNamesFromBothGatesCollapseToTheSameName(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		raw    string
 		expect string
@@ -39,7 +39,7 @@ func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
 
 	for _, testCase := range cases {
 		if got := NormalizeRuleName(testCase.raw); got != testCase.expect {
-			t.Errorf("NormalizeRuleName(%q) = %q, want %q", testCase.raw, got, testCase.expect)
+			test.Errorf("NormalizeRuleName(%q) = %q, want %q", testCase.raw, got, testCase.expect)
 		}
 	}
 
@@ -50,7 +50,7 @@ func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
 	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
 	fromCohere := NormalizeRuleName("consistency-no-enum/noEnum")
 	if fromGate != fromCohere {
-		t.Fatalf("the same rule normalized to %q from the gate and %q from cohere, so no finding could ever match", fromGate, fromCohere)
+		test.Fatalf("the same rule normalized to %q from the gate and %q from cohere, so no finding could ever match", fromGate, fromCohere)
 	}
 }
 
@@ -59,8 +59,8 @@ func TestRuleNamesFromBothGatesCollapseToTheSameName(t *testing.T) {
 // Both directions are tested because they fail independently: a harness that only ever sees the
 // gate's findings reports a clean diff for every defect cohere finds alone, and it looks exactly
 // like agreement.
-func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
-	t.Parallel()
+func TestCompareDetectsADifferenceInEachDirection(test *testing.T) {
+	test.Parallel()
 	rules := Inputs{
 		CohereRules:     map[string]bool{"consistency-no-enum": true},
 		ConfiguredRules: map[string]bool{"consistency-no-enum": true},
@@ -73,10 +73,10 @@ func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
 
 	report := Compare(onlyCohere)
 	if len(report.Differences) != 1 {
-		t.Fatalf("a finding only cohere reported must surface as one difference, got %d", len(report.Differences))
+		test.Fatalf("a finding only cohere reported must surface as one difference, got %d", len(report.Differences))
 	}
 	if report.Differences[0].OnlyOn != SideCohere {
-		t.Fatalf("difference attributed to %q, want %q", report.Differences[0].OnlyOn, SideCohere)
+		test.Fatalf("difference attributed to %q, want %q", report.Differences[0].OnlyOn, SideCohere)
 	}
 
 	onlyGate := rules
@@ -86,10 +86,10 @@ func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
 
 	report = Compare(onlyGate)
 	if len(report.Differences) != 1 {
-		t.Fatalf("a finding only the gate reported must surface as one difference, got %d", len(report.Differences))
+		test.Fatalf("a finding only the gate reported must surface as one difference, got %d", len(report.Differences))
 	}
 	if report.Differences[0].OnlyOn != SideGate {
-		t.Fatalf("difference attributed to %q, want %q", report.Differences[0].OnlyOn, SideGate)
+		test.Fatalf("difference attributed to %q, want %q", report.Differences[0].OnlyOn, SideGate)
 	}
 }
 
@@ -97,8 +97,8 @@ func TestCompareDetectsADifferenceInEachDirection(t *testing.T) {
 //
 // This is the control for the test above: without it, a Compare that reported everything as a
 // difference would pass both direction tests and be completely broken.
-func TestMatchingFindingsAreNotDifferences(t *testing.T) {
-	t.Parallel()
+func TestMatchingFindingsAreNotDifferences(test *testing.T) {
+	test.Parallel()
 	report := Compare(Inputs{
 		CohereFindings:   []Finding{{File: "a.ts", Line: 3, Column: 16, Rule: "consistency-no-enum", Side: SideCohere}},
 		GateFindings:     []Finding{{File: "a.ts", Line: 3, Column: 9, Rule: "consistency-no-enum", Side: SideGate}},
@@ -112,10 +112,10 @@ func TestMatchingFindingsAreNotDifferences(t *testing.T) {
 	// different offsets within a line routinely, and keying on column would report a difference for
 	// every finding the two sides agree about.
 	if len(report.Differences) != 0 {
-		t.Fatalf("the same finding from both sides must not be a difference, got %d: %+v", len(report.Differences), report.Differences)
+		test.Fatalf("the same finding from both sides must not be a difference, got %d: %+v", len(report.Differences), report.Differences)
 	}
 	if len(report.Agreements) != 1 || report.Agreements[0].Shared != 1 {
-		t.Fatalf("expected one rule agreeing with one shared finding, got %+v", report.Agreements)
+		test.Fatalf("expected one rule agreeing with one shared finding, got %+v", report.Agreements)
 	}
 }
 
@@ -124,8 +124,8 @@ func TestMatchingFindingsAreNotDifferences(t *testing.T) {
 // Getting this wrong is not cosmetic. Most of the current gap is rules cohere has never claimed,
 // and reporting those as disagreements reports noise as signal — while reporting a genuine
 // disagreement as a coverage gap hides the only class that blocks the claim.
-func TestClassificationSeparatesCoverageFromCorrectness(t *testing.T) {
-	t.Parallel()
+func TestClassificationSeparatesCoverageFromCorrectness(test *testing.T) {
+	test.Parallel()
 	inputs := Inputs{
 		GateFindings: []Finding{
 			{File: "a.tsx", Line: 1, Rule: "react-component-no-multiple-primary", Side: SideGate},
@@ -156,14 +156,14 @@ func TestClassificationSeparatesCoverageFromCorrectness(t *testing.T) {
 	}
 	for ruleName, want := range expected {
 		if got := byRule[ruleName]; got != want {
-			t.Errorf("rule %q classified %q, want %q", ruleName, got, want)
+			test.Errorf("rule %q classified %q, want %q", ruleName, got, want)
 		}
 	}
 }
 
 // Only both-active differences block the claim.
-func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
-	t.Parallel()
+func TestUnportedRulesDoNotBlockAgreement(test *testing.T) {
+	test.Parallel()
 	provenance := provenProvenance()
 
 	notPorted := Compare(Inputs{
@@ -175,7 +175,7 @@ func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
 	})
 	notPorted.Provenance = provenance
 	if !notPorted.Agreed() {
-		t.Fatal("a rule cohere has never claimed must not count against agreement")
+		test.Fatal("a rule cohere has never claimed must not count against agreement")
 	}
 
 	bothActive := Compare(Inputs{
@@ -187,7 +187,7 @@ func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
 	})
 	bothActive.Provenance = provenance
 	if bothActive.Agreed() {
-		t.Fatal("a rule both sides had enabled, differing, must block agreement")
+		test.Fatal("a rule both sides had enabled, differing, must block agreement")
 	}
 }
 
@@ -195,23 +195,23 @@ func TestUnportedRulesDoNotBlockAgreement(t *testing.T) {
 //
 // This is the exact failure the gate cohere replaces shipped for days, and a diff harness inherits
 // it in a worse form, because an empty diff over two empty runs reads as proof of agreement.
-func TestARunOverNoFilesIsNotComparable(t *testing.T) {
-	t.Parallel()
+func TestARunOverNoFilesIsNotComparable(test *testing.T) {
+	test.Parallel()
 	report := Compare(Inputs{
 		CoherePopulation: Population{FilesWalked: 0, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
 	})
 	if report.Comparable {
-		t.Fatal("cohere walking zero files must make the comparison not comparable")
+		test.Fatal("cohere walking zero files must make the comparison not comparable")
 	}
 	if report.Agreed() {
-		t.Fatal("a not-comparable report must never claim agreement")
+		test.Fatal("a not-comparable report must never claim agreement")
 	}
 
 	rendered := &strings.Builder{}
 	Write(rendered, report)
 	if strings.Contains(rendered.String(), "✓") {
-		t.Fatalf("a vacuous run must not render a pass mark: %q", rendered.String())
+		test.Fatalf("a vacuous run must not render a pass mark: %q", rendered.String())
 	}
 }
 
@@ -219,8 +219,8 @@ func TestARunOverNoFilesIsNotComparable(t *testing.T) {
 //
 // This is the property the whole package is named for, and it is the one that four vacuous probes
 // in one night got past: each had a plausible population and an empty result.
-func TestAnEmptyDiffWithoutControlsIsNotAgreement(t *testing.T) {
-	t.Parallel()
+func TestAnEmptyDiffWithoutControlsIsNotAgreement(test *testing.T) {
+	test.Parallel()
 	unproven := Compare(Inputs{
 		CoherePopulation: Population{FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{FilesWalked: 3407},
@@ -233,16 +233,16 @@ func TestAnEmptyDiffWithoutControlsIsNotAgreement(t *testing.T) {
 		// No controls run at all.
 	}
 	if len(unproven.Differences) != 0 {
-		t.Fatalf("this fixture is meant to have no differences, got %d", len(unproven.Differences))
+		test.Fatalf("this fixture is meant to have no differences, got %d", len(unproven.Differences))
 	}
 	if unproven.Agreed() {
-		t.Fatal("an empty diff from a harness never shown able to detect a difference must not claim agreement")
+		test.Fatal("an empty diff from a harness never shown able to detect a difference must not claim agreement")
 	}
 
 	rendered := &strings.Builder{}
 	Write(rendered, unproven)
 	if strings.Contains(rendered.String(), "✓") {
-		t.Fatalf("an unproven run must not render a pass mark: %q", rendered.String())
+		test.Fatalf("an unproven run must not render a pass mark: %q", rendered.String())
 	}
 
 	// And the same comparison, once the controls have fired, must reach the opposite verdict —
@@ -250,13 +250,13 @@ func TestAnEmptyDiffWithoutControlsIsNotAgreement(t *testing.T) {
 	proven := unproven
 	proven.Provenance = provenProvenance()
 	if !proven.Agreed() {
-		t.Fatal("an empty diff from a proven harness over a real population is agreement, and must be reachable")
+		test.Fatal("an empty diff from a proven harness over a real population is agreement, and must be reachable")
 	}
 }
 
 // A control that fired in only one direction is not proof.
-func TestOneDirectionOfControlIsNotProven(t *testing.T) {
-	t.Parallel()
+func TestOneDirectionOfControlIsNotProven(test *testing.T) {
+	test.Parallel()
 	oneDirection := Provenance{
 		CohereFilesLinted: 3407,
 		GateFilesLinted:   3407,
@@ -267,31 +267,31 @@ func TestOneDirectionOfControlIsNotProven(t *testing.T) {
 		},
 	}
 	if oneDirection.ControlsProven() {
-		t.Fatal("a control in one direction only must not count as proven: a defect on the unexercised side would still report clean")
+		test.Fatal("a control in one direction only must not count as proven: a defect on the unexercised side would still report clean")
 	}
 
 	missed := provenProvenance()
 	missed.ControlsRun[0].Detected = false
 	missed.ControlsRun[0].Detail = "planted enum produced no difference"
 	if missed.ControlsProven() {
-		t.Fatal("a control that did not fire must never count as proven")
+		test.Fatal("a control that did not fire must never count as proven")
 	}
 	if trustworthy, reasons := missed.Trustworthy(); trustworthy || len(reasons) == 0 {
-		t.Fatal("a missed control must make the run untrustworthy and say why")
+		test.Fatal("a missed control must make the run untrustworthy and say why")
 	}
 }
 
 // A population too small to be the tree is its own tell.
-func TestAnImplausiblySmallRunIsUntrustworthy(t *testing.T) {
-	t.Parallel()
+func TestAnImplausiblySmallRunIsUntrustworthy(test *testing.T) {
+	test.Parallel()
 	tiny := provenProvenance()
 	tiny.CohereFilesLinted = 2
 	trustworthy, reasons := tiny.Trustworthy()
 	if trustworthy {
-		t.Fatal("a run over 2 files must not be trusted as a run over the tree")
+		test.Fatal("a run over 2 files must not be trusted as a run over the tree")
 	}
 	if !strings.Contains(strings.Join(reasons, " "), "too few") {
-		t.Fatalf("the reason must name the implausible file count, got %v", reasons)
+		test.Fatalf("the reason must name the implausible file count, got %v", reasons)
 	}
 }
 
@@ -320,8 +320,8 @@ func provenProvenance() Provenance {
 //
 // The degradation is deliberate: fall back to the two-way split, which is honest about what the
 // caller actually knows, rather than to the three-way split, which claims knowledge it does not have.
-func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
-	t.Parallel()
+func TestUnknownConfigurationDoesNotExcuseEveryRule(test *testing.T) {
+	test.Parallel()
 	report := Compare(Inputs{
 		CohereFindings:   []Finding{{File: "a.ts", Line: 1, Rule: "consistency-no-enum", Side: SideCohere}},
 		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 22},
@@ -331,16 +331,16 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 	})
 
 	if len(report.Differences) != 1 {
-		t.Fatalf("expected one difference, got %d", len(report.Differences))
+		test.Fatalf("expected one difference, got %d", len(report.Differences))
 	}
 	if got := report.Differences[0].Classification; got != ClassificationBothActive {
-		t.Fatalf("with configuration unknown, a rule cohere implements and reported must stay %q, got %q — nil must not read as disabled",
+		test.Fatalf("with configuration unknown, a rule cohere implements and reported must stay %q, got %q — nil must not read as disabled",
 			ClassificationBothActive, got)
 	}
 
 	report.Provenance = provenProvenance()
 	if report.Agreed() {
-		t.Fatal("a difference on an implemented rule must still block agreement when the config was never read")
+		test.Fatal("a difference on an implemented rule must still block agreement when the config was never read")
 	}
 }
 
@@ -356,8 +356,8 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(t *testing.T) {
 // and no real rule names, so every rule reads as unconfigured, every genuine disagreement is filed
 // as not-configured, and the harness excuses exactly the findings it exists to surface. It reached
 // a real run and rendered as one wrong word in a table.
-func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
-	t.Parallel()
+func TestAPluginPrefixedConfigKeyKeepsTheRuleName(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		raw    string
 		expect string
@@ -374,7 +374,7 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		if got := NormalizeRuleName(testCase.raw); got != testCase.expect {
-			t.Errorf("NormalizeRuleName(%q) = %q, want %q", testCase.raw, got, testCase.expect)
+			test.Errorf("NormalizeRuleName(%q) = %q, want %q", testCase.raw, got, testCase.expect)
 		}
 	}
 
@@ -384,7 +384,7 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 	fromCohere := NormalizeRuleName("consistency-no-enum/noEnum")
 	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
 	if fromConfig != fromCohere || fromCohere != fromGate {
-		t.Fatalf("one rule normalized three ways: config %q, cohere %q, gate %q", fromConfig, fromCohere, fromGate)
+		test.Fatalf("one rule normalized three ways: config %q, cohere %q, gate %q", fromConfig, fromCohere, fromGate)
 	}
 }
 
@@ -395,8 +395,8 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(t *testing.T) {
 // this tree that gap is most of the catalog, and the reason those rules find nothing is that the
 // gate has been enforcing them for months rather than that they are worthless. A clean diff
 // therefore cannot be the signal to remove the old tool.
-func TestTheVerdictNamesTheRulesItDidNotCompare(t *testing.T) {
-	t.Parallel()
+func TestTheVerdictNamesTheRulesItDidNotCompare(test *testing.T) {
+	test.Parallel()
 	partial := Compare(Inputs{
 		CoherePopulation: Population{FilesWalked: 3407, Rules: 33},
 		GatePopulation:   Population{FilesWalked: 3407},
@@ -410,13 +410,13 @@ func TestTheVerdictNamesTheRulesItDidNotCompare(t *testing.T) {
 	text := rendered.String()
 
 	if !strings.Contains(text, "✓") {
-		t.Fatalf("a clean partial comparison still agrees about what it compared: %q", text)
+		test.Fatalf("a clean partial comparison still agrees about what it compared: %q", text)
 	}
 	if !strings.Contains(text, "not a verdict about them") {
-		t.Fatalf("the verdict must disclaim the rules it could not compare: %q", text)
+		test.Fatalf("the verdict must disclaim the rules it could not compare: %q", text)
 	}
 	if !strings.Contains(text, "the other 2 are unported") {
-		t.Fatalf("the verdict must count the uncompared rules, got: %q", text)
+		test.Fatalf("the verdict must count the uncompared rules, got: %q", text)
 	}
 
 	// The control: full coverage must not carry the disclaimer, or it becomes noise a reader learns
@@ -432,6 +432,6 @@ func TestTheVerdictNamesTheRulesItDidNotCompare(t *testing.T) {
 	rendered = &strings.Builder{}
 	Write(rendered, full)
 	if strings.Contains(rendered.String(), "not a verdict about them") {
-		t.Fatalf("a comparison covering the whole config must not disclaim anything: %q", rendered.String())
+		test.Fatalf("a comparison covering the whole config must not disclaim anything: %q", rendered.String())
 	}
 }

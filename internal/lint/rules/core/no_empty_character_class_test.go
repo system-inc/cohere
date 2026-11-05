@@ -13,8 +13,8 @@ const emptyCharacterClassFile = "/repository/source/Thing.ts"
 // invented here. That matters more than usual: this rule's whole difficulty is discriminating
 // between bracket sequences that look alike, and a corpus written by the porter tends to contain
 // the cases the porter already thought of. These contain the ones they did not.
-func TestNoEmptyCharacterClassFires(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -34,9 +34,9 @@ func TestNoEmptyCharacterClassFires(t *testing.T) {
 		{"under the unicode flag", "export const Pattern = /[(]\\u{0}*[]/u;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
 				"unexpectedEmptyCharacterClass")
 		})
 	}
@@ -45,8 +45,8 @@ func TestNoEmptyCharacterClassFires(t *testing.T) {
 // Under `v`, classes nest. These are separated from the cases above because they exercise the
 // recursion rather than the emptiness test, and because a scanner that ignores the `v` flag passes
 // every case above while failing all of these.
-func TestNoEmptyCharacterClassFiresInsideNestedClasses(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassFiresInsideNestedClasses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -62,9 +62,9 @@ func TestNoEmptyCharacterClassFiresInsideNestedClasses(t *testing.T) {
 		{"the left operand of an intersection", "export const Pattern = /[[]&&b]/v;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
 				"unexpectedEmptyCharacterClass")
 		})
 	}
@@ -73,8 +73,8 @@ func TestNoEmptyCharacterClassFiresInsideNestedClasses(t *testing.T) {
 // The clean half is where this rule is actually decided. Every case here contains brackets, and
 // several contain the exact byte pair `[]`, so a rule that searches for that pair rather than
 // parsing the pattern fires on all of them.
-func TestNoEmptyCharacterClassStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -102,9 +102,9 @@ func TestNoEmptyCharacterClassStaysSilent(t *testing.T) {
 		{"the RegExp constructor", "export const Pattern = new RegExp('^abc[]');\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
 		})
 	}
 }
@@ -112,8 +112,8 @@ func TestNoEmptyCharacterClassStaysSilent(t *testing.T) {
 // The `v` flag's clean cases, kept apart for the same reason their firing counterparts are: these
 // all nest, and several nest a negated empty class, which is the pairing most likely to be reported
 // by a recursion that checks emptiness before it checks negation.
-func TestNoEmptyCharacterClassStaysSilentInsideNestedClasses(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassStaysSilentInsideNestedClasses(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -131,9 +131,9 @@ func TestNoEmptyCharacterClassStaysSilentInsideNestedClasses(t *testing.T) {
 		{"a negated empty class as a difference operand", "export const Pattern = /[[^]--\\p{ASCII}]/v;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
 		})
 	}
 }
@@ -146,17 +146,17 @@ func TestNoEmptyCharacterClassStaysSilentInsideNestedClasses(t *testing.T) {
 // before the literal's leading trivia lands on the preceding line and cannot be suppressed by any
 // directive the author is able to write, and a finding spanning the whole literal is a different
 // report from the one the gate we are matching produces.
-func TestNoEmptyCharacterClassReportsTheClassAndNotTheLiteral(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassReportsTheClassAndNotTheLiteral(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "export const Pattern = /foo[]bar/;\n"
-	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
+	result := rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "[]" {
-		t.Fatalf("want the finding to cover %q, got %q", "[]", reported)
+		test.Fatalf("want the finding to cover %q, got %q", "[]", reported)
 	}
 }
 
@@ -164,29 +164,29 @@ func TestNoEmptyCharacterClassReportsTheClassAndNotTheLiteral(t *testing.T) {
 // one, and it is invisible in every count: the finding is still produced, still reads as real, and
 // only fails when somebody tries to silence it. Loc.Pos() sits before leading trivia, so a range
 // derived from it lands on the comment's line instead of the code's.
-func TestNoEmptyCharacterClassReportsPastLeadingTrivia(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassReportsPastLeadingTrivia(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "// a comment that must not be swallowed\nexport const Pattern = /foo[]bar/;\n"
-	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
+	result := rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "[]" {
-		t.Fatalf("want the finding to cover %q, got %q", "[]", reported)
+		test.Fatalf("want the finding to cover %q, got %q", "[]", reported)
 	}
 }
 
 // Each empty class is its own finding. A rule that reports once per literal agrees with a
 // single-class corpus on every case above and undercounts the moment a pattern holds two.
-func TestNoEmptyCharacterClassReportsEachClassSeparately(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassReportsEachClassSeparately(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile,
+	result := rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile,
 		"export const Pattern = /[[][]]/v;\n")
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("want two findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
+		test.Fatalf("want two findings, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
 }
 
@@ -194,20 +194,20 @@ func TestNoEmptyCharacterClassReportsEachClassSeparately(t *testing.T) {
 //
 // This is the case a rule that reads the file rather than the node gets wrong, and it is also the
 // smallest statement that the pattern is taken per-literal at all.
-func TestNoEmptyCharacterClassScansEachLiteralSeparately(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassScansEachLiteralSeparately(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "export const First = /[a]/g;\nexport const Second = /x[]/;\n"
-	result := rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
+	result := rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want one finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
+		test.Fatalf("want one finding, got %d: %v", len(result.Diagnostics), result.MessageIds())
 	}
 	// Asserted against the source rather than against a literal offset, because an offset written
 	// by hand is a number that agrees with today's fixture and stops meaning anything the moment
 	// somebody adds a character to the line above it.
 	secondLine := strings.Index(sourceText, "export const Second")
 	if position := result.Diagnostics[0].Range.Pos(); position < secondLine {
-		t.Fatalf("want the finding inside the second literal (at or past %d), got %d", secondLine, position)
+		test.Fatalf("want the finding inside the second literal (at or past %d), got %d", secondLine, position)
 	}
 }
 
@@ -216,9 +216,9 @@ func TestNoEmptyCharacterClassScansEachLiteralSeparately(t *testing.T) {
 // that does not compile. This asserts the rule survives the input at all, which is the half that
 // matters: the scanner returns false mid-walk, and a callback that had already fired must not leave
 // a finding behind on a pattern nobody can read.
-func TestNoEmptyCharacterClassSkipsAnUnterminatedClass(t *testing.T) {
-	t.Parallel()
+func TestNoEmptyCharacterClassSkipsAnUnterminatedClass(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoEmptyCharacterClass, emptyCharacterClassFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile,
 		"export const Pattern = new RegExp('[abc');\n"))
 }

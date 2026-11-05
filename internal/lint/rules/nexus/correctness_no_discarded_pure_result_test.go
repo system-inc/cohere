@@ -29,17 +29,17 @@ func correctnessNoDiscardedPureResultSource(lines ...string) string {
 	return correctnessNoDiscardedPureResultPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoDiscardedPureResultRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoDiscardedPureResult, map[string]string{
+func correctnessNoDiscardedPureResultRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoDiscardedPureResult, map[string]string{
 		correctnessNoDiscardedPureResultFile: sourceText,
 	}, correctnessNoDiscardedPureResultFile)
 }
 
 // correctnessNoDiscardedPureResultExpect asserts the reported spans in source order, and that no
 // finding carries a fix.
-func correctnessNoDiscardedPureResultExpect(t *testing.T, result rule_testing.Result, want ...string) {
-	t.Helper()
+func correctnessNoDiscardedPureResultExpect(test *testing.T, result rule_testing.Result, want ...string) {
+	test.Helper()
 	// The shared assertion by message id, which proves the rule can fire; the checks below hold
 	// each finding's exact text.
 	if len(want) > 0 {
@@ -47,7 +47,7 @@ func correctnessNoDiscardedPureResultExpect(t *testing.T, result rule_testing.Re
 		for index := range wantIds {
 			wantIds[index] = correctnessNoDiscardedPureResultId
 		}
-		rule_testing.ExpectFindings(t, result, wantIds...)
+		rule_testing.ExpectFindings(test, result, wantIds...)
 	}
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -57,38 +57,38 @@ func correctnessNoDiscardedPureResultExpect(t *testing.T, result rule_testing.Re
 	var got []string
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Message.Id != correctnessNoDiscardedPureResultId {
-			t.Fatalf("unexpected message id %q", diagnostic.Message.Id)
+			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
+			test.Fatalf("finding %d is %q, want %q", index, got[index], want[index])
 		}
 	}
 }
 
 // The slip itself, as the research names it: a trim, a replace and a concat whose results are lost.
 // Each is fixed by keeping the result, which is silent.
-func TestCorrectnessNoDiscardedPureResultFiresOnTheSlipAndNotOnItsFix(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedPureResultFiresOnTheSlipAndNotOnItsFix(test *testing.T) {
+	test.Parallel()
 
-	slip := correctnessNoDiscardedPureResultRun(t, correctnessNoDiscardedPureResultSource(
+	slip := correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(
 		"export function normalize() {",
 		"    name.trim();",
 		"    path.replace('/old/', '/new/');",
 		"    list.concat(more);",
 		"}",
 	))
-	correctnessNoDiscardedPureResultExpect(t, slip, "name.trim()", "path.replace('/old/', '/new/')", "list.concat(more)")
+	correctnessNoDiscardedPureResultExpect(test, slip, "name.trim()", "path.replace('/old/', '/new/')", "list.concat(more)")
 
-	fixed := correctnessNoDiscardedPureResultRun(t, correctnessNoDiscardedPureResultSource(
+	fixed := correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(
 		"export function normalize() {",
 		"    name = name.trim();",
 		"    const moved = path.replace('/old/', '/new/');",
@@ -96,11 +96,11 @@ func TestCorrectnessNoDiscardedPureResultFiresOnTheSlipAndNotOnItsFix(t *testing
 		"    return moved;",
 		"}",
 	))
-	rule_testing.ExpectClean(t, fixed)
+	rule_testing.ExpectClean(test, fixed)
 }
 
-func TestCorrectnessNoDiscardedPureResultFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedPureResultFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -118,17 +118,17 @@ func TestCorrectnessNoDiscardedPureResultFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoDiscardedPureResultRun(t, correctnessNoDiscardedPureResultSource(testCase.lines...))
-			correctnessNoDiscardedPureResultExpect(t, result, testCase.want...)
+			result := correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(testCase.lines...))
+			correctnessNoDiscardedPureResultExpect(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoDiscardedPureResultStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoDiscardedPureResultStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -162,10 +162,10 @@ func TestCorrectnessNoDiscardedPureResultStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoDiscardedPureResultRun(t, correctnessNoDiscardedPureResultSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(testCase.lines...)))
 		})
 	}
 }

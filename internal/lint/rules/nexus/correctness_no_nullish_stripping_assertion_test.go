@@ -57,21 +57,21 @@ func correctnessNoNullishStrippingAssertionSource(lines ...string) string {
 // and runs one rule on it. A program per case, so no two cases share interned types: the partition
 // with the style rule is decided by type identity, and identity across files is the instrument bug
 // that rule's doc comment records.
-func correctnessNoNullishStrippingAssertionRunRule(t *testing.T, subject rule.Rule, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFilesWithSetup(t, subject, map[string]string{
+func correctnessNoNullishStrippingAssertionRunRule(test *testing.T, subject rule.Rule, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFilesWithSetup(test, subject, map[string]string{
 		correctnessNoNullishStrippingAssertionFile: sourceText,
 	}, correctnessNoNullishStrippingAssertionFile, func(directory string) {
 		configPath := filepath.Join(directory, "tsconfig.json")
 		if err := os.WriteFile(configPath, []byte(correctnessNoNullishStrippingAssertionTsConfig), 0o644); err != nil {
-			t.Fatalf("writing the fixture tsconfig: %v", err)
+			test.Fatalf("writing the fixture tsconfig: %v", err)
 		}
 	})
 }
 
-func correctnessNoNullishStrippingAssertionRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return correctnessNoNullishStrippingAssertionRunRule(t, CorrectnessNoNullishStrippingAssertion, sourceText)
+func correctnessNoNullishStrippingAssertionRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return correctnessNoNullishStrippingAssertionRunRule(test, CorrectnessNoNullishStrippingAssertion, sourceText)
 }
 
 // correctnessNoNullishStrippingAssertionSpans is every finding's text in source order. The harness
@@ -91,21 +91,21 @@ func correctnessNoNullishStrippingAssertionSpans(result rule_testing.Result) []s
 
 // correctnessNoNullishStrippingAssertionExpect asserts the findings by message id and by the exact
 // text each one points at, in source order, and that none carries a fix.
-func correctnessNoNullishStrippingAssertionExpect(t *testing.T, result rule_testing.Result, wantSpans ...string) {
-	t.Helper()
+func correctnessNoNullishStrippingAssertionExpect(test *testing.T, result rule_testing.Result, wantSpans ...string) {
+	test.Helper()
 	wantIds := make([]string, 0, len(wantSpans))
 	for range wantSpans {
 		wantIds = append(wantIds, correctnessNoNullishStrippingAssertionId)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 	got := correctnessNoNullishStrippingAssertionSpans(result)
 	if strings.Join(got, "\x00") != strings.Join(wantSpans, "\x00") {
-		t.Fatalf("findings point at %q, want %q", got, wantSpans)
+		test.Fatalf("findings point at %q, want %q", got, wantSpans)
 	}
 }
 
@@ -192,50 +192,50 @@ func correctnessNoNullishStrippingAssertionDialogMenu(fixed bool) string {
 
 // The real analytics flags, before the fix: both day-count reads are reported, the narrowed range
 // reads are not.
-func TestCorrectnessNoNullishStrippingAssertionFiresOnAnalyticsDays(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionFiresOnAnalyticsDays(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionAnalytics(false))
-	correctnessNoNullishStrippingAssertionExpect(t, result, "options.days as string", "options.days as string")
+	result := correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionAnalytics(false))
+	correctnessNoNullishStrippingAssertionExpect(test, result, "options.days as string", "options.days as string")
 }
 
-func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedAnalyticsDays(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedAnalyticsDays(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionAnalytics(true)))
+	rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionAnalytics(true)))
 }
 
 // The real `typeof null === 'object'` read, before the fix: the inner assertion is reported, the outer
 // one, already guarded by truthiness, is not.
-func TestCorrectnessNoNullishStrippingAssertionFiresOnReactionsAssignee(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionFiresOnReactionsAssignee(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionReactions(false))
-	correctnessNoNullishStrippingAssertionExpect(t, result, "assigneeFromConfiguration.configuration as Record<string, unknown>")
+	result := correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionReactions(false))
+	correctnessNoNullishStrippingAssertionExpect(test, result, "assigneeFromConfiguration.configuration as Record<string, unknown>")
 }
 
-func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedReactionsAssignee(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedReactionsAssignee(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionReactions(true)))
+	rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionReactions(true)))
 }
 
 // The real dialog focus handler, before the fix: `event.target` is `EventTarget | null`.
-func TestCorrectnessNoNullishStrippingAssertionFiresOnDialogMenu(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionFiresOnDialogMenu(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionDialogMenu(false))
-	correctnessNoNullishStrippingAssertionExpect(t, result, "event.target as HTMLElement")
+	result := correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionDialogMenu(false))
+	correctnessNoNullishStrippingAssertionExpect(test, result, "event.target as HTMLElement")
 }
 
-func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedDialogMenu(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedDialogMenu(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionDialogMenu(true)))
+	rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionDialogMenu(true)))
 }
 
-func TestCorrectnessNoNullishStrippingAssertionFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -289,16 +289,16 @@ func TestCorrectnessNoNullishStrippingAssertionFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionSource(testCase.lines...))
-			correctnessNoNullishStrippingAssertionExpect(t, result, testCase.want...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionSource(testCase.lines...))
+			correctnessNoNullishStrippingAssertionExpect(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoNullishStrippingAssertionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -395,9 +395,9 @@ func TestCorrectnessNoNullishStrippingAssertionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionSource(testCase.lines...)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionSource(testCase.lines...)))
 		})
 	}
 }
@@ -405,8 +405,8 @@ func TestCorrectnessNoNullishStrippingAssertionStaysSilent(t *testing.T) {
 // The partition: on every cast, at most one of this rule and `non-nullable-type-assertion-style`
 // reports, and each reports the casts it owns. Both rules run on the same program text, one program per
 // rule, with the cast that must be reported named for each.
-func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -425,17 +425,17 @@ func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(t *
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := correctnessNoNullishStrippingAssertionSource(testCase.line)
 
-			thisResult := correctnessNoNullishStrippingAssertionRun(t, source)
-			styleResult := correctnessNoNullishStrippingAssertionRunRule(t, typescript.NonNullableTypeAssertionStyle, source)
+			thisResult := correctnessNoNullishStrippingAssertionRun(test, source)
+			styleResult := correctnessNoNullishStrippingAssertionRunRule(test, typescript.NonNullableTypeAssertionStyle, source)
 
 			if testCase.thisOwns {
-				correctnessNoNullishStrippingAssertionExpect(t, thisResult, testCase.span)
+				correctnessNoNullishStrippingAssertionExpect(test, thisResult, testCase.span)
 			} else {
-				rule_testing.ExpectClean(t, thisResult)
+				rule_testing.ExpectClean(test, thisResult)
 			}
 
 			styleSpans := correctnessNoNullishStrippingAssertionSpans(styleResult)
@@ -444,7 +444,7 @@ func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(t *
 				wantStyleSpans = []string{testCase.span}
 			}
 			if strings.Join(styleSpans, "\x00") != strings.Join(wantStyleSpans, "\x00") {
-				t.Fatalf("the style rule reported %q, want %q", styleSpans, wantStyleSpans)
+				test.Fatalf("the style rule reported %q, want %q", styleSpans, wantStyleSpans)
 			}
 		})
 	}
@@ -452,19 +452,19 @@ func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(t *
 
 // The message gives the repairs in the order `no-non-null-assertion` does, since the two rules report
 // the same claim through two doors: guard it, fix the type, then `required` with its reason.
-func TestCorrectnessNoNullishStrippingAssertionMessageGivesTheRepairsInOrder(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoNullishStrippingAssertionMessageGivesTheRepairsInOrder(test *testing.T) {
+	test.Parallel()
 
-	result := correctnessNoNullishStrippingAssertionRun(t, correctnessNoNullishStrippingAssertionAnalytics(false))
+	result := correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionAnalytics(false))
 	if len(result.Diagnostics) == 0 {
-		t.Fatal("want a finding to read the message from")
+		test.Fatal("want a finding to read the message from")
 	}
 	text := result.Diagnostics[0].Message.Description
 	rest := text
 	for _, part := range []string{"guard it", "fix the type", "`stringFlag` or `numberFlag`", "`required(value, 'why it is present')` from `@nexus/source/errors/Assert`"} {
 		index := strings.Index(rest, part)
 		if index < 0 {
-			t.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
+			test.Fatalf("message lacks %q after the parts before it:\n%s", part, text)
 		}
 		rest = rest[index+len(part):]
 	}

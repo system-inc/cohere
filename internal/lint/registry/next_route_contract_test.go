@@ -106,27 +106,27 @@ export default function sitemap() {
 //
 // Every rule runs with nil options, which is the strict case: a consumer that passes no framework
 // list still gets the floor `nextjs.IsRouteContractExport` provides.
-func TestNoRuleRewritesANextRouteContractExport(t *testing.T) {
-	t.Parallel()
+func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
+	test.Parallel()
 
 	rules := All()
 	if len(rules) < 100 {
 		// A registry that loaded nothing would pass this test for the wrong reason.
-		t.Fatalf("the registry holds %d rules, so this test could not see the catalog", len(rules))
+		test.Fatalf("the registry holds %d rules, so this test could not see the catalog", len(rules))
 	}
 
 	for filePath, sourceText := range nextRouteContractFixtures {
 		contract := nextjs.RouteContractExports(filePath)
 		if len(contract) == 0 {
-			t.Fatalf("%s is not a route file by nextjs.RouteContractExports, so its fixture proves nothing", filePath)
+			test.Fatalf("%s is not a route file by nextjs.RouteContractExports, so its fixture proves nothing", filePath)
 		}
 
-		t.Run(filePath, func(t *testing.T) {
-			t.Parallel()
+		test.Run(filePath, func(test *testing.T) {
+			test.Parallel()
 
 			sawContractNames := 0
 			for _, subject := range rules {
-				result := rule_testing.RunTyped(t, subject, filePath, sourceText)
+				result := rule_testing.RunTyped(test, subject, filePath, sourceText)
 				contractRanges := contractExportNameRanges(result.SourceFile, contract)
 				if sawContractNames == 0 {
 					sawContractNames = len(contractRanges)
@@ -135,7 +135,7 @@ func TestNoRuleRewritesANextRouteContractExport(t *testing.T) {
 				for _, diagnostic := range result.Diagnostics {
 					for _, fix := range diagnostic.Fixes {
 						if name, touches := touchedContractName(fix.Range, contractRanges); touches {
-							t.Errorf("%s: a fix rewrites the Next contract export %q (%q over %s): %s",
+							test.Errorf("%s: a fix rewrites the Next contract export %q (%q over %s): %s",
 								subject.Name, name, fix.Text, describeRange(result.SourceFile, fix.Range), diagnostic.Message.Description)
 						}
 					}
@@ -143,7 +143,7 @@ func TestNoRuleRewritesANextRouteContractExport(t *testing.T) {
 						continue
 					}
 					if name, touches := touchedContractName(diagnostic.Range, contractRanges); touches {
-						t.Errorf("%s: reports on the Next contract export %q, advising a change Next would silently ignore: %s",
+						test.Errorf("%s: reports on the Next contract export %q, advising a change Next would silently ignore: %s",
 							subject.Name, name, diagnostic.Message.Description)
 					}
 				}
@@ -152,7 +152,7 @@ func TestNoRuleRewritesANextRouteContractExport(t *testing.T) {
 			// Every contract name in the fixture must have been found, or the ranges the assertions
 			// compare against were empty and every rule passed by seeing nothing.
 			if want := countFixtureContractNames(sourceText, contract); sawContractNames != want {
-				t.Fatalf("found %d contract export names in the parsed file, the fixture writes %d", sawContractNames, want)
+				test.Fatalf("found %d contract export names in the parsed file, the fixture writes %d", sawContractNames, want)
 			}
 		})
 	}

@@ -21,8 +21,8 @@ const uselessCallFile = "/repository/source/UselessCall.ts"
 // so the rewrite would need spread syntax and belongs to that rule. Two are computed accesses
 // through a variable key. Four are calls with no arguments at all. And the last is a private
 // identifier, which merely spells the same word.
-func TestNoUselessCallStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -49,10 +49,10 @@ func TestNoUselessCallStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 }
@@ -64,8 +64,8 @@ func TestNoUselessCallStaysSilent(t *testing.T) {
 // `abc.get("foo", 0).concat.apply(abc . get("foo",  0 ), [1, 2])` matches across differing
 // whitespace, and `[].concat.apply([ ], [1, 2])` matches an empty array literal written two ways,
 // which is the edge case `hasSameTokens` carries from `prefer-spread`.
-func TestNoUselessCallFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -97,10 +97,10 @@ func TestNoUselessCallFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText), "unnecessaryCall")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUselessCall, uselessCallFile, testCase.sourceText), "unnecessaryCall")
 		})
 	}
 }
@@ -122,8 +122,8 @@ func TestNoUselessCallFires(t *testing.T) {
 //
 // The control is the unparenthesized form, which is upstream's neighbouring case and does report,
 // so the silence here is a measurement about the parentheses rather than about the shape.
-func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -132,13 +132,13 @@ func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUselessCall, uselessCallFile,
 		"obj?.foo.bar.call(obj?.foo, 1, 2);"), "unnecessaryCall")
 }
 
@@ -154,8 +154,8 @@ func TestNoUselessCallKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 // rule tests the access shape itself.
 //
 // The control is the dotted form, which reports.
-func TestNoUselessCallDeclinesAComputedAccess(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallDeclinesAComputedAccess(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -166,14 +166,14 @@ func TestNoUselessCallDeclinesAComputedAccess(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 
 	// The control, so the silence above is about the brackets rather than about the receiver.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUselessCall, uselessCallFile,
 		"obj[\"foo\"].call(obj, 1, 2);"), "unnecessaryCall")
 }
 
@@ -192,8 +192,8 @@ func TestNoUselessCallDeclinesAComputedAccess(t *testing.T) {
 //
 // The control is the same shape spelled `call`, so the silence is about the name rather than about
 // the receiver.
-func TestNoUselessCallDeclinesOtherMethods(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallDeclinesOtherMethods(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -205,13 +205,13 @@ func TestNoUselessCallDeclinesOtherMethods(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUselessCall, uselessCallFile, testCase.sourceText))
 		})
 	}
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUselessCall, uselessCallFile,
 		"obj.foo.call(obj, 1, 2);"), "unnecessaryCall")
 }
 
@@ -221,8 +221,8 @@ func TestNoUselessCallDeclinesOtherMethods(t *testing.T) {
 // layer, so nothing between the format string and the reader checks it. A `.call()` finding whose
 // sentence says `.apply()` has the right id, the right span, and tells the reader to look for
 // something that is not there.
-func TestNoUselessCallNamesTheMethod(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallNamesTheMethod(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -233,15 +233,15 @@ func TestNoUselessCallNamesTheMethod(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessCall, uselessCallFile, testCase.sourceText)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessCall, uselessCallFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.HasPrefix(description, testCase.wantPrefix) {
-				t.Fatalf("the message reads %q, which does not name the method it reports", description)
+				test.Fatalf("the message reads %q, which does not name the method it reports", description)
 			}
 		})
 	}
@@ -251,18 +251,18 @@ func TestNoUselessCallNamesTheMethod(t *testing.T) {
 //
 // Upstream passes `node`, the CallExpression. A port anchoring on the callee or on the method name
 // satisfies every assertion above while pointing past the arguments that make the finding true.
-func TestNoUselessCallReportsTheWholeCall(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallReportsTheWholeCall(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "obj.foo.call(obj, 1, 2);"
-	result := rule_testing.Run(t, NoUselessCall, uselessCallFile, sourceText)
+	result := rule_testing.Run(test, NoUselessCall, uselessCallFile, sourceText)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	written := result.SourceFile.Text()
 	reported := written[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "obj.foo.call(obj, 1, 2)" {
-		t.Fatalf("reported %q, wanted the whole call", reported)
+		test.Fatalf("reported %q, wanted the whole call", reported)
 	}
 }
 
@@ -272,17 +272,17 @@ func TestNoUselessCallReportsTheWholeCall(t *testing.T) {
 // literal it belongs here. Neither rule may report both, or the same line gets two findings telling
 // the reader to make two different edits. Upstream's clean case `foo.apply(null, args)` is the first
 // half; the second is asserted with the array literal in place.
-func TestNoUselessCallLeavesVariadicApplyToPreferSpread(t *testing.T) {
-	t.Parallel()
+func TestNoUselessCallLeavesVariadicApplyToPreferSpread(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUselessCall, uselessCallFile,
 		"declare const args: number[];\nfoo.apply(null, args);\n"))
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoUselessCall, uselessCallFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUselessCall, uselessCallFile,
 		"foo.apply(null, [1, 2]);"), "unnecessaryCall")
 
 	// And the mirror, so the partition is asserted from both sides rather than assumed.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, PreferSpread, uselessCallFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, PreferSpread, uselessCallFile,
 		"declare const args: number[];\nfoo.apply(null, args);\n"), "preferSpread")
-	rule_testing.ExpectClean(t, rule_testing.Run(t, PreferSpread, uselessCallFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferSpread, uselessCallFile,
 		"foo.apply(null, [1, 2]);"))
 }

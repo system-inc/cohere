@@ -17,11 +17,11 @@ const withFile = "/repository/source/With.ts"
 //
 // This is the smallest corpus in the lane, so it protects least, and the cases written from reading
 // our own code below carry most of the weight.
-func TestNoWithFires(t *testing.T) {
-	t.Parallel()
+func TestNoWithFires(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.Run(t, NoWith, withFile, "with(foo) { bar() }"), "noWith")
+	rule_testing.ExpectFindings(test,
+		rule_testing.Run(test, NoWith, withFile, "with(foo) { bar() }"), "noWith")
 }
 
 // The clean cases are all the ways the four letters `with` reach a file without being the statement.
@@ -31,8 +31,8 @@ func TestNoWithFires(t *testing.T) {
 // subscript, a computed key, and a destructuring rename. `with` is not a reserved word in a property
 // position, so each of these parses to something other than a WithStatement, and a rule matching on
 // source text rather than on node kind would report every one of them.
-func TestNoWithStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoWithStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -52,9 +52,9 @@ func TestNoWithStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoWith, withFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoWith, withFile, testCase.sourceText))
 		})
 	}
 }
@@ -68,16 +68,16 @@ func TestNoWithStaysSilent(t *testing.T) {
 // and a probe confirmed it: `with(foo) { bar() }` reported [0,19) rather than [0,4). That port would
 // have passed every fixture above while pointing at the wrong text, which is the defect this step
 // exists to catch. The rule carries no fix, so nothing else would have surfaced it either.
-func TestNoWithReportsTheKeywordAlone(t *testing.T) {
-	t.Parallel()
+func TestNoWithReportsTheKeywordAlone(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "with(foo) { bar() }"
-	result := rule_testing.Run(t, NoWith, withFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "noWith")
+	result := rule_testing.Run(test, NoWith, withFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "noWith")
 
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "with" {
-		t.Fatalf("reported span was %q, wanted the keyword %q", reported, "with")
+		test.Fatalf("reported span was %q, wanted the keyword %q", reported, "with")
 	}
 }
 
@@ -88,16 +88,16 @@ func TestNoWithReportsTheKeywordAlone(t *testing.T) {
 // this because its single fail case starts at column one, where the correct and incorrect answers
 // are the same number. Our code is commented and indented everywhere, so column one is the rare
 // case here and this is the common one.
-func TestNoWithSkipsLeadingTrivia(t *testing.T) {
-	t.Parallel()
+func TestNoWithSkipsLeadingTrivia(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "function f() {\n  /* note */ with (foo) { bar() }\n}"
-	result := rule_testing.Run(t, NoWith, withFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "noWith")
+	result := rule_testing.Run(test, NoWith, withFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "noWith")
 
 	reported := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "with" {
-		t.Fatalf("reported span was %q, wanted the keyword %q", reported, "with")
+		test.Fatalf("reported span was %q, wanted the keyword %q", reported, "with")
 	}
 }
 
@@ -107,20 +107,20 @@ func TestNoWithSkipsLeadingTrivia(t *testing.T) {
 // rule that reports each statement from one that reports once and stops, nor from one that reports
 // the outer statement and never descends into its body. Nesting answers all three at once, and the
 // inner span pins that the second finding is the inner keyword rather than a repeat of the outer.
-func TestNoWithReportsEveryStatementIncludingNested(t *testing.T) {
-	t.Parallel()
+func TestNoWithReportsEveryStatementIncludingNested(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "with (a) { with (b) { c() } }"
-	result := rule_testing.Run(t, NoWith, withFile, sourceText)
-	rule_testing.ExpectFindings(t, result, "noWith", "noWith")
+	result := rule_testing.Run(test, NoWith, withFile, sourceText)
+	rule_testing.ExpectFindings(test, result, "noWith", "noWith")
 
 	first := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	second := sourceText[result.Diagnostics[1].Range.Pos():result.Diagnostics[1].Range.End()]
 	if first != "with" || second != "with" {
-		t.Fatalf("reported spans were %q and %q, wanted both to be the keyword", first, second)
+		test.Fatalf("reported spans were %q and %q, wanted both to be the keyword", first, second)
 	}
 	if result.Diagnostics[0].Range.Pos() == result.Diagnostics[1].Range.Pos() {
-		t.Fatalf("both findings pointed at offset %d, so the inner statement was not visited",
+		test.Fatalf("both findings pointed at offset %d, so the inner statement was not visited",
 			result.Diagnostics[0].Range.Pos())
 	}
 }
@@ -138,8 +138,8 @@ func TestNoWithReportsEveryStatementIncludingNested(t *testing.T) {
 // own note means by "not necessary in TypeScript code if `alwaysStrict` is enabled". This pins the
 // behavior so that a later parser change making `with` unparseable fails here loudly rather than
 // silently turning every fixture above vacuous.
-func TestNoWithFiresInsideAModuleAndUnderUseStrict(t *testing.T) {
-	t.Parallel()
+func TestNoWithFiresInsideAModuleAndUnderUseStrict(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -150,10 +150,10 @@ func TestNoWithFiresInsideAModuleAndUnderUseStrict(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoWith, withFile, testCase.sourceText), "noWith")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoWith, withFile, testCase.sourceText), "noWith")
 		})
 	}
 }

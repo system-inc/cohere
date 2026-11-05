@@ -82,8 +82,8 @@ var (
 	classOrderFixtureError error
 )
 
-func classOrderLoadFixture(t *testing.T) *classOrderFixture {
-	t.Helper()
+func classOrderLoadFixture(test *testing.T) *classOrderFixture {
+	test.Helper()
 	classOrderFixtureOnce.Do(func() {
 		path := filepath.Join("testdata", "classorder_fixtures.json")
 		contents, err := os.ReadFile(path)
@@ -97,7 +97,7 @@ func classOrderLoadFixture(t *testing.T) *classOrderFixture {
 		}
 	})
 	if classOrderFixtureError != nil {
-		t.Fatalf("loading the class-order fixture: %v", classOrderFixtureError)
+		test.Fatalf("loading the class-order fixture: %v", classOrderFixtureError)
 	}
 	return classOrderFixtureValue
 }
@@ -214,15 +214,15 @@ func (source *classOrderLiveSource) Reading(className string) (Reading, bool) {
 // `loadTestTable`, which reads two fixed paths off disk and therefore only ever builds ahra's table.
 // This tier needs one table per design system out of one fixture, so the assembly is here and the
 // decoding is shared.
-func classOrderTable(t *testing.T, system *classOrderSystem) *Table {
-	t.Helper()
+func classOrderTable(test *testing.T, system *classOrderSystem) *Table {
+	test.Helper()
 
 	tableFile, contextFile := &system.DescriptorTable, &system.Context
 
 	if len(tableFile.Roots) == 0 || len(contextFile.Namespaces) == 0 {
 		// An empty half builds a table that declines everything, which reads downstream as a port
 		// that stopped answering rather than as a fixture that lost a field.
-		t.Fatalf("%s: the fixture carries %d descriptor roots and %d namespaces; a table cannot be built from that",
+		test.Fatalf("%s: the fixture carries %d descriptor roots and %d namespaces; a table cannot be built from that",
 			system.Name, len(tableFile.Roots), len(contextFile.Namespaces))
 	}
 
@@ -478,9 +478,9 @@ func (source classOrderCorruptedSource) Reading(className string) (Reading, bool
 }
 
 // TestClassOrderDifferential is the Tier 2 run: every class, both design systems, end to end.
-func TestClassOrderDifferential(t *testing.T) {
-	t.Parallel()
-	fixture := classOrderLoadFixture(t)
+func TestClassOrderDifferential(test *testing.T) {
+	test.Parallel()
+	fixture := classOrderLoadFixture(test)
 
 	systems := make([]SystemCases, 0, len(fixture.Systems))
 	sources := make([]*classOrderLiveSource, 0, len(fixture.Systems))
@@ -489,7 +489,7 @@ func TestClassOrderDifferential(t *testing.T) {
 		systems = append(systems, classOrderCases(system))
 		sources = append(sources, &classOrderLiveSource{
 			name:         "ParseCandidate + Table.Lookup",
-			table:        classOrderTable(t, system),
+			table:        classOrderTable(test, system),
 			designSystem: &classOrderDesignSystem{system: system},
 		})
 	}
@@ -509,13 +509,13 @@ func TestClassOrderDifferential(t *testing.T) {
 			sources[index],
 			classOrderControls(),
 		)
-		classOrderAssertReport(t, fixture, sources[index], report)
+		classOrderAssertReport(test, fixture, sources[index], report)
 	}
 }
 
 // classOrderAssertReport is every assertion one run has to pass.
-func classOrderAssertReport(t *testing.T, fixture *classOrderFixture, source *classOrderLiveSource, report Report) {
-	t.Helper()
+func classOrderAssertReport(test *testing.T, fixture *classOrderFixture, source *classOrderLiveSource, report Report) {
+	test.Helper()
 
 	population := report.Populations[0]
 
@@ -527,7 +527,7 @@ func classOrderAssertReport(t *testing.T, fixture *classOrderFixture, source *cl
 	// because this call deliberately passes one system at a time; the two-system requirement is
 	// asserted over the fixture in TestClassOrderDifferentialRequiresTwoDesignSystems.
 	for _, reason := range classOrderUntrustworthyReasons(report) {
-		t.Errorf("%s: untrustworthy run: %s", population.SystemName, reason)
+		test.Errorf("%s: untrustworthy run: %s", population.SystemName, reason)
 	}
 
 	system := classOrderSystemNamed(fixture, population.SystemName)
@@ -549,16 +549,16 @@ func classOrderAssertReport(t *testing.T, fixture *classOrderFixture, source *cl
 	}
 
 	if len(unexplainedDisagreements) > 0 {
-		t.Errorf("%s: %d classes read differently in Go and the engine, under no known mechanism",
+		test.Errorf("%s: %d classes read differently in Go and the engine, under no known mechanism",
 			population.SystemName, len(unexplainedDisagreements))
 		for _, divergence := range classOrderSample(unexplainedDisagreements, 20) {
-			t.Errorf("  %s (%s): engine %s, go %s",
+			test.Errorf("  %s (%s): engine %s, go %s",
 				divergence.ClassName, divergence.Population,
 				divergence.EngineReading.Format(), divergence.GoReading.Format())
 		}
 	}
 	if len(unresolvableAlpha) < classOrderExpectedUnresolvableAlpha {
-		t.Errorf("%s: the unresolvable-alpha mechanism covered %d classes, below the expected %d; "+
+		test.Errorf("%s: the unresolvable-alpha mechanism covered %d classes, below the expected %d; "+
 			"an acknowledgement that covers nothing is excusing something else",
 			population.SystemName, len(unresolvableAlpha), classOrderExpectedUnresolvableAlpha)
 	}
@@ -571,10 +571,10 @@ func classOrderAssertReport(t *testing.T, fixture *classOrderFixture, source *cl
 	// `@utility` evaluator: the model has no membership test for "does this value resolve at all".
 	// A ceiling fails the moment the port starts inventing more than the mechanism accounts for.
 	if invented := grouped[OutcomeEngineSilent]; len(invented) > classOrderExpectedInventedReadings {
-		t.Errorf("%s: %d classes where Go answered and the engine declined, above the %d the known mechanism accounts for",
+		test.Errorf("%s: %d classes where Go answered and the engine declined, above the %d the known mechanism accounts for",
 			population.SystemName, len(invented), classOrderExpectedInventedReadings)
 		for _, divergence := range classOrderSample(invented, 20) {
-			t.Errorf("  %s (%s): engine declined, go %s",
+			test.Errorf("  %s (%s): engine declined, go %s",
 				divergence.ClassName, divergence.Population, divergence.GoReading.Format())
 		}
 	}
@@ -585,42 +585,42 @@ func classOrderAssertReport(t *testing.T, fixture *classOrderFixture, source *cl
 	// ahra's 408 declines are the model's own declared boundary, so any ceiling loose enough to
 	// admit them is loose enough to hide the 408th. Connected has exactly one such class,
 	// `max-w-screen-sm`, and a percentage would have absorbed it without a word.
-	classOrderAssertGoSilence(t, system, source, population, grouped[OutcomeGoSilent])
+	classOrderAssertGoSilence(test, system, source, population, grouped[OutcomeGoSilent])
 
 	// The coverage assertion, stated as its own requirement: a side reporting nothing is a failed
 	// run and not a clean one. Trustworthy already refuses a run over the both-silent ceiling; this
 	// asserts the positive, that the run actually answered the bulk of what it was given.
 	if answered := population.Answered(); answered < population.Total()/2 {
-		t.Errorf("%s: only %d of %d classes were answered by both sides; a differential that mostly says nothing is not a clean run",
+		test.Errorf("%s: only %d of %d classes were answered by both sides; a differential that mostly says nothing is not a clean run",
 			population.SystemName, answered, population.Total())
 	}
 
 	// The controls. Proving the check can fail is what makes the passes above mean anything, and a
 	// control that did not fire invalidates the run rather than merely noting a gap.
 	if !report.ControlsProven() {
-		t.Errorf("%s: controls were not proven in both silent directions; detection has not been demonstrated", population.SystemName)
+		test.Errorf("%s: controls were not proven in both silent directions; detection has not been demonstrated", population.SystemName)
 	}
 	for _, result := range report.Controls {
 		if result.Detected {
 			continue
 		}
-		t.Errorf("%s: control %q did not fire: %s", population.SystemName, result.Control.Name, result.Detail)
+		test.Errorf("%s: control %q did not fire: %s", population.SystemName, result.Control.Name, result.Detail)
 	}
 
 	// The fixture's own counts, asserted against what the run actually walked. A fixture that
 	// silently lost a population is the failure this catches, and it is invisible in a rate.
 	if population.RegistryClasses != system.Counts.RegistryClasses {
-		t.Errorf("%s: walked %d registry classes, fixture recorded %d",
+		test.Errorf("%s: walked %d registry classes, fixture recorded %d",
 			population.SystemName, population.RegistryClasses, system.Counts.RegistryClasses)
 	}
 	if population.CorpusClasses != system.Counts.CorpusClasses {
-		t.Errorf("%s: walked %d corpus classes, fixture recorded %d",
+		test.Errorf("%s: walked %d corpus classes, fixture recorded %d",
 			population.SystemName, population.CorpusClasses, system.Counts.CorpusClasses)
 	}
 
 	// Printed on success, because a suite that compared twelve answers and one that compared a
 	// hundred and ninety thousand look the same as a green line.
-	t.Log("\n" + report.Describe())
+	test.Log("\n" + report.Describe())
 }
 
 // classOrderUntrustworthyReasons runs Trustworthy's checks minus the two-system rule.
@@ -661,15 +661,15 @@ func classOrderUntrustworthyReasons(report Report) []string {
 // That class of defect is reachable only from a class *name*. A fixture that hands the Go side a
 // pre-parsed candidate has already decided the root, so it can never disagree with the parser about
 // which root a class has. This is the seam, and this is what testing it finds.
-func classOrderAssertGoSilence(t *testing.T, system *classOrderSystem, source *classOrderLiveSource, population Population, silent []Divergence) {
-	t.Helper()
+func classOrderAssertGoSilence(test *testing.T, system *classOrderSystem, source *classOrderLiveSource, population Population, silent []Divergence) {
+	test.Helper()
 
 	perDeclaration := make(map[string]bool, len(system.Context.PerDeclarationRoots))
 	for _, root := range system.Context.PerDeclarationRoots {
 		perDeclaration[root] = true
 	}
 	if len(perDeclaration) == 0 {
-		t.Errorf("%s: the fixture names no per-declaration roots, so every decline below is unexplained for the wrong reason",
+		test.Errorf("%s: the fixture names no per-declaration roots, so every decline below is unexplained for the wrong reason",
 			population.SystemName)
 	}
 
@@ -697,14 +697,14 @@ func classOrderAssertGoSilence(t *testing.T, system *classOrderSystem, source *c
 	// TestClassOrderAcknowledgementsAreStillEarned, because `max-w-screen` is advertised by only one
 	// of the two registries and a per-system assertion would fail on the other for being right.
 	if acknowledged > 0 {
-		t.Logf("%s: %d declines covered by a known missing descriptor row", population.SystemName, acknowledged)
+		test.Logf("%s: %d declines covered by a known missing descriptor row", population.SystemName, acknowledged)
 	}
 
 	if declared < classOrderExpectedPerDeclarationDeclines {
 		// The declared boundary vanishing is as much a finding as an undeclared decline appearing:
 		// it means either the fixture lost the `@utility` roots or the model started answering
 		// classes it has no basis to answer.
-		t.Errorf("%s: only %d classes were declined under the %d per-declaration roots, below the expected %d",
+		test.Errorf("%s: only %d classes were declined under the %d per-declaration roots, below the expected %d",
 			population.SystemName, declared, len(perDeclaration), classOrderExpectedPerDeclarationDeclines)
 	}
 
@@ -725,13 +725,13 @@ func classOrderAssertGoSilence(t *testing.T, system *classOrderSystem, source *c
 
 	// The roots are named rather than the classes counted, because "declined 408 classes" is not
 	// actionable and "declined every class rooted at `max-w-screen`, which has no descriptor row" is.
-	t.Errorf("%s: %d classes were declined under %d roots that are not per-declaration, so the table is missing rows",
+	test.Errorf("%s: %d classes were declined under %d roots that are not per-declaration, so the table is missing rows",
 		population.SystemName, len(silent)-declared, len(counts))
 	for index, entry := range counts {
 		if index >= 15 {
 			break
 		}
-		t.Errorf("  %d declined under root %q, for example %s", entry.count, entry.root, example[entry.root])
+		test.Errorf("  %d declined under root %q, for example %s", entry.count, entry.root, example[entry.root])
 	}
 }
 
@@ -819,9 +819,9 @@ func classOrderSystemNamed(fixture *classOrderFixture, name string) *classOrderS
 // Asserted across both systems rather than within one, because coverage is legitimately per
 // repository: `max-w-screen` is advertised by www-connected-app's registry and not by ahra's, so
 // demanding it fire on ahra would fail the suite for being correct.
-func TestClassOrderAcknowledgementsAreStillEarned(t *testing.T) {
-	t.Parallel()
-	fixture := classOrderLoadFixture(t)
+func TestClassOrderAcknowledgementsAreStillEarned(test *testing.T) {
+	test.Parallel()
+	fixture := classOrderLoadFixture(test)
 
 	exercised := map[string]int{}
 	unresolvableAlpha := 0
@@ -831,7 +831,7 @@ func TestClassOrderAcknowledgementsAreStillEarned(t *testing.T) {
 		system := &fixture.Systems[index]
 		source := &classOrderLiveSource{
 			name:         "ParseCandidate + Table.Lookup",
-			table:        classOrderTable(t, system),
+			table:        classOrderTable(test, system),
 			designSystem: &classOrderDesignSystem{system: system},
 		}
 		perDeclaration := make(map[string]bool, len(system.Context.PerDeclarationRoots))
@@ -862,17 +862,17 @@ func TestClassOrderAcknowledgementsAreStillEarned(t *testing.T) {
 
 	for root := range classOrderMissingDescriptorRoots {
 		if exercised[root] == 0 {
-			t.Errorf("no design system exercised the acknowledged missing descriptor row for %q; "+
+			test.Errorf("no design system exercised the acknowledged missing descriptor row for %q; "+
 				"an acknowledgement covering nothing is an excuse waiting for the next defect under that root", root)
 		}
 	}
 	if unresolvableAlpha == 0 {
-		t.Error("no design system exercised the unresolvable-alpha mechanism; the acknowledgement no longer covers anything")
+		test.Error("no design system exercised the unresolvable-alpha mechanism; the acknowledgement no longer covers anything")
 	}
 	if invented == 0 {
-		t.Error("no design system exercised the invented-reading mechanism; the acknowledgement no longer covers anything")
+		test.Error("no design system exercised the invented-reading mechanism; the acknowledgement no longer covers anything")
 	}
 
-	t.Logf("acknowledgements exercised across %d design systems: %d unresolvable-alpha, %d invented readings, %v missing descriptor rows",
+	test.Logf("acknowledgements exercised across %d design systems: %d unresolvable-alpha, %d invented readings, %v missing descriptor rows",
 		len(fixture.Systems), unresolvableAlpha, invented, exercised)
 }

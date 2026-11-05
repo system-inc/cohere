@@ -18,11 +18,11 @@ import (
 // that moves. `internal/lint/rules/react/tools/vendor_fixtures` re-pulls at a chosen sha when the pin is bumped.
 const fixtureRoot = "testdata/fixtures"
 
-func load(t *testing.T) []Fixture {
-	t.Helper()
+func load(test *testing.T) []Fixture {
+	test.Helper()
 	fixtures, err := Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the vendored corpus: %v", err)
+		test.Fatalf("loading the vendored corpus: %v", err)
 	}
 	return fixtures
 }
@@ -45,9 +45,9 @@ func load(t *testing.T) []Fixture {
 // they are the only false-positive oracle here, since over-reporting on an error fixture produces
 // more findings and reads as success. A total-only assertion would let the two populations trade
 // against each other silently, which is the shape of defect this whole file guards.
-func TestCorpusIsTheSizeItClaimsToBe(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestCorpusIsTheSizeItClaimsToBe(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	errorNamed, clean := 0, 0
 	for _, fixture := range fixtures {
@@ -59,11 +59,11 @@ func TestCorpusIsTheSizeItClaimsToBe(t *testing.T) {
 		clean++
 	}
 	if errorNamed != ExpectedErrorFixtureCount {
-		t.Errorf("corpus holds %d error fixtures, want %d at sha %s",
+		test.Errorf("corpus holds %d error fixtures, want %d at sha %s",
 			errorNamed, ExpectedErrorFixtureCount, UpstreamSha)
 	}
 	if clean != ExpectedCleanFixtureCount {
-		t.Errorf("corpus holds %d clean fixtures, want %d at sha %s; these are the only population "+
+		test.Errorf("corpus holds %d clean fixtures, want %d at sha %s; these are the only population "+
 			"where a finding is a defect, so losing them silently removes the ability to measure "+
 			"over-reporting at all", clean, ExpectedCleanFixtureCount, UpstreamSha)
 	}
@@ -89,19 +89,19 @@ func TestCorpusIsTheSizeItClaimsToBe(t *testing.T) {
 	// 222 + 103, not 221 + 104. The brief this task came from carried the latter; both halves were
 	// off by one and the total was right, which is how a transcription slip survives a total check.
 	if topLevel != 222 {
-		t.Errorf("top-level fixtures = %d, want 222", topLevel)
+		test.Errorf("top-level fixtures = %d, want 222", topLevel)
 	}
 	if nested != 103 {
-		t.Errorf("nested fixtures = %d, want 103", nested)
+		test.Errorf("nested fixtures = %d, want 103", nested)
 	}
 	if len(subdirectories) != 9 {
-		t.Errorf("subdirectories holding error fixtures = %d, want 9; got %v", len(subdirectories), subdirectories)
+		test.Errorf("subdirectories holding error fixtures = %d, want 9; got %v", len(subdirectories), subdirectories)
 	}
 
 	// Guard the trap directly: a filter that only saw the top level would report 222 and pass every
 	// other assertion in this file.
 	if nested == 0 {
-		t.Fatal("no nested fixtures found at all, which is the exact shape of the depth-anchored grep defect")
+		test.Fatal("no nested fixtures found at all, which is the exact shape of the depth-anchored grep defect")
 	}
 }
 
@@ -111,9 +111,9 @@ func TestCorpusIsTheSizeItClaimsToBe(t *testing.T) {
 // an expectation parser that silently produced empty results cannot pass — which it otherwise
 // would, since an empty expectation compared against an empty result is a pass, and 325 of those is
 // a perfect score over a corpus nobody read.
-func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestEveryFixtureHasAParsedExpectation(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	withDeclaredCount, withLocation, totalErrors := 0, 0, 0
 	for _, fixture := range fixtures {
@@ -122,12 +122,12 @@ func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
 		base := filepath.Base(fixture.Name)
 		if !strings.HasPrefix(base, "error.") && !strings.HasPrefix(base, "todo.error.") {
 			if fixture.Expected.Raw != "" {
-				t.Errorf("%s: clean fixture carries an `## Error` block", fixture.Name)
+				test.Errorf("%s: clean fixture carries an `## Error` block", fixture.Name)
 			}
 			continue
 		}
 		if fixture.Expected.Raw == "" {
-			t.Errorf("%s: empty `## Error` block", fixture.Name)
+			test.Errorf("%s: empty `## Error` block", fixture.Name)
 		}
 		if fixture.Expected.HasDeclaredCount {
 			withDeclaredCount++
@@ -135,7 +135,7 @@ func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
 		for _, expectedError := range fixture.Expected.Errors {
 			totalErrors++
 			if expectedError.Message == "" {
-				t.Errorf("%s: parsed an error with an empty message", fixture.Name)
+				test.Errorf("%s: parsed an error with an empty message", fixture.Name)
 			}
 			if expectedError.HasLocation {
 				withLocation++
@@ -147,11 +147,11 @@ func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
 	// different shape entirely (`Missing semicolon. (7:24)`, `unexpected error`). Asserting the
 	// split keeps a parser that started ignoring the header from passing quietly.
 	if withDeclaredCount != 311 {
-		t.Errorf("fixtures with a `Found N error` header = %d, want 311", withDeclaredCount)
+		test.Errorf("fixtures with a `Found N error` header = %d, want 311", withDeclaredCount)
 	}
 
 	if totalErrors == 0 {
-		t.Fatal("parsed zero individual errors across the whole corpus, which is what a broken parser looks like from a passing suite")
+		test.Fatal("parsed zero individual errors across the whole corpus, which is what a broken parser looks like from a passing suite")
 	}
 
 	// 429 diagnostics, 398 with a primary location. Both pinned, because both are load-bearing and
@@ -160,12 +160,12 @@ func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
 	// span at all. The two errors nearly cancel, which is what makes 427 dangerous rather than
 	// obviously wrong.
 	if totalErrors != 429 {
-		t.Errorf("parsed %d individual errors, want 429 at sha %s", totalErrors, UpstreamSha)
+		test.Errorf("parsed %d individual errors, want 429 at sha %s", totalErrors, UpstreamSha)
 	}
 	if withLocation != 398 {
-		t.Errorf("errors carrying a primary location = %d, want 398", withLocation)
+		test.Errorf("errors carrying a primary location = %d, want 398", withLocation)
 	}
-	t.Logf("parsed %d individual errors, %d carrying a location, across %d fixtures", totalErrors, withLocation, len(fixtures))
+	test.Logf("parsed %d individual errors, %d carrying a location, across %d fixtures", totalErrors, withLocation, len(fixtures))
 }
 
 // TestDeclaredCountMatchesParsedErrors cross-checks the parser against the goldens' own arithmetic.
@@ -173,9 +173,9 @@ func TestEveryFixtureHasAParsedExpectation(t *testing.T) {
 // Each golden states how many errors it holds, and the parser counts them independently. Two
 // measurements of the same quantity that were not derived from each other: if the parser drops an
 // `Error:` line or invents one, the sum stops matching the headers and says so.
-func TestDeclaredCountMatchesParsedErrors(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestDeclaredCountMatchesParsedErrors(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	declaredTotal, parsedTotal := 0, 0
 	for _, fixture := range fixtures {
@@ -186,15 +186,15 @@ func TestDeclaredCountMatchesParsedErrors(t *testing.T) {
 		parsedTotal += len(fixture.Expected.Errors)
 
 		if fixture.Expected.DeclaredCount != len(fixture.Expected.Errors) {
-			t.Errorf("%s: golden declares %d errors, parser found %d",
+			test.Errorf("%s: golden declares %d errors, parser found %d",
 				fixture.Name, fixture.Expected.DeclaredCount, len(fixture.Expected.Errors))
 		}
 	}
 
 	if declaredTotal != parsedTotal {
-		t.Errorf("declared %d errors in total, parsed %d", declaredTotal, parsedTotal)
+		test.Errorf("declared %d errors in total, parsed %d", declaredTotal, parsedTotal)
 	}
-	t.Logf("declared and parsed agree at %d individual errors across the 311 headered fixtures", declaredTotal)
+	test.Logf("declared and parsed agree at %d individual errors across the 311 headered fixtures", declaredTotal)
 }
 
 // TestFlowFixtureCountIsUpstreamsOwnTest pins the Flow split.
@@ -205,9 +205,9 @@ func TestDeclaredCountMatchesParsedErrors(t *testing.T) {
 // `source.indexOf('@flow') !== -1`), gives 35, while a first-line-pragma test gives 20. Using the
 // narrower one would hand 15 Flow-syntax files to a TypeScript parser and read the parse failures
 // as rule failures.
-func TestFlowFixtureCountIsUpstreamsOwnTest(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestFlowFixtureCountIsUpstreamsOwnTest(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	flowCount := 0
 	for _, fixture := range fixtures {
@@ -217,11 +217,11 @@ func TestFlowFixtureCountIsUpstreamsOwnTest(t *testing.T) {
 	}
 
 	if flowCount != ExpectedFlowFixtureCount {
-		t.Errorf("fixtures requiring a Flow parser = %d, want %d at sha %s",
+		test.Errorf("fixtures requiring a Flow parser = %d, want %d at sha %s",
 			flowCount, ExpectedFlowFixtureCount, UpstreamSha)
 	}
 	if got, want := len(fixtures)-flowCount, ExpectedFixtureCount-ExpectedFlowFixtureCount; got != want {
-		t.Errorf("fixtures needing no Flow parser = %d, want %d", got, want)
+		test.Errorf("fixtures needing no Flow parser = %d, want %d", got, want)
 	}
 }
 
@@ -231,9 +231,9 @@ func TestFlowFixtureCountIsUpstreamsOwnTest(t *testing.T) {
 // outcome: a directive nobody has looked at should stop the suite, because an unmodelled directive
 // changes what a fixture expects, and a runner that skips it reports "not applicable" for a case it
 // silently got wrong.
-func TestEveryPragmaInTheCorpusIsModelled(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestEveryPragmaInTheCorpusIsModelled(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	seen := map[string]int{}
 	for _, fixture := range fixtures {
@@ -241,7 +241,7 @@ func TestEveryPragmaInTheCorpusIsModelled(t *testing.T) {
 			seen[pragma.Key]++
 		}
 		if err := CheckPragmas(fixture.Name, fixture.Pragmas); err != nil {
-			t.Errorf("%v", err)
+			test.Errorf("%v", err)
 		}
 	}
 
@@ -250,9 +250,9 @@ func TestEveryPragmaInTheCorpusIsModelled(t *testing.T) {
 	// directive happened to already be in a map. The three the clean population added are
 	// `panicThreshold`, `loggerTestOnly` and `expectNothingCompiled`.
 	if len(seen) != 34 {
-		t.Errorf("distinct pragmas across the corpus = %d, want 34; got %v", len(seen), seen)
+		test.Errorf("distinct pragmas across the corpus = %d, want 34; got %v", len(seen), seen)
 	}
-	t.Logf("modelled %d directives, deliberately ignore %d", len(KnownPragmaKeys()), len(IgnoredPragmaKeys()))
+	test.Logf("modelled %d directives, deliberately ignore %d", len(KnownPragmaKeys()), len(IgnoredPragmaKeys()))
 }
 
 // TestUnknownPragmaIsRefusedNotSkipped proves the refusal actually fires.
@@ -260,24 +260,24 @@ func TestEveryPragmaInTheCorpusIsModelled(t *testing.T) {
 // The test over the real corpus above passes when every directive is modelled, which is also what a
 // CheckPragmas that always returned nil would do. So this hands it a directive that is in neither
 // map and requires an error, which is the only way to tell a working guard from an absent one.
-func TestUnknownPragmaIsRefusedNotSkipped(t *testing.T) {
-	t.Parallel()
+func TestUnknownPragmaIsRefusedNotSkipped(test *testing.T) {
+	test.Parallel()
 	pragmas := ParsePragmas("// @validateRefAccessDuringRender @enableSomethingNobodyModelled")
 
 	err := CheckPragmas("error.hypothetical.js", pragmas)
 	if err == nil {
-		t.Fatal("CheckPragmas accepted an unmodelled directive; the whole point of this package is that it does not")
+		test.Fatal("CheckPragmas accepted an unmodelled directive; the whole point of this package is that it does not")
 	}
 
 	var unknown *UnknownPragmaError
 	if !errors.As(err, &unknown) {
-		t.Fatalf("got %T, want *UnknownPragmaError", err)
+		test.Fatalf("got %T, want *UnknownPragmaError", err)
 	}
 	if unknown.Pragma.Key != "enableSomethingNobodyModelled" {
-		t.Errorf("refused %q, want the unmodelled directive", unknown.Pragma.Key)
+		test.Errorf("refused %q, want the unmodelled directive", unknown.Pragma.Key)
 	}
 	if !strings.Contains(err.Error(), "error.hypothetical.js") {
-		t.Errorf("the refusal does not name the fixture: %v", err)
+		test.Errorf("the refusal does not name the fixture: %v", err)
 	}
 }
 
@@ -286,15 +286,15 @@ func TestUnknownPragmaIsRefusedNotSkipped(t *testing.T) {
 // One unmodelled directive means the model of the corpus is wrong, so the other 324 verdicts were
 // computed under a model already known to be incomplete. Marking a single fixture and carrying on
 // would produce exactly the scoreboard this package exists to prevent.
-func TestRunRefusesTheWholeCorpusOnOneUnknownPragma(t *testing.T) {
-	t.Parallel()
+func TestRunRefusesTheWholeCorpusOnOneUnknownPragma(test *testing.T) {
+	test.Parallel()
 	fixtures := []Fixture{
 		{Name: "error.fine.js", Pragmas: ParsePragmas("// @validateNoSetStateInRender")},
 		{Name: "error.bad.js", Pragmas: ParsePragmas("// @somethingUnmodelled")},
 	}
 
 	if _, err := Run(fixtures, NothingImplemented{}, Options{}); err == nil {
-		t.Fatal("Run scored a corpus containing an unmodelled directive")
+		test.Fatal("Run scored a corpus containing an unmodelled directive")
 	}
 }
 
@@ -304,8 +304,8 @@ func TestRunRefusesTheWholeCorpusOnOneUnknownPragma(t *testing.T) {
 // `splitPragma` only splits values on `:`. A parser that normalised it would be kinder than
 // upstream and would score three fixtures under a configuration upstream never applied when it
 // recorded their expectations.
-func TestPragmaParserReproducesUpstreamsSplit(t *testing.T) {
-	t.Parallel()
+func TestPragmaParserReproducesUpstreamsSplit(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		firstLine string
 		want      []Pragma
@@ -334,12 +334,12 @@ func TestPragmaParserReproducesUpstreamsSplit(t *testing.T) {
 	} {
 		got := ParsePragmas(testCase.firstLine)
 		if len(got) != len(testCase.want) {
-			t.Errorf("%q: parsed %d pragmas (%v), want %d", testCase.firstLine, len(got), got, len(testCase.want))
+			test.Errorf("%q: parsed %d pragmas (%v), want %d", testCase.firstLine, len(got), got, len(testCase.want))
 			continue
 		}
 		for index := range got {
 			if got[index] != testCase.want[index] {
-				t.Errorf("%q: pragma %d = %+v, want %+v", testCase.firstLine, index, got[index], testCase.want[index])
+				test.Errorf("%q: pragma %d = %+v, want %+v", testCase.firstLine, index, got[index], testCase.want[index])
 			}
 		}
 	}
@@ -349,9 +349,9 @@ func TestPragmaParserReproducesUpstreamsSplit(t *testing.T) {
 //
 // One fixture, verified by eye against the file on disk, so the parser is anchored to something
 // outside its own output at least once.
-func TestExpectationParserReadsARealGolden(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestExpectationParserReadsARealGolden(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	var subject *Fixture
 	for index := range fixtures {
@@ -361,25 +361,25 @@ func TestExpectationParserReadsARealGolden(t *testing.T) {
 		}
 	}
 	if subject == nil {
-		t.Fatal("error.assign-global-in-jsx-children.js is not in the vendored corpus")
+		test.Fatal("error.assign-global-in-jsx-children.js is not in the vendored corpus")
 	}
 
 	if !subject.Expected.HasDeclaredCount || subject.Expected.DeclaredCount != 1 {
-		t.Errorf("declared count = %d (present %v), want 1", subject.Expected.DeclaredCount, subject.Expected.HasDeclaredCount)
+		test.Errorf("declared count = %d (present %v), want 1", subject.Expected.DeclaredCount, subject.Expected.HasDeclaredCount)
 	}
 	if len(subject.Expected.Errors) != 1 {
-		t.Fatalf("parsed %d errors, want 1", len(subject.Expected.Errors))
+		test.Fatalf("parsed %d errors, want 1", len(subject.Expected.Errors))
 	}
 
 	parsed := subject.Expected.Errors[0]
 	if parsed.Heading != "Error" {
-		t.Errorf("heading = %q, want %q", parsed.Heading, "Error")
+		test.Errorf("heading = %q, want %q", parsed.Heading, "Error")
 	}
 	if want := "Cannot reassign variables declared outside of the component/hook"; parsed.Message != want {
-		t.Errorf("message = %q, want %q", parsed.Message, want)
+		test.Errorf("message = %q, want %q", parsed.Message, want)
 	}
 	if parsed.File != "error.assign-global-in-jsx-children.ts" || parsed.Line != 3 || parsed.Column != 4 {
-		t.Errorf("location = %s:%d:%d, want error.assign-global-in-jsx-children.ts:3:4", parsed.File, parsed.Line, parsed.Column)
+		test.Errorf("location = %s:%d:%d, want error.assign-global-in-jsx-children.ts:3:4", parsed.File, parsed.Line, parsed.Column)
 	}
 }
 
@@ -412,27 +412,27 @@ func (perfectImplementation) Analyze(fixture Fixture) (Result, error) {
 // errors and requires 325 passes. If the comparison cannot recognise a correct answer, this is the
 // test that says so, and it says so today rather than on the day a real rule lands and its first
 // correct result is scored as a failure.
-func TestRunnerCanDetectAPass(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestRunnerCanDetectAPass(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	score, err := Run(fixtures, perfectImplementation{}, Options{})
 	if err != nil {
-		t.Fatalf("scoring a deliberately-correct implementation: %v", err)
+		test.Fatalf("scoring a deliberately-correct implementation: %v", err)
 	}
 
 	if score.Passed != len(fixtures) {
-		t.Errorf("a correct implementation scored %d / %d; the comparison cannot recognise a right answer", score.Passed, score.Considered)
+		test.Errorf("a correct implementation scored %d / %d; the comparison cannot recognise a right answer", score.Passed, score.Considered)
 		for _, fixtureScore := range score.Fixtures {
 			if fixtureScore.Outcome != OutcomePassed {
-				t.Logf("  %s: %s — %s", fixtureScore.Name, fixtureScore.Outcome, fixtureScore.Detail)
+				test.Logf("  %s: %s — %s", fixtureScore.Name, fixtureScore.Outcome, fixtureScore.Detail)
 			}
 		}
 	}
 	if score.Failed != 0 || score.Declined != 0 || score.Refused != 0 {
-		t.Errorf("unexpected non-passes: %s", score.Summary())
+		test.Errorf("unexpected non-passes: %s", score.Summary())
 	}
-	t.Logf("calibration: %s", score.Summary())
+	test.Logf("calibration: %s", score.Summary())
 }
 
 // TestRunnerCanDetectAFailure is the other half of the calibration.
@@ -440,36 +440,36 @@ func TestRunnerCanDetectAPass(t *testing.T) {
 // A comparison that always returned Passed would satisfy the test above just as well as a correct
 // one. This gives it a deliberately wrong answer and requires a failure, so that Passed and Failed
 // are both shown to be reachable.
-func TestRunnerCanDetectAFailure(t *testing.T) {
-	t.Parallel()
+func TestRunnerCanDetectAFailure(test *testing.T) {
+	test.Parallel()
 	expectation := Expectation{
 		Errors: []ExpectedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 3}},
 	}
 
 	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 3}}}); verdict.Outcome != OutcomePassed {
-		t.Errorf("an exactly-right result scored %s", verdict.Outcome)
+		test.Errorf("an exactly-right result scored %s", verdict.Outcome)
 	}
 
 	// Right message, wrong line.
 	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 9}}}); verdict.Outcome != OutcomeFailed {
-		t.Errorf("a result on the wrong line scored %s", verdict.Outcome)
+		test.Errorf("a result on the wrong line scored %s", verdict.Outcome)
 	}
 
 	// Right line, wrong message.
 	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Error", Message: "Something else", Line: 3}}}); verdict.Outcome != OutcomeFailed {
-		t.Errorf("a result with the wrong message scored %s", verdict.Outcome)
+		test.Errorf("a result with the wrong message scored %s", verdict.Outcome)
 	}
 
 	// Right message and line, wrong heading. `Compilation Skipped` and `Error` are different
 	// verdicts about the same source and a port that confuses them has got a real thing wrong.
 	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Todo", Message: "Cannot reassign variables", Line: 3}}}); verdict.Outcome != OutcomeFailed {
-		t.Errorf("a result under the wrong heading scored %s", verdict.Outcome)
+		test.Errorf("a result under the wrong heading scored %s", verdict.Outcome)
 	}
 
 	// Nothing at all. This is the case an unimplemented engine would produce if it returned an
 	// empty result rather than declining, and it must not read as a pass.
 	if verdict := Compare(expectation, Result{}); verdict.Outcome != OutcomeFailed {
-		t.Errorf("an empty result against a golden expecting an error scored %s", verdict.Outcome)
+		test.Errorf("an empty result against a golden expecting an error scored %s", verdict.Outcome)
 	}
 
 	// One finding must not satisfy two expectations. 87 of the 325 expect more than one error.
@@ -478,7 +478,7 @@ func TestRunnerCanDetectAFailure(t *testing.T) {
 		{Heading: "Error", Message: "Same message", Line: 4},
 	}}
 	if verdict := Compare(twoOfTheSame, Result{Errors: []ReportedError{{Heading: "Error", Message: "Same message", Line: 4}}}); verdict.Outcome != OutcomeFailed {
-		t.Errorf("one finding satisfied two identical expectations, so the comparison is a set rather than a multiset")
+		test.Errorf("one finding satisfied two identical expectations, so the comparison is a set rather than a multiset")
 	}
 }
 
@@ -489,58 +489,58 @@ func TestRunnerCanDetectAFailure(t *testing.T) {
 // nothing considered is an empty suite wearing the same digit. The assertions on Considered and
 // Declined are what separate them, and `Score.Check` proves the buckets partition the corpus rather
 // than merely summing to something.
-func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	score, err := Run(fixtures, NothingImplemented{}, Options{})
 	if err != nil {
-		t.Fatalf("scoring the unimplemented engine: %v", err)
+		test.Fatalf("scoring the unimplemented engine: %v", err)
 	}
 
 	if score.Considered != ExpectedFixtureCount {
-		t.Errorf("considered %d fixtures, want %d — a zero over a smaller denominator is not the same measurement",
+		test.Errorf("considered %d fixtures, want %d — a zero over a smaller denominator is not the same measurement",
 			score.Considered, ExpectedFixtureCount)
 	}
 	if score.Passed != 0 {
-		t.Errorf("passed %d, want 0; nothing implements these rules yet", score.Passed)
+		test.Errorf("passed %d, want 0; nothing implements these rules yet", score.Passed)
 	}
 	// Declined, not Failed. NothingImplemented says "I do not handle this" rather than "I found no
 	// errors", and those are different facts about the same absent implementation.
 	if score.Declined != ExpectedFixtureCount {
-		t.Errorf("declined %d, want %d", score.Declined, ExpectedFixtureCount)
+		test.Errorf("declined %d, want %d", score.Declined, ExpectedFixtureCount)
 	}
 	if score.Refused != 0 {
-		t.Errorf("refused %d, want 0; a non-zero refusal count is a defect in this package, not a score", score.Refused)
+		test.Errorf("refused %d, want 0; a non-zero refusal count is a defect in this package, not a score", score.Refused)
 	}
 
-	t.Logf("first honest score: %s", score.Summary())
+	test.Logf("first honest score: %s", score.Summary())
 }
 
 // TestFlowExclusionIsCountedNotDropped checks the excluded fixtures stay in the denominator.
 //
 // The failure mode being guarded is a suite that reports "290 / 290 declined" and reads like full
 // coverage. Excluding must move a fixture between columns, never out of the total.
-func TestFlowExclusionIsCountedNotDropped(t *testing.T) {
-	t.Parallel()
-	fixtures := load(t)
+func TestFlowExclusionIsCountedNotDropped(test *testing.T) {
+	test.Parallel()
+	fixtures := load(test)
 
 	score, err := Run(fixtures, NothingImplemented{}, Options{SkipFlowFixtures: true})
 	if err != nil {
-		t.Fatalf("scoring with Flow fixtures excluded: %v", err)
+		test.Fatalf("scoring with Flow fixtures excluded: %v", err)
 	}
 
 	if score.Considered != ExpectedFixtureCount {
-		t.Errorf("considered %d, want %d; excluding must not shrink the denominator",
+		test.Errorf("considered %d, want %d; excluding must not shrink the denominator",
 			score.Considered, ExpectedFixtureCount)
 	}
 	if score.Excluded != ExpectedFlowFixtureCount {
-		t.Errorf("excluded %d, want %d", score.Excluded, ExpectedFlowFixtureCount)
+		test.Errorf("excluded %d, want %d", score.Excluded, ExpectedFlowFixtureCount)
 	}
 	if score.Declined != ExpectedFixtureCount-ExpectedFlowFixtureCount {
-		t.Errorf("declined %d, want %d", score.Declined, ExpectedFixtureCount-ExpectedFlowFixtureCount)
+		test.Errorf("declined %d, want %d", score.Declined, ExpectedFixtureCount-ExpectedFlowFixtureCount)
 	}
-	t.Logf("with Flow excluded: %s", score.Summary())
+	test.Logf("with Flow excluded: %s", score.Summary())
 }
 
 // TestVendoredCorpusPairsAreComplete guards the vendored tree against silent drift.
@@ -555,8 +555,8 @@ func TestFlowExclusionIsCountedNotDropped(t *testing.T) {
 // its input, and nothing else is in the directory. Content is guaranteed by `Load` parsing each
 // golden, and against upstream by re-running `internal/lint/rules/react/tools/vendor_fixtures` and diffing, which is how
 // the current tree was verified byte-for-byte when it was written.
-func TestVendoredCorpusPairsAreComplete(t *testing.T) {
-	t.Parallel()
+func TestVendoredCorpusPairsAreComplete(test *testing.T) {
+	test.Parallel()
 	var inputs, expectations []string
 	err := filepath.WalkDir(fixtureRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -573,12 +573,12 @@ func TestVendoredCorpusPairsAreComplete(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking the vendored corpus: %v", err)
+		test.Fatalf("walking the vendored corpus: %v", err)
 	}
 
 	const wantPairs = ExpectedErrorFixtureCount + ExpectedCleanFixtureCount
 	if len(inputs) != wantPairs || len(expectations) != wantPairs {
-		t.Errorf("vendored tree holds %d inputs and %d expectations, want %d of each",
+		test.Errorf("vendored tree holds %d inputs and %d expectations, want %d of each",
 			len(inputs), len(expectations), wantPairs)
 	}
 
@@ -589,12 +589,12 @@ func TestVendoredCorpusPairsAreComplete(t *testing.T) {
 	for _, input := range inputs {
 		want := strings.TrimSuffix(input, filepath.Ext(input)) + ".expect.md"
 		if !haveExpectation[want] {
-			t.Errorf("%s has no expectation; upstream pairs these 1:1", input)
+			test.Errorf("%s has no expectation; upstream pairs these 1:1", input)
 		}
 		delete(haveExpectation, want)
 	}
 	for orphan := range haveExpectation {
-		t.Errorf("%s has no input", orphan)
+		test.Errorf("%s has no input", orphan)
 	}
 }
 
@@ -604,15 +604,15 @@ func TestVendoredCorpusPairsAreComplete(t *testing.T) {
 // detail rather than a decision, and it would silently mean "modelled" and "deliberately inert" at
 // once. CheckPragmas consults knownPragmas first, so an overlap would make the ignoredPragmas entry
 // and the evidence written next to it unreachable.
-func TestKnownAndIgnoredPragmasDoNotOverlap(t *testing.T) {
-	t.Parallel()
+func TestKnownAndIgnoredPragmasDoNotOverlap(test *testing.T) {
+	test.Parallel()
 	ignored := map[string]bool{}
 	for _, key := range IgnoredPragmaKeys() {
 		ignored[key] = true
 	}
 	for _, key := range KnownPragmaKeys() {
 		if ignored[key] {
-			t.Errorf("%q is both modelled and deliberately ignored; one of the two entries is unreachable", key)
+			test.Errorf("%q is both modelled and deliberately ignored; one of the two entries is unreachable", key)
 		}
 	}
 
@@ -621,6 +621,6 @@ func TestKnownAndIgnoredPragmasDoNotOverlap(t *testing.T) {
 	// PluginOptions keys in `Entrypoint/Options.ts` and the 40 in `EnvironmentConfigSchema` — so
 	// none of them is a directive this package invented a meaning for.
 	if got := len(KnownPragmaKeys()) + len(IgnoredPragmaKeys()); got != 34 {
-		t.Errorf("modelled plus ignored = %d, want 34 to match the corpus's distinct directives", got)
+		test.Errorf("modelled plus ignored = %d, want 34 to match the corpus's distinct directives", got)
 	}
 }

@@ -127,19 +127,19 @@ type utilityReadingFixture struct {
 // machine (#sycrdr6).
 var utilityTailwindPackageRoot = vendored.TailwindPackageRoot()
 
-func utilityLoadCorpus(t *testing.T, name string) utilityCorpus {
-	t.Helper()
+func utilityLoadCorpus(test *testing.T, name string) utilityCorpus {
+	test.Helper()
 
 	raw, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("read utility fixture: %v", err)
+		test.Fatalf("read utility fixture: %v", err)
 	}
 	var fixture utilityCorpus
 	if err := json.Unmarshal(raw, &fixture); err != nil {
-		t.Fatalf("decode utility fixture: %v", err)
+		test.Fatalf("decode utility fixture: %v", err)
 	}
 	if len(fixture.Cases) == 0 {
-		t.Fatal("utility fixture holds no cases")
+		test.Fatal("utility fixture holds no cases")
 	}
 	return fixture
 }
@@ -151,26 +151,26 @@ func utilityLoadCorpus(t *testing.T, name string) utilityCorpus {
 // The stylesheet is spelled inside its corpus, so this skips naming the variable when the corpus is
 // unset, and skips loudly, because a silently absent corpus turns this suite into one that compares
 // nothing and still prints green. A corpus that is set but lacks the stylesheet fails.
-func utilityBuildEvaluator(t *testing.T, fixture utilityCorpus) *UtilityEvaluator {
-	t.Helper()
+func utilityBuildEvaluator(test *testing.T, fixture utilityCorpus) *UtilityEvaluator {
+	test.Helper()
 
-	entryPath := corpus.Resolve(t, fixture.EntryPath)
+	entryPath := corpus.Resolve(test, fixture.EntryPath)
 	theme, _, err := LoadThemeFromFile(entryPath, NodeStylesheetResolver(utilityTailwindPackageRoot))
 	if err != nil {
-		t.Fatalf("load theme from %s: %v", entryPath, err)
+		test.Fatalf("load theme from %s: %v", entryPath, err)
 	}
 
-	definitions := utilityParseDefinitions(t, fixture)
+	definitions := utilityParseDefinitions(test, fixture)
 	return NewUtilityEvaluator(theme, definitions)
 }
 
 // forEachUtilityOracle runs an evaluator assertion once per copy of the utility oracle, the public
 // theme's and ahra's (#f598zk0), each with the evaluator built from the stylesheet that copy records.
-func forEachUtilityOracle(t *testing.T, run func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator)) {
-	t.Helper()
-	forEachOracleCopy(t, "utility_fixtures.json", func(t *testing.T, fixtureName string) {
-		fixture := utilityLoadCorpus(t, fixtureName)
-		run(t, fixtureName, fixture, utilityBuildEvaluator(t, fixture))
+func forEachUtilityOracle(test *testing.T, run func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator)) {
+	test.Helper()
+	forEachOracleCopy(test, "utility_fixtures.json", func(test *testing.T, fixtureName string) {
+		fixture := utilityLoadCorpus(test, fixtureName)
+		run(test, fixtureName, fixture, utilityBuildEvaluator(test, fixture))
 	})
 }
 
@@ -180,8 +180,8 @@ func forEachUtilityOracle(t *testing.T, run func(t *testing.T, fixtureName strin
 // for. A static `@utility` takes no value and has no `--value()` to resolve, so it is a constant
 // reading the descriptor table already carries; handling it here would be a second implementation of
 // something already measured.
-func utilityParseDefinitions(t *testing.T, fixture utilityCorpus) []*UtilityDefinition {
-	t.Helper()
+func utilityParseDefinitions(test *testing.T, fixture utilityCorpus) []*UtilityDefinition {
+	test.Helper()
 
 	var definitions []*UtilityDefinition
 	for _, block := range fixture.UtilityBlocks {
@@ -190,10 +190,10 @@ func utilityParseDefinitions(t *testing.T, fixture utilityCorpus) []*UtilityDefi
 		}
 		nodes, err := ParseCSS(block.Source)
 		if err != nil {
-			t.Fatalf("parse @utility %s: %v", block.Name, err)
+			test.Fatalf("parse @utility %s: %v", block.Name, err)
 		}
 		if len(nodes) != 1 || nodes[0].Kind != KindAtRule || nodes[0].Name != "@utility" {
-			t.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))
+			test.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))
 		}
 		definitions = append(definitions, &UtilityDefinition{
 			Name:  strings.TrimSuffix(block.Name, "-*"),
@@ -201,7 +201,7 @@ func utilityParseDefinitions(t *testing.T, fixture utilityCorpus) []*UtilityDefi
 		})
 	}
 	if len(definitions) == 0 {
-		t.Fatal("fixture holds no functional @utility blocks")
+		test.Fatal("fixture holds no functional @utility blocks")
 	}
 	return definitions
 }
@@ -248,9 +248,9 @@ func utilityCandidateFromCase(aCase utilityCase) *ParsedCandidate {
 // rather than skipped. That direction is where a port fails silently: an evaluator that accepted
 // everything would agree on every class that compiles and be wrong on the 6,000-odd that do not,
 // while looking identical in a summary that only counted matches.
-func TestUtilityMatchesEngine(t *testing.T) {
-	t.Parallel()
-	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+func TestUtilityMatchesEngine(test *testing.T) {
+	test.Parallel()
+	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
 		var compared, agreedCompiling, agreedRejecting int
 		var disagreements []string
@@ -301,7 +301,7 @@ func TestUtilityMatchesEngine(t *testing.T) {
 		}
 
 		if len(disagreements) > 0 {
-			t.Errorf("%d of %d classes disagreed with the engine:\n  %s", compared-agreedCompiling-agreedRejecting, compared, strings.Join(disagreements, "\n  "))
+			test.Errorf("%d of %d classes disagreed with the engine:\n  %s", compared-agreedCompiling-agreedRejecting, compared, strings.Join(disagreements, "\n  "))
 		}
 
 		// Coverage, printed on success. A suite that compared twelve answers and one that compared
@@ -309,13 +309,13 @@ func TestUtilityMatchesEngine(t *testing.T) {
 		// compiling half is what proves arity is counted right, and the rejecting half is what proves
 		// the post-conditions reject anything at all.
 		if agreedCompiling < 500 {
-			t.Errorf("only %d compiling classes were compared; the fixture is too small to have shown anything about arity", agreedCompiling)
+			test.Errorf("only %d compiling classes were compared; the fixture is too small to have shown anything about arity", agreedCompiling)
 		}
 		if agreedRejecting < 500 {
-			t.Errorf("only %d rejected classes were compared; without them the post-conditions have never been shown to reject", agreedRejecting)
+			test.Errorf("only %d rejected classes were compared; without them the post-conditions have never been shown to reject", agreedRejecting)
 		}
 
-		t.Logf(
+		test.Logf(
 			"tailwind %s: %d functional classes on %d @utility roots; %d compiled and agreed, %d rejected and agreed",
 			fixture.TailwindVersion, compared, len(evaluator.Definitions), agreedCompiling, agreedRejecting,
 		)
@@ -331,15 +331,15 @@ func TestUtilityMatchesEngine(t *testing.T) {
 //
 // The count is asserted too. If a repository change made the exception set smaller, this component's
 // justification changed and that should be read rather than silently passed.
-func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
-	t.Parallel()
-	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
+	test.Parallel()
+	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
 		// Measured per copy: 18 on ahra in Phase 0, and 5 on the public theme, its five per-declaration
 		// roots each with the `translate-full` key two of their namespaces share.
 		measured := map[string]int{"utility_fixtures.json": 18, "utility_fixtures_public.json": 5}[fixtureName]
 		if len(fixture.KnownExceptions) != measured {
-			t.Errorf(
+			test.Errorf(
 				"fixture holds %d known exceptions, %d were measured; the population this component exists for has changed and the change should be read rather than absorbed",
 				len(fixture.KnownExceptions), measured,
 			)
@@ -354,22 +354,22 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 		for _, exception := range fixture.KnownExceptions {
 			aCase, present := byClassName[exception.ClassName]
 			if !present {
-				t.Errorf("%s: the fixture names it an exception and holds no case for it", exception.ClassName)
+				test.Errorf("%s: the fixture names it an exception and holds no case for it", exception.ClassName)
 				continue
 			}
 			if !evaluator.Has(aCase.Root) {
-				t.Errorf("%s: root %q is not defined by any @utility block the evaluator holds", exception.ClassName, aCase.Root)
+				test.Errorf("%s: root %q is not defined by any @utility block the evaluator holds", exception.ClassName, aCase.Root)
 				continue
 			}
 
 			reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
 			if !compiled {
-				t.Errorf("%s: evaluator rejected the class, engine read %s", exception.ClassName, utilityDescribeReading(Reading{Order: exception.Order, Count: exception.Count}))
+				test.Errorf("%s: evaluator rejected the class, engine read %s", exception.ClassName, utilityDescribeReading(Reading{Order: exception.Order, Count: exception.Count}))
 				continue
 			}
 			want := Reading{Order: exception.Order, Count: exception.Count}
 			if !reading.Equal(want) {
-				t.Errorf(
+				test.Errorf(
 					"%s: evaluator read %s, engine read %s (the descriptor table predicted %s)",
 					exception.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want), exception.PredictedByDescriptorModel,
 				)
@@ -378,7 +378,7 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 			// The exception is only an exception because the table's answer differs. If the two ever
 			// agree, this class stopped needing the evaluator and the fixture is stale.
 			if utilityDescribeReading(want) == exception.PredictedByDescriptorModel {
-				t.Errorf(
+				test.Errorf(
 					"%s: the descriptor table predicted %s, which is what the engine says; this class is no longer an exception and the fixture is stale",
 					exception.ClassName, exception.PredictedByDescriptorModel,
 				)
@@ -388,9 +388,9 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 		}
 
 		if reproduced != len(fixture.KnownExceptions) {
-			t.Errorf("reproduced %d of %d known exceptions", reproduced, len(fixture.KnownExceptions))
+			test.Errorf("reproduced %d of %d known exceptions", reproduced, len(fixture.KnownExceptions))
 		}
-		t.Logf("reproduced all %d registry classes the descriptor model declines, each with a reading the table predicts differently", reproduced)
+		test.Logf("reproduced all %d registry classes the descriptor model declines, each with a reading the table predicts differently", reproduced)
 	})
 }
 
@@ -402,12 +402,12 @@ func TestUtilityReproducesTheKnownExceptions(t *testing.T) {
 // asserted here directly rather than inferred from the aggregate, and it is asserted to be non-empty:
 // a repository with no such `@utility` block would make every other test in this file pass over an
 // empty population, which is the failure mode this whole slice has been bitten by.
-func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
-	t.Parallel()
-	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+func TestUtilityFindsThePerDeclarationRoots(test *testing.T) {
+	test.Parallel()
+	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
 		if len(fixture.PerDeclarationRoots) == 0 {
-			t.Fatal("the fixture reports no per-declaration roots; this component's whole population is empty and every other test here is passing over nothing")
+			test.Fatal("the fixture reports no per-declaration roots; this component's whole population is empty and every other test here is passing over nothing")
 		}
 
 		byClassName := make(map[string]utilityCase, len(fixture.Cases))
@@ -418,7 +418,7 @@ func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 		checked := 0
 		for _, root := range fixture.PerDeclarationRoots {
 			if !evaluator.Has(root) {
-				t.Errorf("%s: the fixture reports it as per-declaration and no @utility block defines it", root)
+				test.Errorf("%s: the fixture reports it as per-declaration and no @utility block defines it", root)
 				continue
 			}
 
@@ -427,18 +427,18 @@ func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 			singlePathCase, hasSinglePath := byClassName[root+"-4"]
 			multiPathCase, hasMultiPath := byClassName[root+"-50"]
 			if !hasSinglePath || !hasMultiPath {
-				t.Errorf("%s: the fixture is missing the -4 or -50 probe that separates the two paths", root)
+				test.Errorf("%s: the fixture is missing the -4 or -50 probe that separates the two paths", root)
 				continue
 			}
 
 			singlePath, singleOK := evaluator.Reading(utilityCandidateFromCase(singlePathCase))
 			multiPath, multiOK := evaluator.Reading(utilityCandidateFromCase(multiPathCase))
 			if !singleOK || !multiOK {
-				t.Errorf("%s: one of the two probes did not compile (-4 ok=%v, -50 ok=%v)", root, singleOK, multiOK)
+				test.Errorf("%s: one of the two probes did not compile (-4 ok=%v, -50 ok=%v)", root, singleOK, multiOK)
 				continue
 			}
 			if multiPath.Count <= singlePath.Count {
-				t.Errorf(
+				test.Errorf(
 					"%s: -50 read %s and -4 read %s; a value satisfying two resolution paths must survive more declarations than one satisfying a single path, or this root is not per-declaration and the fixture is wrong about it",
 					root, utilityDescribeReading(multiPath), utilityDescribeReading(singlePath),
 				)
@@ -447,7 +447,7 @@ func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 			checked++
 		}
 
-		t.Logf("%d roots resolve per declaration, each proven by a value satisfying two paths outcounting one satisfying a single path", checked)
+		test.Logf("%d roots resolve per declaration, each proven by a value satisfying two paths outcounting one satisfying a single path", checked)
 	})
 }
 
@@ -462,9 +462,9 @@ func TestUtilityFindsThePerDeclarationRoots(t *testing.T) {
 // because a mutation the test performs on itself is a mutation that stays true after the next
 // refactor. The suppression reaches into the same evaluation state the real path uses, so it cannot
 // drift away from what it is mutating.
-func TestUtilityDropIsNotDefault(t *testing.T) {
-	t.Parallel()
-	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+func TestUtilityDropIsNotDefault(test *testing.T) {
+	test.Parallel()
+	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
 		byClassName := make(map[string]utilityCase, len(fixture.Cases))
 		for _, aCase := range fixture.Cases {
@@ -481,7 +481,7 @@ func TestUtilityDropIsNotDefault(t *testing.T) {
 
 			mutated, compiled := evaluator.compileKeepingDroppedDeclarations(utilityCandidateFromCase(aCase))
 			if !compiled {
-				t.Errorf("%s: the mutant did not compile at all, so this class proves nothing about the drop", exception.ClassName)
+				test.Errorf("%s: the mutant did not compile at all, so this class proves nothing about the drop", exception.ClassName)
 				continue
 			}
 			mutatedSort := PropertySort(mutated)
@@ -490,19 +490,19 @@ func TestUtilityDropIsNotDefault(t *testing.T) {
 				caught++
 				continue
 			}
-			t.Errorf(
+			test.Errorf(
 				"%s: keeping dropped declarations still reads %s, which is what the engine says; the drop rule is not what decides this class's arity and the test is not testing it",
 				exception.ClassName, utilityDescribeReading(want),
 			)
 		}
 
 		if checked == 0 {
-			t.Fatal("no exception class was available to mutate")
+			test.Fatal("no exception class was available to mutate")
 		}
 		if caught != checked {
-			t.Errorf("the drop mutation was caught on %d of %d exception classes", caught, checked)
+			test.Errorf("the drop mutation was caught on %d of %d exception classes", caught, checked)
 		}
-		t.Logf("suppressing the resolve-or-drop rule changes the reading on all %d exception classes, so the differential is testing that rule", caught)
+		test.Logf("suppressing the resolve-or-drop rule changes the reading on all %d exception classes, so the differential is testing that rule", caught)
 	})
 }
 
@@ -517,9 +517,9 @@ func TestUtilityDropIsNotDefault(t *testing.T) {
 // non-ratio declaration resolved, so those are counted separately rather than scored as escapes. The
 // assertion is that the population where it does matter is non-empty, since a splice that never fires
 // is a branch this suite has not exercised.
-func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
-	t.Parallel()
-	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+func TestUtilityRatioSpliceIsLoadBearing(test *testing.T) {
+	test.Parallel()
+	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
 		moved, unaffected := 0, 0
 		for _, aCase := range fixture.Cases {
@@ -537,7 +537,7 @@ func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 			}
 			mutated, mutatedOK := evaluator.compileWithoutRatioSplice(candidate)
 			if !mutatedOK {
-				t.Errorf("%s: the mutant did not compile while the real path did", aCase.ClassName)
+				test.Errorf("%s: the mutant did not compile while the real path did", aCase.ClassName)
 				continue
 			}
 			mutatedSort := PropertySort(mutated)
@@ -549,9 +549,9 @@ func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 		}
 
 		if moved == 0 {
-			t.Error("suppressing the ratio splice changed no reading; either no fraction class in the corpus resolves a non-ratio declaration, or the splice is dead code")
+			test.Error("suppressing the ratio splice changed no reading; either no fraction class in the corpus resolves a non-ratio declaration, or the splice is dead code")
 		}
-		t.Logf("suppressing the ratio splice changes %d fraction classes and leaves %d unaffected, which are the ones where no non-ratio declaration resolved", moved, unaffected)
+		test.Logf("suppressing the ratio splice changes %d fraction classes and leaves %d unaffected, which are the ones where no non-ratio declaration resolved", moved, unaffected)
 	})
 }
 
@@ -563,9 +563,9 @@ func TestUtilityRatioSpliceIsLoadBearing(t *testing.T) {
 // in production the class string goes through ParseCandidate and its output goes here. This runs the
 // whole chain and asserts the same answers, so a mismatch between what the fixture recorded and what
 // the Go parser produces is a failure here rather than a surprise in the rule.
-func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
-	t.Parallel()
-	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
+	test.Parallel()
+	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
 		designSystem := &utilityTestDesignSystem{evaluator: evaluator}
 
@@ -614,12 +614,12 @@ func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 		}
 
 		if len(disagreements) > 0 {
-			t.Errorf("%d of %d classes disagreed end to end:\n  %s", compared-agreed, compared, strings.Join(disagreements, "\n  "))
+			test.Errorf("%d of %d classes disagreed end to end:\n  %s", compared-agreed, compared, strings.Join(disagreements, "\n  "))
 		}
 		if agreed < 500 {
-			t.Errorf("only %d classes agreed end to end; the chain has not been shown to work at scale", agreed)
+			test.Errorf("only %d classes agreed end to end; the chain has not been shown to work at scale", agreed)
 		}
-		t.Logf("%d of %d classes agree end to end, from class string through ParseCandidate to a reading", agreed, compared)
+		test.Logf("%d of %d classes agree end to end, from class string through ParseCandidate to a reading", agreed, compared)
 	})
 }
 
@@ -632,9 +632,9 @@ func TestUtilityAgreesThroughTheGoCandidateParser(t *testing.T) {
 // assertion is that this evaluator declines them: an evaluator that answered would be claiming a
 // mechanism it does not implement, which is a right answer for a wrong reason waiting to become a
 // wrong one.
-func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
-	t.Parallel()
-	forEachUtilityOracle(t, func(t *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+func TestUtilityDoesNotClaimTheShadowQuirk(test *testing.T) {
+	test.Parallel()
+	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
 		// Measured per copy. Ahra's are the four `[16/9]` probes. The public theme's sweep also carries the
 		// five `max-w-screen-*`, which extract.mjs's own model predicts as nothing and the engine reads as
@@ -642,7 +642,7 @@ func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
 		// disagreeing, and outside this component like the rest.
 		measured := map[string]int{"utility_fixtures.json": 4, "utility_fixtures_public.json": 9}[fixtureName]
 		if len(fixture.ShadowQuirkProbes) != measured {
-			t.Errorf("fixture holds %d shadow-quirk probes, %d were measured", len(fixture.ShadowQuirkProbes), measured)
+			test.Errorf("fixture holds %d shadow-quirk probes, %d were measured", len(fixture.ShadowQuirkProbes), measured)
 		}
 
 		for _, probe := range fixture.ShadowQuirkProbes {
@@ -651,13 +651,13 @@ func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
 				root = root[:index]
 			}
 			if evaluator.Has(root) {
-				t.Errorf(
+				test.Errorf(
 					"%s: this evaluator defines root %q, so it is answering a class the shadow quirk explains; the quirk is recorded and not modelled",
 					probe.ClassName, root,
 				)
 			}
 		}
-		t.Logf("%d shadow-quirk probes are outside this component: none of their roots is an @utility block", len(fixture.ShadowQuirkProbes))
+		test.Logf("%d shadow-quirk probes are outside this component: none of their roots is an @utility block", len(fixture.ShadowQuirkProbes))
 	})
 }
 
@@ -668,22 +668,22 @@ func TestUtilityDoesNotClaimTheShadowQuirk(t *testing.T) {
 // here it names the rule: a non-negative multiple of 0.25 written the way JavaScript prints it. The
 // cases are the ones a reasonable guess gets wrong, since `1.50` and `+1` are multiples of 0.25 and
 // are not how `String(Number(x))` spells them.
-func TestUtilitySpacingMultiplierRejects(t *testing.T) {
-	t.Parallel()
+func TestUtilitySpacingMultiplierRejects(test *testing.T) {
+	test.Parallel()
 	accepted := []string{"0", "1", "0.25", "0.5", "1.25", "2.75", "100"}
 	rejected := []string{"1.3", "0.1", "-0.25", "1.50", "+1", "1e2", "", "abc", ".25"}
 
 	for _, value := range accepted {
 		if !isValidSpacingMultiplier(value) {
-			t.Errorf("isValidSpacingMultiplier(%q) = false, want true", value)
+			test.Errorf("isValidSpacingMultiplier(%q) = false, want true", value)
 		}
 	}
 	for _, value := range rejected {
 		if isValidSpacingMultiplier(value) {
-			t.Errorf("isValidSpacingMultiplier(%q) = true, want false", value)
+			test.Errorf("isValidSpacingMultiplier(%q) = true, want false", value)
 		}
 	}
-	t.Logf("%d accepted and %d rejected spacing multipliers", len(accepted), len(rejected))
+	test.Logf("%d accepted and %d rejected spacing multipliers", len(accepted), len(rejected))
 }
 
 // TestUtilityNormalizesValueArguments pins the registration-time rewrites, which are invisible in
@@ -692,8 +692,8 @@ func TestUtilitySpacingMultiplierRejects(t *testing.T) {
 // An argument spelling that resolves nothing produces a dropped declaration and a count one lower,
 // so a port that skipped normalization would fail quietly on exactly the classes this component
 // exists to get right. The cases are upstream's own documented examples.
-func TestUtilityNormalizesValueArguments(t *testing.T) {
-	t.Parallel()
+func TestUtilityNormalizesValueArguments(test *testing.T) {
+	test.Parallel()
 	cases := []struct{ argument, want string }{
 		{"--spacing", "--spacing-*"},
 		{"--spacing- *", "--spacing-*"},
@@ -708,10 +708,10 @@ func TestUtilityNormalizesValueArguments(t *testing.T) {
 	}
 	for _, aCase := range cases {
 		if got := normalizeValueFunctionArgument(aCase.argument); got != aCase.want {
-			t.Errorf("normalizeValueFunctionArgument(%q) = %q, want %q", aCase.argument, got, aCase.want)
+			test.Errorf("normalizeValueFunctionArgument(%q) = %q, want %q", aCase.argument, got, aCase.want)
 		}
 	}
-	t.Logf("%d argument spellings normalize as upstream documents", len(cases))
+	test.Logf("%d argument spellings normalize as upstream documents", len(cases))
 }
 
 // TestUtilitySyntheticCasesMatchEngine covers the branches the repository's own `@utility` blocks
@@ -729,23 +729,23 @@ func TestUtilityNormalizesValueArguments(t *testing.T) {
 // The theme is rebuilt from the fixture's entries rather than from a stylesheet, so these cases stay
 // self-contained: the generator writes each synthetic stylesheet next to the repository's own entry
 // point so `@import "tailwindcss"` resolves, measures it, and deletes it.
-func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
-	t.Parallel()
-	fixture := utilityLoadCorpus(t, "utility_fixtures.json")
+func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
+	test.Parallel()
+	fixture := utilityLoadCorpus(test, "utility_fixtures.json")
 
 	if len(fixture.SyntheticCases) == 0 {
-		t.Fatal("the fixture holds no synthetic cases; four ported branches then have no test at all")
+		test.Fatal("the fixture holds no synthetic cases; four ported branches then have no test at all")
 	}
 
 	var totalCompared, totalCompiling, totalRejecting int
 	for _, syntheticCase := range fixture.SyntheticCases {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
 		// only after the test had returned, so the check would pass on nothing.
-		t.Run(syntheticCase.Name, func(t *testing.T) {
+		test.Run(syntheticCase.Name, func(test *testing.T) {
 			theme := NewTheme()
 			for key, value := range syntheticCase.ThemeEntries {
 				if err := theme.Add(key, value, ThemeOptionNone); err != nil {
-					t.Fatalf("add theme entry %q: %v", key, err)
+					test.Fatalf("add theme entry %q: %v", key, err)
 				}
 			}
 
@@ -756,10 +756,10 @@ func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 				}
 				nodes, err := ParseCSS(block.Source)
 				if err != nil {
-					t.Fatalf("parse @utility %s: %v", block.Name, err)
+					test.Fatalf("parse @utility %s: %v", block.Name, err)
 				}
 				if len(nodes) != 1 || nodes[0].Kind != KindAtRule {
-					t.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))
+					test.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))
 				}
 				definitions = append(definitions, &UtilityDefinition{
 					Name:  strings.TrimSuffix(block.Name, "-*"),
@@ -767,7 +767,7 @@ func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 				})
 			}
 			if len(definitions) == 0 {
-				t.Fatalf("%s declares no functional @utility block", syntheticCase.Name)
+				test.Fatalf("%s declares no functional @utility block", syntheticCase.Name)
 			}
 			evaluator := NewUtilityEvaluator(theme, definitions)
 
@@ -785,7 +785,7 @@ func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 				reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
 				if aCase.Reading == nil {
 					if compiled {
-						t.Errorf("%s: evaluator read %s, engine rejected the class", aCase.ClassName, utilityDescribeReading(reading))
+						test.Errorf("%s: evaluator read %s, engine rejected the class", aCase.ClassName, utilityDescribeReading(reading))
 						continue
 					}
 					rejecting++
@@ -793,11 +793,11 @@ func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 				}
 				want := Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}
 				if !compiled {
-					t.Errorf("%s: evaluator rejected the class, engine read %s", aCase.ClassName, utilityDescribeReading(want))
+					test.Errorf("%s: evaluator rejected the class, engine read %s", aCase.ClassName, utilityDescribeReading(want))
 					continue
 				}
 				if !reading.Equal(want) {
-					t.Errorf("%s: evaluator read %s, engine read %s", aCase.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want))
+					test.Errorf("%s: evaluator read %s, engine read %s", aCase.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want))
 					continue
 				}
 				compiling++
@@ -807,20 +807,20 @@ func TestUtilitySyntheticCasesMatchEngine(t *testing.T) {
 			// was written for: a case where everything compiles has not shown its guard rejects, and
 			// one where nothing does has not shown its resolver resolves.
 			if compiling == 0 && !syntheticCase.RejectionOnly {
-				t.Errorf("%s: no probe compiled, so this case has not shown its resolution branch works", syntheticCase.Name)
+				test.Errorf("%s: no probe compiled, so this case has not shown its resolution branch works", syntheticCase.Name)
 			}
 			if compiling > 0 && syntheticCase.RejectionOnly {
-				t.Errorf("%s: the fixture marks this case rejection-only and %d probes compiled", syntheticCase.Name, compiling)
+				test.Errorf("%s: the fixture marks this case rejection-only and %d probes compiled", syntheticCase.Name, compiling)
 			}
 			if rejecting == 0 {
-				t.Errorf("%s: no probe was rejected, so this case has not shown its guard rejects anything", syntheticCase.Name)
+				test.Errorf("%s: no probe was rejected, so this case has not shown its guard rejects anything", syntheticCase.Name)
 			}
 			totalCompiling += compiling
 			totalRejecting += rejecting
 		})
 	}
 
-	t.Logf(
+	test.Logf(
 		"%d synthetic design systems; %d probes compared, %d compiled and agreed, %d rejected and agreed",
 		len(fixture.SyntheticCases), totalCompared, totalCompiling, totalRejecting,
 	)

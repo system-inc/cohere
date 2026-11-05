@@ -24,12 +24,12 @@ var ruleTypes = gotypes.Product{
 
 // Not parallel: it builds the product the option walks read, so it finishes before they resume. A runner of
 // prebuilt tests skips it and finds the product Workshop built.
-func TestProduct_RuleTypes(t *testing.T) {
+func TestProduct_RuleTypes(test *testing.T) {
 	exports, err := ruleTypes.Build()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	t.Logf("the lint rules types product is %s", exports.Key()[:12])
+	test.Logf("the lint rules types product is %s", exports.Key()[:12])
 }
 
 // ruleExports is ruleTypes found once per test binary.
@@ -37,21 +37,21 @@ var ruleExports = sync.OnceValues(ruleTypes.Find)
 
 // loadRules loads the packages matching patterns from moduleRoot with their syntax and types, and fails
 // the test on any error in any package read from source, naming each, so a walk never reads a partial tree.
-func loadRules(t *testing.T, moduleRoot string, patterns ...string) []*gotypes.Package {
-	t.Helper()
+func loadRules(test *testing.T, moduleRoot string, patterns ...string) []*gotypes.Package {
+	test.Helper()
 	exports, err := ruleExports()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	loaded, err := gotypes.Load(gotypes.Config{Directory: moduleRoot, Exports: exports}, patterns...)
 	if err != nil {
-		t.Fatalf("loading %v: %v", patterns, err)
+		test.Fatalf("loading %v: %v", patterns, err)
 	}
 	if problems := loaded.ErrorsAnywhere(); len(problems) > 0 {
 		for _, problem := range problems {
-			t.Log(problem)
+			test.Log(problem)
 		}
-		t.Fatalf("%d errors loading %v, so the walk would read a partial tree", len(problems), patterns)
+		test.Fatalf("%d errors loading %v, so the walk would read a partial tree", len(problems), patterns)
 	}
 	return loaded.Roots
 }

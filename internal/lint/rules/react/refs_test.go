@@ -240,10 +240,10 @@ var refsCorpus = []refsFixture{
 // each file as `strings.TrimSpace(contents)+"\n"`, so the bytes on disk are one newline short of
 // the literal where a fixture began with one; every span assertion below slices the source the
 // harness actually wrote rather than the Go literal, which is the documented way this bites.
-func runRefsFixture(t *testing.T, fixture refsFixture) rule_testing.Result {
-	t.Helper()
+func runRefsFixture(test *testing.T, fixture refsFixture) rule_testing.Result {
+	test.Helper()
 	name := "component.tsx"
-	return rule_testing.RunTypedFiles(t, Refs, map[string]string{
+	return rule_testing.RunTypedFiles(test, Refs, map[string]string{
 		name:         refsImport + fixture.Source,
 		"react.d.ts": refsReactDeclarations,
 	}, name)
@@ -255,21 +255,21 @@ func runRefsFixture(t *testing.T, fixture refsFixture) rule_testing.Result {
 // each fixture's message ids compared as an ordered sequence. An exact assertion is what makes the
 // number honest, because a fix and a regression landing together cannot net to zero the way they
 // can under a threshold.
-func TestRefsMatchesTheImportedCorpus(t *testing.T) {
-	t.Parallel()
+func TestRefsMatchesTheImportedCorpus(test *testing.T) {
+	test.Parallel()
 
 	if len(refsCorpus) != 30 {
-		t.Fatalf("the corpus holds %d fixtures, want the 30 non-Flow refs fixtures", len(refsCorpus))
+		test.Fatalf("the corpus holds %d fixtures, want the 30 non-Flow refs fixtures", len(refsCorpus))
 	}
 	for _, fixture := range refsCorpus {
-		t.Run(fixture.Name, func(t *testing.T) {
-			t.Parallel()
-			result := runRefsFixture(t, fixture)
+		test.Run(fixture.Name, func(test *testing.T) {
+			test.Parallel()
+			result := runRefsFixture(test, fixture)
 			// Routed through the harness rather than compared by hand: `ExpectFindings` asserts the
 			// ids AND the count in the order the rule produced them, which is the same assertion
 			// this made itself, and `TestEveryRuleShipsAFixturePair` in the registry reads for this
 			// call textually to prove the rule can be shown to fire at all.
-			rule_testing.ExpectFindings(t, result, fixture.Want...)
+			rule_testing.ExpectFindings(test, result, fixture.Want...)
 		})
 	}
 }
@@ -280,15 +280,15 @@ func TestRefsMatchesTheImportedCorpus(t *testing.T) {
 // The brief calls an exact-count assertion the instrument that makes a subset honest. This rule is
 // not a subset, and the count is asserted anyway for the same reason: 35 findings over 30 fixtures,
 // which is the number of caret runs in the vendored `.expect.md` files.
-func TestRefsReportsExactlyThisManyFindingsOnTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestRefsReportsExactlyThisManyFindingsOnTheCorpus(test *testing.T) {
+	test.Parallel()
 
 	total := 0
 	for _, fixture := range refsCorpus {
-		total += len(runRefsFixture(t, fixture).Diagnostics)
+		total += len(runRefsFixture(test, fixture).Diagnostics)
 	}
 	if total != 35 {
-		t.Errorf("the corpus produced %d findings, want exactly 35", total)
+		test.Errorf("the corpus produced %d findings, want exactly 35", total)
 	}
 }
 
@@ -357,17 +357,17 @@ var refsCleanCases = []struct {
 }
 
 // TestRefsStaysSilent asserts the clean cases.
-func TestRefsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestRefsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range refsCleanCases {
-		t.Run(testCase.Name, func(t *testing.T) {
-			t.Parallel()
-			result := runRefsFixture(t, refsFixture{Name: testCase.Name, Source: testCase.Source})
+		test.Run(testCase.Name, func(test *testing.T) {
+			test.Parallel()
+			result := runRefsFixture(test, refsFixture{Name: testCase.Name, Source: testCase.Source})
 			if len(result.Diagnostics) != 0 {
-				t.Logf("this case exists because: %s", testCase.Why)
+				test.Logf("this case exists because: %s", testCase.Why)
 			}
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -379,8 +379,8 @@ func TestRefsStaysSilent(t *testing.T) {
 // `strings.TrimSpace(contents)+"\n"`, so the text the rule saw is the trimmed text; the slice below
 // is taken from that same string rather than from the Go literal, which is the documented way this
 // assertion goes wrong by one byte.
-func TestRefsPointsAtTheAccess(t *testing.T) {
-	t.Parallel()
+func TestRefsPointsAtTheAccess(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		Name   string
@@ -403,20 +403,20 @@ func TestRefsPointsAtTheAccess(t *testing.T) {
 			Want:   "ref",
 		},
 	} {
-		t.Run(testCase.Name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.Name, func(test *testing.T) {
+			test.Parallel()
 			source := refsImport + testCase.Source
-			result := runRefsFixture(t, refsFixture{Name: testCase.Name, Source: testCase.Source})
+			result := runRefsFixture(test, refsFixture{Name: testCase.Name, Source: testCase.Source})
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("reported nothing, want a finding spanning %q", testCase.Want)
+				test.Fatalf("reported nothing, want a finding spanning %q", testCase.Want)
 			}
 			written := strings.TrimSpace(source) + "\n"
 			span := result.Diagnostics[0].Range
 			if span.Pos() < 0 || span.End() > len(written) || span.Pos() >= span.End() {
-				t.Fatalf("finding has range [%d,%d) outside the %d byte source", span.Pos(), span.End(), len(written))
+				test.Fatalf("finding has range [%d,%d) outside the %d byte source", span.Pos(), span.End(), len(written))
 			}
 			if got := written[span.Pos():span.End()]; got != testCase.Want {
-				t.Errorf("finding spans %q, want %q", got, testCase.Want)
+				test.Errorf("finding spans %q, want %q", got, testCase.Want)
 			}
 		})
 	}
@@ -428,8 +428,8 @@ func TestRefsPointsAtTheAccess(t *testing.T) {
 // equality assertions on constants rather than on a format string's output. They exist because a
 // message id assertion cannot see the text, and a Description that drifted into restating the rule
 // name would pass every other test in this file.
-func TestRefsMessagesReadCorrectly(t *testing.T) {
-	t.Parallel()
+func TestRefsMessagesReadCorrectly(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		Kind         refsFindingKind
@@ -444,13 +444,13 @@ func TestRefsMessagesReadCorrectly(t *testing.T) {
 	} {
 		message := refsMessageFor(testCase.Kind)
 		if message.Id != testCase.WantId {
-			t.Errorf("kind %d has id %q, want %q", testCase.Kind, message.Id, testCase.WantId)
+			test.Errorf("kind %d has id %q, want %q", testCase.Kind, message.Id, testCase.WantId)
 		}
 		if !strings.HasPrefix(message.Description, testCase.WantPrefix) {
-			t.Errorf("kind %d description starts %q, want prefix %q", testCase.Kind, message.Description, testCase.WantPrefix)
+			test.Errorf("kind %d description starts %q, want prefix %q", testCase.Kind, message.Description, testCase.WantPrefix)
 		}
 		if !strings.Contains(message.Description, testCase.WantMentions) {
-			t.Errorf("kind %d description never says where a ref MAY be read", testCase.Kind)
+			test.Errorf("kind %d description never says where a ref MAY be read", testCase.Kind)
 		}
 	}
 }
@@ -465,8 +465,8 @@ func TestRefsMessagesReadCorrectly(t *testing.T) {
 //
 // So `ref` must compare equal across different ids, `refValue` must compare equal when only its
 // origin differs, and `guard` must NOT, because a guard is sound only for the ref it guards.
-func TestRefsConvergenceEqualityIgnoresRefIdentity(t *testing.T) {
-	t.Parallel()
+func TestRefsConvergenceEqualityIgnoresRefIdentity(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		Name  string
@@ -512,7 +512,7 @@ func TestRefsConvergenceEqualityIgnoresRefIdentity(t *testing.T) {
 		},
 	} {
 		if got := refsTypeEqual(testCase.A, testCase.B); got != testCase.Equal {
-			t.Errorf("%s: equality is %v, want %v (%s)", testCase.Name, got, testCase.Equal, testCase.Why)
+			test.Errorf("%s: equality is %v, want %v (%s)", testCase.Name, got, testCase.Equal, testCase.Why)
 		}
 	}
 }
@@ -522,8 +522,8 @@ func TestRefsConvergenceEqualityIgnoresRefIdentity(t *testing.T) {
 // It asserts the behaviour that MAKES the equality above necessary, so the two tests fail
 // separately: if the join stopped minting, this fails while the equality test still passes, and a
 // reader would otherwise be left wondering why the equality is written so strangely.
-func TestRefsJoinMintsAFreshIdentityForDifferentRefs(t *testing.T) {
-	t.Parallel()
+func TestRefsJoinMintsAFreshIdentityForDifferentRefs(test *testing.T) {
+	test.Parallel()
 
 	env := newRefsEnvironment()
 	// The operands take identities the environment's counter has already issued, so a freshly
@@ -534,13 +534,13 @@ func TestRefsJoinMintsAFreshIdentityForDifferentRefs(t *testing.T) {
 
 	joined := refsJoin(first, second, env.nextRefId)
 	if joined.Kind != refsRef {
-		t.Fatalf("joining two refs gave kind %d, want a ref", joined.Kind)
+		test.Fatalf("joining two refs gave kind %d, want a ref", joined.Kind)
 	}
 	if joined.RefId == first.RefId || joined.RefId == second.RefId {
-		t.Errorf("the join reused identity %d rather than minting a fresh one", joined.RefId)
+		test.Errorf("the join reused identity %d rather than minting a fresh one", joined.RefId)
 	}
 	if !refsTypeEqual(joined, first) {
-		t.Error("the freshly minted ref does not compare equal to its operand, so the fixpoint cannot settle")
+		test.Error("the freshly minted ref does not compare equal to its operand, so the fixpoint cannot settle")
 	}
 }
 
@@ -550,13 +550,13 @@ func TestRefsJoinMintsAFreshIdentityForDifferentRefs(t *testing.T) {
 // environment is loud rather than silent. Its presence anywhere in the corpus would mean the
 // equality above is wrong, so this asserts it never appears; the bound is ten rounds and every
 // fixture here settles well inside it.
-func TestRefsSettlesOnEveryCorpusFixture(t *testing.T) {
-	t.Parallel()
+func TestRefsSettlesOnEveryCorpusFixture(test *testing.T) {
+	test.Parallel()
 
 	for _, fixture := range refsCorpus {
-		for _, diagnostic := range runRefsFixture(t, fixture).Diagnostics {
+		for _, diagnostic := range runRefsFixture(test, fixture).Diagnostics {
 			if diagnostic.Message.Id == messageRefsDidNotConvergeId {
-				t.Errorf("%s did not converge within the ten round bound", fixture.Name)
+				test.Errorf("%s did not converge within the ten round bound", fixture.Name)
 			}
 		}
 	}
@@ -568,11 +568,11 @@ func TestRefsSettlesOnEveryCorpusFixture(t *testing.T) {
 // on a nil checker returns nil rather than panicking. That is the dangerous failure mode: every
 // silence test would pass vacuously and every fires test would look like a rule bug. This asserts
 // the rule declares the checker, so a later revert of that field fails here loudly.
-func TestRefsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestRefsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !Refs.NeedsTypeChecker {
-		t.Error("the rule stopped declaring NeedsTypeChecker; every typed fixture would pass vacuously")
+		test.Error("the rule stopped declaring NeedsTypeChecker; every typed fixture would pass vacuously")
 	}
 }
 
@@ -582,16 +582,16 @@ func TestRefsRequiresTheTypedHarness(t *testing.T) {
 // is easy to lose: with NO React import at all, so `useRef` is an undeclared global and the file is
 // `any`, a ref arriving by NAME must still report. If someone deleted the name signal believing the
 // checker was sufficient, the imported corpus would still score 27 of 30 and only this would fail.
-func TestRefsNameSignalWorksWithoutTheChecker(t *testing.T) {
-	t.Parallel()
+func TestRefsNameSignalWorksWithoutTheChecker(test *testing.T) {
+	test.Parallel()
 
 	source := "function Component(props) {\n  const value = props.ref.current;\n  return <div>{value}</div>;\n}\n"
-	result := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source}, "c.tsx")
+	result := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": source}, "c.tsx")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("reported %d findings with no React types available, want 1 from the name signal", len(result.Diagnostics))
+		test.Fatalf("reported %d findings with no React types available, want 1 from the name signal", len(result.Diagnostics))
 	}
 	if result.Diagnostics[0].Message.Id != messageRefsValueAccessId {
-		t.Errorf("reported %s, want %s", result.Diagnostics[0].Message.Id, messageRefsValueAccessId)
+		test.Errorf("reported %s, want %s", result.Diagnostics[0].Message.Id, messageRefsValueAccessId)
 	}
 }
 
@@ -610,8 +610,8 @@ func TestRefsNameSignalWorksWithoutTheChecker(t *testing.T) {
 // reports, which is what makes this a JOIN over the operands rather than a test that every operand
 // is a ref: an implementation requiring agreement across predecessors would pass the first case and
 // fail the second.
-func TestRefsJoinsTaintAtABranchMerge(t *testing.T) {
-	t.Parallel()
+func TestRefsJoinsTaintAtABranchMerge(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		Name   string
@@ -626,18 +626,18 @@ func TestRefsJoinsTaintAtABranchMerge(t *testing.T) {
 			Source: "function Component(props) {\n  const a = useRef(null);\n  let chosen = props.other;\n  if (props.cond) {\n    chosen = a;\n  }\n  const value = chosen.current;\n  return <div>{value}</div>;\n}\n",
 		},
 	} {
-		t.Run(testCase.Name, func(t *testing.T) {
-			t.Parallel()
-			result := runRefsFixture(t, refsFixture{Name: testCase.Name, Source: testCase.Source})
+		test.Run(testCase.Name, func(test *testing.T) {
+			test.Parallel()
+			result := runRefsFixture(test, refsFixture{Name: testCase.Name, Source: testCase.Source})
 			if len(result.Diagnostics) != 1 {
 				ids := []string{}
 				for _, diagnostic := range result.Diagnostics {
 					ids = append(ids, diagnostic.Message.Id)
 				}
-				t.Fatalf("reported %v, want exactly one finding (measured on upstream)", ids)
+				test.Fatalf("reported %v, want exactly one finding (measured on upstream)", ids)
 			}
 			if result.Diagnostics[0].Message.Id != messageRefsValueAccessId {
-				t.Errorf("reported %s, want %s", result.Diagnostics[0].Message.Id, messageRefsValueAccessId)
+				test.Errorf("reported %s, want %s", result.Diagnostics[0].Message.Id, messageRefsValueAccessId)
 			}
 		})
 	}
@@ -655,8 +655,8 @@ func TestRefsJoinsTaintAtABranchMerge(t *testing.T) {
 // own symbol. A stub written as `type RefCallback<T> = (i: T) => void` keeps the alias, passes, and
 // tests a checker behaviour that does not occur on real code — the exact failure where the rule and
 // its fixtures share one wrong belief. This fixture is written the real way for that reason.
-func TestRefsExemptsTheMergeRefsShape(t *testing.T) {
-	t.Parallel()
+func TestRefsExemptsTheMergeRefsShape(test *testing.T) {
+	test.Parallel()
 
 	declarations := "declare module 'react' {\n" +
 		"  export interface RefObject<T> { current: T }\n" +
@@ -679,13 +679,13 @@ func TestRefsExemptsTheMergeRefsShape(t *testing.T) {
 		"  return <input ref={setInputReference} />;\n" +
 		"}\n"
 
-	result := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
+	result := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
 	if len(result.Diagnostics) != 0 {
 		ids := []string{}
 		for _, diagnostic := range result.Diagnostics {
 			ids = append(ids, diagnostic.Message.Id)
 		}
-		t.Errorf("reported %v on the mergeRefs shape, want silence (measured clean upstream)", ids)
+		test.Errorf("reported %v on the mergeRefs shape, want silence (measured clean upstream)", ids)
 	}
 }
 
@@ -701,8 +701,8 @@ func TestRefsExemptsTheMergeRefsShape(t *testing.T) {
 // The assertion is that reading the ref field does not make the number field a finding. It also
 // pins that the ref field itself is still tracked, so a fix that simply stopped seeing refs on
 // props would fail the second half rather than passing this by going blind.
-func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
-	t.Parallel()
+func TestRefsDoesNotTaintSiblingFieldsOfARefProp(test *testing.T) {
+	test.Parallel()
 
 	declarations := "declare module 'react' {\n  export interface RefObject<T> { current: T }\n  export function useRef<T>(initial: T): RefObject<T>;\n}"
 	source := "import * as React from 'react';\n" +
@@ -713,13 +713,13 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
 		"  return <div style={{width}} data-guide={guide} />;\n" +
 		"}\n"
 
-	result := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
+	result := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
 	if len(result.Diagnostics) != 0 {
 		ids := []string{}
 		for _, diagnostic := range result.Diagnostics {
 			ids = append(ids, diagnostic.Message.Id)
 		}
-		t.Fatalf("reported %v, want silence: neither the ref OBJECT nor a sibling field is a ref VALUE read", ids)
+		test.Fatalf("reported %v, want silence: neither the ref OBJECT nor a sibling field is a ref VALUE read", ids)
 	}
 
 	// The other half: the ref field is still a ref, so reading its `current` here does report.
@@ -730,9 +730,9 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
 		"  const value = properties.guideElementReference.current;\n" +
 		"  return <div>{value}</div>;\n" +
 		"}\n"
-	readingResult := rule_testing.RunTypedFiles(t, Refs, map[string]string{"c.tsx": reading, "react.d.ts": declarations}, "c.tsx")
+	readingResult := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": reading, "react.d.ts": declarations}, "c.tsx")
 	if len(readingResult.Diagnostics) != 1 {
-		t.Errorf("reading the ref field's current gave %d findings, want 1 — the rule has gone blind to refs on props", len(readingResult.Diagnostics))
+		test.Errorf("reading the ref field's current gave %d findings, want 1 — the rule has gone blind to refs on props", len(readingResult.Diagnostics))
 	}
 }
 
@@ -750,10 +750,10 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(t *testing.T) {
 // A namespaced call lowers to a `MethodCall` whose property is a `Primitive` string rather than to a
 // `PropertyLoad`, which is why matching on the property load did not work either and is worth
 // pinning: the shape is not the one a reader predicts.
-func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
-	t.Parallel()
+func TestRefsAdmitsNamespacedHookCalls(test *testing.T) {
+	test.Parallel()
 
-	namespaced := runRefsFixture(t, refsFixture{
+	namespaced := runRefsFixture(test, refsFixture{
 		Source: "import * as ReactNamespace from 'react';\n" +
 			"export function useOther() {\n" +
 			"  const reference = ReactNamespace.useRef<number | null>(null);\n" +
@@ -761,18 +761,18 @@ func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
 			"  return reference.current;\n" +
 			"}\n",
 	})
-	rule_testing.ExpectFindings(t, namespaced, "refValueAccess")
+	rule_testing.ExpectFindings(test, namespaced, "refValueAccess")
 
 	// The control that gives it meaning: a namespaced call to something that is not a hook must not
 	// admit the function, or the gate stops gating.
-	notAHook := runRefsFixture(t, refsFixture{
+	notAHook := runRefsFixture(test, refsFixture{
 		Source: "import * as Other from 'react';\n" +
 			"export function helper() {\n" +
 			"  const value = Other.somethingElse<number | null>(null);\n" +
 			"  return value;\n" +
 			"}\n",
 	})
-	rule_testing.ExpectClean(t, notAHook)
+	rule_testing.ExpectClean(test, notAHook)
 }
 
 // TestRefsCannotHaveRefTypeAgreesWithTheChecker is the proof behind refsCannotHaveRefType.
@@ -783,8 +783,8 @@ func TestRefsAdmitsNamespacedHookCalls(t *testing.T) {
 // template) and asks the checker about each node the exclusion declines. The tempting shapes the
 // exclusion keeps asking about must answer yes, which is what shows the checker half can see a ref
 // here at all.
-func TestRefsCannotHaveRefTypeAgreesWithTheChecker(t *testing.T) {
-	t.Parallel()
+func TestRefsCannotHaveRefTypeAgreesWithTheChecker(test *testing.T) {
+	test.Parallel()
 
 	const source = `import {useRef, type RefObject} from "./react";
 
@@ -822,7 +822,7 @@ export function Component({label}: {label: string}) {
 						if refsCannotHaveRefType(node) {
 							declined[node.Kind]++
 							if refsNodeHasRefType(ctx, node) {
-								t.Errorf("declined %s at %d, which the checker types as a ref", node.Kind, node.Pos())
+								test.Errorf("declined %s at %d, which the checker types as a ref", node.Kind, node.Pos())
 							}
 						}
 						if node.Kind == ast.KindBinaryExpression || node.Kind == ast.KindConditionalExpression ||
@@ -837,19 +837,19 @@ export function Component({label}: {label: string}) {
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{"react.d.ts": reactStub, "a.tsx": source}, "a.tsx")
+	rule_testing.RunTypedFiles(test, probe, map[string]string{"react.d.ts": reactStub, "a.tsx": source}, "a.tsx")
 
 	for _, kind := range []ast.Kind{ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
 		ast.KindArrowFunction, ast.KindTemplateExpression, ast.KindJsxElement, ast.KindBinaryExpression,
 		ast.KindPrefixUnaryExpression, ast.KindTypeOfExpression, ast.KindVoidExpression} {
 		if declined[kind] == 0 {
-			t.Errorf("no %s was declined, so this source does not test it", kind)
+			test.Errorf("no %s was declined, so this source does not test it", kind)
 		}
 	}
 	for _, shape := range []string{"maybe ?? ref", "maybe || ref", "label ? ref : pick(ref)",
 		"function RefCallback() { return ref; }"} {
 		if !asked[shape] {
-			t.Errorf("%q must still be asked and typed as a ref; it was not", shape)
+			test.Errorf("%q must still be asked and typed as a ref; it was not", shape)
 		}
 	}
 }
@@ -863,10 +863,10 @@ export function Component({label}: {label: string}) {
 // cohere reported the same verdict at the `useMemo` call instead, one screen above, where the
 // author's disable comment does not reach. The rule now lowers through the memo-erased graph, as
 // upstream's validator reads it, so the finding is on the read and the suppression covers it.
-func TestRefsReportsARefReadInsideUseMemoAtTheRead(t *testing.T) {
-	t.Parallel()
+func TestRefsReportsARefReadInsideUseMemoAtTheRead(test *testing.T) {
+	test.Parallel()
 
-	result := runRefsFixture(t, refsFixture{
+	result := runRefsFixture(test, refsFixture{
 		Name: "ref read inside a memo callback",
 		Source: `function hydrate(options: unknown): void {}
 function HydrationBoundary({state}: {state: number}) {
@@ -880,13 +880,13 @@ function HydrationBoundary({state}: {state: number}) {
 `,
 	})
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %v", result.MessageIds())
+		test.Fatalf("expected one finding, got %v", result.MessageIds())
 	}
 	source := result.SourceFile.Text()
 	reported := strings.Count(source[:result.Diagnostics[0].Range.Pos()], "\n")
 	read := strings.Count(source[:strings.Index(source, "optionsRef.current")], "\n")
 	if reported != read {
-		t.Errorf("the finding is on line %d, the ref read on line %d: %q", reported+1, read+1,
+		test.Errorf("the finding is on line %d, the ref read on line %d: %q", reported+1, read+1,
 			source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()])
 	}
 }

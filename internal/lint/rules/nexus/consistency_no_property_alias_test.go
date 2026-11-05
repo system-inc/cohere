@@ -16,8 +16,8 @@ const propertyAliasFile = "/repository/source/Thing.ts"
 // key this rule has: it is ours, so there is no upstream corpus, and the tree reports zero findings
 // precisely because those two sites are suppressed.
 
-func TestConsistencyNoPropertyAliasFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoPropertyAliasFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -74,9 +74,9 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 		{"an array argument to something that is not a hook", "export function run(options: OptionsInterface) {\n    const secret = options.secret;\n    notAHook(function() {\n        return 1;\n    }, [secret]);\n    return secret;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText),
 				"noPropertyAlias")
 		})
 	}
@@ -85,8 +85,8 @@ func TestConsistencyNoPropertyAliasFires(t *testing.T) {
 // The clean half is the specification. Every exemption here is a judgment rather than a narrowing,
 // and each is the kind that reads as a bug until its reason is stated.
 
-func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoPropertyAliasStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -168,9 +168,9 @@ func TestConsistencyNoPropertyAliasStaysSilent(t *testing.T) {
 		{"read in a dependency array inside a nested callback", "export function run(options: OptionsInterface) {\n    const secret = options.secret;\n    wrap(function() {\n        useMemo(function() {\n            return 1;\n        }, [secret]);\n    });\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, ConsistencyNoPropertyAlias, propertyAliasFile, testCase.sourceText))
 		})
 	}
 }

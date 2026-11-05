@@ -18,11 +18,11 @@ import (
 //
 // Absolute rather than relative because `program.Build` resolves a tsconfig against a current
 // directory, and a test binary's working directory is its own package directory.
-func fixturePath(t *testing.T, name string) string {
-	t.Helper()
+func fixturePath(test *testing.T, name string) string {
+	test.Helper()
 	absolute, err := filepath.Abs(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("resolving the %s fixture: %v", name, err)
+		test.Fatalf("resolving the %s fixture: %v", name, err)
 	}
 	return absolute
 }
@@ -32,30 +32,30 @@ func fixturePath(t *testing.T, name string) string {
 // Single-threaded on purpose: symbol pointers are the identity this whole package turns on, and a
 // symbol obtained from one checker cannot be compared against one from another. One checker makes
 // the comparison meaningful in a test the same way `CheckerForFile` makes it meaningful in a run.
-func buildFixture(t *testing.T) (*program.Graph, string) {
-	t.Helper()
-	root := fixturePath(t, "symbols")
+func buildFixture(test *testing.T) (*program.Graph, string) {
+	test.Helper()
+	root := fixturePath(test, "symbols")
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   root + "/tsconfig.json",
 		CurrentDirectory: root,
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the fixture program: %v", err)
+		test.Fatalf("building the fixture program: %v", err)
 	}
 	return graph, root
 }
 
 // planFor builds a plan against a position in the fixture, named the way the command line names one.
-func planFor(t *testing.T, graph *program.Graph, root string, relative string, line int, column int, newName string) *Plan {
-	t.Helper()
+func planFor(test *testing.T, graph *program.Graph, root string, relative string, line int, column int, newName string) *Plan {
+	test.Helper()
 	plan, err := Build(context.Background(), graph, Position{
 		FileName: filepath.Join(root, relative),
 		Line:     line,
 		Column:   column,
 	}, newName)
 	if err != nil {
-		t.Fatalf("building the plan for %s:%d:%d: %v", relative, line, column, err)
+		test.Fatalf("building the plan for %s:%d:%d: %v", relative, line, column, err)
 	}
 	return plan
 }
@@ -78,13 +78,13 @@ func describeEdits(plan *Plan, root string) string {
 // aliased import, and one call. Everything else in the fixture that spells `err` must be declined —
 // the shadowed inner binding, the local alias `failure`, and the string key — and each of those is a
 // different mechanism, so a rule that got any one wrong shows up here as a different count.
-func TestRenameFindsEveryReferenceAndNothingElse(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
+func TestRenameFindsEveryReferenceAndNothingElse(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/origin.ts", 1, 17, "reportError")
 
 	if len(plan.Refusals) > 0 {
-		t.Fatalf("the plan was refused, which it must not be: %v", plan.Refusals)
+		test.Fatalf("the plan was refused, which it must not be: %v", plan.Refusals)
 	}
 
 	got := describeEdits(plan, root)
@@ -95,11 +95,11 @@ func TestRenameFindsEveryReferenceAndNothingElse(t *testing.T) {
 		"src/origin.ts:1:17 declaration -> \"reportError\"",
 	}, "\n")
 	if got != want {
-		t.Fatalf("the edit set is wrong.\ngot:\n%s\n\nwant:\n%s", got, want)
+		test.Fatalf("the edit set is wrong.\ngot:\n%s\n\nwant:\n%s", got, want)
 	}
 
 	if plan.FilesTouched != 2 {
-		t.Fatalf("touched %d files, want 2", plan.FilesTouched)
+		test.Fatalf("touched %d files, want 2", plan.FilesTouched)
 	}
 }
 
@@ -108,15 +108,15 @@ func TestRenameFindsEveryReferenceAndNothingElse(t *testing.T) {
 // `import { err as failure }` has two identifiers and they are two symbols. Renaming the export must
 // rewrite `err` and leave `failure`, and the failure mode if it does not is a file that still parses
 // while referring to an import that no longer exists.
-func TestRenameLeavesTheLocalAliasAlone(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
+func TestRenameLeavesTheLocalAliasAlone(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/origin.ts", 1, 17, "reportError")
 
 	for _, edit := range plan.Edits {
 		// Column 17 on line 2 is `failure`; column 10 is the `err` half.
 		if strings.HasSuffix(edit.FileName, "consumer.ts") && edit.Line == 2 && edit.Column != 10 {
-			t.Fatalf("the rename touched the local alias at 2:%d, which belongs to the importing file", edit.Column)
+			test.Fatalf("the rename touched the local alias at 2:%d, which belongs to the importing file", edit.Column)
 		}
 	}
 }
@@ -128,13 +128,13 @@ func TestRenameLeavesTheLocalAliasAlone(t *testing.T) {
 // different symbol from the binding, so renaming the binding must produce `{ punned: renamedValue }`
 // and never `{ renamedValue }`. Writing the collapsed form changes the shape of the object, which
 // type-checks and is wrong at runtime for every consumer reading that property.
-func TestRenameExpandsShorthandRatherThanReplacingIt(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/consumer.ts", 13, 11, "renamedValue")
+func TestRenameExpandsShorthandRatherThanReplacingIt(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/consumer.ts", 13, 11, "renamedValue")
 
 	if len(plan.Refusals) > 0 {
-		t.Fatalf("the plan was refused, which it must not be: %v", plan.Refusals)
+		test.Fatalf("the plan was refused, which it must not be: %v", plan.Refusals)
 	}
 
 	var expansion *Edit
@@ -144,10 +144,10 @@ func TestRenameExpandsShorthandRatherThanReplacingIt(t *testing.T) {
 		}
 	}
 	if expansion == nil {
-		t.Fatalf("no shorthand expansion in the plan, so `{ punned }` would be left binding to a name that no longer exists.\n%s", describeEdits(plan, root))
+		test.Fatalf("no shorthand expansion in the plan, so `{ punned }` would be left binding to a name that no longer exists.\n%s", describeEdits(plan, root))
 	}
 	if expansion.Text != "punned: renamedValue" {
-		t.Fatalf("the shorthand writes %q, want %q — the collapsed form silently rewrites the object's contract", expansion.Text, "punned: renamedValue")
+		test.Fatalf("the shorthand writes %q, want %q — the collapsed form silently rewrites the object's contract", expansion.Text, "punned: renamedValue")
 	}
 }
 
@@ -155,34 +155,34 @@ func TestRenameExpandsShorthandRatherThanReplacingIt(t *testing.T) {
 //
 // The inner `err` inside `useBoth` is a different symbol that happens to share a spelling. A rename
 // driven by name matching would capture it; one driven by identity must not.
-func TestRenameDeclinesAShadowedBinding(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
+func TestRenameDeclinesAShadowedBinding(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/origin.ts", 1, 17, "reportError")
 
 	for _, edit := range plan.Edits {
 		if strings.HasSuffix(edit.FileName, "consumer.ts") && (edit.Line == 6 || edit.Line == 7) {
-			t.Fatalf("the rename captured the shadowed inner binding at line %d, which is a different symbol", edit.Line)
+			test.Fatalf("the rename captured the shadowed inner binding at line %d, which is a different symbol", edit.Line)
 		}
 	}
 }
 
 // TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope is the other direction of the same property.
 // Renaming the inner one must not escape into the outer scope.
-func TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/consumer.ts", 6, 15, "innerValue")
+func TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/consumer.ts", 6, 15, "innerValue")
 
 	if len(plan.Refusals) > 0 {
-		t.Fatalf("the plan was refused, which it must not be: %v", plan.Refusals)
+		test.Fatalf("the plan was refused, which it must not be: %v", plan.Refusals)
 	}
 	if len(plan.Edits) != 2 {
-		t.Fatalf("the inner rename produced %d edits, want 2 (its declaration and its one use).\n%s", len(plan.Edits), describeEdits(plan, root))
+		test.Fatalf("the inner rename produced %d edits, want 2 (its declaration and its one use).\n%s", len(plan.Edits), describeEdits(plan, root))
 	}
 	for _, edit := range plan.Edits {
 		if edit.Line != 6 && edit.Line != 7 {
-			t.Fatalf("the inner rename escaped its scope, touching line %d", edit.Line)
+			test.Fatalf("the inner rename escaped its scope, touching line %d", edit.Line)
 		}
 	}
 }
@@ -193,19 +193,19 @@ func TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope(t *testing.T) {
 // `toUpperCase` is declared in the bundled `lib.es5.d.ts`, which is in the program and not in the
 // project. Renaming it would rewrite our call site and leave the declaration, or worse, rewrite a
 // file we do not own.
-func TestRenameRefusesADeclarationOutsideTheProject(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/consumer.ts", 22, 18, "toUpper")
+func TestRenameRefusesADeclarationOutsideTheProject(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/consumer.ts", 22, 18, "toUpper")
 
 	if len(plan.Refusals) == 0 {
-		t.Fatalf("renaming a declaration outside the project was allowed, which would break every other consumer of that package.\n%s", describeEdits(plan, root))
+		test.Fatalf("renaming a declaration outside the project was allowed, which would break every other consumer of that package.\n%s", describeEdits(plan, root))
 	}
 	if !strings.Contains(plan.Refusals[0], "declared outside this project") {
-		t.Fatalf("the refusal does not name the cause: %q", plan.Refusals[0])
+		test.Fatalf("the refusal does not name the cause: %q", plan.Refusals[0])
 	}
 	if len(plan.Edits) != 0 {
-		t.Fatalf("a refused plan carries %d edits, and a refused plan must carry none", len(plan.Edits))
+		test.Fatalf("a refused plan carries %d edits, and a refused plan must carry none", len(plan.Edits))
 	}
 }
 
@@ -213,16 +213,16 @@ func TestRenameRefusesADeclarationOutsideTheProject(t *testing.T) {
 //
 // A collision may still compile — a shadowing one does — so this cannot be deferred to the type
 // phase. Refusing loudly beats writing and hoping something downstream complains.
-func TestRenameRefusesACollision(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/origin.ts", 5, 14, "err")
+func TestRenameRefusesACollision(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/origin.ts", 5, 14, "err")
 
 	if len(plan.Refusals) == 0 {
-		t.Fatalf("renaming into a name that is already declared was allowed, which produces a duplicate binding or a silent shadow")
+		test.Fatalf("renaming into a name that is already declared was allowed, which produces a duplicate binding or a silent shadow")
 	}
 	if !strings.Contains(plan.Refusals[0], "already declared") {
-		t.Fatalf("the refusal does not name the cause: %q", plan.Refusals[0])
+		test.Fatalf("the refusal does not name the cause: %q", plan.Refusals[0])
 	}
 }
 
@@ -231,13 +231,13 @@ func TestRenameRefusesACollision(t *testing.T) {
 // `table['err']` is invisible to the checker and always will be. A rename that misses it produces a
 // codebase that compiles and is broken at runtime, and nothing after this phase catches it. So the
 // verb must REPORT the blind spot rather than hand back a count that implies completeness.
-func TestRenameReportsWhatItCouldNotSee(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
+func TestRenameReportsWhatItCouldNotSee(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/origin.ts", 1, 17, "reportError")
 
 	if len(plan.Blind) == 0 {
-		t.Fatalf("the plan reported no blind spots, but the fixture holds `table['err']`, which the checker cannot see")
+		test.Fatalf("the plan reported no blind spots, but the fixture holds `table['err']`, which the checker cannot see")
 	}
 	found := false
 	for _, blind := range plan.Blind {
@@ -246,29 +246,29 @@ func TestRenameReportsWhatItCouldNotSee(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("the string-keyed use at line 18 was not reported as invisible: %+v", plan.Blind)
+		test.Fatalf("the string-keyed use at line 18 was not reported as invisible: %+v", plan.Blind)
 	}
 }
 
 // TestRenameRefusesANameThatIsNotAnIdentifier keeps the tool from writing source that cannot parse.
-func TestRenameRefusesANameThatIsNotAnIdentifier(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
+func TestRenameRefusesANameThatIsNotAnIdentifier(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
 	for _, name := range []string{"class", "with a space", "9lives", "has-a-dash", ""} {
-		plan := planFor(t, graph, root, "src/origin.ts", 1, 17, name)
+		plan := planFor(test, graph, root, "src/origin.ts", 1, 17, name)
 		if len(plan.Refusals) == 0 {
-			t.Fatalf("renaming to %q was allowed, which would produce source that does not parse", name)
+			test.Fatalf("renaming to %q was allowed, which would produce source that does not parse", name)
 		}
 	}
 }
 
 // TestRenameRefusesRenamingToTheSameName catches the no-op that would otherwise report edits.
-func TestRenameRefusesRenamingToTheSameName(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
-	plan := planFor(t, graph, root, "src/origin.ts", 1, 17, "err")
+func TestRenameRefusesRenamingToTheSameName(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
+	plan := planFor(test, graph, root, "src/origin.ts", 1, 17, "err")
 	if len(plan.Refusals) == 0 {
-		t.Fatalf("renaming a symbol to its own name was allowed, which writes bytes for no reason")
+		test.Fatalf("renaming a symbol to its own name was allowed, which writes bytes for no reason")
 	}
 }
 
@@ -276,35 +276,35 @@ func TestRenameRefusesRenamingToTheSameName(t *testing.T) {
 //
 // A bare name is not a symbol. `err` names both the exported function and the shadowed inner
 // binding, so there is no single right answer and guessing one is worse than refusing.
-func TestBareNameRefusesWhenAmbiguous(t *testing.T) {
-	t.Parallel()
-	graph, _ := buildFixture(t)
+func TestBareNameRefusesWhenAmbiguous(test *testing.T) {
+	test.Parallel()
+	graph, _ := buildFixture(test)
 	candidates, symbols, err := ResolveBareName(context.Background(), graph, "err")
 	if err != nil {
-		t.Fatalf("resolving the bare name: %v", err)
+		test.Fatalf("resolving the bare name: %v", err)
 	}
 	if len(symbols) < 2 {
-		t.Fatalf("`err` resolved to %d symbols, want at least 2 — the fixture declares it more than once, so a single answer means the search is not seeing them all", len(symbols))
+		test.Fatalf("`err` resolved to %d symbols, want at least 2 — the fixture declares it more than once, so a single answer means the search is not seeing them all", len(symbols))
 	}
 	if len(candidates) != len(symbols) {
-		t.Fatalf("%d candidates against %d symbols, and the two must correspond one for one", len(candidates), len(symbols))
+		test.Fatalf("%d candidates against %d symbols, and the two must correspond one for one", len(candidates), len(symbols))
 	}
 }
 
 // TestBareNameResolvesWhenUnambiguous is the other half: the sugar must actually work, or its
 // refusal above proves nothing.
-func TestBareNameResolvesWhenUnambiguous(t *testing.T) {
-	t.Parallel()
-	graph, _ := buildFixture(t)
+func TestBareNameResolvesWhenUnambiguous(test *testing.T) {
+	test.Parallel()
+	graph, _ := buildFixture(test)
 	candidates, symbols, err := ResolveBareName(context.Background(), graph, "taken")
 	if err != nil {
-		t.Fatalf("resolving the bare name: %v", err)
+		test.Fatalf("resolving the bare name: %v", err)
 	}
 	if len(symbols) != 1 {
-		t.Fatalf("`taken` resolved to %d symbols, want exactly 1", len(symbols))
+		test.Fatalf("`taken` resolved to %d symbols, want exactly 1", len(symbols))
 	}
 	if candidates[0].Kind != "variable" {
-		t.Fatalf("the candidate is a %q, want a variable", candidates[0].Kind)
+		test.Fatalf("the candidate is a %q, want a variable", candidates[0].Kind)
 	}
 }
 
@@ -315,12 +315,12 @@ func TestBareNameResolvesWhenUnambiguous(t *testing.T) {
 // sits BEFORE leading trivia, while the resolver matches against the token's own trimmed span. The
 // printed column was short by the indentation and resolving it failed. Same root cause as the one
 // `rule.TokenRange` exists to prevent, arriving through the reporting path instead of the fix path.
-func TestBareNamePositionRoundTrips(t *testing.T) {
-	t.Parallel()
-	graph, _ := buildFixture(t)
+func TestBareNamePositionRoundTrips(test *testing.T) {
+	test.Parallel()
+	graph, _ := buildFixture(test)
 	candidates, _, err := ResolveBareName(context.Background(), graph, "err")
 	if err != nil {
-		t.Fatalf("resolving the bare name: %v", err)
+		test.Fatalf("resolving the bare name: %v", err)
 	}
 	for _, candidate := range candidates {
 		plan, err := Build(context.Background(), graph, Position{
@@ -329,11 +329,11 @@ func TestBareNamePositionRoundTrips(t *testing.T) {
 			Column:   candidate.Column,
 		}, "roundTripped")
 		if err != nil {
-			t.Fatalf("the position this tool printed for %s:%d:%d does not resolve: %v",
+			test.Fatalf("the position this tool printed for %s:%d:%d does not resolve: %v",
 				candidate.FileName, candidate.Line, candidate.Column, err)
 		}
 		if plan.OldName != "err" {
-			t.Fatalf("the printed position resolved to %q rather than to `err`", plan.OldName)
+			test.Fatalf("the printed position resolved to %q rather than to `err`", plan.OldName)
 		}
 	}
 }
@@ -343,11 +343,11 @@ func TestBareNamePositionRoundTrips(t *testing.T) {
 // A rename that produces a compiling program with different semantics is the failure mode this verb
 // exists to hunt, and the only way to know a rename did not do that is to rebuild the program from
 // the written bytes and ask the compiler. The fixture is copied first, because this test writes.
-func TestApplyProducesATreeThatStillTypechecks(t *testing.T) {
-	t.Parallel()
-	source := fixturePath(t, "symbols")
-	working := t.TempDir()
-	copyTree(t, source, working)
+func TestApplyProducesATreeThatStillTypechecks(test *testing.T) {
+	test.Parallel()
+	source := fixturePath(test, "symbols")
+	working := test.TempDir()
+	copyTree(test, source, working)
 
 	graph, err := program.Build(program.Options{
 		ConfigFileName:   working + "/tsconfig.json",
@@ -355,31 +355,31 @@ func TestApplyProducesATreeThatStillTypechecks(t *testing.T) {
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("building the copied fixture: %v", err)
+		test.Fatalf("building the copied fixture: %v", err)
 	}
 
 	// The baseline has to be clean, or "still typechecks" afterwards proves nothing. A fixture that
 	// was already broken would satisfy this test with a rename that broke it further.
-	if before := len(typeDiagnostics(t, graph)); before != 0 {
-		t.Fatalf("the fixture does not typecheck before the rename (%d diagnostics), so this test cannot measure anything", before)
+	if before := len(typeDiagnostics(test, graph)); before != 0 {
+		test.Fatalf("the fixture does not typecheck before the rename (%d diagnostics), so this test cannot measure anything", before)
 	}
 
 	plan, err := Build(context.Background(), graph, Position{
 		FileName: filepath.Join(working, "src/origin.ts"), Line: 1, Column: 17,
 	}, "reportError")
 	if err != nil {
-		t.Fatalf("building the plan: %v", err)
+		test.Fatalf("building the plan: %v", err)
 	}
 	if len(plan.Refusals) > 0 {
-		t.Fatalf("the plan was refused: %v", plan.Refusals)
+		test.Fatalf("the plan was refused: %v", plan.Refusals)
 	}
 
 	written, err := Apply(plan)
 	if err != nil {
-		t.Fatalf("applying the rename: %v", err)
+		test.Fatalf("applying the rename: %v", err)
 	}
 	if written != 2 {
-		t.Fatalf("wrote %d files, want 2", written)
+		test.Fatalf("wrote %d files, want 2", written)
 	}
 
 	rebuilt, err := program.Build(program.Options{
@@ -388,30 +388,30 @@ func TestApplyProducesATreeThatStillTypechecks(t *testing.T) {
 		SingleThreaded:   true,
 	})
 	if err != nil {
-		t.Fatalf("rebuilding after the rename: %v", err)
+		test.Fatalf("rebuilding after the rename: %v", err)
 	}
-	if after := typeDiagnostics(t, rebuilt); len(after) != 0 {
-		t.Fatalf("the renamed tree does not typecheck: %v", after)
+	if after := typeDiagnostics(test, rebuilt); len(after) != 0 {
+		test.Fatalf("the renamed tree does not typecheck: %v", after)
 	}
 
 	// The bytes themselves, because "it compiles" is necessary and not sufficient. A rename that
 	// collapsed the shorthand or rewrote the local alias would still compile here.
 	consumer, err := os.ReadFile(filepath.Join(working, "src/consumer.ts"))
 	if err != nil {
-		t.Fatalf("reading the renamed consumer: %v", err)
+		test.Fatalf("reading the renamed consumer: %v", err)
 	}
 	text := string(consumer)
 	if !strings.Contains(text, "import { reportError as failure }") {
-		t.Fatalf("the aliased import's source half was not rewritten correctly:\n%s", text)
+		test.Fatalf("the aliased import's source half was not rewritten correctly:\n%s", text)
 	}
 	if !strings.Contains(text, "const err = 'inner'") {
-		t.Fatalf("the shadowed inner binding was captured by the rename:\n%s", text)
+		test.Fatalf("the shadowed inner binding was captured by the rename:\n%s", text)
 	}
 	if !strings.Contains(text, "table['err']") {
-		t.Fatalf("the string key was rewritten, which the checker cannot justify:\n%s", text)
+		test.Fatalf("the string key was rewritten, which the checker cannot justify:\n%s", text)
 	}
 	if !strings.Contains(text, "return { punned }") {
-		t.Fatalf("an unrelated shorthand was disturbed:\n%s", text)
+		test.Fatalf("an unrelated shorthand was disturbed:\n%s", text)
 	}
 }
 
@@ -428,13 +428,13 @@ func TestApplyProducesATreeThatStillTypechecks(t *testing.T) {
 // That is the brief's fixtures-assert-the-wrong-layer survivor, and no amount of extra error-shaped
 // assertions fixes it. The property being guarded is that a refused plan writes NO BYTES, so the
 // test now points at a real file that Apply could successfully rewrite, and asserts it is unchanged.
-func TestApplyRefusesARefusedPlan(t *testing.T) {
-	t.Parallel()
-	working := t.TempDir()
+func TestApplyRefusesARefusedPlan(test *testing.T) {
+	test.Parallel()
+	working := test.TempDir()
 	target := filepath.Join(working, "writable.ts")
 	original := "export const err = 1;\n"
 	if err := os.WriteFile(target, []byte(original), 0o644); err != nil {
-		t.Fatalf("seeding the writable file: %v", err)
+		test.Fatalf("seeding the writable file: %v", err)
 	}
 
 	// An edit that WOULD apply cleanly if the guard were not there: the range covers `err` exactly.
@@ -452,24 +452,24 @@ func TestApplyRefusesARefusedPlan(t *testing.T) {
 
 	written, err := Apply(plan)
 	if err == nil {
-		t.Fatalf("a refused plan was applied, which is the half-renamed tree this verb exists to prevent")
+		test.Fatalf("a refused plan was applied, which is the half-renamed tree this verb exists to prevent")
 	}
 	if written != 0 {
-		t.Fatalf("a refused plan reported %d files written, and a refused plan must write none", written)
+		test.Fatalf("a refused plan reported %d files written, and a refused plan must write none", written)
 	}
 
 	after, readError := os.ReadFile(target)
 	if readError != nil {
-		t.Fatalf("reading the target back: %v", readError)
+		test.Fatalf("reading the target back: %v", readError)
 	}
 	if string(after) != original {
-		t.Fatalf("a refused plan rewrote the file.\ngot:  %q\nwant: %q", string(after), original)
+		test.Fatalf("a refused plan rewrote the file.\ngot:  %q\nwant: %q", string(after), original)
 	}
 }
 
 // typeDiagnostics reports the compiler's own diagnostics over the project files.
-func typeDiagnostics(t *testing.T, graph *program.Graph) []string {
-	t.Helper()
+func typeDiagnostics(test *testing.T, graph *program.Graph) []string {
+	test.Helper()
 	var messages []string
 	for _, file := range graph.ProjectFiles() {
 		for _, diagnostic := range graph.Diagnostics(context.Background(), file) {
@@ -483,8 +483,8 @@ func typeDiagnostics(t *testing.T, graph *program.Graph) []string {
 }
 
 // copyTree copies a fixture so a writing test never touches the checked-in one.
-func copyTree(t *testing.T, source string, destination string) {
-	t.Helper()
+func copyTree(test *testing.T, source string, destination string) {
+	test.Helper()
 	err := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -504,7 +504,7 @@ func copyTree(t *testing.T, source string, destination string) {
 		return os.WriteFile(target, contents, info.Mode())
 	})
 	if err != nil {
-		t.Fatalf("copying the fixture: %v", err)
+		test.Fatalf("copying the fixture: %v", err)
 	}
 }
 
@@ -523,13 +523,13 @@ func copyTree(t *testing.T, source string, destination string) {
 // every existing assertion still passing. The test constructs that caller directly rather than
 // asserting the branch is unreachable, because "unreachable" is a verdict that expires the moment
 // someone adds a caller, and this package exports the type that makes one possible.
-func TestApplyRefusesAPlanThatWouldNotParse(t *testing.T) {
-	t.Parallel()
-	working := t.TempDir()
+func TestApplyRefusesAPlanThatWouldNotParse(test *testing.T) {
+	test.Parallel()
+	working := test.TempDir()
 	target := filepath.Join(working, "broken.ts")
 	original := "export const value = 1;\n"
 	if err := os.WriteFile(target, []byte(original), 0o644); err != nil {
-		t.Fatalf("seeding the file: %v", err)
+		test.Fatalf("seeding the file: %v", err)
 	}
 
 	// A range that swallows the `const` keyword as well as the name, which is precisely the
@@ -548,21 +548,21 @@ func TestApplyRefusesAPlanThatWouldNotParse(t *testing.T) {
 
 	written, err := Apply(plan)
 	if err == nil {
-		t.Fatalf("a plan producing unparseable source was written, which corrupts the file for every later phase")
+		test.Fatalf("a plan producing unparseable source was written, which corrupts the file for every later phase")
 	}
 	if !strings.Contains(err.Error(), "unparseable") {
-		t.Fatalf("the refusal does not name the cause: %v", err)
+		test.Fatalf("the refusal does not name the cause: %v", err)
 	}
 	if written != 0 {
-		t.Fatalf("reported %d files written, want 0", written)
+		test.Fatalf("reported %d files written, want 0", written)
 	}
 
 	after, readError := os.ReadFile(target)
 	if readError != nil {
-		t.Fatalf("reading the target back: %v", readError)
+		test.Fatalf("reading the target back: %v", readError)
 	}
 	if string(after) != original {
-		t.Fatalf("the file was rewritten despite the refusal.\ngot:  %q\nwant: %q", string(after), original)
+		test.Fatalf("the file was rewritten despite the refusal.\ngot:  %q\nwant: %q", string(after), original)
 	}
 }
 
@@ -579,13 +579,13 @@ func TestApplyRefusesAPlanThatWouldNotParse(t *testing.T) {
 // So this is a subsumption receipt rather than a guard test. The assertion is deliberately on the
 // refusal and the unchanged bytes rather than on the message, since the message is the half that
 // moves depending on which of the two checks fires.
-func TestApplyRefusesOverlappingEdits(t *testing.T) {
-	t.Parallel()
-	working := t.TempDir()
+func TestApplyRefusesOverlappingEdits(test *testing.T) {
+	test.Parallel()
+	working := test.TempDir()
 	target := filepath.Join(working, "overlap.ts")
 	original := "export const value = 1;\n"
 	if err := os.WriteFile(target, []byte(original), 0o644); err != nil {
-		t.Fatalf("seeding the file: %v", err)
+		test.Fatalf("seeding the file: %v", err)
 	}
 
 	plan := &Plan{
@@ -599,18 +599,18 @@ func TestApplyRefusesOverlappingEdits(t *testing.T) {
 
 	written, err := Apply(plan)
 	if err == nil {
-		t.Fatalf("overlapping edits were applied, so the tool wrote bytes it could not justify")
+		test.Fatalf("overlapping edits were applied, so the tool wrote bytes it could not justify")
 	}
 	if written != 0 {
-		t.Fatalf("reported %d files written, want 0", written)
+		test.Fatalf("reported %d files written, want 0", written)
 	}
 
 	after, readError := os.ReadFile(target)
 	if readError != nil {
-		t.Fatalf("reading the target back: %v", readError)
+		test.Fatalf("reading the target back: %v", readError)
 	}
 	if string(after) != original {
-		t.Fatalf("the file was rewritten despite the refusal.\ngot:  %q\nwant: %q", string(after), original)
+		test.Fatalf("the file was rewritten despite the refusal.\ngot:  %q\nwant: %q", string(after), original)
 	}
 }
 
@@ -625,21 +625,21 @@ func TestApplyRefusesOverlappingEdits(t *testing.T) {
 // Written for a surviving mutant. Dropping the alias resolution in `resolveAnchor` left every
 // existing fixture green, because all of them anchored on a declaration where there is no alias to
 // follow. The gap was in the fixtures rather than in the code.
-func TestRenamingFromAnImportSiteRenamesTheExport(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
+func TestRenamingFromAnImportSiteRenamesTheExport(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
 
-	fromDeclaration := planFor(t, graph, root, "src/origin.ts", 1, 17, "reportError")
-	fromImport := planFor(t, graph, root, "src/consumer.ts", 1, 10, "reportError")
+	fromDeclaration := planFor(test, graph, root, "src/origin.ts", 1, 17, "reportError")
+	fromImport := planFor(test, graph, root, "src/consumer.ts", 1, 10, "reportError")
 
 	if len(fromImport.Refusals) > 0 {
-		t.Fatalf("renaming from an import site was refused: %v", fromImport.Refusals)
+		test.Fatalf("renaming from an import site was refused: %v", fromImport.Refusals)
 	}
 	if got, want := describeEdits(fromImport, root), describeEdits(fromDeclaration, root); got != want {
-		t.Fatalf("anchoring on the import produced a different plan than anchoring on the declaration.\ngot:\n%s\n\nwant:\n%s", got, want)
+		test.Fatalf("anchoring on the import produced a different plan than anchoring on the declaration.\ngot:\n%s\n\nwant:\n%s", got, want)
 	}
 	if fromImport.OldName != "err" {
-		t.Fatalf("the import anchor resolved to %q, want `err`", fromImport.OldName)
+		test.Fatalf("the import anchor resolved to %q, want `err`", fromImport.OldName)
 	}
 }
 
@@ -662,9 +662,9 @@ func TestRenamingFromAnImportSiteRenamesTheExport(t *testing.T) {
 // The test is kept because the property it actually asserts is still worth holding: a column in the
 // middle of a line selects the identifier at that column. It simply is not the guard for the
 // mutation that prompted it.
-func TestPositionResolvesTheIdentifierUnderTheCursor(t *testing.T) {
-	t.Parallel()
-	graph, root := buildFixture(t)
+func TestPositionResolvesTheIdentifierUnderTheCursor(test *testing.T) {
+	test.Parallel()
+	graph, root := buildFixture(test)
 
 	// Column 18 on line 22 is `toUpperCase` in `value.toUpperCase()`. The enclosing property-access
 	// expression begins at `value`, so a resolver preferring the outermost match answers `value`.
@@ -672,9 +672,9 @@ func TestPositionResolvesTheIdentifierUnderTheCursor(t *testing.T) {
 		FileName: filepath.Join(root, "src/consumer.ts"), Line: 22, Column: 18,
 	}, "toUpper")
 	if err != nil {
-		t.Fatalf("resolving the inner identifier: %v", err)
+		test.Fatalf("resolving the inner identifier: %v", err)
 	}
 	if plan.OldName != "toUpperCase" {
-		t.Fatalf("the position resolved to %q, want `toUpperCase` — a column selects the identifier it points at", plan.OldName)
+		test.Fatalf("the position resolved to %q, want `toUpperCase` — a column selects the identifier it points at", plan.OldName)
 	}
 }

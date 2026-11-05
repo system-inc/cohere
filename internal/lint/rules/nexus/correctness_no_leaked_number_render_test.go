@@ -48,16 +48,16 @@ func correctnessNoLeakedNumberRenderSource(lines ...string) string {
 	return correctnessNoLeakedNumberRenderPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoLeakedNumberRenderRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTyped(t, CorrectnessNoLeakedNumberRender, correctnessNoLeakedNumberRenderFile, sourceText)
+func correctnessNoLeakedNumberRenderRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTyped(test, CorrectnessNoLeakedNumberRender, correctnessNoLeakedNumberRenderFile, sourceText)
 }
 
 // correctnessNoLeakedNumberRenderExpect asserts the findings in source order by the text each one
 // points at. The harness trims the subject file before writing it, so spans are read from the
 // program's own text.
-func correctnessNoLeakedNumberRenderExpect(t *testing.T, result rule_testing.Result, want ...string) {
-	t.Helper()
+func correctnessNoLeakedNumberRenderExpect(test *testing.T, result rule_testing.Result, want ...string) {
+	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
 		return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -66,21 +66,21 @@ func correctnessNoLeakedNumberRenderExpect(t *testing.T, result rule_testing.Res
 	for range want {
 		wantIds = append(wantIds, correctnessNoLeakedNumberRenderId)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	text := result.SourceFile.Text()
 	var got []string
 	for _, diagnostic := range diagnostics {
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 	if len(got) != len(want) {
-		t.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
+		test.Fatalf("expected %d findings %q, got %d %q", len(want), want, len(got), got)
 	}
 	for index := range want {
 		if got[index] != want[index] {
-			t.Fatalf("finding %d is %q, want %q (all: %q)", index, got[index], want[index], got)
+			test.Fatalf("finding %d is %q, want %q (all: %q)", index, got[index], want[index], got)
 		}
 	}
 }
@@ -163,35 +163,35 @@ func correctnessNoLeakedNumberRenderWebSockets(condition string) string {
 }
 
 // The three real sites as they stand: each operand is reported, and nothing else is.
-func TestCorrectnessNoLeakedNumberRenderFiresOnTheRealSites(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLeakedNumberRenderFiresOnTheRealSites(test *testing.T) {
+	test.Parallel()
 
-	correctnessNoLeakedNumberRenderExpect(t,
-		correctnessNoLeakedNumberRenderRun(t, correctnessNoLeakedNumberRenderPagination("properties.itemsTotal")),
+	correctnessNoLeakedNumberRenderExpect(test,
+		correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderPagination("properties.itemsTotal")),
 		"properties.itemsTotal")
-	correctnessNoLeakedNumberRenderExpect(t,
-		correctnessNoLeakedNumberRenderRun(t, correctnessNoLeakedNumberRenderCheckboxGrid("properties.maximumSelectionsPerRow")),
+	correctnessNoLeakedNumberRenderExpect(test,
+		correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderCheckboxGrid("properties.maximumSelectionsPerRow")),
 		"properties.maximumSelectionsPerRow")
-	correctnessNoLeakedNumberRenderExpect(t,
-		correctnessNoLeakedNumberRenderRun(t, correctnessNoLeakedNumberRenderWebSockets("information.statistics.connectedAt")),
+	correctnessNoLeakedNumberRenderExpect(test,
+		correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderWebSockets("information.statistics.connectedAt")),
 		"information.statistics.connectedAt")
 }
 
 // The same three sites fixed: each condition is a boolean, and nothing fires. The outer
 // `information.statistics &&` in the WebSockets page is an object and stays silent in both.
-func TestCorrectnessNoLeakedNumberRenderStaysSilentOnTheFixedSites(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLeakedNumberRenderStaysSilentOnTheFixedSites(test *testing.T) {
+	test.Parallel()
 
-	rule_testing.ExpectClean(t, correctnessNoLeakedNumberRenderRun(t,
+	rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test,
 		correctnessNoLeakedNumberRenderPagination("properties.itemsTotal !== undefined")))
-	rule_testing.ExpectClean(t, correctnessNoLeakedNumberRenderRun(t,
+	rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test,
 		correctnessNoLeakedNumberRenderCheckboxGrid("properties.maximumSelectionsPerRow !== undefined && properties.maximumSelectionsPerRow > 0")))
-	rule_testing.ExpectClean(t, correctnessNoLeakedNumberRenderRun(t,
+	rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test,
 		correctnessNoLeakedNumberRenderWebSockets("information.statistics.connectedAt !== null")))
 }
 
-func TestCorrectnessNoLeakedNumberRenderFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLeakedNumberRenderFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -233,17 +233,17 @@ func TestCorrectnessNoLeakedNumberRenderFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			result := correctnessNoLeakedNumberRenderRun(t, correctnessNoLeakedNumberRenderSource(testCase.lines...))
-			correctnessNoLeakedNumberRenderExpect(t, result, testCase.want...)
+			result := correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderSource(testCase.lines...))
+			correctnessNoLeakedNumberRenderExpect(test, result, testCase.want...)
 		})
 	}
 }
 
-func TestCorrectnessNoLeakedNumberRenderStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoLeakedNumberRenderStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -284,10 +284,10 @@ func TestCorrectnessNoLeakedNumberRenderStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
-			rule_testing.ExpectClean(t, correctnessNoLeakedNumberRenderRun(t, correctnessNoLeakedNumberRenderSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderSource(testCase.lines...)))
 		})
 	}
 }

@@ -48,12 +48,12 @@ import (
 //
 // So the readable signal is `emptyInside` against `carryingInside`. A memo block whose interior
 // scopes all carry nothing is a block the rule cannot fire on for any reason at all.
-func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
-	t.Parallel()
+func TestMemoBlockScopeRelationshipAcrossCorpus(test *testing.T) {
+	test.Parallel()
 
 	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
 	if err != nil {
-		t.Fatalf("loading the vendored corpus: %v", err)
+		test.Fatalf("loading the vendored corpus: %v", err)
 	}
 
 	var (
@@ -82,7 +82,7 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 			flowExcluded++
 			continue
 		}
-		observations, ok := memoBlockObservations(t, fixture.Source)
+		observations, ok := memoBlockObservations(test, fixture.Source)
 		if !ok {
 			continue
 		}
@@ -102,7 +102,7 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 				continue
 			}
 			blocksAllEmpty++
-			if len(goldenDependencies(t, fixture.ExpectPath)) > 0 {
+			if len(goldenDependencies(test, fixture.ExpectPath)) > 0 {
 				// Upstream's compiled output emits a cache slot for this fixture, so it inferred a
 				// dependency where every scope inside our block carries none. This is the answer
 				// key rather than our own shape: a disagreement visible per fixture.
@@ -119,19 +119,19 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	}
 
 	if blocksTotal == 0 {
-		t.Fatal("no memo block was observed across the corpus, so this test asserts nothing; " +
+		test.Fatal("no memo block was observed across the corpus, so this test asserts nothing; " +
 			"marker construction or the walk changed rather than the corpus being empty")
 	}
 
-	t.Logf("fixtures=%d flowExcluded=%d blocks=%d blocksWithCarrying=%d blocksAllEmpty=%d",
+	test.Logf("fixtures=%d flowExcluded=%d blocks=%d blocksWithCarrying=%d blocksAllEmpty=%d",
 		fixturesScored, flowExcluded, blocksTotal, blocksWithCarrying, blocksAllEmpty)
-	t.Logf("scopesInside=%d carryingInside=%d emptyInside=%d capturingInside=%d carryingAfter=%d",
+	test.Logf("scopesInside=%d carryingInside=%d emptyInside=%d capturingInside=%d carryingAfter=%d",
 		scopesInside, carryingInside, emptyInside, capturingInside, carryingAfter)
-	t.Logf("blocksAllEmptyWithCapture=%d blocksAllEmptyContradictedByGolden=%d of %d all-empty blocks",
+	test.Logf("blocksAllEmptyWithCapture=%d blocksAllEmptyContradictedByGolden=%d of %d all-empty blocks",
 		blocksAllEmptyWithCapture, blocksAllEmptyContradicted, blocksAllEmpty)
 	sort.Strings(emptyWithCaptureNames)
 	for _, name := range emptyWithCaptureNames {
-		t.Logf("  empty-with-capture: %s", name)
+		test.Logf("  empty-with-capture: %s", name)
 	}
 
 	// Measured floors. `blocksWithCarrying` is the population the rule's third condition can fire
@@ -195,12 +195,12 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// `useMemo-constant-prop`, whose two memo blocks memoize over a constant.
 	const knownBlocksAllEmpty = 22
 	if blocksWithCarrying < knownBlocksWithCarrying {
-		t.Errorf("blocks with a dependency-carrying interior scope = %d, want at least %d; the "+
+		test.Errorf("blocks with a dependency-carrying interior scope = %d, want at least %d; the "+
 			"rule's third condition can no longer reach programs it could reach before",
 			blocksWithCarrying, knownBlocksWithCarrying)
 	}
 	if blocksAllEmpty > knownBlocksAllEmpty {
-		t.Errorf("memo blocks whose every interior scope carries no dependency = %d, want at most "+
+		test.Errorf("memo blocks whose every interior scope carries no dependency = %d, want at most "+
 			"%d; more blocks became invisible to the comparison", blocksAllEmpty, knownBlocksAllEmpty)
 	}
 	// The capture subset is pinned separately because it is the one with a known cause. It should
@@ -212,7 +212,7 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// 16 with the frozen-capture rule, the same two blocks as above.
 	const knownBlocksAllEmptyWithCapture = 16
 	if blocksAllEmptyWithCapture > knownBlocksAllEmptyWithCapture {
-		t.Errorf("all-empty memo blocks holding a capturing closure = %d, want at most %d; the "+
+		test.Errorf("all-empty memo blocks holding a capturing closure = %d, want at most %d; the "+
 			"closure boundary is swallowing more dependencies than before",
 			blocksAllEmptyWithCapture, knownBlocksAllEmptyWithCapture)
 	}
@@ -238,7 +238,7 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(t *testing.T) {
 	// of the two false positives that close at `knownFalsePositives`.
 	const knownBlocksAllEmptyContradicted = 7
 	if blocksAllEmptyContradicted > knownBlocksAllEmptyContradicted {
-		t.Errorf("all-empty memo blocks contradicted by upstream's compiled output = %d, want at "+
+		test.Errorf("all-empty memo blocks contradicted by upstream's compiled output = %d, want at "+
 			"most %d; upstream infers a dependency in a block where we now infer none",
 			blocksAllEmptyContradicted, knownBlocksAllEmptyContradicted)
 	}
@@ -254,8 +254,8 @@ type memoBlockObservation struct {
 }
 
 // memoBlockObservations walks one fixture the way the validator does and counts per memo block.
-func memoBlockObservations(t *testing.T, source string) ([]memoBlockObservation, bool) {
-	t.Helper()
+func memoBlockObservations(test *testing.T, source string) ([]memoBlockObservation, bool) {
+	test.Helper()
 
 	var all []memoBlockObservation
 	lowered := false
@@ -281,7 +281,7 @@ func memoBlockObservations(t *testing.T, source string) ([]memoBlockObservation,
 			}
 		},
 	}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts":  reactiveDeclarations,
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")

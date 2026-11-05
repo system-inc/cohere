@@ -34,8 +34,8 @@ type mergeCase struct {
 	wantRanges map[ScopeId]mutation_aliasing.MutableRange
 }
 
-func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScopes) {
-	t.Helper()
+func buildMergeCase(test *testing.T, testCase mergeCase) (*Function, *ReactiveScopes) {
+	test.Helper()
 
 	function := &Function{}
 	scopes := &ReactiveScopes{
@@ -102,8 +102,8 @@ func buildMergeCase(t *testing.T, testCase mergeCase) (*Function, *ReactiveScope
 // says nothing is wrong. A port written from the natural description of this pass -- "union any two
 // scopes that overlap without nesting" -- passes `overlapNonNested`, `properlyNested`, `disjoint`
 // and `sameStartSameEnd`, and fails exactly this one.
-func TestMergeMatchesReact(t *testing.T) {
-	t.Parallel()
+func TestMergeMatchesReact(test *testing.T) {
+	test.Parallel()
 
 	cases := []mergeCase{
 		{
@@ -222,25 +222,25 @@ func TestMergeMatchesReact(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			function, scopes := buildMergeCase(t, testCase)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			function, scopes := buildMergeCase(test, testCase)
 			merged := MergeOverlappingReactiveScopes(function, scopes)
 
 			for scope, want := range testCase.wantGroups {
 				if got := merged.GroupOf(scope); got != want {
-					t.Errorf("scope %d merged into %d, want %d -- this is React's own answer",
+					test.Errorf("scope %d merged into %d, want %d -- this is React's own answer",
 						scope, got, want)
 				}
 			}
 			for scope, want := range testCase.wantRanges {
 				if got := merged.RangeOf(scope); got != want {
-					t.Errorf("scope %d range = [%d,%d), want [%d,%d) -- React's own answer",
+					test.Errorf("scope %d range = [%d,%d), want [%d,%d) -- React's own answer",
 						scope, got.Start, got.End, want.Start, want.End)
 				}
 			}
 			if got, want := merged.Len(), len(testCase.wantRanges); got != want {
-				t.Errorf("%d scopes survived, want %d", got, want)
+				test.Errorf("%d scopes survived, want %d", got, want)
 			}
 		})
 	}
@@ -252,10 +252,10 @@ func TestMergeMatchesReact(t *testing.T) {
 // disagree, so a reader who simplifies this pass into "union scopes whose ranges overlap without
 // nesting" cannot do it silently. The two ranges here NEST, so a pairwise rule finds nothing to do
 // and leaves two scopes; React unions them because of the use at instruction 4.
-func TestMergeIsNotAPairwiseOverlapRule(t *testing.T) {
-	t.Parallel()
+func TestMergeIsNotAPairwiseOverlapRule(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := buildMergeCase(t, mergeCase{
+	function, scopes := buildMergeCase(test, mergeCase{
 		scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 5}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}},
 		terminal:     10,
@@ -263,13 +263,13 @@ func TestMergeIsNotAPairwiseOverlapRule(t *testing.T) {
 	merged := MergeOverlappingReactiveScopes(function, scopes)
 
 	if merged.Len() != 1 {
-		t.Fatalf("got %d surviving scopes, want 1; the interleaving use did not union them, which "+
+		test.Fatalf("got %d surviving scopes, want 1; the interleaving use did not union them, which "+
 			"is what a pairwise range comparison would also conclude", merged.Len())
 	}
 	// And the ranges genuinely nest, which is what makes this a control rather than a duplicate.
 	outer, inner := mutation_aliasing.MutableRange{Start: 1, End: 9}, mutation_aliasing.MutableRange{Start: 3, End: 5}
 	if !(outer.Start <= inner.Start && inner.End <= outer.End) {
-		t.Fatal("this case no longer nests, so it stopped separating the two spellings")
+		test.Fatal("this case no longer nests, so it stopped separating the two spellings")
 	}
 }
 
@@ -280,10 +280,10 @@ func TestMergeIsNotAPairwiseOverlapRule(t *testing.T) {
 // start to zero, which is the failure `AssignReactiveScopes` uses an adopt-or-minimise hull to
 // avoid. Both halves are asserted: the degenerate scope must survive untouched, and the real scopes
 // around it must merge normally.
-func TestMergeSkipsDegenerateScopes(t *testing.T) {
-	t.Parallel()
+func TestMergeSkipsDegenerateScopes(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := buildMergeCase(t, mergeCase{
+	function, scopes := buildMergeCase(test, mergeCase{
 		scopes:       []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 1, End: 5}, {Start: 3, End: 8}},
 		instructions: [][3]int{{1, 2, 1}, {3, 3, 0}, {4, 0, 2}},
 		terminal:     9,
@@ -291,18 +291,18 @@ func TestMergeSkipsDegenerateScopes(t *testing.T) {
 	merged := MergeOverlappingReactiveScopes(function, scopes)
 
 	if got := merged.GroupOf(1); got != 1 {
-		t.Errorf("the unset scope merged into %d; it must never enter the sweep at all", got)
+		test.Errorf("the unset scope merged into %d; it must never enter the sweep at all", got)
 	}
 	if got := merged.RangeOf(1); got != (mutation_aliasing.MutableRange{Start: 0, End: 0}) {
-		t.Errorf("the unset scope's range moved to [%d,%d)", got.Start, got.End)
+		test.Errorf("the unset scope's range moved to [%d,%d)", got.Start, got.End)
 	}
 	// The control: the two real scopes around it must still merge, or this test would pass on a
 	// pass that simply does nothing.
 	if merged.GroupOf(3) != merged.GroupOf(2) {
-		t.Error("the two real scopes did not merge, so this test measured nothing")
+		test.Error("the two real scopes did not merge, so this test measured nothing")
 	}
 	if got := merged.RangeOf(merged.GroupOf(2)); got.Start == 0 {
-		t.Errorf("a merged group took a zero start from the unset scope: [%d,%d)", got.Start, got.End)
+		test.Errorf("a merged group took a zero start from the unset scope: [%d,%d)", got.Start, got.End)
 	}
 }
 
@@ -310,10 +310,10 @@ func TestMergeSkipsDegenerateScopes(t *testing.T) {
 //
 // A merge that loses members would still reach zero overlapping pairs, which is the failure this
 // stage is uniquely positioned to commit, so membership is asserted separately from the ranges.
-func TestMergeConservesMembership(t *testing.T) {
-	t.Parallel()
+func TestMergeConservesMembership(test *testing.T) {
+	test.Parallel()
 
-	function, scopes := buildMergeCase(t, mergeCase{
+	function, scopes := buildMergeCase(test, mergeCase{
 		scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 5}, {Start: 3, End: 8}, {Start: 10, End: 12}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}, {10, 3, 0}},
 		terminal:     13,
@@ -330,17 +330,17 @@ func TestMergeConservesMembership(t *testing.T) {
 	for _, scope := range merged.Ids() {
 		for _, member := range merged.MembersOf(scope) {
 			if after[member] {
-				t.Errorf("value %d appears in two surviving scopes", member)
+				test.Errorf("value %d appears in two surviving scopes", member)
 			}
 			after[member] = true
 		}
 	}
 	if len(before) != len(after) {
-		t.Errorf("membership changed: %d values before, %d after", len(before), len(after))
+		test.Errorf("membership changed: %d values before, %d after", len(before), len(after))
 	}
 	for member := range before {
 		if !after[member] {
-			t.Errorf("value %d was dropped by the merge", member)
+			test.Errorf("value %d was dropped by the merge", member)
 		}
 	}
 }
@@ -351,15 +351,15 @@ func TestMergeConservesMembership(t *testing.T) {
 // each instruction and each terminal handled exactly once. That is a stronger claim than "it
 // terminates" and it is the one worth pinning, because the natural pairwise spelling of this pass
 // DOES iterate and a reader carrying that model would add a loop.
-func TestMergeIsASingleSweep(t *testing.T) {
-	t.Parallel()
+func TestMergeIsASingleSweep(test *testing.T) {
+	test.Parallel()
 
 	testCase := mergeCase{
 		scopes:       []mutation_aliasing.MutableRange{{Start: 1, End: 5}, {Start: 3, End: 8}},
 		instructions: [][3]int{{1, 1, 0}, {3, 2, 0}, {4, 0, 1}, {5, 0, 2}},
 		terminal:     9,
 	}
-	function, scopes := buildMergeCase(t, testCase)
+	function, scopes := buildMergeCase(test, testCase)
 
 	state := &mergeSweepState{rangeOf: scopes.RangeOf}
 	state.starts, state.ends = collectScopeInfo(function, scopes)
@@ -377,41 +377,41 @@ func TestMergeIsASingleSweep(t *testing.T) {
 
 	// One visit per instruction plus one for the terminal, and not one more.
 	if want := len(testCase.instructions) + 1; state.visits != want {
-		t.Errorf("the sweep visited %d positions over %d instructions and one terminal; anything "+
+		test.Errorf("the sweep visited %d positions over %d instructions and one terminal; anything "+
 			"above %d means something is revisiting", state.visits, len(testCase.instructions), want)
 	}
 	// And both queues must be fully drained, which is what makes the bound exact rather than lucky.
 	if len(state.starts) != 0 || len(state.ends) != 0 {
-		t.Errorf("the sweep left %d starts and %d ends unconsumed, so some scope never closed",
+		test.Errorf("the sweep left %d starts and %d ends unconsumed, so some scope never closed",
 			len(state.starts), len(state.ends))
 	}
 }
 
 // TestMergeGapsAreDeclared makes closing a gap a visible event rather than a silent improvement.
-func TestMergeGapsAreDeclared(t *testing.T) {
-	t.Parallel()
+func TestMergeGapsAreDeclared(test *testing.T) {
+	test.Parallel()
 
 	gaps := MergeGaps()
 	if len(gaps) != 2 {
-		t.Fatalf("got %d gaps, want 2; a gap closing or opening should be a deliberate edit", len(gaps))
+		test.Fatalf("got %d gaps, want 2; a gap closing or opening should be a deliberate edit", len(gaps))
 	}
 	if gaps[0] != MergeGapPrimitiveOperandSkip || gaps[1] != MergeGapBlockScopeAlignment {
-		t.Error("the declared gaps are not the two this pass documents")
+		test.Error("the declared gaps are not the two this pass documents")
 	}
 }
 
 // TestMergeHandlesAnEmptyScopeTable pins the ordinary answer for a function with no entangled values.
-func TestMergeHandlesAnEmptyScopeTable(t *testing.T) {
-	t.Parallel()
+func TestMergeHandlesAnEmptyScopeTable(test *testing.T) {
+	test.Parallel()
 
 	if got := MergeOverlappingReactiveScopes(nil, nil); got.Len() != 0 || got.Unions() != 0 {
-		t.Error("a nil input produced a non-empty result")
+		test.Error("a nil input produced a non-empty result")
 	}
 	// A scope this pass never saw must answer itself, which is what lets a caller key a map on
 	// GroupOf without first asking whether the scope merged.
 	var empty *MergedScopes
 	if got := empty.GroupOf(7); got != 7 {
-		t.Errorf("GroupOf on an empty result returned %d, want the scope itself", got)
+		test.Errorf("GroupOf on an empty result returned %d, want the scope itself", got)
 	}
 }
 
@@ -420,12 +420,12 @@ func TestMergeHandlesAnEmptyScopeTable(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // mergeCorpusStats walks the corpus once and returns everything the measurements below read.
-func mergeCorpusStats(t *testing.T, limit int) (functions, before, after, unions int,
+func mergeCorpusStats(test *testing.T, limit int) (functions, before, after, unions int,
 	nonNestedBefore, nonNestedAfter int, widthOneMultiAfter, maxWidthBefore, maxWidthAfter int,
 	nestingBefore, nestingAfter int) {
-	t.Helper()
+	test.Helper()
 
-	forEachCorpusFunction(t, limit, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, limit, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		functions++
 		before += scopes.Len()
 
@@ -505,23 +505,23 @@ func countNonNestedPairs(ranges map[ScopeId]mutation_aliasing.MutableRange) int 
 //
 // The thresholds below are looser than those numbers. This guards the SHAPE, not the corpus, which
 // moves when the tree does.
-func TestMergeDrivesNonNestedOverlapToZero(t *testing.T) {
-	t.Parallel()
+func TestMergeDrivesNonNestedOverlapToZero(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 	functions, before, after, unions, nonNestedBefore, nonNestedAfter,
-		widthOneMultiAfter, maxWidthBefore, maxWidthAfter, _, _ := mergeCorpusStats(t, 400)
+		widthOneMultiAfter, maxWidthBefore, maxWidthAfter, _, _ := mergeCorpusStats(test, 400)
 
-	t.Logf("functions=%d scopes %d->%d (unions=%d) nonNestedOverlap %d->%d maxWidth %d->%d",
+	test.Logf("functions=%d scopes %d->%d (unions=%d) nonNestedOverlap %d->%d maxWidth %d->%d",
 		functions, before, after, unions, nonNestedBefore, nonNestedAfter,
 		maxWidthBefore, maxWidthAfter)
 
 	if nonNestedBefore == 0 {
-		t.Fatal("no scopes overlapped without nesting before the merge, so the zero after it is " +
+		test.Fatal("no scopes overlapped without nesting before the merge, so the zero after it is " +
 			"about the corpus rather than about this pass")
 	}
 	if nonNestedAfter != 0 {
-		t.Errorf("%d scope pairs still overlap without nesting after merging; the block-nesting "+
+		test.Errorf("%d scope pairs still overlap without nesting after merging; the block-nesting "+
 			"assertion this pass exists to satisfy would still fail", nonNestedAfter)
 	}
 
@@ -529,15 +529,15 @@ func TestMergeDrivesNonNestedOverlapToZero(t *testing.T) {
 	// Reaching zero by merging everything into one scope per function would satisfy the assertion
 	// above and destroy the output.
 	if after < before/2 {
-		t.Errorf("merging collapsed %d scopes into %d, which is more than half; that is the shape "+
+		test.Errorf("merging collapsed %d scopes into %d, which is more than half; that is the shape "+
 			"of over-merging rather than of fixing overlaps", before, after)
 	}
 	if widthOneMultiAfter != 0 {
-		t.Errorf("%d merged scopes hold several values in a single instruction, which is the shape "+
+		test.Errorf("%d merged scopes hold several values in a single instruction, which is the shape "+
 			"catastrophic over-merging produces", widthOneMultiAfter)
 	}
 	if maxWidthAfter > maxWidthBefore*2 {
-		t.Errorf("the widest scope grew from %d to %d instructions, which is more widening than "+
+		test.Errorf("the widest scope grew from %d to %d instructions, which is more widening than "+
 			"fixing overlaps should require", maxWidthBefore, maxWidthAfter)
 	}
 }
@@ -557,14 +557,14 @@ func TestMergeDrivesNonNestedOverlapToZero(t *testing.T) {
 // The empty cell stays empty, the 1,903 narrow singletons are untouched, and the widest scope does
 // not move at all: 955 instructions before and after. Every scope this pass merged came from the
 // wide multi-member population, which is exactly the population that can overlap.
-func TestMergePreservesScopeWidthAndMembership(t *testing.T) {
-	t.Parallel()
+func TestMergePreservesScopeWidthAndMembership(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 	var oneNarrowBefore, oneWideBefore, manyNarrowBefore, manyWideBefore int
 	var oneNarrowAfter, oneWideAfter, manyNarrowAfter, manyWideAfter int
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		for _, scope := range scopes.Ids() {
 			scopeRange := scopes.RangeOf(scope)
 			classify(int(scopeRange.End-scopeRange.Start), len(scopes.MembersOf(scope)),
@@ -578,13 +578,13 @@ func TestMergePreservesScopeWidthAndMembership(t *testing.T) {
 		}
 	})
 
-	t.Logf("before  1member/width1=%d 1member/wide=%d many/width1=%d many/wide=%d",
+	test.Logf("before  1member/width1=%d 1member/wide=%d many/width1=%d many/wide=%d",
 		oneNarrowBefore, oneWideBefore, manyNarrowBefore, manyWideBefore)
-	t.Logf("after   1member/width1=%d 1member/wide=%d many/width1=%d many/wide=%d",
+	test.Logf("after   1member/width1=%d 1member/wide=%d many/width1=%d many/wide=%d",
 		oneNarrowAfter, oneWideAfter, manyNarrowAfter, manyWideAfter)
 
 	if manyNarrowBefore != 0 || manyNarrowAfter != 0 {
-		t.Errorf("the empty cell filled: %d multi-member scopes of width one before and %d after",
+		test.Errorf("the empty cell filled: %d multi-member scopes of width one before and %d after",
 			manyNarrowBefore, manyNarrowAfter)
 	}
 	// A ceiling rather than an equality, and the change from equality is recorded rather than
@@ -611,11 +611,11 @@ func TestMergePreservesScopeWidthAndMembership(t *testing.T) {
 	//
 	// The empty-cell assertion above is the one that catches over-merging, and it is untouched.
 	if oneNarrowAfter > oneNarrowBefore {
-		t.Errorf("the narrow single-value scopes GREW from %d to %d; merging cannot create a "+
+		test.Errorf("the narrow single-value scopes GREW from %d to %d; merging cannot create a "+
 			"scope, so this population can only shrink", oneNarrowBefore, oneNarrowAfter)
 	}
 	if manyWideBefore == 0 {
-		t.Fatal("no wide multi-member scopes exist, so the table above measured nothing")
+		test.Fatal("no wide multi-member scopes exist, so the table above measured nothing")
 	}
 }
 
@@ -646,30 +646,30 @@ func classify(width, members int, oneNarrow, oneWide, manyNarrow, manyWide *int)
 // scope, and 1 block subtree crossing another block subtree. That last one is not a scope problem at
 // all -- measured with the scope items removed entirely, it is still there -- so it belongs to the
 // lowering rather than to any scope pass.
-func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
-	t.Parallel()
+func TestMergeLeavesBlockScopeAlignmentUnclosed(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
-	_, _, _, _, _, _, _, _, _, nestingBefore, nestingAfter := mergeCorpusStats(t, 400)
+	skipWithoutCorpus(test)
+	_, _, _, _, _, _, _, _, _, nestingBefore, nestingAfter := mergeCorpusStats(test, 400)
 
 	blocksAlone := 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		blocksAlone += blockNestingViolations(nil, programBlockSubtrees(function))
 	})
 
-	t.Logf("assertValidBlockNesting violations: before=%d after=%d; among block subtrees alone=%d",
+	test.Logf("assertValidBlockNesting violations: before=%d after=%d; among block subtrees alone=%d",
 		nestingBefore, nestingAfter, blocksAlone)
 
 	if nestingAfter >= nestingBefore {
-		t.Errorf("merging did not reduce the block-nesting violations at all (%d -> %d), so this "+
+		test.Errorf("merging did not reduce the block-nesting violations at all (%d -> %d), so this "+
 			"pass is not doing its half", nestingBefore, nestingAfter)
 	}
 	if nestingAfter == 0 {
-		t.Error("the full assertion now passes, which means MergeGapBlockScopeAlignment has " +
+		test.Error("the full assertion now passes, which means MergeGapBlockScopeAlignment has " +
 			"closed and this test and that gap should both be revisited")
 	}
 	if blocksAlone == 0 {
-		t.Log("no block-subtree-against-block-subtree violations remain; the lowering note in " +
+		test.Log("no block-subtree-against-block-subtree violations remain; the lowering note in " +
 			"this pass's doc comment can be dropped")
 	}
 }
@@ -681,13 +681,13 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(t *testing.T) {
 // every use-operand of every function expression, which is strictly more than the gate would skip.
 // The control is asserted in the same test, because a small delta from a probe that barely fires
 // would not be a useful bound.
-func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
-	t.Parallel()
+func TestMergeFunctionOperandSkipUpperBound(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 	withoutGate, withGate, candidates := 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		withoutGate += MergeOverlappingReactiveScopes(function, scopes).Unions()
 		withGate += unionsSkippingFunctionOperands(function, scopes)
 		for _, block := range function.Blocks {
@@ -710,11 +710,11 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 		}
 	})
 
-	t.Logf("unions without the gate=%d, with it at its upper bound=%d; %d candidate operands",
+	test.Logf("unions without the gate=%d, with it at its upper bound=%d; %d candidate operands",
 		withoutGate, withGate, candidates)
 
 	if candidates == 0 {
-		t.Fatal("no function-expression operands exist on this corpus, so the zero below is about " +
+		test.Fatal("no function-expression operands exist on this corpus, so the zero below is about " +
 			"the probe rather than about the gate")
 	}
 	// The gap's size, recorded as this assertion's own message asked once it stopped being zero.
@@ -738,7 +738,7 @@ func TestMergeFunctionOperandSkipUpperBound(t *testing.T) {
 	// full 135/127 to 139/138 union differential is recorded in IMMUTABLE_ALIAS_EDGES.md.
 	const knownGateDivergence = 4
 	if withoutGate-withGate != knownGateDivergence {
-		t.Errorf("skipping every function-expression operand changed the union count from %d to "+
+		test.Errorf("skipping every function-expression operand changed the union count from %d to "+
 			"%d, a divergence of %d where %d was measured; MergeGapPrimitiveOperandSkip changed "+
 			"size and the new one should be recorded", withoutGate, withGate,
 			withoutGate-withGate, knownGateDivergence)
@@ -788,12 +788,12 @@ func unionsSkippingFunctionOperands(function *Function, scopes *ReactiveScopes) 
 // with everything after it. `Function.Blocks` is documented as reverse postorder, which is what makes
 // this hold, and it is asserted here rather than trusted because it is an assumption about a table
 // `Construct` produces rather than about anything this file does.
-func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
-	t.Parallel()
+func TestMergeAssumesMonotoneEvaluationOrder(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 	functions, violations := 0, 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		functions++
 		var last static_single_assignment.EvaluationOrder
 		for _, block := range function.Blocks {
@@ -818,12 +818,12 @@ func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
 			}
 		}
 	})
-	t.Logf("functions=%d non-monotone steps=%d", functions, violations)
+	test.Logf("functions=%d non-monotone steps=%d", functions, violations)
 	if functions == 0 {
-		t.Fatal("no functions were walked, so this measured nothing")
+		test.Fatal("no functions were walked, so this measured nothing")
 	}
 	if violations != 0 {
-		t.Errorf("evaluation order steps backwards %d times across the block sequence; the sweep's "+
+		test.Errorf("evaluation order steps backwards %d times across the block sequence; the sweep's "+
 			"stack discipline is unsound on this graph", violations)
 	}
 }
@@ -835,12 +835,12 @@ func TestMergeAssumesMonotoneEvaluationOrder(t *testing.T) {
 // structure provides. A non-deterministic merge produces a different representative for the same
 // group on different runs, which is the shape that makes a cache non-reproducible without ever
 // producing a wrong answer.
-func TestMergeIsDeterministic(t *testing.T) {
-	t.Parallel()
+func TestMergeIsDeterministic(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 	functions, mismatches, merges := 0, 0, 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		functions++
 		first := MergeOverlappingReactiveScopes(function, scopes)
 		second := MergeOverlappingReactiveScopes(function, scopes)
@@ -860,12 +860,12 @@ func TestMergeIsDeterministic(t *testing.T) {
 			}
 		}
 	})
-	t.Logf("functions=%d unions=%d mismatches=%d", functions, merges, mismatches)
+	test.Logf("functions=%d unions=%d mismatches=%d", functions, merges, mismatches)
 	if merges == 0 {
-		t.Fatal("nothing merged on the whole corpus, so running it twice compared two no-ops")
+		test.Fatal("nothing merged on the whole corpus, so running it twice compared two no-ops")
 	}
 	if mismatches != 0 {
-		t.Errorf("%d functions merged differently on a second run", mismatches)
+		test.Errorf("%d functions merged differently on a second run", mismatches)
 	}
 }
 
@@ -876,13 +876,13 @@ func TestMergeIsDeterministic(t *testing.T) {
 // mutation reversing it survives correctly rather than through a fixture gap. That verdict expires
 // the moment a pass able to mint coincident starts lands, and this test is what makes the expiry
 // visible instead of silent.
-func TestMergeSortComparatorReachability(t *testing.T) {
-	t.Parallel()
+func TestMergeSortComparatorReachability(test *testing.T) {
+	test.Parallel()
 
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 	startPositions, sharedStarts, endPositions, sharedEnds, widestEndGroup := 0, 0, 0, 0, 0
 
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		starts, ends := collectScopeInfo(function, scopes)
 		for _, group := range starts {
 			startPositions++
@@ -901,18 +901,18 @@ func TestMergeSortComparatorReachability(t *testing.T) {
 		}
 	})
 
-	t.Logf("start positions=%d (%d hold several scopes); end positions=%d (%d hold several, "+
+	test.Logf("start positions=%d (%d hold several scopes); end positions=%d (%d hold several, "+
 		"widest=%d)", startPositions, sharedStarts, endPositions, sharedEnds, widestEndGroup)
 
 	if startPositions == 0 || endPositions == 0 {
-		t.Fatal("no scope positions were collected, so this measured nothing")
+		test.Fatal("no scope positions were collected, so this measured nothing")
 	}
 	if sharedEnds == 0 {
-		t.Error("no end position holds several scopes, so sortByStartDescending is unreachable " +
+		test.Error("no end position holds several scopes, so sortByStartDescending is unreachable " +
 			"too and sharedEndReversedStack has stopped covering anything")
 	}
 	if sharedStarts != 0 {
-		t.Errorf("%d start positions now hold several scopes, so sortByEndDescending has become "+
+		test.Errorf("%d start positions now hold several scopes, so sortByEndDescending has become "+
 			"reachable; its unreachability verdict in merge_scopes.go is void and a fixture "+
 			"covering the stack-depth ordering is now required", sharedStarts)
 	}
@@ -924,11 +924,11 @@ func TestMergeSortComparatorReachability(t *testing.T) {
 // Deleting that line survives the fixture set because 0 of 3,306 corpus scopes are registered only
 // through a terminal place. The synthetic half of this test asserts the line WORKS anyway, by
 // building a scope whose sole appearance is a terminal operand and checking it reaches the tables.
-func TestMergeRegistersScopesFromTerminals(t *testing.T) {
-	t.Parallel()
+func TestMergeRegistersScopesFromTerminals(test *testing.T) {
+	test.Parallel()
 
 	// The synthetic half: a scope that appears nowhere but the terminal must still be registered.
-	function, scopes := buildMergeCase(t, mergeCase{
+	function, scopes := buildMergeCase(test, mergeCase{
 		scopes:        []mutation_aliasing.MutableRange{{Start: 1, End: 9}, {Start: 3, End: 12}},
 		instructions:  [][3]int{{1, 1, 0}},
 		terminal:      3,
@@ -947,7 +947,7 @@ func TestMergeRegistersScopesFromTerminals(t *testing.T) {
 		return false
 	}
 	if !registered(starts, 2) || !registered(ends, 2) {
-		t.Error("a scope whose only place is a terminal operand never reached the start or end " +
+		test.Error("a scope whose only place is a terminal operand never reached the start or end " +
 			"tables, so the sweep cannot see it at all")
 	}
 	// React's own answer for this input is that nothing merges: with one block the sweep never
@@ -955,14 +955,14 @@ func TestMergeRegistersScopesFromTerminals(t *testing.T) {
 	// starts merging here is caught rather than read as an improvement.
 	merged := MergeOverlappingReactiveScopes(function, scopes)
 	if merged.Len() != 2 || merged.Unions() != 0 {
-		t.Errorf("got %d scopes and %d unions, want 2 and 0; React leaves these separate",
+		test.Errorf("got %d scopes and %d unions, want 2 and 0; React leaves these separate",
 			merged.Len(), merged.Unions())
 	}
 
 	// The corpus half: the measurement that explains the survivor.
-	skipWithoutCorpus(t)
+	skipWithoutCorpus(test)
 	onlyTerminal, total := 0, 0
-	forEachCorpusFunction(t, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
 		fromInstruction, fromTerminal := map[ScopeId]bool{}, map[ScopeId]bool{}
 		for _, block := range function.Blocks {
 			if block == nil {
@@ -992,9 +992,9 @@ func TestMergeRegistersScopesFromTerminals(t *testing.T) {
 			}
 		}
 	})
-	t.Logf("scopes=%d registered only through a terminal place=%d", total, onlyTerminal)
+	test.Logf("scopes=%d registered only through a terminal place=%d", total, onlyTerminal)
 	if onlyTerminal != 0 {
-		t.Errorf("%d scopes are now registered only through a terminal place, so deleting that "+
+		test.Errorf("%d scopes are now registered only through a terminal place, so deleting that "+
 			"record would change an answer and the survivor verdict in merge_scopes.go is void",
 			onlyTerminal)
 	}

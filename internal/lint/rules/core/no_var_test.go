@@ -8,8 +8,8 @@ import (
 
 const varFile = "/repository/source/Thing.ts"
 
-func TestNoVarFires(t *testing.T) {
-	t.Parallel()
+func TestNoVarFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -31,15 +31,15 @@ func TestNoVarFires(t *testing.T) {
 		{"a var in a namespace nested inside declare global", "declare global {\n    namespace Space {\n        var value: number;\n    }\n}\nexport {};\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoVar, varFile, testCase.sourceText), "unexpectedVar")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoVar, varFile, testCase.sourceText), "unexpectedVar")
 		})
 	}
 }
 
-func TestNoVarStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoVarStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -68,9 +68,9 @@ func TestNoVarStaysSilent(t *testing.T) {
 		{"no declarations", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoVar, varFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoVar, varFile, testCase.sourceText))
 		})
 	}
 }

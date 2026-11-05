@@ -15,8 +15,8 @@ import (
 // TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress.
 const defaultPropsMatchPropTypesFile = "/repository/source/DefaultPropsMatchPropTypes.tsx"
 
-func TestDefaultPropsMatchPropTypesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestDefaultPropsMatchPropTypesStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -75,10 +75,10 @@ func TestDefaultPropsMatchPropTypesStaysSilent(t *testing.T) {
 		{"upstream valid 52", "\n        import type { FieldProps } from 'redux-form';\n\n        type Props = FieldProps & {\n          name: string,\n          type: string,\n          label?: string,\n          placeholder?: string,\n          disabled?: boolean,\n        };\n\n        TextField.defaultProps = {\n          label: '',\n          placeholder: '',\n          disabled: false,\n        };\n      ", DefaultPropsMatchPropTypesOptions{AllowRequiredDefaults: false}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes, defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DefaultPropsMatchPropTypes, defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -86,8 +86,8 @@ func TestDefaultPropsMatchPropTypesStaysSilent(t *testing.T) {
 // TestDefaultPropsMatchPropTypesFires asserts the count AND the rendered message of every
 // finding. Both messages interpolate the prop name, so a message-id assertion could not see an
 // interpolation defect, and the two arms differ only by which id fires on which input.
-func TestDefaultPropsMatchPropTypesFires(t *testing.T) {
-	t.Parallel()
+func TestDefaultPropsMatchPropTypesFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -176,21 +176,21 @@ func TestDefaultPropsMatchPropTypesFires(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes, defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DefaultPropsMatchPropTypes, defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
 
 			// The ids first, through the harness helper. `TestEveryRuleShipsAFixturePair` looks for
 			// this call BY NAME, so asserting the rendered text alone reads to that guard as a rule
 			// nothing proves can fire. It caught exactly that here.
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Description != testCase.wantMessages[index] {
-					t.Errorf("finding %d renders\n  got  %q\n  want %q", index, diagnostic.Message.Description, testCase.wantMessages[index])
+					test.Errorf("finding %d renders\n  got  %q\n  want %q", index, diagnostic.Message.Description, testCase.wantMessages[index])
 				}
 			}
 		})
@@ -220,8 +220,8 @@ func TestDefaultPropsMatchPropTypesFires(t *testing.T) {
 // Each row below asserts what this port does, which is nothing, so the record fails loudly if that
 // ever changes. The `wantUpstream` column is what the installed build reports, kept beside it so
 // the size of the gap is on the page rather than in a commit message.
-func TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress(t *testing.T) {
-	t.Parallel()
+func TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -236,17 +236,17 @@ func TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DefaultPropsMatchPropTypes,
 				defaultPropsMatchPropTypesFile, testCase.sourceText,
 				DefaultDefaultPropsMatchPropTypesOptions())
 			if len(result.Diagnostics) != 0 {
-				t.Errorf("this port reports %d findings on a case it is not meant to express; "+
+				test.Errorf("this port reports %d findings on a case it is not meant to express; "+
 					"upstream reports %d", len(result.Diagnostics), testCase.wantUpstream)
 			}
 			if testCase.wantUpstream == 0 {
-				t.Error("this row records a gap and upstream reports nothing, so it records nothing")
+				test.Error("this row records a gap and upstream reports nothing, so it records nothing")
 			}
 		})
 	}
@@ -269,8 +269,8 @@ func TestDefaultPropsMatchPropTypesCasesThisPortCannotExpress(t *testing.T) {
 //	                         owner, and either object resolved through an identifier
 //	component separation     two components in one file do not share props, which is what keeps one
 //	                         component's propTypes from satisfying another's defaults
-func TestDefaultPropsMatchPropTypesMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestDefaultPropsMatchPropTypesMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -310,17 +310,17 @@ func TestDefaultPropsMatchPropTypesMatchesTheInstalledRuleOnInputsTheCorpusDoesN
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, DefaultPropsMatchPropTypes,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, DefaultPropsMatchPropTypes,
 				defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
-				t.Fatalf("installed build reports %d findings, this rule reports %d",
+				test.Fatalf("installed build reports %d findings, this rule reports %d",
 					len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Description != testCase.wantMessages[index] {
-					t.Errorf("finding %d renders\n  got  %q\n  want %q",
+					test.Errorf("finding %d renders\n  got  %q\n  want %q",
 						index, diagnostic.Message.Description, testCase.wantMessages[index])
 				}
 			}

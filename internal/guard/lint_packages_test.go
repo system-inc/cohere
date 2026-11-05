@@ -25,12 +25,12 @@ var lintTypes = gotypes.Product{
 
 // Not parallel: it builds the product every other test here reads, so it finishes before they resume. A
 // runner of prebuilt tests skips it and finds the product Workshop built.
-func TestProduct_LintTypes(t *testing.T) {
+func TestProduct_LintTypes(test *testing.T) {
 	exports, err := lintTypes.Build()
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	t.Logf("the lint types product is %s", exports.Key()[:12])
+	test.Logf("the lint types product is %s", exports.Key()[:12])
 }
 
 // lintExports is lintTypes found once per test binary.
@@ -46,8 +46,8 @@ var lintExports = sync.OnceValues(lintTypes.Find)
 // The packages it returns are the named roots, each with its syntax and type information, so the scans see
 // the same calls they saw when every dependency was type-checked from source too: a dependency's types are
 // the same read either way, and no scan reads a dependency's syntax.
-func lintPackages(t *testing.T, overlay map[string][]byte) []*gotypes.Package {
-	t.Helper()
+func lintPackages(test *testing.T, overlay map[string][]byte) []*gotypes.Package {
+	test.Helper()
 
 	key := overlayKey(overlay)
 	lintLoads.Lock()
@@ -60,7 +60,7 @@ func lintPackages(t *testing.T, overlay map[string][]byte) []*gotypes.Package {
 
 	load.once.Do(func() { load.packages, load.failure = loadLintPackages(overlay) })
 	if load.failure != "" {
-		t.Fatal(load.failure)
+		test.Fatal(load.failure)
 	}
 	return load.packages
 }

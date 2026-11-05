@@ -12,14 +12,14 @@ import (
 // It asserts nothing about the totals yet; it is the instrument that produces the numbers the
 // pinned assertions are then written from. A run that named no fixtures would be the tell that the
 // selection is empty rather than the rules being perfect.
-func TestWiredRulesAgainstReactsOwnGoldens(t *testing.T) {
-	t.Parallel()
+func TestWiredRulesAgainstReactsOwnGoldens(test *testing.T) {
+	test.Parallel()
 	if testing.Short() {
-		t.Skip("builds a TypeScript program per fixture")
+		test.Skip("builds a TypeScript program per fixture")
 	}
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+		test.Fatalf("loading the corpus: %v", err)
 	}
 
 	grand := map[react_conformance.Verdict]int{}
@@ -29,7 +29,7 @@ func TestWiredRulesAgainstReactsOwnGoldens(t *testing.T) {
 		counts := map[react_conformance.Verdict]int{}
 		var failures []string
 		for _, fixture := range scored {
-			result, analyzeErr := Analyze(subject, fixture, t.TempDir())
+			result, analyzeErr := Analyze(subject, fixture, test.TempDir())
 			verdict := react_conformance.Classify(fixture, result, analyzeErr)
 			counts[verdict.Verdict]++
 			grand[verdict.Verdict]++
@@ -37,7 +37,7 @@ func TestWiredRulesAgainstReactsOwnGoldens(t *testing.T) {
 				failures = append(failures, "      "+fixture.Name+" :: "+verdict.Reason)
 			}
 		}
-		t.Logf("%-20s selected %3d  passed %3d  failed %3d  divergence %2d  notscored %2d  unresolvable %2d",
+		test.Logf("%-20s selected %3d  passed %3d  failed %3d  divergence %2d  notscored %2d  unresolvable %2d",
 			upstream, len(scored),
 			counts[react_conformance.VerdictPassed],
 			counts[react_conformance.VerdictFailed],
@@ -45,10 +45,10 @@ func TestWiredRulesAgainstReactsOwnGoldens(t *testing.T) {
 			counts[react_conformance.VerdictNotScored],
 			counts[react_conformance.VerdictUnresolvableTypes])
 		for _, f := range failures {
-			t.Log(f)
+			test.Log(f)
 		}
 	}
-	t.Logf("TOTAL passed %d failed %d divergence %d notscored %d unresolvable %d",
+	test.Logf("TOTAL passed %d failed %d divergence %d notscored %d unresolvable %d",
 		grand[react_conformance.VerdictPassed], grand[react_conformance.VerdictFailed],
 		grand[react_conformance.VerdictStatedDivergence], grand[react_conformance.VerdictNotScored],
 		grand[react_conformance.VerdictUnresolvableTypes])

@@ -12,8 +12,8 @@ import (
 // measured rather than transcribed.
 const noSetStateFile = "/repository/source/NoSetState.tsx"
 
-func TestNoSetStateStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoSetStateStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n        var Hello = function() {\n          this.setState({})\n        };\n      "},
@@ -21,16 +21,16 @@ func TestNoSetStateStaysSilent(t *testing.T) {
 		{"upstream valid 2", "\n        var Hello = createReactClass({\n          componentDidUpdate: function() {\n            someNonMemberFunction(arg);\n            this.someHandler = this.setState;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSetState, noSetStateFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestNoSetStateFires(t *testing.T) {
-	t.Parallel()
+func TestNoSetStateFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -43,10 +43,10 @@ func TestNoSetStateFires(t *testing.T) {
 		{"upstream invalid 4", "\n        class Hello extends React.Component {\n          render() {\n            return <div onMouseEnter={() => this.setState({dropdownIndex: index})} />;\n          }\n        };\n      ", []string{"noSetState"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSetState, noSetStateFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -71,8 +71,8 @@ func TestNoSetStateFires(t *testing.T) {
 // The nested-class row is the one worth reading twice: a plain class written inside a component
 // still reports, because the ancestor walk finds the enclosing component and never asks whether a
 // nearer class interrupted it. That is upstream's behaviour, reproduced.
-func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -107,11 +107,11 @@ func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testi
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSetState, noSetStateFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantFindings {
-				t.Errorf("installed build reports %d findings, this rule reports %d",
+				test.Errorf("installed build reports %d findings, this rule reports %d",
 					testCase.wantFindings, len(result.Diagnostics))
 			}
 		})
@@ -128,8 +128,8 @@ func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t *testi
 // The parenthesized row is the interesting one: upstream's span INCLUDES the parentheses, because
 // its parser folded them away and the member access it reports covers that text. Our parser keeps
 // the node, and reporting on the member access reproduces the same span for a different reason.
-func TestNoSetStateAnchorsOnTheCalleeNotTheCall(t *testing.T) {
-	t.Parallel()
+func TestNoSetStateAnchorsOnTheCalleeNotTheCall(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -154,16 +154,16 @@ func TestNoSetStateAnchorsOnTheCalleeNotTheCall(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSetState, noSetStateFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSetState, noSetStateFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantSpans[index] {
-					t.Errorf("finding %d points at %q, want %q", index, reported, testCase.wantSpans[index])
+					test.Errorf("finding %d points at %q, want %q", index, reported, testCase.wantSpans[index])
 				}
 			}
 		})
@@ -175,14 +175,14 @@ func TestNoSetStateAnchorsOnTheCalleeNotTheCall(t *testing.T) {
 // The message has no format verbs, so there is nothing to interpolate, but the text is upstream's
 // own string. Asserted against a literal typed here rather than against the rule's own constant, so
 // the two cannot move together under mutation.
-func TestNoSetStateMessage(t *testing.T) {
-	t.Parallel()
+func TestNoSetStateMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageNoSetState.Id != "noSetState" {
-		t.Errorf("message id is %q, want %q", messageNoSetState.Id, "noSetState")
+		test.Errorf("message id is %q, want %q", messageNoSetState.Id, "noSetState")
 	}
 	if messageNoSetState.Description != "Do not use setState" {
-		t.Errorf("message description is %q, want upstream's own text", messageNoSetState.Description)
+		test.Errorf("message description is %q, want upstream's own text", messageNoSetState.Description)
 	}
 }
 
@@ -193,8 +193,8 @@ func TestNoSetStateMessage(t *testing.T) {
 // authority has no filename condition anywhere. The source deliberately holds no JSX, so a `.ts`
 // file parses cleanly and the parser's opinion cannot be mistaken for the rule's. The `.ts` row is
 // the one that carries the weight: it is exactly the file a `.tsx` gate would have silenced.
-func TestNoSetStateHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestNoSetStateHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class H extends React.Component { m(){ this.setState({}); } }\n"
 	for _, fileName := range []string{
@@ -203,10 +203,10 @@ func TestNoSetStateHasNoFileSuffixGate(t *testing.T) {
 		"/repository/source/Suffix.ts",
 		"/repository/source/Suffix.js",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoSetState, fileName, sourceText)
-			rule_testing.ExpectFindings(t, result, "noSetState")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoSetState, fileName, sourceText)
+			rule_testing.ExpectFindings(test, result, "noSetState")
 		})
 	}
 }

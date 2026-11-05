@@ -40,8 +40,8 @@ const noUnusedVarsScriptTsConfig = `{
 }`
 const noUnusedVarsOptionPrelude = "declare const o: Record<string, number>;\ndeclare const n2: { x: number[] };\ndeclare const list: number[];\ndeclare const list2: [number, { e: number }];\ndeclare const nested: number[][];\ndeclare const entries: [string, number][];\ndeclare function use(...values: unknown[]): void;\n"
 
-func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		withPrelude bool
@@ -144,7 +144,7 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(t *testin
 		{true, "{\"destructuredArrayIgnorePattern\":\"^(?=_)\"}", "{}", "const [a, b] = list;\nuse(b);", []string{"unusedVar a"}, []string{"unusedVar a"}},
 	}
 	if len(cases) != 87 {
-		t.Fatalf("%d rows, and 87 were replayed", len(cases))
+		test.Fatalf("%d rows, and 87 were replayed", len(cases))
 	}
 
 	for _, testCase := range cases {
@@ -153,12 +153,12 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(t *testin
 			options string
 			want    []string
 		}{{"with", testCase.options, testCase.want}, {"without", testCase.without, testCase.wantWithout}} {
-			t.Run(column.label+" "+column.options+": "+testCase.body, func(t *testing.T) {
-				t.Parallel()
+			test.Run(column.label+" "+column.options+": "+testCase.body, func(test *testing.T) {
+				test.Parallel()
 
 				options, err := DecodeNoUnusedVarsOptions(json.RawMessage(column.options))
 				if err != nil {
-					t.Fatalf("decoding %s: %v", column.options, err)
+					test.Fatalf("decoding %s: %v", column.options, err)
 				}
 				prelude := ""
 				if testCase.withPrelude {
@@ -166,10 +166,10 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(t *testin
 				}
 				// The harness writes the file trimmed, so positions are in the trimmed text.
 				source := strings.TrimSpace(prelude+testCase.body) + "\n"
-				result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoUnusedVars, map[string]string{"a.ts": source}, "a.ts", options,
+				result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"a.ts": source}, "a.ts", options,
 					func(directory string) {
 						if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsScriptTsConfig), 0o644); err != nil {
-							t.Fatalf("writing the tsconfig: %v", err)
+							test.Fatalf("writing the tsconfig: %v", err)
 						}
 					})
 				var got []string
@@ -184,7 +184,7 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(t *testin
 					got = append(got, id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 				if strings.Join(got, ",") != strings.Join(column.want, ",") {
-					t.Fatalf("reported %v, want %v", got, column.want)
+					test.Fatalf("reported %v, want %v", got, column.want)
 				}
 			})
 		}
@@ -193,8 +193,8 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(t *testin
 
 // The decoder reads upstream's two forms and refuses a mode spelling upstream's schema refuses, so a
 // typo fails at load rather than running the default (#6esg2nx, the class of #p9s1131).
-func TestDecodeNoUnusedVarsOptionsModesAndShorthand(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
+	test.Parallel()
 
 	accepted := map[string]NoUnusedVarsOptions{
 		`"local"`:                  {Vars: "local", Args: "after-used", CaughtErrors: "all"},
@@ -213,11 +213,11 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(t *testing.T) {
 	for raw, want := range accepted {
 		decoded, err := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
 		if err != nil {
-			t.Errorf("%s was refused: %v", raw, err)
+			test.Errorf("%s was refused: %v", raw, err)
 			continue
 		}
 		if decoded != want {
-			t.Errorf("%s decoded to %+v, want %+v", raw, decoded, want)
+			test.Errorf("%s decoded to %+v, want %+v", raw, decoded, want)
 		}
 	}
 
@@ -233,11 +233,11 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(t *testing.T) {
 	for raw, naming := range refused {
 		_, err := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
 		if err == nil {
-			t.Errorf("%s decoded, and upstream's schema refuses it", raw)
+			test.Errorf("%s decoded, and upstream's schema refuses it", raw)
 			continue
 		}
 		if !strings.Contains(err.Error(), naming) {
-			t.Errorf("%s was refused, but the error does not name %s: %v", raw, naming, err)
+			test.Errorf("%s was refused, but the error does not name %s: %v", raw, naming, err)
 		}
 	}
 }
@@ -250,8 +250,8 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(t *testing.T) {
 // `after-used` rows pin the two halves of upstream's isAfterLastUsedArg: a destructured name is never
 // skipped by it, and a later destructured name that is read, or given a default anywhere in its
 // pattern, keeps the parameters before it.
-func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(t *testing.T) {
-	t.Parallel()
+func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(test *testing.T) {
+	test.Parallel()
 
 	const prelude = "declare function use(...values: unknown[]): void;\n"
 	cases := []struct {
@@ -295,19 +295,19 @@ func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(t *testing.T) {
 		{"{\"argsIgnorePattern\":\"^_\"}", "function f(a: number, { b }: { b: number }) {}\nuse(f);", []string{"unusedVar a", "unusedVar b"}},
 	}
 	if len(cases) != 34 {
-		t.Fatalf("%d rows, and 34 were replayed", len(cases))
+		test.Fatalf("%d rows, and 34 were replayed", len(cases))
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.options+" "+testCase.body, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.options+" "+testCase.body, func(test *testing.T) {
+			test.Parallel()
 
 			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.options, err)
+				test.Fatalf("decoding %s: %v", testCase.options, err)
 			}
 			source := prelude + testCase.body + "\nexport {};\n"
-			result := rule_testing.RunTypedWithOptions(t, NoUnusedVars, "a.ts", source, options)
+			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", source, options)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				if diagnostic.Range.Pos() < len(prelude) {
@@ -320,7 +320,7 @@ func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(t *testing.T) {
 				got = append(got, id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
 			}
 			if strings.Join(got, ",") != strings.Join(testCase.want, ",") {
-				t.Fatalf("reported %v, want %v", got, testCase.want)
+				test.Fatalf("reported %v, want %v", got, testCase.want)
 			}
 		})
 	}

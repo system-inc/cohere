@@ -23,25 +23,25 @@ import (
 // tests that rewrite the fixture and state plain path lists (exact prefix matching, `**` with directories,
 // whitespace through `ls-files -X`, links, oversized files). Those behaviors are held by this package's own
 // tests and by the differential against git.
-func TestGitCheckIgnoreCorpus(t *testing.T) {
-	t.Parallel()
-	source := gitSource(t)
+func TestGitCheckIgnoreCorpus(test *testing.T) {
+	test.Parallel()
+	source := gitSource(test)
 	contents, err := os.ReadFile(filepath.Join(source, "t", "t0008-ignores.sh"))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	script := strings.Split(string(contents), "\n")
 
-	root := t.TempDir()
-	buildCheckIgnoreFixture(t, root, script)
+	root := test.TempDir()
+	buildCheckIgnoreFixture(test, root, script)
 	matcher, err := New(root)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	asserted, skippedGlobal, skippedIndex := 0, 0, 0
 	seen := map[string]string{}
-	for _, expectation := range checkIgnoreExpectations(t, script) {
+	for _, expectation := range checkIgnoreExpectations(test, script) {
 		switch {
 		case strings.Contains(expectation.file, "global_excludes"):
 			skippedGlobal++
@@ -59,28 +59,28 @@ func TestGitCheckIgnoreCorpus(t *testing.T) {
 			want = expectation.file + ":" + expectation.line + ":" + expectation.pattern
 		}
 		if previous, present := seen[resolved]; present && previous != want {
-			t.Fatalf("t0008 states two answers for %s: %q and %q", resolved, previous, want)
+			test.Fatalf("t0008 states two answers for %s: %q and %q", resolved, previous, want)
 		}
 		seen[resolved] = want
 
 		info, statError := os.Lstat(filepath.Join(root, filepath.FromSlash(resolved)))
 		isDirectory := statError == nil && info.IsDir()
-		ignored, decided := decide(t, matcher, resolved, isDirectory)
+		ignored, decided := decide(test, matcher, resolved, isDirectory)
 		got := ""
 		if !decided.IsZero() {
 			got = decided.String()
 		}
 		wantIgnored := want != "" && !strings.HasPrefix(expectation.pattern, "!")
 		if got != want || ignored != wantIgnored {
-			t.Errorf("t0008 line %d: %s: got %v by %q, git expects %v by %q", expectation.scriptLine, resolved, ignored, got, wantIgnored, want)
+			test.Errorf("t0008 line %d: %s: got %v by %q, git expects %v by %q", expectation.scriptLine, resolved, ignored, got, wantIgnored, want)
 		}
 		asserted++
 	}
 	if len(seen) < 25 {
-		t.Fatalf("read only %d distinct paths from t0008-ignores.sh; the reader has lost the corpus", len(seen))
+		test.Fatalf("read only %d distinct paths from t0008-ignores.sh; the reader has lost the corpus", len(seen))
 	}
-	t.Logf("t0008 at git %s: %d expectations asserted over %d distinct paths; not asserted: %d naming the global excludes file, %d about a tracked file under the index",
-		gitCommit(t, source), asserted, len(seen), skippedGlobal, skippedIndex)
+	test.Logf("t0008 at git %s: %d expectations asserted over %d distinct paths; not asserted: %d naming the global excludes file, %d about a tracked file under the index",
+		gitCommit(test, source), asserted, len(seen), skippedGlobal, skippedIndex)
 }
 
 // checkIgnoreExpectation is one verbose line t0008 expects check-ignore to print.
@@ -101,8 +101,8 @@ var (
 
 // checkIgnoreExpectations finds every verbose expectation in the script, with the directory its paths are
 // relative to and whether the test runs against the index.
-func checkIgnoreExpectations(t *testing.T, script []string) []checkIgnoreExpectation {
-	t.Helper()
+func checkIgnoreExpectations(test *testing.T, script []string) []checkIgnoreExpectation {
+	test.Helper()
 	// Each test's span, the directory it changes into, and whether it reads the index.
 	type testSpan struct {
 		start, end int
@@ -215,7 +215,7 @@ func checkIgnoreExpectations(t *testing.T, script []string) []checkIgnoreExpecta
 			if strings.HasPrefix(expectedPath, `"`) {
 				unquoted, err := strconv.Unquote(expectedPath)
 				if err != nil {
-					t.Fatalf("t0008 line %d: path %s does not unquote: %v", index+1, expectedPath, err)
+					test.Fatalf("t0008 line %d: path %s does not unquote: %v", index+1, expectedPath, err)
 				}
 				expectedPath = unquoted
 			}
@@ -235,8 +235,8 @@ func checkIgnoreExpectations(t *testing.T, script []string) []checkIgnoreExpecta
 // buildCheckIgnoreFixture rebuilds what t0008's setup test makes: its directories, its link, its nested
 // repository and its ignore files. The files it creates only so they exist are not needed: a path's
 // answer depends on whether it is a directory, not on whether it exists.
-func buildCheckIgnoreFixture(t *testing.T, root string, script []string) {
-	t.Helper()
+func buildCheckIgnoreFixture(test *testing.T, root string, script []string) {
+	test.Helper()
 	start, end := -1, -1
 	for index, line := range script {
 		if strings.HasPrefix(line, "test_expect_success 'setup'") {
@@ -247,12 +247,12 @@ func buildCheckIgnoreFixture(t *testing.T, root string, script []string) {
 		}
 	}
 	if start < 0 || end < 0 {
-		t.Fatal("t0008 has no setup test to rebuild the fixture from")
+		test.Fatal("t0008 has no setup test to rebuild the fixture from")
 	}
 
 	mustMkdir := func(relative string) {
 		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(relative)), 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	mustMkdir(".git/info")
@@ -270,7 +270,7 @@ func buildCheckIgnoreFixture(t *testing.T, root string, script []string) {
 		case strings.HasPrefix(line, "ln -s "):
 			fields := strings.Fields(line)
 			if err := os.Symlink(fields[2], filepath.Join(root, filepath.FromSlash(fields[3]))); err != nil {
-				t.Fatal(err)
+				test.Fatal(err)
 			}
 		case strings.HasPrefix(line, "cd "):
 			currentDirectory = strings.TrimSuffix(strings.TrimPrefix(line, "cd "), " &&")
@@ -287,15 +287,15 @@ func buildCheckIgnoreFixture(t *testing.T, root string, script []string) {
 			if strings.Contains(target, "$") {
 				continue
 			}
-			writeTree(t, root, map[string]string{target: strings.Join(body, "\n") + "\n"})
+			writeTree(test, root, map[string]string{target: strings.Join(body, "\n") + "\n"})
 			ignoreFiles++
 		case echo.MatchString(line):
 			match := echo.FindStringSubmatch(line)
-			writeTree(t, root, map[string]string{match[2]: match[1] + "\n"})
+			writeTree(test, root, map[string]string{match[2]: match[1] + "\n"})
 			ignoreFiles++
 		}
 	}
 	if ignoreFiles < 4 {
-		t.Fatalf("rebuilt only %d ignore files from t0008's setup", ignoreFiles)
+		test.Fatalf("rebuilt only %d ignore files from t0008's setup", ignoreFiles)
 	}
 }

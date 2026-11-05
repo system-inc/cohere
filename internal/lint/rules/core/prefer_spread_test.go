@@ -10,8 +10,8 @@ import (
 //
 // The two shapes the rule is about: a bare callee given an empty `this`, and a member callee given
 // back the object it was reached through.
-func TestPreferSpreadReportsRedundantThisArgument(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadReportsRedundantThisArgument(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"foo.apply(undefined, args);",
@@ -27,8 +27,8 @@ func TestPreferSpreadReportsRedundantThisArgument(t *testing.T) {
 		"class C { #foo; m(args: any) { obj.#foo.apply(obj, args); } }",
 		"wrap(foo.apply(null, args));",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "apply.ts", source)
-		rule_testing.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(test, PreferSpread, "apply.ts", source)
+		rule_testing.ExpectFindings(test, result, "preferSpread")
 	}
 }
 
@@ -37,8 +37,8 @@ func TestPreferSpreadReportsRedundantThisArgument(t *testing.T) {
 //
 // `foo['apply'](null, args)` does exactly what `foo.apply(null, args)` does, so a rule that read
 // only the dotted form would have a hole that any minifier output falls into.
-func TestPreferSpreadReadsBothMemberAccessForms(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadReadsBothMemberAccessForms(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		`foo["apply"](null, args);`,
@@ -46,12 +46,12 @@ func TestPreferSpreadReadsBothMemberAccessForms(t *testing.T) {
 		`obj["foo"].apply(obj, args);`,
 		`obj["foo"].apply(obj["foo"] && obj, args);`,
 	} {
-		result := rule_testing.Run(t, PreferSpread, "computed.ts", source)
+		result := rule_testing.Run(test, PreferSpread, "computed.ts", source)
 		if source == `obj["foo"].apply(obj["foo"] && obj, args);` {
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 			continue
 		}
-		rule_testing.ExpectFindings(t, result, "preferSpread")
+		rule_testing.ExpectFindings(test, result, "preferSpread")
 	}
 }
 
@@ -60,8 +60,8 @@ func TestPreferSpreadReadsBothMemberAccessForms(t *testing.T) {
 // The comparison is over tokens, so a receiver written across three lines with a comment inside it
 // is the same receiver as one written inline. A comparison over raw source text would miss every
 // one of these, which is the shape real formatted code takes.
-func TestPreferSpreadIgnoresCommentsAndWhitespace(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadIgnoresCommentsAndWhitespace(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"obj\n  .foo\n  .apply(obj, args);",
@@ -70,8 +70,8 @@ func TestPreferSpreadIgnoresCommentsAndWhitespace(t *testing.T) {
 		"[].concat.apply([\n/* comment */\n], args);",
 		"[1, 2].concat.apply([1, 2], args);",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "trivia.ts", source)
-		rule_testing.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(test, PreferSpread, "trivia.ts", source)
+		rule_testing.ExpectFindings(test, result, "preferSpread")
 	}
 }
 
@@ -80,8 +80,8 @@ func TestPreferSpreadIgnoresCommentsAndWhitespace(t *testing.T) {
 // Parentheses wrapping the whole callee, the whole receiver, or an argument are pure grouping and
 // change nothing, so they must not hide the call. This is separate from the optional-chaining case
 // below, where the parentheses do change meaning.
-func TestPreferSpreadSeesThroughGroupingParentheses(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadSeesThroughGroupingParentheses(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"foo.apply((null), args);",
@@ -90,8 +90,8 @@ func TestPreferSpreadSeesThroughGroupingParentheses(t *testing.T) {
 		"(foo.apply)(null, args);",
 		"(obj.foo).apply(obj, args);",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "parens.ts", source)
-		rule_testing.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(test, PreferSpread, "parens.ts", source)
+		rule_testing.ExpectFindings(test, result, "preferSpread")
 	}
 }
 
@@ -99,8 +99,8 @@ func TestPreferSpreadSeesThroughGroupingParentheses(t *testing.T) {
 //
 // An optional call or an optional property read still ends in the same `.apply()` with the same
 // redundant `this`, so the rewrite is still available and the rule still fires.
-func TestPreferSpreadHandlesOptionalChaining(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadHandlesOptionalChaining(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"foo.apply?.(undefined, args);",
@@ -110,8 +110,8 @@ func TestPreferSpreadHandlesOptionalChaining(t *testing.T) {
 		"a?.b.c.foo.apply(a?.b.c, args);",
 		"(a?.b).c.foo.apply((a?.b).c, args);",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "optional.ts", source)
-		rule_testing.ExpectFindings(t, result, "preferSpread")
+		result := rule_testing.Run(test, PreferSpread, "optional.ts", source)
+		rule_testing.ExpectFindings(test, result, "preferSpread")
 	}
 }
 
@@ -121,15 +121,15 @@ func TestPreferSpreadHandlesOptionalChaining(t *testing.T) {
 // same expression. ESLint's AST has no node for the parentheses and reports these as matching
 // receivers; ours keeps the node and stays silent, which is the stricter and the correct reading.
 // A finding here would be a false one.
-func TestPreferSpreadKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadKeepsParenthesizedOptionalChainsDistinct(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"(a?.b).c.foo.apply(a?.b.c, args);",
 		"a?.b.c.foo.apply((a?.b).c, args);",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "divergence.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, PreferSpread, "divergence.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -138,8 +138,8 @@ func TestPreferSpreadKeepsParenthesizedOptionalChainsDistinct(t *testing.T) {
 //
 // Every case here is an `.apply()` that is doing the job `.apply()` exists for: setting a `this`
 // the call would not otherwise have. Rewriting any of them to spread syntax would change behavior.
-func TestPreferSpreadStaysSilentWhenTheThisBindingMatters(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadStaysSilentWhenTheThisBindingMatters(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"foo.apply(obj, args);",
@@ -154,8 +154,8 @@ func TestPreferSpreadStaysSilentWhenTheThisBindingMatters(t *testing.T) {
 		"(obj as any).foo.apply(obj, args);",
 		"[1, 2].concat.apply([1, 3], args);",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "binding.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, PreferSpread, "binding.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -164,8 +164,8 @@ func TestPreferSpreadStaysSilentWhenTheThisBindingMatters(t *testing.T) {
 // Building an array only to take it apart is a real defect and it is `no-useless-call`'s. Reporting
 // it here would give the reader a message about `this` bindings for a call whose `this` is not the
 // problem.
-func TestPreferSpreadLeavesArrayLiteralsToNoUselessCall(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadLeavesArrayLiteralsToNoUselessCall(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"foo.apply(undefined, [1, 2]);",
@@ -174,8 +174,8 @@ func TestPreferSpreadLeavesArrayLiteralsToNoUselessCall(t *testing.T) {
 		"foo.apply(null, ([1, 2]));",
 		"obj.foo.apply(obj, ...args);",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "literals.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, PreferSpread, "literals.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -184,8 +184,8 @@ func TestPreferSpreadLeavesArrayLiteralsToNoUselessCall(t *testing.T) {
 // A computed key that is not a literal cannot be resolved without knowing what the variable holds,
 // and a private `#apply` is a different property that spells the same word. Both must stay silent,
 // and both are shapes a looser check would report.
-func TestPreferSpreadIgnoresCallsThatAreNotApply(t *testing.T) {
-	t.Parallel()
+func TestPreferSpreadIgnoresCallsThatAreNotApply(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{
 		"var apply; foo[apply](null, args);",
@@ -198,7 +198,7 @@ func TestPreferSpreadIgnoresCallsThatAreNotApply(t *testing.T) {
 		"foo(...args);",
 		"obj.foo(...args);",
 	} {
-		result := rule_testing.Run(t, PreferSpread, "other.ts", source)
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, PreferSpread, "other.ts", source)
+		rule_testing.ExpectClean(test, result)
 	}
 }

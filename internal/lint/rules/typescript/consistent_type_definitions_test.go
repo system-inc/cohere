@@ -29,20 +29,20 @@ type consistentTypeDefinitionsCase struct {
 // `interface`, and a plain string field would read empty input as "", which matches neither arm and
 // silences the rule on every file while looking configured.
 func runConsistentTypeDefinitions(
-	t *testing.T,
+	test *testing.T,
 	testCase consistentTypeDefinitionsCase,
 ) rule_testing.Result {
-	t.Helper()
+	test.Helper()
 
 	encoded, err := json.Marshal(testCase.style)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	decoded, err := DecodeConsistentTypeDefinitionsOptions(encoded)
 	if err != nil {
-		t.Fatalf("could not decode options %q: %v", testCase.style, err)
+		test.Fatalf("could not decode options %q: %v", testCase.style, err)
 	}
-	return rule_testing.RunWithOptions(t, ConsistentTypeDefinitions,
+	return rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
 		consistentTypeDefinitionsFile, testCase.sourceText, decoded)
 }
 
@@ -100,8 +100,8 @@ func consistentTypeDefinitionsCases() []consistentTypeDefinitionsCase {
 }
 
 // TestConsistentTypeDefinitionsMatchesUpstream replays the whole corpus.
-func TestConsistentTypeDefinitionsMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeDefinitionsMatchesUpstream(test *testing.T) {
+	test.Parallel()
 
 	cases := consistentTypeDefinitionsCases()
 
@@ -116,18 +116,18 @@ func TestConsistentTypeDefinitionsMatchesUpstream(t *testing.T) {
 		}
 	}
 	if len(cases) != 33 {
-		t.Fatalf("expected 33 corpus cases, have %d", len(cases))
+		test.Fatalf("expected 33 corpus cases, have %d", len(cases))
 	}
 	if reporting != 23 {
-		t.Fatalf("expected 23 reporting cases, have %d", reporting)
+		test.Fatalf("expected 23 reporting cases, have %d", reporting)
 	}
 	if fixable != 21 {
-		t.Fatalf("expected 21 fixable cases, have %d", fixable)
+		test.Fatalf("expected 21 fixable cases, have %d", fixable)
 	}
 
 	for _, testCase := range cases {
-		result := runConsistentTypeDefinitions(t, testCase)
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		result := runConsistentTypeDefinitions(test, testCase)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 	}
 }
 
@@ -137,8 +137,8 @@ func TestConsistentTypeDefinitionsMatchesUpstream(t *testing.T) {
 // message-id layer, from a correct one: every row in the test above stays green either way. So the
 // whole rewritten file is compared, against text the installed 8.67.0 build produced through
 // `verifyAndFix` rather than against anything reconstructed by hand.
-func TestConsistentTypeDefinitionsRewritesWhatUpstreamRewrites(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeDefinitionsRewritesWhatUpstreamRewrites(test *testing.T) {
+	test.Parallel()
 
 	checked := 0
 	for _, testCase := range consistentTypeDefinitionsCases() {
@@ -146,11 +146,11 @@ func TestConsistentTypeDefinitionsRewritesWhatUpstreamRewrites(t *testing.T) {
 			continue
 		}
 		checked++
-		result := runConsistentTypeDefinitions(t, testCase)
-		rule_testing.ExpectFixedSource(t, result, *testCase.wantOutput)
+		result := runConsistentTypeDefinitions(test, testCase)
+		rule_testing.ExpectFixedSource(test, result, *testCase.wantOutput)
 	}
 	if checked != 21 {
-		t.Fatalf("expected to check 21 rewrites, checked %d", checked)
+		test.Fatalf("expected to check 21 rewrites, checked %d", checked)
 	}
 }
 
@@ -161,33 +161,33 @@ func TestConsistentTypeDefinitionsRewritesWhatUpstreamRewrites(t *testing.T) {
 // 2707: a type alias there does not do what the interface did, so the repair would change meaning
 // rather than spelling. The finding is identical whether or not a fix rides along, so only asserting
 // the ABSENCE of a proposed fix can tell the two apart.
-func TestConsistentTypeDefinitionsDeclinesInsideDeclareGlobal(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeDefinitionsDeclinesInsideDeclareGlobal(test *testing.T) {
+	test.Parallel()
 
-	declined := runConsistentTypeDefinitions(t, consistentTypeDefinitionsCase{
+	declined := runConsistentTypeDefinitions(test, consistentTypeDefinitionsCase{
 		sourceText: "declare global {\n  interface Array<T> {\n    foo(): T;\n  }\n}",
 		style:      "type",
 	})
-	rule_testing.ExpectFindings(t, declined, "typeOverInterface")
+	rule_testing.ExpectFindings(test, declined, "typeOverInterface")
 	for _, diagnostic := range declined.Diagnostics {
 		if len(diagnostic.Fixes) > 0 {
-			t.Errorf("expected no fix inside `declare global`, got %d", len(diagnostic.Fixes))
+			test.Errorf("expected no fix inside `declare global`, got %d", len(diagnostic.Fixes))
 		}
 	}
 
 	// The control. The same interface OUTSIDE a global augmentation is repaired, so the decline
 	// above is the guard rather than a fixer that never fires under this option.
-	repaired := runConsistentTypeDefinitions(t, consistentTypeDefinitionsCase{
+	repaired := runConsistentTypeDefinitions(test, consistentTypeDefinitionsCase{
 		sourceText: "interface Array2<T> {\n  foo(): T;\n}",
 		style:      "type",
 	})
-	rule_testing.ExpectFindings(t, repaired, "typeOverInterface")
+	rule_testing.ExpectFindings(test, repaired, "typeOverInterface")
 	proposed := 0
 	for _, diagnostic := range repaired.Diagnostics {
 		proposed += len(diagnostic.Fixes)
 	}
 	if proposed == 0 {
-		t.Fatal("the control proposed no fix, so the decline above proves nothing")
+		test.Fatal("the control proposed no fix, so the decline above proves nothing")
 	}
 }
 
@@ -197,34 +197,34 @@ func TestConsistentTypeDefinitionsDeclinesInsideDeclareGlobal(t *testing.T) {
 // empty input, and the zero value of the settings struct is the empty string, which matches neither
 // arm -- a rule that is silent on every file while looking configured, and indistinguishable from a
 // clean tree in a violation count.
-func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeConsistentTypeDefinitionsOptions(nil)
 	if err != nil {
-		t.Fatalf("empty options should decode to the default: %v", err)
+		test.Fatalf("empty options should decode to the default: %v", err)
 	}
 	settings, ok := decoded.(ConsistentTypeDefinitionsOptions)
 	if !ok {
-		t.Fatalf("expected ConsistentTypeDefinitionsOptions, got %T", decoded)
+		test.Fatalf("expected ConsistentTypeDefinitionsOptions, got %T", decoded)
 	}
 	if settings.Style != ConsistentTypeDefinitionsInterface {
-		t.Fatalf("expected the default to be interface, got %q", settings.Style)
+		test.Fatalf("expected the default to be interface, got %q", settings.Style)
 	}
 
 	// The control that the default is doing work: unconfigured, the rule reports a type alias and
 	// stays silent on an interface, which is the `interface` arm rather than no arm at all.
-	reported := rule_testing.RunWithOptions(t, ConsistentTypeDefinitions,
+	reported := rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
 		consistentTypeDefinitionsFile, "type T = { x: number };", settings)
-	rule_testing.ExpectFindings(t, reported, "interfaceOverType")
+	rule_testing.ExpectFindings(test, reported, "interfaceOverType")
 
-	silent := rule_testing.RunWithOptions(t, ConsistentTypeDefinitions,
+	silent := rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
 		consistentTypeDefinitionsFile, "interface I { x: number }", settings)
-	rule_testing.ExpectClean(t, silent)
+	rule_testing.ExpectClean(test, silent)
 
 	// And a bad value fails loudly rather than silencing the rule.
 	if _, err := DecodeConsistentTypeDefinitionsOptions([]byte(`"neither"`)); err == nil {
-		t.Error("expected the decoder to refuse an unknown style")
+		test.Error("expected the decoder to refuse an unknown style")
 	}
 }
 
@@ -240,8 +240,8 @@ func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(t *testing.T) {
 //
 // Three and four heritage types are asserted as well as two, because a reversal of two is also a
 // rotation and a rule that rotated rather than reversed would pass at two.
-func TestConsistentTypeDefinitionsKeepsHeritageOrder(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeDefinitionsKeepsHeritageOrder(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source string
@@ -253,11 +253,11 @@ func TestConsistentTypeDefinitionsKeepsHeritageOrder(t *testing.T) {
 		{"interface A extends B<T1>, C<T2> {\n  x: number;\n}", "type A = {\n  x: number;\n} & B<T1> & C<T2>"},
 	}
 	for _, testCase := range cases {
-		result := runConsistentTypeDefinitions(t, consistentTypeDefinitionsCase{
+		result := runConsistentTypeDefinitions(test, consistentTypeDefinitionsCase{
 			sourceText: testCase.source,
 			style:      "type",
 		})
-		rule_testing.ExpectFixedSource(t, result, testCase.want)
+		rule_testing.ExpectFixedSource(test, result, testCase.want)
 	}
 }
 
@@ -268,8 +268,8 @@ func TestConsistentTypeDefinitionsKeepsHeritageOrder(t *testing.T) {
 // interfaces. This rule rewrites only the keyword and the punctuation around the body, so `export`,
 // `declare`, the JSDoc above and a comment between the modifier and the keyword all stay where they
 // were, in both directions. Every expected output is byte-identical to upstream's installed build.
-func TestConsistentTypeDefinitionsKeepsTheDeclarationModifiers(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeDefinitionsKeepsTheDeclarationModifiers(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		style      string
@@ -289,10 +289,10 @@ func TestConsistentTypeDefinitionsKeepsTheDeclarationModifiers(t *testing.T) {
 	for _, testCase := range cases {
 		decoded, err := DecodeConsistentTypeDefinitionsOptions([]byte(`"` + testCase.style + `"`))
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
-		result := rule_testing.RunWithOptions(t, ConsistentTypeDefinitions,
+		result := rule_testing.RunWithOptions(test, ConsistentTypeDefinitions,
 			consistentTypeDefinitionsFile, testCase.sourceText, decoded)
-		rule_testing.ExpectFixedSource(t, result, testCase.want)
+		rule_testing.ExpectFixedSource(test, result, testCase.want)
 	}
 }

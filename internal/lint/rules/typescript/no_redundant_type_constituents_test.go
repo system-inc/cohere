@@ -25,8 +25,8 @@ func noRedundantTypeConstituentsCaseName(index int) string {
 // carries two boolean literals beside a string. `never` inside a return annotation is clean because
 // it says something there. And `string | number` is clean in both directions: two primitives do not
 // absorb each other at all.
-func TestNoRedundantTypeConstituentsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantTypeConstituentsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []string{
 		"type T = any;\ntype U = T;\n",
@@ -86,9 +86,9 @@ func TestNoRedundantTypeConstituentsStaysSilent(t *testing.T) {
 		"declare function fn(): never | 'foo';\n",
 	}
 	for index, sourceText := range cases {
-		t.Run(noRedundantTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoRedundantTypeConstituents,
+		test.Run(noRedundantTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoRedundantTypeConstituents,
 				noRedundantTypeConstituentsFile, sourceText))
 		})
 	}
@@ -109,8 +109,8 @@ type noRedundantTypeConstituentsFinding struct {
 // TestNoRedundantTypeConstituentsFires is upstream's forty-nine reporting cases verbatim, with every
 // finding's id, rendered text and span taken from the installed 8.67.0 build rather than from the
 // corpus's own `errors` array, which states ids but not the rendered text.
-func TestNoRedundantTypeConstituentsFires(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantTypeConstituentsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText   string
@@ -666,16 +666,16 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(noRedundantTypeConstituentsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoRedundantTypeConstituents,
+		test.Run(noRedundantTypeConstituentsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoRedundantTypeConstituents,
 				noRedundantTypeConstituentsFile, testCase.sourceText)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
 				wantIds[position] = want.wantId
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			// The harness writes the fixture trimmed, so the span slices are against that text
 			// rather than the Go literal above. The captured spans came from a file written the
@@ -686,14 +686,14 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 
 				gotSpan := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if gotSpan != want.wantSpan {
-					t.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
+					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Id != want.wantId {
-					t.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
+					test.Fatalf("finding %d id: expected %q, got %q", position, want.wantId,
 						diagnostic.Message.Id)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					t.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
+					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage,
 						diagnostic.Message.Description)
 				}
 			}
@@ -712,14 +712,14 @@ func TestNoRedundantTypeConstituentsFires(t *testing.T) {
 // the untyped run below does, so the declaration is not the guard and the two have to be tested
 // separately. The second half is the control: without something that fires, a rule which can never
 // report at all satisfies the first half.
-func TestNoRedundantTypeConstituentsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoRedundantTypeConstituentsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "type T = string | any;\n"
 
-	rule_testing.ExpectClean(t, rule_testing.Run(t, NoRedundantTypeConstituents,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoRedundantTypeConstituents,
 		noRedundantTypeConstituentsFile, sourceText))
 
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoRedundantTypeConstituents,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoRedundantTypeConstituents,
 		noRedundantTypeConstituentsFile, sourceText), "overrides")
 }

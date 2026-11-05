@@ -42,18 +42,18 @@ type wave1Fixture struct {
 // silence into equality is how a table that stopped answering scores perfectly.
 //
 // Run on the public theme's oracle and on ahra's (#f598zk0), each against the design system it records.
-func TestFrameworkFunctionalUtilitiesMatchTheEngine(t *testing.T) {
-	t.Parallel()
-	forEachOracleCopy(t, "wave1_fixtures.json", func(t *testing.T, fixtureName string) {
-		fixture := loadWave1Fixture(t, fixtureName)
-		expectFrameworkFunctionalUtilitiesMatch(t, fixture, oracleSystem(t, fixture.EntryPoint))
+func TestFrameworkFunctionalUtilitiesMatchTheEngine(test *testing.T) {
+	test.Parallel()
+	forEachOracleCopy(test, "wave1_fixtures.json", func(test *testing.T, fixtureName string) {
+		fixture := loadWave1Fixture(test, fixtureName)
+		expectFrameworkFunctionalUtilitiesMatch(test, fixture, oracleSystem(test, fixture.EntryPoint))
 	})
 }
 
 // expectFrameworkFunctionalUtilitiesMatch compares one wave-1 oracle with the table, over the design
 // system it was captured from.
-func expectFrameworkFunctionalUtilitiesMatch(t *testing.T, fixture wave1Fixture, system *LoadedDesignSystem) {
-	t.Helper()
+func expectFrameworkFunctionalUtilitiesMatch(test *testing.T, fixture wave1Fixture, system *LoadedDesignSystem) {
+	test.Helper()
 
 	var agreed, bothDeclined, goSilent, engineSilent int
 	var disagreements, silentNames []string
@@ -61,7 +61,7 @@ func expectFrameworkFunctionalUtilitiesMatch(t *testing.T, fixture wave1Fixture,
 	for _, testCase := range fixture.Cases {
 		utility, known := FrameworkFunctionalUtilities[testCase.Root]
 		if !known {
-			t.Fatalf("%s is in the fixture and not in the table; the fixture and the table disagree about which roots wave 1 covers", testCase.Root)
+			test.Fatalf("%s is in the fixture and not in the table; the fixture and the table disagree about which roots wave 1 covers", testCase.Root)
 		}
 
 		// A negative candidate parses to its own root: `-col-1` is root `-col`, not `col` negated,
@@ -112,26 +112,26 @@ func expectFrameworkFunctionalUtilitiesMatch(t *testing.T, fixture wave1Fixture,
 	// gap in this table wearing the same shape.
 	for _, className := range silentNames {
 		if _, found := FrameworkStaticDeclarations[className]; !found {
-			t.Errorf("%s: the engine reads it, this table declines, and no static registration covers it, so it is an unexplained gap", className)
+			test.Errorf("%s: the engine reads it, this table declines, and no static registration covers it, so it is an unexplained gap", className)
 		}
 	}
 	if len(silentNames) > 0 {
-		t.Logf("table-silent classes, all covered by the static table: %v", silentNames)
+		test.Logf("table-silent classes, all covered by the static table: %v", silentNames)
 	}
-	t.Logf("wave 1: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
+	test.Logf("wave 1: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
 		fixture.RootCount, fixture.CaseCount, agreed, bothDeclined, goSilent, engineSilent, len(disagreements))
 
 	// The population assertions, stated before the disagreements so a run that measured almost
 	// nothing fails on the denominator rather than passing on the rate.
 	if agreed < 150 {
-		t.Errorf("only %d cases agreed of %d answered by the engine; a table that stopped answering scores perfectly on any comparison that counts only disagreements", agreed, fixture.Answered)
+		test.Errorf("only %d cases agreed of %d answered by the engine; a table that stopped answering scores perfectly on any comparison that counts only disagreements", agreed, fixture.Answered)
 	}
 	if bothDeclined < 50 {
-		t.Errorf("only %d cases were declined by both sides; the rejection branches are under-exercised", bothDeclined)
+		test.Errorf("only %d cases were declined by both sides; the rejection branches are under-exercised", bothDeclined)
 	}
 
 	for _, disagreement := range disagreements {
-		t.Error(disagreement)
+		test.Error(disagreement)
 	}
 }
 
@@ -145,8 +145,8 @@ func expectFrameworkFunctionalUtilitiesMatch(t *testing.T, fixture wave1Fixture,
 // `mask-size` and `mask-position` all spell their handler as `handle(value) { if (!value) return }`,
 // which is why no probe value reached them and why they were invisible to a generator that only asks
 // what a root reads.
-func TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots(t *testing.T) {
-	t.Parallel()
+func TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots(test *testing.T) {
+	test.Parallel()
 	// Seven of the eight. `mask-radial` is the exception and stays uncovered: it emits four
 	// declarations behind `--tw-*` custom properties, so it belongs to wave 2b rather than here, and
 	// naming it in this list would claim coverage this table does not have.
@@ -156,11 +156,11 @@ func TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots(t *testing.T) {
 	} {
 		utility, known := FrameworkFunctionalUtilities[root]
 		if !known {
-			t.Errorf("%s is one of the roots no probe value reaches and it is not in the table", root)
+			test.Errorf("%s is one of the roots no probe value reaches and it is not in the table", root)
 			continue
 		}
 		if utility.Property == "" {
-			t.Errorf("%s is in the table with no property, so it answers nothing", root)
+			test.Errorf("%s is in the table with no property, so it answers nothing", root)
 		}
 	}
 }
@@ -170,8 +170,8 @@ func TestFrameworkFunctionalUtilitiesCoverTheUnprobableRoots(t *testing.T) {
 // Twelve roots use the positive-integer handler. A closure per row would have made them twelve
 // lookalike functions and a correction could reach eleven and miss the twelfth, which is the defect
 // class this whole port keeps finding.
-func TestFrameworkFunctionalUtilitiesShareOneBarePredicate(t *testing.T) {
-	t.Parallel()
+func TestFrameworkFunctionalUtilitiesShareOneBarePredicate(test *testing.T) {
+	test.Parallel()
 	shared := 0
 	for _, utility := range FrameworkFunctionalUtilities {
 		if utility.BareValue == BareValuePositiveInteger {
@@ -179,7 +179,7 @@ func TestFrameworkFunctionalUtilitiesShareOneBarePredicate(t *testing.T) {
 		}
 	}
 	if shared < 10 {
-		t.Errorf("%d roots reference the shared positive-integer predicate; upstream has twelve in this wave, so the table may have inlined some", shared)
+		test.Errorf("%d roots reference the shared positive-integer predicate; upstream has twelve in this wave, so the table may have inlined some", shared)
 	}
 }
 
@@ -196,32 +196,32 @@ func formatReading(reading Reading) string {
 	return string(raw) + "#" + itoa(reading.Count)
 }
 
-func loadWave1Fixture(t *testing.T, name string) wave1Fixture {
-	t.Helper()
+func loadWave1Fixture(test *testing.T, name string) wave1Fixture {
+	test.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("read %s: %v", name, err)
+		test.Fatalf("read %s: %v", name, err)
 	}
 	var fixture wave1Fixture
 	if err := json.Unmarshal(raw, &fixture); err != nil {
-		t.Fatalf("parse %s: %v", name, err)
+		test.Fatalf("parse %s: %v", name, err)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
-		t.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)
+		test.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)
 	}
 	return fixture
 }
 
 // loadWave1DesignSystem loads ahra's design system, which the wave fixtures were captured against: a skip
 // naming the variable when the corpus is unset, and a failure when it is set and does not load.
-func loadWave1DesignSystem(t *testing.T) *LoadedDesignSystem {
-	t.Helper()
+func loadWave1DesignSystem(test *testing.T) *LoadedDesignSystem {
+	test.Helper()
 	system, err := LoadDesignSystem(LoadOptions{
-		EntryPoint:          corpus.Resolve(t, "ahra:app/_theme/styles/theme.css"),
+		EntryPoint:          corpus.Resolve(test, "ahra:app/_theme/styles/theme.css"),
 		TailwindPackageRoot: vendored.TailwindPackageRoot(),
 	})
 	if err != nil {
-		t.Fatalf("%s is set, but its design system does not load: %v", corpus.Ahra.Variable, err)
+		test.Fatalf("%s is set, but its design system does not load: %v", corpus.Ahra.Variable, err)
 	}
 	return system
 }
@@ -241,8 +241,8 @@ func loadWave1DesignSystem(t *testing.T) *LoadedDesignSystem {
 // If this test ever fails, a root in this wave gained a diverging static value and the property half
 // of the lookup became load-bearing here. That is the moment to add a mutation covering it, not to
 // loosen this.
-func TestFrameworkStaticValuesDeclareTheirRootsProperty(t *testing.T) {
-	t.Parallel()
+func TestFrameworkStaticValuesDeclareTheirRootsProperty(test *testing.T) {
+	test.Parallel()
 	withStatics, diverging := 0, 0
 	for root, utility := range FrameworkFunctionalUtilities {
 		if len(utility.StaticValues) == 0 {
@@ -252,18 +252,18 @@ func TestFrameworkStaticValuesDeclareTheirRootsProperty(t *testing.T) {
 		for _, static := range utility.StaticValues {
 			if static.Property != utility.Property {
 				diverging++
-				t.Logf("%s: static %q declares %q where the root declares %q", root, static.Name, static.Property, utility.Property)
+				test.Logf("%s: static %q declares %q where the root declares %q", root, static.Name, static.Property, utility.Property)
 			}
 		}
 	}
 
 	if withStatics == 0 {
-		t.Fatal("no wave-1 root declares staticValues, so this assertion measured nothing")
+		test.Fatal("no wave-1 root declares staticValues, so this assertion measured nothing")
 	}
 	if diverging > 0 {
-		t.Errorf("%d static values now declare a property their root does not; the property lookup in Reading is load-bearing in this wave and needs a mutation covering it", diverging)
+		test.Errorf("%d static values now declare a property their root does not; the property lookup in Reading is load-bearing in this wave and needs a mutation covering it", diverging)
 	}
-	t.Logf("%d roots declare staticValues, %d diverging properties", withStatics, diverging)
+	test.Logf("%d roots declare staticValues, %d diverging properties", withStatics, diverging)
 }
 
 // TestFrameworkBareValueSuffixIsUnobservableInAReading records why a mutation of it survives.
@@ -278,8 +278,8 @@ func TestFrameworkStaticValuesDeclareTheirRootsProperty(t *testing.T) {
 //
 // The value matters even though the reading does not: it is what an arbitrary-value data-type
 // inference would read downstream, and it is what the engine emits.
-func TestFrameworkBareValueSuffixIsUnobservableInAReading(t *testing.T) {
-	t.Parallel()
+func TestFrameworkBareValueSuffixIsUnobservableInAReading(test *testing.T) {
+	test.Parallel()
 	theme := NewTheme()
 	cases := []struct {
 		root     string
@@ -295,7 +295,7 @@ func TestFrameworkBareValueSuffixIsUnobservableInAReading(t *testing.T) {
 	for _, testCase := range cases {
 		utility, known := FrameworkFunctionalUtilities[testCase.root]
 		if !known {
-			t.Errorf("%s is not in the table", testCase.root)
+			test.Errorf("%s is not in the table", testCase.root)
 			continue
 		}
 		candidate := ParsedCandidate{
@@ -305,11 +305,11 @@ func TestFrameworkBareValueSuffixIsUnobservableInAReading(t *testing.T) {
 		}
 		resolved, produced := ResolveFunctionalUtilityValue(&candidate, utility.Description(), theme, false)
 		if !produced {
-			t.Errorf("%s-%s resolved to nothing", testCase.root, testCase.bare)
+			test.Errorf("%s-%s resolved to nothing", testCase.root, testCase.bare)
 			continue
 		}
 		if resolved.Value != testCase.expected {
-			t.Errorf("%s-%s resolved to %q, the engine resolves it to %q", testCase.root, testCase.bare, resolved.Value, testCase.expected)
+			test.Errorf("%s-%s resolved to %q, the engine resolves it to %q", testCase.root, testCase.bare, resolved.Value, testCase.expected)
 		}
 	}
 
@@ -321,7 +321,7 @@ func TestFrameworkBareValueSuffixIsUnobservableInAReading(t *testing.T) {
 	longReading, _ := utility.Reading("delay", &long, theme, false)
 	shortReading, _ := utility.Reading("delay", &short, theme, false)
 	if !readingsEqual(longReading, shortReading) {
-		t.Errorf("delay-150 and delay-1 read differently (%v#%d and %v#%d); if that is now true, a reading-based test can cover the suffix",
+		test.Errorf("delay-150 and delay-1 read differently (%v#%d and %v#%d); if that is now true, a reading-based test can cover the suffix",
 			longReading.Order, longReading.Count, shortReading.Order, shortReading.Count)
 	}
 }

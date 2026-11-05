@@ -22,8 +22,8 @@ import (
 // noUselessReturnDeclinesToFix marks a case upstream reports and deliberately does not repair.
 const noUselessReturnDeclinesToFix = "\x00declines"
 
-func TestNoUselessReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -59,18 +59,18 @@ func TestNoUselessReturnStaysSilent(t *testing.T) {
 		{name: "valid24", source: "\n        function foo() {\n          try {\n              bar();\n              return;\n          } finally {\n              baz();\n          }\n          qux();\n        }\n        "},
 	}
 	if len(cases) != 25 {
-		t.Fatalf("REFUSING: the clean table holds %d cases, want 25", len(cases))
+		test.Fatalf("REFUSING: the clean table holds %d cases, want 25", len(cases))
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUselessReturn, "file.ts", testCase.source))
 		})
 	}
 }
 
-func TestNoUselessReturnFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -116,28 +116,28 @@ func TestNoUselessReturnFires(t *testing.T) {
 		{name: "invalid23", source: "function foo() { return; return; }", findings: 1, wantFixed: "function foo() {  return; }"},
 	}
 	if len(cases) != 24 {
-		t.Fatalf("REFUSING: the reporting table holds %d cases, want 24", len(cases))
+		test.Fatalf("REFUSING: the reporting table holds %d cases, want 24", len(cases))
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessReturn, "file.ts", testCase.source)
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "unnecessaryReturn"
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			if testCase.wantFixed == noUselessReturnDeclinesToFix {
 				for index, finding := range result.Diagnostics {
 					if len(finding.Fixes) > 0 {
-						t.Errorf("finding %d offered a repair upstream declines; for this rule that "+
+						test.Errorf("finding %d offered a repair upstream declines; for this rule that "+
 							"means deleting a statement it refuses to delete", index)
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
@@ -145,8 +145,8 @@ func TestNoUselessReturnFires(t *testing.T) {
 // The span and the message, neither of which ExpectFindings can see. Upstream reports the whole
 // return statement, which is also the span the repair deletes, so a wrong anchor here means an
 // unattended edit lands somewhere the reader was never shown.
-func TestNoUselessReturnSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -159,23 +159,23 @@ func TestNoUselessReturnSpanAndMessage(t *testing.T) {
 		{"insideACase", "function foo() { switch (a) { case 1: bar(); return; } }", "return;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessReturn, "file.ts", testCase.source)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			if got := testCase.source[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Errorf("reported text: got %q, want %q", got, testCase.wantText)
+				test.Errorf("reported text: got %q, want %q", got, testCase.wantText)
 			}
 			if finding.Message.Id != "unnecessaryReturn" {
-				t.Errorf("message id: got %q", finding.Message.Id)
+				test.Errorf("message id: got %q", finding.Message.Id)
 			}
 			wantPrefix := "This `return` ends the function at a point where the function was going " +
 				"to end anyway, so it changes nothing"
 			if got := finding.Message.Description; !strings.HasPrefix(got, wantPrefix) {
-				t.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
+				test.Errorf("message:\n got %q\nwant prefix %q", got, wantPrefix)
 			}
 		})
 	}
@@ -194,8 +194,8 @@ func TestNoUselessReturnSpanAndMessage(t *testing.T) {
 //
 // Both halves matter. Losing the first means the repair eats a developer's comment unattended;
 // losing the second means the rule stops repairing ordinary code because a comment sits beside it.
-func TestNoUselessReturnComments(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnComments(test *testing.T) {
+	test.Parallel()
 
 	declines := []struct {
 		name   string
@@ -206,12 +206,12 @@ func TestNoUselessReturnComments(t *testing.T) {
 		{"commentBetweenKeywordAndSemicolon", "function foo() { bar(); return /* why */ ; }"},
 	}
 	for _, testCase := range declines {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, "unnecessaryReturn")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessReturn, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, "unnecessaryReturn")
 			if len(result.Diagnostics[0].Fixes) != 0 {
-				t.Errorf("offered a repair that would delete the comment inside the return")
+				test.Errorf("offered a repair that would delete the comment inside the return")
 			}
 		})
 	}
@@ -230,38 +230,38 @@ func TestNoUselessReturnComments(t *testing.T) {
 			"function foo() { bar();  /*keep*/ }"},
 	}
 	for _, testCase := range repairs {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, "unnecessaryReturn")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUselessReturn, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, "unnecessaryReturn")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
 	}
 }
 
 // The removability guard, upstream's third `output: null`. A return that is not a member of a
 // statement list cannot be deleted, because removing it leaves a construct with no body.
-func TestNoUselessReturnRemovability(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnRemovability(test *testing.T) {
+	test.Parallel()
 
 	declines := []string{
 		"function foo() { if (foo) return; }",
 		"function foo() { if (foo) return; else bar(); }",
 	}
 	for _, source := range declines {
-		result := rule_testing.Run(t, NoUselessReturn, "file.ts", source)
+		result := rule_testing.Run(test, NoUselessReturn, "file.ts", source)
 		if len(result.Diagnostics) == 0 {
-			t.Fatalf("expected a finding on %q", source)
+			test.Fatalf("expected a finding on %q", source)
 		}
 		if len(result.Diagnostics[0].Fixes) != 0 {
-			t.Errorf("offered a repair on %q, which would leave the `if` with no consequent", source)
+			test.Errorf("offered a repair on %q, which would leave the `if` with no consequent", source)
 		}
 	}
 
 	// A control: the same judgment inside a block IS repaired, so the decline above is about the
 	// parent rather than about the rule declining to fix anything.
-	rule_testing.ExpectFixedSource(t,
-		rule_testing.Run(t, NoUselessReturn, "file.ts", "function foo() { if (foo) { return; } }"),
+	rule_testing.ExpectFixedSource(test,
+		rule_testing.Run(test, NoUselessReturn, "file.ts", "function foo() { if (foo) { return; } }"),
 		"function foo() { if (foo) {  } }")
 }
 
@@ -271,8 +271,8 @@ func TestNoUselessReturnRemovability(t *testing.T) {
 // does not have the failure that stranded type annotations elsewhere in this tree. These exist to
 // pin that: a return inside a typed function, a generic one, and a method still reports and the
 // repair leaves every annotation untouched.
-func TestNoUselessReturnTypeScriptShapes(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnTypeScriptShapes(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -289,14 +289,14 @@ func TestNoUselessReturnTypeScriptShapes(t *testing.T) {
 			"function foo(a?: number): void { bar(a);  }"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// Typed because an annotated function is exactly where the rule asks the checker
 			// whether the compiler needs the return. See TestNoUselessReturnKeepsAReturnTheCompilerRequires.
 			// The typed harness writes the fixture with a trailing newline, which the repair keeps.
-			result := rule_testing.RunTyped(t, NoUselessReturn, "file.ts", testCase.source)
-			rule_testing.ExpectFindings(t, result, "unnecessaryReturn")
-			rule_testing.ExpectFixedSource(t, result, testCase.wantFixed+"\n")
+			result := rule_testing.RunTyped(test, NoUselessReturn, "file.ts", testCase.source)
+			rule_testing.ExpectFindings(test, result, "unnecessaryReturn")
+			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed+"\n")
 		})
 	}
 }
@@ -307,8 +307,8 @@ func TestNoUselessReturnTypeScriptShapes(t *testing.T) {
 //
 // Every expectation here was compiled with the return deleted rather than predicted: each silent row
 // fails with TS2355 or TS2378, and each reporting row compiles.
-func TestNoUselessReturnKeepsAReturnTheCompilerRequires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnKeepsAReturnTheCompilerRequires(test *testing.T) {
+	test.Parallel()
 
 	const prelude = "type DictionaryType<T> = Record<string, T>;\ntype Nothing = void;\n" +
 		"declare const condition: boolean;\ndeclare function bar(): void;\n"
@@ -328,9 +328,9 @@ func TestNoUselessReturnKeepsAReturnTheCompilerRequires(t *testing.T) {
 			"export function f(): string | undefined { const g = () => { return 'x'; }; g(); return; }\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoUselessReturn, "file.ts", prelude+testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUselessReturn, "file.ts", prelude+testCase.source))
 		})
 	}
 
@@ -347,9 +347,9 @@ func TestNoUselessReturnKeepsAReturnTheCompilerRequires(t *testing.T) {
 			"export function f(): string | undefined { if (condition) { return 'x'; } bar(); return; }\n"},
 	}
 	for _, testCase := range reporting {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoUselessReturn, "file.ts", prelude+testCase.source),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUselessReturn, "file.ts", prelude+testCase.source),
 				"unnecessaryReturn")
 		})
 	}
@@ -363,8 +363,8 @@ func TestNoUselessReturnKeepsAReturnTheCompilerRequires(t *testing.T) {
 // early exit followed by more work inside the try, which is the ordinary shape of guarded code:
 // before this was corrected the rule reported 51 such sites across 33 files on this tree, and every
 // one was a false positive. Each row measured against the installed build at 10.8.1.
-func TestNoUselessReturnTryBoundary(t *testing.T) {
-	t.Parallel()
+func TestNoUselessReturnTryBoundary(test *testing.T) {
+	test.Parallel()
 
 	clean := []struct {
 		name   string
@@ -382,9 +382,9 @@ func TestNoUselessReturnTryBoundary(t *testing.T) {
 			"function f() { try { const a = g(); if (a === b) { return; } write(a); } catch (e) { log(e); } }"},
 	}
 	for _, testCase := range clean {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUselessReturn, "file.ts", testCase.source))
 		})
 	}
 
@@ -397,10 +397,10 @@ func TestNoUselessReturnTryBoundary(t *testing.T) {
 		{"nothingAfterTheTry", "function f() { try { bar(); return; } catch (e) {} }"},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoUselessReturn, "file.ts", testCase.source), "unnecessaryReturn")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoUselessReturn, "file.ts", testCase.source), "unnecessaryReturn")
 		})
 	}
 }

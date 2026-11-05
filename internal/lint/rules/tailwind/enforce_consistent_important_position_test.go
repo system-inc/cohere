@@ -15,14 +15,14 @@ import (
 // string, so this rule asks nothing of the design system and declares no ProgramReads. The proof it
 // needs none is `unknown class carries the marker` below, which reports on a class no theme
 // defines.
-func runImportantPositionFixture(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.Run(t, EnforceConsistentImportantPosition, "Component.tsx", source)
+func runImportantPositionFixture(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.Run(test, EnforceConsistentImportantPosition, "Component.tsx", source)
 }
 
 // TestEnforceConsistentImportantPositionReports covers what upstream reports.
-func TestEnforceConsistentImportantPositionReports(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentImportantPositionReports(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -72,16 +72,16 @@ func TestEnforceConsistentImportantPositionReports(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runImportantPositionFixture(t, testCase.source), "importantPosition")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runImportantPositionFixture(test, testCase.source), "importantPosition")
 		})
 	}
 }
 
 // TestEnforceConsistentImportantPositionStaysSilent covers what upstream leaves alone.
-func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentImportantPositionStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -123,9 +123,9 @@ func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runImportantPositionFixture(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runImportantPositionFixture(test, testCase.source))
 		})
 	}
 }
@@ -134,32 +134,32 @@ func TestEnforceConsistentImportantPositionStaysSilent(t *testing.T) {
 //
 // The option exists because a repository mid-migration wants to name its target rather than have
 // one read off its node_modules. Under `legacy` every expectation above inverts.
-func TestEnforceConsistentImportantPositionLegacy(t *testing.T) {
-	t.Parallel()
+func TestEnforceConsistentImportantPositionLegacy(test *testing.T) {
+	test.Parallel()
 	legacy := EnforceConsistentImportantPositionOptions{Position: importantPositionLegacy}
 
-	reported := rule_testing.RunWithOptions(t, EnforceConsistentImportantPosition, "Component.tsx",
+	reported := rule_testing.RunWithOptions(test, EnforceConsistentImportantPosition, "Component.tsx",
 		`const element = <div className="text-red-500!" />;`, legacy)
-	rule_testing.ExpectFindings(t, reported, "importantPosition")
+	rule_testing.ExpectFindings(test, reported, "importantPosition")
 
-	silent := rule_testing.RunWithOptions(t, EnforceConsistentImportantPosition, "Component.tsx",
+	silent := rule_testing.RunWithOptions(test, EnforceConsistentImportantPosition, "Component.tsx",
 		`const element = <div className="!text-red-500" />;`, legacy)
-	rule_testing.ExpectClean(t, silent)
+	rule_testing.ExpectClean(test, silent)
 }
 
 // TestEnforceConsistentImportantPositionNamesBothSpellings pins the message content.
-func TestEnforceConsistentImportantPositionNamesBothSpellings(t *testing.T) {
-	t.Parallel()
-	result := runImportantPositionFixture(t, `const element = <div className="hover:!flex" />;`)
-	rule_testing.ExpectFindings(t, result, "importantPosition")
+func TestEnforceConsistentImportantPositionNamesBothSpellings(test *testing.T) {
+	test.Parallel()
+	result := runImportantPositionFixture(test, `const element = <div className="hover:!flex" />;`)
+	rule_testing.ExpectFindings(test, result, "importantPosition")
 
 	if len(result.Diagnostics) == 0 {
-		t.Fatal("expected a finding")
+		test.Fatal("expected a finding")
 	}
 	message := result.Diagnostics[0].Message.Description
 	for _, want := range []string{"hover:!flex", "hover:flex!"} {
 		if !strings.Contains(message, want) {
-			t.Errorf("the message does not name %q: %s", want, message)
+			test.Errorf("the message does not name %q: %s", want, message)
 		}
 	}
 }

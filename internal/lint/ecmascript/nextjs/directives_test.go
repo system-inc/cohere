@@ -10,8 +10,8 @@ import (
 
 // parseSource builds a source file the way the harness does, so the predicate is tested against a
 // real parse rather than a hand-built node.
-func parseSource(t *testing.T, sourceText string) *ast.SourceFile {
-	t.Helper()
+func parseSource(test *testing.T, sourceText string) *ast.SourceFile {
+	test.Helper()
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/repository/app/Component.tsx",
 		PathKey:  "/repository/app/Component.tsx",
@@ -24,8 +24,8 @@ func parseSource(t *testing.T, sourceText string) *ast.SourceFile {
 // three cases below. Only the walk knows that a prologue ends at the first statement that is not a
 // directive, and oxc is silent on all three. That is the defect this function exists to prevent, so
 // it is asserted here rather than only through a rule fixture.
-func TestHasFileDirective(t *testing.T) {
-	t.Parallel()
+func TestHasFileDirective(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name       string
 		sourceText string
@@ -47,32 +47,32 @@ func TestHasFileDirective(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			got := HasFileDirective(parseSource(t, testCase.sourceText), "use client")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			got := HasFileDirective(parseSource(test, testCase.sourceText), "use client")
 			if got != testCase.want {
-				t.Errorf("HasFileDirective = %v, want %v", got, testCase.want)
+				test.Errorf("HasFileDirective = %v, want %v", got, testCase.want)
 			}
 		})
 	}
 }
 
 // A nil source file answers false rather than panicking, since a rule may run before a parse.
-func TestHasFileDirectiveToleratesNil(t *testing.T) {
-	t.Parallel()
+func TestHasFileDirectiveToleratesNil(test *testing.T) {
+	test.Parallel()
 	if HasFileDirective(nil, "use client") {
-		t.Error("a nil source file must answer false")
+		test.Error("a nil source file must answer false")
 	}
 }
 
 // The directive argument is honoured rather than hardcoded, so `use server` works too.
-func TestHasFileDirectiveReadsTheGivenDirective(t *testing.T) {
-	t.Parallel()
-	sourceFile := parseSource(t, "\"use server\"\nexport const x = 1\n")
+func TestHasFileDirectiveReadsTheGivenDirective(test *testing.T) {
+	test.Parallel()
+	sourceFile := parseSource(test, "\"use server\"\nexport const x = 1\n")
 	if !HasFileDirective(sourceFile, "use server") {
-		t.Error("use server must be found when asked for")
+		test.Error("use server must be found when asked for")
 	}
 	if HasFileDirective(sourceFile, "use client") {
-		t.Error("use client must not be found in a use server file")
+		test.Error("use client must not be found in a use server file")
 	}
 }

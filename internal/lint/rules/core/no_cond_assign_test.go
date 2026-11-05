@@ -16,8 +16,8 @@ var exceptParensOptions = NoCondAssignOptions(NoCondAssignExceptParens)
 
 // Fires, default mode. Every case here is upstream's `fail` list carrying `None` for options,
 // meaning the default `except-parens`.
-func TestNoCondAssignFiresUnderExceptParens(t *testing.T) {
-	t.Parallel()
+func TestNoCondAssignFiresUnderExceptParens(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -40,10 +40,10 @@ func TestNoCondAssignFiresUnderExceptParens(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, exceptParensOptions)
-			rule_testing.ExpectFindings(t, result, "condAssign")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, exceptParensOptions)
+			rule_testing.ExpectFindings(test, result, "condAssign")
 		})
 	}
 }
@@ -53,8 +53,8 @@ func TestNoCondAssignFiresUnderExceptParens(t *testing.T) {
 // Nine of these report TWICE upstream, at a byte-identical span, because its statement branch and
 // its assignment branch both fire on a bare assignment in a test position. This asserts one finding
 // each. The divergence is deliberate and is argued at the rule.
-func TestNoCondAssignFiresUnderAlways(t *testing.T) {
-	t.Parallel()
+func TestNoCondAssignFiresUnderAlways(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -83,17 +83,17 @@ func TestNoCondAssignFiresUnderAlways(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, alwaysOptions)
-			rule_testing.ExpectFindings(t, result, "condAssign")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, alwaysOptions)
+			rule_testing.ExpectFindings(test, result, "condAssign")
 		})
 	}
 }
 
 // Stays silent. Upstream's whole `pass` list, each with the mode it was written under.
-func TestNoCondAssignStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoCondAssignStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -152,61 +152,61 @@ func TestNoCondAssignStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // Cases upstream does not cover, each here for a reason stated at the case.
-func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
-	t.Run("no options at all falls back to except-parens", func(t *testing.T) {
-		t.Parallel()
+	test.Run("no options at all falls back to except-parens", func(test *testing.T) {
+		test.Parallel()
 		// The registry hands a rule its decoded options, and a rule configured with a bare severity
 		// gets nothing at all. Upstream's corpus always supplies a mode, so nothing there pins what
 		// happens when the config says only `"error"`. The default has to be the permissive one, or
 		// enabling the rule the ordinary way silently turns on the strict mode.
-		result := rule_testing.Run(t, NoCondAssign, condAssignFile, "if ((a = b));")
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.Run(test, NoCondAssign, condAssignFile, "if ((a = b));")
+		rule_testing.ExpectClean(test, result)
 
-		result = rule_testing.Run(t, NoCondAssign, condAssignFile, "if (a = b);")
-		rule_testing.ExpectFindings(t, result, "condAssign")
+		result = rule_testing.Run(test, NoCondAssign, condAssignFile, "if (a = b);")
+		rule_testing.ExpectFindings(test, result, "condAssign")
 	})
 
-	t.Run("an unrecognized mode string is treated as the default", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an unrecognized mode string is treated as the default", func(test *testing.T) {
+		test.Parallel()
 		// A typo in the config must not silently escalate to the strict mode. It relaxes to the
 		// documented default instead, which is the same direction the decoder fails in.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, "if ((a = b));", NoCondAssignOptions("alwyas"))
-		rule_testing.ExpectClean(t, result)
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, "if ((a = b));", NoCondAssignOptions("alwyas"))
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("logical assignment operators in a test position", func(t *testing.T) {
-		t.Parallel()
+	test.Run("logical assignment operators in a test position", func(test *testing.T) {
+		test.Parallel()
 		// `&&=` and `??=` are assignments the ES2021 grammar added, and a rule matching only `=`
 		// and the arithmetic compounds misses them. Upstream's corpus predates them.
 		for _, source := range []string{"if (a ||= b) { }", "if (a &&= b) { }", "if (a ??= b) { }"} {
-			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, source, exceptParensOptions)
-			rule_testing.ExpectFindings(t, result, "condAssign")
+			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, source, exceptParensOptions)
+			rule_testing.ExpectFindings(test, result, "condAssign")
 		}
 	})
 
-	t.Run("a nested conditional reports each assignment once", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a nested conditional reports each assignment once", func(test *testing.T) {
+		test.Parallel()
 		// Two assignments in one test position. A rule reporting per statement rather than per
 		// assignment finds one of these; a rule that walks ancestors without stopping finds one of
 		// them twice. This is the case that separates those two defects.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"if ((a = b) || (c = d)) { }", alwaysOptions)
-		rule_testing.ExpectFindings(t, result, "condAssign", "condAssign")
+		rule_testing.ExpectFindings(test, result, "condAssign", "condAssign")
 	})
 
-	t.Run("a for initializer is not the test, even when the test also assigns", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a for initializer is not the test, even when the test also assigns", func(test *testing.T) {
+		test.Parallel()
 		// Found by a surviving mutant. Dropping the start bound of the containment check turns the
 		// `for` initializer into a second finding, because the initializer ENDS before the test
 		// ends and so satisfies the end bound on its own.
@@ -216,34 +216,34 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// not the start bound is checked. It takes an assignment in BOTH positions to separate them,
 		// and the finding must land on the test's assignment rather than the initializer's.
 		const source = "for (x = 0; y = 1; z++) { }"
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, source, alwaysOptions)
-		rule_testing.ExpectFindings(t, result, "condAssign")
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, source, alwaysOptions)
+		rule_testing.ExpectFindings(test, result, "condAssign")
 		reported := result.Diagnostics[0].Range.Pos()
 		if want := 14; reported != want {
-			t.Fatalf("the finding starts at offset %d, wanted %d (the test's operator, not the initializer's)", reported, want)
+			test.Fatalf("the finding starts at offset %d, wanted %d (the test's operator, not the initializer's)", reported, want)
 		}
 	})
 
-	t.Run("a for initializer assigning into a parenthesized value", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a for initializer assigning into a parenthesized value", func(test *testing.T) {
+		test.Parallel()
 		// The same bound, reached a different way: here the initializer NESTS an assignment, so a
 		// rule missing the start bound reports two findings on a loop whose test assigns nothing.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"for (a = (b = 1); c; d) { }", alwaysOptions)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("an else-if test is checked", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an else-if test is checked", func(test *testing.T) {
+		test.Parallel()
 		// The else branch of an if is another IfStatement, so this passes only if the listener sees
 		// nested statements rather than top-level ones.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"if (a) { } else if (b = c) { }", exceptParensOptions)
-		rule_testing.ExpectFindings(t, result, "condAssign")
+		rule_testing.ExpectFindings(test, result, "condAssign")
 	})
 
-	t.Run("a getter body in a test position stops the ancestor walk", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a getter body in a test position stops the ancestor walk", func(test *testing.T) {
+		test.Parallel()
 		// Found by a surviving mutant, and the only input that distinguishes the Block stop from
 		// nothing at all. An object literal sitting in an `if` test is truthy and its getter never
 		// runs during the test, so the assignment inside it is a body assignment.
@@ -251,37 +251,37 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 		// Upstream's corpus covers the function-expression and arrow forms of this and not the
 		// accessor form. Its own stop set names Function and ArrowFunctionExpression, so a port
 		// naming only those two would report here; the Block is what actually stops it.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"if ({ get p(){ a = 1; return 1; } }) { }", alwaysOptions)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("an arrow with an expression body stops the ancestor walk", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an arrow with an expression body stops the ancestor walk", func(test *testing.T) {
+		test.Parallel()
 		// The one function form with no Block to stop at, which is why ArrowFunction is in the stop
 		// set and the four other function kinds are not.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"if ((() => a = 1)()) { }", alwaysOptions)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("an object method body in a test position", func(t *testing.T) {
-		t.Parallel()
+	test.Run("an object method body in a test position", func(test *testing.T) {
+		test.Parallel()
 		// Same shape as the getter, reached through an ordinary method. Stopped by the Block rather
 		// than by any method-specific case.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"if ({ m(){ a = 1; } }) { }", alwaysOptions)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 
-	t.Run("a class body stops the ancestor walk", func(t *testing.T) {
-		t.Parallel()
+	test.Run("a class body stops the ancestor walk", func(test *testing.T) {
+		test.Parallel()
 		// Upstream stops at Function, ArrowFunction, Program, and BlockStatement. A method body is
 		// a BlockStatement so it stops, but this pins that a whole class expression sitting in a
 		// test position does not leak its assignments into the condition.
-		result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile,
+		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile,
 			"if (class { m() { let a; a = 1; return a; } }) { }", alwaysOptions)
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	})
 }
 
@@ -290,8 +290,8 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(t *testing.T) {
 // `ExpectFindings` asserts ids and count and nothing else, so a rule reporting the whole assignment
 // rather than just its operator passes every fixture above. Upstream points at the operator token
 // specifically, and the two differ by the whole left operand.
-func TestNoCondAssignReportsTheOperator(t *testing.T) {
-	t.Parallel()
+func TestNoCondAssignReportsTheOperator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -313,15 +313,15 @@ func TestNoCondAssignReportsTheOperator(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.want {
-				t.Fatalf("the finding covers %q, wanted the operator %q", reported, testCase.want)
+				test.Fatalf("the finding covers %q, wanted the operator %q", reported, testCase.want)
 			}
 		})
 	}
@@ -329,16 +329,16 @@ func TestNoCondAssignReportsTheOperator(t *testing.T) {
 
 // The `while (a /* = */ = b) {}` case above pins the comment, and this pins the column upstream
 // snapshots for it, so a span that is right in text but shifted in position still fails.
-func TestNoCondAssignOperatorSpanMatchesUpstreamOffset(t *testing.T) {
-	t.Parallel()
+func TestNoCondAssignOperatorSpanMatchesUpstreamOffset(test *testing.T) {
+	test.Parallel()
 
 	const source = "while (a /* = */ = b) {}"
-	result := rule_testing.RunWithOptions(t, NoCondAssign, condAssignFile, source, alwaysOptions)
+	result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, source, alwaysOptions)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 	}
 	// Upstream's snapshot reports column 18, one-based, which is offset 17 here.
 	if got := result.Diagnostics[0].Range.Pos(); got != 17 {
-		t.Fatalf("the finding starts at offset %d, wanted 17 to match the upstream column", got)
+		test.Fatalf("the finding starts at offset %d, wanted 17 to match the upstream column", got)
 	}
 }

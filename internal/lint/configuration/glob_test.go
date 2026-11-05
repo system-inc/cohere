@@ -45,12 +45,12 @@ func globProbePaths(patterns []string) []string {
  * project would extend it, and each path's ignore verdict and override match is compared with what the
  * reference gives pattern by pattern.
  */
-func TestCompiledGlobsAnswerAsMatchDid(t *testing.T) {
-	t.Parallel()
+func TestCompiledGlobsAnswerAsMatchDid(test *testing.T) {
+	test.Parallel()
 	forms := 0
 	for _, name := range SetNames() {
-		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "` + name + `"}`})
-		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "` + name + `"}`})
+		loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 
 		patterns := append([]string{}, loaded.IgnorePatterns...)
 		for _, override := range loaded.Overrides {
@@ -68,7 +68,7 @@ func TestCompiledGlobsAnswerAsMatchDid(t *testing.T) {
 			}
 			resolved := loaded.Resolve(filepath.Join(directory, path))
 			if resolved.Ignored != (wantIgnoredBy != "") || resolved.IgnoredBy != wantIgnoredBy {
-				t.Errorf("%s: %q resolved ignored=%v by %q, want by %q", name, path, resolved.Ignored, resolved.IgnoredBy, wantIgnoredBy)
+				test.Errorf("%s: %q resolved ignored=%v by %q, want by %q", name, path, resolved.Ignored, resolved.IgnoredBy, wantIgnoredBy)
 			}
 			if resolved.Ignored {
 				continue
@@ -92,25 +92,25 @@ func TestCompiledGlobsAnswerAsMatchDid(t *testing.T) {
 				}
 			}
 			if strings.Join(got, ",") != strings.Join(want, ",") {
-				t.Errorf("%s: %q matched overrides %v, want %v", name, path, got, want)
+				test.Errorf("%s: %q matched overrides %v, want %v", name, path, got, want)
 			}
 			for _, pattern := range patterns {
 				if Match(pattern, path) != referenceMatch(pattern, path) {
-					t.Errorf("Match(%q, %q) disagrees with the reference", pattern, path)
+					test.Errorf("Match(%q, %q) disagrees with the reference", pattern, path)
 				}
 			}
 		}
 	}
 	// The control: the sets carry glob forms at all, so the loop above compared something.
 	if forms == 0 {
-		t.Fatal("no set carries an ignore pattern or an override, so nothing was compared")
+		test.Fatal("no set carries an ignore pattern or an override, so nothing was compared")
 	}
 }
 
 // A brace form and a doubled star are the two shapes most easily compiled wrong, so they are pinned on
 // their own beside the sets' forms, through MatchAny's single split.
-func TestCompiledGlobFormsMatchAsBefore(t *testing.T) {
-	t.Parallel()
+func TestCompiledGlobFormsMatchAsBefore(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		pattern string
 		paths   []string
@@ -125,7 +125,7 @@ func TestCompiledGlobFormsMatchAsBefore(t *testing.T) {
 		for _, path := range testCase.paths {
 			want := referenceMatch(testCase.pattern, path)
 			if got := MatchAny([]string{"never/**", testCase.pattern}, path); got != want {
-				t.Errorf("MatchAny(%q, %q) = %v, want %v", testCase.pattern, path, got, want)
+				test.Errorf("MatchAny(%q, %q) = %v, want %v", testCase.pattern, path, got, want)
 			}
 		}
 	}

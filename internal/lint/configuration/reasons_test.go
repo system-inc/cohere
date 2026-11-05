@@ -10,23 +10,23 @@ import (
 // `reasons`, and the list is held to the guard `departures` has, so a stale entry cannot pass as a
 // decision.
 
-func TestAReasonedOffLoadsAndIsRecorded(t *testing.T) {
-	t.Parallel()
-	directory := writeConfigs(t, map[string]string{
+func TestAReasonedOffLoadsAndIsRecorded(test *testing.T) {
+	test.Parallel()
+	directory := writeConfigs(test, map[string]string{
 		"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "  style, with no bug class behind it  "}}`,
 	})
-	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+	loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 	offReason, recorded := loaded.OffReasons["no-continue"]
 	if !recorded || offReason.Reason != "style, with no bug class behind it" {
-		t.Fatalf("recorded %+v (%v), want the file's sentence, trimmed", offReason, recorded)
+		test.Fatalf("recorded %+v (%v), want the file's sentence, trimmed", offReason, recorded)
 	}
 	if offReason.File != filepath.Join(directory, "CohereSettings.json") {
-		t.Errorf("the reason names %s, want the file that gave it", offReason.File)
+		test.Errorf("the reason names %s, want the file that gave it", offReason.File)
 	}
 }
 
-func TestAReasonThatExplainsNothingIsRefused(t *testing.T) {
-	t.Parallel()
+func TestAReasonThatExplainsNothingIsRefused(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		name  string
 		files map[string]string
@@ -67,10 +67,10 @@ func TestAReasonThatExplainsNothingIsRefused(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			directory := writeConfigs(t, testCase.files)
-			refusedWith(t, filepath.Join(directory, "CohereSettings.json"), testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			directory := writeConfigs(test, testCase.files)
+			refusedWith(test, filepath.Join(directory, "CohereSettings.json"), testCase.want)
 		})
 	}
 }
@@ -78,26 +78,26 @@ func TestAReasonThatExplainsNothingIsRefused(t *testing.T) {
 // A reason follows its rule up the chain: a project inheriting a reasoned off inherits the reason, a
 // restated off keeps it, an off that departs from an inherited ruling carries the departure's reason,
 // and a project turning the rule back on drops it.
-func TestAReasonFollowsTheRuleUpTheChain(t *testing.T) {
-	t.Parallel()
+func TestAReasonFollowsTheRuleUpTheChain(test *testing.T) {
+	test.Parallel()
 	base := `{"rules": {"no-continue": "off", "no-plusplus": "off", "no-var": "error"},
 		"reasons": {"no-continue": "style", "no-plusplus": "style too"}}`
-	directory := writeConfigs(t, map[string]string{
+	directory := writeConfigs(test, map[string]string{
 		"base.json": base,
 		"CohereSettings.json": `{"extends": "./base.json",
 			"rules": {"no-plusplus": "error", "no-continue": "off", "no-var": "off"},
 			"departures": {"no-plusplus": "this project counts by hand", "no-var": "a legacy script keeps var"}}`,
 	})
-	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+	loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 
 	if offReason := loaded.OffReasons["no-continue"]; offReason.Reason != "style" || offReason.File != filepath.Join(directory, "base.json") {
-		t.Errorf("a restated off recorded %+v, want the base's reason and file", offReason)
+		test.Errorf("a restated off recorded %+v, want the base's reason and file", offReason)
 	}
 	if offReason := loaded.OffReasons["no-var"]; offReason.Reason != "a legacy script keeps var" {
-		t.Errorf("an off departing from an inherited error recorded %+v, want the departure's reason", offReason)
+		test.Errorf("an off departing from an inherited error recorded %+v, want the departure's reason", offReason)
 	}
 	if offReason, recorded := loaded.OffReasons["no-plusplus"]; recorded {
-		t.Errorf("a rule the project turned back on kept a reason for being off: %+v", offReason)
+		test.Errorf("a rule the project turned back on kept a reason for being off: %+v", offReason)
 	}
 }
 
@@ -107,58 +107,58 @@ func TestAReasonFollowsTheRuleUpTheChain(t *testing.T) {
 // its own or its departure's, loads.
 // Not parallel: it swaps the package's setFiles for a stand-in tier set through withOurTierForTest
 // (withSetFiles), which every test that reads a set would see.
-func TestAnOffWithNoReasonIsRefusedAndAReasonedOneLoads(t *testing.T) {
-	withOurTierForTest(t)
-	t.Run("an unreasoned off in the project's own file is refused", func(t *testing.T) {
-		t.Parallel()
-		directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:system-inc/test", "rules": {"no-continue": "off"}}`})
-		refusedWith(t, filepath.Join(directory, "CohereSettings.json"),
+func TestAnOffWithNoReasonIsRefusedAndAReasonedOneLoads(test *testing.T) {
+	withOurTierForTest(test)
+	test.Run("an unreasoned off in the project's own file is refused", func(test *testing.T) {
+		test.Parallel()
+		directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "cohere:system-inc/test", "rules": {"no-continue": "off"}}`})
+		refusedWith(test, filepath.Join(directory, "CohereSettings.json"),
 			`turns off "no-continue" in `+filepath.Join(directory, "CohereSettings.json")+` with no reason`)
 	})
 
-	t.Run("an unreasoned off in a base is refused, naming the base", func(t *testing.T) {
-		t.Parallel()
-		directory := writeConfigs(t, map[string]string{
+	test.Run("an unreasoned off in a base is refused, naming the base", func(test *testing.T) {
+		test.Parallel()
+		directory := writeConfigs(test, map[string]string{
 			"base.json":           `{"extends": "cohere:system-inc/test", "rules": {"no-continue": "off"}}`,
 			"CohereSettings.json": `{"extends": "./base.json"}`,
 		})
-		refusedWith(t, filepath.Join(directory, "CohereSettings.json"),
+		refusedWith(test, filepath.Join(directory, "CohereSettings.json"),
 			`turns off "no-continue" in `+filepath.Join(directory, "base.json")+` with no reason`)
 	})
 
-	t.Run("the same off with a reason loads", func(t *testing.T) {
-		t.Parallel()
-		directory := writeConfigs(t, map[string]string{
+	test.Run("the same off with a reason loads", func(test *testing.T) {
+		test.Parallel()
+		directory := writeConfigs(test, map[string]string{
 			"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "style"}}`,
 		})
-		loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 		if !loaded.TurnsOffAtTopLevel("no-continue") {
-			t.Error("TurnsOffAtTopLevel did not see the off")
+			test.Error("TurnsOffAtTopLevel did not see the off")
 		}
 	})
 
-	t.Run("an off its departure explains loads", func(t *testing.T) {
-		t.Parallel()
-		directory := writeConfigs(t, map[string]string{
+	test.Run("an off its departure explains loads", func(test *testing.T) {
+		test.Parallel()
+		directory := writeConfigs(test, map[string]string{
 			"base.json": `{"rules": {"no-var": "error"}}`,
 			"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-var": "off"},
 				"departures": {"no-var": "a legacy script keeps var"}}`,
 		})
-		loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 	})
 }
 
 // withOurTierForTest carries an empty tier set, `cohere:system-inc/test`, in place of the embedded sets,
 // so a test's chain can be one of ours by extending it, and be held to reasons.
-func withOurTierForTest(t *testing.T) {
-	t.Helper()
-	withSetFiles(t, map[string]string{"system-inc/test": `{}`})
+func withOurTierForTest(test *testing.T) {
+	test.Helper()
+	withSetFiles(test, map[string]string{"system-inc/test": `{}`})
 }
 
 // Outside our tiers a project goes its own way (#bfxz13m): an off or a departure in its own files needs
 // no reason, and loads. Each case is a refusal above, made again in a chain that reaches no tier set.
-func TestOutsideOurTiersAProjectsOwnOffsAndDeparturesNeedNoReason(t *testing.T) {
-	t.Parallel()
+func TestOutsideOurTiersAProjectsOwnOffsAndDeparturesNeedNoReason(test *testing.T) {
+	test.Parallel()
 	cases := map[string]map[string]string{
 		"an unreasoned off in the project's own file": {"CohereSettings.json": `{"rules": {"no-continue": "off"}}`},
 		"an unreasoned off in a base": {
@@ -175,21 +175,21 @@ func TestOutsideOurTiersAProjectsOwnOffsAndDeparturesNeedNoReason(t *testing.T) 
 		},
 	}
 	for name, files := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			directory := writeConfigs(t, files)
-			loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			directory := writeConfigs(test, files)
+			loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 			if len(loaded.Departures) != 0 {
-				t.Errorf("a departure with no reason was recorded as one: %+v", loaded.Departures)
+				test.Errorf("a departure with no reason was recorded as one: %+v", loaded.Departures)
 			}
 		})
 	}
 
 	// The unreasoned off is not given a reason it never had: coverage counts it as an off with no reason.
-	directory := writeConfigs(t, cases["an undeclared departure"])
-	loaded := loadOrFail(t, filepath.Join(directory, "CohereSettings.json"))
+	directory := writeConfigs(test, cases["an undeclared departure"])
+	loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 	if _, reasoned := loaded.OffReasonFor("no-implied-eval"); reasoned || !loaded.TurnsOffAtTopLevel("no-implied-eval") {
-		t.Error("an outsider's unreasoned off must load as an off with no reason")
+		test.Error("an outsider's unreasoned off must load as an off with no reason")
 	}
 }
 
@@ -197,10 +197,10 @@ func TestOutsideOurTiersAProjectsOwnOffsAndDeparturesNeedNoReason(t *testing.T) 
 // chain that reaches no tier set.
 // Not parallel: it swaps the package's setFiles for its own sets through withSetFiles, which every test
 // that reads a set would see.
-func TestASetsOwnUnreasonedOffIsRefusedInAnyChain(t *testing.T) {
-	withSetFiles(t, map[string]string{"typescript": `{"rules": {"no-continue": "off"}}`})
-	directory := writeConfigs(t, map[string]string{"CohereSettings.json": `{"extends": "cohere:typescript"}`})
-	refusedWith(t, filepath.Join(directory, "CohereSettings.json"), `turns off "no-continue" in cohere:typescript with no reason`)
+func TestASetsOwnUnreasonedOffIsRefusedInAnyChain(test *testing.T) {
+	withSetFiles(test, map[string]string{"typescript": `{"rules": {"no-continue": "off"}}`})
+	directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "cohere:typescript"}`})
+	refusedWith(test, filepath.Join(directory, "CohereSettings.json"), `turns off "no-continue" in cohere:typescript with no reason`)
 }
 
 // The loader decides tier membership by InOurTiers over the whole chain, the predicate the format
@@ -208,9 +208,9 @@ func TestASetsOwnUnreasonedOffIsRefusedInAnyChain(t *testing.T) {
 // as one named directly does. The same project with the tier set dropped from the chain loads.
 // Not parallel: it swaps the package's setFiles for a stand-in tier set through withOurTierForTest
 // (withSetFiles), which every test that reads a set would see.
-func TestTierMembershipIsTheWholeChainsAndThePredicateFormatAsks(t *testing.T) {
-	withOurTierForTest(t)
-	inTier := writeConfigs(t, map[string]string{
+func TestTierMembershipIsTheWholeChainsAndThePredicateFormatAsks(test *testing.T) {
+	withOurTierForTest(test)
+	inTier := writeConfigs(test, map[string]string{
 		"middle.json":         `{"extends": "cohere:system-inc/test"}`,
 		"base.json":           `{"extends": "./middle.json"}`,
 		"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-continue": "off"}}`,
@@ -218,14 +218,14 @@ func TestTierMembershipIsTheWholeChainsAndThePredicateFormatAsks(t *testing.T) {
 	path := filepath.Join(inTier, "CohereSettings.json")
 	sources, err := SourcesOf(path)
 	if err != nil || !InOurTiers(sources) {
-		t.Fatalf("a nested tier set must make the chain ours by the shared predicate: %v %v", sources, err)
+		test.Fatalf("a nested tier set must make the chain ours by the shared predicate: %v %v", sources, err)
 	}
-	refusedWith(t, path, `turns off "no-continue" in `+path+` with no reason`)
+	refusedWith(test, path, `turns off "no-continue" in `+path+` with no reason`)
 
-	outside := writeConfigs(t, map[string]string{
+	outside := writeConfigs(test, map[string]string{
 		"middle.json":         `{}`,
 		"base.json":           `{"extends": "./middle.json"}`,
 		"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-continue": "off"}}`,
 	})
-	loadOrFail(t, filepath.Join(outside, "CohereSettings.json"))
+	loadOrFail(test, filepath.Join(outside, "CohereSettings.json"))
 }

@@ -84,8 +84,8 @@ func concurrencyNoCheckThenWriteSource(lines ...string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func concurrencyNoCheckThenWriteRun(t *testing.T, nodeTypes string, sourceText string) rule_testing.Result {
-	t.Helper()
+func concurrencyNoCheckThenWriteRun(test *testing.T, nodeTypes string, sourceText string) rule_testing.Result {
+	test.Helper()
 	files := map[string]string{
 		"types/node.d.ts":               nodeTypes,
 		concurrencyNoCheckThenWriteFile: sourceText,
@@ -93,28 +93,28 @@ func concurrencyNoCheckThenWriteRun(t *testing.T, nodeTypes string, sourceText s
 	for name, contents := range concurrencyNoCheckThenWriteSharpPackage {
 		files[name] = contents
 	}
-	return rule_testing.RunTypedFiles(t, ConcurrencyNoCheckThenWrite, files, concurrencyNoCheckThenWriteFile)
+	return rule_testing.RunTypedFiles(test, ConcurrencyNoCheckThenWrite, files, concurrencyNoCheckThenWriteFile)
 }
 
 // concurrencyNoCheckThenWriteExpect asserts the findings point at exactly these checks, in order,
 // with the message naming the write.
-func concurrencyNoCheckThenWriteExpect(t *testing.T, result rule_testing.Result, sourceText string, wantSpans []string, wantWrite string) {
-	t.Helper()
+func concurrencyNoCheckThenWriteExpect(test *testing.T, result rule_testing.Result, sourceText string, wantSpans []string, wantWrite string) {
+	test.Helper()
 	wantIds := make([]string, 0, len(wantSpans))
 	for range wantSpans {
 		wantIds = append(wantIds, concurrencyNoCheckThenWriteId)
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	for index, diagnostic := range result.Diagnostics {
 		reported := sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 		if reported != wantSpans[index] {
-			t.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported, wantSpans[index])
+			test.Fatalf("finding %d points at\n%s\nwant\n%s", index, reported, wantSpans[index])
 		}
 		if diagnostic.Message.Description != concurrencyNoCheckThenWriteMessage(wantWrite).Description {
-			t.Fatalf("message is %q, want the one naming `%s`", diagnostic.Message.Description, wantWrite)
+			test.Fatalf("message is %q, want the one naming `%s`", diagnostic.Message.Description, wantWrite)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 }
@@ -408,8 +408,8 @@ func concurrencyNoCheckThenWritePhiSocialLibrary(fixed bool) string {
 
 // The real sites, before and after. Each before-shape is one finding on the check; each after-shape,
 // written the way the fix in `IntelligenceMediaGenerationApi.ts` writes it, is silent.
-func TestConcurrencyNoCheckThenWriteRealSites(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteRealSites(test *testing.T) {
+	test.Parallel()
 
 	accessKling := "NodeFileSystemPromises.access(NodePath.join(outputDirectory, `${index}.mp4`))"
 	cases := []struct {
@@ -430,25 +430,25 @@ func TestConcurrencyNoCheckThenWriteRealSites(t *testing.T) {
 			"NodeFileSystem.existsSync(NodePath.join(dayDirectory, `${baseName}.webp`))", "toFile"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, testCase.before)
-			concurrencyNoCheckThenWriteExpect(t, result, testCase.before, []string{testCase.wantSpan}, testCase.wantWrite)
-			rule_testing.ExpectClean(t, concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, testCase.after))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, testCase.before)
+			concurrencyNoCheckThenWriteExpect(test, result, testCase.before, []string{testCase.wantSpan}, testCase.wantWrite)
+			rule_testing.ExpectClean(test, concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, testCase.after))
 		})
 	}
 }
 
 // The two other real shapes: the loop inside a parallel `map` callback, and a `copyFile` write.
-func TestConcurrencyNoCheckThenWriteRealSitesWithoutAFixedCopy(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteRealSitesWithoutAFixedCopy(test *testing.T) {
+	test.Parallel()
 
-	result := concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, concurrencyNoCheckThenWriteKlingImages)
-	concurrencyNoCheckThenWriteExpect(t, result, concurrencyNoCheckThenWriteKlingImages,
+	result := concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, concurrencyNoCheckThenWriteKlingImages)
+	concurrencyNoCheckThenWriteExpect(test, result, concurrencyNoCheckThenWriteKlingImages,
 		[]string{"NodeFileSystemPromises.access(NodePath.join(outputDirectory, `${index}.png`))"}, "writeFile")
 
-	result = concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, concurrencyNoCheckThenWriteOpenAiCommandLine)
-	concurrencyNoCheckThenWriteExpect(t, result, concurrencyNoCheckThenWriteOpenAiCommandLine,
+	result = concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, concurrencyNoCheckThenWriteOpenAiCommandLine)
+	concurrencyNoCheckThenWriteExpect(test, result, concurrencyNoCheckThenWriteOpenAiCommandLine,
 		[]string{"NodeFileSystemPromises.access(NodePath.join(outputDirectory, `${fileIndex}.png`))"}, "copyFile")
 }
 
@@ -467,8 +467,8 @@ func concurrencyNoCheckThenWriteShape(lines ...string) string {
 	}, append(lines, "}")...)...)
 }
 
-func TestConcurrencyNoCheckThenWriteFires(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name      string
@@ -555,19 +555,19 @@ func TestConcurrencyNoCheckThenWriteFires(t *testing.T) {
 		}, "NodeFileSystem.existsSync(NodePath.join(directory, `${index}.png`))", "writeFileSync"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			sourceText := concurrencyNoCheckThenWriteShape(testCase.lines...)
-			result := concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, sourceText)
-			concurrencyNoCheckThenWriteExpect(t, result, sourceText, []string{testCase.wantSpan}, testCase.wantWrite)
+			result := concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, sourceText)
+			concurrencyNoCheckThenWriteExpect(test, result, sourceText, []string{testCase.wantSpan}, testCase.wantWrite)
 		})
 	}
 }
 
 // `@types/node` 20 declares the API under `fs` and re-exports it as `node:fs`; the same import still
 // resolves to Node's declaration.
-func TestConcurrencyNoCheckThenWriteFiresOnOlderNodeTypes(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteFiresOnOlderNodeTypes(test *testing.T) {
+	test.Parallel()
 
 	sourceText := concurrencyNoCheckThenWriteSource(
 		"import * as NodeFileSystem from 'node:fs';",
@@ -578,13 +578,13 @@ func TestConcurrencyNoCheckThenWriteFiresOnOlderNodeTypes(t *testing.T) {
 		"    NodeFileSystem.writeFileSync(NodePath.join(directory, `${index}.png`), bytes);",
 		"}",
 	)
-	result := concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteOlderNodeTypes, sourceText)
-	concurrencyNoCheckThenWriteExpect(t, result, sourceText,
+	result := concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteOlderNodeTypes, sourceText)
+	concurrencyNoCheckThenWriteExpect(test, result, sourceText,
 		[]string{"NodeFileSystem.existsSync(NodePath.join(directory, `${index}.png`))"}, "writeFileSync")
 }
 
-func TestConcurrencyNoCheckThenWriteStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -748,17 +748,17 @@ func TestConcurrencyNoCheckThenWriteStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, concurrencyNoCheckThenWriteShape(testCase.lines...))
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, concurrencyNoCheckThenWriteShape(testCase.lines...))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // A project's own `existsSync` is not Node's, whatever its name.
-func TestConcurrencyNoCheckThenWriteStaysSilentOnALookalikeCheck(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteStaysSilentOnALookalikeCheck(test *testing.T) {
+	test.Parallel()
 
 	sourceText := concurrencyNoCheckThenWriteSource(
 		"import * as NodeFileSystem from 'node:fs';",
@@ -770,12 +770,12 @@ func TestConcurrencyNoCheckThenWriteStaysSilentOnALookalikeCheck(t *testing.T) {
 		"    NodeFileSystem.writeFileSync(NodePath.join(directory, `${index}.png`), bytes);",
 		"}",
 	)
-	rule_testing.ExpectClean(t, concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, sourceText))
+	rule_testing.ExpectClean(test, concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, sourceText))
 }
 
 // A `toFile` that is not sharp's is not matched, even in a file that imports sharp.
-func TestConcurrencyNoCheckThenWriteStaysSilentOnALookalikeToFile(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteStaysSilentOnALookalikeToFile(test *testing.T) {
+	test.Parallel()
 
 	sourceText := concurrencyNoCheckThenWriteSource(
 		"import * as NodeFileSystem from 'node:fs';",
@@ -789,7 +789,7 @@ func TestConcurrencyNoCheckThenWriteStaysSilentOnALookalikeToFile(t *testing.T) 
 		"    void sharp;",
 		"}",
 	)
-	rule_testing.ExpectClean(t, concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, sourceText))
+	rule_testing.ExpectClean(test, concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, sourceText))
 }
 
 // The real before-file of `persistArtifact`, as it stood before 0f33c3f0, is a missed finding by
@@ -797,8 +797,8 @@ func TestConcurrencyNoCheckThenWriteStaysSilentOnALookalikeToFile(t *testing.T) 
 // changed by anything else holding `input` during the `await` between the check and the write, so the
 // rule cannot prove the two paths equal. It fires once the fields are read into locals (the fixture
 // above). Reported beside the measurement as the gap between the brief's nine sites and eight.
-func TestConcurrencyNoCheckThenWriteMissesPropertyReads(t *testing.T) {
-	t.Parallel()
+func TestConcurrencyNoCheckThenWriteMissesPropertyReads(test *testing.T) {
+	test.Parallel()
 
 	sourceText := concurrencyNoCheckThenWriteSource(
 		"import * as NodeFileSystemPromises from 'node:fs/promises';",
@@ -822,5 +822,5 @@ func TestConcurrencyNoCheckThenWriteMissesPropertyReads(t *testing.T) {
 		"    return outputPath;",
 		"}",
 	)
-	rule_testing.ExpectClean(t, concurrencyNoCheckThenWriteRun(t, concurrencyNoCheckThenWriteNodeTypes, sourceText))
+	rule_testing.ExpectClean(test, concurrencyNoCheckThenWriteRun(test, concurrencyNoCheckThenWriteNodeTypes, sourceText))
 }

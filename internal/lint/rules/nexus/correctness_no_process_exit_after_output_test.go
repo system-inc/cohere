@@ -107,9 +107,9 @@ func correctnessNoProcessExitAfterOutputSource(lines ...string) string {
 	return correctnessNoProcessExitAfterOutputPrelude + strings.Join(lines, "\n") + "\n"
 }
 
-func correctnessNoProcessExitAfterOutputRun(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFiles(t, CorrectnessNoProcessExitAfterOutput, map[string]string{
+func correctnessNoProcessExitAfterOutputRun(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFiles(test, CorrectnessNoProcessExitAfterOutput, map[string]string{
 		correctnessNoProcessExitAfterOutputFile:           sourceText,
 		correctnessNoProcessExitAfterOutputNodeFile:       correctnessNoProcessExitAfterOutputNodeTypes,
 		correctnessNoProcessExitAfterOutputWebConsoleFile: correctnessNoProcessExitAfterOutputWebConsole,
@@ -118,8 +118,8 @@ func correctnessNoProcessExitAfterOutputRun(t *testing.T, sourceText string) rul
 
 // correctnessNoProcessExitAfterOutputExpect asserts the findings, in source order, by the text each
 // one points at. Every finding carries the one message and no fix.
-func correctnessNoProcessExitAfterOutputExpect(t *testing.T, result rule_testing.Result, want []string) {
-	t.Helper()
+func correctnessNoProcessExitAfterOutputExpect(test *testing.T, result rule_testing.Result, want []string) {
+	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
 		return diagnostics[left].Range.Pos() < diagnostics[right].Range.Pos()
@@ -128,17 +128,17 @@ func correctnessNoProcessExitAfterOutputExpect(t *testing.T, result rule_testing
 	for index := range want {
 		wantIds[index] = correctnessNoProcessExitAfterOutputId
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 	text := result.SourceFile.Text()
 	var got []string
 	for _, diagnostic := range diagnostics {
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			t.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
 		}
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Fatalf("findings are %q, want %q", got, want)
+		test.Fatalf("findings are %q, want %q", got, want)
 	}
 }
 
@@ -227,8 +227,8 @@ func correctnessNoProcessExitAfterOutputGodword(fixed bool) string {
 	)
 }
 
-func TestCorrectnessNoProcessExitAfterOutputRealSites(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoProcessExitAfterOutputRealSites(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name   string
@@ -241,19 +241,19 @@ func TestCorrectnessNoProcessExitAfterOutputRealSites(t *testing.T) {
 		{"godwordRequireInteractiveTerminal", correctnessNoProcessExitAfterOutputGodword, []string{"NodeProcess.exit(1)"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name+" as it stands", func(t *testing.T) {
-			t.Parallel()
-			correctnessNoProcessExitAfterOutputExpect(t, correctnessNoProcessExitAfterOutputRun(t, testCase.source(false)), testCase.want)
+		test.Run(testCase.name+" as it stands", func(test *testing.T) {
+			test.Parallel()
+			correctnessNoProcessExitAfterOutputExpect(test, correctnessNoProcessExitAfterOutputRun(test, testCase.source(false)), testCase.want)
 		})
-		t.Run(testCase.name+" fixed", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, correctnessNoProcessExitAfterOutputRun(t, testCase.source(true)))
+		test.Run(testCase.name+" fixed", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, correctnessNoProcessExitAfterOutputRun(test, testCase.source(true)))
 		})
 	}
 }
 
-func TestCorrectnessNoProcessExitAfterOutputFires(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoProcessExitAfterOutputFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -416,16 +416,16 @@ func TestCorrectnessNoProcessExitAfterOutputFires(t *testing.T) {
 		}, []string{"process.exit(1)"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			correctnessNoProcessExitAfterOutputExpect(t,
-				correctnessNoProcessExitAfterOutputRun(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)), testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			correctnessNoProcessExitAfterOutputExpect(test,
+				correctnessNoProcessExitAfterOutputRun(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)), testCase.want)
 		})
 	}
 }
 
-func TestCorrectnessNoProcessExitAfterOutputStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoProcessExitAfterOutputStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name  string
@@ -558,9 +558,9 @@ func TestCorrectnessNoProcessExitAfterOutputStaysSilent(t *testing.T) {
 		}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, correctnessNoProcessExitAfterOutputRun(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, correctnessNoProcessExitAfterOutputRun(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)))
 		})
 	}
 }
@@ -585,9 +585,9 @@ var correctnessNoProcessExitAfterOutputScript = correctnessNoProcessExitAfterOut
 // them, under a tsconfig whose module detection is `auto`. The harness's default forces every file to
 // be a module, which would make the script a module too and leave its function unreachable for a
 // reason other than the one the script row tests.
-func correctnessNoProcessExitAfterOutputRunWithHelpers(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.RunTypedFilesWithSetup(t, CorrectnessNoProcessExitAfterOutput, map[string]string{
+func correctnessNoProcessExitAfterOutputRunWithHelpers(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFilesWithSetup(test, CorrectnessNoProcessExitAfterOutput, map[string]string{
 		correctnessNoProcessExitAfterOutputFile:           sourceText,
 		correctnessNoProcessExitAfterOutputNodeFile:       correctnessNoProcessExitAfterOutputNodeTypes,
 		correctnessNoProcessExitAfterOutputWebConsoleFile: correctnessNoProcessExitAfterOutputWebConsole,
@@ -597,7 +597,7 @@ func correctnessNoProcessExitAfterOutputRunWithHelpers(t *testing.T, sourceText 
 		tsconfig := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
 			`"moduleDetection": "auto", "types": []}, "include": ["**/*.ts"]}`
 		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(tsconfig), 0o644); err != nil {
-			t.Fatalf("writing the tsconfig: %v", err)
+			test.Fatalf("writing the tsconfig: %v", err)
 		}
 	})
 }
@@ -607,8 +607,8 @@ func correctnessNoProcessExitAfterOutputRunWithHelpers(t *testing.T, sourceText 
 // before the call returns. The two hazards the rule missed are modelled first: `showHelp()` then
 // `exit(0)` in AhraCommandLineInterface.ts, and `reportFreshness(...)` reached through `import()` in
 // BackupCommandLineInterface.ts.
-func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(t *testing.T) {
-	t.Parallel()
+func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(test *testing.T) {
+	test.Parallel()
 
 	fires := []struct {
 		name  string
@@ -643,14 +643,14 @@ func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(t *testing.T) {
 		}},
 	}
 	for _, testCase := range fires {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			exit := "process.exit(0)"
 			if strings.Contains(strings.Join(testCase.lines, "\n"), "process.exit(1)") {
 				exit = "process.exit(1)"
 			}
-			correctnessNoProcessExitAfterOutputExpect(t,
-				correctnessNoProcessExitAfterOutputRunWithHelpers(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
+			correctnessNoProcessExitAfterOutputExpect(test,
+				correctnessNoProcessExitAfterOutputRunWithHelpers(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
 				[]string{exit})
 		})
 	}
@@ -697,10 +697,10 @@ func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(t *testing.T) {
 		}, nil},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			correctnessNoProcessExitAfterOutputExpect(t,
-				correctnessNoProcessExitAfterOutputRunWithHelpers(t, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			correctnessNoProcessExitAfterOutputExpect(test,
+				correctnessNoProcessExitAfterOutputRunWithHelpers(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
 				testCase.want)
 		})
 	}

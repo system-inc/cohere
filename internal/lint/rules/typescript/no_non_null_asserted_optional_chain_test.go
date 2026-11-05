@@ -11,8 +11,8 @@ const assertedOptionalChainFile = "/repository/source/Thing.ts"
 // The cases below are the original's own test file plus a run of the real plugin at 8.67.0, which
 // is the only answer key this rule has: the tree cohere gates contains zero non-null assertions, so
 // a clean run over it cannot distinguish a working port from an inert one.
-func TestNoNonNullAssertedOptionalChainFires(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedOptionalChainFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -32,17 +32,17 @@ func TestNoNonNullAssertedOptionalChainFires(t *testing.T) {
 		{"a parenthesized assertion at chain end", "declare const foo: any;\nexport const r = (foo?.bar!);\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.Run(t, NoNonNullAssertedOptionalChain, assertedOptionalChainFile, testCase.sourceText),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.Run(test, NoNonNullAssertedOptionalChain, assertedOptionalChainFile, testCase.sourceText),
 				"noNonNullOptionalChain")
 		})
 	}
 }
 
-func TestNoNonNullAssertedOptionalChainStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedOptionalChainStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -74,10 +74,10 @@ func TestNoNonNullAssertedOptionalChainStaysSilent(t *testing.T) {
 		{"a definite assignment", "export let value!: number;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.Run(t, NoNonNullAssertedOptionalChain, assertedOptionalChainFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.Run(test, NoNonNullAssertedOptionalChain, assertedOptionalChainFile, testCase.sourceText))
 		})
 	}
 }
@@ -97,8 +97,8 @@ func TestNoNonNullAssertedOptionalChainStaysSilent(t *testing.T) {
 // could construct against the range helper failed to compile, and a mutant that does not compile is
 // neither a catch nor a survival, so this gap stood unmeasured rather than cleared until somebody
 // read the test file and saw only ExpectFindings and ExpectClean in it.
-func TestNoNonNullAssertedOptionalChainSuggestsRemovingTheOperator(t *testing.T) {
-	t.Parallel()
+func TestNoNonNullAssertedOptionalChainSuggestsRemovingTheOperator(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -118,23 +118,23 @@ func TestNoNonNullAssertedOptionalChainSuggestsRemovingTheOperator(t *testing.T)
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoNonNullAssertedOptionalChain,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoNonNullAssertedOptionalChain,
 				assertedOptionalChainFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 || len(suggestions[0].Fixes) != 1 {
-				t.Fatalf("wanted one suggestion carrying one fix, got %d", len(suggestions))
+				test.Fatalf("wanted one suggestion carrying one fix, got %d", len(suggestions))
 			}
 
 			fix := suggestions[0].Fixes[0]
 			rewritten := testCase.sourceText[:fix.Range.Pos()] + fix.Text +
 				testCase.sourceText[fix.Range.End():]
 			if rewritten != testCase.wantSource {
-				t.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
+				test.Fatalf("applying the suggestion gave %q, wanted %q", rewritten, testCase.wantSource)
 			}
 		})
 	}

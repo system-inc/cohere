@@ -33,8 +33,8 @@ import (
 // The existing checker test uses one file, so it runs one worker and could never have caught this.
 // **The file count is the instrument here**, which is why it is written out rather than trimmed to
 // something tidier.
-func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
-	t.Parallel()
+func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
+	test.Parallel()
 	files := map[string]string{"tsconfig.json": minimalConfig}
 
 	// Enough files, cross-importing, that several workers run at once and reach across checkers.
@@ -52,16 +52,16 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 		)
 	}
 
-	directory := writeProject(t, files)
+	directory := writeProject(test, files)
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 
 	if graph.Workers() < 2 {
 		// One worker cannot race, so a pass here would prove nothing. This is the same shape as a
 		// sweep whose probe never ran.
-		t.Skipf("this machine gave the walk %d worker, so nothing ran concurrently", graph.Workers())
+		test.Skipf("this machine gave the walk %d worker, so nothing ran concurrently", graph.Workers())
 	}
 
 	// Counted atomically: the listeners run on every worker at once, which is the point of the test.
@@ -76,7 +76,7 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			if ctx.TypeChecker == nil {
-				t.Error("a rule was dispatched without a checker")
+				test.Error("a rule was dispatched without a checker")
 				return nil
 			}
 			return rule.Listeners{
@@ -93,15 +93,15 @@ func TestCheckerSurvivesTheParallelWalk(t *testing.T) {
 
 	projectFiles := graph.ProjectFiles()
 	if len(projectFiles) < 2 {
-		t.Fatalf("expected the project to hold many files, got %d", len(projectFiles))
+		test.Fatalf("expected the project to hold many files, got %d", len(projectFiles))
 	}
 
 	if _, err := graph.Walk(context.Background(), projectFiles, []rule.Rule{probe}); err != nil {
-		t.Fatalf("walking with a type-querying rule: %v", err)
+		test.Fatalf("walking with a type-querying rule: %v", err)
 	}
 
 	if queries.Load() == 0 {
 		// Surviving a walk that asked nothing is exactly the vacuous pass this file exists to avoid.
-		t.Fatal("the probe rule completed without answering a single type query, so nothing was proven")
+		test.Fatal("the probe rule completed without answering a single type query, so nothing was proven")
 	}
 }

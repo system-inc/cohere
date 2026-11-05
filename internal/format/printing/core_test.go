@@ -307,9 +307,9 @@ func attachedSummary(root *toyNode) [][]any {
 }
 
 // TestCoreAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
-func TestCoreAgreesWithUpstream(t *testing.T) {
-	t.Parallel()
-	root := corpus.PrettierFork.Root(t)
+func TestCoreAgreesWithUpstream(test *testing.T) {
+	test.Parallel()
+	root := corpus.PrettierFork.Root(test)
 	const count = 3000
 	random := rand.New(rand.NewSource(20261002))
 	cases := make([]toyCase, count)
@@ -319,7 +319,7 @@ func TestCoreAgreesWithUpstream(t *testing.T) {
 	}
 	encoded, err := json.Marshal(cases)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	command := exec.Command("node", "--input-type=module", "-e", toyUpstreamScript)
@@ -328,18 +328,18 @@ func TestCoreAgreesWithUpstream(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	var upstream []toyResult
 	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	// The Go side gets fresh ASTs, decoded from the same JSON, so neither side sees the other's
 	// attachment state.
 	var fresh []toyCase
 	if err := json.Unmarshal(encoded, &fresh); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	commentsTotal, upstreamErrors, textMismatches, attachMismatches := 0, 0, 0, 0
@@ -348,14 +348,14 @@ func TestCoreAgreesWithUpstream(t *testing.T) {
 		if upstream[index].Error != "" {
 			upstreamErrors++
 			if upstreamErrors <= 3 {
-				t.Logf("upstream refused case %d: %s", index, upstream[index].Error)
+				test.Logf("upstream refused case %d: %s", index, upstream[index].Error)
 			}
 			continue
 		}
 		options := &Options[*toyNode]{Printer: toyPrinter(), OriginalText: testCase.Text, EmbeddedLanguageFormatting: "off"}
 		printed, err := PrintAstToDoc(testCase.Ast, testCase.Comments, options)
 		if err != nil {
-			t.Errorf("case %d: %v\ntext %q", index, err, testCase.Text)
+			test.Errorf("case %d: %v\ntext %q", index, err, testCase.Text)
 			continue
 		}
 		formatted := doc.Print(printed, doc.Options{PrintWidth: testCase.Width, TabWidth: 2})
@@ -365,19 +365,19 @@ func TestCoreAgreesWithUpstream(t *testing.T) {
 		if string(attachedGo) != string(attachedUpstream) {
 			attachMismatches++
 			if attachMismatches <= 3 {
-				t.Errorf("case %d attachment\ntext %q\nwant %s\ngot  %s", index, testCase.Text, attachedUpstream, attachedGo)
+				test.Errorf("case %d attachment\ntext %q\nwant %s\ngot  %s", index, testCase.Text, attachedUpstream, attachedGo)
 			}
 		}
 		if formatted != upstream[index].Formatted {
 			textMismatches++
 			if textMismatches <= 3 {
-				t.Errorf("case %d output\ntext %q\nwant %q\ngot  %q", index, testCase.Text, upstream[index].Formatted, formatted)
+				test.Errorf("case %d output\ntext %q\nwant %q\ngot  %q", index, testCase.Text, upstream[index].Formatted, formatted)
 			}
 		}
 	}
-	t.Logf("%d programs, %d comments, %d upstream refused, %d attachment mismatches, %d output mismatches",
+	test.Logf("%d programs, %d comments, %d upstream refused, %d attachment mismatches, %d output mismatches",
 		count, commentsTotal, upstreamErrors, attachMismatches, textMismatches)
 	if upstreamErrors > count/10 {
-		t.Errorf("upstream refused %d of %d programs, so the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf("upstream refused %d of %d programs, so the comparison is thinner than it looks", upstreamErrors, count)
 	}
 }

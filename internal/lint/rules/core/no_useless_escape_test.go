@@ -28,8 +28,8 @@ const uselessEscapeFile = "/repository/source/UselessEscape.tsx"
 // order assigns both diagnostics to the first copy.
 
 // TestNoUselessEscapeFires runs every failing input and asserts the exact diagnostic count.
-func TestNoUselessEscapeFires(t *testing.T) {
-	t.Parallel()
+func TestNoUselessEscapeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -149,14 +149,14 @@ func TestNoUselessEscapeFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
 			wantIds := make([]string, testCase.findings)
 			for index := range wantIds {
 				wantIds[index] = "noUselessEscape"
 			}
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunWithOptions(t, NoUselessEscape, uselessEscapeFile,
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunWithOptions(test, NoUselessEscape, uselessEscapeFile,
 					testCase.sourceText, testCase.options), wantIds...)
 		})
 	}
@@ -169,8 +169,8 @@ func TestNoUselessEscapeFires(t *testing.T) {
 // all required, `/[a\-b]/` is a hyphen escaped in the middle of a class where escaping it is the
 // only way to mean a literal, and the fifty v-flag cases pin the reserved double punctuator rule
 // that no amount of reading the prose would produce correctly.
-func TestNoUselessEscapeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUselessEscapeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -392,10 +392,10 @@ func TestNoUselessEscapeStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t,
-				rule_testing.RunWithOptions(t, NoUselessEscape, uselessEscapeFile,
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test,
+				rule_testing.RunWithOptions(test, NoUselessEscape, uselessEscapeFile,
 					testCase.sourceText, testCase.options))
 		})
 	}
@@ -409,8 +409,8 @@ func TestNoUselessEscapeStaysSilent(t *testing.T) {
 // standing, and every count-based fixture passes while the rewrite corrupts the file.
 //
 // The expectations are upstream's own `fix` vector, verbatim.
-func TestNoUselessEscapeRepairsSource(t *testing.T) {
-	t.Parallel()
+func TestNoUselessEscapeRepairsSource(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -483,10 +483,10 @@ func TestNoUselessEscapeRepairsSource(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFixedSource(t,
-				rule_testing.Run(t, NoUselessEscape, uselessEscapeFile, testCase.sourceText),
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFixedSource(test,
+				rule_testing.Run(test, NoUselessEscape, uselessEscapeFile, testCase.sourceText),
 				testCase.wantSource)
 		})
 	}

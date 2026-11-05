@@ -20,8 +20,8 @@ type hookFlattening struct {
 
 // flattenHooksIn runs the passes upstream runs before the hook flatten, then the flatten, over the
 // one function in source.
-func flattenHooksIn(t *testing.T, source string) hookFlattening {
-	t.Helper()
+func flattenHooksIn(test *testing.T, source string) hookFlattening {
+	test.Helper()
 	var result hookFlattening
 	visited := 0
 	probe := rule.Rule{Name: "hook-flatten", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
@@ -65,7 +65,7 @@ func flattenHooksIn(t *testing.T, source string) hookFlattening {
 			})
 		}}
 	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{
+	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts": reactiveDeclarations + `
 declare module 'react' {
 export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: unknown[]): T;
@@ -74,7 +74,7 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 		"/fixture.tsx": source,
 	}, "/fixture.tsx")
 	if visited != 1 {
-		t.Fatalf("visited %d functions, want one", visited)
+		test.Fatalf("visited %d functions, want one", visited)
 	}
 	return result
 }
@@ -85,12 +85,12 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 // The two branches are indistinguishable to preserve-manual-memoization on every fixture measured,
 // because neither leaves a live scope behind, so a mutation folding the label branch into the pruned
 // one survives the rule's tests. This counts them instead.
-func TestFlattenScopesWithHooksOrUseLabelsALoneHookCall(t *testing.T) {
-	t.Parallel()
-	got := flattenHooksIn(t, `import {useState} from 'react';
+func TestFlattenScopesWithHooksOrUseLabelsALoneHookCall(test *testing.T) {
+	test.Parallel()
+	got := flattenHooksIn(test, `import {useState} from 'react';
 function useFoo() { const [value] = useState(() => ({count: 0})); return value; }`)
 	if got.labels != 1 || got.pruned != 0 || got.scopesLeft != 0 {
-		t.Fatalf("labels=%d pruned=%d scopes left=%d, want the one hook scope rewritten to a label",
+		test.Fatalf("labels=%d pruned=%d scopes left=%d, want the one hook scope rewritten to a label",
 			got.labels, got.pruned, got.scopesLeft)
 	}
 }
@@ -98,9 +98,9 @@ function useFoo() { const [value] = useState(() => ({count: 0})); return value; 
 // TestFlattenScopesWithHooksOrUsePrunesAScopeHoldingMore pins the second branch and what it keeps: the
 // hook call's scope holds a callback's scope, so it is pruned rather than labelled, and the callback's
 // scope stays a scope of its own. That surviving inner scope is what preserve-manual-memoization reads.
-func TestFlattenScopesWithHooksOrUsePrunesAScopeHoldingMore(t *testing.T) {
-	t.Parallel()
-	got := flattenHooksIn(t, `import * as React from 'react';
+func TestFlattenScopesWithHooksOrUsePrunesAScopeHoldingMore(test *testing.T) {
+	test.Parallel()
+	got := flattenHooksIn(test, `import * as React from 'react';
 declare function makeObserver(): { subscribe: (listener: () => void) => () => void; get: () => number };
 function useFoo() {
   const [observer] = React.useState(() => makeObserver());
@@ -112,10 +112,10 @@ function useFoo() {
 	// Two hook calls, and each one's scope holds its method property as well as the call, so both are
 	// pruned rather than labelled.
 	if got.pruned != 2 || got.labels != 0 {
-		t.Fatalf("pruned=%d labels=%d, want both hook calls' scopes pruned", got.pruned, got.labels)
+		test.Fatalf("pruned=%d labels=%d, want both hook calls' scopes pruned", got.pruned, got.labels)
 	}
 	if got.scopesLeft <= got.pruned {
-		t.Fatalf("scopes left=%d with %d pruned, want the callback's scope to survive inside the hook's",
+		test.Fatalf("scopes left=%d with %d pruned, want the callback's scope to survive inside the hook's",
 			got.scopesLeft, got.pruned)
 	}
 }

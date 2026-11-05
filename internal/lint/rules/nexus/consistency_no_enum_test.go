@@ -6,8 +6,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-func TestConsistencyNoEnumFires(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoEnumFires(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]string{
 		"a plain enum":            "enum Color { Red, Green }\n",
@@ -17,16 +17,16 @@ func TestConsistencyNoEnumFires(t *testing.T) {
 		"an enum inside a module": "namespace Theme { export enum Color { Red } }\n",
 	}
 	for name, source := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoEnum, "probe.ts", source)
-			rule_testing.ExpectFindings(t, result, "noEnum")
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoEnum, "probe.ts", source)
+			rule_testing.ExpectFindings(test, result, "noEnum")
 		})
 	}
 }
 
-func TestConsistencyNoEnumStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistencyNoEnumStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := map[string]string{
 		"the as-const replacement": "export const ColorKind = { Red: 'Red' } as const;\n" +
@@ -37,10 +37,10 @@ func TestConsistencyNoEnumStaysSilent(t *testing.T) {
 		"an interface":         "interface Color { red: string }\n",
 	}
 	for name, source := range cases {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistencyNoEnum, "probe.ts", source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoEnum, "probe.ts", source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }

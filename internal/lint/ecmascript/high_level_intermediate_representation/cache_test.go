@@ -52,8 +52,8 @@ func totalPhis(function *Function) int {
 // than against a stand-in cache, because the property under test is that the PRODUCTION path shares
 // work. Counting is possible without a hook into `Lower` because a lowering is a distinct pointer
 // every time it runs: three asks returning one pointer is one lowering.
-func TestForFunctionLowersOncePerFunction(t *testing.T) {
-	t.Parallel()
+func TestForFunctionLowersOncePerFunction(test *testing.T) {
+	test.Parallel()
 
 	var results []*Function
 	var directLowering *Function
@@ -65,10 +65,10 @@ func TestForFunctionLowersOncePerFunction(t *testing.T) {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ctx.TypeChecker == nil {
-						t.Fatal("the harness produced no type checker, so this test would prove nothing")
+						test.Fatal("the harness produced no type checker, so this test would prove nothing")
 					}
 					if ctx.FileCache == nil {
-						t.Fatal("the harness produced no file cache, so a hit could not be observed")
+						test.Fatal("the harness produced no file cache, so a hit could not be observed")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
 						if len(results) > 0 {
@@ -86,20 +86,20 @@ func TestForFunctionLowersOncePerFunction(t *testing.T) {
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "probe.tsx", cacheProbeSource)
+	rule_testing.RunTyped(test, probe, "probe.tsx", cacheProbeSource)
 
 	if len(results) != 3 {
-		t.Fatalf("want three asks recorded, got %d", len(results))
+		test.Fatalf("want three asks recorded, got %d", len(results))
 	}
 	if results[0] == nil {
-		t.Fatal("the probe function did not lower, so this test proves nothing")
+		test.Fatal("the probe function did not lower, so this test proves nothing")
 	}
 	if results[1] != results[0] || results[2] != results[0] {
-		t.Errorf("each ask lowered again: %p, %p, %p — the cache is not being hit",
+		test.Errorf("each ask lowered again: %p, %p, %p — the cache is not being hit",
 			results[0], results[1], results[2])
 	}
 	if directLowering == results[0] {
-		t.Fatal("a fresh Lower returned the cached pointer, so pointer identity proves nothing here")
+		test.Fatal("a fresh Lower returned the cached pointer, so pointer identity proves nothing here")
 	}
 }
 
@@ -110,8 +110,8 @@ func TestForFunctionLowersOncePerFunction(t *testing.T) {
 // correspond to no branch. The doubly-constructed graph still passes `VerifySSA`, so nothing would
 // have caught this at runtime. Asserting the phi count is stable across repeated asks is what
 // pins the design.
-func TestForFunctionConstructsExactlyOnce(t *testing.T) {
-	t.Parallel()
+func TestForFunctionConstructsExactlyOnce(test *testing.T) {
+	test.Parallel()
 
 	var firstPhis, lastPhis int
 
@@ -129,7 +129,7 @@ func TestForFunctionConstructsExactlyOnce(t *testing.T) {
 						done = true
 						first := ForFunction(ctx, function)
 						if first == nil {
-							t.Fatal("the probe function did not lower")
+							test.Fatal("the probe function did not lower")
 						}
 						firstPhis = totalPhis(first)
 						for range 3 {
@@ -140,14 +140,14 @@ func TestForFunctionConstructsExactlyOnce(t *testing.T) {
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "probe.tsx", cacheProbeSource)
+	rule_testing.RunTyped(test, probe, "probe.tsx", cacheProbeSource)
 
 	if firstPhis == 0 {
-		t.Fatal("the probe lowered to zero phis, so a repeated Construct could not be detected — " +
+		test.Fatal("the probe lowered to zero phis, so a repeated Construct could not be detected — " +
 			"this test would pass against any implementation")
 	}
 	if firstPhis != lastPhis {
-		t.Errorf("repeated asks changed the graph: %d phis then %d — Construct ran more than once",
+		test.Errorf("repeated asks changed the graph: %d phis then %d — Construct ran more than once",
 			firstPhis, lastPhis)
 	}
 }
@@ -157,8 +157,8 @@ func TestForFunctionConstructsExactlyOnce(t *testing.T) {
 // `rule.Cached` treats a nil cache as "no caching, compute every time", so a harness that builds a
 // Context by hand keeps working. That contract is load-bearing here and easy to break by reaching
 // for `ctx.FileCache` directly.
-func TestForFunctionWithoutCacheStillLowers(t *testing.T) {
-	t.Parallel()
+func TestForFunctionWithoutCacheStillLowers(test *testing.T) {
+	test.Parallel()
 
 	var withoutCache *Function
 
@@ -182,13 +182,13 @@ func TestForFunctionWithoutCacheStillLowers(t *testing.T) {
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "probe.tsx", cacheProbeSource)
+	rule_testing.RunTyped(test, probe, "probe.tsx", cacheProbeSource)
 
 	if withoutCache == nil {
-		t.Fatal("a nil cache must still compute, but nothing came back")
+		test.Fatal("a nil cache must still compute, but nothing came back")
 	}
 	if len(withoutCache.Blocks) == 0 {
-		t.Fatal("a nil cache returned an empty graph rather than a real lowering")
+		test.Fatal("a nil cache returned an empty graph rather than a real lowering")
 	}
 }
 
@@ -198,8 +198,8 @@ func TestForFunctionWithoutCacheStillLowers(t *testing.T) {
 // This is the second independent check that a hit is real. The pointer test shows one object comes
 // back; this shows the cache recorded exactly one FILL for the function, so the work ran once by
 // the cache's own accounting rather than only by identity.
-func TestForFunctionRecordsOneFillPerFunction(t *testing.T) {
-	t.Parallel()
+func TestForFunctionRecordsOneFillPerFunction(test *testing.T) {
+	test.Parallel()
 
 	var fillKeys []string
 	var askedKey string
@@ -228,7 +228,7 @@ func TestForFunctionRecordsOneFillPerFunction(t *testing.T) {
 			}
 		},
 	}
-	rule_testing.RunTyped(t, probe, "probe.tsx", cacheProbeSource)
+	rule_testing.RunTyped(test, probe, "probe.tsx", cacheProbeSource)
 
 	matching := 0
 	for _, key := range fillKeys {
@@ -237,7 +237,7 @@ func TestForFunctionRecordsOneFillPerFunction(t *testing.T) {
 		}
 	}
 	if matching != 1 {
-		t.Errorf("want exactly one recorded fill for %q after three asks, got %d (keys: %v)",
+		test.Errorf("want exactly one recorded fill for %q after three asks, got %d (keys: %v)",
 			askedKey, matching, fillKeys)
 	}
 }
@@ -254,8 +254,8 @@ func TestForFunctionRecordsOneFillPerFunction(t *testing.T) {
 // a call, or the case would assert nothing about the gate. The memo-free control is the other
 // direction, since a gate that always answered "yes" would pass every escaped case and must still
 // share the cached graph here.
-func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(t *testing.T) {
-	t.Parallel()
+func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -271,8 +271,8 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			var shared, erased *Function
 			recognised := 0
@@ -298,19 +298,19 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(t *testing.T) {
 					}
 				},
 			}
-			rule_testing.RunTyped(t, probe, "probe.tsx", testCase.source)
+			rule_testing.RunTyped(test, probe, "probe.tsx", testCase.source)
 
 			if shared == nil || erased == nil {
-				t.Fatal("the probe function did not lower, so this case proves nothing")
+				test.Fatal("the probe function did not lower, so this case proves nothing")
 			}
 			if (recognised > 0) != testCase.recognised {
-				t.Fatalf("an independent erasure recognised %d calls, so this case does not test what it names", recognised)
+				test.Fatalf("an independent erasure recognised %d calls, so this case does not test what it names", recognised)
 			}
 			if testCase.recognised && erased == shared {
-				t.Error("the erasure recognises a memo call here, but the gate handed back the memo-intact graph")
+				test.Error("the erasure recognises a memo call here, but the gate handed back the memo-intact graph")
 			}
 			if !testCase.recognised && erased != shared {
-				t.Error("nothing here can be erased, but the gate lowered a second graph instead of sharing the first")
+				test.Error("nothing here can be erased, but the gate lowered a second graph instead of sharing the first")
 			}
 		})
 	}
@@ -323,8 +323,8 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(t *testing.T) {
 // it with no error. So each spelling that can reach a component or hook test is a "yes" row, an
 // escape among them, and the "no" rows are what make the gate worth having: a plain module, and a
 // file whose only backslash is an ordinary string escape.
-func TestMayHoldComponentOrHookAnswersFromTheText(t *testing.T) {
-	t.Parallel()
+func TestMayHoldComponentOrHookAnswersFromTheText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, file, source string
@@ -341,8 +341,8 @@ func TestMayHoldComponentOrHookAnswersFromTheText(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 
 			answered := false
 			var got bool
@@ -358,13 +358,13 @@ func TestMayHoldComponentOrHookAnswersFromTheText(t *testing.T) {
 					}
 				},
 			}
-			rule_testing.RunTyped(t, probe, testCase.file, testCase.source)
+			rule_testing.RunTyped(test, probe, testCase.file, testCase.source)
 
 			if !answered {
-				t.Fatal("the probe never ran, so this case proves nothing")
+				test.Fatal("the probe never ran, so this case proves nothing")
 			}
 			if got != testCase.want {
-				t.Errorf("MayHoldComponentOrHook = %v, want %v", got, testCase.want)
+				test.Errorf("MayHoldComponentOrHook = %v, want %v", got, testCase.want)
 			}
 		})
 	}

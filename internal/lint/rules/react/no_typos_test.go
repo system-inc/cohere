@@ -41,8 +41,8 @@ const noTyposFile = "/repository/source/NoTypos.tsx"
 // substring because this port rewrites the wording while keeping the interpolated values.
 
 // TestNoTyposFires runs upstream's reporting cases.
-func TestNoTyposFires(t *testing.T) {
-	t.Parallel()
+func TestNoTyposFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -105,17 +105,17 @@ func TestNoTyposFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoTypos(t, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoTypos(test, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestNoTyposStaysSilent runs upstream's clean cases.
-func TestNoTyposStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoTyposStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -167,9 +167,9 @@ func TestNoTyposStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoTypos(t, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoTypos(test, testCase.sourceText))
 		})
 	}
 }
@@ -180,9 +180,9 @@ func TestNoTyposStaysSilent(t *testing.T) {
 // through its registry is the member-assignment arm, and that is reproduced by searching the file
 // for the declaration rather than by asking the checker, because the registry is doing the same
 // thing. `TestNoTyposNeedsNoChecker` pins that both harnesses agree.
-func runNoTypos(t *testing.T, sourceText string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.Run(t, NoTypos, noTyposFile, sourceText)
+func runNoTypos(test *testing.T, sourceText string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.Run(test, NoTypos, noTyposFile, sourceText)
 }
 
 // TestNoTyposJsDocComponentAnnotationIsNotHonored records the one corpus case held back.
@@ -196,16 +196,16 @@ func runNoTypos(t *testing.T, sourceText string) rule_testing.Result {
 // confirming the same shape reports when the class extends `React.Component` for real. So the
 // silence is the annotation path being dead rather than anything else declining, and silence is what
 // this port produces.
-func TestNoTyposJsDocComponentAnnotationIsNotHonored(t *testing.T) {
-	t.Parallel()
+func TestNoTyposJsDocComponentAnnotationIsNotHonored(test *testing.T) {
+	test.Parallel()
 
 	const annotated = "/** @extends React.Component */\nclass MyComponent extends BaseComponent {}\nMyComponent.PROPTYPES = {};\n"
-	rule_testing.ExpectClean(t, runNoTypos(t, annotated))
+	rule_testing.ExpectClean(test, runNoTypos(test, annotated))
 
 	// The control. Without it, the silence above would be indistinguishable from a rule that cannot
 	// see a member assignment at all.
 	const real = "declare const React: any;\nclass MyComponent extends React.Component {}\nMyComponent.PROPTYPES = {};\n"
-	rule_testing.ExpectFindings(t, runNoTypos(t, real), "typoStaticClassProp")
+	rule_testing.ExpectFindings(test, runNoTypos(test, real), "typoStaticClassProp")
 }
 
 // TestNoTyposImportBindingsGateThePropTypeArms pins the guard that makes two ids inert.
@@ -218,8 +218,8 @@ func TestNoTyposJsDocComponentAnnotationIsNotHonored(t *testing.T) {
 // The source-order rows are the reason this rule walks the file rather than registering per-kind
 // listeners: upstream sets the binding as ESLint reaches the import, so a propTypes object written
 // ABOVE the import sees no binding.
-func TestNoTyposImportBindingsGateThePropTypeArms(t *testing.T) {
-	t.Parallel()
+func TestNoTyposImportBindingsGateThePropTypeArms(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -289,9 +289,9 @@ func TestNoTyposImportBindingsGateThePropTypeArms(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoTypos(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -305,8 +305,8 @@ func TestNoTyposImportBindingsGateThePropTypeArms(t *testing.T) {
 // The last row is the one a port is most likely to get wrong: JSX inside a nested callback belongs
 // to that callback, not to the enclosing function, so a component that only maps over items and
 // returns null does NOT count.
-func TestNoTyposReturningJsxDecidesTheMemberArm(t *testing.T) {
-	t.Parallel()
+func TestNoTyposReturningJsxDecidesTheMemberArm(test *testing.T) {
+	test.Parallel()
 
 	const preamble = "import PropTypes from 'prop-types';\ndeclare const items: any[];\n"
 	cases := []struct {
@@ -342,9 +342,9 @@ func TestNoTyposReturningJsxDecidesTheMemberArm(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoTypos(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -355,8 +355,8 @@ func TestNoTyposReturningJsxDecidesTheMemberArm(t *testing.T) {
 // not prop types at all are accepted: `checkPropTypes`, `resetWarningCache`, and the package's own
 // `PropTypes` self-reference. That is an accident rather than a decision, and reproducing it matters
 // because narrowing the set would report where upstream is silent. Measured on the installed build.
-func TestNoTyposAcceptsEveryPropTypesModuleKey(t *testing.T) {
-	t.Parallel()
+func TestNoTyposAcceptsEveryPropTypesModuleKey(test *testing.T) {
+	test.Parallel()
 
 	const preamble = "import PropTypes from 'prop-types';\ndeclare const React: any;\nclass Foo extends React.Component {}\n"
 	accepted := []string{
@@ -367,17 +367,17 @@ func TestNoTyposAcceptsEveryPropTypesModuleKey(t *testing.T) {
 		"checkPropTypes", "resetWarningCache", "PropTypes",
 	}
 	for _, name := range accepted {
-		t.Run("accepts "+name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoTypos(t,
+		test.Run("accepts "+name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoTypos(test,
 				preamble+"Foo.propTypes = { a: PropTypes."+name+" };\n"))
 		})
 	}
 
 	for _, name := range []string{"strng", "boolean", "Array", "func2"} {
-		t.Run("rejects "+name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoTypos(t,
+		test.Run("rejects "+name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoTypos(test,
 				preamble+"Foo.propTypes = { a: PropTypes."+name+" };\n"), "typoPropType")
 		})
 	}
@@ -387,8 +387,8 @@ func TestNoTyposAcceptsEveryPropTypesModuleKey(t *testing.T) {
 //
 // `shape(...)` walks its object literal and `oneOfType([...])` walks each element, and every other
 // call is left alone. The corpus covers these; these rows pin the boundary, which it does not.
-func TestNoTyposRecursesThroughShapeAndOneOfType(t *testing.T) {
-	t.Parallel()
+func TestNoTyposRecursesThroughShapeAndOneOfType(test *testing.T) {
+	test.Parallel()
 
 	const preamble = "import PropTypes from 'prop-types';\ndeclare const React: any;\nclass Foo extends React.Component {}\n"
 	cases := []struct {
@@ -414,9 +414,9 @@ func TestNoTyposRecursesThroughShapeAndOneOfType(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoTypos(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -426,8 +426,8 @@ func TestNoTyposRecursesThroughShapeAndOneOfType(t *testing.T) {
 // A method whose lowercased name is `getderivedstatefromprops` and which is not declared `static`
 // reports `staticLifecycleMethod`, and if its casing also differs it reports `typoLifecycleMethod`
 // as well. Upstream emits both, in that order, which no single-id fixture can see.
-func TestNoTyposLifecycleArmsAreIndependent(t *testing.T) {
-	t.Parallel()
+func TestNoTyposLifecycleArmsAreIndependent(test *testing.T) {
+	test.Parallel()
 
 	const head = "declare const React: any;\nclass Foo extends React.Component { "
 	cases := []struct {
@@ -473,9 +473,9 @@ func TestNoTyposLifecycleArmsAreIndependent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoTypos(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -486,8 +486,8 @@ func TestNoTyposLifecycleArmsAreIndependent(t *testing.T) {
 // inside the chain, and the two lifecycle ids point at the whole member. Those are three different
 // anchors that no id assertion can tell apart, and getting one wrong means underlining a whole
 // method where upstream underlines one word.
-func TestNoTyposSpans(t *testing.T) {
-	t.Parallel()
+func TestNoTyposSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -527,17 +527,17 @@ func TestNoTyposSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runNoTypos(t, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runNoTypos(test, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			source := result.SourceFile.Text()
 			for index, diagnostic := range result.Diagnostics {
 				got := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != testCase.wantTexts[index] {
-					t.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
+					test.Errorf("finding %d points at %q, want %q", index, got, testCase.wantTexts[index])
 				}
 			}
 		})
@@ -550,42 +550,42 @@ func TestNoTyposSpans(t *testing.T) {
 // value passes every id assertion in this file. Asserted against literals typed here rather than
 // against the rule's own constants, because comparing a diagnostic to the constant it was reported
 // with is an equality whose two sides move together under mutation.
-func TestNoTyposMessagesReadAsWritten(t *testing.T) {
-	t.Parallel()
+func TestNoTyposMessagesReadAsWritten(test *testing.T) {
+	test.Parallel()
 
-	propType := runNoTypos(t,
+	propType := runNoTypos(test,
 		"import PropTypes from 'prop-types';\ndeclare const React: any;\nclass Foo extends React.Component {}\nFoo.propTypes = { a: PropTypes.strng };\n")
-	rule_testing.ExpectFindings(t, propType, "typoPropType")
+	rule_testing.ExpectFindings(test, propType, "typoPropType")
 	if !strings.Contains(propType.Diagnostics[0].Message.Description, "`strng` is not a prop type") {
-		t.Errorf("typoPropType reads %q", propType.Diagnostics[0].Message.Description)
+		test.Errorf("typoPropType reads %q", propType.Diagnostics[0].Message.Description)
 	}
 
-	chain := runNoTypos(t,
+	chain := runNoTypos(test,
 		"import PropTypes from 'prop-types';\ndeclare const React: any;\nclass Foo extends React.Component {}\nFoo.propTypes = { a: PropTypes.string.isRequird };\n")
-	rule_testing.ExpectFindings(t, chain, "typoPropTypeChain")
+	rule_testing.ExpectFindings(test, chain, "typoPropTypeChain")
 	if !strings.Contains(chain.Diagnostics[0].Message.Description, "`isRequird` is not it") {
-		t.Errorf("typoPropTypeChain reads %q", chain.Diagnostics[0].Message.Description)
+		test.Errorf("typoPropTypeChain reads %q", chain.Diagnostics[0].Message.Description)
 	}
 
 	// The two-slot message. A format string reusing one value in both slots would read
 	// "ComponentDidMount calls ComponentDidMount", which is exactly the defect the port brief
 	// records from a rule whose 37 fixtures all agreed with a wrong message.
-	lifecycle := runNoTypos(t,
+	lifecycle := runNoTypos(test,
 		"declare const React: any;\nclass Foo extends React.Component { ComponentDidMount() {} }\n")
-	rule_testing.ExpectFindings(t, lifecycle, "typoLifecycleMethod")
+	rule_testing.ExpectFindings(test, lifecycle, "typoLifecycleMethod")
 	description := lifecycle.Diagnostics[0].Message.Description
 	if !strings.Contains(description, "`ComponentDidMount` is spelled with the wrong casing") {
-		t.Errorf("typoLifecycleMethod is missing the actual name: %q", description)
+		test.Errorf("typoLifecycleMethod is missing the actual name: %q", description)
 	}
 	if !strings.Contains(description, "React calls `componentDidMount`") {
-		t.Errorf("typoLifecycleMethod is missing the expected name: %q", description)
+		test.Errorf("typoLifecycleMethod is missing the expected name: %q", description)
 	}
 
-	static := runNoTypos(t,
+	static := runNoTypos(test,
 		"declare const React: any;\nclass Foo extends React.Component { getDerivedStateFromProps() {} }\n")
-	rule_testing.ExpectFindings(t, static, "staticLifecycleMethod")
+	rule_testing.ExpectFindings(test, static, "staticLifecycleMethod")
 	if !strings.Contains(static.Diagnostics[0].Message.Description, "`getDerivedStateFromProps` is a static lifecycle method") {
-		t.Errorf("staticLifecycleMethod reads %q", static.Diagnostics[0].Message.Description)
+		test.Errorf("staticLifecycleMethod reads %q", static.Diagnostics[0].Message.Description)
 	}
 }
 
@@ -594,8 +594,8 @@ func TestNoTyposMessagesReadAsWritten(t *testing.T) {
 // A plain class is not one, and only `createReactClass` counts on the object side: the shelf's
 // `react.IsEs5ComponentCall` also accepts `createClass` and the namespaced spelling, and upstream's
 // `isES5Component` accepts neither because its createClass pragma defaults to `createReactClass`.
-func TestNoTyposComponentGate(t *testing.T) {
-	t.Parallel()
+func TestNoTyposComponentGate(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -619,9 +619,9 @@ func TestNoTyposComponentGate(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoTypos(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }
@@ -630,31 +630,31 @@ func TestNoTyposComponentGate(t *testing.T) {
 //
 // A class reports `typoStaticClassProp` and a createReactClass object reports `typoPropDeclaration`,
 // and the two carry different text. A port collapsing them would pass every count assertion.
-func TestNoTyposTwoIdsForTheSameCasingError(t *testing.T) {
-	t.Parallel()
+func TestNoTyposTwoIdsForTheSameCasingError(test *testing.T) {
+	test.Parallel()
 
-	class := runNoTypos(t,
+	class := runNoTypos(test,
 		"declare const React: any;\nclass Foo extends React.Component { static PropTypes = {}; }\n")
-	rule_testing.ExpectFindings(t, class, "typoStaticClassProp")
+	rule_testing.ExpectFindings(test, class, "typoStaticClassProp")
 	if !strings.HasPrefix(class.Diagnostics[0].Message.Description, "This static property is spelled") {
-		t.Errorf("class reads %q", class.Diagnostics[0].Message.Description)
+		test.Errorf("class reads %q", class.Diagnostics[0].Message.Description)
 	}
 
-	object := runNoTypos(t,
+	object := runNoTypos(test,
 		"declare function createReactClass(spec: any): any;\ncreateReactClass({ PropTypes: {} });\n")
-	rule_testing.ExpectFindings(t, object, "typoPropDeclaration")
+	rule_testing.ExpectFindings(test, object, "typoPropDeclaration")
 	if !strings.HasPrefix(object.Diagnostics[0].Message.Description, "This property is spelled") {
-		t.Errorf("object reads %q", object.Diagnostics[0].Message.Description)
+		test.Errorf("object reads %q", object.Diagnostics[0].Message.Description)
 	}
 }
 
 // TestNoTyposNeedsNoChecker pins that this rule is syntactic.
-func TestNoTyposNeedsNoChecker(t *testing.T) {
-	t.Parallel()
+func TestNoTyposNeedsNoChecker(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\nclass Foo extends React.Component { static PropTypes = {}; }\n"
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, NoTypos, noTyposFile, source), "typoStaticClassProp")
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoTypos, noTyposFile, source), "typoStaticClassProp")
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoTypos, noTyposFile, source), "typoStaticClassProp")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoTypos, noTyposFile, source), "typoStaticClassProp")
 }
 
 // TestNoTyposHasNoFileGate reports in a `.ts` file, not only in `.tsx`.
@@ -663,17 +663,17 @@ func TestNoTyposNeedsNoChecker(t *testing.T) {
 // test asserting the gate, so the suite locked the bug in. This pins the opposite. The source
 // carries no JSX, because JSX in a `.ts` file is a syntax error and a case that failed to parse
 // would be silent for a reason unrelated to any gate.
-func TestNoTyposHasNoFileGate(t *testing.T) {
-	t.Parallel()
+func TestNoTyposHasNoFileGate(test *testing.T) {
+	test.Parallel()
 
 	const source = "declare const React: any;\nclass Foo extends React.Component { static PropTypes = {}; }\n"
 	for _, fileName := range []string{
 		"/repository/source/NoTypos.tsx",
 		"/repository/source/NoTypos.ts",
 	} {
-		t.Run(fileName, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.Run(t, NoTypos, fileName, source), "typoStaticClassProp")
+		test.Run(fileName, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoTypos, fileName, source), "typoStaticClassProp")
 		})
 	}
 }
@@ -682,8 +682,8 @@ func TestNoTyposHasNoFileGate(t *testing.T) {
 //
 // The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic.
-func TestNoTyposSurvivesShapesThatWouldPanic(t *testing.T) {
-	t.Parallel()
+func TestNoTyposSurvivesShapesThatWouldPanic(test *testing.T) {
+	test.Parallel()
 
 	sources := []string{
 		"import 'prop-types';\nimport 'react';\n",
@@ -699,9 +699,9 @@ func TestNoTyposSurvivesShapesThatWouldPanic(t *testing.T) {
 	}
 
 	for index, sourceText := range sources {
-		t.Run(string(rune('a'+index)), func(t *testing.T) {
-			t.Parallel()
-			runNoTypos(t, sourceText)
+		test.Run(string(rune('a'+index)), func(test *testing.T) {
+			test.Parallel()
+			runNoTypos(test, sourceText)
 		})
 	}
 }
@@ -718,8 +718,8 @@ func TestNoTyposSurvivesShapesThatWouldPanic(t *testing.T) {
 // narrowing it would silence an input upstream reports and no imported fixture would notice.
 //
 // Every verdict below was measured on the installed build.
-func TestNoTyposMemberArmAssignmentShapes(t *testing.T) {
-	t.Parallel()
+func TestNoTyposMemberArmAssignmentShapes(test *testing.T) {
+	test.Parallel()
 
 	const preamble = "declare const React: any;\nclass Foo extends React.Component {}\ndeclare let target: any;\ndeclare function doThing(value: any): void;\n"
 	cases := []struct {
@@ -738,9 +738,9 @@ func TestNoTyposMemberArmAssignmentShapes(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, runNoTypos(t, testCase.sourceText), testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, runNoTypos(test, testCase.sourceText), testCase.wantIds...)
 		})
 	}
 }

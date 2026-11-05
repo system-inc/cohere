@@ -178,13 +178,13 @@ var parseFixtures = []parseFixture{
 // A corpus file graphql-js cannot parse is counted, and the test fails if that count passes a tenth of
 // the corpus: an oracle that rejects everything would otherwise read as perfect agreement. The inline
 // fixtures each say which way graphql-js must go.
-func TestParseAgreesWithGraphqlJs(t *testing.T) {
-	t.Parallel()
+func TestParseAgreesWithGraphqlJs(test *testing.T) {
+	test.Parallel()
 	corpora := os.Getenv("COHERE_GRAPHQL_CORPORA")
 	if corpora == "" {
-		t.Skip("set COHERE_GRAPHQL_CORPORA to compare the parser against graphql-js")
+		test.Skip("set COHERE_GRAPHQL_CORPORA to compare the parser against graphql-js")
 	}
-	root := corpus.PrettierFork.Root(t)
+	root := corpus.PrettierFork.Root(test)
 
 	type input struct {
 		Name string `json:"name"`
@@ -221,11 +221,11 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 			return nil
 		})
 		if err != nil {
-			t.Fatalf("walking %s: %v", corpus, err)
+			test.Fatalf("walking %s: %v", corpus, err)
 		}
 	}
 	if corpusFiles == 0 {
-		t.Fatalf("no .graphql or .gql files under %s", corpora)
+		test.Fatalf("no .graphql or .gql files under %s", corpora)
 	}
 	for _, fixture := range parseFixtures {
 		name := "fixture: " + fixture.name
@@ -237,7 +237,7 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 	for _, each := range inputs {
 		encoded, err := json.Marshal(each)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -248,7 +248,7 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	oracle := map[string]map[string]any{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
@@ -257,7 +257,7 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 		}
 		var record map[string]any
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		oracle[record["name"].(string)] = record
 	}
@@ -266,13 +266,13 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
-			t.Errorf(format, arguments...)
+			test.Errorf(format, arguments...)
 		}
 	}
 	for _, each := range inputs {
 		want, present := oracle[each.Name]
 		if !present {
-			t.Fatalf("the oracle printed nothing for %s", each.Name)
+			test.Fatalf("the oracle printed nothing for %s", each.Name)
 		}
 		wantError, oracleRefused := want["error"].(string)
 		if expectMalformed, isFixture := malformed[each.Name]; isFixture && expectMalformed != oracleRefused {
@@ -303,10 +303,10 @@ func TestParseAgreesWithGraphqlJs(t *testing.T) {
 			identical++
 		}
 	}
-	t.Logf("%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus files refused",
+	test.Logf("%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus files refused",
 		len(inputs), corpusFiles, len(parseFixtures), identical, refusedByBoth, different, corpusRefused)
 	if corpusRefused > corpusFiles/10 {
-		t.Errorf("graphql-js refused %d of %d corpus files; the comparison is thinner than it looks", corpusRefused, corpusFiles)
+		test.Errorf("graphql-js refused %d of %d corpus files; the comparison is thinner than it looks", corpusRefused, corpusFiles)
 	}
 }
 

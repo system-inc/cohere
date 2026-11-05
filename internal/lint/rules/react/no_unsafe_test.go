@@ -35,8 +35,8 @@ const unsafeFile = "/repository/source/Unsafe.tsx"
 // The pairs split by `checkAliases` are reproduced here on both sides of the flag. The pairs split
 // by React version cannot be, and the two pass halves are recorded as reporting; the reasoning is
 // at the line.
-func TestNoUnsafeFires(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -106,11 +106,11 @@ func TestNoUnsafeFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnsafe, unsafeFile, testCase.sourceText,
 				NoUnsafeOptions{CheckAliases: testCase.checkAliases})
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -121,8 +121,8 @@ func TestNoUnsafeFires(t *testing.T) {
 // structural: they write the unprefixed spellings in real components, and `checkAliases` is false.
 // Two more are clean for the React version, and those two are in the fires list instead. The
 // remaining upstream cases here are the structural ones.
-func TestNoUnsafeStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name         string
@@ -204,11 +204,11 @@ func TestNoUnsafeStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoUnsafe, unsafeFile, testCase.sourceText,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoUnsafe, unsafeFile, testCase.sourceText,
 				NoUnsafeOptions{CheckAliases: testCase.checkAliases})
-			rule_testing.ExpectClean(t, result)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -225,8 +225,8 @@ func TestNoUnsafeStaysSilent(t *testing.T) {
 // The rendered description is compared with equality rather than `strings.Contains`, because a
 // predicate weaker than the property it guards is not a guard: a truncated or doubled rendering
 // contains the needle and stays green.
-func TestNoUnsafeReportsAtTheKey(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeReportsAtTheKey(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -271,21 +271,21 @@ func TestNoUnsafeReportsAtTheKey(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoUnsafe, unsafeFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoUnsafe, unsafeFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			if reported := testCase.sourceText[finding.Range.Pos():finding.Range.End()]; reported != testCase.wantText {
-				t.Errorf("reported span is %q, want %q", reported, testCase.wantText)
+				test.Errorf("reported span is %q, want %q", reported, testCase.wantText)
 			}
 			if got := finding.Message.Id; got != testCase.wantMessage.Id {
-				t.Errorf("reported identifier is %q, want %q", got, testCase.wantMessage.Id)
+				test.Errorf("reported identifier is %q, want %q", got, testCase.wantMessage.Id)
 			}
 			if got := finding.Message.Description; got != testCase.wantMessage.Description {
-				t.Errorf("rendered description is %q, want %q", got, testCase.wantMessage.Description)
+				test.Errorf("rendered description is %q, want %q", got, testCase.wantMessage.Description)
 			}
 		})
 	}
@@ -298,8 +298,8 @@ func TestNoUnsafeReportsAtTheKey(t *testing.T) {
 // only buys a guard if something asserts the mapping, and a single class writing all three members
 // is the input that does it: a rule reporting the same identifier three times, or reporting them in
 // the wrong order, passes every other test in this file.
-func TestNoUnsafeNamesTheRightReplacement(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeNamesTheRightReplacement(test *testing.T) {
+	test.Parallel()
 
 	sourceText := "class Foo extends React.Component {\n" +
 		"  UNSAFE_componentWillMount() {}\n" +
@@ -307,8 +307,8 @@ func TestNoUnsafeNamesTheRightReplacement(t *testing.T) {
 		"  UNSAFE_componentWillUpdate() {}\n" +
 		"}\n"
 
-	result := rule_testing.Run(t, NoUnsafe, unsafeFile, sourceText)
-	rule_testing.ExpectFindings(t, result,
+	result := rule_testing.Run(test, NoUnsafe, unsafeFile, sourceText)
+	rule_testing.ExpectFindings(test, result,
 		messageUnsafeComponentWillMount.Id,
 		messageUnsafeComponentWillReceiveProps.Id,
 		messageUnsafeComponentWillUpdate.Id)
@@ -323,7 +323,7 @@ func TestNoUnsafeNamesTheRightReplacement(t *testing.T) {
 	for _, finding := range result.Diagnostics {
 		reported := sourceText[finding.Range.Pos():finding.Range.End()]
 		if want := wantByIdentifier[finding.Message.Id]; reported != want {
-			t.Errorf("finding %q points at %q, want %q", finding.Message.Id, reported, want)
+			test.Errorf("finding %q points at %q, want %q", finding.Message.Id, reported, want)
 		}
 	}
 }
@@ -339,13 +339,13 @@ func TestNoUnsafeNamesTheRightReplacement(t *testing.T) {
 // neither calls `ctx.scoping()` or resolves a reference.
 //
 // Pinned as a test rather than left in prose so that adding a resolution step later fails here.
-func TestNoUnsafeDeclinesTheUntypedHarnessNothing(t *testing.T) {
-	t.Parallel()
+func TestNoUnsafeDeclinesTheUntypedHarnessNothing(test *testing.T) {
+	test.Parallel()
 
 	if NoUnsafe.NeedsTypeChecker {
-		t.Fatal("the rule declares a type checker it does not use")
+		test.Fatal("the rule declares a type checker it does not use")
 	}
-	result := rule_testing.Run(t, NoUnsafe, unsafeFile,
+	result := rule_testing.Run(test, NoUnsafe, unsafeFile,
 		"class Foo extends Component {\n  UNSAFE_componentWillMount() {}\n}\n")
-	rule_testing.ExpectFindings(t, result, messageUnsafeComponentWillMount.Id)
+	rule_testing.ExpectFindings(test, result, messageUnsafeComponentWillMount.Id)
 }

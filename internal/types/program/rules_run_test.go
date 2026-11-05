@@ -15,9 +15,9 @@ import (
 // every registered rule. TanStack/query's config turned most of them off and the footer still read
 // "484 rules" when 118 ran (#v1ah2qq). A rule off everywhere and a rule nobody configured did not run; a
 // rule offered a file that it declined did, and so did one offered only some files.
-func TestRulesRunCountsOnlyTheRulesOfferedAFile(t *testing.T) {
-	t.Parallel()
-	directory := writeProject(t, map[string]string{
+func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
+	test.Parallel()
+	directory := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
 		"CohereSettings.json": `{"rules": {"test-listens": "error", "test-declines": "error", "test-off": "off",
 			"test-only-in-special": "off"},
@@ -27,11 +27,11 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(t *testing.T) {
 	})
 	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if err != nil {
-		t.Fatalf("loading the config: %v", err)
+		test.Fatalf("loading the config: %v", err)
 	}
 
 	listens := func(name string) rule.Rule {
@@ -45,10 +45,10 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(t *testing.T) {
 
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 	if result.Coverage.RulesRun != 3 {
-		t.Errorf("RulesRun is %d of the %d rules handed in, want 3: test-listens, test-declines and test-only-in-special",
+		test.Errorf("RulesRun is %d of the %d rules handed in, want 3: test-listens, test-declines and test-only-in-special",
 			result.Coverage.RulesRun, len(rules))
 	}
 }

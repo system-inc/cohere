@@ -12,10 +12,10 @@ import (
 // firstKey drives a source through the parser and hands the first object-literal property's key
 // node to `ask`, so every assertion below runs against a real parsed node rather than a synthesized
 // one.
-func firstKey(t *testing.T, source string, ask func(key *ast.Node)) {
-	t.Helper()
+func firstKey(test *testing.T, source string, ask func(key *ast.Node)) {
+	test.Helper()
 	found := false
-	rule_testing.Run(t, rule.Rule{
+	rule_testing.Run(test, rule.Rule{
 		Name: "key-probe",
 		Run: func(ctx rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
@@ -36,23 +36,23 @@ func firstKey(t *testing.T, source string, ask func(key *ast.Node)) {
 		},
 	}, "k.ts", "declare const variable: string;\n"+source)
 	if !found {
-		t.Fatalf("%q: no object-literal key reached the probe", source)
+		test.Fatalf("%q: no object-literal key reached the probe", source)
 	}
 }
 
-func expectName(t *testing.T, source string, accept property.Kinds, want string, wantOk bool) {
-	t.Helper()
-	firstKey(t, source, func(key *ast.Node) {
+func expectName(test *testing.T, source string, accept property.Kinds, want string, wantOk bool) {
+	test.Helper()
+	firstKey(test, source, func(key *ast.Node) {
 		got, ok := property.Name(key, accept)
 		if ok != wantOk || got != want {
-			t.Errorf("%q: Name = (%q, %v), want (%q, %v)", source, got, ok, want, wantOk)
+			test.Errorf("%q: Name = (%q, %v), want (%q, %v)", source, got, ok, want, wantOk)
 		}
 	})
 }
 
 // TestStaticAcceptsEverySettledSpelling covers the union set.
-func TestStaticAcceptsEverySettledSpelling(t *testing.T) {
-	t.Parallel()
+func TestStaticAcceptsEverySettledSpelling(test *testing.T) {
+	test.Parallel()
 	for _, c := range []struct{ source, want string }{
 		{"({ plain: 1 });", "plain"},
 		{"({ 'quoted': 1 });", "quoted"},
@@ -69,7 +69,7 @@ func TestStaticAcceptsEverySettledSpelling(t *testing.T) {
 		{"({ method() {} });", "method"},
 		{"({ get accessor() { return 1; } });", "accessor"},
 	} {
-		expectName(t, c.source, property.Static, c.want, true)
+		expectName(test, c.source, property.Static, c.want, true)
 	}
 }
 
@@ -79,20 +79,20 @@ func TestStaticAcceptsEverySettledSpelling(t *testing.T) {
 // `{ [a]: 1 }` names whichever property the variable holds, which is not knowable before it runs.
 // Reading the variable's spelling as the key reported `[foo]()` and `foo()` as duplicate class
 // members, caught by upstream's own clean case rather than by inspection.
-func TestVariableInBracketsIsAlwaysDeclined(t *testing.T) {
-	t.Parallel()
-	expectName(t, "({ [variable]: 1 });", property.Static, "", false)
+func TestVariableInBracketsIsAlwaysDeclined(test *testing.T) {
+	test.Parallel()
+	expectName(test, "({ [variable]: 1 });", property.Static, "", false)
 }
 
 // TestTextualDeclinesWhatItDoesNotAccept pins the narrow set three callers use. Each of these is a
 // spelling those callers never meet, and accepting it would widen their rules silently.
-func TestTextualDeclinesWhatItDoesNotAccept(t *testing.T) {
-	t.Parallel()
-	expectName(t, "({ plain: 1 });", property.Textual, "plain", true)
-	expectName(t, "({ 'quoted': 1 });", property.Textual, "quoted", true)
-	expectName(t, "({ 42: 1 });", property.Textual, "", false)
-	expectName(t, "({ ['computedString']: 1 });", property.Textual, "", false)
-	expectName(t, "({ [`tpl`]: 1 });", property.Textual, "", false)
+func TestTextualDeclinesWhatItDoesNotAccept(test *testing.T) {
+	test.Parallel()
+	expectName(test, "({ plain: 1 });", property.Textual, "plain", true)
+	expectName(test, "({ 'quoted': 1 });", property.Textual, "quoted", true)
+	expectName(test, "({ 42: 1 });", property.Textual, "", false)
+	expectName(test, "({ ['computedString']: 1 });", property.Textual, "", false)
+	expectName(test, "({ [`tpl`]: 1 });", property.Textual, "", false)
 }
 
 // TestComputedPropertyNameDoesNotPanic is the guard that is load-bearing rather than defensive.
@@ -100,16 +100,16 @@ func TestTextualDeclinesWhatItDoesNotAccept(t *testing.T) {
 // Node.Text() panics on a KindComputedPropertyName rather than returning empty, so a caller that
 // read the text first and filtered afterwards crashes the linter. Three of the six lifted
 // implementations had no guard, because their callers never met the shape.
-func TestComputedPropertyNameDoesNotPanic(t *testing.T) {
-	t.Parallel()
+func TestComputedPropertyNameDoesNotPanic(test *testing.T) {
+	test.Parallel()
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			t.Fatalf("Name panicked on a computed key: %v", recovered)
+			test.Fatalf("Name panicked on a computed key: %v", recovered)
 		}
 	}()
 	// Every accept set, including one that excludes Computed, so the early return is exercised too.
 	for _, accept := range []property.Kinds{property.Static, property.Textual, property.Named} {
-		firstKey(t, "({ [variable]: 1 });", func(key *ast.Node) {
+		firstKey(test, "({ [variable]: 1 });", func(key *ast.Node) {
 			property.Name(key, accept)
 			property.NameTagged(key, accept)
 		})
@@ -120,8 +120,8 @@ func TestComputedPropertyNameDoesNotPanic(t *testing.T) {
 //
 // `[1.0]` and `['1.0']` are different class members while `10` and `1e1` are the same one, so
 // neither the source spelling nor the cooked text answers alone.
-func TestNameTaggedSeparatesNumbersFromStrings(t *testing.T) {
-	t.Parallel()
+func TestNameTaggedSeparatesNumbersFromStrings(test *testing.T) {
+	test.Parallel()
 	for _, c := range []struct{ source, want string }{
 		{"({ plain: 1 });", "string:plain"},
 		{"({ 'quoted': 1 });", "string:quoted"},
@@ -131,41 +131,41 @@ func TestNameTaggedSeparatesNumbersFromStrings(t *testing.T) {
 		{"({ 1e1: 1 });", "number:10"},
 		{"({ [`tpl`]: 1 });", "string:tpl"},
 	} {
-		firstKey(t, c.source, func(key *ast.Node) {
+		firstKey(test, c.source, func(key *ast.Node) {
 			got, ok := property.NameTagged(key, property.Static)
 			if !ok || got != c.want {
-				t.Errorf("%q: NameTagged = (%q, %v), want (%q, true)", c.source, got, ok, c.want)
+				test.Errorf("%q: NameTagged = (%q, %v), want (%q, true)", c.source, got, ok, c.want)
 			}
 		})
 	}
 	// The number and string spellings of one text must not collide.
 	var numeric, quoted string
-	firstKey(t, "({ 1.0: 1 });", func(k *ast.Node) { numeric, _ = property.NameTagged(k, property.Static) })
-	firstKey(t, "({ '1.0': 1 });", func(k *ast.Node) { quoted, _ = property.NameTagged(k, property.Static) })
+	firstKey(test, "({ 1.0: 1 });", func(k *ast.Node) { numeric, _ = property.NameTagged(k, property.Static) })
+	firstKey(test, "({ '1.0': 1 });", func(k *ast.Node) { quoted, _ = property.NameTagged(k, property.Static) })
 	if numeric == quoted {
-		t.Errorf("a numeric key and a string key with the same text tagged alike: %q", numeric)
+		test.Errorf("a numeric key and a string key with the same text tagged alike: %q", numeric)
 	}
 }
 
 // TestNilIsNotAName covers the guard a shared function needs and a rule-local one did not: inside a
 // rule the node always came from a walk, and on a shelf any caller can pass anything.
-func TestNilIsNotAName(t *testing.T) {
-	t.Parallel()
+func TestNilIsNotAName(test *testing.T) {
+	test.Parallel()
 	if _, ok := property.Name(nil, property.Static); ok {
-		t.Error("Name(nil) reported a name")
+		test.Error("Name(nil) reported a name")
 	}
 	if _, ok := property.NameTagged(nil, property.Static); ok {
-		t.Error("NameTagged(nil) reported a name")
+		test.Error("NameTagged(nil) reported a name")
 	}
 	if _, ok := property.AccessedName(nil, property.Static); ok {
-		t.Error("AccessedName(nil) reported a name")
+		test.Error("AccessedName(nil) reported a name")
 	}
 }
 
 // TestAccessedName covers the member-access half, where the two spellings of one property have to
 // compare as one reference and a variable subscript must not.
-func TestAccessedName(t *testing.T) {
-	t.Parallel()
+func TestAccessedName(test *testing.T) {
+	test.Parallel()
 	for _, c := range []struct {
 		source string
 		want   string
@@ -183,7 +183,7 @@ func TestAccessedName(t *testing.T) {
 		source := c.source
 		want, wantOk := c.want, c.wantOk
 		found := false
-		rule_testing.Run(t, rule.Rule{
+		rule_testing.Run(test, rule.Rule{
 			Name: "access-probe",
 			Run: func(ctx rule.Context, options any) rule.Listeners {
 				check := func(node *ast.Node) {
@@ -193,7 +193,7 @@ func TestAccessedName(t *testing.T) {
 					found = true
 					got, ok := property.AccessedName(node, property.Static)
 					if ok != wantOk || got != want {
-						t.Errorf("%q: AccessedName = (%q, %v), want (%q, %v)",
+						test.Errorf("%q: AccessedName = (%q, %v), want (%q, %v)",
 							source, got, ok, want, wantOk)
 					}
 				}

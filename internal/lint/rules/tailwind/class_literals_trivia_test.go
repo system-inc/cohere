@@ -13,8 +13,8 @@ import (
 // replaced the opening quote, the file stopped parsing, and the edit engine refused that file's
 // whole batch, every other rule's fixes included. Measured by @system_cohere_format_markdown on
 // perturbed input: 174 files in ahra and 175 in www-phi-health (1,755 and 1,932 refused fixes).
-func TestClassLiteralFixesKeepTheirQuotesAfterTrivia(t *testing.T) {
-	t.Parallel()
+func TestClassLiteralFixesKeepTheirQuotesAfterTrivia(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name, source, want string
 	}{
@@ -36,10 +36,10 @@ func TestClassLiteralFixesKeepTheirQuotesAfterTrivia(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoDuplicateClasses, "Component.tsx", testCase.source)
-			rule_testing.ExpectFixedSource(t, result, testCase.want)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDuplicateClasses, "Component.tsx", testCase.source)
+			rule_testing.ExpectFixedSource(test, result, testCase.want)
 		})
 	}
 }

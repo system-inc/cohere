@@ -42,8 +42,8 @@ var settingsSamples = map[string][2]string{
 }
 
 // tailwindDecoders is every better-tailwindcss rule's registered decoder, by name.
-func tailwindDecoders(t *testing.T) map[string]func(raw []byte, base rule.OptionsBase) (any, error) {
-	t.Helper()
+func tailwindDecoders(test *testing.T) map[string]func(raw []byte, base rule.OptionsBase) (any, error) {
+	test.Helper()
 	decoders := map[string]func(raw []byte, base rule.OptionsBase) (any, error){}
 	for _, registration := range rule.Registered() {
 		if _, isTailwind := tailwindOptionKeys[registration.Rule.Name]; isTailwind {
@@ -51,27 +51,27 @@ func tailwindDecoders(t *testing.T) map[string]func(raw []byte, base rule.Option
 		}
 	}
 	if len(decoders) != 12 {
-		t.Fatalf("found %d better-tailwindcss decoders, want 12", len(decoders))
+		test.Fatalf("found %d better-tailwindcss decoders, want 12", len(decoders))
 	}
 	return decoders
 }
 
 // decodedKey re-encodes decoded options and returns one key's value, compacted.
-func decodedKey(t *testing.T, decoded any, key string) string {
-	t.Helper()
+func decodedKey(test *testing.T, decoded any, key string) string {
+	test.Helper()
 	encoded, err := json.Marshal(decoded)
 	if err != nil {
-		t.Fatalf("encoding %T: %v", decoded, err)
+		test.Fatalf("encoding %T: %v", decoded, err)
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(encoded, &fields); err != nil {
-		t.Fatalf("decoding %T's fields: %v", decoded, err)
+		test.Fatalf("decoding %T's fields: %v", decoded, err)
 	}
-	return compactJsonForTest(t, fields[key])
+	return compactJsonForTest(test, fields[key])
 }
 
-func compactJsonForTest(t *testing.T, raw json.RawMessage) string {
-	t.Helper()
+func compactJsonForTest(test *testing.T, raw json.RawMessage) string {
+	test.Helper()
 	var value any
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return string(raw)
@@ -87,12 +87,12 @@ func settingsBase(block string) rule.OptionsBase {
 	}
 }
 
-func TestEveryDeclaredKeyHasASettingsCase(t *testing.T) {
-	t.Parallel()
+func TestEveryDeclaredKeyHasASettingsCase(test *testing.T) {
+	test.Parallel()
 	for ruleName, keys := range tailwindOptionKeys {
 		for key := range keys {
 			if _, sampled := settingsSamples[key]; !sampled {
-				t.Errorf("%s declares %q and settingsSamples has no case for it", ruleName, key)
+				test.Errorf("%s declares %q and settingsSamples has no case for it", ruleName, key)
 			}
 		}
 	}
@@ -101,27 +101,27 @@ func TestEveryDeclaredKeyHasASettingsCase(t *testing.T) {
 // TestSettingsSitBetweenDefaultsAndOptions is a case per merged key, on every rule that declares it:
 // a key written only in settings reaches the rule, and the rule's own options win over it, as
 // upstream's createRule merges `{...defaults, ...settings, ...options}`.
-func TestSettingsSitBetweenDefaultsAndOptions(t *testing.T) {
-	t.Parallel()
-	for ruleName, decode := range tailwindDecoders(t) {
+func TestSettingsSitBetweenDefaultsAndOptions(test *testing.T) {
+	test.Parallel()
+	for ruleName, decode := range tailwindDecoders(test) {
 		for key := range tailwindOptionKeys[ruleName] {
 			sample := settingsSamples[key]
 			base := settingsBase(`{"` + key + `": ` + sample[0] + `}`)
 
 			fromSettings, err := decode(nil, base)
 			if err != nil {
-				t.Fatalf("%s, %s in settings: %v", ruleName, key, err)
+				test.Fatalf("%s, %s in settings: %v", ruleName, key, err)
 			}
-			if got := decodedKey(t, fromSettings, key); got != compactJsonForTest(t, json.RawMessage(sample[0])) {
-				t.Errorf("%s: %s written in settings as %s decoded as %s", ruleName, key, sample[0], got)
+			if got := decodedKey(test, fromSettings, key); got != compactJsonForTest(test, json.RawMessage(sample[0])) {
+				test.Errorf("%s: %s written in settings as %s decoded as %s", ruleName, key, sample[0], got)
 			}
 
 			fromBoth, err := decode([]byte(`{"`+key+`": `+sample[1]+`}`), base)
 			if err != nil {
-				t.Fatalf("%s, %s in settings and options: %v", ruleName, key, err)
+				test.Fatalf("%s, %s in settings and options: %v", ruleName, key, err)
 			}
-			if got := decodedKey(t, fromBoth, key); got != compactJsonForTest(t, json.RawMessage(sample[1])) {
-				t.Errorf("%s: %s in options (%s) did not win over settings (%s): decoded %s",
+			if got := decodedKey(test, fromBoth, key); got != compactJsonForTest(test, json.RawMessage(sample[1])) {
+				test.Errorf("%s: %s in options (%s) did not win over settings (%s): decoded %s",
 					ruleName, key, sample[1], sample[0], got)
 			}
 		}
@@ -130,26 +130,26 @@ func TestSettingsSitBetweenDefaultsAndOptions(t *testing.T) {
 
 // A key one rule declares and another does not reaches only the rule that declares it, and the merge
 // is shallow: an options key replaces the settings key whole, never merging into it.
-func TestSettingsReachOnlyTheRulesThatDeclareThem(t *testing.T) {
-	t.Parallel()
-	decoders := tailwindDecoders(t)
+func TestSettingsReachOnlyTheRulesThatDeclareThem(test *testing.T) {
+	test.Parallel()
+	decoders := tailwindDecoders(test)
 	base := settingsBase(`{"order": "desc", "callees": ["a", "b"]}`)
 
 	decoded, err := decoders[NoDuplicateClasses.Name](nil, base)
 	if err != nil {
-		t.Fatalf("no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v", err)
+		test.Fatalf("no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v", err)
 	}
 	if callees := legacyNames(decoded.(NoDuplicateClassesOptions).Callees); callees != "a,b" {
-		t.Fatalf("no-duplicate-classes' callees = %v, want settings' [a b]", callees)
+		test.Fatalf("no-duplicate-classes' callees = %v, want settings' [a b]", callees)
 	}
 
 	ordered, err := decoders[EnforceConsistentClassOrder.Name]([]byte(`{"callees": ["c"]}`), base)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	options := ordered.(EnforceConsistentClassOrderOptions)
 	if options.Order != "desc" || legacyNames(options.Callees) != "c" {
-		t.Fatalf("class order decoded order %q and callees %v, want settings' desc and options' [c] alone",
+		test.Fatalf("class order decoded order %q and callees %v, want settings' desc and options' [c] alone",
 			options.Order, options.Callees)
 	}
 }
@@ -164,17 +164,17 @@ func legacyNames(selectors []LegacySelector) string {
 }
 
 // The rule's own element is decoded strictly before anything merges, so its error names its own key.
-func TestARulesOwnOptionsAreDecodedBeforeSettingsMerge(t *testing.T) {
-	t.Parallel()
-	decode := tailwindDecoders(t)[NoDuplicateClasses.Name]
+func TestARulesOwnOptionsAreDecodedBeforeSettingsMerge(test *testing.T) {
+	test.Parallel()
+	decode := tailwindDecoders(test)[NoDuplicateClasses.Name]
 	_, err := decode([]byte(`{"callee": ["cn"]}`), settingsBase(`{"callees": ["mergeClassNames"]}`))
 	if err == nil || !strings.Contains(err.Error(), "callee") {
-		t.Fatalf("a misspelled key in the rule's own options was not refused by name: %v", err)
+		test.Fatalf("a misspelled key in the rule's own options was not refused by name: %v", err)
 	}
 }
 
-func TestSplitTailwindSettingsRefusesWhatNoRuleReads(t *testing.T) {
-	t.Parallel()
+func TestSplitTailwindSettingsRefusesWhatNoRuleReads(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name, block, refused string
 	}{
@@ -186,20 +186,20 @@ func TestSplitTailwindSettingsRefusesWhatNoRuleReads(t *testing.T) {
 	for _, testCase := range testCases {
 		_, err := splitTailwindSettings([]byte(testCase.block))
 		if err == nil || !strings.Contains(err.Error(), testCase.refused) {
-			t.Errorf("%s: %s was not refused naming %s: %v", testCase.name, testCase.block, testCase.refused, err)
+			test.Errorf("%s: %s was not refused naming %s: %v", testCase.name, testCase.block, testCase.refused, err)
 		}
 	}
 
 	parts, err := splitTailwindSettings([]byte(`{"entryPoint": "./theme.css", "order": "desc"}`))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(parts) != 12 {
-		t.Fatalf("entryPoint reached %d rules, want all 12", len(parts))
+		test.Fatalf("entryPoint reached %d rules, want all 12", len(parts))
 	}
 	if !strings.Contains(string(parts[EnforceConsistentClassOrder.Name]), "order") ||
 		strings.Contains(string(parts[NoDuplicateClasses.Name]), "order") {
-		t.Fatalf("order went to the wrong rules: %v", parts)
+		test.Fatalf("order went to the wrong rules: %v", parts)
 	}
 }
 
@@ -214,11 +214,11 @@ const ourSettings = `{
 // TestAnOutsiderIsReadWithUpstreamsDefaults is the zero-config case: a repository with no settings,
 // writing shadcn's `cn` and `clsx`, has those strings read and reported, as upstream would. Before
 // #gj5nm6e the defaults were ours, so every one of these went unchecked.
-func TestAnOutsiderIsReadWithUpstreamsDefaults(t *testing.T) {
-	t.Parallel()
-	decoded, err := tailwindDecoders(t)[NoDuplicateClasses.Name](nil, rule.OptionsBase{ConfigDirectory: "/repo"})
+func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
+	test.Parallel()
+	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](nil, rule.OptionsBase{ConfigDirectory: "/repo"})
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	read := []string{
 		`const merged = cn('flex flex');`,
@@ -244,7 +244,7 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(t *testing.T) {
 		`const Panel = twc.section((properties) => { return properties.open ? 'p-2 p-2' : 'p-4'; });`,
 	}
 	for _, source := range read {
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
 	}
 	unread := []string{
 		`const merged = mergeClassNames('flex flex');`,
@@ -254,18 +254,18 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(t *testing.T) {
 		`const Card = twc.div(function named() { return 'flex flex'; });`,
 	}
 	for _, source := range unread {
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded))
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded))
 	}
 }
 
 // TestOurSettingsReadOurMatchers is our consumers' case: their settings name our own callees and
 // variables, which then replace upstream's for those kinds, while each kind they leave unwritten keeps
 // its defaults.
-func TestOurSettingsReadOurMatchers(t *testing.T) {
-	t.Parallel()
-	decoded, err := tailwindDecoders(t)[NoDuplicateClasses.Name](nil, settingsBase(ourSettings))
+func TestOurSettingsReadOurMatchers(test *testing.T) {
+	test.Parallel()
+	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](nil, settingsBase(ourSettings))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	read := []string{
 		`const merged = mergeClassNames('flex flex');`,
@@ -275,32 +275,32 @@ func TestOurSettingsReadOurMatchers(t *testing.T) {
 		`const element = <div className="flex flex" />;`,
 	}
 	for _, source := range read {
-		rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
 	}
 	unread := []string{
 		`const merged = cn('flex flex');`,
 		`const classes = 'flex flex';`,
 	}
 	for _, source := range unread {
-		rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", source, decoded))
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded))
 	}
 }
 
 // An empty list replaces its kind's defaults with nothing, as upstream's `callees !== undefined` does.
-func TestAnEmptyKindReadsNothingOfIt(t *testing.T) {
-	t.Parallel()
-	decoded, err := tailwindDecoders(t)[NoDuplicateClasses.Name](nil, settingsBase(`{"callees": []}`))
+func TestAnEmptyKindReadsNothingOfIt(test *testing.T) {
+	test.Parallel()
+	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](nil, settingsBase(`{"callees": []}`))
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", `const merged = cn('flex flex');`, decoded))
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoDuplicateClasses, "Component.tsx", `const classNames = 'flex flex';`, decoded), "duplicateClass")
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", `const merged = cn('flex flex');`, decoded))
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", `const classNames = 'flex flex';`, decoded), "duplicateClass")
 }
 
 // TestNamesMatchAsUpstreamsMatchesName pins utils.js's matchesName: the pattern's first match must
 // be the whole name, and an attribute's pattern and name are lowercased first.
-func TestNamesMatchAsUpstreamsMatchesName(t *testing.T) {
-	t.Parallel()
+func TestNamesMatchAsUpstreamsMatchesName(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		patterns  []string
 		lowercase bool
@@ -320,7 +320,7 @@ func TestNamesMatchAsUpstreamsMatchesName(t *testing.T) {
 	for _, testCase := range testCases {
 		patterns := newNamePatterns(testCase.patterns, testCase.lowercase)
 		if got := patterns.matchesUnremembered(testCase.name); got != testCase.want {
-			t.Errorf("%v (lowercase %v) matching %q = %v, want %v",
+			test.Errorf("%v (lowercase %v) matching %q = %v, want %v",
 				testCase.patterns, testCase.lowercase, testCase.name, got, testCase.want)
 		}
 		// And through a selector group, twice, so the second answer is the group's memo.
@@ -335,7 +335,7 @@ func TestNamesMatchAsUpstreamsMatchesName(t *testing.T) {
 		group := newSelectorGroup(selectors, kind)
 		for range 2 {
 			if got := len(group.matching(testCase.name, nil)) > 0; got != testCase.want {
-				t.Errorf("%v (lowercase %v) as selectors matching %q = %v, want %v",
+				test.Errorf("%v (lowercase %v) as selectors matching %q = %v, want %v",
 					testCase.patterns, testCase.lowercase, testCase.name, got, testCase.want)
 			}
 		}
@@ -343,8 +343,8 @@ func TestNamesMatchAsUpstreamsMatchesName(t *testing.T) {
 }
 
 // TestCalleeNameAndPathIsUpstreamsGetESCalleeName pins both readings of a callee.
-func TestCalleeNameAndPathIsUpstreamsGetESCalleeName(t *testing.T) {
-	t.Parallel()
+func TestCalleeNameAndPathIsUpstreamsGetESCalleeName(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		callee, name, path string
 	}{
@@ -372,16 +372,16 @@ func TestCalleeNameAndPathIsUpstreamsGetESCalleeName(t *testing.T) {
 		}
 		walk(sourceFile.AsNode())
 		if len(calls) != 2 {
-			t.Fatalf("%s: found %d calls, want 2", testCase.callee, len(calls))
+			test.Fatalf("%s: found %d calls, want 2", testCase.callee, len(calls))
 		}
 		if name, path := calleeNameAndPath(calls[0]); name != testCase.name || path != testCase.path {
-			t.Errorf("%s: name %q path %q, want %q and %q", testCase.callee, name, path, testCase.name, testCase.path)
+			test.Errorf("%s: name %q path %q, want %q and %q", testCase.callee, name, path, testCase.name, testCase.path)
 		}
 		if name := calleeName(calls[0]); name != testCase.name {
-			t.Errorf("%s: calleeName %q, want %q, the name calleeNameAndPath gives", testCase.callee, name, testCase.name)
+			test.Errorf("%s: calleeName %q, want %q, the name calleeNameAndPath gives", testCase.callee, name, testCase.name)
 		}
 		if name, path := calleeNameAndPath(calls[1]); name != "" || path != "" || calleeName(calls[1]) != "" {
-			t.Errorf("super.cn: name %q path %q, want neither", name, path)
+			test.Errorf("super.cn: name %q path %q, want neither", name, path)
 		}
 	}
 }

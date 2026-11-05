@@ -35,8 +35,8 @@ func maxDepthOf(optionJson string) any {
 // and ZERO cases change verdict between that configuration and cohere's.
 //
 //	17 reporting cases, 11 clean cases.
-func TestMaxDepthFires(t *testing.T) {
-	t.Parallel()
+func TestMaxDepthFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -63,9 +63,9 @@ func TestMaxDepthFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q with %+v: expected %d findings, got %d %v",
+			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 			continue
@@ -74,14 +74,14 @@ func TestMaxDepthFires(t *testing.T) {
 		for range testCase.findings {
 			expected = append(expected, messageMaxDepthTooDeeply.Id)
 		}
-		rule_testing.ExpectFindings(t, result, expected...)
+		rule_testing.ExpectFindings(test, result, expected...)
 	}
 }
 
 // TestMaxDepthStaysSilent carries upstream's clean cases, which are the false positives it already
 // thought about. Each one is a class this port would otherwise ship.
-func TestMaxDepthStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestMaxDepthStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -101,10 +101,10 @@ func TestMaxDepthStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
 		// matches the CALL NAME.
-		rule_testing.ExpectClean(t, result)
+		rule_testing.ExpectClean(test, result)
 	}
 }
 
@@ -120,8 +120,8 @@ func TestMaxDepthStaysSilent(t *testing.T) {
 //
 // Every expected span and message is what the installed ESLint 10.8.1 rule produced on the same
 // source, read out of the oracle run rather than derived by hand.
-func TestMaxDepthSpansAndMessages(t *testing.T) {
-	t.Parallel()
+func TestMaxDepthSpansAndMessages(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -163,9 +163,9 @@ func TestMaxDepthSpansAndMessages(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.spans) {
-			t.Errorf("%q: expected %d findings, got %d %v",
+			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, len(testCase.spans), len(result.Diagnostics), result.MessageIds())
 			continue
 		}
@@ -173,13 +173,13 @@ func TestMaxDepthSpansAndMessages(t *testing.T) {
 		for index, diagnostic := range result.Diagnostics {
 			reported := source[diagnostic.Range.Pos():diagnostic.Range.End()]
 			if reported != testCase.spans[index] {
-				t.Errorf("%q finding %d: expected the span to cover %q, got %q",
+				test.Errorf("%q finding %d: expected the span to cover %q, got %q",
 					testCase.source, index, testCase.spans[index], reported)
 			}
 			// The whole computed sentence: both the depth and the limit are interpolated, and the
 			// depth is the half that a defect would get wrong.
 			if !strings.HasPrefix(diagnostic.Message.Description, testCase.messages[index]) {
-				t.Errorf("%q finding %d: expected the message to open with %q, got %q",
+				test.Errorf("%q finding %d: expected the message to open with %q, got %q",
 					testCase.source, index, testCase.messages[index], diagnostic.Message.Description)
 			}
 		}
@@ -196,8 +196,8 @@ func TestMaxDepthSpansAndMessages(t *testing.T) {
 //
 // Every expected limit is read out of the installed rule's own message, which states maxDepth
 // directly, rather than inferred from a finding count.
-func TestMaxDepthDecoderReadsEveryOptionShape(t *testing.T) {
-	t.Parallel()
+func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		// optionJson is exactly the bytes the config layer hands the decoder.
@@ -232,21 +232,21 @@ func TestMaxDepthDecoderReadsEveryOptionShape(t *testing.T) {
 	for _, testCase := range cases {
 		decoded, err := DecodeMaxDepthOptions([]byte(testCase.optionJson))
 		if err != nil {
-			t.Errorf("decoding %s: %v", testCase.optionJson, err)
+			test.Errorf("decoding %s: %v", testCase.optionJson, err)
 			continue
 		}
 		settings, ok := decoded.(MaxDepthSettings)
 		if !ok {
-			t.Errorf("decoding %s: expected MaxDepthSettings, got %T", testCase.optionJson, decoded)
+			test.Errorf("decoding %s: expected MaxDepthSettings, got %T", testCase.optionJson, decoded)
 			continue
 		}
 		if settings.Disabled != testCase.disabled {
-			t.Errorf("decoding %s: expected disabled=%v, got %v",
+			test.Errorf("decoding %s: expected disabled=%v, got %v",
 				testCase.optionJson, testCase.disabled, settings.Disabled)
 			continue
 		}
 		if !testCase.disabled && settings.Maximum != testCase.maximum {
-			t.Errorf("decoding %s: expected a limit of %d, got %d",
+			test.Errorf("decoding %s: expected a limit of %d, got %d",
 				testCase.optionJson, testCase.maximum, settings.Maximum)
 		}
 	}
@@ -254,21 +254,21 @@ func TestMaxDepthDecoderReadsEveryOptionShape(t *testing.T) {
 	// And end to end, because a decoder row is not a verdict. The disabled shape must report
 	// NOTHING on source that a limit of 0 would report five times.
 	nested := "function f() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }"
-	result := rule_testing.RunWithOptions(t, MaxDepth, maxDepthFile, nested, maxDepthOf(`{"maximum": 0}`))
-	rule_testing.ExpectClean(t, result)
+	result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, nested, maxDepthOf(`{"maximum": 0}`))
+	rule_testing.ExpectClean(test, result)
 
 	// The control: the same source under the sibling zero spelling reports every block, so the
 	// silence above is the option rather than a rule that cannot fire on this input.
-	result = rule_testing.RunWithOptions(t, MaxDepth, maxDepthFile, nested, maxDepthOf(`{"max": 0}`))
+	result = rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, nested, maxDepthOf(`{"max": 0}`))
 	if len(result.Diagnostics) != 5 {
-		t.Errorf("expected the control to report all 5 blocks, got %d: %v",
+		test.Errorf("expected the control to report all 5 blocks, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 
 	// A rule handed nil options enforces upstream's default of 4 rather than doing nothing.
-	result = rule_testing.RunWithOptions(t, MaxDepth, maxDepthFile, nested, nil)
+	result = rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, nested, nil)
 	if len(result.Diagnostics) != 1 {
-		t.Errorf("expected the default limit of 4 to report once, got %d: %v",
+		test.Errorf("expected the default limit of 4 to report once, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 }
@@ -291,8 +291,8 @@ func TestMaxDepthDecoderReadsEveryOptionShape(t *testing.T) {
 // A frame RESETS a count, so it can only show where there is a count to reset: a class nested
 // inside an already-deep block. Every row below is what the installed ESLint 10.8.1 rule answered,
 // and deleting the arm makes all four fail at once while the sibling rows stay green.
-func TestMaxDepthClassMembersAreEachTheirOwnFrame(t *testing.T) {
-	t.Parallel()
+func TestMaxDepthClassMembersAreEachTheirOwnFrame(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -322,10 +322,10 @@ func TestMaxDepthClassMembersAreEachTheirOwnFrame(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, MaxDepth, maxDepthFile, testCase.source,
+		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source,
 			maxDepthOf(testCase.limit))
 		if len(result.Diagnostics) != testCase.findings {
-			t.Errorf("%q at limit %s: expected %d findings, got %d %v",
+			test.Errorf("%q at limit %s: expected %d findings, got %d %v",
 				testCase.source, testCase.limit, testCase.findings,
 				len(result.Diagnostics), result.MessageIds())
 		}

@@ -16,8 +16,8 @@ import (
 // every identifier is still the one its id names after later chunks were started, so no pointer moved.
 // Across them, no identifier is shared, and writing through every identifier of the first leaves the
 // second exactly as it was.
-func TestIdentifiersShareNoStorageAcrossFunctions(t *testing.T) {
-	t.Parallel()
+func TestIdentifiersShareNoStorageAcrossFunctions(test *testing.T) {
+	test.Parallel()
 	var body strings.Builder
 	for index := 0; index < 60; index++ {
 		body.WriteString("  const value" + strings.Repeat("x", index%5) + string(rune('a'+index%26)) + " = input + 1;\n")
@@ -36,18 +36,18 @@ func TestIdentifiersShareNoStorageAcrossFunctions(t *testing.T) {
 			})
 		}}
 	}}
-	rule_testing.RunTypedFiles(t, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
+	rule_testing.RunTypedFiles(test, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
 	if len(functions) != 2 {
-		t.Fatalf("lowered %d functions, want two", len(functions))
+		test.Fatalf("lowered %d functions, want two", len(functions))
 	}
 
 	for _, function := range functions {
 		if len(function.Identifiers) <= 16 {
-			t.Fatalf("%s has %d identifiers, too few to span a second chunk", function.Name, len(function.Identifiers))
+			test.Fatalf("%s has %d identifiers, too few to span a second chunk", function.Name, len(function.Identifiers))
 		}
 		for index, identifier := range function.Identifiers {
 			if identifier.Id != static_single_assignment.IdentifierId(index) {
-				t.Fatalf("%s: identifier %d reads as %d, so a pointer into an earlier chunk moved",
+				test.Fatalf("%s: identifier %d reads as %d, so a pointer into an earlier chunk moved",
 					function.Name, index, identifier.Id)
 			}
 		}
@@ -61,7 +61,7 @@ func TestIdentifiersShareNoStorageAcrossFunctions(t *testing.T) {
 	before := make([]Identifier, len(second.Identifiers))
 	for index, identifier := range second.Identifiers {
 		if owned[identifier] {
-			t.Fatalf("identifier %d of %s is also one of %s's", index, second.Name, first.Name)
+			test.Fatalf("identifier %d of %s is also one of %s's", index, second.Name, first.Name)
 		}
 		before[index] = *identifier
 	}
@@ -71,7 +71,7 @@ func TestIdentifiersShareNoStorageAcrossFunctions(t *testing.T) {
 	}
 	for index, identifier := range second.Identifiers {
 		if *identifier != before[index] {
-			t.Fatalf("writing %s's identifiers changed %s's identifier %d", first.Name, second.Name, index)
+			test.Fatalf("writing %s's identifiers changed %s's identifier %d", first.Name, second.Name, index)
 		}
 	}
 }

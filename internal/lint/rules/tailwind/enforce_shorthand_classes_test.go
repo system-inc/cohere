@@ -13,14 +13,14 @@ import (
 // rule matches on was extracted mechanically from its source rather than retyped: it is 48 rules,
 // and a transcription slip would be a silent miss on one utility family rather than a failure
 // anywhere a suite would notice.
-func runShorthandFixture(t *testing.T, source string) rule_testing.Result {
-	t.Helper()
-	return rule_testing.Run(t, EnforceShorthandClasses, "Component.tsx", source)
+func runShorthandFixture(test *testing.T, source string) rule_testing.Result {
+	test.Helper()
+	return rule_testing.Run(test, EnforceShorthandClasses, "Component.tsx", source)
 }
 
 // TestEnforceShorthandClassesReports covers what upstream reports.
-func TestEnforceShorthandClassesReports(t *testing.T) {
-	t.Parallel()
+func TestEnforceShorthandClassesReports(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name       string
 		source     string
@@ -91,15 +91,15 @@ func TestEnforceShorthandClassesReports(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runShorthandFixture(t, testCase.source)
-			rule_testing.ExpectFindings(t, result, "shorthandClasses")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runShorthandFixture(test, testCase.source)
+			rule_testing.ExpectFindings(test, result, "shorthandClasses")
 			if len(result.Diagnostics) == 0 {
-				t.Fatal("expected a finding")
+				test.Fatal("expected a finding")
 			}
 			if !strings.Contains(result.Diagnostics[0].Message.Description, testCase.correction) {
-				t.Errorf("the message does not name the correction %q: %s",
+				test.Errorf("the message does not name the correction %q: %s",
 					testCase.correction, result.Diagnostics[0].Message.Description)
 			}
 		})
@@ -111,8 +111,8 @@ func TestEnforceShorthandClassesReports(t *testing.T) {
 // Each case here is one of the four things that must agree across a group. Dropping any one of the
 // checks widens the rule silently, which is why each gets its own fixture rather than being taken
 // on trust from the value check.
-func TestEnforceShorthandClassesStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestEnforceShorthandClassesStaysSilent(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name   string
 		source string
@@ -150,9 +150,9 @@ func TestEnforceShorthandClassesStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runShorthandFixture(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runShorthandFixture(test, testCase.source))
 		})
 	}
 }
@@ -162,14 +162,14 @@ func TestEnforceShorthandClassesStaysSilent(t *testing.T) {
 // Several rules in one family can match the same classes. `px-4 py-4` matches both the axis-pair
 // rule and, through them, nothing else; but `ml-1 mr-1 mt-1 mb-1` matches the four-side rule and
 // both two-side rules. Upstream takes one per family, so this reports once rather than three times.
-func TestEnforceShorthandClassesReportsOncePerFamily(t *testing.T) {
-	t.Parallel()
-	result := runShorthandFixture(t, `const element = <div className="ml-1 mr-1 mt-1 mb-1" />;`)
+func TestEnforceShorthandClassesReportsOncePerFamily(test *testing.T) {
+	test.Parallel()
+	result := runShorthandFixture(test, `const element = <div className="ml-1 mr-1 mt-1 mb-1" />;`)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
 	if !strings.Contains(result.Diagnostics[0].Message.Description, "m-1") {
-		t.Errorf("expected the four-side collapse: %s", result.Diagnostics[0].Message.Description)
+		test.Errorf("expected the four-side collapse: %s", result.Diagnostics[0].Message.Description)
 	}
 }
 
@@ -177,11 +177,11 @@ func TestEnforceShorthandClassesReportsOncePerFamily(t *testing.T) {
 //
 // Two families in one literal are two findings, because the one-per-family rule is per family
 // rather than per literal.
-func TestEnforceShorthandClassesReportsEachFamilySeparately(t *testing.T) {
-	t.Parallel()
-	result := runShorthandFixture(t, `const element = <div className="ps-4 pe-4 mt-2 mb-2" />;`)
+func TestEnforceShorthandClassesReportsEachFamilySeparately(test *testing.T) {
+	test.Parallel()
+	result := runShorthandFixture(test, `const element = <div className="ps-4 pe-4 mt-2 mb-2" />;`)
 	if len(result.Diagnostics) != 2 {
-		t.Fatalf("expected two findings, got %d", len(result.Diagnostics))
+		test.Fatalf("expected two findings, got %d", len(result.Diagnostics))
 	}
 }
 
@@ -191,27 +191,27 @@ func TestEnforceShorthandClassesReportsEachFamilySeparately(t *testing.T) {
 // Tailwind never had: the two set `100vw` and `100vh`. The pair stays, and `w-auto h-auto` beside it
 // is the control that the rule still fires through the same harness. Before the check, both
 // reported, and nested literals put two `w-screen h-screen` findings on ahra.
-func TestEnforceShorthandClassesSuggestsOnlyClassesThatExist(t *testing.T) {
-	t.Parallel()
+func TestEnforceShorthandClassesSuggestsOnlyClassesThatExist(test *testing.T) {
+	test.Parallel()
 	packageRoot := classOrderFixturePackageRoot()
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so there is no design system to ask")
+		test.Skip("no installed tailwindcss on this machine, so there is no design system to ask")
 	}
 	run := func(source string) rule_testing.Result {
-		return rule_testing.RunTypedFilesWithSetup(t, EnforceShorthandClasses, map[string]string{
+		return rule_testing.RunTypedFilesWithSetup(test, EnforceShorthandClasses, map[string]string{
 			"Component.tsx":                 source,
 			classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
 		}, "Component.tsx", func(root string) {
 			modules := filepath.Join(root, "node_modules")
 			if err := os.MkdirAll(modules, 0o755); err != nil {
-				t.Fatalf("creating the fixture node_modules: %v", err)
+				test.Fatalf("creating the fixture node_modules: %v", err)
 			}
 			if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-				t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+				test.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
 			}
 		})
 	}
 
-	rule_testing.ExpectClean(t, run(`const element = <div className="h-screen w-screen" />;`))
-	rule_testing.ExpectFindings(t, run(`const element = <div className="h-auto w-auto" />;`), "shorthandClasses")
+	rule_testing.ExpectClean(test, run(`const element = <div className="h-screen w-screen" />;`))
+	rule_testing.ExpectFindings(test, run(`const element = <div className="h-auto w-auto" />;`), "shorthandClasses")
 }

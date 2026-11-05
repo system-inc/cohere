@@ -29,16 +29,16 @@ var scratchPackageSuffixes = []string{"iso", "probe"}
 // The suffix list is deliberately narrow. A real package named for what it does will not end in
 // `iso` or `probe`, and if one ever legitimately does, adding it to an exemption here is a decision
 // somebody makes on purpose rather than a guard quietly widening.
-func TestNoScratchPackagesRemain(t *testing.T) {
-	t.Parallel()
+func TestNoScratchPackagesRemain(test *testing.T) {
+	test.Parallel()
 	entries, err := filepath.Glob("../rules/*")
 	if err != nil {
-		t.Fatalf("globbing rule packages: %v", err)
+		test.Fatalf("globbing rule packages: %v", err)
 	}
 	if len(entries) == 0 {
 		// A sweep with nothing to look at passes for the wrong reason, which is the same shape as
 		// the defect it guards against.
-		t.Fatal("found no rule packages, so this test examined nothing")
+		test.Fatal("found no rule packages, so this test examined nothing")
 	}
 
 	for _, entry := range entries {
@@ -47,7 +47,7 @@ func TestNoScratchPackagesRemain(t *testing.T) {
 			if !strings.HasSuffix(name, suffix) {
 				continue
 			}
-			t.Errorf("internal/rules/%s looks like a throwaway package left behind; delete it file "+
+			test.Errorf("internal/rules/%s looks like a throwaway package left behind; delete it file "+
 				"by file before committing. A scratch copy that registers a rule name breaks "+
 				"TestEveryRuleIsRegistered for every other agent in the tree, and the failure names "+
 				"a package they have never heard of", name)

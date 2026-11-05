@@ -26,8 +26,8 @@ const iframeMissingSandboxFile = "/repository/source/IframeMissingSandbox.tsx"
 // Linter API before any Go was written. The corpus and the running rule agreed on every one.
 
 // TestIframeMissingSandboxFires runs the twelve failing cases from upstream.
-func TestIframeMissingSandboxFires(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -52,17 +52,17 @@ func TestIframeMissingSandboxFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
 
 // TestIframeMissingSandboxStaysSilent runs the thirty three passing cases from upstream.
-func TestIframeMissingSandboxStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -108,10 +108,10 @@ func TestIframeMissingSandboxStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
@@ -129,19 +129,19 @@ func TestIframeMissingSandboxStaysSilent(t *testing.T) {
 // all and `RunTyped` fails while building the type graph with TS18003, no inputs found. Measured by
 // writing all four and reading which two failed and how. A fixture for those suffixes would be
 // unreachable through the harness rather than covered, which reads as coverage and is not.
-func TestIframeMissingSandboxHasNoFileSuffixGate(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxHasNoFileSuffixGate(test *testing.T) {
+	test.Parallel()
 
 	for _, suffix := range []string{".tsx", ".ts"} {
-		t.Run(suffix, func(t *testing.T) {
-			t.Parallel()
+		test.Run(suffix, func(test *testing.T) {
+			test.Parallel()
 			result := rule_testing.RunTyped(
-				t,
+				test,
 				IframeMissingSandbox,
 				"/repository/source/SuffixProbe"+suffix,
 				`React.createElement("iframe");`,
 			)
-			rule_testing.ExpectFindings(t, result, "attributeMissing")
+			rule_testing.ExpectFindings(test, result, "attributeMissing")
 		})
 	}
 }
@@ -152,8 +152,8 @@ func TestIframeMissingSandboxHasNoFileSuffixGate(t *testing.T) {
 // judgment in the wrong place. Upstream reports on the JSXOpeningElement rather than on the whole
 // element, so a paired tag points at the opening tag alone and its closing tag is outside the span.
 // The createElement arm reports on the whole call.
-func TestIframeMissingSandboxAnchorsOnTheOpeningTag(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxAnchorsOnTheOpeningTag(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -171,22 +171,22 @@ func TestIframeMissingSandboxAnchorsOnTheOpeningTag(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			// RunTyped writes strings.TrimSpace(source)+"\n" to disk, so a span sliced from the Go
 			// literal is off by however much leading whitespace the literal carries. These carry
 			// none, and the transform is applied anyway so the slice is against the bytes the
 			// harness actually wrote.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("want %d findings, got %d", len(testCase.wantTexts), len(result.Diagnostics))
+				test.Fatalf("want %d findings, got %d", len(testCase.wantTexts), len(result.Diagnostics))
 			}
 			for index, want := range testCase.wantTexts {
 				diagnostic := result.Diagnostics[index]
 				got := onDisk[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					t.Errorf("finding %d spans %q, want %q", index, got, want)
+					test.Errorf("finding %d spans %q, want %q", index, got, want)
 				}
 			}
 		})
@@ -199,27 +199,27 @@ func TestIframeMissingSandboxAnchorsOnTheOpeningTag(t *testing.T) {
 // format string does. A mutation moving only the per-finding text reads as a surviving mutant with
 // no visible cause unless the rendered text is asserted, and it is asserted against a literal typed
 // here rather than against the rule's own constant, so both sides cannot move together.
-func TestIframeMissingSandboxRendersTheRejectedToken(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxRendersTheRejectedToken(test *testing.T) {
+	test.Parallel()
 
 	result := rule_testing.RunTyped(
-		t,
+		test,
 		IframeMissingSandbox,
 		iframeMissingSandboxFile,
 		`<iframe sandbox="allow-popups __unknown__"/>;`,
 	)
-	rule_testing.ExpectFindings(t, result, "invalidValue")
+	rule_testing.ExpectFindings(test, result, "invalidValue")
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
 	got := result.Diagnostics[0].Message.Description
 	if !strings.HasPrefix(got, "`__unknown__` is not a sandbox token,") {
-		t.Errorf("message does not name the rejected token: %q", got)
+		test.Errorf("message does not name the rejected token: %q", got)
 	}
 	// The token that was ACCEPTED must not appear, which is what separates naming the offender from
 	// naming the whole attribute.
 	if strings.Contains(got, "allow-popups") {
-		t.Errorf("message names an accepted token: %q", got)
+		test.Errorf("message names an accepted token: %q", got)
 	}
 }
 
@@ -229,8 +229,8 @@ func TestIframeMissingSandboxRendersTheRejectedToken(t *testing.T) {
 // `jsx.StringAttributeValue` answers `("", false)` both for an absent attribute and for a present
 // one whose value it cannot read, and this rule reports on exactly one of those two. Every case
 // here was measured against the installed build.
-func TestIframeMissingSandboxSeparatesPresentFromReadable(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxSeparatesPresentFromReadable(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -250,14 +250,14 @@ func TestIframeMissingSandboxSeparatesPresentFromReadable(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -281,8 +281,8 @@ func TestIframeMissingSandboxSeparatesPresentFromReadable(t *testing.T) {
 //
 // The trim is what keeps a leading tab clean, and it is why `"\tallow-forms"` is silent while
 // `"allow-forms\tallow-modals"` is not: trimming acts on the ends of a token, not on its middle.
-func TestIframeMissingSandboxSplitsOnSpacesOnly(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxSplitsOnSpacesOnly(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -296,30 +296,30 @@ func TestIframeMissingSandboxSplitsOnSpacesOnly(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 
 	// The rendered text carries the tab, which is what pins that the whole joined string was the
 	// token rather than either half of it.
 	result := rule_testing.RunTyped(
-		t,
+		test,
 		IframeMissingSandbox,
 		iframeMissingSandboxFile,
 		"<iframe sandbox=\"allow-forms\tallow-modals\" />;",
 	)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
+		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
 	if !strings.HasPrefix(result.Diagnostics[0].Message.Description, "`allow-forms\tallow-modals` is not a sandbox token,") {
-		t.Errorf("message does not carry the joined token: %q", result.Diagnostics[0].Message.Description)
+		test.Errorf("message does not carry the joined token: %q", result.Diagnostics[0].Message.Description)
 	}
 }
 
@@ -329,8 +329,8 @@ func TestIframeMissingSandboxSplitsOnSpacesOnly(t *testing.T) {
 // not count as supplying `sandbox` and the whole call reports as missing. A shorthand DOES count,
 // and its value is an identifier rather than a literal, so it is present and unvalidated. All
 // measured against the installed build; none of these shapes is in the corpus.
-func TestIframeMissingSandboxReadsOnlyIdentifierKeys(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxReadsOnlyIdentifierKeys(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -359,14 +359,14 @@ func TestIframeMissingSandboxReadsOnlyIdentifierKeys(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -378,8 +378,8 @@ func TestIframeMissingSandboxReadsOnlyIdentifierKeys(t *testing.T) {
 // `isCreateElement` accepts none of the three, and all three are measured silent on the installed
 // build. This pins the narrower reading, so a later reader swapping in the shelf helper because its
 // name matches fails here rather than starting to report where upstream is silent.
-func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -400,14 +400,14 @@ func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(t *testing.T
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if len(testCase.wantIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
 }
@@ -419,28 +419,28 @@ func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(t *testing.T
 // `NeedsTypeChecker` fails here rather than producing a vacuous green, which is the failure mode
 // that does not announce itself. The JSX arm needs no checker and keeps reporting either way, which
 // is what makes this a discrimination rather than a blanket silence.
-func TestIframeMissingSandboxRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	untyped := rule_testing.Run(
-		t,
+		test,
 		IframeMissingSandbox,
 		iframeMissingSandboxFile,
 		"import {createElement} from 'react';\ncreateElement('iframe');",
 	)
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 
 	typed := rule_testing.RunTyped(
-		t,
+		test,
 		IframeMissingSandbox,
 		iframeMissingSandboxFile,
 		"import {createElement} from 'react';\ncreateElement('iframe');",
 	)
-	rule_testing.ExpectFindings(t, typed, "attributeMissing")
+	rule_testing.ExpectFindings(test, typed, "attributeMissing")
 
 	// The JSX arm is unaffected by the checker, so it reports under the plain harness too.
-	jsxUntyped := rule_testing.Run(t, IframeMissingSandbox, iframeMissingSandboxFile, `<iframe/>;`)
-	rule_testing.ExpectFindings(t, jsxUntyped, "attributeMissing")
+	jsxUntyped := rule_testing.Run(test, IframeMissingSandbox, iframeMissingSandboxFile, `<iframe/>;`)
+	rule_testing.ExpectFindings(test, jsxUntyped, "attributeMissing")
 }
 
 // TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame covers where cohere leaves upstream.
@@ -452,8 +452,8 @@ func TestIframeMissingSandboxRequiresTheTypedHarness(t *testing.T) {
 // `src` that resolves same-origin is the case the warning exists for. Every silent case here reports
 // under upstream's reading, which is what makes the table discriminate: deleting the origin check
 // fails every one of them.
-func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(t *testing.T) {
-	t.Parallel()
+func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(test *testing.T) {
+	test.Parallel()
 
 	const pair = `sandbox="allow-scripts allow-same-origin"`
 	cases := []struct {
@@ -513,14 +513,14 @@ func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(t *testing
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, IframeMissingSandbox, iframeMissingSandboxFile, testCase.sourceText)
 			if !testCase.reports {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, "invalidCombination")
+			rule_testing.ExpectFindings(test, result, "invalidCombination")
 		})
 	}
 }

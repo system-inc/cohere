@@ -32,8 +32,8 @@ func refusalOf(call func()) (refusal string) {
 // ctx.Program refuses every read a rule did not declare, by name, and admits every read it did
 // (#b8k3bp6). Each method is tried under a declaration of nothing and under one of its own kind only,
 // so a method checking the wrong kind, or none, fails here by name.
-func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
-	t.Parallel()
+func TestAProgramViewAdmitsExactlyTheDeclaredReads(test *testing.T) {
+	test.Parallel()
 	methods := []struct {
 		name string
 		read ProgramRead
@@ -52,16 +52,16 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
 	}
 	program := new(compiler.Program)
 	for _, method := range methods {
-		t.Run(method.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(method.name, func(test *testing.T) {
+			test.Parallel()
 			refused := refusalOf(func() { method.call(ViewProgram(program, nil, Rule{Name: "probe"})) })
 			if !strings.Contains(refused, "rule probe called Program."+method.name) || !strings.Contains(refused, programReadNames[method.read]) {
-				t.Errorf("an undeclared %s was not refused by name and kind: %q", method.name, refused)
+				test.Errorf("an undeclared %s was not refused by name and kind: %q", method.name, refused)
 			}
 			for _, other := range []ProgramRead{ReadsCompilerOptions, ReadsDefaultLibrary, ReadsModuleResolution, ReadsOtherFiles, ReadsDesignSystem} {
 				refused := refusalOf(func() { method.call(ViewProgram(program, nil, Rule{Name: "probe", ProgramReads: other})) })
 				if admitted := refused == ""; admitted != (other == method.read) {
-					t.Errorf("%s under a declaration of %s: admitted %v, want %v", method.name, other, admitted, other == method.read)
+					test.Errorf("%s under a declaration of %s: admitted %v, want %v", method.name, other, admitted, other == method.read)
 				}
 			}
 		})
@@ -70,30 +70,30 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(t *testing.T) {
 
 // Resolving the linted file's own imports is a module-resolution read; resolving another file's is a
 // read of other files, which no per-file key covers.
-func TestResolvingAnotherFilesImportsIsAReadOfOtherFiles(t *testing.T) {
-	t.Parallel()
+func TestResolvingAnotherFilesImportsIsAReadOfOtherFiles(test *testing.T) {
+	test.Parallel()
 	program := new(compiler.Program)
 	resolution := Rule{Name: "probe", ProgramReads: ReadsModuleResolution}
 	refused := refusalOf(func() { ViewProgram(program, nil, resolution).ResolveModule(fileNamed("other.ts"), nil) })
 	if !strings.Contains(refused, "ReadsOtherFiles") {
-		t.Errorf("resolving another file's imports under ReadsModuleResolution alone was not refused: %q", refused)
+		test.Errorf("resolving another file's imports under ReadsModuleResolution alone was not refused: %q", refused)
 	}
 	both := Rule{Name: "probe", ProgramReads: ReadsModuleResolution | ReadsOtherFiles}
 	if refused := refusalOf(func() { ViewProgram(program, nil, both).ResolveModule(fileNamed("other.ts"), nil) }); refused != "" {
-		t.Errorf("resolving another file's imports was refused although ReadsOtherFiles is declared: %q", refused)
+		test.Errorf("resolving another file's imports was refused although ReadsOtherFiles is declared: %q", refused)
 	}
 }
 
 // A program that could not be built is a nil Program, so the rules' `ctx.Program == nil` checks keep
 // meaning what they meant.
-func TestANilProgramViewsAsNil(t *testing.T) {
-	t.Parallel()
+func TestANilProgramViewsAsNil(test *testing.T) {
+	test.Parallel()
 	if ViewProgram(nil, nil, Rule{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
-		t.Error("a nil program gave a non-nil view")
+		test.Error("a nil program gave a non-nil view")
 	}
 	var slot ProgramViewSlot
 	if slot.Point(nil, nil, Rule{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
-		t.Error("a nil program gave a non-nil view from a slot")
+		test.Error("a nil program gave a non-nil view from a slot")
 	}
 	slot.Release()
 }
@@ -115,8 +115,8 @@ func endedOf(call func()) (ended string) {
 // rule's name, including the reads a rule declared, so a rule that kept its Program past the file fails
 // loudly instead of reading through the file the slot was pointed at next. The view a rule kept from one
 // file stays ended while the next file runs, because the slot alternates between two views.
-func TestASlotViewKeptPastItsFileFailsOnEveryRead(t *testing.T) {
-	t.Parallel()
+func TestASlotViewKeptPastItsFileFailsOnEveryRead(test *testing.T) {
+	test.Parallel()
 	program := new(compiler.Program)
 	everything := Rule{Name: "keeps-its-program", ProgramReads: ReadsCompilerOptions | ReadsDefaultLibrary | ReadsModuleResolution | ReadsOtherFiles | ReadsDesignSystem}
 	reads := map[string]func(Program){
@@ -137,7 +137,7 @@ func TestASlotViewKeptPastItsFileFailsOnEveryRead(t *testing.T) {
 	var slot ProgramViewSlot
 	first := slot.Point(program, nil, everything)
 	if ended := endedOf(func() { first.Identity() }); ended != "" {
-		t.Fatalf("a view refused a read during its own file: %s", ended)
+		test.Fatalf("a view refused a read during its own file: %s", ended)
 	}
 	slot.Release()
 	second := slot.Point(program, nil, everything)
@@ -145,18 +145,18 @@ func TestASlotViewKeptPastItsFileFailsOnEveryRead(t *testing.T) {
 	for name, read := range reads {
 		ended := endedOf(func() { read(first) })
 		if ended == "" {
-			t.Errorf("Program.%s read through a view whose file had ended", name)
+			test.Errorf("Program.%s read through a view whose file had ended", name)
 			continue
 		}
 		if !strings.Contains(ended, everything.Name) || !strings.Contains(ended, name) {
-			t.Errorf("Program.%s's refusal names neither the rule nor the read: %s", name, ended)
+			test.Errorf("Program.%s's refusal names neither the rule nor the read: %s", name, ended)
 		}
 	}
 	if ended := endedOf(func() { second.Identity() }); ended != "" {
-		t.Errorf("the next file's view was ended along with the last one: %s", ended)
+		test.Errorf("the next file's view was ended along with the last one: %s", ended)
 	}
 	slot.Release()
 	if ended := endedOf(func() { second.Identity() }); ended == "" {
-		t.Error("the second file's view still read after its own release")
+		test.Error("the second file's view still read after its own release")
 	}
 }

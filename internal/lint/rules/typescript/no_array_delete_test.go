@@ -28,8 +28,8 @@ const noArrayDeleteFile = "noArrayDelete.ts"
 // from the message text alone would miss. Three more pin that `any`, `unknown` and `never` are
 // silent, and they are silent because none of them is an array rather than through any explicit
 // skip. The last one, `delete console.log()`, is not an access at all.
-func TestNoArrayDeleteStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoArrayDeleteStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -83,9 +83,9 @@ func TestNoArrayDeleteStaysSilent(t *testing.T) {
 		{"a dotted property access on a genuine array", "declare const arr: number[];\ndelete arr.length;\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText))
 		})
 	}
 }
@@ -100,8 +100,8 @@ func TestNoArrayDeleteStaysSilent(t *testing.T) {
 // `number[] | string[] | boolean[]` is here to hold that direction down. An INTERSECTION reports
 // when any member is, which is why `number[] & unknown` and `string & Array<number>` both report
 // even though neither is wholly an array.
-func TestNoArrayDeleteFires(t *testing.T) {
-	t.Parallel()
+func TestNoArrayDeleteFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -162,9 +162,9 @@ func TestNoArrayDeleteFires(t *testing.T) {
 		{"parentheses around the receiver", "declare const arr: number[];\ndelete (arr)[0];\n"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText), "noArrayDelete")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText), "noArrayDelete")
 		})
 	}
 }
@@ -188,8 +188,8 @@ func TestNoArrayDeleteFires(t *testing.T) {
 // signal in the whole file: every expected output begins with one, because only the `delete`
 // keyword token is removed and the space after it is not, so a repair that widened its removal by
 // a single byte would fail all twenty two while satisfying every id assertion.
-func TestNoArrayDeleteSuggestions(t *testing.T) {
-	t.Parallel()
+func TestNoArrayDeleteSuggestions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -220,25 +220,25 @@ func TestNoArrayDeleteSuggestions(t *testing.T) {
 		{"an intersection of a string and an array", "\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      ", "\n        declare const arr: string & Array<number>;\n         arr.splice(0, 1);\n      "},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			suggestions := result.Diagnostics[0].Suggestions
 			if len(suggestions) != 1 {
-				t.Fatalf("want one suggestion, got %d", len(suggestions))
+				test.Fatalf("want one suggestion, got %d", len(suggestions))
 			}
 			if suggestions[0].Message.Id != "useSplice" {
-				t.Errorf("suggestion id is %q, want %q", suggestions[0].Message.Id, "useSplice")
+				test.Errorf("suggestion id is %q, want %q", suggestions[0].Message.Id, "useSplice")
 			}
 			// Three fixes per suggestion, one per edited token. Pinned because the adapter carries
 			// a fix slice of any length into one diagnostic, and the edit engine judges each
 			// proposal independently, so a repair that lost one of the three would still apply the
 			// other two and leave source that parses.
 			if len(suggestions[0].Fixes) != 3 {
-				t.Errorf("the suggestion carries %d fixes, want three: the delete token, the open bracket, and the close bracket", len(suggestions[0].Fixes))
+				test.Errorf("the suggestion carries %d fixes, want three: the delete token, the open bracket, and the close bracket", len(suggestions[0].Fixes))
 			}
 			// The harness trims the fixture before building the program, so offsets are against
 			// the trimmed text rather than against the literal written above, and the expected
@@ -261,11 +261,11 @@ func TestNoArrayDeleteSuggestions(t *testing.T) {
 			// one meaningful leading space and drops the shared indentation, because the space the
 			// repair leaves behind is not part of the input's prefix at all.
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
-			got := applyNoArrayDeleteSuggestion(t, source, suggestions[0])
+			got := applyNoArrayDeleteSuggestion(test, source, suggestions[0])
 			leadingTrivia := testCase.sourceText[:len(testCase.sourceText)-len(strings.TrimLeft(testCase.sourceText, " \t\n"))]
 			want := strings.TrimRight(strings.TrimPrefix(testCase.wantOutput, leadingTrivia), " \t\n") + "\n"
 			if got != want {
-				t.Errorf("applying the suggestion produced\n%q\nwant\n%q", got, want)
+				test.Errorf("applying the suggestion produced\n%q\nwant\n%q", got, want)
 			}
 		})
 	}
@@ -277,14 +277,14 @@ func TestNoArrayDeleteSuggestions(t *testing.T) {
 // rule this one genuinely needs the ordering: every suggestion carries three fixes over three
 // distinct ranges in the same expression, so applying them front to back would shift the two that
 // follow and produce garbage that still compiles as a string.
-func applyNoArrayDeleteSuggestion(t *testing.T, source string, suggestion rule.Suggestion) string {
-	t.Helper()
+func applyNoArrayDeleteSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(i, j int) bool { return fixes[i].Range.Pos() > fixes[j].Range.Pos() })
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()
 		if start < 0 || end > len(source) || start > end {
-			t.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
+			test.Fatalf("the suggestion proposes an out-of-range edit [%d,%d) over %d bytes", start, end, len(source))
 		}
 		source = source[:start] + fix.Text + source[end:]
 	}
@@ -309,8 +309,8 @@ func applyNoArrayDeleteSuggestion(t *testing.T, source string, suggestion rule.S
 //
 // The four upstream cases that record no position are covered by the suggestion outputs instead,
 // which pin three exact byte ranges each and are strictly stronger than a span assertion.
-func TestNoArrayDeleteSpans(t *testing.T) {
-	t.Parallel()
+func TestNoArrayDeleteSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -337,43 +337,43 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 		{"an intersection of a string and an array", "\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      ", "delete arr[0]"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("want one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			finding := result.Diagnostics[0]
 			if finding.Range.End() > len(source) {
-				t.Fatalf("the finding ends at %d over %d bytes", finding.Range.End(), len(source))
+				test.Fatalf("the finding ends at %d over %d bytes", finding.Range.End(), len(source))
 			}
 			if got := source[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Errorf("the finding points at %q, want %q", got, testCase.wantText)
+				test.Errorf("the finding points at %q, want %q", got, testCase.wantText)
 			}
 			// Asserted against literals typed here rather than against the rule's own message
 			// constants, because comparing a finding to the constant it was built from moves both
 			// sides together under mutation and reads as a passing test over a changed message.
 			if finding.Message.Id != "noArrayDelete" {
-				t.Errorf("the message id is %q, want %q", finding.Message.Id, "noArrayDelete")
+				test.Errorf("the message id is %q, want %q", finding.Message.Id, "noArrayDelete")
 			}
 			if finding.Message.Description != "Using the `delete` operator with an array expression is unsafe." {
-				t.Errorf("the message reads %q", finding.Message.Description)
+				test.Errorf("the message reads %q", finding.Message.Description)
 			}
 			if finding.RuleName != "@typescript-eslint/no-array-delete" {
-				t.Errorf("the finding reports under %q, and a name that is not the registered one is unsuppressable by the comment its author wrote", finding.RuleName)
+				test.Errorf("the finding reports under %q, and a name that is not the registered one is unsuppressable by the comment its author wrote", finding.RuleName)
 			}
 			if len(finding.Suggestions) != 1 {
-				t.Fatalf("want one suggestion, got %d", len(finding.Suggestions))
+				test.Fatalf("want one suggestion, got %d", len(finding.Suggestions))
 			}
 			if finding.Suggestions[0].Message.Description != "Use `array.splice()` instead." {
-				t.Errorf("the suggestion reads %q", finding.Suggestions[0].Message.Description)
+				test.Errorf("the suggestion reads %q", finding.Suggestions[0].Message.Description)
 			}
 			// A suggestion rather than a fix, asserted because the distinction is permission. The
 			// engine applies a fix unattended, and splice reindexes the array where delete does not,
 			// so this repair changing arms from suggestion to fix would silently rewrite behavior.
 			if len(finding.Fixes) != 0 {
-				t.Errorf("the finding carries %d fixes, and this repair must be a suggestion because splice reindexes the array", len(finding.Fixes))
+				test.Errorf("the finding carries %d fixes, and this repair must be a suggestion because splice reindexes the array", len(finding.Fixes))
 			}
 		})
 	}
@@ -392,21 +392,21 @@ func TestNoArrayDeleteSpans(t *testing.T) {
 // registration, since NeedsTypeChecker is declared; it covers the harness path, where a Context is
 // built by hand. This test pins the declaration AND the guard, so losing either one fails loudly
 // rather than going vacuously green.
-func TestNoArrayDeleteRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoArrayDeleteRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !NoArrayDelete.NeedsTypeChecker {
-		t.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
 	}
 	if NoArrayDelete.Name != "@typescript-eslint/no-array-delete" {
-		t.Errorf("the registered name is %q, and the inventory writes typescript/no-array-delete", NoArrayDelete.Name)
+		test.Errorf("the registered name is %q, and the inventory writes typescript/no-array-delete", NoArrayDelete.Name)
 	}
 
 	// A finding the typed harness produces and the untyped one cannot.
 	source := "declare const arr: number[];\ndelete arr[0];\n"
-	typed := rule_testing.RunTyped(t, NoArrayDelete, noArrayDeleteFile, source)
+	typed := rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, source)
 	if len(typed.Diagnostics) != 1 {
-		t.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
+		test.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}
 
 	// The guard the absorption made possible. Driving the listener with a checker-less Context must
@@ -415,7 +415,7 @@ func TestNoArrayDeleteRequiresTheTypedHarness(t *testing.T) {
 	listeners := NoArrayDelete.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
 	listener, hasListener := listeners[ast.KindDeleteExpression]
 	if !hasListener {
-		t.Fatal("the rule stopped listening on delete expressions")
+		test.Fatal("the rule stopped listening on delete expressions")
 	}
 	for _, statement := range typed.SourceFile.Statements.Nodes {
 		if statement.Kind == ast.KindExpressionStatement {

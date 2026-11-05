@@ -35,23 +35,23 @@ func asTheTypedUnboundMethodHarnessWroteIt(text string) string {
 // Only one upstream case carries options, so this is the single line in the file that can tell a
 // decoder reading its input from one returning a zero value. The key defaults to false, so a decoder
 // that dropped it entirely would still satisfy the other two hundred and ten rows.
-func decodeUnboundMethodOptionsForTest(t *testing.T, raw string) any {
-	t.Helper()
+func decodeUnboundMethodOptionsForTest(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeUnboundMethodOptions(json.RawMessage(raw))
 	if err != nil {
-		t.Fatalf("the decoder refused %s: %v", raw, err)
+		test.Fatalf("the decoder refused %s: %v", raw, err)
 	}
 	return decoded
 }
 
 // runUnboundMethod runs one case, with or without options.
-func runUnboundMethod(t *testing.T, sourceText string, options string) rule_testing.Result {
-	t.Helper()
+func runUnboundMethod(test *testing.T, sourceText string, options string) rule_testing.Result {
+	test.Helper()
 	if options == "" {
-		return rule_testing.RunTyped(t, UnboundMethod, unboundMethodFile, sourceText)
+		return rule_testing.RunTyped(test, UnboundMethod, unboundMethodFile, sourceText)
 	}
-	return rule_testing.RunTypedWithOptions(t, UnboundMethod, unboundMethodFile, sourceText,
-		decodeUnboundMethodOptionsForTest(t, options))
+	return rule_testing.RunTypedWithOptions(test, UnboundMethod, unboundMethodFile, sourceText,
+		decodeUnboundMethodOptionsForTest(test, options))
 }
 
 // TestUnboundMethodStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -66,8 +66,8 @@ func runUnboundMethod(t *testing.T, sourceText string, options string) rule_test
 // where a reference is immediately consumed rather than detached, a `this: void` annotation, an
 // arrow-function property, a natively bound global, and a long tail of assertion and chaining
 // wrappers that have to be seen through.
-func TestUnboundMethodStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -219,9 +219,9 @@ func TestUnboundMethodStaysSilentOnUpstreamPassCases(t *testing.T) {
 		{sourceText: "\nclass Foo {\n  bazz() {}\n}\ndeclare const foo: Foo;\ndeclare const bazz: string;\nfoo[bazz];\n    ", options: ""},
 	}
 	for index, testCase := range cases {
-		t.Run(unboundMethodCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runUnboundMethod(t, testCase.sourceText, testCase.options))
+		test.Run(unboundMethodCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runUnboundMethod(test, testCase.sourceText, testCase.options))
 		})
 	}
 }
@@ -238,8 +238,8 @@ func TestUnboundMethodStaysSilentOnUpstreamPassCases(t *testing.T) {
 // The spans come from replaying each case through the installed build, because upstream records a
 // start column on only three of its sixty-nine findings and a line number alone cannot see a finding
 // anchored on the wrong node on the right line.
-func TestUnboundMethodFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -633,19 +633,19 @@ func TestUnboundMethodFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(unboundMethodCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := runUnboundMethod(t, testCase.sourceText, testCase.options)
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(unboundMethodCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := runUnboundMethod(test, testCase.sourceText, testCase.options)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
+				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 			written := asTheTypedUnboundMethodHarnessWroteIt(testCase.sourceText)
 			for findingIndex, wantSpan := range testCase.wantSpans {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
+					test.Errorf("finding %d points at %q, wanted %q", findingIndex, gotSpan, wantSpan)
 				}
 			}
 		})
@@ -667,8 +667,8 @@ func TestUnboundMethodFiresOnUpstreamFailCases(t *testing.T) {
 // type-level check: `console` is declared in @types/node rather than in the default library, so the
 // type-level test answers false for it and only the name lookup would exempt it. Here the import
 // makes it a local module symbol instead, which is not natively bound at all, so both report.
-func TestUnboundMethodResolvesAcrossAModuleBoundary(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodResolvesAcrossAModuleBoundary(test *testing.T) {
+	test.Parallel()
 
 	const moduleFileName = "/repository/source/class.ts"
 	const moduleSource = "export const console = { log() {} };\n"
@@ -693,21 +693,21 @@ func TestUnboundMethodResolvesAcrossAModuleBoundary(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFiles(t, UnboundMethod, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(test, UnboundMethod, map[string]string{
 				unboundMethodFile: testCase.sourceText,
 				moduleFileName:    moduleSource,
 			}, unboundMethodFile)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			written := asTheTypedUnboundMethodHarnessWroteIt(testCase.sourceText)
 			reported := result.Diagnostics[0]
 			gotSpan := written[reported.Range.Pos():reported.Range.End()]
 			if gotSpan != testCase.wantSpan {
-				t.Errorf("the finding points at %q, wanted %q", gotSpan, testCase.wantSpan)
+				test.Errorf("the finding points at %q, wanted %q", gotSpan, testCase.wantSpan)
 			}
 		})
 	}
@@ -739,22 +739,22 @@ func TestUnboundMethodResolvesAcrossAModuleBoundary(t *testing.T) {
 // The scope of the divergence is exactly this: a union whose constituents are all dangerous but reach
 // different arms. When they agree, or when only one is dangerous, both orderings pick the same one.
 // One of upstream's two hundred and eleven cases is in that position.
-func TestUnboundMethodOnAUnionWhoseConstituentsDisagree(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodOnAUnionWhoseConstituentsDisagree(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "\nclass Foo {\n  floor = function () {};\n}\n\n" +
 		"const { floor } = Math.random() > 0.5 ? new Foo() : Math;\n      "
 
-	result := runUnboundMethod(t, sourceText, "")
+	result := runUnboundMethod(test, sourceText, "")
 
 	// It reports, on the right node. That much matches upstream exactly.
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
 	written := asTheTypedUnboundMethodHarnessWroteIt(sourceText)
 	reported := result.Diagnostics[0]
 	if gotSpan := written[reported.Range.Pos():reported.Range.End()]; gotSpan != "floor" {
-		t.Errorf("the finding points at %q, wanted %q", gotSpan, "floor")
+		test.Errorf("the finding points at %q, wanted %q", gotSpan, "floor")
 	}
 
 	// And it takes the other message, for the checker-ordering reason above. Asserted rather than
@@ -763,7 +763,7 @@ func TestUnboundMethodOnAUnionWhoseConstituentsDisagree(t *testing.T) {
 	const upstreamMessageId = "unboundWithoutThisAnnotation"
 	const ourMessageId = "unbound"
 	if reported.Message.Id != ourMessageId {
-		t.Errorf("reported %q, wanted %q; upstream reports %q here and the difference is the "+
+		test.Errorf("reported %q, wanted %q; upstream reports %q here and the difference is the "+
 			"union constituent order, so a change on either side belongs in the comment above",
 			reported.Message.Id, ourMessageId, upstreamMessageId)
 	}
@@ -783,8 +783,8 @@ func TestUnboundMethodOnAUnionWhoseConstituentsDisagree(t *testing.T) {
 // are what make these a measurement rather than a rubber stamp.
 //
 // Measured against the installed 8.x build, one program per case, with controls in the same run.
-func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -851,12 +851,12 @@ func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUnboundMethod(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUnboundMethod(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheTypedUnboundMethodHarnessWroteIt(testCase.sourceText)
@@ -864,7 +864,7 @@ func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -886,8 +886,8 @@ func TestUnboundMethodSeesThroughWrappersUpstreamsParserRemoves(t *testing.T) {
 // twice on one reference the first time real code has one.
 //
 // Measured against the installed 8.x build, one program per case, with a control in the same run.
-func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -940,12 +940,12 @@ func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUnboundMethod(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUnboundMethod(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheTypedUnboundMethodHarnessWroteIt(testCase.sourceText)
@@ -953,7 +953,7 @@ func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -974,8 +974,8 @@ func TestUnboundMethodOnThisAnnotationsAndRepeatedConstituents(t *testing.T) {
 // all two hundred and eleven imported rows and then reports twice on one reference.
 //
 // Measured against the installed 8.x build, one program per case.
-func TestUnboundMethodStopsAtTheFirstReportingPropertyName(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodStopsAtTheFirstReportingPropertyName(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -1007,12 +1007,12 @@ func TestUnboundMethodStopsAtTheFirstReportingPropertyName(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUnboundMethod(t, testCase.sourceText, "")
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUnboundMethod(test, testCase.sourceText, "")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
-				t.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
+				test.Fatalf("wanted %d findings, got %d, on the case that covers: %s",
 					len(testCase.wantSpans), len(result.Diagnostics), testCase.why)
 			}
 			written := asTheTypedUnboundMethodHarnessWroteIt(testCase.sourceText)
@@ -1020,7 +1020,7 @@ func TestUnboundMethodStopsAtTheFirstReportingPropertyName(t *testing.T) {
 				reported := result.Diagnostics[findingIndex]
 				gotSpan := written[reported.Range.Pos():reported.Range.End()]
 				if gotSpan != wantSpan {
-					t.Errorf("finding %d points at %q, wanted %q (%s)",
+					test.Errorf("finding %d points at %q, wanted %q (%s)",
 						findingIndex, gotSpan, wantSpan, testCase.why)
 				}
 			}
@@ -1035,12 +1035,12 @@ func TestUnboundMethodStopsAtTheFirstReportingPropertyName(t *testing.T) {
 // a vacuous green is the more dangerous of the two failures because nothing announces it. This
 // asserts the untyped harness produces nothing on an input the typed one reports, so a later revert
 // to rule_testing.Run fails loudly rather than quietly.
-func TestUnboundMethodRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	const sourceText = "declare const o: { m(): void };\nconst f = o.m;\n"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, UnboundMethod, unboundMethodFile, sourceText))
-	rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, UnboundMethod, unboundMethodFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, UnboundMethod, unboundMethodFile, sourceText))
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, UnboundMethod, unboundMethodFile,
 		sourceText), "unboundWithoutThisAnnotation")
 }
 
@@ -1050,8 +1050,8 @@ func TestUnboundMethodRequiresTheTypedHarness(t *testing.T) {
 // is to get wrong is the text, and ExpectFindings compares ids and count and nothing else. The
 // wanted strings are typed as literals rather than read from the rule's own constants, because a
 // comparison against the constant moves with any mutation of it.
-func TestUnboundMethodRendersUpstreamsMessageText(t *testing.T) {
-	t.Parallel()
+func TestUnboundMethodRendersUpstreamsMessageText(test *testing.T) {
+	test.Parallel()
 
 	const base = "A method that is not declared with `this: void` may cause unintentional scoping " +
 		"of `this` when separated from its object.\n" +
@@ -1078,18 +1078,18 @@ func TestUnboundMethodRendersUpstreamsMessageText(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runUnboundMethod(t, testCase.sourceText, "")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUnboundMethod(test, testCase.sourceText, "")
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := result.Diagnostics[0]
 			if reported.Message.Id != testCase.wantId {
-				t.Errorf("reported id %q, wanted %q", reported.Message.Id, testCase.wantId)
+				test.Errorf("reported id %q, wanted %q", reported.Message.Id, testCase.wantId)
 			}
 			if reported.Message.Description != testCase.wantMessage {
-				t.Errorf("reported message %q, wanted %q",
+				test.Errorf("reported message %q, wanted %q",
 					reported.Message.Description, testCase.wantMessage)
 			}
 		})

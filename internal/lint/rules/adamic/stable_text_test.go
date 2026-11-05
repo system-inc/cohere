@@ -32,30 +32,30 @@ export const columns: () => Column[] = function() {
 
 // relationMessages walks Case.ts of files with the two relation rules on a program checked by one checker, after
 // asking it about Another.ts first when anotherFirst is set, and returns each rule's message there.
-func relationMessages(t *testing.T, files map[string]string, anotherFirst bool) map[string]string {
-	t.Helper()
-	directory := t.TempDir()
-	writeAdamicSupport(t)(directory)
+func relationMessages(test *testing.T, files map[string]string, anotherFirst bool) map[string]string {
+	test.Helper()
+	directory := test.TempDir()
+	writeAdamicSupport(test)(directory)
 	for name, source := range files {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(source), 0o644); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), SingleThreaded: true})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	another := graph.Program.GetSourceFile(tspath.RootedFilePath(filepath.Join(directory, "Another.ts")))
 	caseFile := graph.Program.GetSourceFile(tspath.RootedFilePath(filepath.Join(directory, "Case.ts")))
 	if another == nil || caseFile == nil {
-		t.Fatal("the fixture's files are not in the program")
+		test.Fatal("the fixture's files are not in the program")
 	}
 	if anotherFirst {
 		graph.Program.GetSemanticDiagnostics(context.Background(), another)
 	}
 	result, err := graph.Walk(context.Background(), []*ast.SourceFile{caseFile}, []rule.Rule{InvariantMutable, NoOptionalWidening})
 	if err != nil {
-		t.Fatalf("walking: %v", err)
+		test.Fatalf("walking: %v", err)
 	}
 	messages := map[string]string{}
 	for _, diagnostic := range result.Diagnostics {
@@ -68,15 +68,15 @@ func relationMessages(t *testing.T, files map[string]string, anotherFirst bool) 
 // the same words whether the checker normalized another file's literals first or not, which at GOMAXPROCS=16 is
 // a matter of scheduling (#dq881as). TypeToString printed `extra?: never` first in one and last in the other.
 // The fixture is held to that: each rule must report in both orders, or the comparison proves nothing.
-func TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst(t *testing.T) {
-	t.Parallel()
-	alone, afterAnother := relationMessages(t, stableTextFiles, false), relationMessages(t, stableTextFiles, true)
+func TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst(test *testing.T) {
+	test.Parallel()
+	alone, afterAnother := relationMessages(test, stableTextFiles, false), relationMessages(test, stableTextFiles, true)
 	for _, ruleName := range []string{InvariantMutable.Name, NoOptionalWidening.Name} {
 		if alone[ruleName] == "" || afterAnother[ruleName] == "" {
-			t.Fatalf("%s did not report in both orders (%q, %q), so this compares nothing", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Fatalf("%s did not report in both orders (%q, %q), so this compares nothing", ruleName, alone[ruleName], afterAnother[ruleName])
 		}
 		if alone[ruleName] != afterAnother[ruleName] {
-			t.Errorf("%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Errorf("%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s", ruleName, alone[ruleName], afterAnother[ruleName])
 		}
 	}
 }
@@ -102,20 +102,20 @@ export const columns: () => Column[] = function() {
 // members keep their written order with the borrowed one after them (#ncz8caa). Own by range printed
 // `meta; extra?; id; note` alone and `meta; id; note; extra?` after Another.ts; own by nothing would print them all
 // by name, `extra?; id; meta; note`.
-func TestOwnMembersAreTheContainersNotWhatItsRangeHolds(t *testing.T) {
-	t.Parallel()
-	alone, afterAnother := relationMessages(t, nestedTextFiles, false), relationMessages(t, nestedTextFiles, true)
+func TestOwnMembersAreTheContainersNotWhatItsRangeHolds(test *testing.T) {
+	test.Parallel()
+	alone, afterAnother := relationMessages(test, nestedTextFiles, false), relationMessages(test, nestedTextFiles, true)
 	// Under Adamic's exactOptionalPropertyTypes a synthesized member is missing-only, and prints `never` (#sp4xwtj).
 	const column = "id: string; note: string; extra?: never; }"
 	for _, ruleName := range []string{InvariantMutable.Name, NoOptionalWidening.Name} {
 		if alone[ruleName] == "" || afterAnother[ruleName] == "" {
-			t.Fatalf("%s did not report in both orders (%q, %q), so this compares nothing", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Fatalf("%s did not report in both orders (%q, %q), so this compares nothing", ruleName, alone[ruleName], afterAnother[ruleName])
 		}
 		if alone[ruleName] != afterAnother[ruleName] {
-			t.Errorf("%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Errorf("%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s", ruleName, alone[ruleName], afterAnother[ruleName])
 		}
 		if !strings.Contains(alone[ruleName], column) {
-			t.Errorf("%s doesn't print the column's own members in their written order, then the borrowed one (%q):\n  %s", ruleName, column, alone[ruleName])
+			test.Errorf("%s doesn't print the column's own members in their written order, then the borrowed one (%q):\n  %s", ruleName, column, alone[ruleName])
 		}
 	}
 }
@@ -124,11 +124,11 @@ func TestOwnMembersAreTheContainersNotWhatItsRangeHolds(t *testing.T) {
 // own printer starts from (#sp4xwtj). Under Adamic's options, exactOptionalPropertyTypes, `y?: number` prints as
 // written, where 632001cb printed the missing marker as `y?: number | undefined`, and a written `| undefined` is kept,
 // since there it is a different type. Without the option the two are one type, and it prints with `| undefined`.
-func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(t *testing.T) {
-	t.Parallel()
+func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(test *testing.T) {
+	test.Parallel()
 	withoutExactOptional := strings.Replace(adamicConfiguration, `"exactOptionalPropertyTypes": true,`, "", 1)
 	if withoutExactOptional == adamicConfiguration {
-		t.Fatal("Adamic's configuration no longer sets exactOptionalPropertyTypes where this test removes it")
+		test.Fatal("Adamic's configuration no longer sets exactOptionalPropertyTypes where this test removes it")
 	}
 	cases := []struct {
 		name, configuration, written, printed string
@@ -138,16 +138,16 @@ func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(t *testi
 		{"not exact, written number", withoutExactOptional, "y?: number", "y?: number | undefined; }"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			messages := relationMessages(t, map[string]string{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			messages := relationMessages(test, map[string]string{
 				"tsconfig.json": testCase.configuration,
 				"Another.ts":    "export {};\n",
 				"Case.ts":       "declare const narrow: { x: number }; function draw(point: { x: number; " + testCase.written + " }): void {} draw(narrow);\n",
 			}, false)
 			message := messages[NoOptionalWidening.Name]
 			if want := "seen here as '{ x: number; " + testCase.printed + "'"; !strings.Contains(message, want) {
-				t.Errorf("with %s written, want %q in:\n  %s", testCase.written, want, message)
+				test.Errorf("with %s written, want %q in:\n  %s", testCase.written, want, message)
 			}
 		})
 	}
@@ -155,19 +155,19 @@ func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(t *testi
 
 // TestASymbolKeyedMemberPrintsWithoutItsCreationId: a member keyed by a unique symbol reads `[brand]` in both relation
 // rules' text, never typescript-go's internal `\xfe@brand@id`, whose id is the symbol's creation order (#z9jcxp1).
-func TestASymbolKeyedMemberPrintsWithoutItsCreationId(t *testing.T) {
-	t.Parallel()
-	messages := relationMessages(t, map[string]string{
+func TestASymbolKeyedMemberPrintsWithoutItsCreationId(test *testing.T) {
+	test.Parallel()
+	messages := relationMessages(test, map[string]string{
 		"Another.ts": "export {};\n",
 		"Case.ts":    "declare const brand: unique symbol; declare const narrow: { x: number }; function draw(point: { x: number; [brand]?: string }): void {} draw(narrow);\n",
 	}, false)
 	message := messages[NoOptionalWidening.Name]
 	for _, want := range []string{"seen here as '{ x: number; [brand]?: string; }'", "the optional property `[brand]`"} {
 		if !strings.Contains(message, want) {
-			t.Errorf("want %q in:\n  %q", want, message)
+			test.Errorf("want %q in:\n  %q", want, message)
 		}
 	}
 	if strings.Contains(message, "\xfe") || strings.Contains(message, `\xfe`) {
-		t.Errorf("the internal name reached the text:\n  %q", message)
+		test.Errorf("the internal name reached the text:\n  %q", message)
 	}
 }

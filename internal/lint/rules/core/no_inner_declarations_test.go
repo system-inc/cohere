@@ -27,17 +27,17 @@ import (
 
 // decodeNoInnerDeclarationsForTest turns a fixture's JSON into options the way the config layer
 // does. An empty string stands for a rule configured as a bare severity.
-func decodeNoInnerDeclarationsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeNoInnerDeclarationsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	decoded, err := DecodeNoInnerDeclarationsOptions([]byte(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding %q: %v", optionsJson, err)
+		test.Fatalf("decoding %q: %v", optionsJson, err)
 	}
 	return decoded
 }
 
-func TestNoInnerDeclarationsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoInnerDeclarationsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -88,10 +88,10 @@ func TestNoInnerDeclarationsStaysSilent(t *testing.T) {
 		{name: "valid38", source: "const C = class { method() { if(test) { function somethingElse() { } } } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations,
-				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(t, testCase.optionsJson)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations,
+				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -99,8 +99,8 @@ func TestNoInnerDeclarationsStaysSilent(t *testing.T) {
 // Each case asserts the count and the two values the message interpolates. ExpectFindings sees
 // neither: both slots are filled from the same node, so swapping them renders a sentence that still
 // reads as English and names the wrong scope.
-func TestNoInnerDeclarationsFires(t *testing.T) {
-	t.Parallel()
+func TestNoInnerDeclarationsFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -137,21 +137,21 @@ func TestNoInnerDeclarationsFires(t *testing.T) {
 		{name: "invalid28", source: "{ function foo () {'use strict' \n console.log('foo called'); } }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
-				testCase.source, decodeNoInnerDeclarationsForTest(t, testCase.optionsJson))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
+				testCase.source, decodeNoInnerDeclarationsForTest(test, testCase.optionsJson))
 			if len(result.Diagnostics) != len(testCase.want) {
-				t.Fatalf("expected %d findings, got %d", len(testCase.want), len(result.Diagnostics))
+				test.Fatalf("expected %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
 			for index, finding := range result.Diagnostics {
 				if finding.Message.Id != "moveDeclToRoot" {
-					t.Errorf("finding %d id: got %q", index, finding.Message.Id)
+					test.Errorf("finding %d id: got %q", index, finding.Message.Id)
 				}
 				wantPrefix := fmt.Sprintf("Move %s declaration to %s root. ",
 					testCase.want[index][0], testCase.want[index][1])
 				if got := finding.Message.Description; !strings.HasPrefix(got, wantPrefix) {
-					t.Errorf("finding %d message:\n got %q\nwant prefix %q", index, got, wantPrefix)
+					test.Errorf("finding %d message:\n got %q\nwant prefix %q", index, got, wantPrefix)
 				}
 			}
 		})
@@ -159,8 +159,8 @@ func TestNoInnerDeclarationsFires(t *testing.T) {
 }
 
 // The span, which no message assertion can see. Upstream reports the whole declaration.
-func TestNoInnerDeclarationsSpan(t *testing.T) {
-	t.Parallel()
+func TestNoInnerDeclarationsSpan(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name        string
@@ -173,24 +173,24 @@ func TestNoInnerDeclarationsSpan(t *testing.T) {
 		{"insideABareBlock", "{ var a; }", `["both"]`, "var a;"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
-				testCase.source, decodeNoInnerDeclarationsForTest(t, testCase.optionsJson))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
+				testCase.source, decodeNoInnerDeclarationsForTest(test, testCase.optionsJson))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
+				test.Fatalf("expected 1 finding, got %d", len(result.Diagnostics))
 			}
 			finding := result.Diagnostics[0]
 			if got := testCase.source[finding.Range.Pos():finding.Range.End()]; got != testCase.wantText {
-				t.Errorf("reported text: got %q, want %q", got, testCase.wantText)
+				test.Errorf("reported text: got %q, want %q", got, testCase.wantText)
 			}
 		})
 	}
 }
 
 // The decoder, whose defaults are the two lines most likely to have no upstream counterpart.
-func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name                     string
@@ -207,24 +207,24 @@ func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
 		{"emptySecondObjectKeepsTheDefault", `["both", {}]`, true, true},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoInnerDeclarationsOptions([]byte(testCase.optionsJson))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+				test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
 			}
 			settings, isSettings := decoded.(NoInnerDeclarationsOptions)
 			if !isSettings {
-				t.Fatalf("decoded to %T", decoded)
+				test.Fatalf("decoded to %T", decoded)
 			}
 			if settings.Both == nil || settings.BlockScopedFunctions == nil {
-				t.Fatalf("a nil field would leave the rule reading a default it did not choose")
+				test.Fatalf("a nil field would leave the rule reading a default it did not choose")
 			}
 			if *settings.Both != testCase.wantBoth {
-				t.Errorf("both: got %v, want %v", *settings.Both, testCase.wantBoth)
+				test.Errorf("both: got %v, want %v", *settings.Both, testCase.wantBoth)
 			}
 			if *settings.BlockScopedFunctions != testCase.wantBlockScopedFunctions {
-				t.Errorf("blockScopedFunctions: got %v, want %v",
+				test.Errorf("blockScopedFunctions: got %v, want %v",
 					*settings.BlockScopedFunctions, testCase.wantBlockScopedFunctions)
 			}
 		})
@@ -240,7 +240,7 @@ func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
 		`["both", {"blockScopedFunctions": "allow"}, "functions"]`,
 	} {
 		if _, err := DecodeNoInnerDeclarationsOptions([]byte(bad)); err == nil {
-			t.Errorf("decoding %q should have failed, and a silent fallback to the default would "+
+			test.Errorf("decoding %q should have failed, and a silent fallback to the default would "+
 				"turn a typo into a configuration nobody wrote", bad)
 		}
 	}
@@ -250,19 +250,19 @@ func TestDecodeNoInnerDeclarationsOptions(t *testing.T) {
 // carries a nil BlockScopedFunctions. Since that option defaults to TRUE, reading nil as false
 // would invert the rule and report every block-scoped function in the tree. Every fixture above
 // routes through the decoder, so nothing there could see it.
-func TestNoInnerDeclarationsHandlesNilOptions(t *testing.T) {
-	t.Parallel()
+func TestNoInnerDeclarationsHandlesNilOptions(test *testing.T) {
+	test.Parallel()
 
 	// Strict code, default options: a block-scoped function declaration is exempt.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"export {};\nif (test) { function doSomething() { } }", nil))
 
 	// Sloppy code, default options: it reports, so the nil path is not simply inert.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"if (test) { function doSomething() { } }", nil), "moveDeclToRoot")
 
 	// And `var` is NOT checked under the default, which is the other half of the nil path.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"if (test) { var foo; }", nil))
 }
 
@@ -278,28 +278,28 @@ func TestNoInnerDeclarationsHandlesNilOptions(t *testing.T) {
 // Pinned here by handing the rule the shape only such a caller produces. The alternative was to
 // delete the reading as unreachable, and the verdict would have been correct today and expired the
 // first time anything constructed these options anywhere but the decoder.
-func TestNoInnerDeclarationsPartialOptionsKeepTheDefault(t *testing.T) {
-	t.Parallel()
+func TestNoInnerDeclarationsPartialOptionsKeepTheDefault(test *testing.T) {
+	test.Parallel()
 
 	checkBoth := true
 	partial := NoInnerDeclarationsOptions{Both: &checkBoth}
 
 	// Strict code with the block-scoped-functions field left unset. The default is allow, so this
 	// is clean; read as disallow it reports.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"export {};\nif (test) { function doSomething() { } }", partial))
 
 	// A control on the same struct, so the clean verdict above is not vacuous: `var` is checked
 	// because Both was set, which proves the options reached the rule at all.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"export {};\nif (test) { var foo; }", partial), "moveDeclToRoot")
 }
 
 // The strictness gate, computed here rather than read off a scope table. Each source of strictness
 // is pinned separately, because a rule that got only one of them right would pass most of the
 // corpus.
-func TestNoInnerDeclarationsStrictness(t *testing.T) {
-	t.Parallel()
+func TestNoInnerDeclarationsStrictness(test *testing.T) {
+	test.Parallel()
 
 	allow := `["both", {"blockScopedFunctions": "allow"}]`
 
@@ -317,10 +317,10 @@ func TestNoInnerDeclarationsStrictness(t *testing.T) {
 		{"staticBlockIsStrict", "class C { static { if (test) { function f() { } } } }"},
 	}
 	for _, testCase := range exempt {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations,
-				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(t, allow)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations,
+				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(test, allow)))
 		})
 	}
 
@@ -346,10 +346,10 @@ func TestNoInnerDeclarationsStrictness(t *testing.T) {
 		{"directiveInsideABlockIsNotAPrologue", "if (test) { 'use strict'\n function f() { } }"},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInnerDeclarations,
-				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(t, allow)),
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInnerDeclarations,
+				"file.ts", testCase.source, decodeNoInnerDeclarationsForTest(test, allow)),
 				"moveDeclToRoot")
 		})
 	}
@@ -370,17 +370,17 @@ func TestNoInnerDeclarationsStrictness(t *testing.T) {
 // above behave as the fixtures in TestNoInnerDeclarationsStrictness assert. This is a parser
 // difference rather than a rule difference and is stated so the next reader does not add the gate
 // and find nothing can reach it.
-func TestNoInnerDeclarationsCannotExpressTheEcmaScript5Gate(t *testing.T) {
-	t.Parallel()
+func TestNoInnerDeclarationsCannotExpressTheEcmaScript5Gate(test *testing.T) {
+	test.Parallel()
 
 	allow := `["both", {"blockScopedFunctions": "allow"}]`
 	// The sloppy half of each pair still reports here, for the ordinary reason.
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
-		"if (test) { function doSomething() { } }", decodeNoInnerDeclarationsForTest(t, allow)),
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
+		"if (test) { function doSomething() { } }", decodeNoInnerDeclarationsForTest(test, allow)),
 		"moveDeclToRoot")
 	// The strict half is where the editions differ: upstream reports it under ES5 and is silent
 	// from ES2015 on. This tool can only produce the second answer.
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoInnerDeclarations, "file.ts",
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
 		"'use strict'\nif (test) { function doSomething() { } }",
-		decodeNoInnerDeclarationsForTest(t, allow)))
+		decodeNoInnerDeclarationsForTest(test, allow)))
 }

@@ -226,7 +226,7 @@ var attentionFixtures = []string{
 	"a\n\n_b_\n\nc",
 }
 
-func TestAttentionEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, attentionFixtures)
+func TestAttentionEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, attentionFixtures)
 }

@@ -134,7 +134,7 @@ var liquidFixtures = []string{
 	"{{\ta\t}}",
 }
 
-func TestLiquidEvents(t *testing.T) {
-	t.Parallel()
-	compareEvents(t, liquidFixtures)
+func TestLiquidEvents(test *testing.T) {
+	test.Parallel()
+	compareEvents(test, liquidFixtures)
 }

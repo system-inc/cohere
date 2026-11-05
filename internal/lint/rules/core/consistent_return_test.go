@@ -31,14 +31,14 @@ type consistentReturnCase struct {
 }
 
 // decodeConsistentReturnOptionsForTest routes a case's options through the shipped decoder.
-func decodeConsistentReturnOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return nil
 	}
 	decoded, err := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+		test.Fatalf("decoding options %q: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -100,20 +100,20 @@ var consistentReturnFiringCases = []consistentReturnCase{
 // them and not to the third -- and a port collapsing the two would pass every id assertion. The
 // span is asserted because upstream computes four different locations by node kind, and pointing
 // at the whole function instead would also pass every id assertion.
-func TestConsistentReturnFires(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range consistentReturnFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
-				testCase.source, decodeConsistentReturnOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistentReturn, consistentReturnFile,
+				testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.findings))
 			for i, finding := range testCase.findings {
 				wantIds[i] = finding.id
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for i, finding := range testCase.findings {
 				got := result.Diagnostics[i].Message.Description
@@ -127,10 +127,10 @@ func TestConsistentReturnFires(t *testing.T) {
 				case "unexpectedReturnValue":
 					want = finding.name + " expected no return value."
 				default:
-					t.Fatalf("unknown message id %q", finding.id)
+					test.Fatalf("unknown message id %q", finding.id)
 				}
 				if !strings.HasPrefix(got, want) {
-					t.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+					test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
 				}
 
 				// The span. Upstream asserts a line and a column; `Run` does not trim its input, so
@@ -139,7 +139,7 @@ func TestConsistentReturnFires(t *testing.T) {
 				line, column := consistentReturnLineAndColumn(testCase.source,
 					result.Diagnostics[i].Range.Pos())
 				if line != finding.line || column != finding.column {
-					t.Errorf("finding %d should point at line %d column %d, got line %d column %d "+
+					test.Errorf("finding %d should point at line %d column %d, got line %d column %d "+
 						"(reported text %q)", i, finding.line, finding.column, line, column,
 						testCase.source[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()])
 				}
@@ -166,15 +166,15 @@ func consistentReturnLineAndColumn(source string, offset int) (int, int) {
 }
 
 // TestConsistentReturnStaysSilent runs upstream's 23 valid cases.
-func TestConsistentReturnStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range consistentReturnCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, ConsistentReturn,
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ConsistentReturn,
 				consistentReturnFile, testCase.source,
-				decodeConsistentReturnOptionsForTest(t, testCase.optionsJson)))
+				decodeConsistentReturnOptionsForTest(test, testCase.optionsJson)))
 		})
 	}
 }
@@ -383,36 +383,36 @@ var consistentReturnAddedCases = []struct {
 }
 
 // TestConsistentReturnAddedCases covers what upstream's corpus does not write.
-func TestConsistentReturnAddedCases(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnAddedCases(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range consistentReturnAddedCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
-				testCase.source, decodeConsistentReturnOptionsForTest(t, testCase.optionsJson))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, ConsistentReturn, consistentReturnFile,
+				testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 
 			if testCase.message == "" {
 				if len(result.Diagnostics) != 0 {
-					t.Fatalf("expected no findings, got %d %v (%s)",
+					test.Fatalf("expected no findings, got %d %v (%s)",
 						len(result.Diagnostics), result.MessageIds(), testCase.reason)
 				}
 				return
 			}
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("expected 1 finding, got %d %v (%s)",
+				test.Fatalf("expected 1 finding, got %d %v (%s)",
 					len(result.Diagnostics), result.MessageIds(), testCase.reason)
 			}
 			if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, testCase.message) {
-				t.Errorf("message should begin %q, got %q (%s)", testCase.message, got, testCase.reason)
+				test.Errorf("message should begin %q, got %q (%s)", testCase.message, got, testCase.reason)
 			}
 		})
 	}
 }
 
 // TestConsistentReturnDecoderRoundTrip pins the option surface through the shipped decoder.
-func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnDecoderRoundTrip(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -423,23 +423,23 @@ func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
 		{"an explicit false", `{"treatUndefinedAsUnspecified":false}`, false},
 		{"an explicit true", `{"treatUndefinedAsUnspecified":true}`, true},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeConsistentReturnOptions(json.RawMessage(testCase.optionsJson))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+				test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
 			}
 			if got := decoded.(ConsistentReturnSettings).TreatUndefinedAsUnspecified; got != testCase.want {
-				t.Errorf("treatUndefinedAsUnspecified should be %v, got %v", testCase.want, got)
+				test.Errorf("treatUndefinedAsUnspecified should be %v, got %v", testCase.want, got)
 			}
 		})
 	}
 
 	// A rule configured as a bare severity is handed nil options rather than a struct. Asserted by
 	// bypassing the decoder entirely, which is the path no other fixture here takes.
-	result := rule_testing.RunWithOptions(t, ConsistentReturn, consistentReturnFile,
+	result := rule_testing.RunWithOptions(test, ConsistentReturn, consistentReturnFile,
 		"function foo() { if (true) return true; else return; }", nil)
-	rule_testing.ExpectFindings(t, result, "missingReturnValue")
+	rule_testing.ExpectFindings(test, result, "missingReturnValue")
 }
 
 // TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken pins the method arm of the report range.
@@ -453,8 +453,8 @@ func TestConsistentReturnDecoderRoundTrip(t *testing.T) {
 // A modifier does separate them. Measured against the installed rule: `class A { static foo() }`
 // reports at column 18, which is `foo`, while the method node begins at column 11 on `static`.
 // Same for `get`, `async` and the generator asterisk.
-func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		source string
@@ -467,13 +467,13 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
 		{"class A { *foo() { if (a) return true; } }", "foo"},
 		{"var o = { async foo() { if (a) return true; } };", "foo"},
 	} {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, ConsistentReturn, consistentReturnFile, testCase.source)
-			rule_testing.ExpectFindings(t, result, "missingReturn")
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistentReturn, consistentReturnFile, testCase.source)
+			rule_testing.ExpectFindings(test, result, "missingReturn")
 			reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantText {
-				t.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
+				test.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
 			}
 		})
 	}
@@ -492,8 +492,8 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(t *testing.T) {
 //
 // Measured cost on the ahra tree: 141 findings against the installed rule's 130, with all 130
 // agreeing exactly and nothing missing in the other direction.
-func TestConsistentReturnHandlesATryWithADeclarationAndAFinally(t *testing.T) {
-	t.Parallel()
+func TestConsistentReturnHandlesATryWithADeclarationAndAFinally(test *testing.T) {
+	test.Parallel()
 
 	// Was an over-report and is now correct. The function returns on every path: the `try` returns
 	// a value and the `catch` rethrows, so nothing falls off the end.
@@ -505,17 +505,17 @@ func TestConsistentReturnHandlesATryWithADeclarationAndAFinally(t *testing.T) {
 	// try and catch positions; ours had a separate branch for the catch case. Removing it brought
 	// the tree from 141 findings to eslint's 131, exactly, with no other rule moving.
 	reporting := "async function f() { try { const r = g(); return r; } catch (e) { throw e; } finally { k(); } }"
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, reporting))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, ConsistentReturn, consistentReturnFile, reporting))
 
 	// The two controls that localised the cause, kept because they are what proves the repair did
 	// not simply silence the rule on every try/finally shape. Each differs from the case above by
 	// exactly one element and each was already correct.
 	withoutDeclaration := "async function f() { try { return 1; } catch (e) { throw e; } finally { k(); } }"
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, withoutDeclaration))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, ConsistentReturn, consistentReturnFile, withoutDeclaration))
 
 	withoutFinally := "async function f() { try { const r = g(); return r; } catch (e) { throw e; } }"
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, ConsistentReturn, consistentReturnFile, withoutFinally))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, ConsistentReturn, consistentReturnFile, withoutFinally))
 }

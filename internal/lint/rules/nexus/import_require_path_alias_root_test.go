@@ -24,8 +24,8 @@ import (
 
 const rootTestAliases = `"aliases": [{"directory": ".", "alias": "@project"}]`
 
-func decodeRootForTest(t *testing.T, root string, base rule.OptionsBase) (ImportRequirePathAliasOptions, error) {
-	t.Helper()
+func decodeRootForTest(test *testing.T, root string, base rule.OptionsBase) (ImportRequirePathAliasOptions, error) {
+	test.Helper()
 	raw := "{" + rootTestAliases + "}"
 	if root != "" {
 		raw = "{" + rootTestAliases + `, "repositoryRoot": "` + root + `"}`
@@ -37,17 +37,17 @@ func decodeRootForTest(t *testing.T, root string, base rule.OptionsBase) (Import
 	return decoded.(ImportRequirePathAliasOptions), nil
 }
 
-func TestImportRequirePathAliasRootIsAnchored(t *testing.T) {
-	t.Parallel()
+func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
+	test.Parallel()
 
 	// The config sits one level above the project, as a repository-level config over a monorepo
 	// project would, so "relative to the config" and "the project root" are different answers and a
 	// decoder that confused them fails a case below.
-	configDirectory := t.TempDir()
+	configDirectory := test.TempDir()
 	projectRoot := filepath.Join(configDirectory, "project")
 	for _, directory := range []string{projectRoot, filepath.Join(configDirectory, "beside")} {
 		if err := os.Mkdir(directory, 0o755); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	}
 	base := rule.OptionsBase{ConfigDirectory: configDirectory, ProjectRoot: projectRoot}
@@ -67,24 +67,24 @@ func TestImportRequirePathAliasRootIsAnchored(t *testing.T) {
 		{"an absolute root holding the project is kept", configDirectory, configDirectory},
 	}
 	for _, testCase := range accepted {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := decodeRootForTest(t, testCase.root, base)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, err := decodeRootForTest(test, testCase.root, base)
 			if err != nil {
-				t.Fatalf("refused: %v", err)
+				test.Fatalf("refused: %v", err)
 			}
 			if decoded.RepositoryRoot != testCase.want {
-				t.Errorf("root = %q, want %q", decoded.RepositoryRoot, testCase.want)
+				test.Errorf("root = %q, want %q", decoded.RepositoryRoot, testCase.want)
 			}
 			if len(decoded.Aliases) != 1 {
-				t.Errorf("the aliases did not survive decoding: %+v", decoded.Aliases)
+				test.Errorf("the aliases did not survive decoding: %+v", decoded.Aliases)
 			}
 		})
 	}
 
 	aFile := filepath.Join(configDirectory, "NotADirectory.json")
 	if err := os.WriteFile(aFile, []byte("{}"), 0o644); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 
 	refused := []struct {
@@ -98,20 +98,20 @@ func TestImportRequirePathAliasRootIsAnchored(t *testing.T) {
 		{"a root that is a file", "NotADirectory.json", base},
 		// The worktree case: the pinned root exists, and it is another checkout, so nothing this run
 		// checks is under it.
-		{"an existing absolute root beside the project", t.TempDir(), base},
+		{"an existing absolute root beside the project", test.TempDir(), base},
 		{"a relative root beside the project", "beside", base},
 		{"absent with no project root known", "", rule.OptionsBase{ConfigDirectory: configDirectory}},
 		{"relative with no config directory known", ".", rule.OptionsBase{ProjectRoot: projectRoot}},
 	}
 	for _, testCase := range refused {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			decoded, err := decodeRootForTest(t, testCase.root, testCase.base)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			decoded, err := decodeRootForTest(test, testCase.root, testCase.base)
 			if err == nil {
-				t.Fatalf("accepted a root that cannot be determined: %q", decoded.RepositoryRoot)
+				test.Fatalf("accepted a root that cannot be determined: %q", decoded.RepositoryRoot)
 			}
 			if !strings.Contains(err.Error(), "repositoryRoot") {
-				t.Errorf("the refusal does not name the option: %v", err)
+				test.Errorf("the refusal does not name the option: %v", err)
 			}
 		})
 	}

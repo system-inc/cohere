@@ -15,11 +15,11 @@ import (
 
 // realCommentCorpus collects comment lines from the tree, so a gate over comments is measured
 // against the comments that exist rather than the ones somebody thought to write.
-func realCommentCorpus(t *testing.T) []string {
-	t.Helper()
+func realCommentCorpus(test *testing.T) []string {
+	test.Helper()
 
 	var comments []string
-	root := corpus.Structure.Path(t, "source")
+	root := corpus.Structure.Path(test, "source")
 	fileCount := 0
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || fileCount >= 400 {
@@ -45,7 +45,7 @@ func realCommentCorpus(t *testing.T) []string {
 	})
 
 	if len(comments) < 1000 {
-		t.Fatalf("the structure corpus gave only %d comments, too few to be a corpus", len(comments))
+		test.Fatalf("the structure corpus gave only %d comments, too few to be a corpus", len(comments))
 	}
 	return comments
 }

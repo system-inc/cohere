@@ -12,7 +12,7 @@ import (
 // The earlier probe scored "distinct symbol identity" alone and disagreed with upstream on 7 of
 // these 23: five false negatives where duplicate var, function and enum declarations share one
 // symbol, and two false positives where the same name in two non-overlapping scopes gets two
-// symbols. That probe only called t.Logf, so it passed while carrying every one of those
+// symbols. That probe only called test.Logf, so it passed while carrying every one of those
 // disagreements, which is the same shape as a measurement that never ran.
 //
 // The shipped rule does not use symbol identity at all, which is why those 7 are not its problem.
@@ -23,8 +23,8 @@ import (
 //
 // The `want` column is what the installed @typescript-eslint 8.67.0 rule does, driven case by case
 // through the ESLint Linter API with a control firing.
-func TestPartitionAndKindSeparatesAllTwentyThree(t *testing.T) {
-	t.Parallel()
+func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		label      string
@@ -69,17 +69,17 @@ func TestPartitionAndKindSeparatesAllTwentyThree(t *testing.T) {
 
 	disagreements := 0
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil)
+		result := rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil)
 		got := len(result.Diagnostics)
 		if got != testCase.wantCount {
 			disagreements++
-			t.Errorf("%-26s got %d findings, upstream reports %d  %s", testCase.label, got, testCase.wantCount, testCase.note)
+			test.Errorf("%-26s got %d findings, upstream reports %d  %s", testCase.label, got, testCase.wantCount, testCase.note)
 		}
 	}
 	if disagreements != 0 {
-		t.Errorf("partition-and-kind disagrees with upstream on %d of %d cases", disagreements, len(cases))
+		test.Errorf("partition-and-kind disagrees with upstream on %d of %d cases", disagreements, len(cases))
 	}
-	t.Logf("partition-and-kind: %d disagreements over %d cases (identity alone had 7)", disagreements, len(cases))
+	test.Logf("partition-and-kind: %d disagreements over %d cases (identity alone had 7)", disagreements, len(cases))
 }
 
 // TestNoRedeclareTypeAliasBelongsToNoMergeSet pins the shape that produced this rule's only finding
@@ -95,8 +95,8 @@ func TestPartitionAndKindSeparatesAllTwentyThree(t *testing.T) {
 // under BOTH option values. `class A {} namespace A {}` is silent by default and reports with
 // `ignoreDeclarationMerge` off, so its verdict moves with the option. A type alias has no exemption
 // to turn off, so both columns below are the same.
-func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareTypeAliasBelongsToNoMergeSet(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		label      string
@@ -111,17 +111,17 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
 		{"type then interface", "type X = { a: number };\ninterface X { b: number }"},
 		{"type then enum", "type X = 1;\nenum X { A }"},
 	} {
-		t.Run(testCase.label, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.label, func(test *testing.T) {
+			test.Parallel()
 			// Default options, which is what the live config gives this rule.
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil),
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil),
 				"redeclared")
 
 			// And with the merge exemptions explicitly off, which must not move the verdict. This is
 			// the half that separates a type alias from a class: there is no exemption to lift.
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, redeclareOptions(false)),
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, redeclareOptions(false)),
 				"redeclared")
 		})
 	}
@@ -133,10 +133,10 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(t *testing.T) {
 		"interface X { a: number }\nnamespace X { export function create() {} }",
 		"class X {}\nnamespace X { export function create() {} }",
 	} {
-		rule_testing.ExpectClean(t,
-			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, nil))
-		rule_testing.ExpectFindings(t,
-			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, redeclareOptions(false)),
+		rule_testing.ExpectClean(test,
+			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, sourceText, nil))
+		rule_testing.ExpectFindings(test,
+			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, sourceText, redeclareOptions(false)),
 			"redeclared")
 	}
 }

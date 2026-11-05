@@ -44,34 +44,34 @@ func (e engineImplementation) Analyze(fixture react_conformance.Fixture) (react_
 // The assertions are two-sided on purpose. A pass floor alone is satisfied by a harness that cannot
 // see, and a failure count alone is satisfied by one that is broken; requiring BOTH to be non-zero,
 // plus the partition check, is what makes the number a measurement.
-func TestAggregateWithTheRuleEngineWired(t *testing.T) {
-	t.Parallel()
+func TestAggregateWithTheRuleEngineWired(test *testing.T) {
+	test.Parallel()
 	if testing.Short() {
-		t.Skip("builds a TypeScript program per fixture")
+		test.Skip("builds a TypeScript program per fixture")
 	}
 	fixtures, err := react_conformance.Load(fixtureRoot)
 	if err != nil {
-		t.Fatalf("loading the corpus: %v", err)
+		test.Fatalf("loading the corpus: %v", err)
 	}
 
-	report, err := react_conformance.Aggregate(fixtures, engineImplementation{t: t})
+	report, err := react_conformance.Aggregate(fixtures, engineImplementation{t: test})
 	if err != nil {
-		t.Fatalf("aggregating: %v", err)
+		test.Fatalf("aggregating: %v", err)
 	}
 
-	t.Logf("\n%s", report.Summary())
+	test.Logf("\n%s", report.Summary())
 	for _, ruleName := range report.RuleNames() {
 		if _, shipped := react_conformance.ShippedRules[ruleName]; !shipped {
 			continue
 		}
-		t.Logf("  shipped rule %-22s %v", ruleName, report.ByRule()[ruleName])
+		test.Logf("  shipped rule %-22s %v", ruleName, report.ByRule()[ruleName])
 	}
 
 	if report.Counts[react_conformance.VerdictPassed] == 0 {
-		t.Error("nothing passed, so the engine is not reaching any rule")
+		test.Error("nothing passed, so the engine is not reaching any rule")
 	}
 	if report.Counts[react_conformance.VerdictFailed] == 0 {
-		t.Error("nothing failed; a harness that cannot produce a failure is not measuring anything")
+		test.Error("nothing failed; a harness that cannot produce a failure is not measuring anything")
 	}
 
 	// The pinned numbers. Exact rather than floors, because the whole point of the wiring is that
@@ -92,7 +92,7 @@ func TestAggregateWithTheRuleEngineWired(t *testing.T) {
 		{react_conformance.VerdictFlowSyntax, react_conformance.ExpectedFlowFixtureCount},
 	} {
 		if got := report.Counts[want.Verdict]; got != want.Count {
-			t.Errorf("%s = %d, want %d", want.Verdict, got, want.Count)
+			test.Errorf("%s = %d, want %d", want.Verdict, got, want.Count)
 		}
 	}
 
@@ -105,7 +105,7 @@ func TestAggregateWithTheRuleEngineWired(t *testing.T) {
 				continue
 			}
 			if verdict.Verdict == react_conformance.VerdictNotScored {
-				t.Errorf("%s is owned by wired rule %s and was not scored: %s", verdict.Name, upstream, verdict.Reason)
+				test.Errorf("%s is owned by wired rule %s and was not scored: %s", verdict.Name, upstream, verdict.Reason)
 			}
 		}
 	}

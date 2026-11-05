@@ -41,14 +41,14 @@ type noRestrictedGlobalsCase struct {
 func noRestrictedGlobalsStringPointer(value string) *string { return &value }
 
 // decodeNoRestrictedGlobalsOptionsForTest routes a case's options through the shipped decoder.
-func decodeNoRestrictedGlobalsOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeNoRestrictedGlobalsOptionsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return nil
 	}
 	decoded, err := DecodeNoRestrictedGlobalsOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+		test.Fatalf("decoding options %q: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -254,8 +254,8 @@ var noRestrictedGlobalsFiringCasesBlock1 = []noRestrictedGlobalsCase{
 //
 // Only four globals are ever named explicitly across the corpus, and a case marked `browser` needs
 // the handful the cases actually touch.
-func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) {
-	t.Helper()
+func runNoRestrictedGlobalsCase(test *testing.T, testCase noRestrictedGlobalsCase) {
+	test.Helper()
 
 	// A case whose verdict is decided ABOVE the rule, by the language version rather than by the
 	// rule's own judgment. `globalThis.foo()` appears in upstream's valid AND invalid lists with
@@ -267,7 +267,7 @@ func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) 
 	// weakening the rule, which would also have silenced the ES2020 half that upstream reports.
 	if testCase.ecmaVersion != 0 && testCase.ecmaVersion < 2020 &&
 		strings.Contains(testCase.source, "globalThis") {
-		t.Skipf("upstream runs this at ecmaVersion %d, where globalThis is not a known name; "+
+		test.Skipf("upstream runs this at ecmaVersion %d, where globalThis is not a known name; "+
 			"our program is ES2022 and the checker knows it unconditionally", testCase.ecmaVersion)
 	}
 
@@ -276,14 +276,14 @@ func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) 
 		files["EnvironmentGlobals.d.ts"] = declarations
 	}
 
-	result := rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, files, "Probe.ts",
-		decodeNoRestrictedGlobalsOptionsForTest(t, testCase.optionsJson))
+	result := rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, files, "Probe.ts",
+		decodeNoRestrictedGlobalsOptionsForTest(test, testCase.optionsJson))
 
 	wantIds := make([]string, len(testCase.findings))
 	for i, finding := range testCase.findings {
 		wantIds[i] = finding.id
 	}
-	rule_testing.ExpectFindings(t, result, wantIds...)
+	rule_testing.ExpectFindings(test, result, wantIds...)
 
 	for i, finding := range testCase.findings {
 		// Upstream's two templates: `Unexpected use of '{{name}}'.` and
@@ -295,7 +295,7 @@ func runNoRestrictedGlobalsCase(t *testing.T, testCase noRestrictedGlobalsCase) 
 			want += " " + finding.customMessage
 		}
 		if got := result.Diagnostics[i].Message.Description; !strings.HasPrefix(got, want) {
-			t.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+			test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
 		}
 	}
 }
@@ -326,19 +326,19 @@ func noRestrictedGlobalsAmbientDeclarations(environmentGlobals *string) string {
 }
 
 // TestNoRestrictedGlobalsFires runs both of upstream's invalid blocks.
-func TestNoRestrictedGlobalsFires(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedGlobalsFiringCasesBlock0 {
-		t.Run("javascript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("javascript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 	for _, testCase := range noRestrictedGlobalsFiringCasesBlock1 {
-		t.Run("typescript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("typescript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 }
@@ -348,19 +348,19 @@ func TestNoRestrictedGlobalsFires(t *testing.T) {
 // The TypeScript block is the more valuable of the two here: 32 of its 42 cases are type positions,
 // which is the exclusion a port is most likely to get wrong, and several of them differ only in
 // how deeply the type is nested.
-func TestNoRestrictedGlobalsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noRestrictedGlobalsCleanCasesBlock0 {
-		t.Run("javascript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("javascript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 	for _, testCase := range noRestrictedGlobalsCleanCasesBlock1 {
-		t.Run("typescript/"+testCase.source, func(t *testing.T) {
-			t.Parallel()
-			runNoRestrictedGlobalsCase(t, testCase)
+		test.Run("typescript/"+testCase.source, func(test *testing.T) {
+			test.Parallel()
+			runNoRestrictedGlobalsCase(test, testCase)
 		})
 	}
 }
@@ -375,8 +375,8 @@ func TestNoRestrictedGlobalsStaysSilent(t *testing.T) {
 //	a bare reference          the identifier itself
 //	window.foo                the PROPERTY, `foo`, not `window.foo` and not `window`
 //	window["foo"]             the string literal, again the property half
-func TestNoRestrictedGlobalsSpan(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsSpan(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name        string
@@ -414,15 +414,15 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 			wantText:    "foo",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			files := map[string]string{"Probe.ts": testCase.source}
 			if testCase.globals != "" {
 				files["EnvironmentGlobals.d.ts"] = "declare var " + testCase.globals + ": any;\n"
 			}
-			result := rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, files, "Probe.ts",
-				decodeNoRestrictedGlobalsOptionsForTest(t, testCase.optionsJson))
-			rule_testing.ExpectFindings(t, result, "defaultMessage")
+			result := rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, files, "Probe.ts",
+				decodeNoRestrictedGlobalsOptionsForTest(test, testCase.optionsJson))
+			rule_testing.ExpectFindings(test, result, "defaultMessage")
 
 			// `RunTypedFiles` writes each fixture as TrimSpace(contents)+"\n", so the literal above
 			// is one byte offset from the file on disk unless it is transformed the same way.
@@ -431,7 +431,7 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 			onDisk := strings.TrimSpace(testCase.source) + "\n"
 			reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantText {
-				t.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
+				test.Errorf("finding should point at %q, got %q", testCase.wantText, reported)
 			}
 		})
 	}
@@ -450,13 +450,13 @@ func TestNoRestrictedGlobalsSpan(t *testing.T) {
 // because distinguishing them would need a name that is restricted while the map is empty. Kept
 // because registering no listener at all is measurably cheaper on a tree of this size than one
 // map lookup per identifier in every file.
-func TestNoRestrictedGlobalsIsInertWithoutConfiguration(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsIsInertWithoutConfiguration(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{"foo;", "window.foo();", "event;"} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals,
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals,
 				noRestrictedGlobalsFile, source, nil))
 		})
 	}
@@ -467,17 +467,17 @@ func TestNoRestrictedGlobalsIsInertWithoutConfiguration(t *testing.T) {
 // A typed rule handed the plain harness goes silent rather than crashing, which makes every
 // StaysSilent case pass vacuously and every Fires case look like a rule defect. Asserted so a later
 // revert to `Run` fails loudly here rather than quietly everywhere.
-func TestNoRestrictedGlobalsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
-	decoded := decodeNoRestrictedGlobalsOptionsForTest(t, `["foo"]`)
+	decoded := decodeNoRestrictedGlobalsOptionsForTest(test, `["foo"]`)
 
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoRestrictedGlobals,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoRestrictedGlobals,
 		noRestrictedGlobalsFile, "foo;", decoded))
 
 	// The control: the same input through the typed harness does report, so the silence above is
 	// the nil-checker guard rather than a rule that cannot fire.
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals,
 		noRestrictedGlobalsFile, "foo;", decoded), "defaultMessage")
 }
 
@@ -485,27 +485,27 @@ func TestNoRestrictedGlobalsRequiresTheTypedHarness(t *testing.T) {
 // ones it must refuse. Upstream's variadic spelling, `["error", "event", "fdescribe"]`, used to
 // reach this decoder as the bare string "event" and fail, while `["error", ["event", "fdescribe"]]`
 // was the workaround; now the list arrives whole and every element is a global.
-func TestDecodeNoRestrictedGlobalsOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeNoRestrictedGlobalsOptions(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeNoRestrictedGlobalsOptions([]byte(
 		`["event", {"name": "fdescribe", "message": "Do not commit fdescribe."}]`))
 	if err != nil {
-		t.Fatalf("upstream's variadic spelling was refused: %v", err)
+		test.Fatalf("upstream's variadic spelling was refused: %v", err)
 	}
 	settings := decoded.(NoRestrictedGlobalsSettings)
 	if len(settings.GlobalsOrder) != 2 || settings.Globals["fdescribe"] != "Do not commit fdescribe." {
-		t.Errorf("both elements must be read, the second with its message: %+v", settings)
+		test.Errorf("both elements must be read, the second with its message: %+v", settings)
 	}
 
 	decoded, err = DecodeNoRestrictedGlobalsOptions([]byte(
 		`[{"globals": ["event"], "checkGlobalObject": true, "globalObjects": ["myGlobal"]}]`))
 	if err != nil {
-		t.Fatalf("the object form was refused: %v", err)
+		test.Fatalf("the object form was refused: %v", err)
 	}
 	settings = decoded.(NoRestrictedGlobalsSettings)
 	if !settings.CheckGlobalObject || len(settings.GlobalObjects) != 1 || len(settings.GlobalsOrder) != 1 {
-		t.Errorf("the object form's flags must be read: %+v", settings)
+		test.Errorf("the object form's flags must be read: %+v", settings)
 	}
 
 	for _, raw := range []string{
@@ -520,7 +520,7 @@ func TestDecodeNoRestrictedGlobalsOptions(t *testing.T) {
 		`[{"name": "event", "mesage": "x"}]`,
 	} {
 		if decoded, err := DecodeNoRestrictedGlobalsOptions([]byte(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }
@@ -537,8 +537,8 @@ func TestDecodeNoRestrictedGlobalsOptions(t *testing.T) {
 // The firing rows are the controls: a component tag and a shorthand both read a binding, and
 // WisdomGateItems.ts:304 before #war4qsy read a bare `status`, which is `window.status` and rendered
 // empty every time.
-func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsJudgesOnlyValueReferences(test *testing.T) {
+	test.Parallel()
 
 	const file = "/repository/source/NoRestrictedGlobals.tsx"
 	const confusing = `["status", "name", "open", "stop", "length", "event", "Option"]`
@@ -550,10 +550,10 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 		{"an object-literal method typed by a standard-library type", "export const lengthy: { length(): number } = { length() { return 1; } };\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
-				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals, file,
+				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(test, confusing)))
 		})
 	}
 
@@ -567,10 +567,10 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 		{"a destructuring default reads the global", "declare const source: { label?: string };\nconst { label = name } = source;\nexport { label };\n", []string{"defaultMessage"}},
 	}
 	for _, testCase := range firing {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, rule_testing.RunTypedWithOptions(t, NoRestrictedGlobals, file,
-				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(t, confusing)), testCase.ids...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals, file,
+				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(test, confusing)), testCase.ids...)
 		})
 	}
 }
@@ -586,16 +586,16 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(t *testing.T) {
 // export-from and import rows are clean, and the firing rows report at the `print` they name. A
 // local `export { print }` with no `from` exports whatever `print` resolves to here, which is the
 // global, so it is a read and reports.
-func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(test *testing.T) {
+	test.Parallel()
 
 	const graphql = "export declare function print(): string;\nexport declare const other: number;\n"
-	run := func(t *testing.T, source string) rule_testing.Result {
-		t.Helper()
-		return rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, map[string]string{
+	run := func(test *testing.T, source string) rule_testing.Result {
+		test.Helper()
+		return rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, map[string]string{
 			"graphql.d.ts": graphql,
 			"a.ts":         source,
-		}, "a.ts", decodeNoRestrictedGlobalsOptionsForTest(t, `["print"]`))
+		}, "a.ts", decodeNoRestrictedGlobalsOptionsForTest(test, `["print"]`))
 	}
 
 	silent := []struct{ name, source string }{
@@ -607,9 +607,9 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 		{"a global exported under the restricted name", "export { undeclaredThing as print };\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, run(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, run(test, testCase.source))
 		})
 	}
 
@@ -620,9 +620,9 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 		{"a local export of the global under its own name, reported once", "export { print as print };\n"},
 	}
 	for _, testCase := range firing {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t, run(t, testCase.source), "defaultMessage")
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test, run(test, testCase.source), "defaultMessage")
 		})
 	}
 }
@@ -636,14 +636,14 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(t *testing.T) {
 // is clean on each row below, restricting `top`.
 //
 // The firing row is the control: a value read in a declaration file is still a read.
-func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(test *testing.T) {
+	test.Parallel()
 
-	run := func(t *testing.T, source string) rule_testing.Result {
-		t.Helper()
-		return rule_testing.RunTypedFilesWithOptions(t, NoRestrictedGlobals, map[string]string{
+	run := func(test *testing.T, source string) rule_testing.Result {
+		test.Helper()
+		return rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, map[string]string{
 			"photon.d.ts": source,
-		}, "photon.d.ts", decodeNoRestrictedGlobalsOptionsForTest(t, `["top"]`))
+		}, "photon.d.ts", decodeNoRestrictedGlobalsOptionsForTest(test, `["top"]`))
 	}
 
 	silent := []struct{ name, source string }{
@@ -653,11 +653,11 @@ func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(t *testing.T
 		{"a type query is a type position", "export declare const edge: typeof top;\n"},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, run(t, testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, run(test, testCase.source))
 		})
 	}
 
-	rule_testing.ExpectFindings(t, run(t, "export declare const edge: number;\nexport default top;\n"), "defaultMessage")
+	rule_testing.ExpectFindings(test, run(test, "export declare const edge: number;\nexport default top;\n"), "defaultMessage")
 }

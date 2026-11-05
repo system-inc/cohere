@@ -15,11 +15,11 @@ const thisAliasFile = "/repository/source/Thing.ts"
 // than by building the internal struct directly. That is deliberate: the decoder is where the
 // `allowDestructuring` inversion and the `allowNames` alias live, so a fixture that skipped it
 // would test the rule while leaving the two most breakable lines in the port unasserted.
-func decodeThisAliasOptionsForTest(t *testing.T, configuration string) any {
-	t.Helper()
+func decodeThisAliasOptionsForTest(test *testing.T, configuration string) any {
+	test.Helper()
 	options, err := DecodeNoThisAliasOptions(json.RawMessage(configuration))
 	if err != nil {
-		t.Fatalf("decoding %s: %v", configuration, err)
+		test.Fatalf("decoding %s: %v", configuration, err)
 	}
 	return options
 }
@@ -29,8 +29,8 @@ func decodeThisAliasOptionsForTest(t *testing.T, configuration string) any {
 // The snapshot carries sixteen diagnostics against these ten inputs, and the extractor flags that
 // as a discrepancy. It is not one: nine inputs report once and the class case reports seven, which
 // the snapshot's own line headers confirm (lines 3, 4, 12, 13, 14, 15 and 16 of that input).
-func TestNoThisAliasFires(t *testing.T) {
-	t.Parallel()
+func TestNoThisAliasFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -83,19 +83,19 @@ func TestNoThisAliasFires(t *testing.T) {
 		{"two declarators in one declaration", "var b = this, c = this;", "{}", []string{"thisAssignment", "thisAssignment"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
-				decodeThisAliasOptionsForTest(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.expected...)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoThisAlias, thisAliasFile, testCase.sourceText,
+				decodeThisAliasOptionsForTest(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.expected...)
 		})
 	}
 }
 
 // TestNoThisAliasStaysSilent is the corpus's seven passing inputs plus the cases our own tree makes
 // reachable.
-func TestNoThisAliasStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoThisAliasStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -141,10 +141,10 @@ func TestNoThisAliasStaysSilent(t *testing.T) {
 		{"a comparison against this", "declare let foo: any;\nconst r = foo === this;", "{}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile,
-				testCase.sourceText, decodeThisAliasOptionsForTest(t, testCase.configuration)))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoThisAlias, thisAliasFile,
+				testCase.sourceText, decodeThisAliasOptionsForTest(test, testCase.configuration)))
 		})
 	}
 }
@@ -154,19 +154,19 @@ func TestNoThisAliasStaysSilent(t *testing.T) {
 // It is not an optimization. Measured on the release binary, the identical source reports in a
 // `.ts` file and is silent in a `.js` one, so dropping the gate would report every `const self =
 // this` in every JavaScript file in a tree upstream leaves alone.
-func TestNoThisAliasDeclinesJavaScript(t *testing.T) {
-	t.Parallel()
+func TestNoThisAliasDeclinesJavaScript(test *testing.T) {
+	test.Parallel()
 
 	const source = "const self = this;"
 
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunWithOptions(t, NoThisAlias, "/repository/source/Thing.ts", source,
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunWithOptions(test, NoThisAlias, "/repository/source/Thing.ts", source,
 			NoThisAliasOptions{}),
 		"thisAssignment")
 
 	for _, fileName := range []string{"/repository/source/Thing.js", "/repository/source/Thing.jsx"} {
-		rule_testing.ExpectClean(t,
-			rule_testing.RunWithOptions(t, NoThisAlias, fileName, source, NoThisAliasOptions{}))
+		rule_testing.ExpectClean(test,
+			rule_testing.RunWithOptions(test, NoThisAlias, fileName, source, NoThisAliasOptions{}))
 	}
 }
 
@@ -177,8 +177,8 @@ func TestNoThisAliasDeclinesJavaScript(t *testing.T) {
 // pointing somewhere upstream does not. The expected text is a literal typed here rather than a
 // value read back off the rule, so a mutation moving the report site cannot move the assertion with
 // it.
-func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
-	t.Parallel()
+func TestNoThisAliasPointsAtTheAliasItself(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name          string
@@ -203,16 +203,16 @@ func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
 		{"an object destructuring assignment", "let foo; ({foo} = this)", `{"allowDestructuring": false}`, "{foo}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, testCase.sourceText,
-				decodeThisAliasOptionsForTest(t, testCase.configuration))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunWithOptions(test, NoThisAlias, thisAliasFile, testCase.sourceText,
+				decodeThisAliasOptionsForTest(test, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			reported := testCase.sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.wantReported {
-				t.Errorf("finding covered %q, wanted %q", reported, testCase.wantReported)
+				test.Errorf("finding covered %q, wanted %q", reported, testCase.wantReported)
 			}
 		})
 	}
@@ -224,29 +224,29 @@ func TestNoThisAliasPointsAtTheAliasItself(t *testing.T) {
 // Assertions are against literals typed here rather than against the rule's own message constants,
 // because comparing a finding to the constant it was built from is an equality that moves with any
 // mutation of that constant and therefore guards nothing.
-func TestNoThisAliasMessagesSayWhichJudgmentFired(t *testing.T) {
-	t.Parallel()
+func TestNoThisAliasMessagesSayWhichJudgmentFired(test *testing.T) {
+	test.Parallel()
 
-	identifier := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile, "const self = this;",
+	identifier := rule_testing.RunWithOptions(test, NoThisAlias, thisAliasFile, "const self = this;",
 		NoThisAliasOptions{})
 	if len(identifier.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(identifier.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(identifier.Diagnostics))
 	}
 
-	destructure := rule_testing.RunWithOptions(t, NoThisAlias, thisAliasFile,
+	destructure := rule_testing.RunWithOptions(test, NoThisAlias, thisAliasFile,
 		"const { props } = this;", NoThisAliasOptions{ReportDestructuring: true})
 	if len(destructure.Diagnostics) != 1 {
-		t.Fatalf("wanted one finding, got %d", len(destructure.Diagnostics))
+		test.Fatalf("wanted one finding, got %d", len(destructure.Diagnostics))
 	}
 
 	if messageNoThisAlias.Id != "thisAssignment" {
-		t.Errorf("identifier message id is %q, wanted %q", messageNoThisAlias.Id, "thisAssignment")
+		test.Errorf("identifier message id is %q, wanted %q", messageNoThisAlias.Id, "thisAssignment")
 	}
 	if messageNoThisDestructure.Id != "thisDestructure" {
-		t.Errorf("destructure message id is %q, wanted %q", messageNoThisDestructure.Id, "thisDestructure")
+		test.Errorf("destructure message id is %q, wanted %q", messageNoThisDestructure.Id, "thisDestructure")
 	}
 	if messageNoThisAlias.Description == messageNoThisDestructure.Description {
-		t.Error("the two messages carry the same description, so a reader cannot tell which judgment fired")
+		test.Error("the two messages carry the same description, so a reader cannot tell which judgment fired")
 	}
 }
 
@@ -254,8 +254,8 @@ func TestNoThisAliasMessagesSayWhichJudgmentFired(t *testing.T) {
 //
 // The inversion and the alias are the two lines in this port with no counterpart upstream, so they
 // get assertions of their own rather than only being exercised through fixtures.
-func TestNoThisAliasDecodeMapsUpstreamSpellings(t *testing.T) {
-	t.Parallel()
+func TestNoThisAliasDecodeMapsUpstreamSpellings(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name                    string
@@ -274,26 +274,26 @@ func TestNoThisAliasDecodeMapsUpstreamSpellings(t *testing.T) {
 		{"both spellings at once prefers the correct one", `{"allowedNames": ["a"], "allowNames": ["b"]}`, false, []string{"a"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeNoThisAliasOptions(json.RawMessage(testCase.configuration))
 			if err != nil {
-				t.Fatalf("decoding: %v", err)
+				test.Fatalf("decoding: %v", err)
 			}
 			options, ok := decoded.(NoThisAliasOptions)
 			if !ok {
-				t.Fatalf("decoder produced %T", decoded)
+				test.Fatalf("decoder produced %T", decoded)
 			}
 			if options.ReportDestructuring != testCase.wantReportDestructuring {
-				t.Errorf("ReportDestructuring is %v, wanted %v",
+				test.Errorf("ReportDestructuring is %v, wanted %v",
 					options.ReportDestructuring, testCase.wantReportDestructuring)
 			}
 			if len(options.AllowedNames) != len(testCase.wantAllowedNames) {
-				t.Fatalf("AllowedNames is %v, wanted %v", options.AllowedNames, testCase.wantAllowedNames)
+				test.Fatalf("AllowedNames is %v, wanted %v", options.AllowedNames, testCase.wantAllowedNames)
 			}
 			for index, name := range testCase.wantAllowedNames {
 				if options.AllowedNames[index] != name {
-					t.Errorf("AllowedNames[%d] is %q, wanted %q", index, options.AllowedNames[index], name)
+					test.Errorf("AllowedNames[%d] is %q, wanted %q", index, options.AllowedNames[index], name)
 				}
 			}
 		})

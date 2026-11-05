@@ -156,26 +156,26 @@ func formatFullStack(fileName string, input string, options formatoptions.Option
 }
 
 // parseInputs normalizes and parses every input.
-func parseInputs(t testing.TB, inputs []string) ([]string, []bool, []parsed) {
-	t.Helper()
+func parseInputs(test testing.TB, inputs []string) ([]string, []bool, []parsed) {
+	test.Helper()
 	texts := make([]string, len(inputs))
 	byteOrderMarks := make([]bool, len(inputs))
 	for index, input := range inputs {
 		texts[index], byteOrderMarks[index] = normalizeInput(input)
 	}
-	return texts, byteOrderMarks, parseTrees(t, texts)
+	return texts, byteOrderMarks, parseTrees(test, texts)
 }
 
 // compareFormat formats every input with Prettier and with the port under every variant, the port two
 // ways: the full stack (Format: the Go parser and the printer, from the text) and the printer alone on
 // the tree the real parser built (the tree loader). Each difference is reported. Where Prettier fails,
 // both must fail too, and Format with an error printing.IsSyntax recognizes.
-func compareFormat(t *testing.T, inputs []string) int {
-	t.Helper()
-	texts, byteOrderMarks, trees := parseInputs(t, inputs)
+func compareFormat(test *testing.T, inputs []string) int {
+	test.Helper()
+	texts, byteOrderMarks, trees := parseInputs(test, inputs)
 	failures, fullStackFailures, compared, oracleFailures := 0, 0, 0, 0
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(t, t.Name())
+	golden := oracletest.Open(test, test.Name())
 	for variantIndex, options := range formatVariants {
 		engine := golden.Engine(options)
 		for index, input := range inputs {
@@ -186,84 +186,84 @@ func compareFormat(t *testing.T, inputs []string) int {
 				oracleFailures++
 				if trees[index].err == "" {
 					failures++
-					t.Errorf("variant %d, %q: the oracle failed (%v) but the parser did not", variantIndex, input, oracleErr)
+					test.Errorf("variant %d, %q: the oracle failed (%v) but the parser did not", variantIndex, input, oracleErr)
 				}
 				if fullStackErr == nil || !printing.IsSyntax(fullStackErr) {
 					fullStackFailures++
-					t.Errorf("variant %d, %q: the oracle failed (%v) but Format gave %q, %v", variantIndex, input, oracleErr, fullStack, fullStackErr)
+					test.Errorf("variant %d, %q: the oracle failed (%v) but Format gave %q, %v", variantIndex, input, oracleErr, fullStack, fullStackErr)
 				}
 				continue
 			}
 			compared++
 			if fullStackErr != nil {
 				fullStackFailures++
-				t.Errorf("variant %d, %q: Format: %v", variantIndex, input, fullStackErr)
+				test.Errorf("variant %d, %q: Format: %v", variantIndex, input, fullStackErr)
 			} else if fullStack != expected {
 				fullStackFailures++
-				t.Errorf("variant %d, %q: Format: %s", variantIndex, input, differential.FirstDifference(expected, fullStack))
+				test.Errorf("variant %d, %q: Format: %s", variantIndex, input, differential.FirstDifference(expected, fullStack))
 			}
 			actual, err := formatParsed("fixture.yaml", trees[index], texts[index], byteOrderMarks[index], options, "preserve", nil)
 			if err != nil {
 				failures++
-				t.Errorf("variant %d, %q: %v", variantIndex, input, err)
+				test.Errorf("variant %d, %q: %v", variantIndex, input, err)
 				continue
 			}
 			if actual != expected {
 				failures++
-				t.Errorf("variant %d, %q: %s", variantIndex, input, differential.FirstDifference(expected, actual))
+				test.Errorf("variant %d, %q: %s", variantIndex, input, differential.FirstDifference(expected, actual))
 			}
 		}
 	}
-	t.Logf("%d comparisons over %d fixtures and %d option sets: full stack %d differ, tree loader %d differ; %d oracle failures (syntax errors)",
+	test.Logf("%d comparisons over %d fixtures and %d option sets: full stack %d differ, tree loader %d differ; %d oracle failures (syntax errors)",
 		compared, len(inputs), len(formatVariants), fullStackFailures, failures, oracleFailures)
 	return failures + fullStackFailures
 }
 
-func TestFormatFixturesMatchOracle(t *testing.T) {
-	t.Parallel()
-	compareFormat(t, formatFixtures)
+func TestFormatFixturesMatchOracle(test *testing.T) {
+	test.Parallel()
+	compareFormat(test, formatFixtures)
 }
 
 // TestFormatOracleCanFail proves the comparison sees a difference: the port's output for one input
 // against the oracle's for another.
-func TestFormatOracleCanFail(t *testing.T) {
-	t.Parallel()
-	engine := oracletest.Open(t, t.Name()).Engine(formatoptions.Default())
+func TestFormatOracleCanFail(test *testing.T) {
+	test.Parallel()
+	engine := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
 	expected, err := engine.Format("fixture.yaml", "a: [b]")
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	texts, byteOrderMarks, trees := parseInputs(t, []string{"a: [b, c]"})
+	texts, byteOrderMarks, trees := parseInputs(test, []string{"a: [b, c]"})
 	if byteOrderMarks[0] {
-		t.Fatal("the fixture has no byte order mark")
+		test.Fatal("the fixture has no byte order mark")
 	}
 	actual, err := Print(trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if actual == expected {
-		t.Fatalf("the comparison found no difference: both printed %q", actual)
+		test.Fatalf("the comparison found no difference: both printed %q", actual)
 	}
 }
 
 // TestPrintDocLeavesTheTrailingHardline checks the embedding contract: PrintDoc's doc ends in the
 // hardline that upstream's textToDoc strips, and the caller strips it.
-func TestPrintDocLeavesTheTrailingHardline(t *testing.T) {
-	t.Parallel()
-	texts, _, trees := parseInputs(t, []string{"a: b\n"})
+func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
+	test.Parallel()
+	texts, _, trees := parseInputs(test, []string{"a: b\n"})
 	document, err := PrintDoc(trees[0].root, texts[0], formatoptions.Default(), nil)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	printed := docString(document)
 	if printed != "a: b\n" {
-		t.Fatalf("PrintDoc laid out is %q", printed)
+		test.Fatalf("PrintDoc laid out is %q", printed)
 	}
 	if stripped := docString(stripTrailingHardline(document)); stripped != "a: b" {
-		t.Fatalf("stripped, it is %q", stripped)
+		test.Fatalf("stripped, it is %q", stripped)
 	}
 	if strings.Contains(printed, "\r") {
-		t.Fatal("a doc has no line endings of its own")
+		test.Fatal("a doc has no line endings of its own")
 	}
 }
 
@@ -281,32 +281,32 @@ process.stdout.write(JSON.stringify(inputs));
 
 // suiteInputs is every input of the yaml-test-suite in the fork's node_modules, and each case's canonical
 // dump.
-func suiteInputs(t *testing.T) []string {
-	t.Helper()
+func suiteInputs(test *testing.T) []string {
+	test.Helper()
 	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed")
+		test.Skip("node is not installed")
 	}
-	script := filepath.Join(t.TempDir(), "suite.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(t))), 0o644); err != nil {
-		t.Fatal(err)
+	script := filepath.Join(test.TempDir(), "suite.mjs")
+	if err := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(test))), 0o644); err != nil {
+		test.Fatal(err)
 	}
 	output, err := exec.Command("node", script).Output()
 	if err != nil {
-		t.Skipf("the yaml-test-suite is not loadable: %v", err)
+		test.Skipf("the yaml-test-suite is not loadable: %v", err)
 	}
 	var inputs []string
 	if err := json.Unmarshal(output, &inputs); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if len(inputs) < 400 {
-		t.Fatalf("the suite gave %d inputs", len(inputs))
+		test.Fatalf("the suite gave %d inputs", len(inputs))
 	}
 	return inputs
 }
 
 // TestYamlTestSuiteMatchesOracle runs the suite through both sides under every option set. Inputs the
 // oracle cannot format (the suite's error cases) must fail in the parser too.
-func TestYamlTestSuiteMatchesOracle(t *testing.T) {
-	t.Parallel()
-	compareFormat(t, suiteInputs(t))
+func TestYamlTestSuiteMatchesOracle(test *testing.T) {
+	test.Parallel()
+	compareFormat(test, suiteInputs(test))
 }

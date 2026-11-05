@@ -22,8 +22,8 @@ const redeclareFile = "/repository/source/Redeclare.ts"
  */
 
 // noRedeclareTsconfig is the corpus tsconfig, with lib replaced for a row that names one.
-func noRedeclareTsconfig(t *testing.T, lib []string) string {
-	t.Helper()
+func noRedeclareTsconfig(test *testing.T, lib []string) string {
+	test.Helper()
 	if lib == nil {
 		return noRedeclareCorpusTsconfig
 	}
@@ -32,18 +32,18 @@ func noRedeclareTsconfig(t *testing.T, lib []string) string {
 		Include         []string       `json:"include"`
 	}
 	if err := json.Unmarshal([]byte(noRedeclareCorpusTsconfig), &configuration); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	configuration.CompilerOptions["lib"] = lib
 	encoded, err := json.Marshal(configuration)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return string(encoded)
 }
 
-func TestNoRedeclareUpstreamCorpus(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareUpstreamCorpus(test *testing.T) {
+	test.Parallel()
 
 	valid, invalid, pinned := 0, 0, 0
 	for _, row := range noRedeclareCorpus {
@@ -62,7 +62,7 @@ func TestNoRedeclareUpstreamCorpus(t *testing.T) {
 		}
 	}
 	if valid != noRedeclareCorpusUpstreamValid || invalid != noRedeclareCorpusUpstreamInvalid || pinned != noRedeclareCorpusUpstreamPinned {
-		t.Fatalf("the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
+		test.Fatalf("the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
 			valid, invalid, pinned, noRedeclareCorpusUpstreamValid, noRedeclareCorpusUpstreamInvalid, noRedeclareCorpusUpstreamPinned)
 	}
 
@@ -71,17 +71,17 @@ func TestNoRedeclareUpstreamCorpus(t *testing.T) {
 		if row.edge != "" {
 			name = row.edge
 		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
 			options, err := DecodeNoRedeclareOptions([]byte(row.options))
 			if err != nil {
-				t.Fatalf("decoding %q: %v", row.options, err)
+				test.Fatalf("decoding %q: %v", row.options, err)
 			}
-			configuration := noRedeclareTsconfig(t, row.lib)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, NoRedeclare, map[string]string{"file.ts": row.source}, "file.ts", options,
+			configuration := noRedeclareTsconfig(test, row.lib)
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoRedeclare, map[string]string{"file.ts": row.source}, "file.ts", options,
 				func(directory string) {
 					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-						t.Fatal(err)
+						test.Fatal(err)
 					}
 				})
 
@@ -97,9 +97,9 @@ func TestNoRedeclareUpstreamCorpus(t *testing.T) {
 				})
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(row.findings) {
-				t.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
+				test.Fatalf("the rule reports %q, and typescript-eslint 8.71.0 reports %q", reported, row.findings)
 			}
-			rule_testing.RecordAssertedCase(t, result)
+			rule_testing.RecordAssertedCase(test, result)
 		})
 	}
 }
@@ -107,8 +107,8 @@ func TestNoRedeclareUpstreamCorpus(t *testing.T) {
 // The three things cohere cannot express are pinned on the rows that carry them, by name, so a row
 // cannot lose its pin and quietly start asserting a verdict it was never recorded under, and a fourth
 // kind cannot appear without a reason being written for it.
-func TestNoRedeclareCorpusPinsWhatCohereCannotExpress(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareCorpusPinsWhatCohereCannotExpress(test *testing.T) {
+	test.Parallel()
 
 	reasons := map[string]bool{
 		// cohere carries no globals configuration, by the 1.0 contract (#bfxz13m item 4).
@@ -122,14 +122,14 @@ func TestNoRedeclareCorpusPinsWhatCohereCannotExpress(t *testing.T) {
 	for _, row := range noRedeclareCorpus {
 		for _, feature := range row.pinned {
 			if !reasons[feature] {
-				t.Errorf("row %d pins %q, which has no reason here", row.index, feature)
+				test.Errorf("row %d pins %q, which has no reason here", row.index, feature)
 			}
 			counts[feature]++
 		}
 	}
 	for feature := range reasons {
 		if counts[feature] == 0 {
-			t.Errorf("no row pins %q, so its reason above is stale", feature)
+			test.Errorf("no row pins %q, so its reason above is stale", feature)
 		}
 	}
 }
@@ -141,8 +141,8 @@ func TestNoRedeclareCorpusPinsWhatCohereCannotExpress(t *testing.T) {
 // never looked at. Nothing is lost: TypeScript's checker reports a real redeclaration in each (TS2451
 // and its kin). Each case was recorded clean against the installed rule; the control shows the same
 // duplicate in an ordinary block still reports, so the silence is the scope and not a dead rule.
-func TestNoRedeclareScopesUpstreamNeverExamines(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareScopesUpstreamNeverExamines(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -156,16 +156,16 @@ func TestNoRedeclareScopesUpstreamNeverExamines(t *testing.T) {
 		{"catch clause", "try {\n} catch ({ a, b: a }) {\n}"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, nil))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil))
 		})
 	}
 
-	t.Run("control: an ordinary block reports", func(t *testing.T) {
-		t.Parallel()
-		rule_testing.ExpectFindings(t,
-			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "{\n  let a;\n  let a;\n}", nil),
+	test.Run("control: an ordinary block reports", func(test *testing.T) {
+		test.Parallel()
+		rule_testing.ExpectFindings(test,
+			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "{\n  let a;\n  let a;\n}", nil),
 			"redeclared")
 	})
 }
@@ -193,17 +193,17 @@ func redeclareOptions(ignoreDeclarationMerge bool) any {
 // Without this a later revert of the nil guard would be invisible: the untyped harness hands the
 // rule a nil checker, the rule returns early, and every StaysSilent case above would keep passing
 // vacuously while every Fires case failed in a way that reads like a rule defect.
-func TestNoRedeclareRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	// The typed harness reports.
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTyped(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"), "redeclared")
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTyped(test, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"), "redeclared")
 
 	// The plain one hands the rule no checker, so it declines. Silence here is the correct answer
 	// and not a finding this rule missed.
-	rule_testing.ExpectClean(t,
-		rule_testing.Run(t, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"))
+	rule_testing.ExpectClean(test,
+		rule_testing.Run(test, NoRedeclare, redeclareFile, "var a = 1; var a = 2;"))
 }
 
 // TestNoRedeclareDefaultsToIgnoringDeclarationMerge is the decoder test, and it exists because both
@@ -213,38 +213,38 @@ func TestNoRedeclareRequiresTheTypedHarness(t *testing.T) {
 // zero-valued struct whose false `IgnoreDeclarationMerge` turns every merge exemption off. That does
 // not weaken the rule, it inverts it: thirteen of upstream's clean cases would start reporting. Both
 // halves are asserted, since a decoder that ignored its input entirely would pass the first alone.
-func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeNoRedeclareOptions(nil)
 	if err != nil {
-		t.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", err)
+		test.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", err)
 	}
 	if got := decoded.(NoRedeclareOptions); !got.IgnoreDeclarationMerge || !got.BuiltinGlobals {
-		t.Errorf("absent options: %+v, want both true", got)
+		test.Errorf("absent options: %+v, want both true", got)
 	}
 	builtinsOff, err := DecodeNoRedeclareOptions(json.RawMessage(`{"builtinGlobals":false}`))
 	if err != nil {
-		t.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
+		test.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
 	}
 	if got := builtinsOff.(NoRedeclareOptions); got.BuiltinGlobals || !got.IgnoreDeclarationMerge {
-		t.Errorf("builtinGlobals false: %+v, want it off and the merge exemption still on", got)
+		test.Errorf("builtinGlobals false: %+v, want it off and the merge exemption still on", got)
 	}
 
 	explicit, err := DecodeNoRedeclareOptions(json.RawMessage(`{"ignoreDeclarationMerge":false}`))
 	if err != nil {
-		t.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
+		test.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
 	}
 	if got := explicit.(NoRedeclareOptions); got.IgnoreDeclarationMerge {
-		t.Errorf("explicit false: IgnoreDeclarationMerge = true, want false")
+		test.Errorf("explicit false: IgnoreDeclarationMerge = true, want false")
 	}
 
 	// And the same distinction reaching the rule, since the two lines above only prove the decoder
 	// parses. A bare "error" configuration is nil options, and the merge must stay exempt there.
-	rule_testing.ExpectClean(t,
-		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", nil))
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", redeclareOptions(false)),
+	rule_testing.ExpectClean(test,
+		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", nil))
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", redeclareOptions(false)),
 		"redeclared")
 }
 
@@ -260,8 +260,8 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(t *testing.T) {
 // The harness writes each fixture as `strings.TrimSpace(contents)+"\n"`, so slicing a literal that
 // carried a leading newline would be off by one byte. These sources are written without one, so the
 // literal and the file agree, and the slice below is taken from the same string the harness wrote.
-func TestNoRedeclareSpans(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -282,16 +282,16 @@ func TestNoRedeclareSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != testCase.wantTexts[index] {
-					t.Errorf("finding %d points at %q, want %q", index, reported, testCase.wantTexts[index])
+					test.Errorf("finding %d points at %q, want %q", index, reported, testCase.wantTexts[index])
 				}
 			}
 		})
@@ -304,20 +304,20 @@ func TestNoRedeclareSpans(t *testing.T) {
 // and the assertion is equality against a literal typed here rather than against the rule's own
 // constant. Comparing to the constant would look correct and would move with any mutation of it,
 // which is how a message-text mutant survives a test written the obvious way.
-func TestNoRedeclareMessage(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareMessage(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, "var a = 3;\nvar a = 10;", nil)
+	result := rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "var a = 3;\nvar a = 10;", nil)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
 	const wantIdentifier = "redeclared"
 	if got := result.Diagnostics[0].Message.Id; got != wantIdentifier {
-		t.Errorf("message id = %q, want %q", got, wantIdentifier)
+		test.Errorf("message id = %q, want %q", got, wantIdentifier)
 	}
 	const wantPrefix = "This name is already declared in the same scope."
 	if got := result.Diagnostics[0].Message.Description; len(got) < len(wantPrefix) || got[:len(wantPrefix)] != wantPrefix {
-		t.Errorf("message description = %q, want it to begin %q", got, wantPrefix)
+		test.Errorf("message description = %q, want it to begin %q", got, wantPrefix)
 	}
 }
 
@@ -329,8 +329,8 @@ func TestNoRedeclareMessage(t *testing.T) {
 // identified the arm as subsumed rather than as untested. The corpus writes none of these shapes
 // past two declarations, so without this test the subsumption argument would rest on reading alone.
 // Every verdict below was driven against the installed rule first.
-func TestNoRedeclareMergeSetsSubsumeTheAllOneKindCases(t *testing.T) {
-	t.Parallel()
+func TestNoRedeclareMergeSetsSubsumeTheAllOneKindCases(test *testing.T) {
+	test.Parallel()
 
 	for _, sourceText := range []string{
 		"interface A {}\ninterface A {}\ninterface A {}",
@@ -338,15 +338,15 @@ func TestNoRedeclareMergeSetsSubsumeTheAllOneKindCases(t *testing.T) {
 		"interface A {}\nnamespace A {}",
 		"namespace A {}\ninterface A {}\nnamespace A {}",
 	} {
-		rule_testing.ExpectClean(t,
-			rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile, sourceText, nil))
+		rule_testing.ExpectClean(test,
+			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, sourceText, nil))
 	}
 
 	// The control, and the reason the four silences above are the sets working rather than the rule
 	// being inert on these kinds: add a second CLASS and the class set's primary count passes one,
 	// so the exemption lapses and exactly the extra class reports.
-	rule_testing.ExpectFindings(t,
-		rule_testing.RunTypedWithOptions(t, NoRedeclare, redeclareFile,
+	rule_testing.ExpectFindings(test,
+		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile,
 			"interface A {}\nclass A {}\nclass A {}\nnamespace A {}", nil),
 		"redeclared")
 }

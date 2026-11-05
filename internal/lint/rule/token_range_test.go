@@ -22,8 +22,8 @@ import (
 //
 // Each source must hold at least one zero-width node with trivia after it, or this test could pass on a
 // shape that cannot fail.
-func TestTokenRangeOfAZeroWidthNodeIsEmptyWhereItSits(t *testing.T) {
-	t.Parallel()
+func TestTokenRangeOfAZeroWidthNodeIsEmptyWhereItSits(test *testing.T) {
+	test.Parallel()
 	for _, source := range []struct {
 		name, fileName, text string
 		kind                 core.ScriptKind
@@ -34,16 +34,16 @@ func TestTokenRangeOfAZeroWidthNodeIsEmptyWhereItSits(t *testing.T) {
 		{"a comment after the tag name", "/repository/source/Comment.tsx", "const node = <a/* note */ />;", core.ScriptKindTSX},
 		{"a missing condition in recovery", "/repository/source/Recovery.ts", "if ( ) {}", core.ScriptKindTS},
 	} {
-		t.Run(source.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(source.name, func(test *testing.T) {
+			test.Parallel()
 			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(source.fileName),
 				PathKey: tspath.PathKey(source.fileName)}, source.text, source.kind)
 			problems, zeroWidthBeforeTrivia := zeroWidthRangeProblems(sourceFile, TokenRange)
 			for _, problem := range problems {
-				t.Error(problem)
+				test.Error(problem)
 			}
 			if zeroWidthBeforeTrivia == 0 {
-				t.Fatalf("%q holds no zero-width node followed by trivia, so this case could not fail", source.text)
+				test.Fatalf("%q holds no zero-width node followed by trivia, so this case could not fail", source.text)
 			}
 			// The mutant: the scanner's start cut at the node's end, which TokenRange returned before the fix.
 			inverted, _ := zeroWidthRangeProblems(sourceFile, func(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
@@ -53,7 +53,7 @@ func TestTokenRangeOfAZeroWidthNodeIsEmptyWhereItSits(t *testing.T) {
 				return TokenRange(sourceFile, node)
 			})
 			if len(inverted) == 0 {
-				t.Errorf("%q: the inverted range passed, so this case could not have failed", source.text)
+				test.Errorf("%q: the inverted range passed, so this case could not have failed", source.text)
 			}
 		})
 	}

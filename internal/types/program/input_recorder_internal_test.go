@@ -11,8 +11,8 @@ import (
 // resolved the package first, so the record varied between builds of one tree. Here every order of one set of
 // questions must give one answer: a probe with a present path beneath it is left out, a probe with none is
 // kept, and the two spellings of a directory are one path.
-func TestTheRecordIsTheSameWhateverOrderTheQuestionsCameIn(t *testing.T) {
-	t.Parallel()
+func TestTheRecordIsTheSameWhateverOrderTheQuestionsCameIn(test *testing.T) {
+	test.Parallel()
 	type question struct {
 		path              string
 		present, depended bool
@@ -36,11 +36,11 @@ func TestTheRecordIsTheSameWhateverOrderTheQuestionsCameIn(t *testing.T) {
 		return [3][]string{present, absent, probed}
 	}()
 	if !reflect.DeepEqual(want[2], []string{"/project/node_modules/lonely"}) {
-		t.Fatalf("probed %v, want only the probe with nothing recorded beneath it, without its slash", want[2])
+		test.Fatalf("probed %v, want only the probe with nothing recorded beneath it, without its slash", want[2])
 	}
 	for _, path := range want[0] {
 		if path == "/project/node_modules/react-dom" || path == "/project/node_modules/@firebase/app" {
-			t.Errorf("%s has a recorded path beneath it and was recorded too", path)
+			test.Errorf("%s has a recorded path beneath it and was recorded too", path)
 		}
 	}
 
@@ -59,7 +59,7 @@ func TestTheRecordIsTheSameWhateverOrderTheQuestionsCameIn(t *testing.T) {
 		}
 		present, absent, probed := recorder.Inputs()
 		if got := [3][]string{present, absent, probed}; !reflect.DeepEqual(got, want) {
-			t.Fatalf("an order the loaders could have asked in recorded\n  %v\nwhere another recorded\n  %v", got, want)
+			test.Fatalf("an order the loaders could have asked in recorded\n  %v\nwhere another recorded\n  %v", got, want)
 		}
 	}
 }

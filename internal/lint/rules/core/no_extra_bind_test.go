@@ -25,8 +25,8 @@ const extraBindFile = "/repository/source/ExtraBind.ts"
 // The offsets were measured by running the installed rule over each case and converting its
 // one-based line and column to a byte offset, which two of these cases need because their span sits
 // on the second line.
-func TestNoExtraBindFires(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -115,14 +115,14 @@ func TestNoExtraBindFires(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unexpected")
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExtraBind, extraBindFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unexpected")
 
 			reported := result.Diagnostics[0].Range
 			if reported.Pos() != testCase.spanStart || reported.End() != testCase.spanEnd {
-				t.Errorf("reported [%d,%d), want [%d,%d) -- text %q",
+				test.Errorf("reported [%d,%d), want [%d,%d) -- text %q",
 					reported.Pos(), reported.End(), testCase.spanStart, testCase.spanEnd,
 					testCase.sourceText[reported.Pos():reported.End()])
 			}
@@ -132,10 +132,10 @@ func TestNoExtraBindFires(t *testing.T) {
 				// `output: null` upstream. The finding stands and the repair is declined, so
 				// asserting no fixes is asserting the decline rather than asserting nothing.
 				if fixes := result.Diagnostics[0].Fixes; len(fixes) != 0 {
-					t.Errorf("proposed %d fixes on a case upstream declines to repair", len(fixes))
+					test.Errorf("proposed %d fixes on a case upstream declines to repair", len(fixes))
 				}
 			case string:
-				rule_testing.ExpectFixedSource(t, result, want)
+				rule_testing.ExpectFixedSource(test, result, want)
 			}
 		})
 	}
@@ -143,8 +143,8 @@ func TestNoExtraBindFires(t *testing.T) {
 
 // The clean cases are what separate a pointless bind from a useful one, and every one of them is a
 // false positive this rule would otherwise ship.
-func TestNoExtraBindStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ sourceText string }{
 		{"var a = function(b) { return b }.bind(c, d)"},
@@ -215,9 +215,9 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText))
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoExtraBind, extraBindFile, testCase.sourceText))
 		})
 	}
 }
@@ -228,8 +228,8 @@ func TestNoExtraBindStaysSilent(t *testing.T) {
 // corpus case, because none of them writes anything between the member access and the argument list
 // that has to survive. Upstream's comment names the shape that does, and it is the reason the fixer
 // is built as a pair, so it is written here.
-func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText  string
@@ -242,24 +242,24 @@ func TestNoExtraBindRepairKeepsWhatSitsBetweenTheTwoSpans(t *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		t.Run(testCase.sourceText, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.Run(t, NoExtraBind, extraBindFile, testCase.sourceText)
-			rule_testing.ExpectFindings(t, result, "unexpected")
-			rule_testing.ExpectFixedSource(t, result, testCase.fixedSource)
+		test.Run(testCase.sourceText, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoExtraBind, extraBindFile, testCase.sourceText)
+			rule_testing.ExpectFindings(test, result, "unexpected")
+			rule_testing.ExpectFixedSource(test, result, testCase.fixedSource)
 		})
 	}
 }
 
 // The message is a value with no interpolation, so the assertion is on the constant's own fields,
 // compared against literals typed here rather than against the rule's own constant.
-func TestNoExtraBindMessage(t *testing.T) {
-	t.Parallel()
+func TestNoExtraBindMessage(test *testing.T) {
+	test.Parallel()
 
 	if messageUnnecessaryBind.Id != "unexpected" {
-		t.Errorf("message id is %q", messageUnnecessaryBind.Id)
+		test.Errorf("message id is %q", messageUnnecessaryBind.Id)
 	}
 	if messageUnnecessaryBind.Description == "" {
-		t.Error("message carries no description")
+		test.Error("message carries no description")
 	}
 }

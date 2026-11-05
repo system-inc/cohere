@@ -34,14 +34,14 @@ type noConfusingVoidExpressionCase struct {
 func noConfusingVoidExpressionStringPointer(value string) *string { return &value }
 
 // decodeNoConfusingVoidExpressionOptionsForTest routes a case's options through the decoder.
-func decodeNoConfusingVoidExpressionOptionsForTest(t *testing.T, optionsJson string) any {
-	t.Helper()
+func decodeNoConfusingVoidExpressionOptionsForTest(test *testing.T, optionsJson string) any {
+	test.Helper()
 	if optionsJson == "" {
 		return nil
 	}
 	decoded, err := DecodeNoConfusingVoidExpressionOptions(json.RawMessage(optionsJson))
 	if err != nil {
-		t.Fatalf("decoding options %q: %v", optionsJson, err)
+		test.Fatalf("decoding options %q: %v", optionsJson, err)
 	}
 	return decoded
 }
@@ -193,28 +193,28 @@ const noConfusingVoidExpressionJsxIntrinsics = "declare global {\n" +
 	"}\n"
 
 // runNoConfusingVoidExpressionCase drives one case with the ambient preamble prepended.
-func runNoConfusingVoidExpressionCase(t *testing.T, testCase noConfusingVoidExpressionCase) rule_testing.Result {
-	t.Helper()
+func runNoConfusingVoidExpressionCase(test *testing.T, testCase noConfusingVoidExpressionCase) rule_testing.Result {
+	test.Helper()
 	fileName := noConfusingVoidExpressionFile
 	preamble := noConfusingVoidExpressionAmbientGlobals
 	if testCase.jsx {
 		fileName = noConfusingVoidExpressionJsxFile
 		preamble += noConfusingVoidExpressionJsxIntrinsics
 	}
-	return rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression, fileName,
+	return rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression, fileName,
 		preamble+testCase.source,
-		decodeNoConfusingVoidExpressionOptionsForTest(t, testCase.optionsJson))
+		decodeNoConfusingVoidExpressionOptionsForTest(test, testCase.optionsJson))
 }
 
 // TestNoConfusingVoidExpressionFires runs upstream's 57 invalid cases.
-func TestNoConfusingVoidExpressionFires(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingVoidExpressionFires(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noConfusingVoidExpressionFiringCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			result := runNoConfusingVoidExpressionCase(t, testCase)
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			result := runNoConfusingVoidExpressionCase(test, testCase)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 
 			// The repair, which no message-id assertion can see. Thirty seven of upstream's cases
 			// carry an `output`, and a fixer anchored correctly can still write the wrong bytes.
@@ -227,7 +227,7 @@ func TestNoConfusingVoidExpressionFires(t *testing.T) {
 				// the decline is the assertion.
 				for i, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d proposes %d fixes; upstream declines this case",
+						test.Errorf("finding %d proposes %d fixes; upstream declines this case",
 							i, len(diagnostic.Fixes))
 					}
 				}
@@ -237,20 +237,20 @@ func TestNoConfusingVoidExpressionFires(t *testing.T) {
 			if testCase.jsx {
 				preamble += noConfusingVoidExpressionJsxIntrinsics
 			}
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFixedSource(test, result,
 				strings.TrimSpace(preamble+*testCase.fixedSource)+"\n")
 		})
 	}
 }
 
 // TestNoConfusingVoidExpressionStaysSilent runs upstream's 53 valid cases.
-func TestNoConfusingVoidExpressionStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingVoidExpressionStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range noConfusingVoidExpressionCleanCases {
-		t.Run(testCase.source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runNoConfusingVoidExpressionCase(t, testCase))
+		test.Run(testCase.source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runNoConfusingVoidExpressionCase(test, testCase))
 		})
 	}
 }
@@ -273,8 +273,8 @@ func TestNoConfusingVoidExpressionStaysSilent(t *testing.T) {
 // The reporting rows are the controls that keep this to undefined: the same positions with a real
 // `void`, including `nexus/source/coordination/RandomSleep.test.ts:250`, an `await` of a
 // `Promise<void>`, which is a true positive and stays one.
-func TestNoConfusingVoidExpressionJudgesVoidNotUndefined(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingVoidExpressionJudgesVoidNotUndefined(test *testing.T) {
+	test.Parallel()
 
 	const declarations = "declare function returnsUndefined(): undefined;\n" +
 		"declare function returnsVoid(): void;\n" +
@@ -298,16 +298,16 @@ func TestNoConfusingVoidExpressionJudgesVoidNotUndefined(t *testing.T) {
 		{name: "a void call returned", source: "function f() { return returnsVoid(); }", messageIds: []string{"invalidVoidExprReturnLast"}},
 		{name: "RandomSleep.test.ts:250, awaiting Promise<void>", source: "async function f() { const result = await randomSleep(100, 200); }", messageIds: []string{"invalidVoidExpr"}},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+declarations+testCase.source, nil)
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -322,8 +322,8 @@ func TestNoConfusingVoidExpressionJudgesVoidNotUndefined(t *testing.T) {
 //
 // A deliberate narrowing rather than a different repair: upstream offers a fix here and this does
 // not. Stated so the missing fix reads as a decision rather than an unfinished port.
-func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name      string
@@ -341,15 +341,15 @@ func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(t *testing.T) {
 			messageId: "invalidVoidExprReturnLast",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+testCase.source, nil)
-			rule_testing.ExpectFindings(t, result, testCase.messageId)
+			rule_testing.ExpectFindings(test, result, testCase.messageId)
 			for i, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
-					t.Errorf("finding %d proposes %d fixes; the repair would delete the comment "+
+					test.Errorf("finding %d proposes %d fixes; the repair would delete the comment "+
 						"sitting inside the range it replaces", i, len(diagnostic.Fixes))
 				}
 			}
@@ -367,8 +367,8 @@ func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(t *testing.T) {
 // A mutation widening this to VoidLike survived all 110 imported cases, because upstream's corpus
 // writes no `undefined` annotation under this option. Measured against the installed rule: a
 // function annotated `undefined` is NOT exempt, while `void` and `void | undefined` are.
-func TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike(t *testing.T) {
-	t.Parallel()
+func TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike(test *testing.T) {
+	test.Parallel()
 
 	options := `{"ignoreVoidReturningFunctions":true}`
 
@@ -393,17 +393,17 @@ func TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike(t *testing.T) {
 			messageIds: nil,
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, NoConfusingVoidExpression,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+testCase.source,
-				decodeNoConfusingVoidExpressionOptionsForTest(t, options))
+				decodeNoConfusingVoidExpressionOptionsForTest(test, options))
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }

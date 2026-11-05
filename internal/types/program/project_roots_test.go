@@ -11,8 +11,8 @@ import (
 // routine with many writers sharing the tree, and on 2026-10-03 it panicked a build on ahra with a
 // message blaming path casing (3,790 named, 3,789 loaded). These pin what Build does instead.
 
-func TestClassifyMissingRootsTellsTheFourCasesApart(t *testing.T) {
-	t.Parallel()
+func TestClassifyMissingRootsTellsTheFourCasesApart(test *testing.T) {
+	test.Parallel()
 	states := map[string]rootState{"gone.ts": rootAbsent, "locked.ts": rootUnreadable, "cased.ts": rootReadable}
 	inspect := func(fileName string) rootState { return states[fileName] }
 
@@ -32,68 +32,68 @@ func TestClassifyMissingRootsTellsTheFourCasesApart(t *testing.T) {
 	}
 	for _, testCase := range cases {
 		if got := classifyMissingRoots(testCase.missing, inspect); got != testCase.want {
-			t.Errorf("%s: got verdict %d, want %d", testCase.name, got, testCase.want)
+			test.Errorf("%s: got verdict %d, want %d", testCase.name, got, testCase.want)
 		}
 	}
 }
 
 // The whole path, with no seam: a root the glob lists and the program cannot read. Before this, Build
 // returned a graph and ProjectFiles panicked.
-func TestBuildRefusesARootItCannotReadInsteadOfPanicking(t *testing.T) {
-	t.Parallel()
-	directory := writeMismatchFixture(t, map[string]string{
+func TestBuildRefusesARootItCannotReadInsteadOfPanicking(test *testing.T) {
+	test.Parallel()
+	directory := writeMismatchFixture(test, map[string]string{
 		"tsconfig.json": mismatchFixtureConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Locked.ts":     "export const locked = 2;\n",
 	})
 	locked := filepath.Join(directory, "Locked.ts")
 	if err := os.Chmod(locked, 0o000); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chmod(locked, 0o644) })
+	test.Cleanup(func() { os.Chmod(locked, 0o644) })
 	if file, err := os.Open(locked); err == nil {
 		file.Close()
-		t.Skip("this user can read a mode-000 file, so the fixture cannot make a root unreadable")
+		test.Skip("this user can read a mode-000 file, so the fixture cannot make a root unreadable")
 	}
 
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			t.Fatalf("Build panicked on an unreadable root: %v", recovered)
+			test.Fatalf("Build panicked on an unreadable root: %v", recovered)
 		}
 	}()
 	graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err == nil {
-		t.Fatalf("Build returned a graph of %d project files from a config naming 2, one unreadable",
+		test.Fatalf("Build returned a graph of %d project files from a config naming 2, one unreadable",
 			len(graph.ProjectFiles()))
 	}
 	if !strings.Contains(err.Error(), "Locked.ts") || !strings.Contains(err.Error(), "could not be read") {
-		t.Fatalf("the error does not name the unreadable file and why: %v", err)
+		test.Fatalf("the error does not name the unreadable file and why: %v", err)
 	}
 }
 
 // A healthy build returns exactly the files the config named, which is the other direction of the
 // guard: a verification that refused everything would pass the test above.
-func TestBuildReturnsEveryNamedFileWhenNothingMoved(t *testing.T) {
-	t.Parallel()
-	directory := writeMismatchFixture(t, map[string]string{
+func TestBuildReturnsEveryNamedFileWhenNothingMoved(test *testing.T) {
+	test.Parallel()
+	directory := writeMismatchFixture(test, map[string]string{
 		"tsconfig.json": mismatchFixtureConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Beta.ts":       "export const beta = 2;\n",
 	})
 	graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if err != nil {
-		t.Fatalf("building: %v", err)
+		test.Fatalf("building: %v", err)
 	}
 	if named, got := len(graph.Config.FileNames()), len(graph.ProjectFiles()); named != 2 || got != 2 {
-		t.Fatalf("named %d and returned %d project files, want 2 and 2", named, got)
+		test.Fatalf("named %d and returned %d project files, want 2 and 2", named, got)
 	}
 }
 
 // Real concurrency, no seam: files created and deleted while Build runs. Whatever the interleaving, a
 // build either returns every file its config named or an error, and never panics.
-func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(t *testing.T) {
-	t.Parallel()
-	directory := writeMismatchFixture(t, map[string]string{
+func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(test *testing.T) {
+	test.Parallel()
+	directory := writeMismatchFixture(test, map[string]string{
 		"tsconfig.json": mismatchFixtureConfig,
 		"Alpha.ts":      "export const alpha = 1;\n",
 	})
@@ -121,7 +121,7 @@ func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(t *testing.T) {
 		func() {
 			defer func() {
 				if recovered := recover(); recovered != nil {
-					t.Fatalf("attempt %d: Build panicked while the tree changed: %v", attempt, recovered)
+					test.Fatalf("attempt %d: Build panicked while the tree changed: %v", attempt, recovered)
 				}
 			}()
 			graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
@@ -129,7 +129,7 @@ func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(t *testing.T) {
 				return
 			}
 			if named, got := len(graph.Config.FileNames()), len(graph.ProjectFiles()); named != got {
-				t.Fatalf("attempt %d: a successful build named %d files and returned %d", attempt, named, got)
+				test.Fatalf("attempt %d: a successful build named %d files and returned %d", attempt, named, got)
 			}
 		}()
 	}

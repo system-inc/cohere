@@ -56,13 +56,13 @@ process.stdin.on("end", async () => {
 // A file the fork cannot parse has no answer to match and is skipped, but counted, and the test fails
 // if that count passes a tenth of the corpus: an oracle that rejects everything would otherwise read as
 // perfect agreement.
-func TestConvertAgreesWithPrettier(t *testing.T) {
-	t.Parallel()
+func TestConvertAgreesWithPrettier(test *testing.T) {
+	test.Parallel()
 	corpora := os.Getenv("COHERE_ESTREE_CORPORA")
 	if corpora == "" {
-		t.Skip("set COHERE_ESTREE_CORPORA to compare the converter against the fork")
+		test.Skip("set COHERE_ESTREE_CORPORA to compare the converter against the fork")
 	}
-	root := corpus.PrettierFork.Root(t)
+	root := corpus.PrettierFork.Root(test)
 	seen := map[string]bool{}
 	var files []string
 	for _, corpus := range strings.Split(corpora, ":") {
@@ -73,7 +73,7 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 		}
 		listing, err := exec.Command("git", "-C", corpus, "ls-files", "--", "*.ts", "*.tsx").Output()
 		if err != nil {
-			t.Fatalf("listing %s: %v", corpus, err)
+			test.Fatalf("listing %s: %v", corpus, err)
 		}
 		for _, name := range strings.Split(string(listing), "\n") {
 			path := filepath.Join(corpus, name)
@@ -94,7 +94,7 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if err := command.Run(); err != nil {
-		t.Fatalf("node: %v\n%s", err, stderr.String())
+		test.Fatalf("node: %v\n%s", err, stderr.String())
 	}
 	oracle := map[string]map[string]any{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
@@ -103,7 +103,7 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 		}
 		var record map[string]any
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		oracle[record["file"].(string)] = record
 	}
@@ -112,7 +112,7 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 	for _, path := range files {
 		want, present := oracle[path]
 		if !present {
-			t.Fatalf("the oracle printed nothing for %s", path)
+			test.Fatalf("the oracle printed nothing for %s", path)
 		}
 		if _, failed := want["error"]; failed {
 			refused++
@@ -120,19 +120,19 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 		}
 		source, err := os.ReadFile(path)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		got, err := dumpFile(path, string(source))
 		if err != nil {
 			different++
-			t.Errorf("%s: the fork parses it and the converter refused: %v", path, err)
+			test.Errorf("%s: the fork parses it and the converter refused: %v", path, err)
 			continue
 		}
 		for _, key := range []string{"ast", "comments"} {
 			if difference := firstDifference(want[key], got[key], key); difference != "" {
 				different++
 				if different <= 10 {
-					t.Errorf("%s: %s", path, difference)
+					test.Errorf("%s: %s", path, difference)
 				}
 				break
 			}
@@ -141,9 +141,9 @@ func TestConvertAgreesWithPrettier(t *testing.T) {
 			identical++
 		}
 	}
-	t.Logf("%d files, %d identical, %d different, %d the fork could not parse", len(files), identical, different, refused)
+	test.Logf("%d files, %d identical, %d different, %d the fork could not parse", len(files), identical, different, refused)
 	if refused > len(files)/10 {
-		t.Errorf("the fork refused %d of %d files; the comparison is thinner than it looks", refused, len(files))
+		test.Errorf("the fork refused %d of %d files; the comparison is thinner than it looks", refused, len(files))
 	}
 }
 

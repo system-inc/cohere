@@ -19,11 +19,11 @@ import (
 // remove it. Removing it makes every locals table empty and the whole rule silently, vacuously
 // clean, which no fixture above could distinguish from a clean input. This asserts the flag so that
 // revert fails loudly.
-func TestNoShadowDeclaresTheTypeChecker(t *testing.T) {
-	t.Parallel()
+func TestNoShadowDeclaresTheTypeChecker(test *testing.T) {
+	test.Parallel()
 
 	if !NoShadow.NeedsTypeChecker {
-		t.Fatal("NoShadow must declare NeedsTypeChecker: the binder populates the locals tables " +
+		test.Fatal("NoShadow must declare NeedsTypeChecker: the binder populates the locals tables " +
 			"this rule reads, and without the program every table is empty and the rule goes " +
 			"vacuously clean on every file")
 	}
@@ -34,20 +34,20 @@ func TestNoShadowDeclaresTheTypeChecker(t *testing.T) {
 // It runs a case that reports under RunTyped through the plain harness and asserts the rule finds
 // nothing there. That is not a property worth having, it is the failure mode being recorded: if
 // this ever starts reporting, the untyped path became viable and the declaration can be revisited.
-func TestNoShadowNeedsTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestNoShadowNeedsTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "var a = 3;\nfunction b() {\n  var a = 10;\n}\n"
 
-	typedResult := rule_testing.RunTyped(t, NoShadow, "file.ts", source)
+	typedResult := rule_testing.RunTyped(test, NoShadow, "file.ts", source)
 	if len(typedResult.Diagnostics) != 1 {
-		t.Fatalf("control failed: the typed harness must report this case once, got %d",
+		test.Fatalf("control failed: the typed harness must report this case once, got %d",
 			len(typedResult.Diagnostics))
 	}
 
-	untypedResult := rule_testing.Run(t, NoShadow, "file.ts", source)
+	untypedResult := rule_testing.Run(test, NoShadow, "file.ts", source)
 	if len(untypedResult.Diagnostics) != 0 {
-		t.Fatalf("the untyped harness now reports %d findings on a case that needs the binder; "+
+		test.Fatalf("the untyped harness now reports %d findings on a case that needs the binder; "+
 			"the NeedsTypeChecker reasoning in the doc comment is stale",
 			len(untypedResult.Diagnostics))
 	}
@@ -59,13 +59,13 @@ func TestNoShadowNeedsTheTypedHarness(t *testing.T) {
 // rendering the wrong text passes every case above. The message interpolates the shadowed
 // declaration line and column, so it is asserted for equality rather than by prefix: a Contains
 // check on an interpolated value is weaker than the property it guards.
-func TestNoShadowSpanAndMessage(t *testing.T) {
-	t.Parallel()
+func TestNoShadowSpanAndMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "var a = 3;\nfunction b() {\n  var a = 10;\n}\n"
-	result := rule_testing.RunTyped(t, NoShadow, "file.ts", source)
+	result := rule_testing.RunTyped(test, NoShadow, "file.ts", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 
 	diagnostic := result.Diagnostics[0]
@@ -75,7 +75,7 @@ func TestNoShadowSpanAndMessage(t *testing.T) {
 	written := strings.TrimSpace(source) + "\n"
 	reported := written[diagnostic.Range.Pos():diagnostic.Range.End()]
 	if reported != "a" {
-		t.Errorf("finding should point at the inner binding name, got %q", reported)
+		test.Errorf("finding should point at the inner binding name, got %q", reported)
 	}
 
 	// The outer `var a` is on line 1, and its name is at column 5.
@@ -84,10 +84,10 @@ func TestNoShadowSpanAndMessage(t *testing.T) {
 		"so code written against the outer one silently reads the inner one. Rename the inner " +
 		"binding. The name 'a' is already declared in the upper scope on line 1 column 5."
 	if diagnostic.Message.Description != wantMessage {
-		t.Errorf("message text\n got: %q\nwant: %q", diagnostic.Message.Description, wantMessage)
+		test.Errorf("message text\n got: %q\nwant: %q", diagnostic.Message.Description, wantMessage)
 	}
 	if diagnostic.Message.Id != "noShadow" {
-		t.Errorf("message id: got %q, want %q", diagnostic.Message.Id, "noShadow")
+		test.Errorf("message id: got %q, want %q", diagnostic.Message.Id, "noShadow")
 	}
 }
 
@@ -96,18 +96,18 @@ func TestNoShadowSpanAndMessage(t *testing.T) {
 // The enum arm is reported through a different accessor from every other binding, because an enum
 // declaration is not a locals container and its members live on the enum symbol Exports table. Its
 // message differs too, so both are pinned here.
-func TestNoShadowEnumMessage(t *testing.T) {
-	t.Parallel()
+func TestNoShadowEnumMessage(test *testing.T) {
+	test.Parallel()
 
 	source := "enum A {\n  A,\n  B,\n}\n"
-	result := rule_testing.RunTyped(t, NoShadow, "file.ts", source)
+	result := rule_testing.RunTyped(test, NoShadow, "file.ts", source)
 	if len(result.Diagnostics) != 1 {
-		t.Fatalf("expected one finding, got %d", len(result.Diagnostics))
+		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
 
 	diagnostic := result.Diagnostics[0]
 	if diagnostic.Message.Id != "noEnumShadow" {
-		t.Errorf("message id: got %q, want %q", diagnostic.Message.Id, "noEnumShadow")
+		test.Errorf("message id: got %q, want %q", diagnostic.Message.Id, "noEnumShadow")
 	}
 
 	wantMessage := "This enum member takes a name that is already bound in an enclosing scope. " +
@@ -115,7 +115,7 @@ func TestNoShadowEnumMessage(t *testing.T) {
 		"names it resolves to this member rather than to the outer binding. Rename the member. " +
 		"The name 'A' is already declared in the upper scope on line 1 column 6."
 	if diagnostic.Message.Description != wantMessage {
-		t.Errorf("message text\n got: %q\nwant: %q", diagnostic.Message.Description, wantMessage)
+		test.Errorf("message text\n got: %q\nwant: %q", diagnostic.Message.Description, wantMessage)
 	}
 }
 
@@ -126,8 +126,8 @@ func TestNoShadowEnumMessage(t *testing.T) {
 // identity test that a KindParenthesizedExpression would break. A destructured parameter is the
 // other shape: reading a binding name without a kind guard panics on a binding pattern, and the
 // walk recovers per FILE, so one such parameter would cost every rule in the package its verdict.
-func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	silent := []struct {
 		name   string
@@ -159,20 +159,20 @@ func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(t *testing.T) {
 		},
 	}
 	for _, testCase := range silent {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source)
-			rule_testing.ExpectClean(t, result)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTyped(test, NoShadow, "file.ts", testCase.source)
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// Control for the two parenthesized cases above: without the parentheses the exemption applies
 	// and the case is clean, so a wrapped call must still REPORT. If this went silent the unwrap
 	// would be over-reaching rather than correct.
-	t.Run("parenthesized wrapped call still reports", func(t *testing.T) {
-		t.Parallel()
-		result := rule_testing.RunTyped(t, NoShadow, "file.ts", "var a = (wrap(function a() {}));\n")
-		rule_testing.ExpectFindings(t, result, "noShadow")
+	test.Run("parenthesized wrapped call still reports", func(test *testing.T) {
+		test.Parallel()
+		result := rule_testing.RunTyped(test, NoShadow, "file.ts", "var a = (wrap(function a() {}));\n")
+		rule_testing.ExpectFindings(test, result, "noShadow")
 	})
 }
 
@@ -182,39 +182,39 @@ func TestNoShadowHandlesShapesTheCorpusDoesNotWrite(t *testing.T) {
 // exempted `infer` outright would pass the whole imported set while silencing two shapes upstream
 // reports. Every verdict below was measured by driving the installed rule at 8.67.0 rather than
 // read off the source; the commands are recorded in the helper doc comment.
-func TestNoShadowInferTypeParameters(t *testing.T) {
-	t.Parallel()
+func TestNoShadowInferTypeParameters(test *testing.T) {
+	test.Parallel()
 
-	t.Run("infer over infer is clean", func(t *testing.T) {
-		t.Parallel()
+	test.Run("infer over infer is clean", func(test *testing.T) {
+		test.Parallel()
 		source := "export type A<F> = F extends (a: Array<infer T>) => any\n" +
 			"  ? T[]\n" +
 			"  : F extends (...a: infer T) => any\n" +
 			"    ? T\n" +
 			"    : never;\n"
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source))
 	})
 
 	// The two boundary cases. Both REPORT on the installed rule, and both would go silent under a
 	// blanket infer exemption.
-	t.Run("infer over an outer type alias reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("infer over an outer type alias reports", func(test *testing.T) {
+		test.Parallel()
 		source := "type T = string;\nexport type A<F> = F extends (a: infer T) => any ? T : never;\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 
-	t.Run("infer over an outer type parameter reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("infer over an outer type parameter reports", func(test *testing.T) {
+		test.Parallel()
 		source := "export type A<T> = T extends (a: infer T) => any ? T : never;\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 
 	// Clean, but for the type-versus-value reason rather than for the infer one. Recorded so a
 	// later reader does not attribute it to this exemption.
-	t.Run("infer over an outer value is clean", func(t *testing.T) {
-		t.Parallel()
+	test.Run("infer over an outer value is clean", func(test *testing.T) {
+		test.Parallel()
 		source := "const T = 1;\nexport type A<F> = F extends (a: infer T) => any ? T : never;\n"
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source))
 	})
 }
 
@@ -224,12 +224,12 @@ func TestNoShadowInferTypeParameters(t *testing.T) {
 // every member of both. Without the containment test in collectEnumMembers this input reports
 // TWICE at the identical span, which reads as a correct finding in any count and is visible only
 // in the count itself.
-func TestNoShadowMergedEnumReportsOnce(t *testing.T) {
-	t.Parallel()
+func TestNoShadowMergedEnumReportsOnce(test *testing.T) {
+	test.Parallel()
 
 	source := "enum A {\n  B = 2,\n}\n\nenum A {\n  A = 1,\n}\n"
-	result := rule_testing.RunTyped(t, NoShadow, "file.ts", source)
-	rule_testing.ExpectFindings(t, result, "noEnumShadow")
+	result := rule_testing.RunTyped(test, NoShadow, "file.ts", source)
+	rule_testing.ExpectFindings(test, result, "noEnumShadow")
 }
 
 // TestNoShadowFunctionTypeParameterNames covers a shape upstream corpus does not write.
@@ -241,8 +241,8 @@ func TestNoShadowMergedEnumReportsOnce(t *testing.T) {
 //
 // Every verdict was measured by driving the installed rule at 8.67.0. Five type-position parameter
 // forms are clean over an outer value; a real function parameter over the same value reports.
-func TestNoShadowFunctionTypeParameterNames(t *testing.T) {
-	t.Parallel()
+func TestNoShadowFunctionTypeParameterNames(test *testing.T) {
+	test.Parallel()
 
 	clean := []struct {
 		name   string
@@ -258,18 +258,18 @@ func TestNoShadowFunctionTypeParameterNames(t *testing.T) {
 		},
 	}
 	for _, testCase := range clean {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoShadow, "file.ts", testCase.source))
 		})
 	}
 
 	// The control that makes the five above mean something: the same outer value shadowed by a
 	// REAL parameter reports, so the exemption is about type position rather than about the name.
-	t.Run("control: a real function parameter reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("control: a real function parameter reports", func(test *testing.T) {
+		test.Parallel()
 		source := "const cb = 1;\nfunction foo(cb: number) {}\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 }
 
@@ -283,33 +283,33 @@ func TestNoShadowFunctionTypeParameterNames(t *testing.T) {
 //
 // Measured on the installed rule at 8.67.0: the two sibling forms are clean, and the three forms
 // where one name genuinely encloses or precedes a real declaration all report.
-func TestNoShadowSiblingExpressionNames(t *testing.T) {
-	t.Parallel()
+func TestNoShadowSiblingExpressionNames(test *testing.T) {
+	test.Parallel()
 
-	t.Run("two sibling function expressions of one name are clean", func(t *testing.T) {
-		t.Parallel()
+	test.Run("two sibling function expressions of one name are clean", func(test *testing.T) {
+		test.Parallel()
 		source := "var b = function a() {};\nvar c = function a() {};\n"
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source))
 	})
 
-	t.Run("two sibling class expressions of one name are clean", func(t *testing.T) {
-		t.Parallel()
+	test.Run("two sibling class expressions of one name are clean", func(test *testing.T) {
+		test.Parallel()
 		source := "var b = class a {};\nvar c = class a {};\n"
-		rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source))
+		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source))
 	})
 
 	// The controls. Each reports upstream, so the exemption above is about sibling position rather
 	// than about expression names being exempt.
-	t.Run("control: expression name over a preceding declaration reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("control: expression name over a preceding declaration reports", func(test *testing.T) {
+		test.Parallel()
 		source := "function a() {}\nvar b = function a() {};\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 
-	t.Run("control: expression name over a following declaration reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("control: expression name over a following declaration reports", func(test *testing.T) {
+		test.Parallel()
 		source := "var b = function a() {};\nfunction a() {}\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 }
 
@@ -322,31 +322,31 @@ func TestNoShadowSiblingExpressionNames(t *testing.T) {
 //
 // Upstream default corpus writes no interface type parameter anywhere, so nothing imported can see
 // this. It was found by driving the installed rule at 8.67.0 over shapes the corpus does not write.
-func TestNoShadowInterfaceTypeParameters(t *testing.T) {
-	t.Parallel()
+func TestNoShadowInterfaceTypeParameters(test *testing.T) {
+	test.Parallel()
 
-	t.Run("interface type parameter over an outer type reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("interface type parameter over an outer type reports", func(test *testing.T) {
+		test.Parallel()
 		source := "type T = 1;\ninterface I<T> {\n  x: T;\n}\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 
 	// The control that pins the comparison: the type alias form reports too, and it reaches the
 	// answer through the locals table rather than through the shape collection above.
-	t.Run("type alias type parameter over an outer type reports", func(t *testing.T) {
-		t.Parallel()
+	test.Run("type alias type parameter over an outer type reports", func(test *testing.T) {
+		test.Parallel()
 		source := "type T = 1;\ntype A<T> = T;\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 
 	// An interface with NO type parameters is the common case and its TypeParameters field is nil.
 	// Dereferencing it would panic, and the walk recovers per FILE, so one such interface would
 	// cost every rule in the package its verdict on that file. The assertion is that a binding
 	// nested INSIDE the interface's members is still reached, which a bare early return would lose.
-	t.Run("plain interface does not abandon the subtree", func(t *testing.T) {
-		t.Parallel()
+	test.Run("plain interface does not abandon the subtree", func(test *testing.T) {
+		test.Parallel()
 		source := "type T = 1;\ninterface Plain {\n  x: number;\n}\nfunction f<T>(a: T) {}\n"
-		rule_testing.ExpectFindings(t, rule_testing.RunTyped(t, NoShadow, "file.ts", source), "noShadow")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoShadow, "file.ts", source), "noShadow")
 	})
 }
 
@@ -359,8 +359,8 @@ func TestNoShadowInterfaceTypeParameters(t *testing.T) {
 // the other two thirds of the hoisting set survived a mutation of the whole imported suite.
 //
 // Every verdict measured against the installed rule at 8.67.0.
-func TestNoShadowTemporalDeadZone(t *testing.T) {
-	t.Parallel()
+func TestNoShadowTemporalDeadZone(test *testing.T) {
+	test.Parallel()
 
 	reports := []struct {
 		name   string
@@ -376,10 +376,10 @@ func TestNoShadowTemporalDeadZone(t *testing.T) {
 		{"overlapping positions", "function a(a) {}\n"},
 	}
 	for _, testCase := range reports {
-		t.Run(testCase.name+" reports", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectFindings(t,
-				rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source), "noShadow")
+		test.Run(testCase.name+" reports", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(test,
+				rule_testing.RunTyped(test, NoShadow, "file.ts", testCase.source), "noShadow")
 		})
 	}
 
@@ -394,9 +394,9 @@ func TestNoShadowTemporalDeadZone(t *testing.T) {
 		{"outer var", "{\n  let a;\n}\nvar a;\n"},
 	}
 	for _, testCase := range clean {
-		t.Run(testCase.name+" is clean", func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTyped(t, NoShadow, "file.ts", testCase.source))
+		test.Run(testCase.name+" is clean", func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoShadow, "file.ts", testCase.source))
 		})
 	}
 }

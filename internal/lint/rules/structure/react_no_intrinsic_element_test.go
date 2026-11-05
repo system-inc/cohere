@@ -10,8 +10,8 @@ const anchorFile = "/repository/source/components/Page.tsx"
 const linkImplementationFile = "/repository/source/components/navigation/Link.tsx"
 const horizontalRuleImplementationFile = "/repository/source/components/layout/HorizontalRule.tsx"
 
-func TestReactNoAnchorElementFires(t *testing.T) {
-	t.Parallel()
+func TestReactNoAnchorElementFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -54,28 +54,28 @@ func TestReactNoAnchorElementFires(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			fileName := anchorFile
 			if testCase.name == "an anchor in a differently placed Link.tsx" {
 				fileName = "/repository/source/widgets/Link.tsx"
 			}
-			result := rule_testing.Run(t, ReactElementNoAnchor, fileName, testCase.sourceText)
+			result := rule_testing.Run(test, ReactElementNoAnchor, fileName, testCase.sourceText)
 			ids := result.MessageIds()
 			if len(ids) != testCase.wantCount {
-				t.Fatalf("expected %d findings, got %d: %v", testCase.wantCount, len(ids), ids)
+				test.Fatalf("expected %d findings, got %d: %v", testCase.wantCount, len(ids), ids)
 			}
 			for _, id := range ids {
 				if id != "noAnchorElement" {
-					t.Fatalf("unexpected message id %q", id)
+					test.Fatalf("unexpected message id %q", id)
 				}
 			}
 		})
 	}
 }
 
-func TestReactNoAnchorElementStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactNoAnchorElementStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -135,27 +135,27 @@ func TestReactNoAnchorElementStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactElementNoAnchor, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactElementNoAnchor, testCase.fileName, testCase.sourceText))
 		})
 	}
 }
 
-func TestReactNoHorizontalRuleElementFires(t *testing.T) {
-	t.Parallel()
+func TestReactNoHorizontalRuleElementFires(test *testing.T) {
+	test.Parallel()
 
 	// hr is written self-closing essentially always, so this is the shape that matters most and it
 	// is the one a JsxOpeningElement-only listener misses entirely.
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactElementNoHorizontalRule, anchorFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactElementNoHorizontalRule, anchorFile,
 		"export function Page() {\n    return <div><hr /></div>;\n}\n"), "noHrElement")
 
-	rule_testing.ExpectFindings(t, rule_testing.Run(t, ReactElementNoHorizontalRule, anchorFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactElementNoHorizontalRule, anchorFile,
 		"export function Page() {\n    return <div><hr /><hr /></div>;\n}\n"), "noHrElement", "noHrElement")
 }
 
-func TestReactNoHorizontalRuleElementStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestReactNoHorizontalRuleElementStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -187,9 +187,9 @@ func TestReactNoHorizontalRuleElementStaysSilent(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.Run(t, ReactElementNoHorizontalRule, testCase.fileName, testCase.sourceText))
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactElementNoHorizontalRule, testCase.fileName, testCase.sourceText))
 		})
 	}
 }

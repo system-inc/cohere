@@ -9,25 +9,25 @@ import (
 )
 
 // runClassOrderFixtureWithOptions is runClassOrderFixture with the rule's options.
-func runClassOrderFixtureWithOptions(t *testing.T, source string, options EnforceConsistentClassOrderOptions) rule_testing.Result {
-	t.Helper()
+func runClassOrderFixtureWithOptions(test *testing.T, source string, options EnforceConsistentClassOrderOptions) rule_testing.Result {
+	test.Helper()
 
 	packageRoot := classOrderFixturePackageRoot()
 	if packageRoot == "" {
-		t.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
+		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an order")
 	}
 
-	return rule_testing.RunTypedFilesWithSetupAndOptions(t, EnforceConsistentClassOrder, map[string]string{
+	return rule_testing.RunTypedFilesWithSetupAndOptions(test, EnforceConsistentClassOrder, map[string]string{
 		"Component.tsx":                 source,
 		classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
 	}, "Component.tsx", options, func(root string) {
 		modules := filepath.Join(root, "node_modules")
 		if err := os.MkdirAll(modules, 0o755); err != nil {
-			t.Fatalf("creating the fixture node_modules: %v", err)
+			test.Fatalf("creating the fixture node_modules: %v", err)
 		}
 		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			t.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+			test.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
 		}
 	})
 }
@@ -36,8 +36,8 @@ func runClassOrderFixtureWithOptions(t *testing.T, source string, options Enforc
 // `unknownClassPosition` (enforce-consistent-class-order.test.ts at 4.7.0), each written and wanted
 // exactly as upstream's jsx case is, plus the default each one changes, so every option is shown
 // changing the verdict.
-func TestClassOrderOptions(t *testing.T) {
-	t.Parallel()
+func TestClassOrderOptions(test *testing.T) {
+	test.Parallel()
 	testCases := []struct {
 		name    string
 		source  string
@@ -74,15 +74,15 @@ func TestClassOrderOptions(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			source := `export const element = <img className="` + testCase.source + `" />;`
-			result := runClassOrderFixtureWithOptions(t, source, testCase.options)
+			result := runClassOrderFixtureWithOptions(test, source, testCase.options)
 			if testCase.want == "" {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result, `export const element = <img className="`+testCase.want+`" />;`+"\n")
+			rule_testing.ExpectFixedSource(test, result, `export const element = <img className="`+testCase.want+`" />;`+"\n")
 		})
 	}
 }

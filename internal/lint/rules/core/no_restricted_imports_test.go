@@ -24,20 +24,20 @@ type noRestrictedImportsCase struct {
 // schema constraint upstream expresses declaratively -- eight of them -- plus the compile of every
 // user-supplied regular expression and glob group. A fixture bypassing it would leave all of that
 // untested while still passing.
-func runNoRestrictedImports(t *testing.T, testCase noRestrictedImportsCase) rule_testing.Result {
-	t.Helper()
+func runNoRestrictedImports(test *testing.T, testCase noRestrictedImportsCase) rule_testing.Result {
+	test.Helper()
 
 	encoded, err := json.Marshal(testCase.options)
 	if err != nil {
-		t.Fatalf("could not encode options: %v", err)
+		test.Fatalf("could not encode options: %v", err)
 	}
 	// The struct is upstream's `{paths, patterns}` object form, so the list the config layer hands a
 	// list rule is that object as its one element.
 	decoded, err := DecodeNoRestrictedImportsOptions([]byte("[" + string(encoded) + "]"))
 	if err != nil {
-		t.Fatalf("could not decode options for %q: %v", testCase.sourceText, err)
+		test.Fatalf("could not decode options for %q: %v", testCase.sourceText, err)
 	}
-	return rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+	return rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 		testCase.sourceText, decoded)
 }
 
@@ -338,8 +338,8 @@ func noRestrictedImportsCases() []noRestrictedImportsCase {
 }
 
 // TestNoRestrictedImportsMatchesUpstream replays the whole corpus.
-func TestNoRestrictedImportsMatchesUpstream(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsMatchesUpstream(test *testing.T) {
+	test.Parallel()
 
 	cases := noRestrictedImportsCases()
 
@@ -350,37 +350,37 @@ func TestNoRestrictedImportsMatchesUpstream(t *testing.T) {
 		}
 	}
 	if len(cases) != 263 {
-		t.Fatalf("expected 263 corpus cases, have %d", len(cases))
+		test.Fatalf("expected 263 corpus cases, have %d", len(cases))
 	}
 	if reporting != 153 {
-		t.Fatalf("expected 153 reporting cases, have %d", reporting)
+		test.Fatalf("expected 153 reporting cases, have %d", reporting)
 	}
 
 	for _, testCase := range cases {
-		result := runNoRestrictedImports(t, testCase)
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		result := runNoRestrictedImports(test, testCase)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 	}
 }
 
 // TestNoRestrictedImportsIsSilentWithNoConfiguration is the half a corpus of configured cases cannot
 // cover.
-func TestNoRestrictedImportsIsSilentWithNoConfiguration(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsIsSilentWithNoConfiguration(test *testing.T) {
+	test.Parallel()
 
 	const source = "import fs from 'fs'; export { a } from 'mod'; import * as ns from 'os';"
 
-	unconfigured := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+	unconfigured := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 		source, NoRestrictedImportsOptions{})
-	rule_testing.ExpectClean(t, unconfigured)
+	rule_testing.ExpectClean(test, unconfigured)
 
 	// The control. Without it the assertion above passes for a rule that can never report at all.
-	configured := runNoRestrictedImports(t, noRestrictedImportsCase{
+	configured := runNoRestrictedImports(test, noRestrictedImportsCase{
 		sourceText: source,
 		options: NoRestrictedImportsOptions{
 			Paths: []NoRestrictedImportsPath{{Name: "fs"}, {Name: "mod"}, {Name: "os"}},
 		},
 	})
-	rule_testing.ExpectFindings(t, configured, "path", "path", "path")
+	rule_testing.ExpectFindings(test, configured, "path", "path", "path")
 }
 
 // TestNoRestrictedImportsEmptyObjectRestrictsNothing pins `[{}]`, and the divergence it keeps.
@@ -389,16 +389,16 @@ func TestNoRestrictedImportsIsSilentWithNoConfiguration(t *testing.T) {
 // `import b from "undefined"` under `[{}]` and nothing else: its runtime reads the empty object as a
 // path entry and keys it by the name it does not have. Here `[{}]` restricts nothing, so the
 // module named `undefined` is clean too, and this test fails if that ever drifts back.
-func TestNoRestrictedImportsEmptyObjectRestrictsNothing(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsEmptyObjectRestrictsNothing(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeNoRestrictedImportsOptions([]byte(`[{}]`))
 	if err != nil {
-		t.Fatalf("decoding [{}]: %v", err)
+		test.Fatalf("decoding [{}]: %v", err)
 	}
-	result := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+	result := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 		`import a from "foo"; import b from "undefined"; import c from "";`, decoded)
-	rule_testing.ExpectClean(t, result)
+	rule_testing.ExpectClean(test, result)
 }
 
 // TestNoRestrictedImportsChecksImportEquals covers the one arm upstream's corpus does not reach.
@@ -409,8 +409,8 @@ func TestNoRestrictedImportsEmptyObjectRestrictsNothing(t *testing.T) {
 //
 // Two behaviours are asserted, both of which follow from upstream passing an EMPTY import-name map
 // for this form: a whole-module restriction reports, and an `importNames` restriction cannot.
-func TestNoRestrictedImportsChecksImportEquals(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsChecksImportEquals(test *testing.T) {
+	test.Parallel()
 
 	cases := []noRestrictedImportsCase{
 		{
@@ -442,8 +442,8 @@ func TestNoRestrictedImportsChecksImportEquals(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := runNoRestrictedImports(t, testCase)
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		result := runNoRestrictedImports(test, testCase)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 	}
 }
 
@@ -452,8 +452,8 @@ func TestNoRestrictedImportsChecksImportEquals(t *testing.T) {
 // Every one of these would otherwise fail silently: an entry with no name matches nothing and reads
 // as a clean tree, a pattern with neither a group nor a regex likewise, and an entry pairing a
 // restrict-list with an allow-list asks the rule to permit and forbid the same name at once.
-func TestNoRestrictedImportsRejectsContradictoryConfiguration(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsRejectsContradictoryConfiguration(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name       string
@@ -483,10 +483,10 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(t *testing.T) {
 	for _, testCase := range cases {
 		_, err := DecodeNoRestrictedImportsOptions([]byte(testCase.configured))
 		if testCase.wantError && err == nil {
-			t.Errorf("%s: expected the decoder to refuse %s", testCase.name, testCase.configured)
+			test.Errorf("%s: expected the decoder to refuse %s", testCase.name, testCase.configured)
 		}
 		if !testCase.wantError && err != nil {
-			t.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, err)
+			test.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, err)
 		}
 	}
 }
@@ -497,29 +497,29 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(t *testing.T) {
 // Upstream folds a bare `patterns: ["a", "!b"]` into ONE entry whose group is both, which means the
 // `!` un-matches the earlier entry. Decoding them as two separate entries would make the negation
 // apply to nothing, and `foo/bar` would report where upstream is silent.
-func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(test *testing.T) {
+	test.Parallel()
 
 	decoded, err := DecodeNoRestrictedImportsOptions([]byte(`[{"patterns":["foo/*","!foo/bar"]}]`))
 	if err != nil {
-		t.Fatalf("could not decode: %v", err)
+		test.Fatalf("could not decode: %v", err)
 	}
 	options, ok := decoded.(NoRestrictedImportsOptions)
 	if !ok {
-		t.Fatalf("expected NoRestrictedImportsOptions, got %T", decoded)
+		test.Fatalf("expected NoRestrictedImportsOptions, got %T", decoded)
 	}
 	if len(options.Patterns) != 1 {
-		t.Fatalf("expected the two strings folded into 1 entry, got %d", len(options.Patterns))
+		test.Fatalf("expected the two strings folded into 1 entry, got %d", len(options.Patterns))
 	}
 
 	// The control that the folding actually changes a verdict, rather than merely a shape.
-	excluded := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+	excluded := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 		"import { a } from 'foo/bar';", options)
-	rule_testing.ExpectClean(t, excluded)
+	rule_testing.ExpectClean(test, excluded)
 
-	included := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+	included := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 		"import { a } from 'foo/baz';", options)
-	rule_testing.ExpectFindings(t, included, "patterns")
+	rule_testing.ExpectFindings(test, included, "patterns")
 }
 
 // TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly pins the second half of upstream's
@@ -539,8 +539,8 @@ func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(t *testing.T) {
 //
 // The re-export mirror answers identically, which is why both are asserted: they read two different
 // fields on two different node kinds here, and a port can easily get one right and the other wrong.
-func TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly(test *testing.T) {
+	test.Parallel()
 
 	options := NoRestrictedImportsOptions{
 		Paths: []NoRestrictedImportsPath{{Name: "mod", AllowTypeImports: true}},
@@ -566,9 +566,9 @@ func TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly(t *testing.T)
 		{"import def from 'mod';", []string{"path"}},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		result := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 			testCase.source, options)
-		rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 	}
 }
 
@@ -583,8 +583,8 @@ func TestNoRestrictedImportsTreatsAnAllTypeSpecifierListAsTypeOnly(t *testing.T)
 //
 // This exists because a mutation that anchored every such finding on the start of the statement
 // survived all 263 corpus rows. Every one of them asserts ids, and the ids do not move.
-func TestNoRestrictedImportsAnchorsANamespaceFindingOnTheStar(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsAnchorsANamespaceFindingOnTheStar(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		source   string
@@ -611,16 +611,16 @@ func TestNoRestrictedImportsAnchorsANamespaceFindingOnTheStar(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		result := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 			testCase.source, testCase.options)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("%q: expected 1 finding, got %d %v",
+			test.Fatalf("%q: expected 1 finding, got %d %v",
 				testCase.source, len(result.Diagnostics), result.MessageIds())
 		}
 		span := result.Diagnostics[0].Range
 		reported := testCase.source[span.Pos():span.End()]
 		if reported != testCase.wantText {
-			t.Errorf("%q: finding anchored on %q, want %q", testCase.source, reported, testCase.wantText)
+			test.Errorf("%q: finding anchored on %q, want %q", testCase.source, reported, testCase.wantText)
 		}
 	}
 }
@@ -637,32 +637,32 @@ func TestNoRestrictedImportsAnchorsANamespaceFindingOnTheStar(t *testing.T) {
 // answer the same way with the flag on and off. A mutation compiling those two patterns with `iu`
 // survived every one of the 263 corpus rows, because no corpus row pairs a name pattern with a name
 // of the other case.
-func TestNoRestrictedImportsCaseSensitiveGovernsThePathOnly(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsCaseSensitiveGovernsThePathOnly(test *testing.T) {
+	test.Parallel()
 
 	for _, caseSensitive := range []bool{false, true} {
 		restricting := NoRestrictedImportsOptions{Patterns: []NoRestrictedImportsPattern{
 			{Group: []string{"mod"}, ImportNamePattern: "^Foo", CaseSensitive: caseSensitive}}}
 
-		matching := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		matching := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 			"import { Foo } from 'mod';", restricting)
-		rule_testing.ExpectFindings(t, matching, "patternAndImportName")
+		rule_testing.ExpectFindings(test, matching, "patternAndImportName")
 
 		// The case that moves if the flag is wrongly applied to the name pattern.
-		notMatching := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		notMatching := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 			"import { foo } from 'mod';", restricting)
-		rule_testing.ExpectClean(t, notMatching)
+		rule_testing.ExpectClean(test, notMatching)
 
 		allowing := NoRestrictedImportsOptions{Patterns: []NoRestrictedImportsPattern{
 			{Group: []string{"mod"}, AllowImportNamePattern: "^Foo", CaseSensitive: caseSensitive}}}
 
-		permitted := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		permitted := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 			"import { Foo } from 'mod';", allowing)
-		rule_testing.ExpectClean(t, permitted)
+		rule_testing.ExpectClean(test, permitted)
 
-		refused := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		refused := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 			"import { foo } from 'mod';", allowing)
-		rule_testing.ExpectFindings(t, refused, "allowedImportNamePattern")
+		rule_testing.ExpectFindings(test, refused, "allowedImportNamePattern")
 	}
 
 	// The control that `caseSensitive` is doing something at all, on the half it DOES govern. With
@@ -670,12 +670,12 @@ func TestNoRestrictedImportsCaseSensitiveGovernsThePathOnly(t *testing.T) {
 	// the assertions above would also hold for a rule that ignored the option entirely.
 	insensitive := NoRestrictedImportsOptions{Patterns: []NoRestrictedImportsPattern{
 		{Group: []string{"MOD"}, CaseSensitive: false}}}
-	rule_testing.ExpectFindings(t, rule_testing.RunWithOptions(t, NoRestrictedImports,
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoRestrictedImports,
 		noRestrictedImportsFile, "import { a } from 'mod';", insensitive), "patterns")
 
 	sensitive := NoRestrictedImportsOptions{Patterns: []NoRestrictedImportsPattern{
 		{Group: []string{"MOD"}, CaseSensitive: true}}}
-	rule_testing.ExpectClean(t, rule_testing.RunWithOptions(t, NoRestrictedImports,
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoRestrictedImports,
 		noRestrictedImportsFile, "import { a } from 'mod';", sensitive))
 }
 
@@ -686,8 +686,8 @@ func TestNoRestrictedImportsCaseSensitiveGovernsThePathOnly(t *testing.T) {
 // (upstream's `Intl.ListFormat("en-US")`, which is quoted, comma separated, with `and` before the
 // last and a serial comma only from three items), the verb agreement, and whether a project's own
 // message is appended. A mutation that made the verb always plural survived all 263 corpus rows.
-func TestNoRestrictedImportsRendersTheWholeMessage(t *testing.T) {
-	t.Parallel()
+func TestNoRestrictedImportsRendersTheWholeMessage(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name     string
@@ -725,16 +725,16 @@ func TestNoRestrictedImportsRendersTheWholeMessage(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(t, NoRestrictedImports, noRestrictedImportsFile,
+		result := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 			testCase.source, testCase.options)
 		if len(result.Diagnostics) != 1 {
-			t.Fatalf("%s: expected 1 finding, got %d %v",
+			test.Fatalf("%s: expected 1 finding, got %d %v",
 				testCase.name, len(result.Diagnostics), result.MessageIds())
 		}
 		rendered := result.Diagnostics[0].Message.Description
 		for _, want := range testCase.contains {
 			if !strings.Contains(rendered, want) {
-				t.Errorf("%s: message %q does not contain %q", testCase.name, rendered, want)
+				test.Errorf("%s: message %q does not contain %q", testCase.name, rendered, want)
 			}
 		}
 	}

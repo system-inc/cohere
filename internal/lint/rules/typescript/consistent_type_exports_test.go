@@ -60,8 +60,8 @@ func consistentTypeExportsFixtureFiles(subject string) map[string]string {
 }
 
 // decodeConsistentTypeExportsOptions runs a configuration through the real decoder.
-func decodeConsistentTypeExportsOptions(t *testing.T, configuration string) any {
-	t.Helper()
+func decodeConsistentTypeExportsOptions(test *testing.T, configuration string) any {
+	test.Helper()
 
 	if configuration == "" {
 		// A rule configured as a bare `"error"` is handed nil, not an empty struct.
@@ -69,7 +69,7 @@ func decodeConsistentTypeExportsOptions(t *testing.T, configuration string) any 
 	}
 	options, err := DecodeConsistentTypeExportsOptions([]byte(configuration))
 	if err != nil {
-		t.Fatalf("could not decode %s: %v", configuration, err)
+		test.Fatalf("could not decode %s: %v", configuration, err)
 	}
 	return options
 }
@@ -84,8 +84,8 @@ func decodeConsistentTypeExportsOptions(t *testing.T, configuration string) any 
 //
 // Ten of them import from another module and are silent because of what THAT module exports, which
 // is the half of this rule no single-file fixture can reach.
-func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -189,12 +189,12 @@ func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, rule_testing.RunTypedFilesWithOptions(t,
+		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithOptions(test,
 				ConsistentTypeExports, consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
-				decodeConsistentTypeExportsOptions(t, testCase.configuration)))
+				decodeConsistentTypeExportsOptions(test, testCase.configuration)))
 		})
 	}
 }
@@ -208,8 +208,8 @@ func TestConsistentTypeExportsStaysSilentOnUpstreamPassCases(t *testing.T) {
 // what they name. The spans say where the finding points, which is the whole statement. And the
 // applied source says what the edit engine will write unattended, which for the mixed cases is a
 // statement SPLIT into two and is the thing a message-id assertion cannot see at all.
-func TestConsistentTypeExportsFiresOnUpstreamFailCases(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -395,31 +395,31 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
+		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
-				decodeConsistentTypeExportsOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				decodeConsistentTypeExportsOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 			onDisk := consistentTypeExportsOnDisk(testCase.sourceText)
 			for index, wantSpan := range testCase.wantSpans {
 				reported := onDisk[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
 				if reported != wantSpan {
-					t.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
+					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}
 			}
 
 			if testCase.wantFixed == "" {
 				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						t.Errorf("finding %d carries %d fixes, want none", index, len(diagnostic.Fixes))
+						test.Errorf("finding %d carries %d fixes, want none", index, len(diagnostic.Fixes))
 					}
 				}
 				return
 			}
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFixedSource(test, result,
 				consistentTypeExportsOnDisk(testCase.wantFixed))
 		})
 	}
@@ -437,8 +437,8 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(t *testing.T) {
 // alias, and a string-literal export name whose quotes and escapes must survive verbatim.
 //
 // Every expectation is what the installed 8.67.0 build produced for that exact input.
-func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -477,15 +477,15 @@ func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(t *testing.T) {
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
+		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile, nil)
 			if len(result.Diagnostics) == 0 {
-				t.Fatalf("expected a finding on %q", testCase.sourceText)
+				test.Fatalf("expected a finding on %q", testCase.sourceText)
 			}
-			rule_testing.ExpectFixedSource(t, result,
+			rule_testing.ExpectFixedSource(test, result,
 				consistentTypeExportsOnDisk(testCase.wantFixed))
 		})
 	}
@@ -495,8 +495,8 @@ func TestConsistentTypeExportsSplitKeepsWhatTheSpecifierCarries(t *testing.T) {
 //
 // Each row was run through the installed 8.67.0 build and carries the verdict that build produced,
 // so a row asserting silence asserts upstream's silence rather than this port's.
-func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -596,15 +596,15 @@ func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(t *testin
 		},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
+		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile,
-				decodeConsistentTypeExportsOptions(t, testCase.configuration))
-			rule_testing.ExpectFindings(t, result, testCase.wantIds...)
+				decodeConsistentTypeExportsOptions(test, testCase.configuration))
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixed != "" {
-				rule_testing.ExpectFixedSource(t, result,
+				rule_testing.ExpectFixedSource(test, result,
 					consistentTypeExportsOnDisk(testCase.wantFixed))
 			}
 		})
@@ -621,8 +621,8 @@ func TestConsistentTypeExportsDiscriminatesOnCasesUpstreamDoesNotWrite(t *testin
 // Each expectation is the name list the installed 8.67.0 build printed for that exact input,
 // recovered from its message text, and compared against a literal typed here rather than against
 // the rule's own constant, since a constant moves with the mutation.
-func TestConsistentTypeExportsNamesTheExportsUpstreamNames(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsNamesTheExportsUpstreamNames(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		sourceText string
@@ -634,12 +634,12 @@ func TestConsistentTypeExportsNamesTheExportsUpstreamNames(t *testing.T) {
 		{"type A = 1;\ntype B = 2;\ntype C = 3;\nconst v = 4;\nexport { A, B, C, v };", "multipleExportsAreTypes", "A, B and C"},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
+		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
 				consistentTypeExportsFixtureFiles(testCase.sourceText),
 				consistentTypeExportsFile, nil)
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
 			var want string
 			switch testCase.wantId {
@@ -649,7 +649,7 @@ func TestConsistentTypeExportsNamesTheExportsUpstreamNames(t *testing.T) {
 				want = messageConsistentTypeExportsMultipleExportsAreTypes(testCase.wantNames).Description
 			}
 			if result.Diagnostics[0].Message.Description != want {
-				t.Errorf("the description is %q, want %q",
+				test.Errorf("the description is %q, want %q",
 					result.Diagnostics[0].Message.Description, want)
 			}
 		})
@@ -657,8 +657,8 @@ func TestConsistentTypeExportsNamesTheExportsUpstreamNames(t *testing.T) {
 }
 
 // TestConsistentTypeExportsDecoderResolvesTheOption puts the decoder under test.
-func TestConsistentTypeExportsDecoderResolvesTheOption(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsDecoderResolvesTheOption(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		configuration string
@@ -669,18 +669,18 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(t *testing.T) {
 		{"{\"fixMixedExportsWithInlineTypeSpecifier\": false}", false},
 	}
 	for index, testCase := range cases {
-		t.Run(consistentTypeExportsCaseName(index), func(t *testing.T) {
-			t.Parallel()
+		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeConsistentTypeExportsOptions([]byte(testCase.configuration))
 			if err != nil {
-				t.Fatalf("decoding %s: %v", testCase.configuration, err)
+				test.Fatalf("decoding %s: %v", testCase.configuration, err)
 			}
 			options, ok := decoded.(ConsistentTypeExportsOptions)
 			if !ok {
-				t.Fatalf("the decoder returned %T rather than the options struct", decoded)
+				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
 			}
 			if options.FixMixedExportsWithInlineTypeSpecifier != testCase.wantInline {
-				t.Errorf("the inline option resolved to %v, want %v",
+				test.Errorf("the inline option resolved to %v, want %v",
 					options.FixMixedExportsWithInlineTypeSpecifier, testCase.wantInline)
 			}
 		})
@@ -692,14 +692,14 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(t *testing.T) {
 // A rule configured as a bare `"error"` is handed nil, and the zero value happens to match
 // upstream's default here. Asserted anyway so a later default change fails loudly rather than
 // silently switching which repair the tree gets.
-func TestConsistentTypeExportsNilOptionsUsesTheSplittingRepair(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsNilOptionsUsesTheSplittingRepair(test *testing.T) {
+	test.Parallel()
 
 	source := "import { Type1, value1 } from './consistent-type-exports/index';\nexport { Type1, value1 };"
-	result := rule_testing.RunTypedFilesWithOptions(t, ConsistentTypeExports,
+	result := rule_testing.RunTypedFilesWithOptions(test, ConsistentTypeExports,
 		consistentTypeExportsFixtureFiles(source), consistentTypeExportsFile, nil)
-	rule_testing.ExpectFindings(t, result, "singleExportIsType")
-	rule_testing.ExpectFixedSource(t, result, consistentTypeExportsOnDisk(
+	rule_testing.ExpectFindings(test, result, "singleExportIsType")
+	rule_testing.ExpectFixedSource(test, result, consistentTypeExportsOnDisk(
 		"import { Type1, value1 } from './consistent-type-exports/index';\nexport type { Type1 };\nexport { value1 };"))
 }
 
@@ -708,12 +708,12 @@ func TestConsistentTypeExportsNilOptionsUsesTheSplittingRepair(t *testing.T) {
 // A typed rule handed the plain harness gets a nil checker, and the guard at the top of the listener
 // turns that into silence rather than a panic. Silence is the more dangerous failure: every clean
 // case passes vacuously and every reporting case fails in a way that reads as a rule bug.
-func TestConsistentTypeExportsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeExportsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	source := "import { Type1 } from './consistent-type-exports/index';\nexport { Type1 };"
-	rule_testing.ExpectClean(t, rule_testing.Run(t, ConsistentTypeExports,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistentTypeExports,
 		consistentTypeExportsFile, source))
-	rule_testing.ExpectFindings(t, rule_testing.RunTypedFiles(t, ConsistentTypeExports,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedFiles(test, ConsistentTypeExports,
 		consistentTypeExportsFixtureFiles(source), consistentTypeExportsFile), "typeOverValue")
 }

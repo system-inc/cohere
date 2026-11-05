@@ -14,14 +14,14 @@ import (
 // that forgets to run that pass gets an empty seed and prunes EVERY dependency, which is a total
 // loss of the rule's comparison surface and would still satisfy any assertion phrased about pruning
 // alone. So both directions are asserted, on real source, before any specific claim.
-func TestPruneNonReactiveDependenciesKeepsAndPrunes(t *testing.T) {
-	t.Parallel()
+func TestPruneNonReactiveDependenciesKeepsAndPrunes(test *testing.T) {
+	test.Parallel()
 
 	functions, before, after, removed := 0, 0, 0, 0
 
-	forEachCorpusFunctionWithChecker(t, 200, func(function *Function, checker *shimchecker.Checker) {
+	forEachCorpusFunctionWithChecker(test, 200, func(function *Function, checker *shimchecker.Checker) {
 		InferReactive(function, checker)
-		tree, dependencies := prunableTree(t, function, checker)
+		tree, dependencies := prunableTree(test, function, checker)
 		if tree == nil {
 			return
 		}
@@ -36,21 +36,21 @@ func TestPruneNonReactiveDependenciesKeepsAndPrunes(t *testing.T) {
 	})
 
 	if functions < 50 {
-		t.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
+		test.Fatalf("only %d functions reached the pass; the corpus walk is not reaching real source",
 			functions)
 	}
 	if before == 0 {
-		t.Fatal("no dependencies were collected, so pruning none proves nothing")
+		test.Fatal("no dependencies were collected, so pruning none proves nothing")
 	}
 	if after == 0 {
-		t.Error("every dependency was pruned; that is what an empty reactive seed looks like, and " +
+		test.Error("every dependency was pruned; that is what an empty reactive seed looks like, and " +
 			"it destroys the set the rule compares")
 	}
 	if removed != before-after {
-		t.Errorf("the pass reported %d removals and the table shrank by %d", removed, before-after)
+		test.Errorf("the pass reported %d removals and the table shrank by %d", removed, before-after)
 	}
 
-	t.Logf("functions=%d dependenciesBefore=%d after=%d removed=%d", functions, before, after, removed)
+	test.Logf("functions=%d dependenciesBefore=%d after=%d removed=%d", functions, before, after, removed)
 }
 
 // TestPruneNonReactiveDependenciesPropagatesToScopeOutputs covers the half `InferReactive` cannot do.
@@ -61,8 +61,8 @@ func TestPruneNonReactiveDependenciesKeepsAndPrunes(t *testing.T) {
 //
 // Without the propagation an enclosing scope depending on an inner scope's output prunes it as
 // non-reactive, and the rule then compares a set missing a dependency that genuinely changes.
-func TestPruneNonReactiveDependenciesPropagatesToScopeOutputs(t *testing.T) {
-	t.Parallel()
+func TestPruneNonReactiveDependenciesPropagatesToScopeOutputs(test *testing.T) {
+	test.Parallel()
 
 	// Inner scope: depends on reactive value 1, declares value 2.
 	// Outer scope: depends on value 2, which is only reactive because the inner scope's is.
@@ -92,12 +92,12 @@ func TestPruneNonReactiveDependenciesPropagatesToScopeOutputs(t *testing.T) {
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
 	if len(dependencies.DependenciesOf(1)) != 1 {
-		t.Fatalf("the inner scope's reactive dependency was pruned, leaving %d; the seed is not "+
+		test.Fatalf("the inner scope's reactive dependency was pruned, leaving %d; the seed is not "+
 			"reaching this fixture and the propagation below cannot be tested",
 			len(dependencies.DependenciesOf(1)))
 	}
 	if len(dependencies.DependenciesOf(2)) != 1 {
-		t.Error("the outer scope's dependency was pruned; the inner scope has a reactive " +
+		test.Error("the outer scope's dependency was pruned; the inner scope has a reactive " +
 			"dependency, so its declared output is reactive in practice and must survive")
 	}
 }
@@ -108,8 +108,8 @@ func TestPruneNonReactiveDependenciesPropagatesToScopeOutputs(t *testing.T) {
 // outputs, so those outputs stay non-reactive. Dropping that condition makes the propagation
 // unconditional, which keeps every dependency and turns the pass into a no-op that still passes a
 // test asserting only that something survives.
-func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(t *testing.T) {
-	t.Parallel()
+func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(test *testing.T) {
+	test.Parallel()
 
 	inner := &ReactiveScopeBlock{Scope: 1}
 	outer := &ReactiveScopeBlock{Scope: 2}
@@ -137,11 +137,11 @@ func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(t *testing
 
 	removed := PruneNonReactiveDependencies(tree, function, dependencies)
 	if removed != 2 {
-		t.Errorf("removed %d dependencies, want 2; a scope with no reactive dependency propagates "+
+		test.Errorf("removed %d dependencies, want 2; a scope with no reactive dependency propagates "+
 			"nothing, so the outer scope's dependency must prune too", removed)
 	}
 	if len(dependencies.DependenciesOf(1)) != 0 || len(dependencies.DependenciesOf(2)) != 0 {
-		t.Errorf("dependencies survived: inner=%d outer=%d",
+		test.Errorf("dependencies survived: inner=%d outer=%d",
 			len(dependencies.DependenciesOf(1)), len(dependencies.DependenciesOf(2)))
 	}
 }
@@ -156,8 +156,8 @@ func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(t *testing
 // The two flat fixtures above cannot catch that -- a mutation reversing the order survived them,
 // because siblings in one block are visited left to right either way. Nesting is where the order
 // shows, and it is not exotic: 115 of 1,202 corpus scopes sit inside another.
-func TestPruneNonReactiveDependenciesVisitsInnermostFirst(t *testing.T) {
-	t.Parallel()
+func TestPruneNonReactiveDependenciesVisitsInnermostFirst(test *testing.T) {
+	test.Parallel()
 
 	// The inner scope sits INSIDE the outer one. Inner depends on reactive value 1 and declares
 	// value 2; outer depends on value 2, which is reactive only by propagation from inner.
@@ -187,11 +187,11 @@ func TestPruneNonReactiveDependenciesVisitsInnermostFirst(t *testing.T) {
 	PruneNonReactiveDependencies(tree, function, dependencies)
 
 	if len(dependencies.DependenciesOf(1)) != 1 {
-		t.Fatalf("the inner scope's reactive dependency was pruned, leaving %d; the seed is not "+
+		test.Fatalf("the inner scope's reactive dependency was pruned, leaving %d; the seed is not "+
 			"reaching this fixture", len(dependencies.DependenciesOf(1)))
 	}
 	if len(dependencies.DependenciesOf(2)) != 1 {
-		t.Error("the enclosing scope's dependency was pruned; the inner scope propagates its " +
+		test.Error("the enclosing scope's dependency was pruned; the inner scope propagates its " +
 			"output as reactive, so visiting outermost-first asks before that has happened")
 	}
 }

@@ -27,14 +27,14 @@ type consistentTypeImportsCase struct {
 // decodeConsistentTypeImportsFixtureOptions routes a case's option payload through the rule's
 // own exported decoder. An empty payload means the corpus case carried no options, which is
 // the bare `"error"` shape and must reach the rule as the documented defaults.
-func decodeConsistentTypeImportsFixtureOptions(t *testing.T, payload string) any {
-	t.Helper()
+func decodeConsistentTypeImportsFixtureOptions(test *testing.T, payload string) any {
+	test.Helper()
 	if payload == "" {
 		return DefaultConsistentTypeImportsOptions()
 	}
 	decoded, err := DecodeConsistentTypeImportsOptions(json.RawMessage(payload))
 	if err != nil {
-		t.Fatalf("decoding fixture options %s: %v", payload, err)
+		test.Fatalf("decoding fixture options %s: %v", payload, err)
 	}
 	return decoded
 }
@@ -544,32 +544,32 @@ var consistentTypeImportsReportingCases = []consistentTypeImportsCase{
 //
 // These are the cases that catch a port, because each one was added upstream when somebody hit the
 // bug it describes. Four of them differ from a reporting case only in what a name resolves to.
-func TestConsistentTypeImportsStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	for index, testCase := range consistentTypeImportsCleanCases {
-		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		test.Run(fmt.Sprintf("case%02d", index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
-				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
-			rule_testing.ExpectClean(t, result)
+				decodeConsistentTypeImportsFixtureOptions(test, testCase.options))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
 // TestConsistentTypeImportsFires runs upstream's reporting corpus, asserting the message ids in
 // source order.
-func TestConsistentTypeImportsFires(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsFires(test *testing.T) {
+	test.Parallel()
 
 	for index, testCase := range consistentTypeImportsReportingCases {
-		t.Run(fmt.Sprintf("case%02d", index), func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		test.Run(fmt.Sprintf("case%02d", index), func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
-				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+				decodeConsistentTypeImportsFixtureOptions(test, testCase.options))
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -801,20 +801,20 @@ var consistentTypeImportsMeasuredCases = []struct {
 }
 
 // TestConsistentTypeImportsMeasuredCases runs the cases written here rather than imported.
-func TestConsistentTypeImportsMeasuredCases(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsMeasuredCases(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range consistentTypeImportsMeasuredCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
-				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
+				decodeConsistentTypeImportsFixtureOptions(test, testCase.options))
 			if len(testCase.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
@@ -826,8 +826,8 @@ func TestConsistentTypeImportsMeasuredCases(t *testing.T) {
 // statement passes every id fixture in this file. The text is sliced out of the source with the
 // finding's own range and compared against a literal typed here rather than against anything the
 // rule computes.
-func TestConsistentTypeImportsPointsAtTheRightNode(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsPointsAtTheRightNode(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name    string
@@ -865,18 +865,18 @@ func TestConsistentTypeImportsPointsAtTheRightNode(t *testing.T) {
 			spans:   []string{"import type { A } from 'foo';", "type B"},
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
-				decodeConsistentTypeImportsFixtureOptions(t, testCase.options))
+				decodeConsistentTypeImportsFixtureOptions(test, testCase.options))
 			if len(result.Diagnostics) != len(testCase.spans) {
-				t.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.spans))
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.spans))
 			}
 			for position, diagnostic := range result.Diagnostics {
 				covered := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if covered != testCase.spans[position] {
-					t.Errorf("finding %d covers %q, want %q", position, covered, testCase.spans[position])
+					test.Errorf("finding %d covers %q, want %q", position, covered, testCase.spans[position])
 				}
 			}
 		})
@@ -893,8 +893,8 @@ func TestConsistentTypeImportsPointsAtTheRightNode(t *testing.T) {
 //
 // The three shapes are upstream's own: one name bare, two joined with `and` and no comma, three or
 // more with an Oxford comma. The three-name form is the one a reimplementation gets wrong.
-func TestConsistentTypeImportsRendersTheNameList(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsRendersTheNameList(test *testing.T) {
+	test.Parallel()
 
 	for _, testCase := range []struct {
 		name   string
@@ -917,16 +917,16 @@ func TestConsistentTypeImportsRendersTheNameList(t *testing.T) {
 			want:   "Imports A, C, and D are only used as type.",
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source,
 				DefaultConsistentTypeImportsOptions())
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("got %d findings, want 1", len(result.Diagnostics))
+				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
 			if result.Diagnostics[0].Message.Description != testCase.want {
-				t.Errorf("rendered %q, want %q",
+				test.Errorf("rendered %q, want %q",
 					result.Diagnostics[0].Message.Description, testCase.want)
 			}
 		})
@@ -946,11 +946,11 @@ func TestConsistentTypeImportsRendersTheNameList(t *testing.T) {
 // That silence is the more dangerous of the two failure modes and is why the guard stays regardless:
 // a nil checker does not panic here, so a rule missing its guard buys a vacuous green rather than an
 // obvious crash.
-func TestConsistentTypeImportsRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !ConsistentTypeImports.NeedsTypeChecker {
-		t.Fatal("the rule resolves every name through the checker and must declare it")
+		test.Fatal("the rule resolves every name through the checker and must declare it")
 	}
 
 	for _, testCase := range []struct {
@@ -984,15 +984,15 @@ func TestConsistentTypeImportsRequiresTheTypedHarness(t *testing.T) {
 			typed: []string{"avoidImportType"},
 		},
 	} {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			typed := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			typed := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source, testCase.options)
-			rule_testing.ExpectFindings(t, typed, testCase.typed...)
+			rule_testing.ExpectFindings(test, typed, testCase.typed...)
 
-			untyped := rule_testing.RunWithOptions(t, ConsistentTypeImports,
+			untyped := rule_testing.RunWithOptions(test, ConsistentTypeImports,
 				"consistent_type_imports.tsx", testCase.source, testCase.options)
-			rule_testing.ExpectClean(t, untyped)
+			rule_testing.ExpectClean(test, untyped)
 		})
 	}
 }
@@ -1003,18 +1003,18 @@ func TestConsistentTypeImportsRequiresTheTypedHarness(t *testing.T) {
 // zero-value struct matching no arm. That failure reports nothing while looking correctly wired,
 // and every fixture reaching the rule through the decoder would still pass, which is why this
 // asserts the decoded values directly.
-func TestConsistentTypeImportsDecoderDefaults(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsDecoderDefaults(test *testing.T) {
+	test.Parallel()
 
 	defaults := DefaultConsistentTypeImportsOptions()
 	if defaults.Prefer != "type-imports" {
-		t.Errorf("prefer defaults to %q, want %q", defaults.Prefer, "type-imports")
+		test.Errorf("prefer defaults to %q, want %q", defaults.Prefer, "type-imports")
 	}
 	if defaults.FixStyle != "separate-type-imports" {
-		t.Errorf("fixStyle defaults to %q, want %q", defaults.FixStyle, "separate-type-imports")
+		test.Errorf("fixStyle defaults to %q, want %q", defaults.FixStyle, "separate-type-imports")
 	}
 	if !defaults.DisallowTypeAnnotations {
-		t.Error("disallowTypeAnnotations defaults to false, want true")
+		test.Error("disallowTypeAnnotations defaults to false, want true")
 	}
 
 	for _, testCase := range []struct {
@@ -1062,10 +1062,10 @@ func TestConsistentTypeImportsDecoderDefaults(t *testing.T) {
 	} {
 		decoded, err := DecodeConsistentTypeImportsOptions([]byte(testCase.payload))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", testCase.payload, err)
+			test.Fatalf("decoding %s: %v", testCase.payload, err)
 		}
 		if decoded != any(testCase.want) {
-			t.Errorf("decoding %s gave %+v, want %+v", testCase.payload, decoded, testCase.want)
+			test.Errorf("decoding %s gave %+v, want %+v", testCase.payload, decoded, testCase.want)
 		}
 	}
 }
@@ -1076,18 +1076,18 @@ func TestConsistentTypeImportsDecoderDefaults(t *testing.T) {
 // point, so upstream's repair proposed as its several primitive edits applied nothing at all. The
 // repair here is one replacement per finding, and this is what keeps a later change from splitting
 // it back up. The `import()` annotation finding carries no repair, as upstream's does not.
-func TestConsistentTypeImportsProposesOneEditPerFinding(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsProposesOneEditPerFinding(test *testing.T) {
+	test.Parallel()
 
 	for _, source := range []string{"import Foo from 'foo';\nlet foo: Foo;\n", "import Foo, { Bar } from 'foo';\nlet foo: Foo;\nlet bar: Bar;\n", "import { A, B } from 'foo';\nconst foo: A = B();\n"} {
-		result := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+		result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 			"consistent_type_imports.tsx", source, DefaultConsistentTypeImportsOptions())
 		if len(result.Diagnostics) == 0 {
-			t.Fatalf("expected a finding on %q", source)
+			test.Fatalf("expected a finding on %q", source)
 		}
 		for _, diagnostic := range result.Diagnostics {
 			if len(diagnostic.Fixes) != 1 || len(diagnostic.Suggestions) != 0 {
-				t.Errorf("%q proposed %d fixes and %d suggestions, want exactly one fix",
+				test.Errorf("%q proposed %d fixes and %d suggestions, want exactly one fix",
 					source, len(diagnostic.Fixes), len(diagnostic.Suggestions))
 			}
 		}
@@ -1095,14 +1095,14 @@ func TestConsistentTypeImportsProposesOneEditPerFinding(t *testing.T) {
 
 	// And what that one edit writes, for the commonest shape. The full corpus of repairs, upstream's
 	// seventy, is in consistent_type_imports_fix_test.go.
-	mixed := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports, "consistent_type_imports.tsx",
+	mixed := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports, "consistent_type_imports.tsx",
 		"import Foo, { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n", DefaultConsistentTypeImportsOptions())
-	rule_testing.ExpectFixedSource(t, mixed, "import type Foo from 'foo';\nimport { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n")
+	rule_testing.ExpectFixedSource(test, mixed, "import type Foo from 'foo';\nimport { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n")
 
-	annotation := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+	annotation := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "type T = import('foo');\n", DefaultConsistentTypeImportsOptions())
 	if len(annotation.Diagnostics) != 1 || len(annotation.Diagnostics[0].Fixes) != 0 {
-		t.Errorf("the import() annotation finding should report once with no repair, got %+v", annotation.Diagnostics)
+		test.Errorf("the import() annotation finding should report once with no repair, got %+v", annotation.Diagnostics)
 	}
 }
 
@@ -1119,27 +1119,27 @@ func TestConsistentTypeImportsProposesOneEditPerFinding(t *testing.T) {
 // twenty-eight fixtures, because each one reached the rule through a decoder that never produces
 // nil. The `import()` case below is the input that separates the two versions, and the import case
 // beside it is the control proving the harness is passing nil rather than failing to run.
-func TestConsistentTypeImportsWithNilOptions(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsWithNilOptions(test *testing.T) {
+	test.Parallel()
 
-	annotations := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+	annotations := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "type T = import('foo');\n", nil)
-	rule_testing.ExpectFindings(t, annotations, "noImportTypeAnnotations")
+	rule_testing.ExpectFindings(test, annotations, "noImportTypeAnnotations")
 
-	imported := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+	imported := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "import Foo from 'foo';\nlet foo: Foo;\n", nil)
-	rule_testing.ExpectFindings(t, imported, "typeOverValue")
+	rule_testing.ExpectFindings(test, imported, "typeOverValue")
 
-	clean := rule_testing.RunTypedWithOptions(t, ConsistentTypeImports,
+	clean := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "import type { Foo } from 'foo';\nlet foo: Foo;\n", nil)
-	rule_testing.ExpectClean(t, clean)
+	rule_testing.ExpectClean(test, clean)
 }
 
 // TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram covers the pragma when `jsxFactory` names
 // one, which is how the parser resolves it when a project is configured: the first identifier of the
 // factory, so `h` for preact, and `React` stops being special.
-func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(t *testing.T) {
-	t.Parallel()
+func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(test *testing.T) {
+	test.Parallel()
 
 	withFactory := func(directory string) {
 		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
@@ -1147,7 +1147,7 @@ func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(t *testing.T) {
 			`"jsxFragmentFactory": "Fragment"}, ` +
 			`"include": ["**/*.ts", "**/*.tsx"]}`
 		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-			t.Fatalf("writing the tsconfig: %v", err)
+			test.Fatalf("writing the tsconfig: %v", err)
 		}
 	}
 	cases := []struct {
@@ -1163,16 +1163,16 @@ func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(t *testing.T) {
 		{"without a fragment the fragment factory is a type use", "import { h, Fragment } from 'preact';\ntype T = Fragment;\nconst x = <div />;\n", []string{"someImportsAreOnlyTypes"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(t, ConsistentTypeImports,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, ConsistentTypeImports,
 				map[string]string{"/repository/source/Factory.tsx": testCase.source}, "/repository/source/Factory.tsx",
 				DefaultConsistentTypeImportsOptions(), withFactory)
 			if len(testCase.ids) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.ids...)
+			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }

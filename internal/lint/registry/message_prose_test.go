@@ -32,27 +32,27 @@ import (
 // settings-reachable fix." into "edit." when `fix/` became `edit/`, and `edit` is English, so no
 // token test can tell the package from the verb. That one was found by reading the diff, and a
 // rename whose new name is an ordinary word still needs that reading.
-func TestMessagesDoNotNameInternalPackages(t *testing.T) {
-	t.Parallel()
-	packageNames := underscoredInternalPackageNames(t)
+func TestMessagesDoNotNameInternalPackages(test *testing.T) {
+	test.Parallel()
+	packageNames := underscoredInternalPackageNames(test)
 	if len(packageNames) == 0 {
 		// An empty set matches nothing, and a guard with nothing to match passes for the wrong
 		// reason, which is the defect it guards against.
-		t.Fatal("found no underscored package directories under internal/, so this test checked nothing")
+		test.Fatal("found no underscored package directories under internal/, so this test checked nothing")
 	}
 
-	descriptions := ruleMessageDescriptionsOnDisk(t)
+	descriptions := ruleMessageDescriptionsOnDisk(test)
 	if len(descriptions) == 0 {
-		t.Fatal("found no message descriptions under internal/lint/rules, so this test checked nothing")
+		test.Fatal("found no message descriptions under internal/lint/rules, so this test checked nothing")
 	}
-	t.Logf("checked %d descriptions against %d underscored package names", len(descriptions), len(packageNames))
+	test.Logf("checked %d descriptions against %d underscored package names", len(descriptions), len(packageNames))
 
 	for _, description := range descriptions {
 		for _, word := range proseWordPattern.FindAllString(description.text, -1) {
 			if !packageNames[word] {
 				continue
 			}
-			t.Errorf("%s: a message description contains %q, which is the name of a package directory "+
+			test.Errorf("%s: a message description contains %q, which is the name of a package directory "+
 				"under internal/ rather than a word a reader knows; a rename that substituted text "+
 				"leaked into prose, or the message is telling a user about this tree's layout. "+
 				"Description: %q", description.position, word, description.text)
@@ -65,8 +65,8 @@ var proseWordPattern = regexp.MustCompile(`[A-Za-z0-9_]+`)
 
 // underscoredInternalPackageNames is every directory under internal/ that holds a Go package and
 // whose name carries an underscore.
-func underscoredInternalPackageNames(t *testing.T) map[string]bool {
-	t.Helper()
+func underscoredInternalPackageNames(test *testing.T) map[string]bool {
+	test.Helper()
 
 	names := map[string]bool{}
 	err := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, walkErr error) error {
@@ -86,7 +86,7 @@ func underscoredInternalPackageNames(t *testing.T) map[string]bool {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking internal/: %v", err)
+		test.Fatalf("walking internal/: %v", err)
 	}
 	return names
 }
@@ -103,8 +103,8 @@ type messageDescription struct {
 // a name the rule only knows at report time, and the comments beside it discuss package names
 // legitimately. Every string literal inside the description's expression is collected and joined,
 // so `"Identifier \"" + name + "\" is..."` and a `fmt.Sprintf` format string are both read.
-func ruleMessageDescriptionsOnDisk(t *testing.T) []messageDescription {
-	t.Helper()
+func ruleMessageDescriptionsOnDisk(test *testing.T) []messageDescription {
+	test.Helper()
 
 	var found []messageDescription
 	fileSet := token.NewFileSet()
@@ -121,7 +121,7 @@ func ruleMessageDescriptionsOnDisk(t *testing.T) []messageDescription {
 
 		parsed, parseErr := parser.ParseFile(fileSet, path, nil, 0)
 		if parseErr != nil {
-			t.Fatalf("parsing %s: %v", path, parseErr)
+			test.Fatalf("parsing %s: %v", path, parseErr)
 		}
 
 		ast.Inspect(parsed, func(node ast.Node) bool {
@@ -142,7 +142,7 @@ func ruleMessageDescriptionsOnDisk(t *testing.T) []messageDescription {
 		return nil
 	})
 	if err != nil {
-		t.Fatalf("walking internal/lint/rules: %v", err)
+		test.Fatalf("walking internal/lint/rules: %v", err)
 	}
 	return found
 }

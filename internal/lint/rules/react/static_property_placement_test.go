@@ -20,17 +20,17 @@ import (
 const staticPropertyPlacementFile = "/repository/source/StaticPropertyPlacement.tsx"
 
 // staticPropertyPlacementDecode routes a fixture's raw options through the exported decoder.
-func staticPropertyPlacementDecode(t *testing.T, raw string) any {
-	t.Helper()
+func staticPropertyPlacementDecode(test *testing.T, raw string) any {
+	test.Helper()
 	decoded, err := DecodeStaticPropertyPlacementOptions([]byte(raw))
 	if err != nil {
-		t.Fatalf("decoding %s returned %v", raw, err)
+		test.Fatalf("decoding %s returned %v", raw, err)
 	}
 	return decoded
 }
 
-func TestStaticPropertyPlacementStaysSilent(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementStaysSilent(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText, rawOptions string }{
 		{"upstream valid 0", "\n        var MyComponent = createReactClass({\n          childContextTypes: {\n            something: PropTypes.bool\n          },\n\n          contextTypes: {\n            something: PropTypes.bool\n          },\n\n          getDefaultProps: function() {\n            name: 'Bob'\n          },\n\n          displayName: 'Hello',\n\n          propTypes: {\n            something: PropTypes.bool\n          },\n\n          render: function() {\n            return null;\n          },\n        });\n      ", "[\"property assignment\"]"},
@@ -95,18 +95,18 @@ func TestStaticPropertyPlacementStaysSilent(t *testing.T) {
 		{"upstream valid 59", "\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n\n          myMethod() {\n            MyComponent.displayName = \"Bonjour\";\n          }\n        }\n      ", "[\"static public field\"]"},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, testCase.rawOptions))
-			rule_testing.ExpectClean(t, result)
+				staticPropertyPlacementDecode(test, testCase.rawOptions))
+			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestStaticPropertyPlacementFires(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementFires(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, rawOptions string
@@ -131,12 +131,12 @@ func TestStaticPropertyPlacementFires(t *testing.T) {
 		{"upstream invalid 16", "\n        class MyComponent extends React.Component {\n          displayName = 'Foo';\n        }\n      ", "[\"static public field\"]", []string{"notStaticClassProp"}},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, testCase.rawOptions))
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+				staticPropertyPlacementDecode(test, testCase.rawOptions))
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -147,8 +147,8 @@ func TestStaticPropertyPlacementFires(t *testing.T) {
 // a reader are the last two: a NON-static getter is silent under every configuration, because
 // upstream requires both `static` and the getter kind before it looks at the name at all, and an
 // unrelated static field is silent because it is not one of the six names.
-func TestStaticPropertyPlacementPositionMatrix(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementPositionMatrix(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, rawOptions string
@@ -215,16 +215,16 @@ func TestStaticPropertyPlacementPositionMatrix(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, testCase.rawOptions))
+				staticPropertyPlacementDecode(test, testCase.rawOptions))
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -239,8 +239,8 @@ func TestStaticPropertyPlacementPositionMatrix(t *testing.T) {
 // the corpus never writes one. The function-declaration row is the other direction: upstream
 // requires an ES6 class specifically, so a function component with `propTypes` attached is silent
 // even though that is the most common way the property is written in real code.
-func TestStaticPropertyPlacementAssignmentReceiver(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementAssignmentReceiver(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText string
@@ -283,16 +283,16 @@ func TestStaticPropertyPlacementAssignmentReceiver(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, `["static public field"]`))
+				staticPropertyPlacementDecode(test, `["static public field"]`))
 			if len(testCase.messageIds) == 0 {
-				rule_testing.ExpectClean(t, result)
+				rule_testing.ExpectClean(test, result)
 				return
 			}
-			rule_testing.ExpectFindings(t, result, testCase.messageIds...)
+			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
 }
@@ -302,8 +302,8 @@ func TestStaticPropertyPlacementAssignmentReceiver(t *testing.T) {
 // The property name is interpolated into all three, so a message-id assertion cannot see anything
 // the interpolation does. Asserted against literals typed here rather than against the rule's own
 // builder, which would move both sides together under mutation.
-func TestStaticPropertyPlacementMessageText(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementMessageText(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, rawOptions, wantId, wantText string
@@ -337,22 +337,22 @@ func TestStaticPropertyPlacementMessageText(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, testCase.rawOptions))
+				staticPropertyPlacementDecode(test, testCase.rawOptions))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			if result.Diagnostics[0].Message.Id != testCase.wantId {
-				t.Fatalf("id is %q, wanted %q", result.Diagnostics[0].Message.Id, testCase.wantId)
+				test.Fatalf("id is %q, wanted %q", result.Diagnostics[0].Message.Id, testCase.wantId)
 			}
 			if result.Diagnostics[0].Message.Description != testCase.wantText {
-				t.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
+				test.Fatalf("message is %q", result.Diagnostics[0].Message.Description)
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 0 {
-				t.Fatal("upstream marks this rule not fixable and neither does this port")
+				test.Fatal("upstream marks this rule not fixable and neither does this port")
 			}
 		})
 	}
@@ -363,8 +363,8 @@ func TestStaticPropertyPlacementMessageText(t *testing.T) {
 // The in-class arms anchor on the whole member and the assignment arm anchors on the LEFT side of
 // the assignment rather than on the statement, which is upstream reporting the MemberExpression it
 // was visiting. A message-id assertion cannot see either.
-func TestStaticPropertyPlacementSpans(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementSpans(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct{ name, sourceText, rawOptions, reported string }{
 		{
@@ -387,20 +387,20 @@ func TestStaticPropertyPlacementSpans(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, testCase.rawOptions))
+				staticPropertyPlacementDecode(test, testCase.rawOptions))
 			if len(result.Diagnostics) != 1 {
-				t.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
+				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 			}
 			// The typed harness writes `strings.TrimSpace(contents)+"\n"`, so the expectation is
 			// transformed the same way the input was rather than sliced from the Go literal.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 			if reported != testCase.reported {
-				t.Fatalf("finding points at %q, wanted %q", reported, testCase.reported)
+				test.Fatalf("finding points at %q, wanted %q", reported, testCase.reported)
 			}
 		})
 	}
@@ -413,8 +413,8 @@ func TestStaticPropertyPlacementSpans(t *testing.T) {
 // time. The nil row is the one that matters most, because a rule configured as a bare "error" is
 // handed empty input and a decoder without a fallback would give every property an unmatched
 // position and silently invert the rule.
-func TestDecodeStaticPropertyPlacementOptions(t *testing.T) {
-	t.Parallel()
+func TestDecodeStaticPropertyPlacementOptions(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, raw string
@@ -443,23 +443,23 @@ func TestDecodeStaticPropertyPlacementOptions(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			decoded, err := DecodeStaticPropertyPlacementOptions([]byte(testCase.raw))
 			if err != nil {
-				t.Fatalf("decode returned %v", err)
+				test.Fatalf("decode returned %v", err)
 			}
 			options, isOptions := decoded.(StaticPropertyPlacementOptions)
 			if !isOptions {
-				t.Fatalf("decode returned %T", decoded)
+				test.Fatalf("decode returned %T", decoded)
 			}
 			if len(options.Positions) != len(staticPropertyPlacementProperties) {
-				t.Fatalf("decoded %d positions, wanted %d",
+				test.Fatalf("decoded %d positions, wanted %d",
 					len(options.Positions), len(staticPropertyPlacementProperties))
 			}
 			for property, want := range testCase.want {
 				if options.Positions[property] != want {
-					t.Fatalf("%s is %q, wanted %q", property, options.Positions[property], want)
+					test.Fatalf("%s is %q, wanted %q", property, options.Positions[property], want)
 				}
 			}
 		})
@@ -470,8 +470,8 @@ func TestDecodeStaticPropertyPlacementOptions(t *testing.T) {
 //
 // Each of these used to decode to the default, so a typo in a position or a property name produced a
 // rule enforcing something the author did not write. Upstream's schema refuses every one.
-func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(t *testing.T) {
-	t.Parallel()
+func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
+	test.Parallel()
 
 	for _, raw := range []string{
 		`["nonsense"]`,
@@ -482,7 +482,7 @@ func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(t *testi
 		`"static getter"`,
 	} {
 		if decoded, err := DecodeStaticPropertyPlacementOptions([]byte(raw)); err == nil {
-			t.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
+			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}
 }
@@ -492,12 +492,12 @@ func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(t *testi
 // Every other fixture here reaches the rule through the decoder, so nothing else can see the
 // rule's own nil fallback. A rule handed nil options would otherwise read a nil map, find no
 // position for any property, and go silent on everything.
-func TestStaticPropertyPlacementNilOptionsUsesTheDefault(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementNilOptionsUsesTheDefault(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTyped(t, StaticPropertyPlacement, staticPropertyPlacementFile,
+	result := rule_testing.RunTyped(test, StaticPropertyPlacement, staticPropertyPlacementFile,
 		"class MyComponent extends React.Component { propTypes = {}; render(){ return null; } }")
-	rule_testing.ExpectFindings(t, result, "notStaticClassProp")
+	rule_testing.ExpectFindings(test, result, "notStaticClassProp")
 }
 
 // TestStaticPropertyPlacementRequiresTheTypedHarness asserts the checker is genuinely needed.
@@ -506,20 +506,20 @@ func TestStaticPropertyPlacementNilOptionsUsesTheDefault(t *testing.T) {
 // guard would go quietly narrower rather than announcing itself. The assignment arm is the half
 // that needs resolution; the in-class arms do not, which is why the untyped run is asserted to be
 // silent on an assignment and the typed run to report it.
-func TestStaticPropertyPlacementRequiresTheTypedHarness(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementRequiresTheTypedHarness(test *testing.T) {
+	test.Parallel()
 
 	if !StaticPropertyPlacement.NeedsTypeChecker {
-		t.Fatal("the assignment arm resolves its receiver through the checker and must declare it")
+		test.Fatal("the assignment arm resolves its receiver through the checker and must declare it")
 	}
 	source := "class MyComponent extends React.Component { render(){ return null; } }\nMyComponent.propTypes = {};"
-	untyped := rule_testing.RunWithOptions(t, StaticPropertyPlacement, staticPropertyPlacementFile,
+	untyped := rule_testing.RunWithOptions(test, StaticPropertyPlacement, staticPropertyPlacementFile,
 		source, DefaultStaticPropertyPlacementOptions())
-	rule_testing.ExpectClean(t, untyped)
+	rule_testing.ExpectClean(test, untyped)
 
-	typed := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+	typed := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 		staticPropertyPlacementFile, source, DefaultStaticPropertyPlacementOptions())
-	rule_testing.ExpectFindings(t, typed, "notStaticClassProp")
+	rule_testing.ExpectFindings(test, typed, "notStaticClassProp")
 }
 
 // TestStaticPropertyPlacementFlowAliases pins the two names that map onto a different reported name.
@@ -532,8 +532,8 @@ func TestStaticPropertyPlacementRequiresTheTypedHarness(t *testing.T) {
 // The annotation is required. A field named `props` with no annotation is silent, which is what
 // separates the alias from an ordinary field that happens to share the name. Upstream's corpus
 // writes neither shape, so a mutation disabling the alias survived until these rows existed.
-func TestStaticPropertyPlacementFlowAliases(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementFlowAliases(test *testing.T) {
+	test.Parallel()
 
 	cases := []struct {
 		name, sourceText, wantId, wantName string
@@ -550,14 +550,14 @@ func TestStaticPropertyPlacementFlowAliases(t *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 				staticPropertyPlacementFile, testCase.sourceText,
-				staticPropertyPlacementDecode(t, `["property assignment"]`))
-			rule_testing.ExpectFindings(t, result, testCase.wantId)
+				staticPropertyPlacementDecode(test, `["property assignment"]`))
+			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			if !strings.Contains(result.Diagnostics[0].Message.Description, "'"+testCase.wantName+"'") {
-				t.Fatalf("message %q does not name %q",
+				test.Fatalf("message %q does not name %q",
 					result.Diagnostics[0].Message.Description, testCase.wantName)
 			}
 		})
@@ -565,11 +565,11 @@ func TestStaticPropertyPlacementFlowAliases(t *testing.T) {
 
 	// An unannotated field named `props` is not the alias, so it is not one of the six names and is
 	// silent. Measured.
-	plain := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+	plain := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 		staticPropertyPlacementFile,
 		"class MyComponent extends React.Component { props = {}; render(){ return null; } }",
-		staticPropertyPlacementDecode(t, `["property assignment"]`))
-	rule_testing.ExpectClean(t, plain)
+		staticPropertyPlacementDecode(test, `["property assignment"]`))
+	rule_testing.ExpectClean(test, plain)
 }
 
 // TestStaticPropertyPlacementMergedReceiverDeclaration pins the declaration loop.
@@ -578,12 +578,12 @@ func TestStaticPropertyPlacementFlowAliases(t *testing.T) {
 // zero, so a rule reading `symbol.Declarations[0]` instead of looping goes silent on it. Measured:
 // the installed build reports, so the loop is what reproduces upstream and the index would be a
 // silent false negative. This is the index-zero trap this tree names for six other rules.
-func TestStaticPropertyPlacementMergedReceiverDeclaration(t *testing.T) {
-	t.Parallel()
+func TestStaticPropertyPlacementMergedReceiverDeclaration(test *testing.T) {
+	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(t, StaticPropertyPlacement,
+	result := rule_testing.RunTypedWithOptions(test, StaticPropertyPlacement,
 		staticPropertyPlacementFile,
 		"interface MyComponent { a: number }\nclass MyComponent extends React.Component { render(){ return null; } }\nMyComponent.propTypes = {};",
-		staticPropertyPlacementDecode(t, `["static public field"]`))
-	rule_testing.ExpectFindings(t, result, "notStaticClassProp")
+		staticPropertyPlacementDecode(test, `["static public field"]`))
+	rule_testing.ExpectFindings(test, result, "notStaticClassProp")
 }

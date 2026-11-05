@@ -6,8 +6,8 @@ import "testing"
 // Severity is an iota, so SeverityOff is 0, and any diagnostic that formats one with %s or %q
 // without a String method prints '\x00' — illegible in exactly the output a reader consults to
 // find out whether their config is being honored.
-func TestSeverityRendersAsTheConfigSpellsIt(t *testing.T) {
-	t.Parallel()
+func TestSeverityRendersAsTheConfigSpellsIt(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		severity Severity
 		expected string
@@ -18,7 +18,7 @@ func TestSeverityRendersAsTheConfigSpellsIt(t *testing.T) {
 		{Severity(99), "unknown"},
 	} {
 		if actual := testCase.severity.String(); actual != testCase.expected {
-			t.Errorf("severity %d rendered as %q, want %q", int(testCase.severity), actual, testCase.expected)
+			test.Errorf("severity %d rendered as %q, want %q", int(testCase.severity), actual, testCase.expected)
 		}
 	}
 }

@@ -45,35 +45,35 @@ type preferNullishCoalescingReplayedCase struct {
 // one pair of its parentheses, and parenthesising the fallback by precedence; an if's suggestion
 // carries comments out of the block. An id and a count see none of that, so each row pins the
 // spanned text and the whole file after the suggestion.
-func TestPreferNullishCoalescingTernaryAndIfFire(t *testing.T) {
-	t.Parallel()
+func TestPreferNullishCoalescingTernaryAndIfFire(test *testing.T) {
+	test.Parallel()
 	cases := append(append([]preferNullishCoalescingReplayedCase(nil),
 		preferNullishCoalescingTernaryAndIfCases...), preferNullishCoalescingBeyondTheCorpusCases...)
 	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			result := runPreferNullishCoalescing(t, preferNullishCoalescingCase{
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferNullishCoalescing(test, preferNullishCoalescingCase{
 				source: testCase.source, optionsJson: testCase.optionsJson,
 			})
 			wantIds := make([]string, 0, len(testCase.findings))
 			for _, expected := range testCase.findings {
 				wantIds = append(wantIds, expected.id)
 			}
-			rule_testing.ExpectFindings(t, result, wantIds...)
+			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			text := asTheTypedPreferNullishHarnessWroteIt(testCase.source)
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
 
-				start := preferNullishCoalescingOffsetOf(t, testCase.source, expected.line, expected.column)
+				start := preferNullishCoalescingOffsetOf(test, testCase.source, expected.line, expected.column)
 				if diagnostic.Range.Pos() != start || diagnostic.Range.End() != start+len(expected.reported) {
-					t.Errorf("finding %d: expected the span %q at line %d column %d, got %q",
+					test.Errorf("finding %d: expected the span %q at line %d column %d, got %q",
 						index, expected.reported, expected.line, expected.column,
 						text[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 
 				if len(diagnostic.Suggestions) != 1 {
-					t.Fatalf("finding %d: expected one suggestion, got %d", index, len(diagnostic.Suggestions))
+					test.Fatalf("finding %d: expected one suggestion, got %d", index, len(diagnostic.Suggestions))
 				}
 				// Applied from the back, so an earlier edit never shifts a later one's offsets.
 				fixes := append([]rule.Fix(nil), diagnostic.Suggestions[0].Fixes...)
@@ -85,7 +85,7 @@ func TestPreferNullishCoalescingTernaryAndIfFire(t *testing.T) {
 					applied = applied[:fix.Range.Pos()] + fix.Text + applied[fix.Range.End():]
 				}
 				if applied != expected.suggested {
-					t.Errorf("finding %d: the suggestion writes\n%s\nupstream's writes\n%s",
+					test.Errorf("finding %d: the suggestion writes\n%s\nupstream's writes\n%s",
 						index, applied, expected.suggested)
 				}
 			}
@@ -118,29 +118,29 @@ var preferNullishCoalescingBeyondTheCorpusCases = []preferNullishCoalescingRepla
 // declines it; a port answering "fixable" there is silent on every corpus case and wrong here. The
 // strict `=== null || === null` row is the loose join's own control: the same shape read strict, on
 // a type that also holds undefined, is not fixable. All four replayed silent on the installed build.
-func TestPreferNullishCoalescingTernaryAndIfStaySilentBeyondTheCorpus(t *testing.T) {
-	t.Parallel()
+func TestPreferNullishCoalescingTernaryAndIfStaySilentBeyondTheCorpus(test *testing.T) {
+	test.Parallel()
 	for _, source := range []string{
 		"declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x === null || x === null ? y : x;\n",
 		"declare let x: string | null;\ndeclare const y: string;\nconst r = x !== x ? x : y;\n",
 		"declare let x: string | null;\ndeclare const y: string;\nconst r = x === x || x === x ? y : x;\n",
 		"declare let x: string | null;\ndeclare const y: string;\nif (x === x) x = y;\n",
 	} {
-		t.Run(source, func(t *testing.T) {
-			t.Parallel()
-			rule_testing.ExpectClean(t, runPreferNullishCoalescing(t, preferNullishCoalescingCase{source: source}))
+		test.Run(source, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runPreferNullishCoalescing(test, preferNullishCoalescingCase{source: source}))
 		})
 	}
 }
 
 // TestPreferNullishCoalescingTernaryAndIfMessages pins the two new renderings whole, since the
 // replay table asserts ids and the message text is ours past upstream's first sentence.
-func TestPreferNullishCoalescingTernaryAndIfMessages(t *testing.T) {
-	t.Parallel()
-	ternary := runPreferNullishCoalescing(t, preferNullishCoalescingCase{
+func TestPreferNullishCoalescingTernaryAndIfMessages(test *testing.T) {
+	test.Parallel()
+	ternary := runPreferNullishCoalescing(test, preferNullishCoalescingCase{
 		source: "declare const a: string | null;\nconst x = a !== null ? a : 'b';\n",
 	})
-	assignment := runPreferNullishCoalescing(t, preferNullishCoalescingCase{
+	assignment := runPreferNullishCoalescing(test, preferNullishCoalescingCase{
 		source: "declare let a: string | null;\nif (!a) a = 'b';\n",
 	})
 	for _, check := range []struct {
@@ -155,7 +155,7 @@ func TestPreferNullishCoalescingTernaryAndIfMessages(t *testing.T) {
 	} {
 		if len(check.result.Diagnostics) != 1 ||
 			!strings.HasPrefix(check.result.Diagnostics[0].Message.Description, check.opening) {
-			t.Errorf("%s: expected one finding opening with upstream's sentence %q, got %v",
+			test.Errorf("%s: expected one finding opening with upstream's sentence %q, got %v",
 				check.name, check.opening, check.result.Diagnostics)
 		}
 	}
@@ -2154,13 +2154,13 @@ c ?? (c ? 1 : 2);
 // Every row runs with the compiler on and off, so a silent row is shown to be the gate rather than a
 // shape the check never reported. The harness has no React types, so each ref is annotated: read as
 // `any`, its `current` is not nullable and the check would never fire.
-func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(t *testing.T) {
-	t.Parallel()
+func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(test *testing.T) {
+	test.Parallel()
 
 	decode := func(raw string) PreferNullishCoalescingOptions {
 		decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(raw))
 		if err != nil {
-			t.Fatalf("decoding %s: %v", raw, err)
+			test.Fatalf("decoding %s: %v", raw, err)
 		}
 		return decoded.(PreferNullishCoalescingOptions)
 	}
@@ -2168,27 +2168,27 @@ func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(t *testin
 	compilerOff := decode(`{"reactCompiler": false}`)
 
 	for _, testCase := range preferNullishCoalescingCompiledRows {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-			off := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOff)
-			rule_testing.ExpectFindings(t, off, "preferNullishOverAssignment")
-			on := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOn)
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			off := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOff)
+			rule_testing.ExpectFindings(test, off, "preferNullishOverAssignment")
+			on := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOn)
 			if testCase.compiled {
-				rule_testing.ExpectClean(t, on)
+				rule_testing.ExpectClean(test, on)
 				return
 			}
-			rule_testing.ExpectFindings(t, on, "preferNullishOverAssignment")
+			rule_testing.ExpectFindings(test, on, "preferNullishOverAssignment")
 		})
 	}
 
 	// The ternary's repair is `??`, an expression the compiler lowers, so it still reports in a
 	// component with the compiler on.
-	ternary := rule_testing.RunTypedWithOptions(t, PreferNullishCoalescing, "Compiled.tsx", `
+	ternary := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", `
 export function Badge(properties: { label: string | null }) {
     const label = properties.label !== null ? properties.label : 'none';
     return <span>{label}</span>;
 }`, compilerOn)
-	rule_testing.ExpectFindings(t, ternary, "preferNullishOverTernary")
+	rule_testing.ExpectFindings(test, ternary, "preferNullishOverTernary")
 }
 
 // preferNullishCoalescingCompiledRows is the table both engines run: each source holds one `if` the
