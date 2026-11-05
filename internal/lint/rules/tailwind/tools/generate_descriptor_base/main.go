@@ -49,8 +49,8 @@
 // rather than approximate. Over 1,425 namespace buckets across the three systems, every bucket is
 // one of exactly two things and there are no others:
 //
-//   - **399 buckets consumed by the root**, keyed on one of 14 namespaces — `--color`, `--font`,
-//     `--text`, `--leading` and their kin — which read identically in all three systems. A fact
+//   - **399 buckets consumed by the root**, keyed on one of 14 namespaces (`--color`, `--font`,
+//     `--text`, `--leading` and their kin), which read identically in all three systems. A fact
 //     about Tailwind, printed here.
 //   - **1,026 buckets the root does not consume**, every one of which reads *exactly* its axis's
 //     `@none` bucket. A namespace a root ignores does not produce a reading of its own; the value
@@ -60,7 +60,7 @@
 // Zero violations. That is why a repository declaring `--color-weird` gets `border-weird-1` right
 // without this file knowing the token exists: `border` does not consume `--color-weird`, so the
 // bucket equals `@none`, and `@none` is already here. It is also why the split is not merely a size
-// optimisation — the 1,026 are not omitted because they compress well, they are omitted because
+// optimisation: the 1,026 are not omitted because they compress well, they are omitted because
 // storing them would be storing one repository's token names.
 //
 // # What is deliberately not printed
@@ -618,7 +618,7 @@ func sameEverywhere(maps []map[string]*reading, key string, value *reading) bool
 //
 // The last three path segments are not enough on their own. Every corpus repository's stylesheet
 // ends `_theme/styles/theme.css`, so three segments name two different systems identically, and a
-// system generated from a temporary directory leaks a session-specific path into a checked-in file —
+// system generated from a temporary directory leaks a session-specific path into a checked-in file,
 // which is what the first version of this table did, baking a scratchpad directory into line 3.
 //
 // So the repository directory is used where the path has the shape a repository has, and anything
@@ -672,7 +672,7 @@ func writeAxis(out *bytes.Buffer, axis axisSelector, entry *rootEntry, framework
 	writeStringReadingMap(&axisBuffer, "ByType", "\t\t\t", axis.byType(entry), fallback, nil, pool)
 	// Namespaces keep their fallback-equal entries: a miss here continues the bare-value precedence
 	// to inference rather than ending at the fallback, so eliding one changes the answer. What is
-	// filtered instead is which namespaces appear at all — the framework's, plus the two
+	// filtered instead is which namespaces appear at all: the framework's, plus the two
 	// pseudo-namespaces, and never a repository token.
 	writeStringReadingMap(&axisBuffer, "ByNamespace", "\t\t\t", axis.byNamespace(entry), nil, frameworkNamespaces, pool)
 	if fallback != nil {
