@@ -5,10 +5,10 @@ import Testing
 @testable import CohereSwift
 
 /*
- The Swift adapter of the text rules' conformance corpus (#4b337jk): one set of cases at the repository's
- `conformance/textrules`, one expected verdict each, which every engine's own suite must meet. The Go loader
- validates the corpus's shape for both Go adapters; this reads the same files by walking up from its own path,
- as the policy tests do, and keeps its own copy of the ledger's checks, since only Swift can run Swift:
+ The Swift adapter of the text rules' conformance corpus (#4b337jk): one set of cases under the repository's
+ `conformance/textrules/testdata`, one expected verdict each, which every engine's own suite must meet. The Go
+ loader validates the corpus's shape for both Go adapters; this reads the same files by walking up from its own
+ path, as the policy tests do, and keeps its own copy of the ledger's checks, since only Swift can run Swift:
 
  - a failing case with no row fails, and so does a row of the other kind than the failure;
  - a row whose case passes fails as stale;
@@ -39,7 +39,8 @@ struct TextRulesConformanceTests {
             let container = try decoder.singleValueContainer()
             if let name = try? container.decode(String.self) {
                 self = .rule(name)
-            } else {
+            }
+            else {
                 self = .none(try container.decode(NoneEntry.self).none)
             }
         }
@@ -93,7 +94,10 @@ struct TextRulesConformanceTests {
         var ledger: [LedgerRow]
 
         func row(for testCase: Case) -> LedgerRow? {
-            ledger.first { $0.engine == TextRulesConformanceTests.engine && $0.family == testCase.family && $0.case == testCase.name }
+            ledger.first {
+                $0.engine == TextRulesConformanceTests.engine && $0.family == testCase.family
+                    && $0.case == testCase.name
+            }
         }
     }
 
@@ -104,18 +108,27 @@ struct TextRulesConformanceTests {
             [String: [String: EngineRule]].self,
             from: Data(contentsOf: corpusRoot.appendingPathComponent("families.json")),
         )
-        let ledger = try decoder.decode([LedgerRow].self, from: Data(contentsOf: corpusRoot.appendingPathComponent("ledger.json")))
+        let ledger = try decoder.decode(
+            [LedgerRow].self,
+            from: Data(contentsOf: corpusRoot.appendingPathComponent("ledger.json")),
+        )
         var cases: [Case] = []
         var everyCaseId: Set<String> = []
         for family in families.keys.sorted() {
-            let familyDirectory = corpusRoot.appendingPathComponent(family)
+            let familyDirectory = corpusRoot.appendingPathComponent("testdata").appendingPathComponent(family)
             let names = try FileManager.default.contentsOfDirectory(atPath: familyDirectory.path).sorted()
             for name in names {
                 let caseDirectory = familyDirectory.appendingPathComponent(name)
-                let file = try decoder.decode(CaseFile.self, from: Data(contentsOf: caseDirectory.appendingPathComponent("case.json")))
+                let file = try decoder.decode(
+                    CaseFile.self,
+                    from: Data(contentsOf: caseDirectory.appendingPathComponent("case.json")),
+                )
                 everyCaseId.insert("\(family)/\(name)")
                 guard file.languages.contains(engine) else { continue }
-                let source = try String(contentsOf: caseDirectory.appendingPathComponent("case.swift"), encoding: .utf8)
+                let source = try String(
+                    contentsOf: caseDirectory.appendingPathComponent("case.swift"),
+                    encoding: .utf8,
+                )
                 cases.append(Case(family: family, name: name, file: file, source: source))
             }
         }
@@ -142,7 +155,8 @@ struct TextRulesConformanceTests {
         while index < bytes.count {
             if bytes[index] == UInt8(ascii: "\n") {
                 starts.append(index + 1)
-            } else if bytes[index] == UInt8(ascii: "\r") {
+            }
+            else if bytes[index] == UInt8(ascii: "\r") {
                 if index + 1 < bytes.count, bytes[index + 1] == UInt8(ascii: "\n") {
                     index += 1
                 }
@@ -217,7 +231,11 @@ struct TextRulesConformanceTests {
         var expected: [ByteRange] = []
         for (index, span) in expect.enumerated() {
             guard let resolved = resolve(span, in: bytes) else {
-                return Comparison(failure: "verdict", controlHeld: false, detail: "expect \(index) does not resolve in case.swift")
+                return Comparison(
+                    failure: "verdict",
+                    controlHeld: false,
+                    detail: "expect \(index) does not resolve in case.swift",
+                )
             }
             expected.append(resolved)
         }
@@ -246,7 +264,9 @@ struct TextRulesConformanceTests {
         }
         let rules = RuleRegistry.fileRules(vocabulary: try AbbreviationVocabulary.compiledIn())
         guard let found = rules.first(where: { $0.name == name }) else {
-            throw ConformanceError("families.json names \(name) for Swift in \(family), and no rule is registered by that name")
+            throw ConformanceError(
+                "families.json names \(name) for Swift in \(family), and no rule is registered by that name"
+            )
         }
         return found
     }
@@ -279,7 +299,8 @@ struct TextRulesConformanceTests {
             return Comparison(
                 failure: "verdict",
                 controlHeld: false,
-                detail: "the case gives options \(options.keys.sorted()), and the Swift adapter has no translation for them",
+                detail:
+                    "the case gives options \(options.keys.sorted()), and the Swift adapter has no translation for them",
             )
         }
         return compare(expect: testCase.file.expect, source: testCase.source, found: try run(testCase, in: corpus))
@@ -293,7 +314,9 @@ struct TextRulesConformanceTests {
             let comparison = try Self.judge(testCase, in: corpus)
             compared += 1
             if testCase.isControl, !comparison.controlHeld {
-                Issue.record("\(testCase.id) is its family's control, and Swift does not report it as a control must, which no ledger row can excuse: \(comparison.detail)")
+                Issue.record(
+                    "\(testCase.id) is its family's control, and Swift does not report it as a control must, which no ledger row can excuse: \(comparison.detail)"
+                )
                 continue
             }
             let row = corpus.row(for: testCase)
@@ -301,11 +324,17 @@ struct TextRulesConformanceTests {
                 case (nil, nil):
                     break
                 case let (nil, row?):
-                    Issue.record("\(testCase.id) now passes in Swift, so its \(row.kind) row (task \(row.task)) is stale: delete it")
+                    Issue.record(
+                        "\(testCase.id) now passes in Swift, so its \(row.kind) row (task \(row.task)) is stale: delete it"
+                    )
                 case let (failure?, nil):
-                    Issue.record("\(testCase.id) fails in Swift with a \(failure) failure and no ledger row: \(comparison.detail)")
+                    Issue.record(
+                        "\(testCase.id) fails in Swift with a \(failure) failure and no ledger row: \(comparison.detail)"
+                    )
                 case let (failure?, row?) where row.kind != failure:
-                    Issue.record("\(testCase.id) fails in Swift with a \(failure) failure, and its ledger row (task \(row.task)) says \(row.kind): \(comparison.detail)")
+                    Issue.record(
+                        "\(testCase.id) fails in Swift with a \(failure) failure, and its ledger row (task \(row.task)) says \(row.kind): \(comparison.detail)"
+                    )
                 case (.some, .some):
                     break
             }
@@ -328,8 +357,14 @@ struct TextRulesConformanceTests {
                 Issue.record("ledger.json has a Swift row for \(id), which has no Swift form")
                 continue
             }
-            #expect(row.kind == "verdict" || row.kind == "span", "\(id): a row's kind is verdict or span, not \(row.kind)")
-            #expect(!testCase.isControl || row.kind == "span", "\(id) is a control, and only a span row may sit on one")
+            #expect(
+                row.kind == "verdict" || row.kind == "span",
+                "\(id): a row's kind is verdict or span, not \(row.kind)",
+            )
+            #expect(
+                !testCase.isControl || row.kind == "span",
+                "\(id) is a control, and only a span row may sit on one",
+            )
         }
     }
 
@@ -346,13 +381,20 @@ struct TextRulesConformanceTests {
 
         #expect(Self.compare(expect: [], source: control.source, found: found).failure == "verdict")
 
-        let misplaced = Self.compare(expect: [Span(covers: "fix", occurrence: 1)], source: control.source, found: found)
+        let misplaced = Self.compare(
+            expect: [Span(covers: "fix", occurrence: 1)],
+            source: control.source,
+            found: found,
+        )
         #expect(misplaced.failure == "span", "\(misplaced.detail)")
 
         let bytes = Array(control.source.utf8)
         let ended = found.map { ByteRange(start: $0.start, end: $0.end ?? min($0.start + 4, bytes.count)) }
         let asReported = ended.map { range in
-            Span(covers: String(decoding: bytes[range.start..<(range.end ?? range.start)], as: UTF8.self), occurrence: 1)
+            Span(
+                covers: String(decoding: bytes[range.start..<(range.end ?? range.start)], as: UTF8.self),
+                occurrence: 1,
+            )
         }
         let agreed = Self.compare(expect: asReported, source: control.source, found: ended)
         #expect(agreed.failure == nil, "\(agreed.detail)")

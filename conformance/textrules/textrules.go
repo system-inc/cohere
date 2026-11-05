@@ -7,11 +7,16 @@
 //
 //	families.json        family -> each engine's rule, by its registered name
 //	ledger.json          the cases an engine fails today, each naming the task that fixes it
-//	<family>/<case>/
+//	testdata/<family>/<case>/
 //	  case.json          the expectation, options, path, why, and which languages have a form
 //	  case.ts            one source per language the case lists, and none it does not
 //	  case.go
 //	  case.swift
+//
+// The cases sit under testdata because their sources carry the very violations the rules judge. No tool
+// builds a `case.go` there as a package, and cohere-go skips any directory named testdata, so none of their
+// findings join cohere's own. The two index files stay beside this one, since they describe the corpus rather
+// than being cases in it.
 //
 // Go reads it through go:embed, so neither the TypeScript-rule adapter nor the Go-engine adapter looks for a
 // path. Swift reads the same files by walking up from its test's #filePath and keeps its own copy of the
@@ -46,7 +51,7 @@ import (
 // The corpus files: the two at the top, and every family's case directories whole, so a stray file in a
 // case is seen and refused rather than left out of the embed.
 //
-//go:embed families.json ledger.json */*
+//go:embed families.json ledger.json testdata/*/*
 var embeddedCorpus embed.FS
 
 // Engine is one of cohere's three engines, which is also the language it judges. Each language has exactly
@@ -317,6 +322,8 @@ const (
 	familiesFileName = "families.json"
 	ledgerFileName   = "ledger.json"
 	caseFileName     = "case.json"
+	// casesDirectory holds a directory per family, and in each a directory per case.
+	casesDirectory = "testdata"
 )
 
 // caseFile is case.json as written.
@@ -340,7 +347,11 @@ func LoadFrom(files fs.FS) (*Corpus, error) {
 		return nil, err
 	}
 
-	entries, err := fs.ReadDir(files, ".")
+	caseFiles, err := fs.Sub(files, casesDirectory)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := fs.ReadDir(caseFiles, ".")
 	if err != nil {
 		return nil, err
 	}
@@ -348,16 +359,17 @@ func LoadFrom(files fs.FS) (*Corpus, error) {
 	onDisk := map[string]bool{}
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			// families.json and ledger.json, and in a tree read from disk, this package's Go files.
-			continue
+			return nil, fmt.Errorf("%s/%s is a file, and %s holds only family directories", casesDirectory,
+				entry.Name(), casesDirectory)
 		}
 		rules, named := familyRules[entry.Name()]
 		if !named {
-			return nil, fmt.Errorf("%s is a family directory that %s does not name", entry.Name(), familiesFileName)
+			return nil, fmt.Errorf("%s/%s is a family directory that %s does not name", casesDirectory, entry.Name(),
+				familiesFileName)
 		}
 		onDisk[entry.Name()] = true
 		family := Family{Name: entry.Name(), Rules: rules}
-		family.Cases, err = readCases(files, family)
+		family.Cases, err = readCases(caseFiles, family)
 		if err != nil {
 			return nil, err
 		}
@@ -672,9 +684,9 @@ func LineStarts(source string, engine Engine) []int {
 				index++
 			}
 			starts = append(starts, index+1)
-		case engine == EngineTypeScript && strings.HasPrefix(source[index:], " "),
-			engine == EngineTypeScript && strings.HasPrefix(source[index:], " "):
-			index += len(" ") - 1
+		case engine == EngineTypeScript && strings.HasPrefix(source[index:], "\u2028"),
+			engine == EngineTypeScript && strings.HasPrefix(source[index:], "\u2029"):
+			index += len("\u2028") - 1
 			starts = append(starts, index+1)
 		}
 	}

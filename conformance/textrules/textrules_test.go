@@ -42,13 +42,13 @@ func validCorpus() fstest.MapFS {
 		"families.json": {Data: []byte(`{"words": {"typescript": "no-words", "go": "go/no-words", ` +
 			`"swift": {"none": "a probe of the shape"}}}`)},
 		"ledger.json": {Data: []byte(`[]`)},
-		"words/w01/case.json": {Data: []byte(`{"why": "the control", "control": true, ` +
+		"testdata/words/w01/case.json": {Data: []byte(`{"why": "the control", "control": true, ` +
 			`"expect": [{"covers": "WORD", "occurrence": 1}], "options": {}, "path": null, ` +
 			`"languages": ["typescript", "go"]}`)},
-		"words/w01/case.ts":   {Data: []byte("// WORD here\n")},
-		"words/w01/case.go":   {Data: []byte("package w01\n\n// WORD here\n")},
-		"words/w02/case.json": {Data: []byte(`{"why": "clean", "expect": [], "languages": ["typescript"]}`)},
-		"words/w02/case.ts":   {Data: []byte("// word here\n")},
+		"testdata/words/w01/case.ts":   {Data: []byte("// WORD here\n")},
+		"testdata/words/w01/case.go":   {Data: []byte("package w01\n\n// WORD here\n")},
+		"testdata/words/w02/case.json": {Data: []byte(`{"why": "clean", "expect": [], "languages": ["typescript"]}`)},
+		"testdata/words/w02/case.ts":   {Data: []byte("// word here\n")},
 	}
 }
 
@@ -93,12 +93,12 @@ func TestTheLoaderRefusesAMalformedCorpus(t *testing.T) {
 	}{
 		{
 			"an unknown key in a case",
-			with(valid, "words/w02/case.json", `{"why": "clean", "expect": [], "languages": ["typescript"], "expected": []}`),
+			with(valid, "testdata/words/w02/case.json", `{"why": "clean", "expect": [], "languages": ["typescript"], "expected": []}`),
 			`unknown field "expected"`,
 		},
 		{
 			"an unknown key in a span",
-			with(valid, "words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
+			with(valid, "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
 				`"occurrence": 1, "column": 4}], "languages": ["typescript", "go"]}`),
 			`unknown field "column"`,
 		},
@@ -152,43 +152,43 @@ func TestTheLoaderRefusesAMalformedCorpus(t *testing.T) {
 		},
 		{
 			"a source the case does not list",
-			with(valid, "words/w02/case.go", "package w02\n"),
+			with(valid, "testdata/words/w02/case.go", "package w02\n"),
 			"case.go is not a source the case lists",
 		},
 		{
 			"a language with no source",
-			with(valid, "words/w01/case.go", ""),
+			with(valid, "testdata/words/w01/case.go", ""),
 			"case.go can't be read",
 		},
 		{
 			"a language where the family has no rule",
-			with(valid, "words/w02/case.json", `{"why": "clean", "expect": [], "languages": ["typescript", "swift"]}`),
+			with(valid, "testdata/words/w02/case.json", `{"why": "clean", "expect": [], "languages": ["typescript", "swift"]}`),
 			"where the family has no rule",
 		},
 		{
 			"an expectation that is not in a source",
-			with(valid, "words/w01/case.ts", "// word here\n"),
+			with(valid, "testdata/words/w01/case.ts", "// word here\n"),
 			`"WORD" occurs 0 times`,
 		},
 		{
 			"a span of two forms",
-			with(valid, "words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
+			with(valid, "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
 				`"occurrence": 1, "fileStart": true}], "languages": ["typescript", "go"]}`),
 			"writes 2",
 		},
 		{
 			"a case with no expect",
-			with(valid, "words/w02/case.json", `{"why": "clean", "languages": ["typescript"]}`),
+			with(valid, "testdata/words/w02/case.json", `{"why": "clean", "languages": ["typescript"]}`),
 			"has no expect",
 		},
 		{
 			"a family directory families.json does not name",
-			with(valid, "other/o01/case.json", `{"why": "x", "expect": [], "languages": ["typescript"]}`),
+			with(valid, "testdata/other/o01/case.json", `{"why": "x", "expect": [], "languages": ["typescript"]}`),
 			"does not name",
 		},
 		{
 			"a path that leaves the project",
-			with(valid, "words/w02/case.json", `{"why": "clean", "expect": [], "path": "../utils", "languages": ["typescript"]}`),
+			with(valid, "testdata/words/w02/case.json", `{"why": "clean", "expect": [], "path": "../utils", "languages": ["typescript"]}`),
 			"not a clean project-relative directory",
 		},
 	}
@@ -240,7 +240,7 @@ func TestResolveReadsEachSpanForm(t *testing.T) {
 		{"the file's start", Span{FileStart: true}, "one\ntwo\n", EngineGo, Range{Start: 0, End: 0}},
 		{"lines from the third", Span{LinesFrom: 3}, "a\nb\nc\nd\n", EngineGo, Range{Start: 4, End: 8}},
 		{"a lone carriage return in Swift", Span{LinesFrom: 2}, "a\rb\n", EngineSwift, Range{Start: 2, End: 4}},
-		{"a line separator in TypeScript", Span{LinesFrom: 2}, "a b", EngineTypeScript, Range{Start: 4, End: 5}},
+		{"a line separator in TypeScript", Span{LinesFrom: 2}, "a\u2028b", EngineTypeScript, Range{Start: 4, End: 5}},
 		{"a carriage return and line feed as one", Span{LinesFrom: 3}, "a\r\nb\r\nc", EngineTypeScript, Range{Start: 6, End: 7}},
 	}
 	for _, testCase := range cases {
@@ -260,7 +260,7 @@ func TestResolveReadsEachSpanForm(t *testing.T) {
 	for _, unresolved := range []struct {
 		source string
 		engine Engine
-	}{{"a\rb", EngineGo}, {"a b", EngineSwift}} {
+	}{{"a\rb", EngineGo}, {"a\u2028b", EngineSwift}} {
 		if _, err := Resolve(Span{LinesFrom: 2}, unresolved.source, unresolved.engine); err == nil {
 			t.Errorf("%q has a second line in %s, and should not", unresolved.source, unresolved.engine)
 		}
