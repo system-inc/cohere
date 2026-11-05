@@ -2,7 +2,7 @@
 // 44956a0c53201157aaf5bc19e1c2728896c83ec4.
 //
 // MIT licensed. Copyright (c) 2025 July-present Bytedance Inc and its affiliates, and
-// Copyright (c) 2025 July typescript-eslint and other contributors — the dual attribution is
+// Copyright (c) 2025 July typescript-eslint and other contributors. The dual attribution is
 // upstream's own, because this package descends from tsgolint.
 //
 // Changed on the way in, and nothing else:
@@ -22,25 +22,25 @@
 // distinction matters to the next person diffing against upstream: nothing below modifies a
 // vendored line, so a three-way merge of a new rslint commit touches none of it.
 //
-//   - `dominators.go` — predecessor edges and a dominator tree over the reachable subgraph.
+//   - `dominators.go`: predecessor edges and a dominator tree over the reachable subgraph.
 //     Upstream computes both inside `paths.go`'s `findFinalPathDominators` and discards them; this
 //     exposes them as an API. The algorithm is Cooper-Harvey-Kennedy either way, written a second
 //     time here because the two run over different graphs (that one adds a synthetic exit and drops
 //     thrown edges), and `TestDominatorsAgreeWithFinalPathDominators` pins them against each other
 //     so neither can drift silently.
-//   - `dataflow.go` — a monotone dataflow solver over a caller-supplied lattice, in either
+//   - `dataflow.go`: a monotone dataflow solver over a caller-supplied lattice, in either
 //     direction. Upstream has none, and every consumer that needed one wrote its own loop inline.
 //
 // Both are additive. No vendored file lost a line to them, and the three consumers that predate
-// them — `internal/unused/reachable.go`, `no_useless_assignment_analysis.go`, and
-// `internal/rules/react/rules_of_hooks.go` — were measured byte-identical in their findings across
+// them (`internal/unused/reachable.go`, `no_useless_assignment_analysis.go`, and
+// `internal/rules/react/rules_of_hooks.go`) were measured byte-identical in their findings across
 // the whole `~/Projects/ahra` tree afterwards.
 //
 // Three rules consume this package today. It began as a foundation lift with no callers, and the
 // coupling to the rest of the tree is still deliberately zero: it imports one shim and the standard
 // library, so it can be adopted by a rule without dragging anything behind it.
 //
-// Package controlflow builds a control-flow graph for one code path root — a source
+// Package controlflow builds a control-flow graph for one code path root: a source
 // file, a function, a class static block, or a class field initializer.
 //
 // The graph mirrors the shape ESLint's code path analysis produces, because the
@@ -121,7 +121,7 @@ func (blk *Block[E]) Index() int {
 // that deliberately exclude thrown exits. Different abrupt completions can
 // also share one block after a finally clause, placing that block in both sets.
 //
-// EndReachable reports whether control can run off the end of the root — the
+// EndReachable reports whether control can run off the end of the root: the
 // question ESLint answers with `isAnySegmentReachable(codePath.currentSegments)`
 // at the root's `:exit`. It is false when every path out of the root returns,
 // throws, or loops forever.
@@ -134,13 +134,13 @@ type Graph[E any] struct {
 
 // Hooks are the points where a consumer turns a position in the walk into an
 // event. Every hook may be nil, and every one is called from every position the
-// walk reaches, whether or not control can arrive there — a consumer that has
+// walk reaches, whether or not control can arrive there. A consumer that has
 // no use for unreachable code checks Builder.Current for it.
 //
 // Expression runs before each expression is evaluated. Read runs where an
 // identifier is evaluated as a read, Write where its value is stored; a target
-// that is read before it is written — a compound assignment, an update
-// expression, a destructuring element — sees both, in that order.
+// that is read before it is written (a compound assignment, an update
+// expression, a destructuring element) sees both, in that order.
 //
 // Statement runs as each statement is reached, before it is laid out. Loop runs
 // where control flows back into a loop for another iteration of it.
@@ -177,7 +177,7 @@ type tryFrame[E any] struct {
 // breakable mirrors ESLint's BreakContext#breakable: it is true for loops and
 // switch statements, and false for a labelled statement that wraps neither, so
 // an unlabelled `break` skips past it to the enclosing loop/switch. labels
-// holds every label the target answers to — a loop wrapped as
+// holds every label the target answers to: a loop wrapped as
 // `outer: inner: while (…)` accepts both names. loop names the loop a
 // `continue` starts another iteration of, and is nil where continuing does not
 // re-enter the loop's first node: a `do`…`while` continues into its test, which
@@ -361,8 +361,8 @@ func (builder *Builder[E]) enter(blk *Block[E]) {
 }
 
 // makeUnreachable ends the path at the current block and carries the walk on in
-// a fresh block nothing reaches. The edge into it is recorded, but — unlike
-// every other edge — it does not make its target something control arrives at,
+// a fresh block nothing reaches. The edge into it is recorded, but, unlike
+// every other edge, it does not make its target something control arrives at,
 // which is what leaving through it meant in the first place. That is why the
 // block is never entered: its reachability is settled here, as false.
 func (builder *Builder[E]) makeUnreachable() {

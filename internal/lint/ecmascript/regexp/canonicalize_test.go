@@ -136,7 +136,7 @@ func TestCaseEquivalenceGroupsAgree(test *testing.T) {
 // JavaScript compares each of the pairs it names equal under a regexp's `iu`
 // flags, and Go's own tables would compare them unequal. The `i` flag on its
 // own canonicalizes one UTF-16 code unit at a time, so it joins the pairs
-// inside the basic plane and leaves the two supplementary-plane scripts apart —
+// inside the basic plane and leaves the two supplementary-plane scripts apart,
 // which is checked too, because the delta must not reach further than
 // JavaScript does.
 func TestCanonicalizeUnicode17(test *testing.T) {
