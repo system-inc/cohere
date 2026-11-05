@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/consistency-no-property-alias",
-    "Swift": "cohere-swift/consistency-no-property-alias"
+    "Swift": "cohere-swift/consistency-no-property-alias",
+    "Go": "cohere-go/consistency-no-property-alias"
   },
   "messages": {
     "noPropertyAlias": {
@@ -9,11 +10,13 @@
       "terms": {
         "reach": {
           "TypeScript": "`{{object}}.{{name}}`",
-          "Swift": "`{{reach}}`"
+          "Swift": "`{{reach}}`",
+          "Go": "`{{reach}}`"
         },
         "repairAndWhy": {
           "TypeScript": "Reach for the property directly, so the value keeps the object it came from and a naked local still means this scope created it. Allowed only when the local is read inside a hook dependency array.",
-          "Swift": "It is read once, and nothing runs between its declaration and that read. Write `{{reach}}` where `{{name}}` is read and delete the declaration, so the value keeps the object it came from and a naked local still means this scope made it."
+          "Swift": "It is read once, and nothing runs between its declaration and that read. Write `{{reach}}` where `{{name}}` is read and delete the declaration, so the value keeps the object it came from and a naked local still means this scope made it.",
+          "Go": "It is read once, and nothing that could change the field runs between its declaration and that read, so the reach reads the same value. Write `{{reach}}` where `{{name}}` is read and delete the declaration, so the value keeps the struct it came from and a naked local still means this scope made it."
         }
       }
     }
