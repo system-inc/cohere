@@ -10,7 +10,7 @@ import (
 // noNamespaceFile is where the fixtures pretend to live. A .tsx extension, because half the corpus
 // is JSX and the harness picks its script kind off the suffix.
 //
-// NO file-suffix gate exists in this rule and none should be added. Three shipped react rules here
+// No file-suffix gate exists in this rule and none should be added. Three shipped react rules here
 // gated on .tsx or .jsx through an isJsxFileName helper, residue from an oxc-era port and not
 // upstream behavior: eslint-plugin-react reports on a .ts file exactly as it does on a .tsx one.
 // Those three gates were removed in 4cff5fe, 206b628 and 9dbd234; none remains in this package.
@@ -106,7 +106,7 @@ func TestNoNamespaceStaysSilent(test *testing.T) {
 // each verdict was measured against the installed eslint-plugin-react through the Linter API before
 // being written here.
 
-// TestNoNamespaceCreateElementBoundary pins WHICH createElement calls the rule accepts.
+// TestNoNamespaceCreateElementBoundary pins which createElement calls the rule accepts.
 //
 // This is the single most important test in this file, because the shelf's own
 // react.IsCreateElementCall answers differently on four of these six inputs and reaching for it is
@@ -175,7 +175,7 @@ func TestNoNamespaceReadsBothElementForms(test *testing.T) {
 // TestNoNamespaceDoesNotPanicOnDottedTagNames is crash protection, not a behavioral fixture.
 //
 // ast.Node.Text has no case for a PropertyAccessExpression and reaches its unhandled-case panic, so
-// a rule that rendered an arbitrary tag name to a string would take the whole FILE down for every
+// a rule that rendered an arbitrary tag name to a string would take the whole file down for every
 // rule in the package, not just this one. That failure is invisible to ExpectFindings, which is why
 // this exists as its own test naming what it prevents rather than as another silent case above.
 //
@@ -197,7 +197,7 @@ func TestNoNamespaceDoesNotPanicOnDottedTagNames(test *testing.T) {
 	}
 }
 
-// TestNoNamespaceSpanAndMessage asserts WHERE the finding points and WHAT it says.
+// TestNoNamespaceSpanAndMessage asserts where the finding points and what it says.
 //
 // ExpectFindings compares message ids and a count and nothing else, so a rule pointing at the wrong
 // node passes every fixture above. Upstream reports on the opening element for the JSX arm and on
@@ -207,7 +207,7 @@ func TestNoNamespaceDoesNotPanicOnDottedTagNames(test *testing.T) {
 // The message is compared against a literal typed here rather than against the rule's own constant,
 // because a comparison to the constant moves with the constant under mutation and asserts nothing.
 //
-// Every span is sliced from the source the HARNESS wrote rather than from the literal above:
+// Every span is sliced from the source the harness wrote rather than from the literal above:
 // RunTyped trims its input, so a slice taken from an untrimmed Go literal is off by one and reads
 // exactly like an off-by-one in the rule.
 func TestNoNamespaceSpanAndMessage(test *testing.T) {
@@ -259,7 +259,7 @@ func TestNoNamespaceSpanAndMessage(test *testing.T) {
 	})
 }
 
-// TestNoNamespaceHasNoFileSuffixGate pins the ABSENCE of a gate, so that nobody reintroduces one by
+// TestNoNamespaceHasNoFileSuffixGate pins the absence of a gate, so that nobody reintroduces one by
 // pattern-matching a neighbour in this package.
 //
 // Three shipped react rules here gate on a .tsx or .jsx suffix, which is residue from an oxc-era
@@ -269,7 +269,7 @@ func TestNoNamespaceSpanAndMessage(test *testing.T) {
 // A .ts file cannot hold JSX, so the call arm is what this test can exercise, and it is the arm a
 // suffix gate would silence in exactly the files that matter.
 //
-// **Only the two TypeScript suffixes are asserted here, and that is a HARNESS limit rather than a
+// **Only the two TypeScript suffixes are asserted here, and that is a harness limit rather than a
 // narrowing of the claim.** `rule_testing`'s typed harness writes a tsconfig whose include is
 // `["**/*.ts", "**/*.tsx"]` (program.go:30), so a `.js` or `.jsx` fixture produces no program at all
 // and the run fails with TS18003 before the rule is reached. Measured directly: both suffixes fail
@@ -318,7 +318,7 @@ func TestNoNamespaceHasNoFileSuffixGateUntyped(test *testing.T) {
 
 // TestNoNamespaceNeedsTheTypedHarness pins that the checker declaration is load-bearing.
 //
-// A typed rule handed a nil checker goes SILENT rather than crashing, which is a vacuous green: the
+// A typed rule handed a nil checker goes silent rather than crashing, which is a vacuous green: the
 // StaysSilent half of a fixture set passes for the wrong reason and nothing announces it. So the
 // discriminator is one source that reports under RunTyped and is silent under Run, which is what a
 // later revert of NeedsTypeChecker would turn red.
@@ -341,7 +341,7 @@ func TestNoNamespaceNeedsTheTypedHarness(test *testing.T) {
 // TestNoNamespaceDoesNotPanicOnNonLiteralArguments is crash protection, not a behavioral fixture.
 //
 // `ast.Node.Text` has no case for a CallExpression or a PropertyAccessExpression and reaches its
-// unhandled-case panic. The walk recovers per FILE rather than per rule, so one such node here would
+// unhandled-case panic. The walk recovers per file rather than per rule, so one such node here would
 // cost every rule in this package every finding in that file, and the run would still print a
 // plausible summary line.
 //
@@ -354,7 +354,7 @@ func TestNoNamespaceNeedsTheTypedHarness(test *testing.T) {
 // The string-literal guard is what prevents the call half, measured rather than read: deleting
 // `if first.Kind != ast.KindStringLiteral` and re-running the first case below panics with exactly
 // `Unhandled case in Node.Text: *ast.CallExpression`, and restoring it clears it. So the kind check
-// MUST precede the `Text()` call, and a later reordering that looks harmless is the thing this test
+// must precede the `Text()` call, and a later reordering that looks harmless is the thing this test
 // exists to catch.
 //
 // No `ExpectFindings` fixture can see a panic, which is why this is its own test naming what it
@@ -383,7 +383,7 @@ func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			// Surviving the walk IS the assertion. The verdicts for shapes that have one are
+			// Surviving the walk is the assertion. The verdicts for shapes that have one are
 			// pinned in the boundary tables above.
 			rule_testing.RunTyped(test, NoNamespace, noNamespaceFile, testCase.sourceText)
 		})

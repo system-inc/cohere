@@ -11,7 +11,7 @@ import (
 // every input is. Upstream has no corpus for this, so the reporting cases are the four sites the
 // 2026-10-01 rule review found in ahra (DialogRoot, DrawerRoot, TableRoot, Field), reduced to the
 // shape that makes them unstable and written in the memoized form the obvious fix would produce. The
-// silent cases are the shapes those same files hold that ARE stable, plus every source of identity
+// silent cases are the shapes those same files hold that are stable, plus every source of identity
 // the analysis deliberately trusts.
 
 // TestJsxNoConstructedContextValuesReportsAnUnstableMemoDependency covers each way a memo's input is

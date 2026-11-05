@@ -125,7 +125,7 @@ func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *te
 // argument list is outside the span. Every expected span was measured against the installed build
 // on 2026-08-27 by slicing its reported range out of the source.
 //
-// The parenthesized row is the interesting one: upstream's span INCLUDES the parentheses, because
+// The parenthesized row is the interesting one: upstream's span includes the parentheses, because
 // its parser folded them away and the member access it reports covers that text. Our parser keeps
 // the node, and reporting on the member access reproduces the same span for a different reason.
 func TestNoSetStateAnchorsOnTheCalleeNotTheCall(test *testing.T) {

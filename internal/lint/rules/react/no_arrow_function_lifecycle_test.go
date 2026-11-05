@@ -839,7 +839,7 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(test *testing.T)
 		{"a rest parameter", "class H extends React.Component { componentDidUpdate = (...a) => { f(a); }; render() { return <div />; } }"},
 		{"a typed parameter", "class H extends React.Component { componentDidUpdate = (previous: Properties) => { f(previous); }; render() { return <div />; } }"},
 
-		// A RETURN annotation is lost by the same rewrite and the parameter check cannot see it,
+		// A return annotation is lost by the same rewrite and the parameter check cannot see it,
 		// because it sits outside the parameter list. Measured before the guard existed: the head
 		// is rebuilt as `(params) `, replacing everything between the key and the body, so
 		// `componentDidMount = (): void => {}` was repaired to `componentDidMount() {}` with the
@@ -865,7 +865,7 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(test *testing.T)
 
 // TestNoArrowFunctionLifecycleKeepsTheHeadWhole pins what the rewrite carries and where it declines.
 //
-// The first row shipped broken. The scan for comments "before the body" started at the KEY, so a
+// The first row shipped broken. The scan for comments "before the body" started at the key, so a
 // comment between `=` and the parameter list stopped the replaced head early and left `() =>`
 // standing: `render = /* c */ () => {...}` became `render() /* c */ () => {...}`, which does not
 // parse. Upstream's installed build writes `render() {...}`, dropping the comment; this declines
@@ -937,13 +937,13 @@ func TestNoArrowFunctionLifecycleMessageText(test *testing.T) {
 	}
 }
 
-// TestNoArrowFunctionLifecycleAnchor pins WHERE the finding points, at every report site.
+// TestNoArrowFunctionLifecycleAnchor pins where the finding points, at every report site.
 //
 // Upstream reports on the whole property, so the span covers the name, the arrow and the body
 // together rather than any one of them. A fix that lands correctly while the finding points
 // somewhere else shows the reader a line they were never told about.
 //
-// The rule has THREE report calls, not one: the block body, the concise body, and the declined
+// The rule has three report calls, not one: the block body, the concise body, and the declined
 // repair. An earlier version of this test covered only the concise-body path, and a mutant moving
 // the block-body anchor from the property to the arrow survived every fixture, because no other
 // assertion in the suite looks at where a block-body finding points. Each site is a row here now.

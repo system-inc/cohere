@@ -21,7 +21,7 @@ const noUnusedClassComponentMethodsFile = "/repository/source/NoUnusedClassCompo
 // by a generator. No case was typed by hand.
 //
 // All 58 were run against the installed build, 7.37.5, through the ESLint Linter API with the
-// TypeScript parser, and the two authorities agreed on every one. The comparison was on the RENDERED
+// TypeScript parser, and the two authorities agreed on every one. The comparison was on the rendered
 // message text rather than on message ids, because this corpus states raw text in its `errors`
 // entries and both of this rule's ids interpolate; comparing ids would have compared nothing.
 //
@@ -29,7 +29,7 @@ const noUnusedClassComponentMethodsFile = "/repository/source/NoUnusedClassCompo
 //
 // Both ids interpolate a name and one of them also interpolates the class, so an id assertion cannot
 // see a message naming the wrong thing. The fourth column is the exact string the installed build
-// rendered, captured in the same run that verified the ids, asserted as a PREFIX because this port
+// rendered, captured in the same run that verified the ids, asserted as a prefix because this port
 // appends a sentence of reasoning after upstream's wording.
 
 // TestNoUnusedClassComponentMethodsFires runs upstream's reporting cases.
@@ -150,8 +150,8 @@ func runNoUnusedClassComponentMethods(test *testing.T, sourceText string) rule_t
 
 // TestNoUnusedClassComponentMethodsDefinitionVersusUse pins the narrowest distinction here.
 //
-// Upstream treats a member access as a DEFINITION when its parent is an assignment and it is the
-// left side, and as a USE otherwise. That puts `+=` on the definition side and `++` on the use side,
+// Upstream treats a member access as a definition when its parent is an assignment and it is the
+// left side, and as a use otherwise. That puts `+=` on the definition side and `++` on the use side,
 // which reads backwards until you see that an update expression is not an assignment in the AST.
 // The corpus writes neither, so a port that had grouped all writes together would pass every
 // imported case. Every verdict measured on the installed build.
@@ -176,7 +176,7 @@ func TestNoUnusedClassComponentMethodsDefinitionVersusUse(test *testing.T) {
 		{"a use inside a nested arrow counts", head + "handleClick() {} componentDidMount() { const f = () => this.handleClick(); } }\n", nil},
 		{"an optional-chained use counts", head + "handleClick() {} componentDidMount() { this?.handleClick(); } }\n", nil},
 		// The six below pin the two halves of the assignment test, each of which survived the rest
-		// of this suite as its own mutant. The left-side test is what keeps a member on the RIGHT of
+		// of this suite as its own mutant. The left-side test is what keeps a member on the right of
 		// an assignment a use, and the operator test is what keeps a member inside an ordinary
 		// binary expression a use. The corpus writes neither shape. Every verdict measured on the
 		// installed build, and the last row is the sharpest: one statement where the left side is a
@@ -253,7 +253,7 @@ func TestNoUnusedClassComponentMethodsKeyShapes(test *testing.T) {
 		{"a string key used through a subscript is clean", head + "'handleClick'() {} componentDidMount() { this['handleClick'](); } }\n", nil},
 		{"a computed key used through a dot is clean", head + "['handleClick']() {} componentDidMount() { this.handleClick(); } }\n", nil},
 		{"a variable subscript names nothing and does not count as a use", head + "handleClick() {} componentDidMount() { const k = 'handleClick'; this[k](); } }\n", []string{"unusedWithClass"}},
-		// A computed IDENTIFIER key names something known only at run time and contributes nothing.
+		// A computed identifier key names something known only at run time and contributes nothing.
 		// Upstream's `isKeyLiteralLike` requires `computed === false` for its identifier arm, so
 		// this and the computed-literal row above fall on opposite sides of the same test. This port
 		// accepted both at first and upstream's own clean case
@@ -308,8 +308,8 @@ func TestNoUnusedClassComponentMethodsBothIds(test *testing.T) {
 
 // TestNoUnusedClassComponentMethodsLifecycleSets pins the two era-specific exemptions.
 //
-// `state` is exempt in a class and NOT in a `createReactClass` object; `getInitialState`,
-// `getDefaultProps` and `mixins` are exempt in the object and NOT in a class. The two sets are
+// `state` is exempt in a class and not in a `createReactClass` object; `getInitialState`,
+// `getDefaultProps` and `mixins` are exempt in the object and not in a class. The two sets are
 // mirrors, and a port that merged them would pass every imported case, because the corpus writes
 // each name only on the side where it is exempt. Every verdict measured.
 func TestNoUnusedClassComponentMethodsLifecycleSets(test *testing.T) {
@@ -345,7 +345,7 @@ func TestNoUnusedClassComponentMethodsLifecycleSets(test *testing.T) {
 // TestNoUnusedClassComponentMethodsDestructuringCountsAsUse pins the `{ foo } = this` path.
 //
 // Upstream has a whole `VariableDeclarator` listener for it, and the renamed form
-// `const { foo: bar } = this` counts the SOURCE name rather than the local one, because it reads
+// `const { foo: bar } = this` counts the source name rather than the local one, because it reads
 // `prop.key`. Both measured.
 func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(test *testing.T) {
 	test.Parallel()
@@ -370,9 +370,9 @@ func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(test *testing.T) 
 	}
 }
 
-// TestNoUnusedClassComponentMethodsSpans asserts WHERE each finding points.
+// TestNoUnusedClassComponentMethodsSpans asserts where each finding points.
 //
-// Upstream reports on the KEY node rather than on the member, so a finding on an unused method
+// Upstream reports on the key node rather than on the member, so a finding on an unused method
 // points at the name and not at the body. That is invisible to every id assertion above, and it is
 // the difference between a reader seeing one word underlined and seeing twenty lines.
 func TestNoUnusedClassComponentMethodsSpans(test *testing.T) {
@@ -412,7 +412,7 @@ func TestNoUnusedClassComponentMethodsSpans(test *testing.T) {
 
 // TestNoUnusedClassComponentMethodsComponentGate pins what counts as a component.
 //
-// A plain class is not one, a class EXPRESSION is not listened for, and only `createReactClass`
+// A plain class is not one, a class expression is not listened for, and only `createReactClass`
 // counts on the object side: the shelf's `react.IsEs5ComponentCall` also accepts `createClass` and
 // the namespaced spelling, and upstream accepts neither. Measured.
 func TestNoUnusedClassComponentMethodsComponentGate(test *testing.T) {
@@ -431,7 +431,7 @@ func TestNoUnusedClassComponentMethodsComponentGate(test *testing.T) {
 		{"React.createClass does not", "declare const React: any;\nReact.createClass({ render() { return null; }, handleClick() {} });\n", nil},
 		{"an unrelated call does not", "declare function other(spec: any): any;\nother({ render() { return null; }, handleClick() {} });\n", nil},
 		{"a bare object literal is not a component", "const x = { render() { return null; }, handleClick() {} };\n", nil},
-		// Upstream checks the parent CALLEE and nothing else, so an object in any argument slot
+		// Upstream checks the parent callee and nothing else, so an object in any argument slot
 		// counts. This port checked the first slot at first and a mutant dropping that check
 		// survived every fixture; probing the installed build showed the mutant was right and the
 		// rule was wrong. A nested object is still not a component, because its parent is a property
@@ -450,12 +450,12 @@ func TestNoUnusedClassComponentMethodsComponentGate(test *testing.T) {
 
 // TestNoUnusedClassComponentMethodsNestedClass records a stated divergence.
 //
-// Upstream keeps ONE mutable `classInfo` slot. Entering an inner class declaration overwrites it and
+// Upstream keeps one mutable `classInfo` slot. Entering an inner class declaration overwrites it and
 // the inner class's exit sets it to null, so the outer class stops collecting from that point and
-// never reports. Measured on the installed build: the source below reports only the INNER class's
+// never reports. Measured on the installed build: the source below reports only the inner class's
 // unused member, and the outer `outerUnused` is silently dropped.
 //
-// This port walks each component separately and reports BOTH, which is wider than upstream. The
+// This port walks each component separately and reports both, which is wider than upstream. The
 // alternative is reproducing a single-slot bug that silently loses findings, and the shape that
 // triggers it, a component declared inside another component's method, is rare. Stated here rather
 // than hidden, so the next reader meets a decision rather than a surprise.
@@ -474,10 +474,10 @@ func TestNoUnusedClassComponentMethodsNestedClass(test *testing.T) {
 	result := runNoUnusedClassComponentMethods(test, source)
 	rule_testing.ExpectFindings(test, result, "unusedWithClass", "unusedWithClass")
 
-	source_ := result.SourceFile.Text()
+	sourceText := result.SourceFile.Text()
 	names := make([]string, 0, len(result.Diagnostics))
 	for _, diagnostic := range result.Diagnostics {
-		names = append(names, source_[diagnostic.Range.Pos():diagnostic.Range.End()])
+		names = append(names, sourceText[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
 	// Upstream reports only `innerUnused` here. This port reports both, and the order follows the
 	// walk: the outer class is entered first, so its member is judged first.
@@ -522,7 +522,7 @@ func TestNoUnusedClassComponentMethodsHasNoFileGate(test *testing.T) {
 
 // TestNoUnusedClassComponentMethodsSurvivesShapesThatWouldPanic drives shapes with pieces missing.
 //
-// The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
+// The walk recovers per file rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic.
 func TestNoUnusedClassComponentMethodsSurvivesShapesThatWouldPanic(test *testing.T) {
 	test.Parallel()

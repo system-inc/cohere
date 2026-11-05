@@ -409,7 +409,7 @@ func TestNoMultiCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *t
 //
 // `ExpectFindings` asserts ids and counts and can see none of this, and the anchor is not a detail:
 // upstream returns a different node per shape and the rule reports whatever it returns. A function
-// declaration reports on itself, an arrow assigned to a const reports on the ARROW rather than the
+// declaration reports on itself, an arrow assigned to a const reports on the arrow rather than the
 // declaration, a class reports on itself, a factory reports on its object literal argument, and a
 // pragma wrapper reports on the whole wrapping call.
 //

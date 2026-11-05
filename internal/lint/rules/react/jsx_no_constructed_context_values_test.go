@@ -303,7 +303,7 @@ func TestJsxNoConstructedContextValuesHasNoFileSuffixGate(test *testing.T) {
 // TestJsxNoConstructedContextValuesProviderShapes pins which tag names count, and the two paths are
 // not symmetric.
 //
-// A qualified name only has to END in `Provider`; the object is never examined, so an arbitrary
+// A qualified name only has to end in `Provider`; the object is never examined, so an arbitrary
 // receiver qualifies. A bare identifier has to resolve to a `createContext` call. The corpus writes
 // `Context.Provider` almost throughout and never tests an arbitrary receiver, so every row here was
 // measured against the installed build.
@@ -485,7 +485,7 @@ func TestJsxNoConstructedContextValuesConstructionKinds(test *testing.T) {
 
 // TestJsxNoConstructedContextValuesIdentifierFollowing pins the indirection path.
 //
-// Upstream resolves the identifier to its binding, takes the LAST definition, and bails out unless
+// Upstream resolves the identifier to its binding, takes the last definition, and bails out unless
 // it is a variable or a function name. A parameter is what that bail-out is for, and it is the row
 // that separates this from a rule that reports every identifier.
 func TestJsxNoConstructedContextValuesIdentifierFollowing(test *testing.T) {
@@ -541,7 +541,7 @@ func TestJsxNoConstructedContextValuesParameterIsSilent(test *testing.T) {
 // question the detector would ask about whether a function returns JSX is settled before it is
 // asked. What remains is the name and the class heritage.
 //
-// All twenty rows were measured against the installed build BEFORE the classifier was written, in a
+// All twenty rows were measured against the installed build before the classifier was written, in a
 // throwaway probe package that compared a candidate implementation against them and was deleted.
 // Two rows are where the shelf disagrees and this rule cannot delegate: `scope.NameOf` prefers a
 // function expression's own name over its binding, and it answers a method's name where the class
@@ -558,7 +558,7 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(test *testing.T) {
 		{"a capitalized function declaration", "function Component() { return " + provider + "; }\n", []string{"defaultMsg"}},
 		{"a lowercase function declaration", "function component() { return " + provider + "; }\n", nil},
 
-		// The walk stops at the FIRST function, so an inner lowercase helper hides a provider that
+		// The walk stops at the first function, so an inner lowercase helper hides a provider that
 		// an outer component would otherwise expose, and an inner component exposes one an outer
 		// helper would hide. Both measured.
 		{
@@ -581,7 +581,7 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(test *testing.T) {
 		{"an arrow bound to a capitalized name", "const Component = () => " + provider + ";\n", []string{"defaultMsg"}},
 		{"an arrow bound to a lowercase name", "const component = () => " + provider + ";\n", nil},
 
-		// And the BINDING wins over the function expression's own name, in both directions. This is
+		// And the binding wins over the function expression's own name, in both directions. This is
 		// the pair the shelf helper gets backwards.
 		{
 			"a capitalized function expression bound to a lowercase name",
@@ -665,7 +665,7 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(test *testing.T) {
 // TestJsxNoConstructedContextValuesSpans asserts where each finding points, and it is not where a
 // reader would first guess.
 //
-// Every finding is anchored on the CONSTRUCTION rather than on the value expression, so an indirect
+// Every finding is anchored on the construction rather than on the value expression, so an indirect
 // case reports somewhere else entirely: a const declared two lines above the provider reports on
 // its initializer, not on the identifier in the value prop. Measured by slicing the reported range
 // on the installed build across twenty-six inputs. `ExpectFindings` cannot see any of this and the
@@ -714,7 +714,7 @@ func TestJsxNoConstructedContextValuesSpans(test *testing.T) {
 			"{b: 2}",
 		},
 		{
-			// When BOTH branches construct, the left one wins. The message id is identical either
+			// When both branches construct, the left one wins. The message id is identical either
 			// way, so only the span records which side was tried first: a mutant swapping the two
 			// recursions survived every id fixture in this file. Measured on the installed build,
 			// which underlines `{a: 1}`.
@@ -828,7 +828,7 @@ func TestJsxNoConstructedContextValuesMessageText(test *testing.T) {
 // assertions structurally could not see.
 //
 // A node's `Pos()` includes its leading trivia, so a construction preceded by a comment or a blank
-// line reports the line the TRIVIA starts on. `ctx.ReportNode` already routes through
+// line reports the line the trivia starts on. `ctx.ReportNode` already routes through
 // `rule.TokenRange`, so the finding pointed at the right place the whole time and every span
 // fixture stayed green; only the line number interpolated into the message was wrong, which no
 // message-id assertion and no span assertion can reach.
@@ -860,7 +860,7 @@ func TestJsxNoConstructedContextValuesLineNumbersSkipTrivia(test *testing.T) {
 // TestJsxNoConstructedContextValuesTakesTheLastDeclaration pins which declaration decides when a
 // name has more than one.
 //
-// Upstream reads `defs[defs.length - 1]`, the LAST definition rather than the first. Nothing in the
+// Upstream reads `defs[defs.length - 1]`, the last definition rather than the first. Nothing in the
 // corpus redeclares a name, so a mutation swapping the index survived the entire imported set. The
 // first two rows below have opposite verdicts from declaration order alone, which is the cheapest
 // possible distinguishing pair, and every row was measured against the installed build before it
@@ -888,10 +888,10 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(test *testing.T) {
 		{"an object then an arrow", "  var v = {a: 1};\n  var v = () => {};", []string{"withIdentifierMsgFunc"}},
 		{"an object then a function declaration", "  var v = {a: 1};\n  function v() {}", []string{"withIdentifierMsgFunc"}},
 
-		// A measured divergence, and it is in the CHECKER rather than in the index.
+		// A measured divergence, and it is in the checker rather than in the index.
 		//
 		// Upstream reports "object" here, taking the var as its last definition. Our checker
-		// returns a declaration list of length ONE for a var-and-function pair, holding only the
+		// returns a declaration list of length one for a var-and-function pair, holding only the
 		// function declaration, whichever order they are written in. Probed directly: both
 		// orderings answer `count=1 [0=KindFunctionDeclaration]`, while two vars answer `count=2`
 		// ordered by source position, which is the ordering upstream's scope analysis also
@@ -920,11 +920,11 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(test *testing.T) {
 // TestJsxNoConstructedContextValuesMemberUsageIsTheObject pins which node a member access records
 // as its usage.
 //
-// Upstream sets the usage to the member expression's OBJECT rather than to the whole member
+// Upstream sets the usage to the member expression's object rather than to the whole member
 // expression. Both choices produce the same message id and the same span, because the span comes
 // from the construction and not from the usage, so a mutant swapping them survived every other
 // fixture in this file. The usage is only observable through the message, and only through its
-// usage LINE, since a member expression carries no name for the other slot.
+// usage line, since a member expression carries no name for the other slot.
 //
 // So the distinguishing input has to split the member access across two lines. Measured against the
 // installed build: it renders line 4, the line the object sits on, not line 5.

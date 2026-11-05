@@ -1420,7 +1420,7 @@ func upstreamMessage(parentName string, asProps bool) string {
 	return message
 }
 
-// TestNoUnstableNestedComponentsSpansAndMessages asserts WHERE each finding points and WHAT it
+// TestNoUnstableNestedComponentsSpansAndMessages asserts where each finding points and what it
 // says, neither of which ExpectFindings can see.
 //
 // Every expectation is the installed 7.37.5 build's own output, captured on 2026-08-27 by driving
@@ -1449,7 +1449,7 @@ func TestNoUnstableNestedComponentsSpansAndMessages(test *testing.T) {
 			message:  upstreamMessage("ParentComponent", false),
 		},
 		{
-			// Upstream's resolveComponentName falls back to the binding name only for an ARROW
+			// Upstream's resolveComponentName falls back to the binding name only for an arrow
 			// parent, so this one names the parent.
 			name: "names an arrow parent through its binding",
 			source: `const ParentComponent = () => {
@@ -1460,7 +1460,7 @@ func TestNoUnstableNestedComponentsSpansAndMessages(test *testing.T) {
 			message:  upstreamMessage("ParentComponent", false),
 		},
 		{
-			// The same file written with a function expression parent produces the NO-NAME wording,
+			// The same file written with a function expression parent produces the no-name wording,
 			// because upstream's fallback is guarded on ArrowFunctionExpression specifically.
 			// Measured: this is upstream's behaviour, not ours, and reproducing the narrower guard
 			// is what keeps the message text right.
@@ -1517,11 +1517,11 @@ func TestNoUnstableNestedComponentsSpansAndMessages(test *testing.T) {
 }
 
 // TestNoUnstableNestedComponentsLowercaseParentIsSilent pins the parent-name capitalization test,
-// which is NOT the same predicate as this package's hasComponentCapitalization.
+// which is not the same predicate as this package's hasComponentCapitalization.
 //
 // Upstream indexes character zero and compares it to its own lowercase, with no underscore
 // stripping, so `_ParentComponent` is a lowercase parent and nothing inside it reports. Measured
-// silent against the installed build on 2026-08-27. `no-multi-comp` counts `_Foo` AS a component
+// silent against the installed build on 2026-08-27. `no-multi-comp` counts `_Foo` as a component
 // through the other predicate, so the two look interchangeable and are not.
 func TestNoUnstableNestedComponentsLowercaseParentIsSilent(test *testing.T) {
 	test.Parallel()
@@ -1604,7 +1604,7 @@ func TestNoUnstableNestedComponentsRenderMethodGuard(test *testing.T) {
 }
 
 // TestDecodeNoUnstableNestedComponentsOptions routes configuration through the rule's own decoder,
-// which is where a default inversion would live. The pattern defaults to a NON-EMPTY string, so a
+// which is where a default inversion would live. The pattern defaults to a non-empty string, so a
 // zero-value struct is a different rule rather than the documented one.
 func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	test.Parallel()
@@ -1719,7 +1719,7 @@ func TestNoUnstableNestedComponentsHasNoFileSuffixGate(test *testing.T) {
 }
 
 // TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes covers the panic class the brief names:
-// the walk recovers per FILE, so one nil dereference costs every rule its verdict on that file.
+// the walk recovers per file, so one nil dereference costs every rule its verdict on that file.
 //
 // The first shape is the one that actually fired during this port. `createElementCallCounts`
 // forwards to an unchecked `node.AsCallExpression()`, and an ancestor walk hands it a
@@ -1768,13 +1768,13 @@ func TestNoUnstableNestedComponentsDoesNotPanicOnAwkwardShapes(test *testing.T) 
 
 // TestNoUnstableNestedComponentsHookNamePattern pins upstream's HOOK_REGEXP, `^use[A-Z0-9].*$`.
 //
-// The hook exemption is reached through the closest enclosing CALL's callee identifier, so a call
-// whose name is not hook-shaped must NOT exempt what it returns. Upstream's corpus writes only
+// The hook exemption is reached through the closest enclosing call's callee identifier, so a call
+// whose name is not hook-shaped must not exempt what it returns. Upstream's corpus writes only
 // hook-named calls in this position, so a mutation widening the pattern to match every name
 // survived the whole imported set.
 //
 // Every row measured against the installed 7.37.5 build on 2026-08-27. Note `use` alone reports:
-// the pattern requires a capital or a digit AFTER `use`, so the bare name does not match.
+// the pattern requires a capital or a digit after `use`, so the bare name does not match.
 func TestNoUnstableNestedComponentsHookNamePattern(test *testing.T) {
 	test.Parallel()
 
@@ -1835,19 +1835,19 @@ func TestNoUnstableNestedComponentsPropNamePattern(test *testing.T) {
 // TestNoUnstableNestedComponentsAttributeValueKinds covers JSX attribute values that are not
 // expression containers: a string value and a bare boolean attribute with no value at all.
 //
-// Both rows are here for the panic surface rather than for the predicate. A bare attribute has NO
+// Both rows are here for the panic surface rather than for the predicate. A bare attribute has no
 // value node, so reading it through anything but the typed accessor is a nil dereference, and the
-// walk recovers per FILE rather than per rule.
+// walk recovers per file rather than per rule.
 //
-// # What these rows do NOT prove, stated because my first version of this comment claimed they did
+// # What these rows do not prove, stated because my first version of this comment claimed they did
 //
 // I wrote them expecting them to kill a mutation that drops the container check. They do not, and
-// re-running found that out. The reason is that `Nested` is declared in the parent's BODY, so its
+// re-running found that out. The reason is that `Nested` is declared in the parent's body, so its
 // ancestry is Block > FunctionDeclaration > SourceFile and it never walks near a JSX attribute at
 // all. The predicate is not consulted for either row.
 //
 // Measured against the installed build on 2026-08-27, the guard's real job is to stop the walk
-// CLIMBING PAST a string-valued attribute toward an outer one that is a container:
+// climbing past a string-valued attribute toward an outer one that is a container:
 //
 //	<Outer footer={() => <div />} />                        reports, with the as-props note
 //	<Outer footer={<Inner title="x" render={...} />} />     silent
@@ -1928,7 +1928,7 @@ func TestNoUnstableNestedComponentsAttributeClimbIsBounded(test *testing.T) {
 // needs because its detection pass misses a function component declared inside a class.
 //
 // Both rows measured against the installed 7.37.5 build on 2026-08-27, and the second is the one
-// worth having: upstream does NOT confine the recovery to `render`, so a component built in an
+// worth having: upstream does not confine the recovery to `render`, so a component built in an
 // ordinary method reports too.
 func TestNoUnstableNestedComponentsInsideClassComponents(test *testing.T) {
 	test.Parallel()
@@ -1969,17 +1969,17 @@ func TestNoUnstableNestedComponentsInsideClassComponents(test *testing.T) {
 }
 
 // TestNoUnstableNestedComponentsCreateElementPropsPosition pins the props argument of a
-// createElement call, which is the SECOND one.
+// createElement call, which is the second one.
 //
 // Measured against the installed build on 2026-08-27: a component in the props object reports with
 // the as-props note, and one reached through the type slot does too, because a direct property
 // value is claimed by an earlier branch before the createElement route is consulted.
 //
-// A mutation changing the argument index from 1 to 0 SURVIVES, and that is not a gap these rows
+// A mutation changing the argument index from 1 to 0 survives, and that is not a gap these rows
 // close. Instrumented over all 77 corpus cases plus these: the createElement route is reached 92
 // times, exactly one of those reaches a call carrying two or more arguments, and for that one both
 // indices answer false. Every other reach short-circuits in `isComponentInProp`'s property branch
-// first. A distinguishing input needs a DETECTED component inside a props object that is not itself
+// first. A distinguishing input needs a detected component inside a props object that is not itself
 // a direct property value, and I could not construct one upstream also detects. Recorded as
 // unresolved rather than as an equivalence verdict.
 func TestNoUnstableNestedComponentsCreateElementPropsPosition(test *testing.T) {
