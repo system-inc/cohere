@@ -275,6 +275,8 @@ func TestAStandInEnginesChildIsKilledWhenItsTestEnds(test *testing.T) {
 		close(ended)
 	}()
 	// The subtest stands for a stand-in engine test that leaves its child running; its cleanups run as it ends.
+	// Not parallel: the wait below needs its cleanup to have killed the child, and a parallel subtest would not
+	// start until this test returned
 	test.Run("a test that leaves its child running", func(test *testing.T) {
 		killChildAtCleanup(test, childFile)
 	})

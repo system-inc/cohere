@@ -2,7 +2,8 @@ import Foundation
 import IndexStoreShim
 
 /*
- The index store every debug `swift build` writes beside its products (`<scratch>/out/v5`), read through the
+ The index store every debug `swift build` writes beside its products (`<scratch>/out/v5`), or an xcodebuild under
+ its derived data (`BuildLayout`), read through the
  toolchain's own `libIndexStore.dylib`: for each file the build compiled, every name in it and the
  declaration it resolves to.
 
@@ -280,9 +281,14 @@ import IndexStoreShim
             .path
     }
 
-    /* The store a build into this scratch path writes. */
-    static func storePath(scratchPath: URL) -> URL {
-        scratchPath.appendingPathComponent("out", isDirectory: true)
+    /* The store a build into this layout writes: the folder holding its `v5`. */
+    static func storePath(layout: BuildLayout) -> URL {
+        switch layout {
+            case .swiftPackage(let scratchPath):
+                return scratchPath.appendingPathComponent("out", isDirectory: true)
+            case .xcode(let derivedData):
+                return derivedData.appendingPathComponent("Index.noindex/DataStore", isDirectory: true)
+        }
     }
 
     /* Every name in the file and what it resolves to, or nil when no unit newer than the file describes it. */

@@ -45,6 +45,13 @@ struct PipelineControlTests {
 
         """
 
+    /* The control manifest with a dependency that `--no-fix` cannot resolve, so its build fails before compiling anything. */
+    static let unresolvableManifest = manifest.replacingOccurrences(
+        of: "name: \"Control\",\n    targets:",
+        with:
+            "name: \"Control\",\n    dependencies: [.package(url: \"https://example.invalid/Missing.git\", from: \"1.0.0\")],\n    targets:",
+    )
+
     /* What one run said: the stream's records by kind, in order. */
     struct Run {
         var records: [[String: Any]]
@@ -190,6 +197,57 @@ struct PipelineControlTests {
         #expect(run.of("summary").first?["exitCode"] as? Int == 1)
     }
 
+    /*
+     A `--lint` run on a package no run has built still builds, because its typed rules read the build's index and
+     compile commands, so the file a typed rule applies to is judged rather than crashed, and the run is complete.
+     Before, every such file crashed (@ahra_os_presence_motion, 2026-11-05: 1,251 at ahraos-presence's root under
+     `--lint --no-fix`, and a one-file package). Types stays not requested, so nothing the compiler said is reported.
+     */
+    @Test func aLintRunBuildsWhatItsTypedRulesRead() async throws {
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "        value * 2\n    }\n",
+            with:
+                "        value * 2\n    }\n\n    func hasNone(_ items: [Int]) -> Bool {\n        items.count == 0\n    }\n",
+        )
+        let run = try await Self.run(source: source, arguments: ["--lint"])
+        #expect((run.of("lint").first?["crashes"] as? [[String: Any]] ?? []).isEmpty, "\(run.of("lint"))")
+        #expect(
+            run.of("finding").compactMap { $0["rule"] as? String } == ["cohere-swift/empty-count"],
+            "\(run.of("finding"))",
+        )
+        #expect(run.of("phase").first { $0["name"] as? String == "types" }?["detail"] as? String == "not requested")
+        #expect(run.of("summary").first?["complete"] as? Bool == true)
+    }
+
+    /*
+     A `--lint` run whose build fails before compiling still lints: the rules that need no build judge the file, and
+     the file the typed rules cannot judge says the build is why, in the build's own words. Never a thrown run.
+     */
+    @Test func aLintRunWhoseBuildFailsStillLintsAndSaysWhy() async throws {
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "        value * 2\n    }\n",
+            with:
+                "        value * 2\n    }\n\n    func hasNone(_ items: [Int]) -> Bool {\n        items.count == 0\n    }\n",
+        )
+        let run = try await Self.run(source: source, manifest: Self.unresolvableManifest, arguments: ["--lint"])
+        let crashes = (run.of("lint").first?["crashes"] as? [[String: Any]] ?? []).map { $0["error"] as? String ?? "" }
+        #expect(crashes.count == 1)
+        #expect(
+            crashes.first?.hasPrefix(
+                "the build's index does not describe it as it stands, and no build recorded how to compile it, since the build this run made for the typed rules failed: swift build of"
+            ) == true,
+            "\(crashes)",
+        )
+        #expect(
+            crashes.first?.hasSuffix(
+                "so the rules that read what its names resolve to could not judge it (cohere-swift/empty-count, cohere-swift/redundant-type-annotation); every other rule ran on it"
+            ) == true,
+            "\(crashes)",
+        )
+        #expect(run.of("lint").first?["rulesRun"] as? Int ?? 0 > 0)
+        #expect(run.of("summary").first?["complete"] as? Bool == false)
+    }
+
     /* The naming rule judges with the compiled-in words: no argument names a file, and a word from policy's file is still flagged. */
     @Test func theCompiledInVocabularyIsTheOneJudgedWith() async throws {
         let source = Self.cleanSource.replacingOccurrences(of: "    let value: Int", with: "    let val: Int")
@@ -296,19 +354,18 @@ struct PipelineControlTests {
     }
 
     /*
-     `--no-fix` forbids resolving dependencies, so a package whose Package.resolved is missing (ahraos-macos
-     gitignores its own) fails before the compiler runs. The run must say that, not blame the build layout.
+     `--no-fix` writes nothing into the tree, and SwiftPM keeps a package's pins nowhere but beside its manifest, so
+     a package whose Package.resolved is missing (ahraos-macos gitignores its own) fails before the compiler runs.
+     The run must say that and why, not blame the build layout (#s8p20fe).
      */
     @Test func aBuildThatFailsBeforeCompilingSaysSo() async throws {
-        let manifest = Self.manifest.replacingOccurrences(
-            of: "name: \"Control\",\n    targets:",
-            with:
-                "name: \"Control\",\n    dependencies: [.package(url: \"https://example.invalid/Missing.git\", from: \"1.0.0\")],\n    targets:",
-        )
         await #expect {
-            _ = try await Self.run(source: Self.cleanSource, manifest: manifest)
+            _ = try await Self.run(source: Self.cleanSource, manifest: Self.unresolvableManifest)
         } throws: { error in
             String(describing: error).contains("failed before compiling anything")
+                && String(describing: error).hasSuffix(
+                    "so a check cannot resolve this package: commit its Package.resolved, or run without --no-fix once"
+                )
         }
     }
 }

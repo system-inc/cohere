@@ -40,7 +40,7 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	}
 	run := func(root string, arguments ...string) (string, int) {
 		test.Helper()
-		command := exec.Command(binary, append([]string{"--no-format", "--no-cache"}, arguments...)...)
+		command := exec.Command(binary, append([]string{"--no-format"}, arguments...)...)
 		command.Dir = root
 		output, outputError := command.CombinedOutput()
 		var exitError *exec.ExitError
@@ -59,7 +59,7 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 		`"`+planted+`":"error","no-empty":"error"`,
 		"export function check(flag: boolean): void {\n\tif (flag) {}\n}\n",
 	)
-	output, code := run(beside)
+	output, code := run(beside, "--no-cache")
 	if code != 1 {
 		test.Errorf("exit %d with a crash beside findings, want 1:\n%s", code, output)
 	}
@@ -75,81 +75,112 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	}
 
 	alone := project(`"`+planted+`":"error"`, "export function check(flag: boolean): boolean {\n\treturn !flag;\n}\n")
-	output, code = run(alone)
-	if code != 1 {
-		test.Errorf(
-			"exit %d from a run whose only problem is a crash, want 1, since a missing verdict is not a pass:\n%s",
-			code,
-			output,
-		)
-	}
-	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
-	crashLines := []string{}
-	for _, line := range lines {
-		if strings.Contains(line, " crash "+planted+" ") {
-			crashLines = append(crashLines, line)
+	// The default view, then its replay: a crashed run ends in a verdict, so the run cache records it, and the
+	// replay prints the recorded crash line rather than the footer's count alone.
+	for _, pass := range []string{"cold", "replayed"} {
+		output, code = run(alone)
+		if code != 1 {
+			test.Errorf(
+				"%s: exit %d from a run whose only problem is a crash, want 1, since a missing verdict is not a pass:\n%s",
+				pass,
+				code,
+				output,
+			)
 		}
-	}
-	if len(crashLines) != 1 {
-		test.Fatalf("the default view printed %d crash lines for one crash, want 1:\n%s", len(crashLines), output)
-	}
-	for _, want := range []string{
-		filepath.Join(alone, "crashes.ts"),
-		"This is a bug in cohere, not in your code",
-		reportBugsAt,
-		"Unhandled case in Node.Text",
-	} {
-		if !strings.Contains(crashLines[0], want) {
-			test.Errorf("the crash line lacks %q:\n%s", want, crashLines[0])
+		lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+		crashLines := []string{}
+		for _, line := range lines {
+			if strings.HasPrefix(line, "  crashed: ") {
+				crashLines = append(crashLines, line)
+			}
 		}
-	}
-	if footer := lines[len(lines)-1]; !strings.HasPrefix(footer, "✗ ☠️ ") || !strings.Contains(footer, "1 rule crash") {
-		test.Errorf(
-			"the footer of a run that lost a verdict to a crash is %q, want a failing verdict that names the crash",
-			footer,
-		)
+		if len(crashLines) != 1 {
+			test.Fatalf(
+				"%s: the default view printed %d crash lines for one crash, want 1:\n%s",
+				pass,
+				len(crashLines),
+				output,
+			)
+		}
+		for _, want := range []string{
+			"  crashed: " + filepath.Join(alone, "crashes.ts") + ": cohere's rule " + planted + " crashed on this file",
+			"This is a bug in cohere, not in your code",
+			reportBugsAt,
+			"Unhandled case in Node.Text",
+		} {
+			if !strings.Contains(crashLines[0], want) {
+				test.Errorf("%s: the crash line lacks %q:\n%s", pass, want, crashLines[0])
+			}
+		}
+		if footer := lines[len(lines)-1]; !strings.HasPrefix(footer, "✗ ☠️ ") || !strings.Contains(footer, "1 rule crash") {
+			test.Errorf(
+				"%s: the footer of a run that lost a verdict to a crash is %q, want a failing verdict that names the crash",
+				pass,
+				footer,
+			)
+		}
 	}
 
-	output, code = run(alone, "--json")
-	if code != 1 {
-		test.Errorf("exit %d under --json, want 1", code)
-	}
-	var crashes int
-	var summaries int
-	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
-		var record struct {
-			Kind    string `json:"kind"`
-			Path    string `json:"path"`
-			Rule    string `json:"rule"`
-			Cause   string `json:"cause"`
-			Verdict string `json:"verdict"`
-			Gaps    struct {
-				RuleCrashes int `json:"ruleCrashes"`
-			} `json:"gaps"`
+	// And under --json, cold and then replayed, which the summary says it was: the crash line, and the summary
+	// listing the crash beside its count.
+	for _, wantReplayed := range []bool{false, true} {
+		output, code = run(alone, "--json")
+		if code != 1 {
+			test.Errorf("exit %d under --json, want 1", code)
 		}
-		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
-			test.Fatalf("a --json line is not JSON: %v\n%s", decodeError, line)
-		}
-		switch record.Kind {
-		case "crash":
-			crashes++
-			if record.Rule != planted ||
-				filepath.Base(record.Path) != "crashes.ts" ||
-				!strings.Contains(record.Cause, "Unhandled case") {
-				test.Errorf("the crash record names %s on %s with cause %q", record.Rule, record.Path, record.Cause)
+		var crashes int
+		var summaries int
+		for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+			var record struct {
+				Kind    string `json:"kind"`
+				Path    string `json:"path"`
+				Rule    string `json:"rule"`
+				Cause   string `json:"cause"`
+				Verdict string `json:"verdict"`
+				Cache   struct {
+					Replayed bool `json:"replayed"`
+				} `json:"cache"`
+				Gaps struct {
+					RuleCrashes int        `json:"ruleCrashes"`
+					Crashes     []runCrash `json:"crashes"`
+				} `json:"gaps"`
 			}
-		case "summary":
-			summaries++
-			if record.Verdict != "fail" || record.Gaps.RuleCrashes != 1 {
-				test.Errorf(
-					"the summary says %s with %d rule crashes, want fail and 1",
-					record.Verdict,
-					record.Gaps.RuleCrashes,
-				)
+			if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+				test.Fatalf("a --json line is not JSON: %v\n%s", decodeError, line)
+			}
+			switch record.Kind {
+			case "crash":
+				crashes++
+				if record.Rule != planted ||
+					filepath.Base(record.Path) != "crashes.ts" ||
+					!strings.Contains(record.Cause, "Unhandled case") {
+					test.Errorf("the crash record names %s on %s with cause %q", record.Rule, record.Path, record.Cause)
+				}
+			case "summary":
+				summaries++
+				if record.Verdict != "fail" || record.Gaps.RuleCrashes != 1 {
+					test.Errorf(
+						"the summary says %s with %d rule crashes, want fail and 1",
+						record.Verdict,
+						record.Gaps.RuleCrashes,
+					)
+				}
+				if record.Cache.Replayed != wantReplayed {
+					test.Errorf("the summary says replayed %t, want %t", record.Cache.Replayed, wantReplayed)
+				}
+				if listed := record.Gaps.Crashes; len(listed) != 1 || listed[0].Rule != planted ||
+					listed[0].Path != filepath.Join(alone, "crashes.ts") ||
+					!strings.Contains(listed[0].Cause, "Unhandled case") {
+					test.Errorf(
+						"replayed %t: the summary lists the crashes as %+v, want the one crash with its rule and cause",
+						wantReplayed,
+						listed,
+					)
+				}
 			}
 		}
-	}
-	if crashes != 1 || summaries != 1 {
-		test.Errorf("--json printed %d crash records and %d summaries, want 1 of each:\n%s", crashes, summaries, output)
+		if crashes != 1 || summaries != 1 {
+			test.Errorf("--json printed %d crash records and %d summaries, want 1 of each:\n%s", crashes, summaries, output)
+		}
 	}
 }

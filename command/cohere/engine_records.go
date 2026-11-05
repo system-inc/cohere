@@ -227,6 +227,12 @@ type engineRun struct {
 	// nothing more, which inherits this process's environment as it is.
 	engineEnvironment []string
 
+	// yieldedDirectories are the directories of the Swift projects below this one that run on their own,
+	// symbolic links resolved, when this run is one project of several. Their runs account for their files,
+	// so the excluded files under them are left out of this run's notes and its gap. Nil checks nothing, and
+	// only a Swift run sets it (see discovery.swiftYield).
+	yieldedDirectories []string
+
 	provenance *engineProvenanceRecord
 	project    *engineProjectRecord
 	summary    *engineSummaryRecord
@@ -756,12 +762,17 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 	// The same coverage block a TypeScript run prints, from the same writer, so one fact reads the same
 	// whichever engine states it: one counted line whose terms add up, crashes in full, and each rule
 	// named once behind --coverage.
-	summary, classifyEngineCoverageError := classifyEngineCoverage(record)
+	summary, classifyEngineCoverageError := classifyEngineCoverage(record, run.language)
 	if classifyEngineCoverageError != nil {
 		return classifyEngineCoverageError
 	}
 	writeCoverage(accountOutput(run.out), summary, run.details)
 	run.crashes += len(record.Crashes)
+	// Named for the human view and `--json` as a TypeScript run's are, from the same crashes the coverage notes
+	// named, so every view says the engine's words, and appended as the count is added to, so the list stays as
+	// long as the count.
+	activeSummary.Gaps.Crashes = append(activeSummary.Gaps.Crashes, summary.Crashes...)
+	printCrashGroups(run.out, summary.Crashes)
 
 	if record.ConfigNote != "" {
 		fmt.Fprintf(accountOutput(run.out), "  %s\n", record.ConfigNote)
@@ -782,7 +793,10 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 //
 // A record whose parts add up to more than its whole is refused, for the reason every count stated
 // twice is compared: the counted line would print arithmetic nobody can vouch for.
-func classifyEngineCoverage(record *engineLintRecord) (coverageSummary, error) {
+//
+// Each crash carries the engine's own sentence and language's name for the engine, so it reads as that engine's
+// report and never as a panic of cohere's (see runCrash.message).
+func classifyEngineCoverage(record *engineLintRecord, language engineLanguage) (coverageSummary, error) {
 	notConfigured := make(map[string]bool, len(record.RulesNotConfigured))
 	for _, name := range record.RulesNotConfigured {
 		notConfigured[name] = true
@@ -843,13 +857,14 @@ func classifyEngineCoverage(record *engineLintRecord) (coverageSummary, error) {
 	sort.Strings(summary.PartialFacts)
 
 	for _, crash := range record.Crashes {
-		summary.Crashes = append(summary.Crashes, coverageCrash{File: crash.File, Cause: crash.Error})
+		summary.Crashes = append(summary.Crashes, runCrash{Path: crash.File, Cause: crash.Error, Engine: language.Name})
 	}
 	summary.sortEntries()
 	return summary, nil
 }
 
-// excludedNamedLimit is how many excluded files of one reason are named before they are counted.
+// excludedNamedLimit is how many excluded files of one reason are named before they are counted, for the
+// reasons nobody expects checked. A gap's files are always named.
 const excludedNamedLimit = 5
 
 // writeExcluded says which files the project record left out, once, under the lint line when
@@ -860,6 +875,13 @@ const excludedNamedLimit = 5
 // `vendored under Vendor/` between the lint line and the verdict, which buries the two lines a reader
 // must act on under a hundred that say one thing. A few files are named, because one file left out
 // for a surprising reason is the case worth seeing; a hundred for the same reason are one fact.
+//
+// A file under a directory this run yields is left out, whatever its reason: the run of the Swift project
+// there accounts for it, so on ahraos-presence the root's notes stop naming CapturePhone's and RigSimulator's
+// files as checked by nothing. What remains, for a reason other than the ones the run's language says nobody
+// expects checked, is the run's gap: listed for the footer and `--json`, and named here file by file however
+// many share a reason, since the limit is for one fact said a hundred times and each file of a gap is one to
+// act on. A language that names no such reasons keeps no gap (see engineLanguage.ExpectedExclusionReasons).
 func (run *engineRun) writeExcluded() {
 	if run.excludedPrinted || run.project == nil {
 		return
@@ -874,9 +896,21 @@ func (run *engineRun) writeExcluded() {
 		}
 		filesByReason[reason] = append(filesByReason[reason], file)
 	}
+	var gap []uncheckedSwiftFile
+	gapReasons := map[string]bool{}
 	for _, excluded := range run.project.Excluded {
+		// Resolved, since the engine standardizes its paths as Foundation spells them, `/tmp` where this
+		// process may hold `/private/tmp`, and the yielded directories are resolved too.
+		if len(run.yieldedDirectories) > 0 && yieldsFile(run.yieldedDirectories, resolvedPath(excluded.File)) {
+			continue
+		}
 		add(excluded.File, excluded.Reason)
+		if run.language.ExpectedExclusionReasons != nil && !run.language.ExpectedExclusionReasons[excluded.Reason] {
+			gap = append(gap, uncheckedSwiftFile{File: excluded.File, Reason: excluded.Reason})
+			gapReasons[excluded.Reason] = true
+		}
 	}
+	activeSummary.Gaps.UncheckedSwift = gap
 	// A file the engine could not read is printed the way an excluded file is, because to a reader it is
 	// the same fact: a file nothing checked, and why.
 	for _, unreadable := range run.unreadable {
@@ -885,7 +919,7 @@ func (run *engineRun) writeExcluded() {
 	sort.Strings(reasons)
 	for _, reason := range reasons {
 		files := filesByReason[reason]
-		if len(files) > excludedNamedLimit {
+		if len(files) > excludedNamedLimit && !gapReasons[reason] {
 			fmt.Fprintf(accountOutput(run.out), "  not checked: %d files (%s)\n", len(files), reason)
 			continue
 		}

@@ -31,6 +31,12 @@ type engineLanguage struct {
 	// provenance record and the commit whose sources the front door vouches for, or empty when it vouches
 	// for none.
 	VersionLines func(provenance *engineProvenanceRecord, engineSourceCommit string) []string
+
+	// ExpectedExclusionReasons are the reasons the engine gives, in its own words, for files nobody expects a
+	// run to check. Every other reason a project record gives is the run's gap (engineRun.writeExcluded), so an
+	// engine that rewords one makes the gap louder and never hides it. Nil keeps no gap: only Swift's are
+	// known, and its gap is said as Swift files, in `gaps.uncheckedSwift` and on the footer.
+	ExpectedExclusionReasons map[string]bool
 }
 
 // theEngine is how a sentence names the engine, "the Swift engine", so every error and unfinished
@@ -47,6 +53,13 @@ var swiftLanguage = engineLanguage{
 	FileNoun:      "Swift files",
 	CompilerLabel: "swiftc",
 	VersionLines:  swiftVersionLines,
+	// In swift/Sources/CohereSwift/Project/FileSet.swift's words: what git ignores, what is vendored, and the
+	// manifests. `no target of this package compiles it` is a gap, and so is whatever sentence comes next.
+	ExpectedExclusionReasons: map[string]bool{
+		"ignored by git":         true,
+		"vendored under Vendor/": true,
+		"a package manifest":     true,
+	},
 }
 
 // swiftVersionLines is the Swift engine's `--version` lines. Only Swift has the source-commit line,

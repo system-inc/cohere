@@ -106,6 +106,20 @@
                         "programFiles": { "type": "integer", "description": "The program's size when the run was narrowed to fewer of its files; zero otherwise." },
                         "crashedFiles": { "type": "integer", "description": "Files nothing could check, because cohere crashed on them. They fail the run." },
                         "ruleCrashes": { "type": "integer", "description": "Rules that crashed on a file, each leaving its verdict there missing. They fail the run." },
+                        "crashes": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["path", "cause"],
+                                "properties": {
+                                    "path": { "type": "string", "description": "The file, as the engine names it." },
+                                    "rule": { "type": "string", "description": "The rule that crashed. Absent when the whole file was lost." },
+                                    "cause": { "type": "string", "description": "The panic, as cohere caught it." }
+                                }
+                            },
+                            "description": "Each crash crashedFiles and ruleCrashes count, named, so the list is as long as the two together. The same fields as a `crash` line, which a Swift run does not print. Absent when there are none."
+                        },
                         "rulesSkippingEverything": { "type": "integer", "description": "Rules that declined every file they were offered." },
                         "formattingNotChecked": { "type": "boolean" },
                         "nothingToCheck": { "type": "boolean", "description": "The project had no files to check." },
@@ -113,7 +127,33 @@
                         "unread": { "type": "string", "description": "Files the run could not check for any other reason, as the run said it." },
                         "adamicIgnored": { "type": "integer", "description": "Adamic .a files the program holds that git's ignore rules leave out of the format walk: type-checked and linted, never formatted. Absent when there are none." },
                         "missingGenerated": { "type": "array", "items": { "type": "string" }, "description": "Generated files the program asks for that do not exist yet, relative to the project root: an import or reference path in a project file whose target git ignores, such as Next's .next/types before `next typegen`. They fail the run. Absent when there are none." },
-                        "fixesHeld": { "type": "boolean", "description": "Lint fixes were held because a generated file is missing: none was proposed or written, and formatting ran alone. Absent otherwise." }
+                        "fixesHeld": { "type": "boolean", "description": "Lint fixes were held because a generated file is missing: none was proposed or written, and formatting ran alone. Absent otherwise." },
+                        "unclaimedSwift": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["directory", "files"],
+                                "properties": {
+                                    "directory": { "type": "string", "description": "The shallowest directory under the discovery root holding the files, ending in a slash, or \".\" for files directly in the root." },
+                                    "files": { "type": "integer", "description": "The .swift files below it that no Swift package holds." }
+                                }
+                            },
+                            "description": "Directories of .swift files beside the project that no Swift package holds, so nothing checked them, found by a run from the repository that discovered this one project. They fail nothing. Absent when there are none."
+                        },
+                        "uncheckedSwift": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["file", "reason"],
+                                "properties": {
+                                    "file": { "type": "string", "description": "The file, as the Swift engine names it." },
+                                    "reason": { "type": "string", "description": "Why the engine left it out, in the engine's words, such as \"no target of this package compiles it\"." }
+                                }
+                            },
+                            "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them, less those under a Swift project below it that runs on its own. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
+                        }
                     }
                 },
                 "adamic": {

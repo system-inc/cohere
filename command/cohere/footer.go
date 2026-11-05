@@ -41,9 +41,11 @@ import (
 // One rule outranks the brevity. Anything the run did not check is in this line, green or not: a file a
 // rule crashed on, a rule that skipped every file it was offered, a phase that could not run, formatting
 // not checked, a run narrowed to some of the files, a project with nothing to check, a generated file the
-// program asks for that does not exist yet. The old phase line existed so that a run which checked nothing
-// could not print like one that checked everything, and a one-line summary that dropped those cases would
-// undo it in the line people actually read. So a gap is never left to `--verbose`.
+// program asks for that does not exist yet, Swift files beside the project that no package holds, Swift
+// files inside a package's directory that no target compiles and no other project's run checks. The old
+// phase line existed so that a run which checked nothing could not print like one that checked everything,
+// and a one-line summary that dropped those cases would undo it in the line people actually read. So a gap
+// is never left to `--verbose`.
 
 // phaseGlyphs are the house's glyph for each phase that has one.
 var phaseGlyphs = map[phaseName]string{
@@ -214,6 +216,13 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ "+
 			counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
 	}
+	if len(gaps.UnclaimedSwift) > 0 {
+		markers = append(markers, unclaimedSwiftMarker(gaps.UnclaimedSwift))
+	}
+	if len(gaps.UncheckedSwift) > 0 {
+		markers = append(markers, "⚠ "+
+			counted(len(gaps.UncheckedSwift), "Swift file not checked", "Swift files not checked"))
+	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
 	}
@@ -234,6 +243,9 @@ type overallFacts struct {
 	// its own project too, so some files may be counted twice, and that is said here rather than only in
 	// `--verbose`'s notes (#sxs26s3).
 	CoverageUnknown int
+	// UnclaimedSwift is the directories of Swift files no package holds, which no project's run checked
+	// (#ybspptb). A gap, not a failure: it never changes the verdict, and it is never left to the notes.
+	UnclaimedSwift []unclaimedSwiftDirectory
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -274,7 +286,28 @@ func overallFooter(facts overallFacts, style textStyle) string {
 			counted(facts.CoverageUnknown, "Swift coverage query failed, so some files may be counted twice",
 				"Swift coverage queries failed, so some files may be counted twice")
 	}
+	if len(facts.UnclaimedSwift) > 0 {
+		line += " • " + unclaimedSwiftMarker(facts.UnclaimedSwift)
+	}
 	return line
+}
+
+// unclaimedSwiftMarker says the directories of Swift files no package checks, the first three by name and
+// the rest counted, so the line stays short however many there are:
+//
+//	⚠ Swift files no package checks: CapturePhone/
+//	⚠ Swift files no package checks: A/, B/, C/ and 2 more
+func unclaimedSwiftMarker(directories []unclaimedSwiftDirectory) string {
+	const named = 3
+	names := make([]string, 0, named)
+	for _, unclaimed := range directories[:min(len(directories), named)] {
+		names = append(names, unclaimed.Directory)
+	}
+	marker := "⚠ Swift files no package checks: " + strings.Join(names, ", ")
+	if len(directories) > named {
+		marker += fmt.Sprintf(" and %d more", len(directories)-named)
+	}
+	return marker
 }
 
 // footerSeconds is a duration as the footer says it: 0.004s, 0.05s, 0.4s, 2.4s, 12s. Below a hundredth it

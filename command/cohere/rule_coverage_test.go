@@ -136,7 +136,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	swift, classifyEngineCoverageError := classifyEngineCoverage(&engineLintRecord{
 		RulesRun: 9, RulesWatchedAndQuiet: 3, RulesSilent: []string{"a", "b", "c"},
 		RulesNotConfigured: []string{"a"}, RulesScopedOff: map[string]int{"b": 2, "quiet-but-partly-off": 1},
-	})
+	}, swiftLanguage)
 	if classifyEngineCoverageError != nil {
 		test.Fatal(classifyEngineCoverageError)
 	}
@@ -155,6 +155,7 @@ func TestSwiftCoverageRefusesPartsLargerThanTheWhole(test *testing.T) {
 	test.Parallel()
 	_, classifyEngineCoverageError := classifyEngineCoverage(
 		&engineLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}},
+		swiftLanguage,
 	)
 	if classifyEngineCoverageError == nil || !strings.Contains(classifyEngineCoverageError.Error(), "more than that") {
 		test.Fatalf("a record counting 3 rules among 2 was accepted: %v", classifyEngineCoverageError)
