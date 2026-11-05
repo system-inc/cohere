@@ -99,7 +99,10 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
 		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory for %s: %v", root, homeError)
+			}
 			root = filepath.Join(home, root[2:])
 		}
 		if root == "" || seen[root] {
@@ -198,7 +201,8 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		}
 
 		type count struct{ identical, measured, rewriteIdentical, rewriteTotal int }
-		var all, withoutEmbed count
+		var all count
+		var withoutEmbed count
 		differences := map[string]int{}
 		var different []differential.FileResult
 		for _, result := range compared.Files {

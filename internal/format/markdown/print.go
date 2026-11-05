@@ -29,7 +29,15 @@ type settings struct {
 	nodes *arena.Arena[Node]
 }
 
-func settingsOf(options *options) *settings { return options.Settings.(*settings) }
+func settingsOf(options *options) *settings {
+	markdownSettings, isSettings := options.Settings.(*settings)
+	if !isSettings {
+		// Invariant: formatWithProseWrap builds the only options this printer runs with, and sets its
+		// Settings to a *settings; it recovers the panic into an error.
+		panic("markdown: options.Settings is not a *settings")
+	}
+	return markdownSettings
+}
 
 func currentNode(path *astPath) *Node {
 	node, _ := path.Node()
@@ -115,6 +123,12 @@ func isNextTokenFakeSetextH2Line(path *astPath) bool {
 }
 
 var syntaxLeadingPattern = regexp.MustCompile(`^>|^(?:[*+-]|#{1,6}|\d+[).])$`)
+
+var (
+	tabsAndNewlinesPattern = regexp.MustCompile(`[\t\n]+`)
+	htmlCommentPattern     = regexp.MustCompile(`(?s)^<!--.*-->$`)
+	javaScriptSpaceRuns    = regexp.MustCompile(`[` + javaScriptSpace + `]+`)
+)
 
 func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any) doc.Doc {
 	node := currentNode(path)
@@ -228,6 +242,8 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 	case "wikiLink":
 		if node.ValueNull {
 			// Upstream prints a null value into the doc, which the doc printer rejects.
+			// Invariant: the wiki link syntax refuses a link without target data, and the target's exit in
+			// wikiLinkFromMarkdown sets the value, so a parsed wiki link always has one.
 			panic("markdown: a wiki link with no target")
 		}
 		contents := node.Value
@@ -434,15 +450,11 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		return replaceEndOfLine(node.Value, doc.Hardline)
 	default:
 		// tableRow is handled in "table" and listItem in "list".
+		// Invariant: mdast builds only the node types above, a fragment never outlives the resume that
+		// pops it, and table and list print their rows and items themselves.
 		panic("markdown: unexpected node type " + node.NodeType)
 	}
 }
-
-var (
-	tabsAndNewlinesPattern = regexp.MustCompile(`[\t\n]+`)
-	htmlCommentPattern     = regexp.MustCompile(`(?s)^<!--.*-->$`)
-	javaScriptSpaceRuns    = regexp.MustCompile(`[` + javaScriptSpace + `]+`)
-)
 
 func isJavaScriptSpace(character rune) bool {
 	return character >= 0 && strings.ContainsRune(javaScriptSpaceText, character)
@@ -534,10 +546,11 @@ func shouldRemainTheSameContent(path *astPath) bool {
 
 // encodeURL is encodeUrl: each character replaced by its encodeURIComponent.
 func encodeURL(link string, characters string) string {
+	encoded := link
 	for _, character := range characters {
-		link = strings.ReplaceAll(link, string(character), url.PathEscape(string(character)))
+		encoded = strings.ReplaceAll(encoded, string(character), url.PathEscape(string(character)))
 	}
-	return link
+	return encoded
 }
 
 // printURL is printUrl: wrap the url in `<>` when it holds a space or the dangerous character.
