@@ -16,16 +16,23 @@ const idMatchFile = "/repository/source/IdMatch.ts"
 // Routed through the rule's own exported decoder rather than filling the struct, so a defect in the
 // decoder is under test rather than bypassed by every fixture. The flags are passed as a map so a
 // case naming only `properties` decodes through the same absent-key path a real config would.
-func idMatchOf(pattern string, flags map[string]bool) any {
-	tuple := []any{pattern}
-	if flags != nil {
-		tuple = append(tuple, flags)
-	}
-	encoded, err := json.Marshal(tuple)
+func idMatchOf(pattern string, flags map[string]bool) IdMatchSettings {
+	// Each element is marshalled on its own and joined into the list, which is the same bytes as marshalling
+	// the list whole, without a slice that holds a string beside a map.
+	encodedPattern, err := json.Marshal(pattern)
 	if err != nil {
 		panic(err)
 	}
-	settings, err := DecodeIdMatchOptions(encoded)
+	encoded := "[" + string(encodedPattern)
+	if flags != nil {
+		encodedFlags, encodeFlagsError := json.Marshal(flags)
+		if encodeFlagsError != nil {
+			panic(encodeFlagsError)
+		}
+		encoded += "," + string(encodedFlags)
+	}
+	encoded += "]"
+	settings, err := DecodeIdMatchOptions([]byte(encoded))
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +67,7 @@ func TestIdMatchFires(test *testing.T) {
 	cases := []struct {
 		source string
 		// settings is what the rule's own decoder produces for this case's options.
-		settings any
+		settings IdMatchSettings
 		// findings is one message id per expected finding, in report order, taken from what the
 		// installed rule produced rather than assumed: a private name reports through a different
 		// id and no count could tell them apart.
@@ -358,7 +365,7 @@ func TestIdMatchStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdMatchSettings
 	}{
 		{source: "__foo = \"Matthieu\"", settings: idMatchOf("^[a-z]+$", map[string]bool{"onlyDeclarations": true})},
 		{source: "firstname = \"Matthieu\"", settings: idMatchOf("^[a-z]+$", nil)},
@@ -498,7 +505,7 @@ func TestIdMatchSpansAndMessages(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdMatchSettings
 		spans    []string
 		messages []string
 	}{
@@ -612,7 +619,7 @@ func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	}
 
 	// A rule handed nil options reports nothing rather than dereferencing a nil pattern.
-	result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, "var no_camelcased = 1;", nil)
+	result := rule_testing.RunTyped(test, IdMatch, idMatchFile, "var no_camelcased = 1;")
 	if len(result.Diagnostics) != 0 {
 		test.Errorf("expected an unconfigured rule to report nothing, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
@@ -641,7 +648,7 @@ func TestIdMatchDestructuringKeysAreNeverChecked(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdMatchSettings
 		findings int
 		// reported names the identifier the single finding must cover, so a rule reporting the key
 		// instead of the binding fails even where the count would match.
@@ -722,7 +729,7 @@ func TestIdMatchOptionGatesAreArmSpecific(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdMatchSettings
 		findings int
 		reported string
 	}{
@@ -919,7 +926,7 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 }
 
 // mustDecodeIdMatch decodes exactly the bytes the config layer would hand the rule.
-func mustDecodeIdMatch(test *testing.T, raw string) any {
+func mustDecodeIdMatch(test *testing.T, raw string) IdMatchSettings {
 	test.Helper()
 	decoded, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(raw))
 	if decodeIdMatchOptionsError != nil {

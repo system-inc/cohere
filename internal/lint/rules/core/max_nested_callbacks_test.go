@@ -21,7 +21,7 @@ import (
 // decodeMaxNestedCallbacksForTest turns a fixture's JSON into options the way the config layer does.
 // An empty string stands for a rule configured as a bare severity, which reaches the decoder as
 // empty input.
-func decodeMaxNestedCallbacksForTest(test *testing.T, optionsJson string) any {
+func decodeMaxNestedCallbacksForTest(test *testing.T, optionsJson string) MaxNestedCallbacksOptions {
 	test.Helper()
 	decoded, decodeMaximumNestedCallbacksOptionsError := DecodeMaxNestedCallbacksOptions([]byte(optionsJson))
 	if decodeMaximumNestedCallbacksOptionsError != nil {
@@ -320,7 +320,7 @@ func TestDecodeMaxNestedCallbacksOptions(test *testing.T) {
 	}
 }
 
-// A rule configured as a bare severity reaches Run with nil rather than with options, and a
+// A rule configured as a bare severity reaches Run unconfigured rather than with options, and a
 // zero-value struct there carries a nil Maximum. Without the fallback the rule reads the limit as
 // zero and reports every callback in the tree, or reads it as nil and reports nothing; either way
 // every fixture above still passes, because all of them route through the decoder.
@@ -334,23 +334,21 @@ func TestMaxNestedCallbacksHandlesNilOptions(test *testing.T) {
 	for depth := 0; depth < 11; depth++ {
 		deepEnoughForTheDefault += "})"
 	}
-	result := rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts", deepEnoughForTheDefault, nil)
+	result := rule_testing.Run(test, MaxNestedCallbacks, "file.ts", deepEnoughForTheDefault)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("expected the default limit of 10 to report once on an 11-deep nest, got %d findings",
 			len(result.Diagnostics))
 	}
 	shallow := "foo(function(){ foo(function(){}) })"
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts", shallow, nil))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, MaxNestedCallbacks, "file.ts", shallow))
 	// And the same input through the decoder, so the two paths are pinned to the same answer.
-	var throughDecoder any
 	decoded, decodeMaximumNestedCallbacksOptionsError := DecodeMaxNestedCallbacksOptions([]byte(""))
 	if decodeMaximumNestedCallbacksOptionsError != nil {
 		test.Fatalf("decoding empty: %v", decodeMaximumNestedCallbacksOptionsError)
 	}
-	throughDecoder = decoded
 	if len(rule_testing.RunWithOptions(test, MaxNestedCallbacks, "file.ts",
-		deepEnoughForTheDefault, throughDecoder).Diagnostics) != 1 {
-		test.Errorf("the decoder path and the nil path disagree about the default")
+		deepEnoughForTheDefault, decoded).Diagnostics) != 1 {
+		test.Errorf("the decoder path and the unconfigured path disagree about the default")
 	}
 }
 

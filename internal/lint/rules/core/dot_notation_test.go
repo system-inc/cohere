@@ -421,7 +421,7 @@ var dotNotationSilentCases = []dotNotationCase{
 }
 
 // decodedDotNotation routes a row's raw JSON through the rule's own exported decoder.
-func decodedDotNotation(test *testing.T, raw string) any {
+func decodedDotNotation(test *testing.T, raw string) DotNotationOptions {
 	test.Helper()
 	decoded, decodeDotNotationOptionsError := DecodeDotNotationOptions([]byte(raw))
 	if decodeDotNotationOptionsError != nil {

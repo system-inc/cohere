@@ -1048,7 +1048,7 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 }
 
 // decodedFuncNameMatching routes a row's raw JSON through the rule's own exported decoder.
-func decodedFuncNameMatching(test *testing.T, raw string) any {
+func decodedFuncNameMatching(test *testing.T, raw string) FuncNameMatchingOptions {
 	test.Helper()
 	decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(raw))
 	if decodeFuncNameMatchingOptionsError != nil {
