@@ -224,8 +224,7 @@ func unifiedSignaturesIsOverload(node *ast.Node) bool {
 // of each other.
 func unifiedSignaturesNestedScopes(scope *ast.Node) []*ast.Node {
 	var found []*ast.Node
-	var visit func(node *ast.Node) bool
-	visit = func(node *ast.Node) bool {
+	visit := func(node *ast.Node) bool {
 		switch node.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression, ast.KindInterfaceDeclaration,
 			ast.KindTypeLiteral, ast.KindModuleBlock:

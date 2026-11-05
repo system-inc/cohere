@@ -962,7 +962,11 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(test *testin
 			test.Errorf("%s was refused: %v", accepted.wire, err)
 			continue
 		}
-		if got := decoded.(ClassLiteralPropertyStyleOptions).Style; got != accepted.want {
+		options, isType := decoded.(ClassLiteralPropertyStyleOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected ClassLiteralPropertyStyleOptions", decoded)
+		}
+		if got := options.Style; got != accepted.want {
 			test.Errorf("%s decoded to %s, want %s", accepted.wire, got, accepted.want)
 		}
 	}

@@ -414,15 +414,6 @@ func contextualParameterType(ctx rule.Context, node *ast.Node) (*checker.Type, b
 	return checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameters[parameterIndex]), true
 }
 
-// declaredParameterType reads a parameter's type from the signature its own function declares.
-func declaredParameterType(ctx rule.Context, node *ast.Node) *checker.Type {
-	parameter := node.AsParameterDeclaration()
-	if parameter.Type != nil {
-		return checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, parameter.Type)
-	}
-	return nil
-}
-
 // bindingPatternSourceType answers the type of whatever a destructuring pattern is taking apart.
 //
 // Four sources, and they recurse: an initializer on a variable declaration, a parameter's own

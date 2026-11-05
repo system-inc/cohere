@@ -531,7 +531,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 	test.Run("false is distinguishable from absent", func(test *testing.T) {
 		test.Parallel()
 		decoded, _ := DecodeOnlyThrowErrorOptions(json.RawMessage(`{"allowThrowingAny": false}`))
-		options := decoded.(OnlyThrowErrorOptions)
+		options, isType := decoded.(OnlyThrowErrorOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		}
 		if options.AllowThrowingAny == nil {
 			test.Fatal("allowThrowingAny: false decoded to nil, which the rule would read as the TRUE default")
 		}
@@ -547,7 +550,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding: %v", err)
 		}
-		options := decoded.(OnlyThrowErrorOptions)
+		options, isType := decoded.(OnlyThrowErrorOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		}
 		if len(options.AllowInline) != 1 || options.AllowInline[0] != "Promise" {
 			test.Errorf("AllowInline is %v, want [Promise]", options.AllowInline)
 		}
@@ -569,7 +575,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding: %v", err)
 		}
-		options := decoded.(OnlyThrowErrorOptions)
+		options, isType := decoded.(OnlyThrowErrorOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		}
 		if len(options.Allow) != 1 || len(options.Allow[0].Name) != 2 {
 			test.Fatalf("Allow decoded to %+v", options.Allow)
 		}
@@ -588,7 +597,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding: %v", err)
 		}
-		options := decoded.(OnlyThrowErrorOptions)
+		options, isType := decoded.(OnlyThrowErrorOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		}
 		// `file` is the zero value, so keeping the specifier would silently mean `file`. Dropping
 		// it says nothing at all, which is the honest answer for a value we cannot represent.
 		if len(options.Allow) != 0 {
@@ -603,7 +615,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding: %v", err)
 		}
-		options := decoded.(OnlyThrowErrorOptions)
+		options, isType := decoded.(OnlyThrowErrorOptions)
+		if !isType {
+			test.Fatalf("decoding the options gave %T, expected OnlyThrowErrorOptions", decoded)
+		}
 		if len(options.Allow) != 1 {
 			test.Fatalf("Allow decoded to %+v", options.Allow)
 		}

@@ -257,7 +257,11 @@ func TestConsistentTypeImportsFixCases(test *testing.T) {
 				if err != nil {
 					test.Fatalf("decoding %s: %v", testCase.options, err)
 				}
-				settings = decoded.(ConsistentTypeImportsOptions)
+				typed, isType := decoded.(ConsistentTypeImportsOptions)
+				if !isType {
+					test.Fatalf("decoding the options gave %T, expected ConsistentTypeImportsOptions", decoded)
+				}
+				settings = typed
 			}
 			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports, "consistent_type_imports.ts", testCase.code, settings)
 			rule_testing.ExpectFixedSource(test, result, testCase.want)

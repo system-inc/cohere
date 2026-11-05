@@ -93,8 +93,7 @@ var PreferFind = rule.Rule{
 		// The two composite forms are asymmetric and the corpus pins both. Null and undefined
 		// members of a union are skipped rather than disqualifying, so `string[] | undefined`
 		// reports, and at least one real array must remain, so `null | undefined` alone does not.
-		var isArrayish func(subject *checker.Type) bool
-		isArrayish = func(subject *checker.Type) bool {
+		isArrayish := func(subject *checker.Type) bool {
 			foundArray := false
 			for unionPart := range type_checking.UnionTypePartsSeq(subject) {
 				if type_checking.IsTypeFlagSet(unionPart, checker.TypeFlagsNull) ||

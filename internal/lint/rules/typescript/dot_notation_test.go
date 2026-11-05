@@ -143,7 +143,10 @@ func TestDotNotationOptionsDecode(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	options := decoded.(DotNotationOptions)
+	options, isType := decoded.(DotNotationOptions)
+	if !isType {
+		test.Fatalf("decoding the options gave %T, expected DotNotationOptions", decoded)
+	}
 	if options.AllowKeywords == nil || !*options.AllowKeywords ||
 		options.AllowIndexSignaturePropertyAccess || options.AllowPrivateClassPropertyAccess || options.AllowProtectedClassPropertyAccess {
 		test.Errorf("the defaults are %+v", options)

@@ -110,7 +110,10 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 			if err != nil {
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
 			}
-			options := decoded.(PreferNullishCoalescingOptions)
+			options, isType := decoded.(PreferNullishCoalescingOptions)
+			if !isType {
+				test.Fatalf("decoding the options gave %T, expected PreferNullishCoalescingOptions", decoded)
+			}
 			if options.IgnorePrimitives != testCase.want {
 				test.Errorf("expected %#v, got %#v", testCase.want, options.IgnorePrimitives)
 			}
@@ -178,7 +181,11 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
 			}
 			if testCase.check != nil {
-				testCase.check(test, decoded.(PreferNullishCoalescingOptions))
+				options, isType := decoded.(PreferNullishCoalescingOptions)
+				if !isType {
+					test.Fatalf("decoding the options gave %T, expected PreferNullishCoalescingOptions", decoded)
+				}
+				testCase.check(test, options)
 			}
 		})
 	}
@@ -192,7 +199,6 @@ type preferNullishCoalescingCase struct {
 	source      string
 	optionsJson string
 	findings    int
-	reason      string
 }
 
 func runPreferNullishCoalescing(test *testing.T, testCase preferNullishCoalescingCase) rule_testing.Result {
