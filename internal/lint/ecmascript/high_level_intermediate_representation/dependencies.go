@@ -1392,7 +1392,7 @@ func (collector *dependencyCollector) handleInstruction(instruction *Instruction
 		collector.declare(instructionValue.LValue.Identifier, decl)
 	case *Destructure:
 		collector.visitDependency(collector.temporaries.resolve(instructionValue.Value))
-		// The shared `eachPatternPlace` yields defaults and computed keys as USES alongside the
+		// The shared `eachPatternPlace` yields defaults and computed keys as uses alongside the
 		// bindings, which is richer than upstream's `eachPatternOperand` and exactly right here: a
 		// default value is read by the destructure and is a genuine dependency.
 		eachPatternPlace(instructionValue.LValue, func(place Place, role PlaceRole) {

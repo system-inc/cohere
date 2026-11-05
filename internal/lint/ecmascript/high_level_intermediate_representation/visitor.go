@@ -176,7 +176,7 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 		// No places.
 	case *StartMemoize:
 		for _, dep := range typed.Deps {
-			// A global-rooted dependency carries a NAME rather than a place, so it holds a zero
+			// A global-rooted dependency carries a name rather than a place, so it holds a zero
 			// `Place` that names no identifier. Visiting it would hand every operand consumer an
 			// identifier id of zero, which single-assignment renaming would then treat as a real
 			// binding.
@@ -296,7 +296,7 @@ func EachSuccessor(terminal Terminal, visit func(block static_single_assignment.
 		for _, kase := range typed.Cases {
 			visitReal(kase.Block)
 		}
-		// A switch with no default can fall past every case, so the fallthrough IS an edge here.
+		// A switch with no default can fall past every case, so the fallthrough is an edge here.
 		if !hasDefaultCase(typed.Cases) {
 			visitReal(typed.Fallthrough)
 		}

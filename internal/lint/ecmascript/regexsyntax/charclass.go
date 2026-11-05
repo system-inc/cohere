@@ -371,7 +371,7 @@ func parseRegexCharacterClass(
 			index += step
 
 		case character == '[' && flags.UnicodeSets:
-			// v-flag nested class — emit as breaker; caller recurses via
+			// v-flag nested class: emit as breaker; caller recurses via
 			// IterateRegexCharacterClasses to parse nested contents.
 			nestedEnd, ok := ClassEnd(pattern, index, flags)
 			if !ok {
@@ -385,7 +385,7 @@ func parseRegexCharacterClass(
 			flags.UnicodeSets &&
 			index+1 < len(pattern) &&
 			pattern[index+1] == character:
-			// v-flag set operator `--` or `&&` — breaker
+			// v-flag set operator `--` or `&&`: breaker
 			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: index, End: index + 2})
 			index += 2
 			pendingIndex = -1
@@ -586,7 +586,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 		}
 		return RegexCharElement{}, 0, false
 	}
-	// Identity escape — value is the (possibly multi-byte) character after `\`.
+	// Identity escape: value is the (possibly multi-byte) character after `\`.
 	character, size := utf8.DecodeRuneInString(pattern[index+1:])
 	if size == 0 {
 		return RegexCharElement{}, 0, false
@@ -601,7 +601,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 
 // readRawClassChar reads a non-`\`-prefixed character inside a class body
 // (i.e. a raw character at pattern[index]). Raw astral in non-u/v mode emits
-// the HIGH surrogate only — callers handle the low-surrogate companion by
+// the high surrogate only: callers handle the low-surrogate companion by
 // inspecting IsLoneSurrogate and stepping via a subsequent call.
 //
 // To keep the protocol simple, ParseRegexCharacterClass calls this once and

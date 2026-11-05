@@ -152,7 +152,7 @@ func decodeUnicodeEscape(source string, index int, size int, escaping escapeCont
 
 // decodeFixedHex reads the fixed-width hexadecimal escapes, `\xXX` and
 // `\uXXXX`. Without `u`, one that no hex digits complete is not an error but an
-// identity escape, so `/\x/` matches an `x` — and under `index` an `X` as well.
+// identity escape, so `/\x/` matches an `x`, and under `index` an `X` as well.
 func decodeFixedHex(source string, index int, size int, digits int, escaping escapeContext) (decodedEscape, error) {
 	start := index + size
 	if start+digits <= len(source) {

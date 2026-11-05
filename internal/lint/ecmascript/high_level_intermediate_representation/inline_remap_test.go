@@ -14,7 +14,7 @@ import (
 //
 // Two properties are load-bearing and neither is incidental. The nested body branches, so it holds
 // more than one block and its terminals name blocks -- a single-block body has no reference a
-// skipped remap could leave stale. And the PARENT branches before it ever reaches the call, which
+// skipped remap could leave stale. And the parent branches before it ever reaches the call, which
 // pushes the parent's own block ids past the low numbers a freshly lowered nested body starts at.
 // Measured: with a straight-line parent, the two id spaces coincided exactly, so a mutation that
 // skipped the block remap left ids that were still inside the copied set and the test passed. The

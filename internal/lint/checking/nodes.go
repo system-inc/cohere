@@ -76,7 +76,7 @@ func TypeRecurser(subjectType *checker.Type, predicate func(subjectType *checker
 	return predicate(subjectType)
 }
 
-// SUPER DIRTY HACK FOR OPTIONAL FIELDS :(
+// Super dirty hack for optional fields :(
 func Ref[T any](value T) *T {
 	// A copy of its own, so the pointer handed out reaches nothing the caller passed.
 	copied := value
