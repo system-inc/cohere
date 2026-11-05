@@ -10,128 +10,161 @@
 
 package values
 
-import "github.com/system-inc/cohere/internal/format/estree"
+import (
+	"math"
 
-// newRaws is Node's `this.raws = { before: "", after: "" }`.
-func newRaws() map[string]any {
-	return map[string]any{"before": "", "after": ""}
+	"github.com/system-inc/cohere/internal/format/estree"
+)
+
+// sourceSpan is a node's source, { start: { line, column }, end: { line, column } }, as the parser
+// computes it. Columns are in UTF-16 units, the library's own. The end column is NaN where upstream
+// computes it from an undefined variable; no start column ever is.
+type sourceSpan struct {
+	startLine   int
+	startColumn int
+	endLine     int
+	endColumn   int
+	// endColumnIsNaN is an end column computed from an undefined `next`.
+	endColumnIsNaN bool
 }
 
-// position is a source start or end: { line, column }. column is in UTF-16 units, the library's own,
-// and is NaN (a float64) where upstream computes it from an undefined variable.
-func position(line int, column any) map[string]any {
-	return map[string]any{"line": line, "column": column}
-}
-
-func source(start map[string]any, end map[string]any) map[string]any {
-	return map[string]any{"start": start, "end": end}
+// setSource writes nodeSource into node.source as the plain object the glue reads. A constructor holds
+// the key with nil in its place, so Set keeps it where JavaScript assigns it. The objects are built
+// only here, where they are handed to the node; the parser carries the typed sourceSpan.
+func setSource(node *estree.Node, nodeSource sourceSpan) {
+	end := map[string]any{"line": nodeSource.endLine, "column": nodeSource.endColumn}
+	if nodeSource.endColumnIsNaN {
+		end["column"] = math.NaN()
+	}
+	node.Set("source", map[string]any{
+		"start": map[string]any{"line": nodeSource.startLine, "column": nodeSource.startColumn},
+		"end":   end,
+	})
 }
 
 // Root: Container with type 'root'.
 func newRoot() *estree.Node {
-	return estree.New("root", 0, 0, "raws", newRaws(), "nodes", []*estree.Node{})
+	return estree.New("root", 0, 0, "raws", map[string]any{"before": "", "after": ""}, "nodes", []*estree.Node{})
 }
 
 // Value: Container with type 'value' and unbalanced 0.
 func newValue() *estree.Node {
-	return estree.New("value", 0, 0, "raws", newRaws(), "nodes", []*estree.Node{}, "unbalanced", float64(0))
+	return estree.New(
+		"value",
+		0,
+		0,
+		"raws",
+		map[string]any{"before": "", "after": ""},
+		"nodes",
+		[]*estree.Node{},
+		"unbalanced",
+		float64(0),
+	)
 }
 
 // leaf builds the Node subclasses that take { value, source, sourceIndex }: colon, comma, operator,
 // unicode-range and word.
-func leaf(nodeType string, value string, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New(
+func leaf(nodeType string, value string, nodeSource sourceSpan, sourceIndex int) *estree.Node {
+	node := estree.New(
 		nodeType,
 		0,
 		0,
 		"raws",
-		newRaws(),
+		map[string]any{"before": "", "after": ""},
 		"value",
 		value,
 		"source",
-		nodeSource,
+		nil,
 		"sourceIndex",
 		sourceIndex,
 	)
+	setSource(node, nodeSource)
+	return node
 }
 
 // Paren: Node with type 'paren' and parenType "".
-func newParen(value string, nodeSource map[string]any, sourceIndex int) *estree.Node {
+func newParen(value string, nodeSource sourceSpan, sourceIndex int) *estree.Node {
 	node := leaf("paren", value, nodeSource, sourceIndex)
 	node.Set("parenType", "")
 	return node
 }
 
 // Comment: Node with type 'comment' and inline from its options.
-func newComment(value string, inline bool, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New(
+func newComment(value string, inline bool, nodeSource sourceSpan, sourceIndex int) *estree.Node {
+	node := estree.New(
 		"comment",
 		0,
 		0,
 		"raws",
-		newRaws(),
+		map[string]any{"before": "", "after": ""},
 		"value",
 		value,
 		"inline",
 		inline,
 		"source",
-		nodeSource,
+		nil,
 		"sourceIndex",
 		sourceIndex,
 	)
+	setSource(node, nodeSource)
+	return node
 }
 
 // AtWord: Container with type 'atword'.
-func newAtWord(value string, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New(
+func newAtWord(value string, nodeSource sourceSpan, sourceIndex int) *estree.Node {
+	node := estree.New(
 		"atword",
 		0,
 		0,
 		"raws",
-		newRaws(),
+		map[string]any{"before": "", "after": ""},
 		"value",
 		value,
 		"source",
-		nodeSource,
+		nil,
 		"sourceIndex",
 		sourceIndex,
 		"nodes",
 		[]*estree.Node{},
 	)
+	setSource(node, nodeSource)
+	return node
 }
 
 // NumberNode: Node with type 'number' and unit from its options, or "".
-func newNumber(value string, nodeSource map[string]any, sourceIndex int, unit string) *estree.Node {
-	return estree.New(
+func newNumber(value string, nodeSource sourceSpan, sourceIndex int, unit string) *estree.Node {
+	node := estree.New(
 		"number",
 		0,
 		0,
 		"raws",
-		newRaws(),
+		map[string]any{"before": "", "after": ""},
 		"value",
 		value,
 		"source",
-		nodeSource,
+		nil,
 		"sourceIndex",
 		sourceIndex,
 		"unit",
 		unit,
 	)
+	setSource(node, nodeSource)
+	return node
 }
 
 // FunctionNode: Container with type 'func', unbalanced starting at -1 so the parser knows no parens
 // have been added yet.
-func newFunc(value string, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New(
+func newFunc(value string, nodeSource sourceSpan, sourceIndex int) *estree.Node {
+	node := estree.New(
 		"func",
 		0,
 		0,
 		"raws",
-		newRaws(),
+		map[string]any{"before": "", "after": ""},
 		"value",
 		value,
 		"source",
-		nodeSource,
+		nil,
 		"sourceIndex",
 		sourceIndex,
 		"nodes",
@@ -139,48 +172,62 @@ func newFunc(value string, nodeSource map[string]any, sourceIndex int) *estree.N
 		"unbalanced",
 		float64(-1),
 	)
+	setSource(node, nodeSource)
+	return node
 }
 
 // StringNode: Node with type 'string' and quoted from its options.
-func newString(value string, nodeSource map[string]any, sourceIndex int, quoted bool) *estree.Node {
-	return estree.New(
+func newString(value string, nodeSource sourceSpan, sourceIndex int, quoted bool) *estree.Node {
+	node := estree.New(
 		"string",
 		0,
 		0,
 		"raws",
-		newRaws(),
+		map[string]any{"before": "", "after": ""},
 		"value",
 		value,
 		"source",
-		nodeSource,
+		nil,
 		"sourceIndex",
 		sourceIndex,
 		"quoted",
 		quoted,
 	)
+	setSource(node, nodeSource)
+	return node
 }
 
-// raws is node.raws.
-func raws(node *estree.Node) map[string]any {
+// rawString is node.raws[key], which this package only ever holds as a string.
+func rawString(node *estree.Node, key string) string {
 	nodeRaws, isMap := node.Get("raws").(map[string]any)
 	if !isMap {
-		// Invariant: every constructor above sets raws to newRaws(); Parse recovers the panic into an
+		// Invariant: every constructor above sets raws to an object; Parse recovers the panic into an
 		// error.
 		panic("css values: node.raws is not an object")
 	}
-	return nodeRaws
+	raw, isString := nodeRaws[key].(string)
+	if !isString {
+		// Invariant: the parser reads only before and after, which every constructor sets to "" and
+		// every append keeps a string; Parse recovers the panic into an error.
+		panic("css values: node.raws." + key + " is not a string")
+	}
+	return raw
+}
+
+// setRaw is node.raws[key] = text.
+func setRaw(node *estree.Node, key string, text string) {
+	nodeRaws, isMap := node.Get("raws").(map[string]any)
+	if !isMap {
+		// Invariant: every constructor above sets raws to an object; Parse recovers the panic into an
+		// error.
+		panic("css values: node.raws is not an object")
+	}
+	nodeRaws[key] = text
 }
 
 // appendRaw is node.raws[key] += text.
 func appendRaw(node *estree.Node, key string, text string) {
-	nodeRaws := raws(node)
-	raw, isString := nodeRaws[key].(string)
-	if !isString {
-		// Invariant: the parser appends only to before and after, which newRaws() sets to "" and every
-		// append keeps a string; Parse recovers the panic into an error.
-		panic("css values: node.raws." + key + " is not a string")
-	}
-	nodeRaws[key] = raw + text
+	setRaw(node, key, rawString(node, key)+text)
 }
 
 // appendNode is Container's append: node.parent = this; this.nodes.push(node).

@@ -21,7 +21,9 @@ func parseNodes(test *testing.T, text string) []*estree.Node {
 	return root.List("nodes")[0].List("nodes")
 }
 
-func sourceColumn(test *testing.T, node *estree.Node, edge string) any {
+// sourceColumn is node.source[edge].column, which the library holds as a number or NaN: the column, or
+// isNaN for NaN. Any other value fails the test.
+func sourceColumn(test *testing.T, node *estree.Node, edge string) (int, bool) {
 	test.Helper()
 	nodeSource, isMap := node.Get("source").(map[string]any)
 	if !isMap {
@@ -31,7 +33,16 @@ func sourceColumn(test *testing.T, node *estree.Node, edge string) any {
 	if !isMap {
 		test.Fatalf("%s source %s %v, want a {line, column} object", node.Type(), edge, nodeSource[edge])
 	}
-	return edgePosition["column"]
+	switch column := edgePosition["column"].(type) {
+	case int:
+		return column, false
+	case float64:
+		if math.IsNaN(column) {
+			return 0, true
+		}
+	}
+	test.Fatalf("%s source %s column %#v, want an int or NaN", node.Type(), edge, edgePosition["column"])
+	return 0, false
 }
 
 // TestParseShapes checks, without node, the fields the oracle found that are easiest to get wrong:
@@ -59,12 +70,12 @@ func TestParseShapes(test *testing.T) {
 		)
 	}
 	// --foo is "--" and "foo" merged, indexed at "foo"; loc.js's fixValueWordLoc undoes that.
-	if nodes[1].String("value") != "--foo" || nodes[1].Get("sourceIndex") != 7 || raws(nodes[1])["before"] != " " {
+	if nodes[1].String("value") != "--foo" || nodes[1].Get("sourceIndex") != 7 || rawString(nodes[1], "before") != " " {
 		test.Errorf(
 			"--foo: got value %q sourceIndex %v raws %v",
 			nodes[1].String("value"),
 			nodes[1].Get("sourceIndex"),
-			raws(nodes[1]),
+			nodes[1].Get("raws"),
 		)
 	}
 	// A function holds its parens and arguments, and is balanced again at the end.
@@ -83,12 +94,12 @@ func TestParseShapes(test *testing.T) {
 	if !nodes[3].Bool("isHex") || !nodes[3].Bool("isColor") {
 		test.Errorf("#fff: want isHex and isColor")
 	}
-	if nodes[4].String("value") != "a" || !nodes[4].Bool("quoted") || raws(nodes[4])["quote"] != "\"" {
+	if nodes[4].String("value") != "a" || !nodes[4].Bool("quoted") || rawString(nodes[4], "quote") != "\"" {
 		test.Errorf(
 			"string: got %q quoted %v raws %v",
 			nodes[4].String("value"),
 			nodes[4].Get("quoted"),
-			raws(nodes[4]),
+			nodes[4].Get("raws"),
 		)
 	}
 	if nodes[5].String("value") != " c " || nodes[5].Bool("inline") {
@@ -97,23 +108,25 @@ func TestParseShapes(test *testing.T) {
 
 	// A value opening with a paren ends that paren at column NaN; the next paren reuses a stale end.
 	parens := parseNodes(test, "(a)")
-	if column, isFloat := sourceColumn(test, parens[0], "end").(float64); !isFloat || !math.IsNaN(column) {
-		test.Errorf("first paren end column: want NaN, got %v", sourceColumn(test, parens[0], "end"))
+	if column, isNaN := sourceColumn(test, parens[0], "end"); !isNaN {
+		test.Errorf("first paren end column: want NaN, got %v", column)
 	}
-	if sourceColumn(test, parens[2], "end") != 2 {
-		test.Errorf("closing paren end column: want 2, got %v", sourceColumn(test, parens[2], "end"))
+	if column, isNaN := sourceColumn(test, parens[2], "end"); isNaN || column != 2 {
+		test.Errorf("closing paren end column: want 2, got %v (NaN %v)", column, isNaN)
 	}
 
 	// sourceIndex is bytes; columns stay UTF-16 units.
 	multibyte := parseNodes(test, "\xc3\xa9 \xf0\x9f\x98\x80x b")
-	if multibyte[1].Get("sourceIndex") != 3 ||
+	if column, isNaN := sourceColumn(test, multibyte[2], "start"); multibyte[1].Get("sourceIndex") != 3 ||
 		multibyte[2].Get("sourceIndex") != 9 ||
-		sourceColumn(test, multibyte[2], "start") != 7 {
+		isNaN ||
+		column != 7 {
 		test.Errorf(
-			"non-ASCII: got sourceIndex %v and %v, column %v",
+			"non-ASCII: got sourceIndex %v and %v, column %v (NaN %v)",
 			multibyte[1].Get("sourceIndex"),
 			multibyte[2].Get("sourceIndex"),
-			sourceColumn(test, multibyte[2], "start"),
+			column,
+			isNaN,
 		)
 	}
 
