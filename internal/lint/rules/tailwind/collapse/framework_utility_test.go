@@ -226,6 +226,7 @@ func formatReading(reading Reading) string {
 	if len(reading.Order) == 0 {
 		return "[]#" + itoa(reading.Count)
 	}
+	// Ignored: Order is a slice of ints, which json.Marshal cannot fail to encode.
 	raw, _ := json.Marshal(reading.Order)
 	return string(raw) + "#" + itoa(reading.Count)
 }

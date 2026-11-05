@@ -247,6 +247,12 @@ func (registry *VariantRegistry) Registrations() []VariantRegistration {
 	return registrations
 }
 
+// unregisteredVariantOrder ranks a root the registry has never seen, past every registered one.
+//
+// Upstream cannot reach this state, so the value is cohere's own and is chosen to be far past any
+// plausible registration count rather than to mean anything.
+const unregisteredVariantOrder = 1 << 24
+
 // Compare orders two parsed variants, porting upstream's `Variants.compare`.
 //
 // The branch order is upstream's and every step of it is observable:
@@ -365,12 +371,6 @@ func (registry *VariantRegistry) Compare(left *ParsedVariant, right *ParsedVaria
 	}
 	return 1
 }
-
-// unregisteredVariantOrder ranks a root the registry has never seen, past every registered one.
-//
-// Upstream cannot reach this state, so the value is cohere's own and is chosen to be far past any
-// plausible registration count rather than to mean anything.
-const unregisteredVariantOrder = 1 << 24
 
 // variantsAreEqual reports whether two parsed variants are the same variant.
 //
@@ -498,11 +498,11 @@ func (registry *VariantRegistry) BuildVariantOrder(variants []ParsedVariant) *Ru
 // irrelevant to the result, but keeping it faithful means a future reader diffing the population
 // against the engine's cache sees the same sequence rather than a reordering they have to explain.
 func appendVariantAndNested(population []ParsedVariant, variant ParsedVariant) []ParsedVariant {
-	population = append(population, variant)
+	grown := append(population, variant)
 	if variant.Variant != nil {
-		population = appendVariantAndNested(population, *variant.Variant)
+		grown = appendVariantAndNested(grown, *variant.Variant)
 	}
-	return population
+	return grown
 }
 
 // Len reports how many distinct variants the order holds.

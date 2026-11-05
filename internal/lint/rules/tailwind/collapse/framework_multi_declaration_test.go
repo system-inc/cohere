@@ -200,7 +200,9 @@ func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(test *testing.T) {
 	}
 
 	theme := NewTheme()
-	theme.Add("--ease-initial", "cubic-bezier(0,0,1,1)", 0)
+	if addError := theme.Add("--ease-initial", "cubic-bezier(0,0,1,1)", 0); addError != nil {
+		test.Fatalf("Add(%q): %v", "--ease-initial", addError)
+	}
 
 	candidate := ParsedCandidate{
 		Kind:  ParsedCandidateKindFunctional,

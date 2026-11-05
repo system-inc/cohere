@@ -112,7 +112,7 @@ func ParseValue(input string) []ValueNode {
 	// one-character separator rather than a two-character one. A lone `\r` is untouched and falls
 	// through to the default branch as an ordinary character, which is why this is a replace
 	// rather than a general newline normalisation.
-	input = strings.ReplaceAll(input, "\r\n", "\n")
+	normalized := strings.ReplaceAll(input, "\r\n", "\n")
 
 	ast := []ValueNode{}
 
@@ -166,14 +166,14 @@ func ParseValue(input string) []ValueNode {
 		buffer.Reset()
 	}
 
-	for index := 0; index < len(input); index++ {
-		character := input[index]
+	for index := 0; index < len(normalized); index++ {
+		character := normalized[index]
 
 		switch {
 		// A `\` escapes the next character: both are consumed into the buffer, and neither is
 		// examined. This is what keeps `a\(b` from opening a function and `a\ b` from splitting.
 		case character == valueBackslash:
-			if index+1 < len(input) {
+			if index+1 < len(normalized) {
 				// One byte, not one rune, and the two are provably indistinguishable here.
 				// Upstream indexes by UTF-16 code unit, so for a character outside the BMP it
 				// consumes only the high surrogate and lets the low surrogate fall to the default
@@ -183,7 +183,7 @@ func ParseValue(input string) []ValueNode {
 				// arrives in the buffer whole. Verified by parsing every string of length 1 to 3
 				// over an alphabet of backslash, quotes, parens, separators and multi-byte
 				// characters against the engine: 2,379 inputs, no disagreement under either rule.
-				buffer.WriteString(input[index : index+2])
+				buffer.WriteString(normalized[index : index+2])
 				index++
 			} else {
 				// A trailing backslash reads one past the end. In JavaScript that is `undefined`,
@@ -196,31 +196,31 @@ func ParseValue(input string) []ValueNode {
 		// `theme(colors.red.500/10)`, where the slash carries meaning and has no spaces around it.
 		case character == valueSlash:
 			flushBuffer()
-			push(ValueNode{Kind: ValueNodeKindWord, Value: string(input[index])})
+			push(ValueNode{Kind: ValueNodeKindWord, Value: string(normalized[index])})
 
 		// A run of separator characters becomes one separator node holding the run verbatim.
 		case isValueSeparator(character):
 			flushBuffer()
 			start := index
 			end := index + 1
-			for ; end < len(input); end++ {
-				if !isValueSeparator(input[end]) {
+			for ; end < len(normalized); end++ {
+				if !isValueSeparator(normalized[end]) {
 					break
 				}
 			}
 			index = end - 1
-			push(ValueNode{Kind: ValueNodeKindSeparator, Value: input[start:end]})
+			push(ValueNode{Kind: ValueNodeKindSeparator, Value: normalized[start:end]})
 
 		// A quoted string is taken whole into the buffer, closing only on a matching quote, so a
 		// `'` inside a `"` string does not end it and a font name keeps its commas.
 		case character == valueSingleQuote || character == valueDoubleQuote:
 			start := index
-			for scan := index + 1; scan < len(input); scan++ {
-				if input[scan] == valueBackslash {
+			for scan := index + 1; scan < len(normalized); scan++ {
+				if normalized[scan] == valueBackslash {
 					scan++
 					continue
 				}
-				if input[scan] == character {
+				if normalized[scan] == character {
 					index = scan
 					break
 				}
@@ -231,7 +231,7 @@ func ParseValue(input string) []ValueNode {
 			// end of input instead would swallow the tail, which agrees with the engine on
 			// `"unterminated` and disagrees on every unterminated string that contains a
 			// separator.
-			buffer.WriteString(input[start : index+1])
+			buffer.WriteString(normalized[start : index+1])
 
 		// A `(` opens a function whose name is whatever the buffer held, which is empty for a bare
 		// `(` and for a `(` right after a separator.
