@@ -125,8 +125,10 @@ func main() {
 		fail("write %s: %v", *output, writeError)
 	}
 
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(os.Stderr, "generate_statics: %d design systems, %d statics registered by all of them (%d dropped as repository-specific)\n",
 		len(systems), len(shared), len(dropped))
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Fprintf(os.Stderr, "  dropped: %s\n", strings.Join(firstFew(dropped, 8), ", "))
 }
 
@@ -284,6 +286,7 @@ func firstFew(values []string, count int) []string {
 }
 
 func fail(format string, arguments ...any) {
+	// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 	fmt.Fprintf(os.Stderr, "generate_statics: "+format+"\n", arguments...)
 	os.Exit(1)
 }

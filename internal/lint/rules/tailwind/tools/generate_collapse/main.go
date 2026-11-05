@@ -249,13 +249,16 @@ func main() {
 	flag.Parse()
 
 	if *entryPoint == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_collapse: -entry-point is required")
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  example: go run ./internal/lint/rules/tailwind/tools/generate_collapse -entry-point ~/Projects/ahra/app/_theme/styles/theme.css")
 		os.Exit(2)
 	}
 
 	result, err := enumerate(*entryPoint, *resolveRoot)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
 		os.Exit(1)
 	}
@@ -265,21 +268,29 @@ func main() {
 	// called without `collapse: true`, so an options mistake enumerates zero families and writes an
 	// empty table that no test would obviously reject.
 	if len(result.Families) == 0 {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_collapse: the engine reported no collapse families at all.")
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  That is almost certainly a broken enumeration rather than a Tailwind with no shorthands.")
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  Check that canonicalizeCandidates is being called with {collapse: true}.")
 		os.Exit(1)
 	}
 	if len(result.PhysicalOnlyFamilies) > 0 {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_collapse: these pairs collapse only with logicalToPhysical off, which the table cannot record:")
 		for _, entry := range result.PhysicalOnlyFamilies {
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintf(os.Stderr, "  %s\n", entry.signature())
 		}
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  CollapseFamily needs a way to say so before this Tailwind can be enumerated.")
 		os.Exit(1)
 	}
 	if result.FunctionalRoots < 100 {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_collapse: only %d functional roots discovered, which is too few to be the real registry.\n", result.FunctionalRoots)
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  A table built from a partial registry is silently missing families.")
 		os.Exit(1)
 	}
@@ -309,10 +320,12 @@ func main() {
 		other := parseDesignSystemInput(raw)
 		otherResult, enumerateError := enumerate(other.entryPoint, other.resolveRoot)
 		if enumerateError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_collapse: enumerating %s for the invariance check: %v\n", other.entryPoint, enumerateError)
 			os.Exit(1)
 		}
 		if otherResult.TailwindVersion != result.TailwindVersion {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_collapse: %s is Tailwind %s and %s is Tailwind %s; refusing to compare engines.\n",
 				*entryPoint, result.TailwindVersion, other.entryPoint, otherResult.TailwindVersion)
 			os.Exit(1)
@@ -322,21 +335,29 @@ func main() {
 		// names, which is the exact failure this check exists to have caught. Refused rather than
 		// counted, because a zero from it looks identical to a real one.
 		if otherResult.FunctionalRoots == result.FunctionalRoots && otherResult.PairsProbed == result.PairsProbed {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_collapse: %s and %s produce the same registry (%d roots, %d pairs).\n",
 				*entryPoint, other.entryPoint, result.FunctionalRoots, result.PairsProbed)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  Two design systems that cannot differ cannot cohere invariance; they are one observation under two names.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  Every repository here vendors the Structure submodule and imports its global.css, so any two of them share a @theme.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  Use internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing.")
 			os.Exit(1)
 		}
 
 		if familySignature(otherResult.Families) != familySignature(result.Families) {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_collapse: CollapseFamilies is NOT repository-invariant.\n")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintf(os.Stderr, "  %s reports %d families; %s reports %d.\n",
 				*entryPoint, len(result.Families), other.entryPoint, len(otherResult.Families))
 			for _, line := range differingFamilies(result.Families, otherResult.Families) {
+				// Ignored: the rest of the same message, and the same exit code says it either way.
 				fmt.Fprintf(os.Stderr, "  %s\n", line)
 			}
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  The table cannot ship as a framework fact. This finding is worth more than the confirmation.")
 			os.Exit(1)
 		}
@@ -346,12 +367,14 @@ func main() {
 
 	rendered, err := render(result)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
 		os.Exit(1)
 	}
 
 	orderRendered, err := renderOrder(result)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
 		os.Exit(1)
 	}
@@ -379,27 +402,35 @@ func main() {
 		} {
 			committed, readError := os.ReadFile(file.path)
 			if readError != nil {
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 				fmt.Fprintf(os.Stderr, "generate_collapse: cannot read %s to check it: %v\n", file.path, readError)
 				os.Exit(1)
 			}
 			if !bytes.Equal(committed, file.rendered) {
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 				fmt.Fprintf(os.Stderr, "generate_collapse: %s is stale for Tailwind %s.\n", file.path, result.TailwindVersion)
+				// Ignored: the rest of the same message, and the same exit code says it either way.
 				fmt.Fprintf(os.Stderr, "  %s\n", file.stale)
+				// Ignored: the rest of the same message, and the same exit code says it either way.
 				fmt.Fprintln(os.Stderr, "  Regenerate it and read the diff: what changed is what this upgrade changed.")
 				os.Exit(1)
 			}
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_collapse: %s and %s are current for Tailwind %s (%d families, %d ordered properties).\n",
 			*output, orderPath, result.TailwindVersion, len(result.Families), len(result.PropertyOrder))
 		return
 	}
 	if writeError := os.WriteFile(orderPath, orderRendered, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", writeError)
 		os.Exit(1)
 	}
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s — %d ordered properties.\n", orderPath, len(result.PropertyOrder))
 
 	if writeError := os.WriteFile(*output, rendered, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", writeError)
 		os.Exit(1)
 	}
@@ -408,13 +439,17 @@ func main() {
 	// a reason nobody could infer from its absence. Four bugs in this generator were exactly that,
 	// so the count is printed rather than left for someone to notice.
 	if len(result.UnreachableRoots) > 0 {
+		// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 		fmt.Fprintf(os.Stderr, "generate_collapse: %d roots were unreachable by every probe value and are absent from the tables:\n", len(result.UnreachableRoots))
 		for _, root := range result.UnreachableRoots {
+			// Ignored: the rest of the same summary, which changes nothing already written.
 			fmt.Fprintf(os.Stderr, "  %s\n", root)
 		}
+		// Ignored: the rest of the same summary, which changes nothing already written.
 		fmt.Fprintln(os.Stderr, "  Each needs a probe value it accepts, or it is silently missing rather than known to have nothing.")
 	}
 
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s — Tailwind %s, %d families from %d pairs over %d roots.\n",
 		*output, result.TailwindVersion, len(result.Families), result.PairsProbed, result.FunctionalRoots)
 }

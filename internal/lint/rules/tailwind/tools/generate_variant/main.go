@@ -55,12 +55,14 @@ func main() {
 	flag.Parse()
 
 	if *packageRoot == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "-package-root is required")
 		os.Exit(2)
 	}
 
 	generated, enumerateError := enumerate(*packageRoot, *corpusFile, *maximumClassLists)
 	if enumerateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "enumerate: %v\n", enumerateError)
 		os.Exit(1)
 	}
@@ -68,19 +70,23 @@ func main() {
 	if *check {
 		committed, readError := os.ReadFile(*output)
 		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "%s is stale: the engine now orders variants differently. Re-run without -check and read the diff.\n", *output)
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
 		return
 	}
 
 	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
@@ -103,10 +109,12 @@ func main() {
 		} `json:"cases"`
 	}
 	if decodeError := json.Unmarshal(generated, &summary); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "summarize: %v\n", decodeError)
 		os.Exit(1)
 	}
 
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(
 		os.Stderr,
 		"wrote %s: tailwind %s, %d synthetic and %d repository cases\n",
@@ -120,6 +128,7 @@ func main() {
 			continue
 		}
 		if len(aCase.Registry.Entries) > 0 {
+			// Ignored: the rest of the same summary, which changes nothing already written.
 			fmt.Fprintf(os.Stderr, "  %s: %d registered variants\n", aCase.Name, len(aCase.Registry.Entries))
 		}
 		if len(aCase.ClassLists) > 0 {
@@ -127,6 +136,7 @@ func main() {
 			for _, classList := range aCase.ClassLists {
 				classes += len(classList.Classes)
 			}
+			// Ignored: the rest of the same summary, which changes nothing already written.
 			fmt.Fprintf(os.Stderr, "  %s: %d class lists, %d classes\n", aCase.Name, len(aCase.ClassLists), classes)
 		}
 	}
@@ -173,6 +183,7 @@ func enumerate(packageRoot, corpusPath string, maximumClassLists int) ([]byte, e
 		if writeError := os.WriteFile(harvestedPath, harvested, 0o644); writeError != nil {
 			return nil, fmt.Errorf("write harvested corpus: %w", writeError)
 		}
+		// Ignored: a harvested corpus left behind fails nothing, and the next run writes over it.
 		defer os.Remove(harvestedPath)
 		arguments = append(arguments, harvestedPath)
 	}

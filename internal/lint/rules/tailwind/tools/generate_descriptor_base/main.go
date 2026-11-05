@@ -154,10 +154,12 @@ func main() {
 	flag.Parse()
 
 	if len(inputPaths) == 0 || *outputPath == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_descriptor_base: -input and -output are required")
 		os.Exit(2)
 	}
 	if len(inputPaths) != len(contextPaths) {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: %d -input and %d -context; they pair up one to one\n",
 			len(inputPaths), len(contextPaths))
 		os.Exit(2)
@@ -166,6 +168,7 @@ func main() {
 	// one extraction every per-repository token looks invariant, and this command would print them
 	// as framework facts, which is precisely the bug the port exists to remove.
 	if len(inputPaths) < 2 {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_descriptor_base: at least two design systems are required; one cannot separate the framework from a repository")
 		os.Exit(2)
 	}
@@ -176,16 +179,19 @@ func main() {
 		readJSON(inputPaths[index], &loaded.table)
 		readJSON(contextPaths[index], &loaded.context)
 		if len(loaded.table.Roots) == 0 || len(loaded.table.Statics) == 0 || loaded.table.TailwindVersion == "" {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s looks empty (%d roots, %d statics, version %q); refusing to generate\n",
 				inputPaths[index], len(loaded.table.Roots), len(loaded.table.Statics), loaded.table.TailwindVersion)
 			os.Exit(3)
 		}
 		if loaded.context.TailwindVersion != loaded.table.TailwindVersion {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s is Tailwind %s and %s is Tailwind %s; refusing to generate\n",
 				inputPaths[index], loaded.table.TailwindVersion, contextPaths[index], loaded.context.TailwindVersion)
 			os.Exit(3)
 		}
 		if loaded.table.TailwindVersion != systems0Version(systems) && len(systems) > 0 {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s is Tailwind %s and an earlier input is Tailwind %s; refusing to mix engines\n",
 				inputPaths[index], loaded.table.TailwindVersion, systems0Version(systems))
 			os.Exit(3)
@@ -197,6 +203,7 @@ func main() {
 
 	formatted, sourceError := format.Source(generated)
 	if sourceError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: generated file does not parse: %v\n", sourceError)
 		os.Exit(1)
 	}
@@ -204,6 +211,7 @@ func main() {
 	if *outputPath == "-" {
 		os.Stdout.Write(formatted)
 	} else if writeError := os.WriteFile(*outputPath, formatted, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", writeError)
 		os.Exit(1)
 	}
@@ -211,12 +219,16 @@ func main() {
 	// Printed on every run. The counts below are the measurement this file's shape rests on, so a
 	// future extraction that moves them says so out loud rather than silently printing a table with
 	// a different meaning.
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Printf("generate_descriptor_base: %d design systems, %d roots invariant across all of them (%d dropped as not shared)\n",
 		len(systems), stats.roots, stats.rootsDropped)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  namespace buckets: %d consumed identically by every system, %d equal to their axis @none and derived live, %d violations\n",
 		stats.consumedBuckets, stats.noneBuckets, stats.violations)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  %d framework namespaces, %d statics invariant (%d dropped as repository-specific)\n",
 		stats.frameworkNamespaces, stats.statics, stats.staticsDropped)
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  readings %d interned, output %s\n", stats.distinctReadings, humanSize(len(formatted)))
 }
 
@@ -230,10 +242,12 @@ func systems0Version(systems []system) string {
 func readJSON(path string, into any) {
 	raw, readError := os.ReadFile(path)
 	if readError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: reading %s: %v\n", path, readError)
 		os.Exit(1)
 	}
 	if decodeError := json.Unmarshal(raw, into); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: parsing %s: %v\n", path, decodeError)
 		os.Exit(1)
 	}
@@ -405,6 +419,7 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 						stats.noneBuckets++
 					default:
 						stats.violations++
+						// Ignored: each violation is told on the way to the refusal below, whose exit code says it either way.
 						fmt.Fprintf(os.Stderr,
 							"generate_descriptor_base: %s %s namespace %q reads %s, which is neither shared by every system nor equal to its axis @none (%s)\n",
 							root, axis.goName, key, readingKey(value), readingKey(noneReading))
@@ -416,6 +431,7 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 	// A violation means the two-way split this file encodes does not hold on these inputs, so the
 	// generated table would be wrong in a way no test names. Refuse rather than print it.
 	if stats.violations > 0 {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: %d namespace buckets fit neither half of the split; refusing to generate\n", stats.violations)
 		os.Exit(4)
 	}

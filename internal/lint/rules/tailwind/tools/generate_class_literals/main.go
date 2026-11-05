@@ -40,6 +40,7 @@ func main() {
 
 	toolDirectory, err := toolDirectory()
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "locating this tool: %v\n", err)
 		os.Exit(1)
 	}
@@ -51,6 +52,7 @@ func main() {
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if runError := command.Run(); runError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "node extract.mjs: %v\n%s", runError, stderr.String())
 		os.Exit(1)
 	}
@@ -61,12 +63,14 @@ func main() {
 		Cases            json.RawMessage `json:"cases"`
 	}
 	if decodeError := json.Unmarshal(stdout.Bytes(), &extracted); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "reading extract.mjs's output: %v\n", decodeError)
 		os.Exit(1)
 	}
 
 	defaults, err := indent(extracted.DefaultSelectors)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "default selectors: %v\n", err)
 		os.Exit(1)
 	}
@@ -77,11 +81,13 @@ func main() {
 		Cases  json.RawMessage `json:"cases"`
 	}{extracted.Plugin, extracted.Cases})
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "oracle: %v\n", err)
 		os.Exit(1)
 	}
 	oracle, err := indent(withoutDefaults)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "oracle: %v\n", err)
 		os.Exit(1)
 	}
@@ -98,16 +104,19 @@ func main() {
 		if *check {
 			committed, readError := os.ReadFile(output.path)
 			if readError != nil {
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 				fmt.Fprintf(os.Stderr, "read %s: %v\n", output.path, readError)
 				os.Exit(1)
 			}
 			if !bytes.Equal(committed, output.contents) {
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 				fmt.Fprintf(os.Stderr, "%s is stale: better-tailwindcss %s answers differently. Re-run without -check and read the diff.\n", output.path, extracted.Plugin)
 				stale = true
 			}
 			continue
 		}
 		if writeError := os.WriteFile(output.path, output.contents, 0o644); writeError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "write %s: %v\n", output.path, writeError)
 			os.Exit(1)
 		}
@@ -116,9 +125,11 @@ func main() {
 		os.Exit(1)
 	}
 	if *check {
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "both files match better-tailwindcss %s\n", extracted.Plugin)
 		return
 	}
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(os.Stderr, "wrote the default selectors and the oracle from better-tailwindcss %s\n", extracted.Plugin)
 }
 

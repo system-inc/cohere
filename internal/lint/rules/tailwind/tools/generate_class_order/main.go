@@ -64,6 +64,7 @@ func main() {
 
 	toolDirectory, err := toolDirectory()
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "locating this tool: %v\n", err)
 		os.Exit(1)
 	}
@@ -74,6 +75,7 @@ func main() {
 
 	generated, summary, err := build(toolDirectory, systemsPath)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "build: %v\n", err)
 		os.Exit(1)
 	}
@@ -81,28 +83,34 @@ func main() {
 	if *check {
 		committed, readError := os.ReadFile(*output)
 		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "%s is stale: the engine now reads at least one class differently. Re-run without -check and read the diff.\n", *output)
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "%s matches the engine\n", *output)
 		return
 	}
 
 	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
 
 	// Printed per system rather than totalled. Two numbers that differ say more than one number that
 	// does not, and the per-repository difference is the measurement this whole port argues from.
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(os.Stderr, "wrote %s (%.1f MB): tailwind %s, %d design systems\n",
 		*output, float64(len(generated))/(1024*1024), summary.TailwindVersion, len(summary.Systems))
 	for _, system := range summary.Systems {
+		// Ignored: the rest of the same summary, which changes nothing already written.
 		fmt.Fprintf(os.Stderr,
 			"  %s: %d registry classes (%d engine nulls), %d corpus classes (%d engine nulls), %d distinct readings, %d utility roots\n",
 			system.Name,
@@ -111,6 +119,7 @@ func main() {
 			system.Counts.DistinctReadings, len(system.Registration.UtilityRoots),
 		)
 	}
+	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Fprintf(os.Stderr,
 		"  design systems: %d shared registry classes, %d read differently, %d present in only one\n",
 		summary.Divergence.SharedClasses, summary.Divergence.DivergentReadings, summary.Divergence.UniqueToOneSystem,
@@ -121,6 +130,7 @@ func main() {
 	// true. If the two systems ever agreed on membership *and* on every reading, the fixture would
 	// still be green and would have stopped saying anything.
 	if summary.Divergence.UniqueToOneSystem == 0 && summary.Divergence.DivergentReadings == 0 {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr,
 			"  the two design systems no longer diverge at all, so this fixture no longer demonstrates that a per-repository table is required")
 		os.Exit(4)
