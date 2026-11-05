@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // rule configured as a bare "error" is handed nil: upstream's default is a working configuration
 // rather than a disabled one, so nil has to decode rather than fail.
 //
-// `RequiresOptions` is deliberately NOT set: the one option defaults false and the rule enforces
+// `RequiresOptions` is deliberately not set: the one option defaults false and the rule enforces
 // sorting without it.
 func init() {
 	rule.Register(rule.Registration{

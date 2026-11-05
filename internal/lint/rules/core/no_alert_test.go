@@ -19,7 +19,7 @@ const alertFile = "/repository/source/Alert.ts"
 // The clean list is almost entirely shadowing, in five different binding positions: a function
 // declaration, a var, a nested var, a parameter, and a var declared in an enclosing function. Read
 // against the reporting list they pair up, and the pairs are the whole point: `var alert = function()
-// {}; window.alert(foo)` REPORTS while `var alert = function() {}; alert();` is clean, because
+// {}; window.alert(foo)` reports while `var alert = function() {}; alert();` is clean, because
 // shadowing the name `alert` says nothing about the property `window.alert`.
 func TestNoAlertStaysSilent(test *testing.T) {
 	test.Parallel()
@@ -94,12 +94,12 @@ func TestNoAlertFires(test *testing.T) {
 
 // The two upstream reporting cases that are clean here, and the reason is not this rule.
 //
-// Upstream reports `this.alert(foo)` at the top level of a SCRIPT, where `this` is the global
+// Upstream reports `this.alert(foo)` at the top level of a script, where `this` is the global
 // object. Our harness pins `moduleDetection: "force"` in `internal/rule_testing/program.go` and our tree
 // is modules throughout, and in a module top-level `this` is `undefined` rather than the global.
 //
 // Measured on the installed rule rather than reasoned about: with `sourceType: "module"` both of
-// these come back CLEAN from upstream itself, and with `sourceType: "script"` both report. So this
+// these come back clean from upstream itself, and with `sourceType: "script"` both report. So this
 // is not a divergence in the port at all, it is the same rule reaching the same verdict about a
 // different kind of file, and no fixture in this tree can express the reporting half because the
 // tree cannot produce a script.
@@ -128,7 +128,7 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(test *testing.T) {
 		"window.alert(foo)"), "unexpected")
 }
 
-// Two upstream CLEAN cases that report here, and the discriminator is the language version.
+// Two upstream clean cases that report here, and the discriminator is the language version.
 //
 // `globalThis.alert();` appears in upstream's corpus twice, once in each list, with identical source
 // text. The only difference is `ecmaVersion`: the clean copies are pinned to the default and to
@@ -146,7 +146,7 @@ func TestNoAlertLeavesGlobalThisToScriptFiles(test *testing.T) {
 //
 // `internal/rule_testing/program.go` pins `target: "ES2022"` and our tree compiles to the same, so
 // `globalThis` is always in the standard library the checker reads and the pre-2020 verdict is not
-// reachable here. Reporting these is therefore agreement with upstream AT OUR TARGET rather than a
+// reachable here. Reporting these is therefore agreement with upstream at our target rather than a
 // divergence from it, and a port reproducing them as clean would be silent on the modern spelling of
 // the exact thing this rule exists to catch.
 //
@@ -285,7 +285,7 @@ func TestNoAlertNeedsTheTypedHarness(test *testing.T) {
 // A callee that is neither an identifier nor a member access must not crash the file.
 //
 // `memberAccessObject` answers nil for such a callee and the member branch fed that nil straight into
-// `ast.SkipParentheses`, which dereferences it. The walk recovers per FILE rather than per rule, so
+// `ast.SkipParentheses`, which dereferences it. The walk recovers per file rather than per rule, so
 // the panic took the whole file away from every rule: 167 files, about five percent of the tree we
 // lint, silently unchecked while the run still printed green and the node count sat a quarter of a
 // million nodes low.
@@ -295,7 +295,7 @@ func TestNoAlertNeedsTheTypedHarness(test *testing.T) {
 //
 // # What this test does and does not prove
 //
-// It pins the shapes so a future edit to the member branch has them written down, and it is NOT the
+// It pins the shapes so a future edit to the member branch has them written down, and it is not the
 // regression proof: it passes against the unfixed rule too. The panic needs the real program, and the
 // fixtures below never reach the nil path in this harness. The proof is an A/B on the tree itself,
 // same tree and same flags, differing only in this file: 167 crashed files before, 0 after. Anyone

@@ -79,16 +79,16 @@ var messageUnexpectedMultilineDivision = rule.Message{
 //
 // # Why no unwrap loop
 //
-// Nothing in this rule walks THROUGH an expression to reason about what is inside it. Every arm
+// Nothing in this rule walks through an expression to reason about what is inside it. Every arm
 // reads a boundary, where one node ends and a token begins, and a parenthesis is part of that
 // boundary rather than something to see past. Unwrapping would move the boundary to the wrong place
 // and report `var a = (a || b)\n(x).doSomething()` at the paren rather than the call.
 //
 // # The division arm, and the stale flag list it carries
 //
-// The shape is a `/` binary whose LEFT child is also a `/` binary, which is how `foo / bar /gym`
+// The shape is a `/` binary whose left child is also a `/` binary, which is how `foo / bar /gym`
 // parses. If the token after the second slash is an identifier that is entirely regular expression
-// flags AND is adjacent to the slash with no space, the line reads as `foo` followed by a regular
+// flags and is adjacent to the slash with no space, the line reads as `foo` followed by a regular
 // expression literal rather than as two divisions.
 //
 // Upstream matches flags with `/^[gimsuy]+$/u`, which predates both `d` (hasIndices, ES2022) and
@@ -143,7 +143,7 @@ var NoUnexpectedMultiline = rule.Rule{
 			// End(), which sits one past it.
 			//
 			// Measured equivalent to reading End() directly, and recorded rather than fixtured
-			// because no input can distinguish them: they differ only if the character AT End() is
+			// because no input can distinguish them: they differ only if the character at End() is
 			// on a later line than the one before it, which requires the expression's final
 			// character to be a line terminator, and no production ends an expression with one.
 			// Probed over six shapes including calls and accesses whose callee itself ends in `)`
@@ -195,7 +195,7 @@ var NoUnexpectedMultiline = rule.Rule{
 				// The token that ends the tag is what upstream compares against, via
 				// `getTokenBefore(quasi)`, and when type arguments are present that token is the
 				// closing `>` rather than anything either node's End() names. The type argument
-				// LIST ends before its own `>`, so skipping trivia forward from there lands on the
+				// list ends before its own `>`, so skipping trivia forward from there lands on the
 				// `>` itself. That is a forward scan over the same gap upstream walks backwards,
 				// and it reaches the same token without a second implementation of comment lexing.
 				//
@@ -227,7 +227,7 @@ var NoUnexpectedMultiline = rule.Rule{
 					return
 				}
 				// Upstream's selector is `BinaryExpression[operator='/'] > BinaryExpression[operator='/'].left`,
-				// so the node it checks is the LEFT child and the second slash is this node's own
+				// so the node it checks is the left child and the second slash is this node's own
 				// operator. Anchoring on the parent instead would check the wrong division in
 				// `foo\n/ bar / baz /g`, which is clean because the break is before `/bar`.
 				left := binary.Left
@@ -239,10 +239,10 @@ var NoUnexpectedMultiline = rule.Rule{
 					return
 				}
 				// The token after the second slash has to be an identifier made only of regular
-				// expression flags AND adjacent to the slash, or the source does not read as a
+				// expression flags and adjacent to the slash, or the source does not read as a
 				// regular expression literal at all.
 				//
-				// Read as a TOKEN rather than as the right operand's node. Upstream calls
+				// Read as a token rather than as the right operand's node. Upstream calls
 				// `getTokenAfter(secondSlash)`, and the two differ whenever the flags are followed
 				// by anything: in `foo\n/ bar /g.test(baz)` the right operand is the whole
 				// `g.test(baz)` call while the token is the bare `g`. Three of upstream's five
@@ -256,7 +256,7 @@ var NoUnexpectedMultiline = rule.Rule{
 				if flagsEnd == flagsStart {
 					return
 				}
-				// A longer identifier that merely STARTS with flag characters is not a flag run:
+				// A longer identifier that merely starts with flag characters is not a flag run:
 				// `foo\n/ bar /gymnasium` reads as a division by an ordinary name. Upstream gets
 				// this from `getTokenAfter` returning the whole identifier and then anchoring the
 				// pattern, so the boundary has to be a non-identifier character.

@@ -101,7 +101,7 @@ func TestNoReturnAssignStaysSilent(test *testing.T) {
 
 // Where the finding lands, which the message-id fixtures above cannot see.
 //
-// This rule has two messages pointing at two DIFFERENT nodes: `returnAssignment` anchors on the
+// This rule has two messages pointing at two different nodes: `returnAssignment` anchors on the
 // whole return statement, `arrowAssignment` on the whole arrow function. Neither anchors on the
 // assignment, which is the span a port would reach for first because it is the node the listener
 // receives. Every id fixture above stays green over that mistake, and the two are not close: on
@@ -254,7 +254,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 	// them: it has no call-argument assignment at all.
 	test.Run("a call's own parentheses read as the author's wrapping", func(test *testing.T) {
 		test.Parallel()
-		// SILENT upstream under the default. The assignment has no wrapper of its own; the token
+		// Silent upstream under the default. The assignment has no wrapper of its own; the token
 		// before it is the call's `(` and the token after is the call's `)`, which is all
 		// `isParenthesised` asks. A structural port reports this.
 		result := rule_testing.Run(test, NoReturnAssign, returnAssignFile, "function f(){ return foo(a = b); }")
@@ -301,7 +301,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 	test.Run("an assignment leading a parenthesized sequence is not wrapped", func(test *testing.T) {
 		test.Parallel()
 		// `(a = b, c)` opens with `(` immediately before the assignment, so the first half of the
-		// predicate answers yes, and the token AFTER the assignment is a comma rather than the
+		// predicate answers yes, and the token after the assignment is a comma rather than the
 		// close paren. Reports upstream. This is the only shape in either corpus that exercises the
 		// close-paren half on its own: every other reporting row already fails the open-paren half,
 		// so a rule checking only the open paren stays green over all of them.
@@ -323,7 +323,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 	test.Run("a wrapper around only part of the returned expression still counts", func(test *testing.T) {
 		test.Parallel()
 		// The predicate does not ask whether the wrapper encloses what is returned, only whether it
-		// hugs the assignment. Both of these are SILENT upstream under the default even though the
+		// hugs the assignment. Both of these are silent upstream under the default even though the
 		// returned expression as a whole is unwrapped.
 		for _, source := range []string{
 			"function f(){ return (a = b) + 1; }",
@@ -345,7 +345,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 
 	test.Run("comments between the parentheses and the assignment are skipped", func(test *testing.T) {
 		test.Parallel()
-		// Upstream's token reader skips comments, so both of these are SILENT. This is the pair that
+		// Upstream's token reader skips comments, so both of these are silent. This is the pair that
 		// decides whether the previous token is found at the node's raw Pos() or at its trimmed
 		// token start: the trimmed start lands inside the comment's trailing gap and gets both rows
 		// wrong.
@@ -358,12 +358,12 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		}
 	})
 
-	// The sentinel set. Upstream's regex is a test on ESTree type NAMES, so which nodes stop the
+	// The sentinel set. Upstream's regex is a test on ESTree type names, so which nodes stop the
 	// walk is not derivable from what a statement is, and these are the rows that pin it.
 	test.Run("a class expression stops the walk", func(test *testing.T) {
 		test.Parallel()
 		// `ClassExpression` is one of the three expression forms named by hand in the regex. The
-		// assignment is in a heritage clause, which is inside a return, and upstream is SILENT.
+		// assignment is in a heritage clause, which is inside a return, and upstream is silent.
 		result := rule_testing.RunWithOptions(test, NoReturnAssign, returnAssignFile,
 			"function f(){ return class extends (a = b) {}; }", alwaysReturnOptions)
 		rule_testing.ExpectClean(test, result)
@@ -382,7 +382,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		// `FunctionExpression` is the second of the three expression forms named by hand in the
 		// regex, and the assignment here is in a parameter default rather than in a body. That
 		// matters: a body assignment is an ExpressionStatement and stops one level lower, so a
-		// parameter default is the ONLY position where the FunctionExpression case decides anything.
+		// parameter default is the only position where the FunctionExpression case decides anything.
 		//
 		// Found by a surviving mutant. Upstream's corpus covers the body form twice and the
 		// parameter form never, so dropping FunctionExpression from the set is invisible to all
@@ -440,9 +440,9 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		test.Parallel()
 		// The walk arrives at the arrow through a ParenthesizedExpression rather than through the
 		// assignment itself, so the body-identity check must compare the arrow's body against the
-		// child the walk came up THROUGH, not against the assignment it started from. Upstream has
+		// child the walk came up through, not against the assignment it started from. Upstream has
 		// no such distinction to make, because its parser discards parentheses and the assignment
-		// IS the body node; ours keeps them, so this is a shape upstream's corpus cannot describe.
+		// is the body node; ours keeps them, so this is a shape upstream's corpus cannot describe.
 		//
 		// Found by a surviving mutant. Upstream ships both of these codes, but only under the
 		// default mode, where the parenthesis guard declines them before the walk runs at all. Under
@@ -469,7 +469,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 	test.Run("an assignment in a statement head inside an arrow block body", func(test *testing.T) {
 		test.Parallel()
 		// The whole statement half of the sentinel set, exercised where it actually decides
-		// something. An assignment in a statement's HEAD (a condition, a loop clause, a throw
+		// something. An assignment in a statement's head (a condition, a loop clause, a throw
 		// operand, a with subject) is not an expression statement, so ExpressionStatement cannot
 		// stop the walk and each statement kind has to stop it itself. Put the statement inside an
 		// arrow's block body and a missing member climbs all the way to the arrow and reports
@@ -505,12 +505,12 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 	test.Run("a declarator initializer in an arrow block body", func(test *testing.T) {
 		test.Parallel()
 		// `var z = a = b` inside an arrow's block body. The assignment sits in a declarator
-		// initializer, which is NOT an expression statement, so the ExpressionStatement case cannot
+		// initializer, which is not an expression statement, so the ExpressionStatement case cannot
 		// stop this walk and the VariableStatement case is what does.
 		//
 		// This is the shape where our parser and upstream's diverge structurally and land in the
 		// same place. Upstream stops at the `BlockStatement`, which is in its sentinel set; we do
-		// not carry Block, because it is subsumed everywhere ELSE by ExpressionStatement, and this
+		// not carry Block, because it is subsumed everywhere else by ExpressionStatement, and this
 		// is the one position where nothing below it would stop the walk. So `VariableStatement`
 		// covers exactly the gap Block would have covered, through a different node.
 		//
@@ -580,7 +580,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		test.Parallel()
 		// A method, a generator, a conditional return, and a try block. All four reach a
 		// ReturnStatement and all four report upstream. The method and generator rows matter because
-		// their bodies are Blocks, which ARE sentinels, so the walk must stop at the return before
+		// their bodies are Blocks, which are sentinels, so the walk must stop at the return before
 		// it reaches the block.
 		for _, source := range []string{
 			"class C { m(){ return a = b; } }",
@@ -596,7 +596,7 @@ func TestNoReturnAssignBeyondTheUpstreamCorpus(test *testing.T) {
 	test.Run("two assignments in one return statement report twice", func(test *testing.T) {
 		test.Parallel()
 		// The listener is per assignment, not per return, so one statement holding two assignments
-		// produces two findings at the SAME span. Measured upstream, which reports both rows twice
+		// produces two findings at the same span. Measured upstream, which reports both rows twice
 		// at byte-identical columns. A rule reporting per return statement finds one, and every
 		// single-assignment fixture above stays green over that.
 		for _, source := range []string{

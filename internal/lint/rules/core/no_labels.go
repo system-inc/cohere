@@ -60,10 +60,10 @@ type NoLabelsOptions struct {
 //
 // The label and the jumps that name it are separate findings, which the corpus states outright:
 // `label: while (true) { break label; }` names two ids and the nested-label case names three. A
-// port reporting once per input passes nothing here, and a port reporting once per LABEL still
+// port reporting once per input passes nothing here, and a port reporting once per label still
 // misses the jump.
 //
-// # The permission is decided by what the label WRAPS, not by what the jump sits in
+// # The permission is decided by what the label wraps, not by what the jump sits in
 //
 // `allowLoop` exempts a label whose body is a loop; `allowSwitch` exempts one whose body is a
 // switch. The corpus pins that the test is on the labeled statement's own body and nothing else:
@@ -76,10 +76,10 @@ type NoLabelsOptions struct {
 // labels a `for`. So a port asking "is this jump inside a loop" reports the first and is wrong; the
 // question is what `A` names.
 //
-// That is why the jumps resolve through a label STACK rather than through their own ancestors. A
+// That is why the jumps resolve through a label stack rather than through their own ancestors. A
 // jump names a label; the label's kind decides.
 //
-// # Reporting the label on exit, which is where the finding ORDER comes from
+// # Reporting the label on exit, which is where the finding order comes from
 //
 // Upstream reports a labeled statement from `LabeledStatement:exit` and a labeled jump on entry.
 // The corpus's three-finding case is what pins it:
@@ -108,7 +108,7 @@ type NoLabelsOptions struct {
 var NoLabels = rule.Rule{
 	Name: "no-labels",
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		// A rule configured as a bare `"error"` is handed NIL rather than a decoded struct, because
+		// A rule configured as a bare `"error"` is handed `nil` rather than a decoded struct, because
 		// `DecodeOptionsInto` errors on empty input and the config turns that into nil. Without this
 		// the type assertion yields the zero value anyway, which happens to be correct here, but
 		// relying on that means the rule is right by accident. Naming it makes the default a
@@ -154,7 +154,7 @@ var NoLabels = rule.Rule{
 				}
 
 				// The label stack, innermost last. A jump reads it by name, which is what makes the
-				// permission depend on what the label WRAPS rather than on where the jump sits.
+				// permission depend on what the label wraps rather than on where the jump sits.
 				type labelEntry struct {
 					name string
 					body *ast.Node
@@ -191,7 +191,7 @@ var NoLabels = rule.Rule{
 							body: labeled.Statement,
 						})
 						current.ForEachChild(visit)
-						// The pop is inert ON ITS OWN and load-bearing in PAIR with the search
+						// The pop is inert on its own and load-bearing in pair with the search
 						// direction above, which is a coupling worth stating because a reader
 						// deleting either half alone will measure no change.
 						//
@@ -203,7 +203,7 @@ var NoLabels = rule.Rule{
 						// stale one and never consults what is beneath. A stale entry is
 						// unreachable rather than harmless.
 						//
-						// Deleting this line AND reversing the search to outermost-first is caught
+						// Deleting this line and reversing the search to outermost-first is caught
 						// by five lines, which is what makes the equivalence a measurement rather
 						// than an argument. The pop stays because the invariant it maintains is
 						// what the search is entitled to assume, and a later reader changing the

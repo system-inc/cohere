@@ -173,8 +173,8 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(test *testing.T) {
 		// next apostrophe closes, or the shout between them disappears.
 		{"possessive apostrophe opens nothing", "// the users' data is NEVER cached by the dogs' walker\nexport const Value = 1;\n", "NEVER"},
 		{"contraction opens nothing", "// don't EVER cache what isn't yours\nexport const Value = 1;\n", "EVER"},
-		// The apostrophe after BOSS follows a letter, so it opens nothing, and the closing apostrophe
-		// after ORDERS must not pair with it to hide ORDERS.
+		// The apostrophe after `BOSS` follows a letter, so it opens nothing, and the closing apostrophe
+		// after `ORDERS` must not pair with it to hide `ORDERS`.
 		{"opening quote glued to a letter", "// the BOSS'S ORDERS' wording\nexport const Value = 1;\n", "ORDERS"},
 		{"closing quote glued to a letter", "// a 'RENAME COLUMN'd table is NEVER safe\nexport const Value = 1;\n", "RENAME"},
 		// The apostrophe hazard itself: a leading apostrophe after a space and a plural possessive
@@ -195,7 +195,7 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(test *testing.T) {
 	}
 }
 
-// An indented code block is code, like a fence (#vy055vj): a sandbox command's TMPDIR and $HOME are
+// An indented code block is code, like a fence (#vy055vj): a sandbox command's `TMPDIR` and `$HOME` are
 // not a raised voice. The blank line before it is what makes it a block; an indented line straight
 // after prose continues the paragraph and is still read. A block comment's own indentation is set
 // aside first, so only a block indented past the gutter counts. Mirrors nexus's Shouting.test.ts.

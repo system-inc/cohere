@@ -53,7 +53,7 @@ type ObjectShorthandSettings struct {
 
 // DefaultObjectShorthandSettings is upstream's `defaultOptions: ["always"]`.
 //
-// Spelled out because the zero value of the struct has an EMPTY mode, which matches none of the six
+// Spelled out because the zero value of the struct has an empty mode, which matches none of the six
 // and would make the rule silently report nothing.
 func DefaultObjectShorthandSettings() ObjectShorthandSettings {
 	return ObjectShorthandSettings{Mode: ObjectShorthandAlways}
@@ -244,7 +244,7 @@ var messageObjectShorthandUnexpectedMix = rule.Message{
 // # Six modes, and `consistent` is a different question from the rest
 //
 // The four simple modes judge each property alone. `consistent` and `consistent-as-needed` judge
-// the OBJECT: every property must use the same style, and under `consistent-as-needed` that style
+// the object: every property must use the same style, and under `consistent-as-needed` that style
 // must be shorthand when every property could be. Those two report on the object literal rather
 // than on a property, which is why they are a separate arm and a separate message id.
 //
@@ -357,10 +357,10 @@ func checkObjectShorthandMember(ruleContext rule.Context, member *ast.Node, sett
 			if settings.AvoidQuotes && objectShorthandKeyIsStringLiteral(member) {
 				return
 			}
-			// An arrow converts only when it has a BLOCK body and `avoidExplicitReturnArrows` is
+			// An arrow converts only when it has a block body and `avoidExplicitReturnArrows` is
 			// on. Upstream's condition is
 			// `ArrowFunctionExpression && body.type === "BlockStatement" && AVOID_EXPLICIT_RETURN_ARROWS`,
-			// so an expression-bodied arrow such as `{ x: () => foo }` is NEVER reported: turning
+			// so an expression-bodied arrow such as `{ x: () => foo }` is never reported: turning
 			// it into a method would have to invent a `return`, which changes what the source says
 			// rather than how it says it. A first draft had this backwards and reported three
 			// corpus cases upstream leaves clean.
@@ -395,8 +395,8 @@ func checkObjectShorthandMember(ruleContext rule.Context, member *ast.Node, sett
 			unwrapped = inner.Expression
 		}
 		if applyToProperties && unwrapped.Kind == ast.KindIdentifier {
-			// Upstream has TWO property-shorthand branches, and the second is easy to miss: a
-			// QUOTED key counts too, when its string value equals the identifier. `{'x': x}` is
+			// Upstream has two property-shorthand branches, and the second is easy to miss: a
+			// quoted key counts too, when its string value equals the identifier. `{'x': x}` is
 			// reportable and `{'x': y}` is not.
 			key := assignment.Name()
 			quoted := key.Kind == ast.KindStringLiteral
@@ -414,7 +414,7 @@ func checkObjectShorthandMember(ruleContext rule.Context, member *ast.Node, sett
 			if objectShorthandHasTypeJsDoc(ruleContext, member) {
 				return
 			}
-			// Upstream's fixer declines whenever ANY comment sits inside the property, because the
+			// Upstream's fixer declines whenever any comment sits inside the property, because the
 			// replacement writes just the name and would delete it.
 			if objectShorthandHasCommentInside(ruleContext, member) {
 				ruleContext.ReportNode(member, messageObjectShorthandExpectedPropertyShorthand)
@@ -429,7 +429,7 @@ func checkObjectShorthandMember(ruleContext rule.Context, member *ast.Node, sett
 // checkObjectShorthandConsistency is upstream's `checkConsistency`.
 //
 // Every property in one object literal must use the same style. Under `checkRedundancy` the chosen
-// style must additionally be shorthand whenever every property COULD be shorthand, which is what
+// style must additionally be shorthand whenever every property could be shorthand, which is what
 // separates `consistent-as-needed` from `consistent`.
 func checkObjectShorthandConsistency(ruleContext rule.Context, node *ast.Node, checkRedundancy bool) {
 	literal := node.AsObjectLiteralExpression()
@@ -443,11 +443,11 @@ func checkObjectShorthandConsistency(ruleContext rule.Context, node *ast.Node, c
 		switch member.Kind {
 		case ast.KindGetAccessor, ast.KindSetAccessor, ast.KindSpreadAssignment:
 			// Upstream's `canHaveShorthand` filter drops accessors and spreads before counting, and
-			// unlike the per-property guards above this one is NOT redundant in spirit -- an
+			// unlike the per-property guards above this one is not redundant in spirit -- an
 			// accessor reaching the shorthand tally would make `{ get a() {}, b }` look mixed and
 			// report `unexpectedMix`, where upstream is clean.
 			//
-			// It is redundant in FACT here for the same parser reason: neither kind matches the
+			// It is redundant in fact here for the same parser reason: neither kind matches the
 			// counting arms below either, so a mutation deleting this case also survives. Kept
 			// because it states the intent at the place a reader looks for it, and because a future
 			// arm added to this switch would need it.
@@ -540,7 +540,7 @@ func objectShorthandKeyIsStringLiteral(member *ast.Node) bool {
 
 // objectShorthandFunctionIsAnonymous answers upstream's `!node.value.id`.
 //
-// A NAMED function expression cannot become a method, because the method form has nowhere to put
+// A named function expression cannot become a method, because the method form has nowhere to put
 // the name and dropping it would remove a binding the body may use.
 func objectShorthandFunctionIsAnonymous(value *ast.Node) bool {
 	if value.Kind != ast.KindFunctionExpression {
@@ -552,8 +552,8 @@ func objectShorthandFunctionIsAnonymous(value *ast.Node) bool {
 
 // objectShorthandIsConstructorName answers upstream's `isConstructor`.
 //
-// NOT simply "starts with a capital". Upstream skips a leading run of `_`, `$` and digits with
-// `CTOR_PREFIX_REGEX = /[^_$0-9]/u` and tests the first character AFTER it, so
+// Not simply "starts with a capital". Upstream skips a leading run of `_`, `$` and digits with
+// `CTOR_PREFIX_REGEX = /[^_$0-9]/u` and tests the first character after it, so
 // `__ConstructorFunction` and `_0ConstructorFunction` are both constructors. A name made entirely
 // of those characters -- `_`, `$$`, `_8` -- matches nothing and is not a constructor.
 //
@@ -596,7 +596,7 @@ func objectShorthandUsesLexicalIdentifier(value *ast.Node) bool {
 			}
 			return
 		// A nested function establishes its own `this` and `arguments`, so what it contains does
-		// not constrain the arrow. So does a CLASS: the `super()` inside a nested class's
+		// not constrain the arrow. So does a class: the `super()` inside a nested class's
 		// constructor belongs to that class, and upstream's scope stack stops there for the same
 		// reason. Missing the class arm made a corpus case go silent, since its arrow body
 		// contained `class Foo extends Bar { constructor() { super(); } }`.
@@ -659,7 +659,7 @@ func objectShorthandMethodToLongform(ruleContext rule.Context, member *ast.Node)
 // objectShorthandFunctionToShorthand is upstream's `makeFunctionShorthand`, which rewrites
 // `{ a: function() {} }` into `{ a() {} }`.
 //
-// The replacement runs from the KEY's first token through the end of the property, and is built as
+// The replacement runs from the key's first token through the end of the property, and is built as
 // the key text plus whatever follows the `function` keyword (or the `*` after it, for a generator),
 // with `async ` and `*` carried across as a prefix. Slicing rather than reconstructing is what keeps
 // the parameter list, the return type and the body exactly as the author wrote them.
@@ -680,9 +680,9 @@ func objectShorthandFunctionToShorthand(ruleContext rule.Context, member *ast.No
 	// A comment between the key and the value would be inside the replaced span, so upstream
 	// declines: `{ f: /* c */ function(){} }` is reported and not repaired.
 	//
-	// The scan runs to the value's first TOKEN rather than to `Pos()`, because `Pos()` begins at
+	// The scan runs to the value's first token rather than to `Pos()`, because `Pos()` begins at
 	// the previous token's end and so starts inside the comment rather than after the colon. It
-	// also has to use the ORIGINAL initializer rather than the paren-unwrapped value, since
+	// also has to use the original initializer rather than the paren-unwrapped value, since
 	// unwrapping moves the start past a parenthesis the comment may sit behind.
 	valueStart := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, assignment.Initializer.Pos()).Pos()
 	if objectShorthandHasCommentBetween(sourceText, key.End(), valueStart) {
@@ -717,19 +717,19 @@ func objectShorthandFunctionToShorthand(ruleContext rule.Context, member *ast.No
 		if arrow == nil || arrow.EqualsGreaterThanToken == nil {
 			return rule.Fix{}, false
 		}
-		// The slice runs to the arrow token's START and the body slice from the body's start, so
-		// the whitespace between them is whatever sat AFTER the arrow rather than before it. That
+		// The slice runs to the arrow token's start and the body slice from the body's start, so
+		// the whitespace between them is whatever sat after the arrow rather than before it. That
 		// is what upstream produces: `x: () => { ... }` becomes `x() { ... }`, keeping the space
 		// the author wrote before the brace.
 		// The parameter list as written, taken from the arrow's own parameter nodes rather than
 		// from a text scan: the slice starts at the arrow's first token, which for
-		// `async (bar = 1) => {}` is `async`, so testing whether the SLICE starts with `(` reads
+		// `async (bar = 1) => {}` is `async`, so testing whether the slice starts with `(` reads
 		// the modifier and wrongly adds a second pair.
-		// Start at the TYPE PARAMETER list when there is one, and at the parameter list otherwise.
+		// Start at the type parameter list when there is one, and at the parameter list otherwise.
 		// Two things make this more than a scan for `(`. The arrow's first token is `async` for
 		// `async (bar) => {}`, which `prefix` already carries, so slicing from it writes the
 		// modifier twice. And a generic arrow `<T>(): void => {}` keeps its `<T>`, which sits
-		// BEFORE the parenthesis: slicing from `(` silently drops the type parameters, which cost
+		// before the parenthesis: slicing from `(` silently drops the type parameters, which cost
 		// one corpus case whose four findings all lost their generics.
 		parameterStart = objectShorthandSignatureStart(ruleContext, value, parameterStart,
 			arrow.EqualsGreaterThanToken.Pos())
@@ -779,7 +779,7 @@ func objectShorthandParameterListStart(ruleContext rule.Context, value *ast.Node
 	if limit > len(text) {
 		limit = len(text)
 	}
-	// Upstream slices from the token after `function`, or after the `*` for a generator, NOT from
+	// Upstream slices from the token after `function`, or after the `*` for a generator, not from
 	// the parenthesis. The difference is the whitespace the author wrote between them:
 	// `foo: async function () {}` becomes `async foo () {}`, keeping the space, where slicing from
 	// `(` would produce `async foo() {}`. An arrow has no keyword to skip, so its whole text is
@@ -853,10 +853,10 @@ func objectShorthandHasCommentBetween(text string, start int, end int) bool {
 	return false
 }
 
-// objectShorthandMemberStart is the member's first TOKEN, which is upstream's `node.range[0]`.
+// objectShorthandMemberStart is the member's first token, which is upstream's `node.range[0]`.
 //
 // `Pos()` begins at the previous token's end, so it includes the leading trivia -- the whitespace
-// AND any comment sitting between the previous property and this one. Upstream's
+// and any comment sitting between the previous property and this one. Upstream's
 // `getCommentsInside` looks only within the node's own range, so a comment before the property is
 // not inside it. Scanning from `Pos()` made a comment between two properties look like a comment
 // inside the second, and the fixer declined a repair upstream performs.

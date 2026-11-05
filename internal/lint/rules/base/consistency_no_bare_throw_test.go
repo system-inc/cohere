@@ -19,9 +19,9 @@ func consistencyNoBareThrowCaseName(index int) string {
 
 // TestNoBareThrowFires is the reporting half of the corpus.
 //
-// This is one of OUR rules, so there is no upstream corpus to import and the fixtures below are
+// This is one of our rules, so there is no upstream corpus to import and the fixtures below are
 // written rather than copied. The brief warns that an invented fixture encodes the same belief as
-// the port, so every row here was produced by DRIVING the original rule through the ESLint 10.8.1
+// the port, so every row here was produced by driving the original rule through the ESLint 10.8.1
 // Linter API rather than by reading it: the source, the span and the constructor name in each row
 // are what that rule reported for that exact input.
 //
@@ -378,11 +378,11 @@ func TestNoBareThrowStaysSilent(test *testing.T) {
 
 // TestNoBareThrowSurvivesThrownShapesThatCannotBeRead is a crash fixture.
 //
-// `ast.Node.Text()` PANICS on a property access and on a call expression, and both are ordinary
+// `ast.Node.Text()` panics on a property access and on a call expression, and both are ordinary
 // source for a throw site: `throw someError.message` and `throw makeError()` are shapes this rule
 // meets. The kind test sits above the text read for exactly that reason.
 //
-// The walk recovers per FILE rather than per rule, so one such panic would cost every rule in this
+// The walk recovers per file rather than per rule, so one such panic would cost every rule in this
 // package every finding in that file, and the run would still print a plausible summary. There is no
 // finding to assert here; the assertion is that the run completes.
 //
@@ -423,7 +423,7 @@ func TestNoBareThrowSurvivesThrownShapesThatCannotBeRead(test *testing.T) {
 func TestNoBareThrowNormalizesThePathSeparator(test *testing.T) {
 	test.Parallel()
 
-	// A file that MUST be exempt, spelled both ways. The forward-slash spelling is the one a real
+	// A file that must be exempt, spelled both ways. The forward-slash spelling is the one a real
 	// run produces and is covered by the silent corpus above; this asserts the gate itself rather
 	// than the harness.
 	if !consistencyNoBareThrowFileIsExempt("/repository/libraries/base/source/foundation/errors/BaseError.ts") {
@@ -432,7 +432,7 @@ func TestNoBareThrowNormalizesThePathSeparator(test *testing.T) {
 	if consistencyNoBareThrowFileIsExempt("/repository/source/modules/thing/Service.ts") {
 		test.Error("an ordinary path is exempt when it should not be")
 	}
-	// The control that gives the row above meaning: a backslash spelling of the SAME capture-path
+	// The control that gives the row above meaning: a backslash spelling of the same capture-path
 	// file is not exempt, which is exactly why the rule normalizes before asking.
 	if consistencyNoBareThrowFileIsExempt(`\repository\libraries\base\source\foundation\errors\BaseError.ts`) {
 		test.Error("a backslash path matched a gate, so normalization would be unnecessary")

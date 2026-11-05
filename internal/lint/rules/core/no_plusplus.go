@@ -55,7 +55,7 @@ func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
 // # The afterthought exemption is recursive, and that is the whole of the port
 //
 // With `allowForLoopAfterthoughts`, upstream exempts the update expression of a `for` loop. But the
-// update may be a SEQUENCE expression, and the exemption reaches through it to any depth:
+// update may be a sequence expression, and the exemption reaches through it to any depth:
 //
 //	for (;; i++) {}                          exempt, the update itself
 //	for (;; foo(), i++) {}                   exempt, an operand of the update
@@ -64,7 +64,7 @@ func noPlusplusUnexpectedUnaryOp(operator string) rule.Message {
 // Upstream expresses this as `isForLoopAfterthought` recursing while the parent is a
 // `SequenceExpression`. Reproduced as the same recursion rather than as a "somewhere inside a for
 // update" containment test, and the difference is measurable: containment would also exempt
-// `for (;; foo(i++)) {}`, where the operator is an ARGUMENT rather than an operand, and upstream
+// `for (;; foo(i++)) {}`, where the operator is an argument rather than an operand, and upstream
 // reports that. The corpus writes it.
 //
 // # Our parser keeps parentheses, and here that costs nothing
@@ -118,7 +118,7 @@ var NoPlusplus = rule.Rule{
 
 // noPlusplusIsForLoopAfterthought reproduces upstream's `isForLoopAfterthought`.
 //
-// Walks up through sequence expressions to see whether this node IS the update expression of a
+// Walks up through sequence expressions to see whether this node is the update expression of a
 // `for` statement. Identity against `statement.Incrementor` rather than containment, which is what
 // keeps `for (;; foo(i++)) {}` reporting: there the operator is an argument to a call that is the
 // update, not an operand of the update.
