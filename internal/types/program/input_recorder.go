@@ -145,77 +145,77 @@ type recordingFS struct {
 // genuinely not there is recorded absent.
 //
 // depended says whether the answer depended on more than existence: a read, a listing or a stat.
-func (recordingFS *recordingFS) noteAnswer(path string, positive bool, depended bool) {
+func (fileSystem *recordingFS) noteAnswer(path string, positive bool, depended bool) {
 	if !positive {
-		positive = recordingFS.FS.Stat(tspath.RootedPath(path)) != nil
+		positive = fileSystem.FS.Stat(tspath.RootedPath(path)) != nil
 	}
-	recordingFS.recorder.note(path, positive, depended)
+	fileSystem.recorder.note(path, positive, depended)
 }
 
-func (recordingFS *recordingFS) FileExists(path tspath.RootedFilePath) bool {
-	exists := recordingFS.FS.FileExists(path)
-	recordingFS.noteAnswer(path.AsString(), exists, false)
+func (fileSystem *recordingFS) FileExists(path tspath.RootedFilePath) bool {
+	exists := fileSystem.FS.FileExists(path)
+	fileSystem.noteAnswer(path.AsString(), exists, false)
 	return exists
 }
 
-func (recordingFS *recordingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	contents, ok := recordingFS.FS.ReadFile(path)
-	recordingFS.noteAnswer(path.AsString(), ok, true)
+func (fileSystem *recordingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	contents, ok := fileSystem.FS.ReadFile(path)
+	fileSystem.noteAnswer(path.AsString(), ok, true)
 	return contents, ok
 }
 
-func (recordingFS *recordingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
-	exists := recordingFS.FS.DirectoryExists(path)
-	recordingFS.noteAnswer(path.AsString(), exists, false)
+func (fileSystem *recordingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	exists := fileSystem.FS.DirectoryExists(path)
+	fileSystem.noteAnswer(path.AsString(), exists, false)
 	return exists
 }
 
 // GetAccessibleEntries is a directory listing, and a listing's answer changes when an entry is added.
 // Recording the directory means its mtime is watched, which is what catches a file added beside the
 // ones the build read.
-func (recordingFS *recordingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
-	entries := recordingFS.FS.GetAccessibleEntries(path)
-	recordingFS.noteAnswer(path.AsString(), recordingFS.FS.DirectoryExists(path), true)
+func (fileSystem *recordingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	entries := fileSystem.FS.GetAccessibleEntries(path)
+	fileSystem.noteAnswer(path.AsString(), fileSystem.FS.DirectoryExists(path), true)
 	return entries
 }
 
-func (recordingFS *recordingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
-	information := recordingFS.FS.Stat(path)
-	recordingFS.noteAnswer(path.AsString(), information != nil, true)
+func (fileSystem *recordingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	information := fileSystem.FS.Stat(path)
+	fileSystem.noteAnswer(path.AsString(), information != nil, true)
 	return information
 }
 
-func (recordingFS *recordingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
-	resolved := recordingFS.FS.Realpath(path)
+func (fileSystem *recordingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	resolved := fileSystem.FS.Realpath(path)
 	// Realpath answers for a missing path too, by returning it unchanged, so existence is asked
 	// rather than assumed. A probe recorded as present that is not would fail the record outright.
-	recordingFS.noteAnswer(path.AsString(), false, false)
+	fileSystem.noteAnswer(path.AsString(), false, false)
 	return resolved
 }
 
-func (recordingFS *recordingFS) WriteFile(path tspath.RootedFilePath, data string) error {
-	recordingFS.markWritten(path.AsString())
-	return recordingFS.FS.WriteFile(path, data)
+func (fileSystem *recordingFS) WriteFile(path tspath.RootedFilePath, data string) error {
+	fileSystem.markWritten(path.AsString())
+	return fileSystem.FS.WriteFile(path, data)
 }
 
-func (recordingFS *recordingFS) AppendFile(path tspath.RootedFilePath, data string) error {
-	recordingFS.markWritten(path.AsString())
-	return recordingFS.FS.AppendFile(path, data)
+func (fileSystem *recordingFS) AppendFile(path tspath.RootedFilePath, data string) error {
+	fileSystem.markWritten(path.AsString())
+	return fileSystem.FS.AppendFile(path, data)
 }
 
-func (recordingFS *recordingFS) Remove(path tspath.RootedPath) error {
-	recordingFS.markWritten(path.AsString())
-	return recordingFS.FS.Remove(path)
+func (fileSystem *recordingFS) Remove(path tspath.RootedPath) error {
+	fileSystem.markWritten(path.AsString())
+	return fileSystem.FS.Remove(path)
 }
 
-func (recordingFS *recordingFS) Chtimes(path tspath.RootedPath, accessTime time.Time, modifiedTime time.Time) error {
-	recordingFS.markWritten(path.AsString())
-	return recordingFS.FS.Chtimes(path, accessTime, modifiedTime)
+func (fileSystem *recordingFS) Chtimes(path tspath.RootedPath, accessTime time.Time, modifiedTime time.Time) error {
+	fileSystem.markWritten(path.AsString())
+	return fileSystem.FS.Chtimes(path, accessTime, modifiedTime)
 }
 
-func (recordingFS *recordingFS) markWritten(path string) {
+func (fileSystem *recordingFS) markWritten(path string) {
 	path = withoutTrailingSlash(path)
-	recordingFS.recorder.mutex.Lock()
-	recordingFS.recorder.written[path] = true
-	recordingFS.recorder.mutex.Unlock()
+	fileSystem.recorder.mutex.Lock()
+	fileSystem.recorder.written[path] = true
+	fileSystem.recorder.mutex.Unlock()
 }

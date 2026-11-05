@@ -181,14 +181,14 @@ type contentPackFS struct {
 	pack *ContentPack
 }
 
-func (packFS *contentPackFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	if contents, served := packFS.pack.serve(path.AsString()); served {
+func (fileSystem *contentPackFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if contents, served := fileSystem.pack.serve(path.AsString()); served {
 		return contents, true
 	}
 	// Stat first, so the key can only be older than the bytes read after it.
 	identity, statted := statIdentity(path.AsString())
-	contents, ok := packFS.FS.ReadFile(path)
-	packFS.pack.noteRead(path.AsString(), identity, statted && ok, contents)
+	contents, ok := fileSystem.FS.ReadFile(path)
+	fileSystem.pack.noteRead(path.AsString(), identity, statted && ok, contents)
 	return contents, ok
 }
 

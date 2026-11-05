@@ -734,7 +734,7 @@ func translateAcrossCaptures(
 // the property exists, and a pass that skipped the default would exempt the one path and not the
 // other, which is a distinction upstream does not draw either.
 //
-// Mutates: refDerived marks every binding the pattern introduces as derived from a ref.
+// Mutates: referenceDerived marks every binding the pattern introduces as derived from a ref.
 func markPatternRefDerived(
 	pattern high_level_intermediate_representation.Pattern,
 	referenceDerived map[static_single_assignment.IdentifierId]bool,

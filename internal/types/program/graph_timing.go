@@ -143,48 +143,48 @@ type timingFS struct {
 	current atomic.Pointer[diskCounters]
 }
 
-func (timingFS *timingFS) start() (*diskCounters, time.Time) {
-	return timingFS.current.Load(), time.Now()
+func (fileSystem *timingFS) start() (*diskCounters, time.Time) {
+	return fileSystem.current.Load(), time.Now()
 }
 
-func (timingFS *timingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	counters, started := timingFS.start()
-	contents, ok := timingFS.FS.ReadFile(path)
+func (fileSystem *timingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	counters, started := fileSystem.start()
+	contents, ok := fileSystem.FS.ReadFile(path)
 	counters.add(diskRead, started)
 	return contents, ok
 }
 
-func (timingFS *timingFS) FileExists(path tspath.RootedFilePath) bool {
-	counters, started := timingFS.start()
-	exists := timingFS.FS.FileExists(path)
+func (fileSystem *timingFS) FileExists(path tspath.RootedFilePath) bool {
+	counters, started := fileSystem.start()
+	exists := fileSystem.FS.FileExists(path)
 	counters.add(diskExistence, started)
 	return exists
 }
 
-func (timingFS *timingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
-	counters, started := timingFS.start()
-	exists := timingFS.FS.DirectoryExists(path)
+func (fileSystem *timingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	counters, started := fileSystem.start()
+	exists := fileSystem.FS.DirectoryExists(path)
 	counters.add(diskExistence, started)
 	return exists
 }
 
-func (timingFS *timingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
-	counters, started := timingFS.start()
-	information := timingFS.FS.Stat(path)
+func (fileSystem *timingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	counters, started := fileSystem.start()
+	information := fileSystem.FS.Stat(path)
 	counters.add(diskStat, started)
 	return information
 }
 
-func (timingFS *timingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
-	counters, started := timingFS.start()
-	entries := timingFS.FS.GetAccessibleEntries(path)
+func (fileSystem *timingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	counters, started := fileSystem.start()
+	entries := fileSystem.FS.GetAccessibleEntries(path)
 	counters.add(diskListing, started)
 	return entries
 }
 
-func (timingFS *timingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
-	counters, started := timingFS.start()
-	resolved := timingFS.FS.Realpath(path)
+func (fileSystem *timingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	counters, started := fileSystem.start()
+	resolved := fileSystem.FS.Realpath(path)
 	counters.add(diskRealpath, started)
 	return resolved
 }

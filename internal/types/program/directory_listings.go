@@ -65,10 +65,10 @@ type listingFS struct {
 	listings *DirectoryListings
 }
 
-func (listingFS *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
-	entries, listed := listingFS.listings.Listing(directory.AsString())
+func (fileSystem *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+	entries, listed := fileSystem.listings.Listing(directory.AsString())
 	if !listed {
-		return listingFS.FS.GetAccessibleEntries(directory)
+		return fileSystem.FS.GetAccessibleEntries(directory)
 	}
 	// What the real disk returns for the same entries (vfs/internal Common.GetAccessibleEntries).
 	result := vfs.Entries{Symlinks: map[string]struct{}{}}
@@ -91,7 +91,7 @@ func (listingFS *listingFS) GetAccessibleEntries(directory tspath.RootedDirector
 			continue
 		}
 		if entry.Type()&fs.ModeSymlink != 0 {
-			if information := listingFS.FS.Stat(
+			if information := fileSystem.FS.Stat(
 				tspath.RootedPath(directory.AsString() + "/" + entry.Name()),
 			); information != nil {
 				add(entry.Name(), information.Mode(), true)

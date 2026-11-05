@@ -24,13 +24,13 @@ type identityFS struct {
 	identities *readIdentities
 }
 
-func (identityFS *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+func (fileSystem *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	identity, statted := statIdentity(path.AsString())
-	contents, ok := identityFS.FS.ReadFile(path)
+	contents, ok := fileSystem.FS.ReadFile(path)
 	if statted && ok {
-		identityFS.identities.mutex.Lock()
-		identityFS.identities.byPath[path.AsString()] = identity
-		identityFS.identities.mutex.Unlock()
+		fileSystem.identities.mutex.Lock()
+		fileSystem.identities.byPath[path.AsString()] = identity
+		fileSystem.identities.mutex.Unlock()
 	}
 	return contents, ok
 }

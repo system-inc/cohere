@@ -92,29 +92,29 @@ type checkedStatsFS struct {
 	answered *atomic.Int64
 }
 
-func (statsFS *checkedStatsFS) FileExists(path tspath.RootedFilePath) bool {
-	if information, present, known := statsFS.snapshot.answer(path.AsString()); known {
-		statsFS.answered.Add(1)
+func (fileSystem *checkedStatsFS) FileExists(path tspath.RootedFilePath) bool {
+	if information, present, known := fileSystem.snapshot.answer(path.AsString()); known {
+		fileSystem.answered.Add(1)
 		return present && !information.IsDir()
 	}
-	return statsFS.FS.FileExists(path)
+	return fileSystem.FS.FileExists(path)
 }
 
-func (statsFS *checkedStatsFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
-	if information, present, known := statsFS.snapshot.answer(path.AsString()); known {
-		statsFS.answered.Add(1)
+func (fileSystem *checkedStatsFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	if information, present, known := fileSystem.snapshot.answer(path.AsString()); known {
+		fileSystem.answered.Add(1)
 		return present && information.IsDir()
 	}
-	return statsFS.FS.DirectoryExists(path)
+	return fileSystem.FS.DirectoryExists(path)
 }
 
-func (statsFS *checkedStatsFS) Stat(path tspath.RootedPath) vfs.FileInfo {
-	if information, present, known := statsFS.snapshot.answer(path.AsString()); known {
-		statsFS.answered.Add(1)
+func (fileSystem *checkedStatsFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	if information, present, known := fileSystem.snapshot.answer(path.AsString()); known {
+		fileSystem.answered.Add(1)
 		if !present {
 			return nil
 		}
 		return information
 	}
-	return statsFS.FS.Stat(path)
+	return fileSystem.FS.Stat(path)
 }
