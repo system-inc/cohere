@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -38,16 +39,16 @@ type consistentReturnCase struct {
 //
 // Not a hand-built settings struct. A fixture that constructs the options directly never exercises
 // the decoder, so a decoder wrong about the shape the config layer delivers passes every fixture.
-func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) any {
+func decodeConsistentReturnOptionsForTest(test *testing.T, optionsJson string) rule.Given[ConsistentReturnSettings] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[ConsistentReturnSettings]{}
 	}
 	decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(optionsJson))
 	if decodeConsistentReturnOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeConsistentReturnOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // asTheTypedConsistentReturnHarnessWroteIt transforms a fixture the way RunTyped transforms it.
@@ -91,7 +92,7 @@ func consistentReturnLeadingBlankLines(source string) int {
 
 func runConsistentReturn(test *testing.T, testCase consistentReturnCase) rule_testing.Result {
 	test.Helper()
-	return rule_testing.RunTypedWithOptions(test, ConsistentReturn, consistentReturnFile,
+	return rule_testing.RunTypedGiven(test, ConsistentReturn, consistentReturnFile,
 		testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 }
 

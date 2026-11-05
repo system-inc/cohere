@@ -44,7 +44,7 @@ type noMeaninglessVoidOperatorRow struct {
 }
 
 // noMeaninglessVoidOperatorOptionsFor routes a case's options through the rule's own decoder.
-func noMeaninglessVoidOperatorOptionsFor(test *testing.T, optionsJson string) any {
+func noMeaninglessVoidOperatorOptionsFor(test *testing.T, optionsJson string) NoMeaninglessVoidOperatorOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultNoMeaninglessVoidOperatorSettings()
@@ -1037,8 +1037,8 @@ func TestNoMeaninglessVoidOperatorFallsBackToTheDefaultOnNilOptions(test *testin
 
 	const neverArgument = "declare function fail(): never;\nvoid fail();"
 
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMeaninglessVoidOperator,
-		noMeaninglessVoidOperatorFile, neverArgument, nil))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoMeaninglessVoidOperator,
+		noMeaninglessVoidOperatorFile, neverArgument))
 
 	// The control: the same input with checkNever on must report, so the silence above is the
 	// default being applied rather than the rule being inert.

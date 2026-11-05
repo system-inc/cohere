@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -34,10 +35,13 @@ type noConfusingVoidExpressionCase struct {
 func noConfusingVoidExpressionStringPointer(value string) *string { return &value }
 
 // decodeNoConfusingVoidExpressionOptionsForTest routes a case's options through the decoder.
-func decodeNoConfusingVoidExpressionOptionsForTest(test *testing.T, optionsJson string) any {
+func decodeNoConfusingVoidExpressionOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[NoConfusingVoidExpressionSettings] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[NoConfusingVoidExpressionSettings]{}
 	}
 	decoded, decodeNoConfusingVoidExpressionOptionsError := DecodeNoConfusingVoidExpressionOptions(
 		json.RawMessage(optionsJson),
@@ -45,7 +49,7 @@ func decodeNoConfusingVoidExpressionOptionsForTest(test *testing.T, optionsJson 
 	if decodeNoConfusingVoidExpressionOptionsError != nil {
 		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoConfusingVoidExpressionOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 var noConfusingVoidExpressionCleanCases = []noConfusingVoidExpressionCase{
@@ -747,7 +751,7 @@ func runNoConfusingVoidExpressionCase(test *testing.T, testCase noConfusingVoidE
 		fileName = noConfusingVoidExpressionJsxFile
 		preamble += noConfusingVoidExpressionJsxIntrinsics
 	}
-	return rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression, fileName,
+	return rule_testing.RunTypedGiven(test, NoConfusingVoidExpression, fileName,
 		preamble+testCase.source,
 		decodeNoConfusingVoidExpressionOptionsForTest(test, testCase.optionsJson))
 }
@@ -861,9 +865,9 @@ func TestNoConfusingVoidExpressionJudgesVoidNotUndefined(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression,
+			result := rule_testing.RunTyped(test, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
-				noConfusingVoidExpressionAmbientGlobals+declarations+testCase.source, nil)
+				noConfusingVoidExpressionAmbientGlobals+declarations+testCase.source)
 			if len(testCase.messageIds) == 0 {
 				rule_testing.ExpectClean(test, result)
 				return
@@ -904,9 +908,9 @@ func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(test *testing.T) 
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression,
+			result := rule_testing.RunTyped(test, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
-				noConfusingVoidExpressionAmbientGlobals+testCase.source, nil)
+				noConfusingVoidExpressionAmbientGlobals+testCase.source)
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
 			for i, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
@@ -956,7 +960,7 @@ func TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike(test *testing.T
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoConfusingVoidExpression,
+			result := rule_testing.RunTypedGiven(test, NoConfusingVoidExpression,
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+testCase.source,
 				decodeNoConfusingVoidExpressionOptionsForTest(test, options))

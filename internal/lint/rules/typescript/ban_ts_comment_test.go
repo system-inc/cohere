@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -18,20 +19,20 @@ const banTsCommentFile = "/repository/source/Thing.ts"
 // The decoder holds five defaults, a polymorphic value for four of the keys, and a regex
 // compile, so a fixture constructing BanTsCommentOptions by hand would leave the whole config
 // half of the port unexercised. An empty configuration is the bare `"error"` case, which the
-// config layer turns into nil options, and it reaches the rule the same way here.
-func decodeBanTsCommentOptions(test *testing.T, configuration string) any {
+// config layer turns into no options, and it reaches the rule the same way here.
+func decodeBanTsCommentOptions(test *testing.T, configuration string) rule.Given[BanTsCommentOptions] {
 	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct. Passing nil
-		// here is what puts the rule's own fallback under test rather than the decoder's.
-		return nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct. Handing
+		// it none here is what puts the rule's own fallback under test rather than the decoder's.
+		return rule.Given[BanTsCommentOptions]{}
 	}
 	options, decodeBanTsCommentOptionsError := DecodeBanTsCommentOptions([]byte(configuration))
 	if decodeBanTsCommentOptionsError != nil {
 		test.Fatalf("could not decode %s: %v", configuration, decodeBanTsCommentOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestBanTsCommentUpstreamCorpus replays typescript-eslint 8.71.0's own rows and the edge rows
@@ -64,7 +65,7 @@ func TestBanTsCommentUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, BanTsComment, banTsCommentFile, row.source,
+			result := rule_testing.RunGiven(test, BanTsComment, banTsCommentFile, row.source,
 				decodeBanTsCommentOptions(test, row.options))
 			if len(row.findings) == 0 {
 				rule_testing.ExpectClean(test, result)
@@ -139,8 +140,7 @@ func TestBanTsCommentDefaultsBindWithNoConfiguration(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(banTsCommentCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, BanTsComment, banTsCommentFile,
-				testCase.sourceText, nil)
+			result := rule_testing.Run(test, BanTsComment, banTsCommentFile, testCase.sourceText)
 			// A silent row asserts clean, so the docs capture records it as clean rather than as a
 			// firing case with no findings.
 			if len(testCase.wantIds) == 0 {
@@ -288,7 +288,7 @@ func TestBanTsCommentDeclinesJavaScriptFiles(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(
 				test,
-				rule_testing.RunWithOptions(test, BanTsComment, fileName, "// @ts-ignore\n", nil),
+				rule_testing.Run(test, BanTsComment, fileName, "// @ts-ignore\n"),
 			)
 		})
 	}
@@ -300,7 +300,7 @@ func TestBanTsCommentDeclinesJavaScriptFiles(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, BanTsComment, fileName, "// @ts-ignore\n", nil)
+			result := rule_testing.Run(test, BanTsComment, fileName, "// @ts-ignore\n")
 			rule_testing.ExpectFindings(test, result, "tsIgnoreInsteadOfExpectError")
 		})
 	}
@@ -363,7 +363,7 @@ func TestBanTsCommentMessageTextNamesTheDirective(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(banTsCommentCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, BanTsComment, banTsCommentFile,
+			result := rule_testing.RunGiven(test, BanTsComment, banTsCommentFile,
 				testCase.sourceText, decodeBanTsCommentOptions(test, testCase.configuration))
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %d: %v", len(result.Diagnostics),
@@ -404,7 +404,7 @@ func TestBanTsCommentSurvivesAnUnterminatedBlockComment(test *testing.T) {
 			test.Parallel()
 			// The assertion is that this returns at all. A finding would also be acceptable for
 			// some of these; a panic is not, and a panic is what the guards prevent.
-			_ = rule_testing.RunWithOptions(test, BanTsComment, banTsCommentFile, sourceText, nil)
+			_ = rule_testing.Run(test, BanTsComment, banTsCommentFile, sourceText)
 		})
 	}
 }

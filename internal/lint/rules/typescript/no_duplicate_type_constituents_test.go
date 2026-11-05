@@ -27,7 +27,7 @@ type noDuplicateTypeConstituentsFinding struct {
 }
 
 // noDuplicateTypeConstituentsOptionsFor routes a case's options through the rule's own decoder.
-func noDuplicateTypeConstituentsOptionsFor(test *testing.T, optionsJson string) any {
+func noDuplicateTypeConstituentsOptionsFor(test *testing.T, optionsJson string) NoDuplicateTypeConstituentsOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultNoDuplicateTypeConstituentsSettings()
@@ -1028,10 +1028,10 @@ func TestNoDuplicateTypeConstituentsFallsBackToTheDefaultOnNilOptions(test *test
 	const union = "type T = A | A;\ntype A = string;"
 	const intersection = "type T = A & A;\ntype A = { a: 1 };"
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
-		noDuplicateTypeConstituentsFile, union, nil), "duplicate")
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoDuplicateTypeConstituents,
-		noDuplicateTypeConstituentsFile, intersection, nil), "duplicate")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoDuplicateTypeConstituents,
+		noDuplicateTypeConstituentsFile, union), "duplicate")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoDuplicateTypeConstituents,
+		noDuplicateTypeConstituentsFile, intersection), "duplicate")
 
 	// The controls: each half must go silent when its own key is set, so the reports above are the
 	// defaults being applied rather than the options being ignored.

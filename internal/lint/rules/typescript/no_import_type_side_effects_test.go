@@ -206,13 +206,13 @@ func TestNoImportTypeSideEffectsMessage(test *testing.T) {
 	}
 }
 
-// The rule takes no options, so it must survive being handed nil the way a bare "error" configuration
+// The rule takes no options, so it must survive being handed none the way a bare "error" configuration
 // hands it. Bypasses the decoder entirely, which every fixture above reaches the rule through.
 func TestNoImportTypeSideEffectsTakesNoOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, NoImportTypeSideEffects,
-		importTypeSideEffectsFile, "import { type A } from 'mod';", nil)
+	result := rule_testing.Run(test, NoImportTypeSideEffects,
+		importTypeSideEffectsFile, "import { type A } from 'mod';")
 	rule_testing.ExpectFindings(test, result, "useTopLevelQualifier")
 
 	if NoImportTypeSideEffects.NeedsTypeChecker {
