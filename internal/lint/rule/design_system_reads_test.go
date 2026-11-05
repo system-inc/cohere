@@ -20,8 +20,8 @@ func TestDesignSystemReadsAreKeptPerProgram(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	theme := filepath.Join(directory, "theme.css")
-	if err := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	first, second, neither := &compiler.Program{}, &compiler.Program{}, &compiler.Program{}
 

@@ -55,8 +55,8 @@ func ParseRunOutput(output []byte) (RunOutput, error) {
 		if json.Unmarshal(line, &kind) != nil || kind.Kind != "summary" {
 			continue
 		}
-		if err := json.Unmarshal(line, &summary); err != nil {
-			return RunOutput{}, fmt.Errorf("reading the summary line: %w", err)
+		if decodeError := json.Unmarshal(line, &summary); decodeError != nil {
+			return RunOutput{}, fmt.Errorf("reading the summary line: %w", decodeError)
 		}
 		found = true
 	}

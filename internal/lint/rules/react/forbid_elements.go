@@ -98,19 +98,19 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 	}
 
 	var wire forbidElementsWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	for _, item := range wire.Forbid {
 		var asString string
-		if err := json.Unmarshal(item, &asString); err == nil {
+		if decodeError := json.Unmarshal(item, &asString); decodeError == nil {
 			options.Forbid = append(options.Forbid, ForbidElementsEntry{Element: asString})
 			continue
 		}
 		var asObject forbidElementsWireEntry
-		if err := rule.UnmarshalOptions(item, &asObject); err != nil {
-			return options, fmt.Errorf("decoding a forbid entry: %w", err)
+		if unmarshalOptionsError := rule.UnmarshalOptions(item, &asObject); unmarshalOptionsError != nil {
+			return options, fmt.Errorf("decoding a forbid entry: %w", unmarshalOptionsError)
 		}
 		options.Forbid = append(options.Forbid, ForbidElementsEntry{
 			Element: asObject.Element,
@@ -234,7 +234,7 @@ var ForbidElements = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[ForbidElementsOptions](options)
 
 		// A rule with an empty list matches nothing, which is the unconfigured state. Building the
@@ -252,8 +252,8 @@ var ForbidElements = rule.Rule{
 		// `rule.TokenRange` is what strips leading trivia, so a name written after a comment or a
 		// newline reports its own text rather than the whitespace before it.
 		sourceTextOf := func(node *ast.Node) string {
-			span := rule.TokenRange(ctx.SourceFile, node)
-			text := ctx.SourceFile.Text()
+			span := rule.TokenRange(ruleContext.SourceFile, node)
+			text := ruleContext.SourceFile.Text()
 			if span.Pos() < 0 || span.End() > len(text) || span.Pos() > span.End() {
 				return ""
 			}
@@ -265,7 +265,7 @@ var ForbidElements = rule.Rule{
 			if !found {
 				return
 			}
-			ctx.ReportNode(node, forbidElementsMessage(element, entry.Message))
+			ruleContext.ReportNode(node, forbidElementsMessage(element, entry.Message))
 		}
 
 		// checkJsxElement handles either opening form. Upstream reports on the NAME node rather
@@ -293,10 +293,10 @@ var ForbidElements = rule.Rule{
 			ast.KindJsxSelfClosingElement: checkJsxElement,
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				arguments := node.AsCallExpression().Arguments

@@ -89,7 +89,7 @@ var NoUnwantedPolyfillio = rule.Rule{
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files while
 	// its own tests pass.
 	Name: "@next/next/no-unwanted-polyfillio",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The local name `next/script` is bound to in this file, empty when it is not imported.
 		//
 		// Filled by the import listener and read by the JSX listener. The walk is a single
@@ -152,7 +152,7 @@ var NoUnwantedPolyfillio = rule.Rule{
 			// feature list is never consulted on these, which is why the arm returns rather than
 			// falling through.
 			if strings.HasPrefix(source, "https://cdn.polyfill.io/v2/") || strings.HasPrefix(source, "https://polyfill.io/v3/") {
-				ctx.ReportNode(sourceNode, messageNoUnwantedPolyfillioSecurity)
+				ruleContext.ReportNode(sourceNode, messageNoUnwantedPolyfillioSecurity)
 				return
 			}
 
@@ -196,7 +196,7 @@ var NoUnwantedPolyfillio = rule.Rule{
 					"from the `features` list.",
 				named, verb, named,
 			)
-			ctx.ReportNode(sourceNode, message)
+			ruleContext.ReportNode(sourceNode, message)
 		}
 
 		return rule.Listeners{

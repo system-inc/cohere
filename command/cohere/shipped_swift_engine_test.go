@@ -27,14 +27,14 @@ import (
 func installCohere(test *testing.T, version string) string {
 	test.Helper()
 	binary := filepath.Join(test.TempDir(), "bin", "cohere")
-	if err := os.MkdirAll(filepath.Dir(binary), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(binary), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	source := buildCohere(test)
 	if version != "" {
 		source = stampedCohere(test, version)
 	}
-	if err := os.Link(source, binary); err != nil {
+	if linkError := os.Link(source, binary); linkError != nil {
 		// Across filesystems a link fails, and a copy is the same install.
 		contents, readError := os.ReadFile(source)
 		if readError != nil {
@@ -77,14 +77,14 @@ func stampedCohere(test *testing.T, version string) string {
 // and streams a clean run, and returns the file it records into.
 func placeSiblingEngine(test *testing.T, binary string) string {
 	test.Helper()
-	clean, err := filepath.Abs(filepath.Join("..", "..", "swift", "Contract", "Clean.jsonl"))
-	if err != nil {
-		test.Fatal(err)
+	clean, absolutePathError := filepath.Abs(filepath.Join("..", "..", "swift", "Contract", "Clean.jsonl"))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	invoked := filepath.Join(test.TempDir(), "invoked")
 	script := "#!/bin/sh\necho \"$@\" > '" + invoked + "'\ncat '" + clean + "'\n"
-	if err := os.WriteFile(filepath.Join(filepath.Dir(binary), release.SwiftEngineFileName), []byte(script), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(filepath.Dir(binary), release.SwiftEngineFileName), []byte(script), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return invoked
 }
@@ -120,8 +120,8 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 	binary := installCohere(test, "1.0.0")
 	invoked := placeSiblingEngine(test, binary)
 	link := filepath.Join(test.TempDir(), "cohere")
-	if err := os.Symlink(binary, link); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink(binary, link); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
 	root := swiftPackage(test, "")
 
@@ -131,8 +131,8 @@ func TestAReleasedCohereRunsTheEngineShippedBesideIt(test *testing.T) {
 	if exitCode != 0 {
 		test.Fatalf("a released cohere with its engine beside it exited %d:\n%s", exitCode, output)
 	}
-	recorded, err := os.ReadFile(invoked)
-	if err != nil {
+	recorded, readError := os.ReadFile(invoked)
+	if readError != nil {
 		test.Fatalf("the engine beside cohere was never run:\n%s", output)
 	}
 	resolvedRoot, _ := filepath.EvalSymlinks(root)
@@ -175,9 +175,9 @@ func TestAReleasedCohereWithNoEngineBesideItNeverBuildsOne(test *testing.T) {
 	}
 	// Named as the run names it, with the executable's symlinks resolved, which on macOS turns /tmp into
 	// /private/tmp.
-	installed, err := filepath.EvalSymlinks(filepath.Dir(binary))
-	if err != nil {
-		test.Fatal(err)
+	installed, resolveSymlinksError := filepath.EvalSymlinks(filepath.Dir(binary))
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	expected := filepath.Join(installed, release.SwiftEngineFileName)
 	if !strings.Contains(output, "This cohere 1.0.0 install has no Swift engine: expected "+expected) ||
@@ -202,7 +202,7 @@ func TestADevelopmentCohereIgnoresAnEngineBesideIt(test *testing.T) {
 	if exitCode != 1 || !strings.Contains(output, "the Swift engine is built from a cohere checkout") {
 		test.Fatalf("a development cohere outside a checkout exited %d:\n%s", exitCode, output)
 	}
-	if _, err := os.Stat(invoked); err == nil {
+	if _, statError := os.Stat(invoked); statError == nil {
 		test.Fatalf("a development cohere ran the engine beside it:\n%s", output)
 	}
 }
@@ -228,26 +228,26 @@ func TestSwiftIsRefusedByNameWhereTheEngineDoesNotShip(test *testing.T) {
 	} {
 		swiftEnginePlatform = platform
 		for _, provenance := range []release.Provenance{{Version: "1.0.0"}, {Version: "dev"}} {
-			_, _, err := resolveSwiftEngineBinary(location, provenance)
+			_, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(location, provenance)
 			want := "Swift is not available on this platform (" + platform.String() +
 				"): cohere-swift ships only for macOS, so nothing in /work/Toy was checked"
-			if err == nil || err.Error() != want {
-				test.Errorf("%s, cohere %s: got %v\nwant %s", platform, provenance.Version, err, want)
+			if resolveSwiftEngineBinaryError == nil || resolveSwiftEngineBinaryError.Error() != want {
+				test.Errorf("%s, cohere %s: got %v\nwant %s", platform, provenance.Version, resolveSwiftEngineBinaryError, want)
 			}
 		}
 	}
 
 	// The control: on macOS the same released cohere gets past the platform, to its sibling.
 	swiftEnginePlatform = release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
-	if _, _, err := resolveSwiftEngineBinary(location, release.Provenance{Version: "1.0.0"}); err == nil ||
-		!strings.Contains(err.Error(), "install has no Swift engine") {
-		test.Errorf("on macOS a released cohere was not sent to its sibling: %v", err)
+	if _, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(location, release.Provenance{Version: "1.0.0"}); resolveSwiftEngineBinaryError == nil ||
+		!strings.Contains(resolveSwiftEngineBinaryError.Error(), "install has no Swift engine") {
+		test.Errorf("on macOS a released cohere was not sent to its sibling: %v", resolveSwiftEngineBinaryError)
 	}
 
 	engine := fakeSwiftEngine(test, "")
 	test.Setenv(dispatch.SwiftEngineOverrideVariable, engine)
 	swiftEnginePlatform = release.Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}
-	if binaryPath, _, err := resolveSwiftEngineBinary(location, release.Provenance{Version: "1.0.0"}); err != nil || binaryPath != engine {
-		test.Errorf("the override was refused on linux: %q, %v", binaryPath, err)
+	if binaryPath, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(location, release.Provenance{Version: "1.0.0"}); resolveSwiftEngineBinaryError != nil || binaryPath != engine {
+		test.Errorf("the override was refused on linux: %q, %v", binaryPath, resolveSwiftEngineBinaryError)
 	}
 }

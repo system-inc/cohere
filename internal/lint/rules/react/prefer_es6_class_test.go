@@ -135,9 +135,9 @@ func TestPreferEs6ClassStaysSilent(test *testing.T) {
 // `"never"`.
 func runPreferEs6Class(test *testing.T, mode PreferEs6ClassMode, sourceText string) rule_testing.Result {
 	test.Helper()
-	decoded, err := DecodePreferEs6ClassOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
-	if err != nil {
-		test.Fatalf("decoding mode %q: %v", mode, err)
+	decoded, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
+	if decodePreferEs6ClassOptionsError != nil {
+		test.Fatalf("decoding mode %q: %v", mode, decodePreferEs6ClassOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, PreferEs6Class, preferEs6ClassFile, sourceText, decoded)
 }
@@ -485,9 +485,9 @@ func TestDecodePreferEs6ClassOptions(test *testing.T) {
 	for _, testCase := range accepted {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodePreferEs6ClassOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			decoded, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions([]byte(testCase.raw))
+			if decodePreferEs6ClassOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodePreferEs6ClassOptionsError)
 			}
 			if decoded.(PreferEs6ClassOptions).Mode != testCase.want {
 				test.Errorf("mode = %q, wanted %q", decoded.(PreferEs6ClassOptions).Mode, testCase.want)
@@ -512,7 +512,7 @@ func TestDecodePreferEs6ClassOptions(test *testing.T) {
 	for _, testCase := range refused {
 		test.Run(testCase.name+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodePreferEs6ClassOptions([]byte(testCase.raw)); err == nil {
+			if _, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions([]byte(testCase.raw)); decodePreferEs6ClassOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})

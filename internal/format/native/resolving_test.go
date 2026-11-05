@@ -22,30 +22,30 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(test *testing.T) {
 	root := test.TempDir()
 	for name, printWidth := range map[string]string{"narrow": "40", "wide": "160"} {
 		directory := filepath.Join(root, name, "source")
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
 		// Each repository extends its own Nexus tier, the one file a format block may live in.
 		nexusTier := `{"format": {"printWidth": ` + printWidth + `}}`
-		if err := os.WriteFile(filepath.Join(root, name, "NexusCohereSettings.json"), []byte(nexusTier), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, name, "NexusCohereSettings.json"), []byte(nexusTier), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		settings := `{"extends": "./NexusCohereSettings.json"}`
-		if err := os.WriteFile(filepath.Join(root, name, "CohereSettings.json"), []byte(settings), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, name, "CohereSettings.json"), []byte(settings), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 
 	// Started in narrow, so a formatter that kept its starting options would print 40 for both.
-	resolving, err := NewResolving(filepath.Join(root, "narrow"))
-	if err != nil {
-		test.Fatal(err)
+	resolving, newResolvingError := NewResolving(filepath.Join(root, "narrow"))
+	if newResolvingError != nil {
+		test.Fatal(newResolvingError)
 	}
 	for name, want := range map[string]string{"narrow": "40", "wide": "160"} {
 		// Text, not "": core.js answers empty text itself, before any printer, so the probe would never run.
-		got, err := resolving.Format(filepath.Join(root, name, "source", "file.resolvingprobe"), "x")
-		if err != nil {
-			test.Fatal(err)
+		got, formatError := resolving.Format(filepath.Join(root, name, "source", "file.resolvingprobe"), "x")
+		if formatError != nil {
+			test.Fatal(formatError)
 		}
 		if got != want {
 			test.Fatalf("%s formatted with printWidth %s, want %s from its own Nexus tier", name, got, want)
@@ -64,8 +64,8 @@ func TestResolvingOffersOnlyWhatAPrinterHandles(test *testing.T) {
 
 	root := test.TempDir()
 	for _, name := range []string{"kept.offeredprobe", "declined.unregistered"} {
-		if err := os.WriteFile(filepath.Join(root, name), []byte("x"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte("x"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 
@@ -90,10 +90,10 @@ func TestResolvingOffersOnlyWhatAPrinterHandles(test *testing.T) {
 func TestResolvingRefusesAConfigItCannotApplyAtConstruction(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"prettier": "@company/prettier-config"}`), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"prettier": "@company/prettier-config"}`), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if _, err := NewResolving(root); err == nil {
+	if _, newResolvingError := NewResolving(root); newResolvingError == nil {
 		test.Fatal("NewResolving accepted Prettier config left in package.json")
 	}
 }

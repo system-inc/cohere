@@ -98,7 +98,7 @@ const messageIdNoRedundantShouldComponentUpdate = "noShouldCompUpdate"
 // would report text upstream never produces, and no fixture asserting a message id could see it.
 var NoRedundantShouldComponentUpdate = rule.Rule{
 	Name: "react/no-redundant-should-component-update",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {
 			if !extendsPureComponent(node) {
 				return
@@ -108,7 +108,7 @@ var NoRedundantShouldComponentUpdate = rule.Rule{
 				if identifierMemberName(member) != "shouldComponentUpdate" {
 					continue
 				}
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: messageIdNoRedundantShouldComponentUpdate,
 					Description: fmt.Sprintf(
 						"%s extends PureComponent and also writes shouldComponentUpdate. "+

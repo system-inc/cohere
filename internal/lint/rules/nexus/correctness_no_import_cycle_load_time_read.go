@@ -134,17 +134,17 @@ var CorrectnessNoImportCycleLoadTimeRead = rule.Rule{
 	// Only a file inside a runtime import cycle can hold a finding, and most files are in none.
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		graph := correctnessNoImportCycleLoadTimeReadGraphFor(ctx)
-		if _, inCycle := graph.component[ctx.SourceFile.PathKey()]; !inCycle {
+		graph := correctnessNoImportCycleLoadTimeReadGraphFor(ruleContext)
+		if _, inCycle := graph.component[ruleContext.SourceFile.PathKey()]; !inCycle {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				correctnessNoImportCycleLoadTimeReadScanFile(ctx, graph)
+				correctnessNoImportCycleLoadTimeReadScanFile(ruleContext, graph)
 			},
 		}
 	},
@@ -175,14 +175,14 @@ var correctnessNoImportCycleLoadTimeReadCache struct {
 // The build asks this file's checker about other files' references. That is the checker's ordinary
 // work (resolving any import already reaches into another file) and every query only reads the
 // program and writes the asking checker's own tables, which this goroutine holds exclusively.
-func correctnessNoImportCycleLoadTimeReadGraphFor(ctx rule.Context) *correctnessNoImportCycleLoadTimeReadGraph {
+func correctnessNoImportCycleLoadTimeReadGraphFor(ruleContext rule.Context) *correctnessNoImportCycleLoadTimeReadGraph {
 	correctnessNoImportCycleLoadTimeReadCache.Lock()
 	defer correctnessNoImportCycleLoadTimeReadCache.Unlock()
-	if correctnessNoImportCycleLoadTimeReadCache.program == ctx.Program.Identity() && correctnessNoImportCycleLoadTimeReadCache.graph != nil {
+	if correctnessNoImportCycleLoadTimeReadCache.program == ruleContext.Program.Identity() && correctnessNoImportCycleLoadTimeReadCache.graph != nil {
 		return correctnessNoImportCycleLoadTimeReadCache.graph
 	}
-	graph := correctnessNoImportCycleLoadTimeReadBuildGraph(ctx.Program, ctx.TypeChecker)
-	correctnessNoImportCycleLoadTimeReadCache.program = ctx.Program.Identity()
+	graph := correctnessNoImportCycleLoadTimeReadBuildGraph(ruleContext.Program, ruleContext.TypeChecker)
+	correctnessNoImportCycleLoadTimeReadCache.program = ruleContext.Program.Identity()
 	correctnessNoImportCycleLoadTimeReadCache.graph = graph
 	return graph
 }
@@ -561,15 +561,15 @@ type correctnessNoImportCycleLoadTimeReadImportBinding struct {
 	namespace bool
 }
 
-func correctnessNoImportCycleLoadTimeReadScanFile(ctx rule.Context, graph *correctnessNoImportCycleLoadTimeReadGraph) {
-	readerPath := ctx.SourceFile.PathKey()
+func correctnessNoImportCycleLoadTimeReadScanFile(ruleContext rule.Context, graph *correctnessNoImportCycleLoadTimeReadGraph) {
+	readerPath := ruleContext.SourceFile.PathKey()
 	bindingsByName := map[string][]correctnessNoImportCycleLoadTimeReadImportBinding{}
-	for _, statement := range ctx.SourceFile.Statements.Nodes {
+	for _, statement := range ruleContext.SourceFile.Statements.Nodes {
 		if statement.Kind != ast.KindImportDeclaration {
 			continue
 		}
 		for _, name := range correctnessNoImportCycleLoadTimeReadBindingNames(statement) {
-			if alias := ctx.TypeChecker.GetSymbolAtLocation(name.name); alias != nil {
+			if alias := ruleContext.TypeChecker.GetSymbolAtLocation(name.name); alias != nil {
 				bindingsByName[name.name.Text()] = append(bindingsByName[name.name.Text()], correctnessNoImportCycleLoadTimeReadImportBinding{alias: alias, namespace: name.namespace})
 			}
 		}
@@ -578,12 +578,12 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ctx rule.Context, graph *corre
 		return
 	}
 
-	correctnessNoImportCycleLoadTimeReadWalkValueIdentifiers(ctx.SourceFile.AsNode(), true, func(identifier *ast.Node) {
+	correctnessNoImportCycleLoadTimeReadWalkValueIdentifiers(ruleContext.SourceFile.AsNode(), true, func(identifier *ast.Node) {
 		bindings := bindingsByName[identifier.Text()]
 		if len(bindings) == 0 {
 			return
 		}
-		symbol := correctnessNoImportCycleLoadTimeReadReferencedSymbol(ctx.TypeChecker, identifier)
+		symbol := correctnessNoImportCycleLoadTimeReadReferencedSymbol(ruleContext.TypeChecker, identifier)
 		for _, binding := range bindings {
 			if binding.alias != symbol {
 				continue
@@ -596,15 +596,15 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ctx rule.Context, graph *corre
 				if access == nil || !ast.IsPropertyAccessExpression(access) || access.Expression() != identifier {
 					return
 				}
-				member := ctx.TypeChecker.GetSymbolAtLocation(access.Name())
+				member := ruleContext.TypeChecker.GetSymbolAtLocation(access.Name())
 				if member == nil {
 					return
 				}
-				read, target = access, ctx.TypeChecker.SkipAlias(member)
+				read, target = access, ruleContext.TypeChecker.SkipAlias(member)
 			} else {
-				target = ctx.TypeChecker.GetAliasedSymbol(binding.alias)
+				target = ruleContext.TypeChecker.GetAliasedSymbol(binding.alias)
 			}
-			declaration := correctnessNoImportCycleLoadTimeReadUninitializedDeclaration(ctx.TypeChecker, target)
+			declaration := correctnessNoImportCycleLoadTimeReadUninitializedDeclaration(ruleContext.TypeChecker, target)
 			if declaration == nil {
 				return
 			}
@@ -615,7 +615,7 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ctx rule.Context, graph *corre
 			if declaringComponent, inCycle := graph.component[declaringFile.PathKey()]; !inCycle || declaringComponent != graph.component[readerPath] {
 				return
 			}
-			ctx.ReportNode(read, rule.Message{
+			ruleContext.ReportNode(read, rule.Message{
 				Id: correctnessNoImportCycleLoadTimeReadId,
 				Description: correctnessNoImportCycleLoadTimeReadText.Render(map[string]string{
 					"name":  target.Name,

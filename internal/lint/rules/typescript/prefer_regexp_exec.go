@@ -79,13 +79,13 @@ var messagePreferRegexpExecOverStringMatch = rule.Message{
 var PreferRegexpExec = rule.Rule{
 	Name:             "@typescript-eslint/prefer-regexp-exec",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return rule.Listeners{}
 		}
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				checkPreferRegexpExec(ctx, node)
+				checkPreferRegexpExec(ruleContext, node)
 			},
 		}
 	},
@@ -97,7 +97,7 @@ var PreferRegexpExec = rule.Rule{
 // Upstream keys on the member expression and reaches the call through its parent; here the listener
 // is on the call and the member is read off it, which is the same pair reached from the other end
 // and makes the one-argument test a direct read rather than a selector clause.
-func checkPreferRegexpExec(ctx rule.Context, node *ast.Node) {
+func checkPreferRegexpExec(ruleContext rule.Context, node *ast.Node) {
 	call := node.AsCallExpression()
 	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
 		return
@@ -126,14 +126,14 @@ func checkPreferRegexpExec(ctx rule.Context, node *ast.Node) {
 	}
 
 	// The receiver has to be a string, which is the type question this rule exists to ask.
-	receiverType := ctx.TypeChecker.GetTypeAtLocation(receiver)
-	if receiverType == nil || type_checking.GetTypeName(ctx.TypeChecker, receiverType) != "string" {
+	receiverType := ruleContext.TypeChecker.GetTypeAtLocation(receiver)
+	if receiverType == nil || type_checking.GetTypeName(ruleContext.TypeChecker, receiverType) != "string" {
 		return
 	}
 
 	// A regex that may carry `g` must stay a `match`. The direction is upstream's: only a PROVEN
 	// absence of the flag allows a report.
-	if !preferRegexpExecDefinitelyHasNoGlobalFlag(ctx, argument) {
+	if !preferRegexpExecDefinitelyHasNoGlobalFlag(ruleContext, argument) {
 		return
 	}
 
@@ -144,24 +144,24 @@ func checkPreferRegexpExec(ctx rule.Context, node *ast.Node) {
 		if !ok {
 			return
 		}
-		ctx.ReportNodeWithFixes(member.Name(), messagePreferRegexpExecOverStringMatch,
-			preferRegexpExecWrappingFix(ctx, node, pattern+".exec(",
+		ruleContext.ReportNodeWithFixes(member.Name(), messagePreferRegexpExecOverStringMatch,
+			preferRegexpExecWrappingFix(ruleContext, node, pattern+".exec(",
 				[]*ast.Node{receiver}, ")"))
 		return
 	}
 
 	// Otherwise the argument's own type picks the repair.
-	argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 	if argumentType == nil {
 		return
 	}
-	switch preferRegexpExecArgumentKind(ctx, argumentType) {
+	switch preferRegexpExecArgumentKind(ruleContext, argumentType) {
 	case preferRegexpExecArgumentRegExp:
-		ctx.ReportNodeWithFixes(member.Name(), messagePreferRegexpExecOverStringMatch,
-			preferRegexpExecWrappingFixTwo(ctx, node, "", argument, ".exec(", receiver, ")"))
+		ruleContext.ReportNodeWithFixes(member.Name(), messagePreferRegexpExecOverStringMatch,
+			preferRegexpExecWrappingFixTwo(ruleContext, node, "", argument, ".exec(", receiver, ")"))
 	case preferRegexpExecArgumentString:
-		ctx.ReportNodeWithFixes(member.Name(), messagePreferRegexpExecOverStringMatch,
-			preferRegexpExecWrappingFixTwo(ctx, node, "RegExp(", argument, ").exec(", receiver, ")"))
+		ruleContext.ReportNodeWithFixes(member.Name(), messagePreferRegexpExecOverStringMatch,
+			preferRegexpExecWrappingFixTwo(ruleContext, node, "RegExp(", argument, ").exec(", receiver, ")"))
 	}
 }
 
@@ -184,12 +184,12 @@ const (
 // `Other` and is silent. That collapse is reproduced here rather than simplified, because a union
 // of the two is exactly the case where either repair would be wrong.
 func preferRegexpExecArgumentKind(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	argumentType *checker.Type,
 ) preferRegexpExecArgumentClass {
 	sawString, sawRegExp := false, false
 	for constituent := range type_checking.UnionTypePartsSeq(argumentType) {
-		switch type_checking.GetTypeName(ctx.TypeChecker, constituent) {
+		switch type_checking.GetTypeName(ruleContext.TypeChecker, constituent) {
 		case "string":
 			sawString = true
 		case "RegExp":
@@ -224,7 +224,7 @@ func preferRegexpExecArgumentKind(
 // `GetSymbolAtLocation` resolves the reference to its declaration and the initializer is the literal
 // with its flags intact, measured with a probe, so the scope analyser upstream needs has an
 // equivalent here rather than an absence.
-func preferRegexpExecDefinitelyHasNoGlobalFlag(ctx rule.Context, argument *ast.Node) bool {
+func preferRegexpExecDefinitelyHasNoGlobalFlag(ruleContext rule.Context, argument *ast.Node) bool {
 	switch argument.Kind {
 	case ast.KindRegularExpressionLiteral:
 		return !preferRegexpExecLiteralHasGlobalFlag(argument.Text())
@@ -234,7 +234,7 @@ func preferRegexpExecDefinitelyHasNoGlobalFlag(ctx rule.Context, argument *ast.N
 		return true
 
 	case ast.KindCallExpression, ast.KindNewExpression:
-		return preferRegexpExecConstructionHasNoGlobalFlag(ctx, argument)
+		return preferRegexpExecConstructionHasNoGlobalFlag(ruleContext, argument)
 
 	case ast.KindIdentifier:
 		// A reference is settled by evaluating it to an actual value, NOT by recursing into
@@ -256,7 +256,7 @@ func preferRegexpExecDefinitelyHasNoGlobalFlag(ctx rule.Context, argument *ast.N
 		// sites in this repository that upstream leaves alone, every one of them
 		// `const r = new RegExp(templateWithASubstitution)`. Caught by a differential over 87 real
 		// files, where the corpus -- which has no such shape -- agreed all 37 rows either way.
-		return preferRegexpExecEvaluatesToNonGlobalRegex(ctx, argument)
+		return preferRegexpExecEvaluatesToNonGlobalRegex(ruleContext, argument)
 	}
 	return false
 }
@@ -283,8 +283,8 @@ func preferRegexpExecDefinitelyHasNoGlobalFlag(ctx rule.Context, argument *ast.N
 // Only `const` is followed, since a `let` can be reassigned anywhere in the program and its
 // initializer proves nothing at this call site. Measured: upstream is likewise clean on
 // `let r = /x/g; a.match(r)`.
-func preferRegexpExecEvaluatesToNonGlobalRegex(ctx rule.Context, reference *ast.Node) bool {
-	initializer := preferRegexpExecInitializerOf(ctx, reference)
+func preferRegexpExecEvaluatesToNonGlobalRegex(ruleContext rule.Context, reference *ast.Node) bool {
+	initializer := preferRegexpExecInitializerOf(ruleContext, reference)
 	if initializer == nil {
 		return false
 	}
@@ -297,7 +297,7 @@ func preferRegexpExecEvaluatesToNonGlobalRegex(ctx rule.Context, reference *ast.
 	// the first is a corpus case that reports, the second is the shape that over-reported 8 sites
 	// in this repository.
 	if initializer.Kind == ast.KindNewExpression || initializer.Kind == ast.KindCallExpression {
-		return preferRegexpExecIsComputableConstruction(ctx, initializer)
+		return preferRegexpExecIsComputableConstruction(ruleContext, initializer)
 	}
 
 	// A computable STRING is safe: the repair wraps it in `RegExp(...)`, which carries no flags.
@@ -312,7 +312,7 @@ func preferRegexpExecEvaluatesToNonGlobalRegex(ctx rule.Context, reference *ast.
 // `getStaticValue` can evaluate `new RegExp('test', ”)` because both arguments are literals, and
 // cannot evaluate `new RegExp(`^${t}$`)` because the pattern depends on a runtime value. So this
 // requires EVERY argument to be a computable string, and then reads the flags from the second.
-func preferRegexpExecIsComputableConstruction(ctx rule.Context, node *ast.Node) bool {
+func preferRegexpExecIsComputableConstruction(ruleContext rule.Context, node *ast.Node) bool {
 	var callee *ast.Node
 	var arguments *ast.NodeList
 	if node.Kind == ast.KindCallExpression {
@@ -392,8 +392,8 @@ func preferRegexpExecIsComputableString(node *ast.Node) bool {
 // So the binding's other references are examined, and any one of them writing disqualifies the
 // fold. `reference.WritesToBinding` is the shelf helper for exactly this question, lifted after four
 // rules were each found hand-rolling it differently.
-func preferRegexpExecInitializerOf(ctx rule.Context, reference *ast.Node) *ast.Node {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(reference)
+func preferRegexpExecInitializerOf(ruleContext rule.Context, reference *ast.Node) *ast.Node {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(reference)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return nil
 	}
@@ -405,7 +405,7 @@ func preferRegexpExecInitializerOf(ctx rule.Context, reference *ast.Node) *ast.N
 	if initializer == nil {
 		return nil
 	}
-	if preferRegexpExecBindingIsReassigned(ctx, declaration, symbol) {
+	if preferRegexpExecBindingIsReassigned(ruleContext, declaration, symbol) {
 		return nil
 	}
 	return initializer
@@ -419,11 +419,11 @@ func preferRegexpExecInitializerOf(ctx rule.Context, reference *ast.Node) *ast.N
 // question is whether the initializer is the ONLY value the binding ever holds, and a narrower
 // search answers a weaker question while looking like the same one.
 func preferRegexpExecBindingIsReassigned(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	declaration *ast.Node,
 	symbol *ast.Symbol,
 ) bool {
-	if ctx.SourceFile == nil {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
 	declarationName := declaration.Name()
@@ -443,14 +443,14 @@ func preferRegexpExecBindingIsReassigned(
 			reference.WritesToBinding(node) {
 			// Same spelling and a write. Confirm it names the same binding before believing it, so
 			// a shadowing declaration elsewhere cannot disqualify this one.
-			if ctx.TypeChecker.GetSymbolAtLocation(node) == symbol {
+			if ruleContext.TypeChecker.GetSymbolAtLocation(node) == symbol {
 				reassigned = true
 				return
 			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool { walk(child); return false })
 	}
-	walk(ctx.SourceFile.AsNode())
+	walk(ruleContext.SourceFile.AsNode())
 	return reassigned
 }
 
@@ -461,7 +461,7 @@ func preferRegexpExecBindingIsReassigned(
 // can read: a runtime string is unproven, so the rule stays silent. `undefined` counts as absent,
 // which upstream reaches through `getStaticValue` returning the value `undefined` rather than no
 // value at all -- a corpus case turns on exactly that.
-func preferRegexpExecConstructionHasNoGlobalFlag(ctx rule.Context, node *ast.Node) bool {
+func preferRegexpExecConstructionHasNoGlobalFlag(ruleContext rule.Context, node *ast.Node) bool {
 	var callee *ast.Node
 	var arguments *ast.NodeList
 	if node.Kind == ast.KindCallExpression {
@@ -527,7 +527,7 @@ func preferRegexpExecLiteralHasGlobalFlag(literal string) bool {
 func preferRegexpExecRegexLiteralFor(value string) (string, bool) {
 	// `esregexp` is this tree's JavaScript-semantics regular-expression engine, already used by
 	// two other rules to answer "would `new RegExp(source)` throw".
-	if _, err := esregexp.Compile(value, ""); err != nil {
+	if _, compileError := esregexp.Compile(value, ""); compileError != nil {
 		return "", false
 	}
 	if value == "" {
@@ -561,7 +561,7 @@ func preferRegexpExecRegexLiteralFor(value string) (string, bool) {
 
 // preferRegexpExecWrappingFix builds a repair that keeps one inner node.
 func preferRegexpExecWrappingFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	call *ast.Node,
 	prefix string,
 	inner []*ast.Node,
@@ -570,16 +570,16 @@ func preferRegexpExecWrappingFix(
 	var replacement strings.Builder
 	replacement.WriteString(prefix)
 	for _, node := range inner {
-		replacement.WriteString(preferRegexpExecInnerText(ctx, node))
+		replacement.WriteString(preferRegexpExecInnerText(ruleContext, node))
 	}
 	replacement.WriteString(suffix)
-	return preferRegexpExecOuterFix(ctx, call, replacement.String())
+	return preferRegexpExecOuterFix(ruleContext, call, replacement.String())
 }
 
 // preferRegexpExecWrappingFixTwo builds a repair that keeps two inner nodes, in the order the
 // repair writes them.
 func preferRegexpExecWrappingFixTwo(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	call *ast.Node,
 	prefix string,
 	first *ast.Node,
@@ -587,9 +587,9 @@ func preferRegexpExecWrappingFixTwo(
 	second *ast.Node,
 	suffix string,
 ) rule.Fix {
-	replacement := prefix + preferRegexpExecInnerText(ctx, first) + middle +
-		preferRegexpExecInnerText(ctx, second) + suffix
-	return preferRegexpExecOuterFix(ctx, call, replacement)
+	replacement := prefix + preferRegexpExecInnerText(ruleContext, first) + middle +
+		preferRegexpExecInnerText(ruleContext, second) + suffix
+	return preferRegexpExecOuterFix(ruleContext, call, replacement)
 }
 
 // preferRegexpExecInnerText renders a preserved node, parenthesised when upstream would parenthesise
@@ -600,9 +600,9 @@ func preferRegexpExecWrappingFixTwo(
 // `checking.IsStrongPrecedenceNode` is that predicate, already ported and already shared by three
 // rules, and it deliberately omits template literals -- which is why a template receiver comes out
 // parenthesised here exactly as it does upstream.
-func preferRegexpExecInnerText(ctx rule.Context, node *ast.Node) string {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	text := ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+func preferRegexpExecInnerText(ruleContext rule.Context, node *ast.Node) string {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	text := ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 	if type_checking.IsStrongPrecedenceNode(node) {
 		return text
 	}
@@ -615,9 +615,9 @@ func preferRegexpExecInnerText(ctx rule.Context, node *ast.Node) string {
 // missing: `a.match(/x/) || b` has to become `(/x/.exec(a)) || b`, because the replacement is a
 // different expression from the one whose precedence the surrounding code was written around.
 // Measured against the installed build, since upstream's corpus has no case in this shape.
-func preferRegexpExecOuterFix(ctx rule.Context, call *ast.Node, replacement string) rule.Fix {
-	callRange := rule.TokenRange(ctx.SourceFile, call)
-	if preferRegexpExecHasWeakPrecedenceParent(call) && !preferRegexpExecIsParenthesized(ctx, call) {
+func preferRegexpExecOuterFix(ruleContext rule.Context, call *ast.Node, replacement string) rule.Fix {
+	callRange := rule.TokenRange(ruleContext.SourceFile, call)
+	if preferRegexpExecHasWeakPrecedenceParent(call) && !preferRegexpExecIsParenthesized(ruleContext, call) {
 		replacement = "(" + replacement + ")"
 	}
 	return rule.ReplaceRange(core.NewTextRange(callRange.Pos(), callRange.End()), replacement)
@@ -656,7 +656,7 @@ func preferRegexpExecHasWeakPrecedenceParent(node *ast.Node) bool {
 
 // preferRegexpExecIsParenthesized answers whether the call is already wrapped, so the outer fix does
 // not add a second pair.
-func preferRegexpExecIsParenthesized(ctx rule.Context, node *ast.Node) bool {
+func preferRegexpExecIsParenthesized(ruleContext rule.Context, node *ast.Node) bool {
 	parent := node.Parent
 	return parent != nil && parent.Kind == ast.KindParenthesizedExpression
 }

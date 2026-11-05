@@ -153,8 +153,8 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -169,7 +169,7 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 				}
 				verdict, seen := verdicts[function]
 				if !seen {
-					verdict = consistencyRequireMatchingReturnTypeJudge(ctx, function)
+					verdict = consistencyRequireMatchingReturnTypeJudge(ruleContext, function)
 					verdicts[function] = verdict
 				}
 
@@ -186,25 +186,25 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 							verdict.source,
 						),
 					}
-					if verdict.admitsUndefined && consistencyRequireMatchingReturnTypeText(ctx, node) == "return;" {
-						ctx.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), "return undefined;"))
+					if verdict.admitsUndefined && consistencyRequireMatchingReturnTypeText(ruleContext, node) == "return;" {
+						ruleContext.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "return undefined;"))
 						return
 					}
-					ctx.ReportNode(node, message)
+					ruleContext.ReportNode(node, message)
 
 				case consistencyRequireMatchingReturnTypeKindVoid:
-					if expression == nil || !consistencyRequireMatchingReturnTypeIsGlobalUndefined(ctx, expression) {
+					if expression == nil || !consistencyRequireMatchingReturnTypeIsGlobalUndefined(ruleContext, expression) {
 						return
 					}
 					message := rule.Message{
 						Id:          consistencyRequireMatchingReturnTypeUndefinedId,
 						Description: consistencyRequireMatchingReturnTypeUndefinedText.Render(verdict.voidValues(), verdict.voidReason),
 					}
-					if consistencyRequireMatchingReturnTypeCanonicalUndefined.MatchString(consistencyRequireMatchingReturnTypeText(ctx, node)) {
-						ctx.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), "return;"))
+					if consistencyRequireMatchingReturnTypeCanonicalUndefined.MatchString(consistencyRequireMatchingReturnTypeText(ruleContext, node)) {
+						ruleContext.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "return;"))
 						return
 					}
-					ctx.ReportNode(node, message)
+					ruleContext.ReportNode(node, message)
 				}
 			},
 		}
@@ -274,7 +274,7 @@ func consistencyRequireMatchingReturnTypeContainer(node *ast.Node) *ast.Node {
 }
 
 // consistencyRequireMatchingReturnTypeJudge decides whether a function is void, a value, or unknowable.
-func consistencyRequireMatchingReturnTypeJudge(ctx rule.Context, function *ast.Node) consistencyRequireMatchingReturnTypeVerdict {
+func consistencyRequireMatchingReturnTypeJudge(ruleContext rule.Context, function *ast.Node) consistencyRequireMatchingReturnTypeVerdict {
 	flags := ast.GetFunctionFlags(function)
 	isAsync := flags&ast.FunctionFlagsAsync != 0
 	isGenerator := flags&ast.FunctionFlagsGenerator != 0
@@ -297,35 +297,35 @@ func consistencyRequireMatchingReturnTypeJudge(ctx rule.Context, function *ast.N
 
 	// 1. The declared annotation is the author's statement, and is final even when it is `any`.
 	if annotation := function.Type(); annotation != nil {
-		declared := checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, annotation)
-		return consistencyRequireMatchingReturnTypeClassify(ctx, declared, true, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromAnnotation)
+		declared := checker.Checker_getTypeFromTypeNode(ruleContext.TypeChecker, annotation)
+		return consistencyRequireMatchingReturnTypeClassify(ruleContext, declared, true, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromAnnotation)
 	}
 
 	// 2. The contextual signature, passed over when it says nothing.
-	if contextual := consistencyRequireMatchingReturnTypeContextualReturnType(ctx, function); contextual != nil {
-		verdict := consistencyRequireMatchingReturnTypeClassify(ctx, contextual, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromSignature)
+	if contextual := consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext, function); contextual != nil {
+		verdict := consistencyRequireMatchingReturnTypeClassify(ruleContext, contextual, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromSignature)
 		if verdict.kind != consistencyRequireMatchingReturnTypeKindUnknown {
 			return verdict
 		}
 	}
 
 	// 3. The inferred type, from the function's own signatures.
-	functionType := ctx.TypeChecker.GetTypeAtLocation(function)
+	functionType := ruleContext.TypeChecker.GetTypeAtLocation(function)
 	if functionType == nil {
 		return consistencyRequireMatchingReturnTypeVerdict{}
 	}
 	if function.Kind == ast.KindGetAccessor {
 		// A get accessor's type is the property's type, which is its return type.
-		return consistencyRequireMatchingReturnTypeClassify(ctx, functionType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
+		return consistencyRequireMatchingReturnTypeClassify(ruleContext, functionType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
 	}
-	signatures := type_checking.GetCallSignatures(ctx.TypeChecker, functionType)
+	signatures := type_checking.GetCallSignatures(ruleContext.TypeChecker, functionType)
 	if len(signatures) == 0 {
 		return consistencyRequireMatchingReturnTypeVerdict{}
 	}
 	var agreed consistencyRequireMatchingReturnTypeVerdict
 	for index, signature := range signatures {
-		returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
-		verdict := consistencyRequireMatchingReturnTypeClassify(ctx, returnType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
+		returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
+		verdict := consistencyRequireMatchingReturnTypeClassify(ruleContext, returnType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
 		if index == 0 {
 			agreed = verdict
 			continue
@@ -345,17 +345,17 @@ func consistencyRequireMatchingReturnTypeJudge(ctx rule.Context, function *ast.N
 // The checker's own `getContextualSignature` is not reachable through the shim, so this rebuilds it
 // from the contextual TYPE: the apparent type's single call signature, or, for a union, each member's
 // single signature with members that have none skipped, their return types unioned.
-func consistencyRequireMatchingReturnTypeContextualReturnType(ctx rule.Context, function *ast.Node) *checker.Type {
+func consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext rule.Context, function *ast.Node) *checker.Type {
 	var contextual *checker.Type
 	switch {
 	case function.Kind == ast.KindFunctionExpression, function.Kind == ast.KindArrowFunction:
-		contextual = checker.Checker_getContextualType(ctx.TypeChecker, function, checker.ContextFlagsSignature)
+		contextual = checker.Checker_getContextualType(ruleContext.TypeChecker, function, checker.ContextFlagsSignature)
 	case ast.IsObjectLiteralMethod(function):
 		// Not `getContextualType`, which dispatches on the node's PARENT and has no arm for a method
 		// whose parent is the object literal itself. Measured: through that call the method's
 		// contextual `() => void` went unread, and only a fixture whose inferred type disagrees with
 		// its context could see it. The checker's own path for a method is this one.
-		contextual = ctx.TypeChecker.GetContextualTypeForObjectLiteralElement(function, checker.ContextFlagsSignature)
+		contextual = ruleContext.TypeChecker.GetContextualTypeForObjectLiteralElement(function, checker.ContextFlagsSignature)
 	default:
 		return nil
 	}
@@ -367,16 +367,16 @@ func consistencyRequireMatchingReturnTypeContextualReturnType(ctx rule.Context, 
 		if part == nil {
 			continue
 		}
-		apparent := checker.Checker_getApparentType(ctx.TypeChecker, part)
+		apparent := checker.Checker_getApparentType(ruleContext.TypeChecker, part)
 		if apparent == nil {
 			continue
 		}
-		signatures := type_checking.GetCallSignatures(ctx.TypeChecker, apparent)
+		signatures := type_checking.GetCallSignatures(ruleContext.TypeChecker, apparent)
 		switch len(signatures) {
 		case 0:
 			continue
 		case 1:
-			if returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signatures[0]); returnType != nil {
+			if returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signatures[0]); returnType != nil {
 				returnTypes = append(returnTypes, returnType)
 			}
 		default:
@@ -389,13 +389,13 @@ func consistencyRequireMatchingReturnTypeContextualReturnType(ctx rule.Context, 
 	case 1:
 		return returnTypes[0]
 	}
-	return ctx.TypeChecker.GetUnionType(returnTypes)
+	return ruleContext.TypeChecker.GetUnionType(returnTypes)
 }
 
 // consistencyRequireMatchingReturnTypeClassify reads one return type as void, value or unknowable,
 // after unwrapping a generator's TReturn and an async function's awaited type.
 func consistencyRequireMatchingReturnTypeClassify(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	returnType *checker.Type,
 	declared bool,
 	isAsync bool,
@@ -410,12 +410,12 @@ func consistencyRequireMatchingReturnTypeClassify(
 	written := returnType
 
 	if isGenerator {
-		returnType = consistencyRequireMatchingReturnTypeGeneratorReturn(ctx, returnType)
+		returnType = consistencyRequireMatchingReturnTypeGeneratorReturn(ruleContext, returnType)
 		if returnType == nil {
 			return unknown
 		}
 	} else if isAsync {
-		returnType = checker.Checker_getAwaitedType(ctx.TypeChecker, returnType)
+		returnType = checker.Checker_getAwaitedType(ruleContext.TypeChecker, returnType)
 		if returnType == nil {
 			return unknown
 		}
@@ -439,7 +439,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 			kind:         consistencyRequireMatchingReturnTypeKindVoid,
 			functionKind: functionKind,
 			voidReason:   consistencyRequireMatchingReturnTypeVoidReasons[source],
-			written:      ctx.TypeChecker.TypeToString(written),
+			written:      ruleContext.TypeChecker.TypeToString(written),
 		}
 	}
 	// Nothing but `undefined`, and not because the author wrote it, is unknowable. An inferred type is
@@ -468,7 +468,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 	return consistencyRequireMatchingReturnTypeVerdict{
 		kind:            consistencyRequireMatchingReturnTypeKindValue,
 		functionKind:    functionKind,
-		rendered:        ctx.TypeChecker.TypeToString(written),
+		rendered:        ruleContext.TypeChecker.TypeToString(written),
 		source:          consistencyRequireMatchingReturnTypeSources[source],
 		admitsUndefined: combined&checker.TypeFlagsUndefined != 0,
 	}
@@ -479,12 +479,12 @@ func consistencyRequireMatchingReturnTypeClassify(
 //
 // The reference guard is a crash guard as well as a narrowing: `Checker_getTypeArguments` panics on a
 // type that is not a reference.
-func consistencyRequireMatchingReturnTypeGeneratorReturn(ctx rule.Context, returnType *checker.Type) *checker.Type {
+func consistencyRequireMatchingReturnTypeGeneratorReturn(ruleContext rule.Context, returnType *checker.Type) *checker.Type {
 	if checker.Type_flags(returnType)&checker.TypeFlagsObject == 0 ||
 		checker.Type_objectFlags(returnType)&checker.ObjectFlagsReference == 0 {
 		return nil
 	}
-	arguments := checker.Checker_getTypeArguments(ctx.TypeChecker, returnType)
+	arguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, returnType)
 	if len(arguments) < 2 {
 		return nil
 	}
@@ -497,19 +497,19 @@ func consistencyRequireMatchingReturnTypeGeneratorReturn(ctx rule.Context, retur
 // The global has no declarations, so a symbol with one is a local that happens to be named
 // `undefined`. Note the complement: asking "does it resolve to a global" through a declarations check
 // answers false for the real `undefined`, which is the trap the porting standard records.
-func consistencyRequireMatchingReturnTypeIsGlobalUndefined(ctx rule.Context, expression *ast.Node) bool {
+func consistencyRequireMatchingReturnTypeIsGlobalUndefined(ruleContext rule.Context, expression *ast.Node) bool {
 	expression = ast.SkipParentheses(expression)
 	if expression == nil || expression.Kind != ast.KindIdentifier || expression.Text() != "undefined" {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
 	return symbol == nil || len(symbol.Declarations) == 0
 }
 
 // consistencyRequireMatchingReturnTypeText is a node's own text, leading trivia excluded.
-func consistencyRequireMatchingReturnTypeText(ctx rule.Context, node *ast.Node) string {
-	textRange := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[textRange.Pos():textRange.End()]
+func consistencyRequireMatchingReturnTypeText(ruleContext rule.Context, node *ast.Node) string {
+	textRange := rule.TokenRange(ruleContext.SourceFile, node)
+	return ruleContext.SourceFile.Text()[textRange.Pos():textRange.End()]
 }
 
 // consistencyRequireMatchingReturnTypeFunctionKind names the function for the message.

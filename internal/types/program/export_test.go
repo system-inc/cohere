@@ -36,8 +36,8 @@ func StaleStatSnapshotForTest(recorded *RunCache) *StatSnapshot {
 			snapshot.answers.Store(input.Path, absentAnswer{})
 			continue
 		}
-		information, err := os.Stat(input.Path)
-		snapshot.note(input.Path, information, err)
+		information, statError := os.Stat(input.Path)
+		snapshot.note(input.Path, information, statError)
 	}
 	return snapshot
 }

@@ -100,9 +100,9 @@ func TestNoUnusedVarsMessageIdAndDescription(test *testing.T) {
 
 			var options any
 			if testCase.options != "" {
-				decoded, err := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
-				if err != nil {
-					test.Fatalf("decoding failed: %v", err)
+				decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+				if decodeNoUnusedVariablesOptionsError != nil {
+					test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 				}
 				options = decoded
 			}
@@ -189,9 +189,9 @@ func TestDecodeNoUnusedVarsOptions(test *testing.T) {
 
 	test.Run("bare error supplies every default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUnusedVarsOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding empty options failed: %v", err)
+		decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(nil)
+		if decodeNoUnusedVariablesOptionsError != nil {
+			test.Fatalf("decoding empty options failed: %v", decodeNoUnusedVariablesOptionsError)
 		}
 		if decoded.Vars != "all" {
 			test.Errorf("vars default is %q, want %q", decoded.Vars, "all")
@@ -209,10 +209,10 @@ func TestDecodeNoUnusedVarsOptions(test *testing.T) {
 
 	test.Run("configured values override", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUnusedVarsOptions(json.RawMessage(
+		decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(
 			`{"args":"none","varsIgnorePattern":"^ignore"}`))
-		if err != nil {
-			test.Fatalf("decoding failed: %v", err)
+		if decodeNoUnusedVariablesOptionsError != nil {
+			test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 		}
 		if decoded.Args != "none" {
 			test.Errorf("args is %q, want %q", decoded.Args, "none")
@@ -243,9 +243,9 @@ func TestNoUnusedVarsIgnoresNoNameByDefault(test *testing.T) {
 
 	// The control on the other side: a configured pattern still exempts, so the reports above come
 	// from the missing default rather than from a rule that stopped reading patterns.
-	options, err := DecodeNoUnusedVarsOptions(json.RawMessage(`{"varsIgnorePattern":"^_","argsIgnorePattern":"^_"}`))
-	if err != nil {
-		test.Fatalf("decoding failed: %v", err)
+	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(`{"varsIgnorePattern":"^_","argsIgnorePattern":"^_"}`))
+	if decodeNoUnusedVariablesOptionsError != nil {
+		test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 	}
 	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "const _deliberate = 1;", options))
 	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "function f(_unused: number) {} f(1);", options))
@@ -749,10 +749,10 @@ func TestNoUnusedVarsIgnoreRestSiblings(test *testing.T) {
 			test.Run(name, func(test *testing.T) {
 				test.Parallel()
 
-				options, err := DecodeNoUnusedVarsOptions(json.RawMessage(
+				options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(
 					`{"ignoreRestSiblings":` + map[bool]string{true: "true", false: "false"}[ignored] + `}`))
-				if err != nil {
-					test.Fatalf("decoding: %v", err)
+				if decodeNoUnusedVariablesOptionsError != nil {
+					test.Fatalf("decoding: %v", decodeNoUnusedVariablesOptionsError)
 				}
 				source := prelude + testCase.body
 				result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", source, options)
@@ -798,8 +798,8 @@ func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"file.ts": testCase.source}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); err != nil {
-						test.Fatal(err)
+					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 			rule_testing.ExpectFixedSource(test, result, testCase.want)
@@ -813,8 +813,8 @@ func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(test *testing.T) {
 	}
 	result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"file.ts": "import { Unused } from 'module';\nexport {};\n"}, "file.ts", defaults,
 		func(directory string) {
-			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		})
 	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 1 {

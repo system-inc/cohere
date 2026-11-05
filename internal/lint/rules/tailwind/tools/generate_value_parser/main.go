@@ -44,16 +44,16 @@ func main() {
 		os.Exit(2)
 	}
 
-	generated, err := enumerate(*packageRoot)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "enumerate: %v\n", err)
+	generated, enumerateError := enumerate(*packageRoot)
+	if enumerateError != nil {
+		fmt.Fprintf(os.Stderr, "enumerate: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read %s: %v\n", *output, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			fmt.Fprintf(os.Stderr, "read %s: %v\n", *output, readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
@@ -65,8 +65,8 @@ func main() {
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stderr, "wrote %s\n", *output)
@@ -96,8 +96,8 @@ func enumerate(packageRoot string) ([]byte, error) {
 		ParseSymbol     string `json:"parseSymbol"`
 		Cases           []any  `json:"cases"`
 	}
-	if err := json.Unmarshal(out, &parsed); err != nil {
-		return nil, fmt.Errorf("parse enumeration: %w", err)
+	if decodeError := json.Unmarshal(out, &parsed); decodeError != nil {
+		return nil, fmt.Errorf("parse enumeration: %w", decodeError)
 	}
 	if parsed.TailwindVersion == "" {
 		return nil, fmt.Errorf("enumeration reported no Tailwind version")

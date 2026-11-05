@@ -25,9 +25,9 @@ var ruleTypes = gotypes.Product{
 // Not parallel: it builds the product the option walks read, so it finishes before they resume. A runner of
 // prebuilt tests skips it and finds the product Workshop built.
 func TestProduct_RuleTypes(test *testing.T) {
-	exports, err := ruleTypes.Build()
-	if err != nil {
-		test.Fatal(err)
+	exports, buildError := ruleTypes.Build()
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	test.Logf("the lint rules types product is %s", exports.Key()[:12])
 }

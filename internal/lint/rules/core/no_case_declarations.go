@@ -57,8 +57,8 @@ var messageAddBraces = rule.Message{
 // whole-clause repair rather than proposing nested blocks that would fight each other.
 var NoCaseDeclarations = rule.Rule{
 	Name: "no-case-declarations",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -88,11 +88,11 @@ var NoCaseDeclarations = rule.Rule{
 						if !isLexicalDeclaration(statement) {
 							continue
 						}
-						ctx.ReportNodeWithSuggestions(statement, messageCaseDeclaration, rule.Suggestion{
+						ruleContext.ReportNodeWithSuggestions(statement, messageCaseDeclaration, rule.Suggestion{
 							Message: messageAddBraces,
 							Fixes: []rule.Fix{
-								ctx.InsertBefore(firstStatement, "{ "),
-								ctx.InsertAfter(lastStatement, " }"),
+								ruleContext.InsertBefore(firstStatement, "{ "),
+								ruleContext.InsertAfter(lastStatement, " }"),
 							},
 						})
 					}

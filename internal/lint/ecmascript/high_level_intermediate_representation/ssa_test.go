@@ -32,15 +32,15 @@ func lowerTypedForSSA(test *testing.T, code string) *Function {
 	probe := rule.Rule{
 		Name:             "ssa-test-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the harness produced no type checker, so this test would prove nothing")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
 						if lowered == nil {
-							lowered = Lower(function, ctx.TypeChecker)
+							lowered = Lower(function, ruleContext.TypeChecker)
 						}
 					})
 				},
@@ -490,14 +490,14 @@ var constructAfterInline = regexp.MustCompile(
 func TestConstructionIsNotReRunAfterTheInline(test *testing.T) {
 	test.Parallel()
 
-	paths, err := filepath.Glob("*.go")
-	if err != nil {
-		test.Fatal(err)
+	paths, globError := filepath.Glob("*.go")
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	for _, path := range paths {
-		source, err := os.ReadFile(path)
-		if err != nil {
-			test.Fatal(err)
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		// This file names the pattern in prose.
 		if filepath.Base(path) == "ssa_test.go" {

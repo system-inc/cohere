@@ -150,8 +150,8 @@ var consistencyNoBareThrowTestPaths = []string{"/test/", "/tests/", "/testing/"}
 // looking for the constructor name would not find it underlined.
 var ConsistencyNoBareThrow = rule.Rule{
 	Name: "base/consistency-no-bare-throw",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -159,7 +159,7 @@ var ConsistencyNoBareThrow = rule.Rule{
 		// path written with forward slashes, and the original ran on a filename ESLint had already
 		// normalized. Without this a Windows-shaped path would decline every gate and the rule would
 		// report inside the capture path.
-		fileName := imports.NormalizedFileName(ctx.SourceFile)
+		fileName := imports.NormalizedFileName(ruleContext.SourceFile)
 
 		if consistencyNoBareThrowFileIsExempt(fileName) {
 			// Returning no listeners rather than guarding at each report, matching the original's
@@ -170,7 +170,7 @@ var ConsistencyNoBareThrow = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
-				reportNoBareThrow(ctx, node)
+				reportNoBareThrow(ruleContext, node)
 			},
 		}
 	},
@@ -210,7 +210,7 @@ func consistencyNoBareThrowFileIsExempt(fileName string) bool {
 }
 
 // reportNoBareThrow judges one throw statement.
-func reportNoBareThrow(ctx rule.Context, node *ast.Node) {
+func reportNoBareThrow(ruleContext rule.Context, node *ast.Node) {
 	thrown := node.AsThrowStatement().Expression
 	if thrown == nil {
 		// Error recovery produces a throw with nothing thrown, from source as ordinary as a
@@ -242,5 +242,5 @@ func reportNoBareThrow(ctx rule.Context, node *ast.Node) {
 	}
 
 	// The new expression rather than the statement, matching the original's `node: thrown`.
-	ctx.ReportNode(thrown, messageNoBareThrow(constructorName))
+	ruleContext.ReportNode(thrown, messageNoBareThrow(constructorName))
 }

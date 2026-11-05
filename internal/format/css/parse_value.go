@@ -208,8 +208,8 @@ var selectorTypePattern = regexp.MustCompile(`^selector-`)
 func parseValue(value string, options *parseOptions) *estree.Node {
 	// The Less `~` + "`" inline JavaScript case (options.parser === "less") is not ported.
 
-	result, err := values.Parse(value, values.Options{Loose: true})
-	if err != nil {
+	result, parseError := values.Parse(value, values.Options{Loose: true})
+	if parseError != nil {
 		// Upstream's catch takes every throw, so every error lands here, the port's own included.
 		return estree.New("value-unknown", 0, 0, "value", value)
 	}

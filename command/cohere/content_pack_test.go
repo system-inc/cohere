@@ -27,11 +27,11 @@ func TestTheContentPackServesAReplacedDeclarationFresh(test *testing.T) {
 	write := func(name string, contents string) {
 		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	// The same size both ways, so only the bytes differ.
@@ -55,27 +55,27 @@ func TestTheContentPackServesAReplacedDeclarationFresh(test *testing.T) {
 	}
 
 	run()
-	if _, err := os.Stat(filepath.Join(root, ".cache", "cohere", "contents.index")); err != nil {
-		test.Fatalf("the first run wrote no content pack, so the runs below prove nothing: %v", err)
+	if _, statError := os.Stat(filepath.Join(root, ".cache", "cohere", "contents.index")); statError != nil {
+		test.Fatalf("the first run wrote no content pack, so the runs below prove nothing: %v", statError)
 	}
 	for _, step := range []struct {
 		replacement string
 		want        int
 	}{{withFinding, 1}, {withoutFinding, 0}} {
-		information, err := os.Stat(declaration)
-		if err != nil {
-			test.Fatal(err)
+		information, statError := os.Stat(declaration)
+		if statError != nil {
+			test.Fatal(statError)
 		}
 		time.Sleep(10 * time.Millisecond)
 		staged := declaration + ".staged"
-		if err := os.WriteFile(staged, []byte(step.replacement), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(staged, []byte(step.replacement), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
-		if err := os.Chtimes(staged, information.ModTime(), information.ModTime()); err != nil {
-			test.Fatal(err)
+		if changeTimesError := os.Chtimes(staged, information.ModTime(), information.ModTime()); changeTimesError != nil {
+			test.Fatal(changeTimesError)
 		}
-		if err := os.Rename(staged, declaration); err != nil {
-			test.Fatal(err)
+		if renameError := os.Rename(staged, declaration); renameError != nil {
+			test.Fatal(renameError)
 		}
 		warm, cold := run(), run("--no-cache")
 		if strings.Join(findings(warm), "\n") != strings.Join(findings(cold), "\n") || len(findings(cold)) != step.want {
@@ -103,11 +103,11 @@ func TestARebuildAfterAFixReadsTheFixedBytes(test *testing.T) {
 	write := func(name string, contents string) {
 		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
@@ -118,8 +118,8 @@ func TestARebuildAfterAFixReadsTheFixedBytes(test *testing.T) {
 	write("source/Use.ts", "import { value } from './Value';\nexport const used = value as string;\n")
 	runCohere(test, binary, root)
 	runCohere(test, binary, root)
-	if _, err := os.Stat(filepath.Join(root, ".cache", "cohere", "contents.index")); err != nil {
-		test.Fatalf("the runs wrote no content pack, so the run below proves nothing: %v", err)
+	if _, statError := os.Stat(filepath.Join(root, ".cache", "cohere", "contents.index")); statError != nil {
+		test.Fatalf("the runs wrote no content pack, so the run below proves nothing: %v", statError)
 	}
 
 	time.Sleep(10 * time.Millisecond)
@@ -128,9 +128,9 @@ func TestARebuildAfterAFixReadsTheFixedBytes(test *testing.T) {
 	if !strings.Contains(warm, "graph rebuilt") {
 		test.Fatalf("the fixer rewrote nothing, so the rebuild this test is about never ran:\n%s", warm)
 	}
-	fixed, err := os.ReadFile(filepath.Join(root, "source", "Use.ts"))
-	if err != nil {
-		test.Fatal(err)
+	fixed, readError := os.ReadFile(filepath.Join(root, "source", "Use.ts"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if !strings.Contains(string(fixed), "value!") {
 		test.Fatalf("the fixer did not rewrite Use.ts as this test expects:\n%s", fixed)

@@ -32,8 +32,8 @@ type ReadFileFunc = func(filename string) ([]byte, error)
 // function that performs the appropriate checks.
 func CheckedReadFile(pass *analysis.Pass, readFile ReadFileFunc) ReadFileFunc {
 	return func(filename string) ([]byte, error) {
-		if err := CheckReadable(pass, filename); err != nil {
-			return nil, err
+		if checkReadableError := CheckReadable(pass, filename); checkReadableError != nil {
+			return nil, checkReadableError
 		}
 		return readFile(filename)
 	}
@@ -88,8 +88,8 @@ func ValidateFixes(fset *token.FileSet, a *analysis.Analyzer, fixes []analysis.S
 			return fmt.Errorf("analyzer %q suggests two fixes with same Message (%s)", a.Name, fix.Message)
 		}
 		fixMessages[fix.Message] = true
-		if err := validateFix(fset, fix); err != nil {
-			return fmt.Errorf("analyzer %q suggests invalid fix (%s): %v", a.Name, fix.Message, err)
+		if validateFixError := validateFix(fset, fix); validateFixError != nil {
+			return fmt.Errorf("analyzer %q suggests invalid fix (%s): %v", a.Name, fix.Message, validateFixError)
 		}
 	}
 	return nil

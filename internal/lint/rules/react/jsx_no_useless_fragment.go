@@ -25,7 +25,7 @@ var (
 // Two ahra findings, `AddressesPage.tsx` and `NotificationsPage.tsx`, wrap only a commented-out
 // block of dead JSX: there is no thing, and the repair is to delete the comment and return `null`
 // rather than to "write the child on its own". An empty fragment has no child either.
-func messageJsxNoUselessFragmentNeedsMoreChildren(ctx rule.Context, children []*ast.Node) rule.Message {
+func messageJsxNoUselessFragmentNeedsMoreChildren(ruleContext rule.Context, children []*ast.Node) rule.Message {
 	const why = " A fragment exists to give several siblings a single parent without emitting an element"
 	description := "This fragment wraps one thing, so it does nothing." + why +
 		"; around a single child it is pure noise in the tree and in the source. Write the child on its own."
@@ -38,7 +38,7 @@ func messageJsxNoUselessFragmentNeedsMoreChildren(ctx rule.Context, children []*
 	case len(kept) == 1 && kept[0].Kind == ast.KindJsxExpression && kept[0].AsJsxExpression().Expression == nil:
 		// `{/* ... */}` parses as an expression container with no expression. Braces holding
 		// nothing at all, `{}`, are the same node with no comment, and render nothing the same way.
-		if jsxNoUselessFragmentHoldsComment(ctx, kept[0]) {
+		if jsxNoUselessFragmentHoldsComment(ruleContext, kept[0]) {
 			description = "This fragment holds only a comment, which renders nothing, so the fragment " +
 				"renders nothing either." + why + ", and here there is nothing to group. Delete it, and the " +
 				"comment with it if that is dead code; where a value is still required, write `null`."
@@ -52,8 +52,8 @@ func messageJsxNoUselessFragmentNeedsMoreChildren(ctx rule.Context, children []*
 
 // jsxNoUselessFragmentHoldsComment reports whether an expression container's source carries a
 // comment, read from the file text because a comment is trivia and has no node.
-func jsxNoUselessFragmentHoldsComment(ctx rule.Context, container *ast.Node) bool {
-	text := ctx.SourceFile.Text()[container.Pos():container.End()]
+func jsxNoUselessFragmentHoldsComment(ruleContext rule.Context, container *ast.Node) bool {
+	text := ruleContext.SourceFile.Text()[container.Pos():container.End()]
 	return strings.Contains(text, "/*") || strings.Contains(text, "//")
 }
 
@@ -83,8 +83,8 @@ func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
 	}
 	// Lenient on purpose: eslint-plugin-react 7.37.5's schema leaves this object open (no
 	// `additionalProperties`), so ESLint loads an extra key and so must this.
-	if err := json.Unmarshal(raw, &options); err != nil {
-		return options, err
+	if decodeError := json.Unmarshal(raw, &options); decodeError != nil {
+		return options, decodeError
 	}
 	return options, nil
 }
@@ -140,7 +140,7 @@ func DecodeJsxNoUselessFragmentOptions(raw []byte) (any, error) {
 // opening or closing token, is an old-parser artifact our parser cannot produce.
 var JsxNoUselessFragment = rule.Rule{
 	Name: "react/jsx-no-useless-fragment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[JsxNoUselessFragmentOptions](options)
 		if !ok {
 			settings = JsxNoUselessFragmentOptions{}
@@ -155,11 +155,11 @@ var JsxNoUselessFragment = rule.Rule{
 			if jsxNoUselessFragmentHasLessThanTwoChildren(children) &&
 				!jsxNoUselessFragmentIsOnlyTextAndNotChild(node, children) &&
 				!(settings.AllowExpressions && jsxNoUselessFragmentIsSingleExpression(children)) {
-				jsxNoUselessFragmentReport(ctx, node, messageJsxNoUselessFragmentNeedsMoreChildren(ctx, children))
+				jsxNoUselessFragmentReport(ruleContext, node, messageJsxNoUselessFragmentNeedsMoreChildren(ruleContext, children))
 			}
 
 			if jsxNoUselessFragmentIsChildOfHtmlElement(node) {
-				jsxNoUselessFragmentReport(ctx, node, messageJsxNoUselessFragmentChildOfHtmlElement)
+				jsxNoUselessFragmentReport(ruleContext, node, messageJsxNoUselessFragmentChildOfHtmlElement)
 			}
 		}
 
@@ -195,13 +195,13 @@ var JsxNoUselessFragment = rule.Rule{
 }
 
 // jsxNoUselessFragmentReport reports with a fix, or without one when the repair is not safe.
-func jsxNoUselessFragmentReport(ctx rule.Context, node *ast.Node, message rule.Message) {
-	fix, ok := jsxNoUselessFragmentFix(ctx, node)
+func jsxNoUselessFragmentReport(ruleContext rule.Context, node *ast.Node, message rule.Message) {
+	fix, ok := jsxNoUselessFragmentFix(ruleContext, node)
 	if !ok {
-		ctx.ReportNode(node, message)
+		ruleContext.ReportNode(node, message)
 		return
 	}
-	ctx.ReportNodeWithFixes(node, message, fix)
+	ruleContext.ReportNodeWithFixes(node, message, fix)
 }
 
 // jsxNoUselessFragmentIsFragmentName matches `<Fragment>` and `<React.Fragment>`.
@@ -592,12 +592,12 @@ func jsxNoUselessFragmentIsNonspaceTextOrCurly(child *ast.Node) bool {
 // it, written over the whole node. Copying the text verbatim is what makes this safe for TypeScript:
 // a type assertion, a non-null assertion, a `satisfies`, a generic call and a typed arrow inside the
 // children all survive byte for byte, each driven through both implementations.
-func jsxNoUselessFragmentFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
+func jsxNoUselessFragmentFix(ruleContext rule.Context, node *ast.Node) (rule.Fix, bool) {
 	if !jsxNoUselessFragmentCanFix(node) {
 		return rule.Fix{}, false
 	}
 
-	span := rule.TokenRange(ctx.SourceFile, node)
+	span := rule.TokenRange(ruleContext.SourceFile, node)
 	openerEnd, closerStart, ok := jsxNoUselessFragmentInnerBounds(node)
 	if !ok {
 		return rule.Fix{}, false
@@ -605,7 +605,7 @@ func jsxNoUselessFragmentFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) 
 
 	text := ""
 	if closerStart > openerEnd {
-		text = jsxNoUselessFragmentTrimLikeReact(ctx.SourceFile.Text()[openerEnd:closerStart])
+		text = jsxNoUselessFragmentTrimLikeReact(ruleContext.SourceFile.Text()[openerEnd:closerStart])
 	}
 	return rule.ReplaceRange(span, text), true
 }

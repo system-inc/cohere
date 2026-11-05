@@ -125,7 +125,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoUselessDefaultAssignmentOptions](options)
 		if !isSettings {
 			settings = DefaultNoUselessDefaultAssignmentSettings()
@@ -153,27 +153,27 @@ var NoUselessDefaultAssignment = rule.Rule{
 		// reports a file-level finding and keeps going; this port declines the file instead, and says
 		// so through Skip, since a declined file and a clean one otherwise read the same (#pa7k7zv).
 		// See the rule's doc comment for the measurement and the reasoning.
-		if ctx.Program != nil &&
-			!type_checking.IsStrictCompilerOptionEnabled(ctx.Program.Options(), ctx.Program.Options().StrictNullChecks) &&
+		if ruleContext.Program != nil &&
+			!type_checking.IsStrictCompilerOptionEnabled(ruleContext.Program.Options(), ruleContext.Program.Options().StrictNullChecks) &&
 			!settings.AllowRuleToRunWithoutStrictNullChecks {
-			ctx.Skip("strictNullChecks is off")
+			ruleContext.Skip("strictNullChecks is off")
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindParameter: func(node *ast.Node) {
-				if ctx.TypeChecker == nil || ctx.Program == nil {
+				if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 					return
 				}
 				parameter := node.AsParameterDeclaration()
 				if parameter.Initializer == nil {
 					return
 				}
-				checkUselessDefault(ctx, canBeUndefined, node, parameter.Initializer,
+				checkUselessDefault(ruleContext, canBeUndefined, node, parameter.Initializer,
 					parameter.Name(), parameter.Type, "parameter")
 			},
 			ast.KindBindingElement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil || ctx.Program == nil {
+				if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 					return
 				}
 				element := node.AsBindingElement()
@@ -183,7 +183,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 				// A binding element never carries its own type annotation; the annotation lives on
 				// whatever the pattern destructures. Passing nil here is what routes it to the
 				// property and tuple paths rather than the parameter one.
-				checkUselessDefault(ctx, canBeUndefined, node, element.Initializer,
+				checkUselessDefault(ruleContext, canBeUndefined, node, element.Initializer,
 					element.Name(), nil, "property")
 			},
 		}
@@ -195,7 +195,7 @@ var NoUselessDefaultAssignment = rule.Rule{
 // `declarationType` is the annotation when the anchor is a parameter and nil for a binding element,
 // which is the only thing that distinguishes the two paths through the `undefined` branch.
 func checkUselessDefault(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	canBeUndefined func(*checker.Type) bool,
 	node *ast.Node,
 	initializer *ast.Node,
@@ -211,24 +211,24 @@ func checkUselessDefault(
 		// uselessUndefined case: `function f(p?: number | undefined = undefined)` gets the marker,
 		// `function foo(a = undefined)` has no annotation and simply loses the default.
 		if declarationType != nil &&
-			canBeUndefined(checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, declarationType)) {
-			reportPreferOptionalSyntax(ctx, node, initializer, name, declarationType)
+			canBeUndefined(checker.Checker_getTypeFromTypeNode(ruleContext.TypeChecker, declarationType)) {
+			reportPreferOptionalSyntax(ruleContext, node, initializer, name, declarationType)
 			return
 		}
-		ctx.ReportNodeWithFixes(initializer, uselessUndefinedMessage(kindText),
-			removeDefaultFix(ctx, initializer, name, declarationType))
+		ruleContext.ReportNodeWithFixes(initializer, uselessUndefinedMessage(kindText),
+			removeDefaultFix(ruleContext, initializer, name, declarationType))
 		return
 	}
 
-	targetType, resolved := defaultTargetType(ctx, node)
+	targetType, resolved := defaultTargetType(ruleContext, node)
 	if !resolved || targetType == nil {
 		return
 	}
 	if canBeUndefined(targetType) {
 		return
 	}
-	ctx.ReportNodeWithFixes(initializer, uselessDefaultAssignmentMessage(kindText),
-		removeDefaultFix(ctx, initializer, name, declarationType))
+	ruleContext.ReportNodeWithFixes(initializer, uselessDefaultAssignmentMessage(kindText),
+		removeDefaultFix(ruleContext, initializer, name, declarationType))
 }
 
 // defaultTargetType answers what type the defaulted target actually has.
@@ -236,9 +236,9 @@ func checkUselessDefault(
 // The second return distinguishes "the type is this" from "this port could not work it out", so a
 // nil type never reads as a resolved absence. Upstream returns null for both and relies on the
 // caller checking; keeping the two apart makes the declines visible at the call site.
-func defaultTargetType(ctx rule.Context, node *ast.Node) (*checker.Type, bool) {
+func defaultTargetType(ruleContext rule.Context, node *ast.Node) (*checker.Type, bool) {
 	if ast.IsParameterDeclaration(node) {
-		return contextualParameterType(ctx, node)
+		return contextualParameterType(ruleContext, node)
 	}
 
 	if !ast.IsBindingElement(node) {
@@ -250,7 +250,7 @@ func defaultTargetType(ctx rule.Context, node *ast.Node) (*checker.Type, bool) {
 		return nil, false
 	}
 
-	sourceType, resolved := bindingPatternSourceType(ctx, pattern)
+	sourceType, resolved := bindingPatternSourceType(ruleContext, pattern)
 	if !resolved || sourceType == nil {
 		return nil, false
 	}
@@ -260,7 +260,7 @@ func defaultTargetType(ctx rule.Context, node *ast.Node) (*checker.Type, bool) {
 		if propertyName == "" {
 			return nil, false
 		}
-		symbol := checker.Checker_getPropertyOfType(ctx.TypeChecker, sourceType, propertyName)
+		symbol := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, sourceType, propertyName)
 		if symbol == nil {
 			return nil, false
 		}
@@ -279,7 +279,7 @@ func defaultTargetType(ctx rule.Context, node *ast.Node) (*checker.Type, bool) {
 				return nil, false
 			}
 		}
-		return checker.Checker_getTypeOfSymbol(ctx.TypeChecker, symbol), true
+		return checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, symbol), true
 	}
 
 	if ast.IsArrayBindingPattern(pattern) {
@@ -310,7 +310,7 @@ func defaultTargetType(ctx rule.Context, node *ast.Node) (*checker.Type, bool) {
 				break
 			}
 		}
-		typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, sourceType)
+		typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, sourceType)
 		if index < 0 || index >= len(typeArguments) {
 			// Past the tuple's end, so this element provably does not exist and a default for it
 			// is live. Corpus: `declare const tuple: [string]; const [a, b = 'default'] = tuple;`
@@ -335,7 +335,7 @@ func defaultTargetType(ctx rule.Context, node *ast.Node) (*checker.Type, bool) {
 // rest parameter, is marked optional, is a type parameter, or has a type admitting undefined. Any
 // one of those on any overload is enough, which is why the loop below is an "any" rather than an
 // "all".
-func contextualParameterType(ctx rule.Context, node *ast.Node) (*checker.Type, bool) {
+func contextualParameterType(ruleContext rule.Context, node *ast.Node) (*checker.Type, bool) {
 	function := node.Parent
 	if function == nil {
 		return nil, false
@@ -356,12 +356,12 @@ func contextualParameterType(ctx rule.Context, node *ast.Node) (*checker.Type, b
 		return nil, false
 	}
 
-	contextualType := checker.Checker_getContextualType(ctx.TypeChecker, function, checker.ContextFlagsNone)
+	contextualType := checker.Checker_getContextualType(ruleContext.TypeChecker, function, checker.ContextFlagsNone)
 	if contextualType == nil {
 		return nil, false
 	}
 
-	signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, contextualType, checker.SignatureKindCall)
+	signatures := checker.Checker_getSignaturesOfType(ruleContext.TypeChecker, contextualType, checker.SignatureKindCall)
 	if len(signatures) == 0 {
 		return nil, false
 	}
@@ -393,7 +393,7 @@ func contextualParameterType(ctx rule.Context, node *ast.Node) (*checker.Type, b
 		if type_checking.IsSymbolFlagSet(parameterSymbol, ast.SymbolFlagsOptional) {
 			return nil, false
 		}
-		parameterType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameterSymbol)
+		parameterType := checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, parameterSymbol)
 		if parameterType == nil || type_checking.IsTypeParameter(parameterType) {
 			return nil, false
 		}
@@ -411,14 +411,14 @@ func contextualParameterType(ctx rule.Context, node *ast.Node) (*checker.Type, b
 	// one the caller's canBeUndefined will reject; the first signature's parameter type is the
 	// honest answer to "what does this parameter actually receive".
 	parameters := checker.Signature_parameters(signatures[0])
-	return checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameters[parameterIndex]), true
+	return checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, parameters[parameterIndex]), true
 }
 
 // bindingPatternSourceType answers the type of whatever a destructuring pattern is taking apart.
 //
 // Four sources, and they recurse: an initializer on a variable declaration, a parameter's own
 // declared type, a nested object pattern's property, or a nested array pattern's element.
-func bindingPatternSourceType(ctx rule.Context, pattern *ast.Node) (*checker.Type, bool) {
+func bindingPatternSourceType(ruleContext rule.Context, pattern *ast.Node) (*checker.Type, bool) {
 	parent := pattern.Parent
 	if parent == nil {
 		return nil, false
@@ -429,11 +429,11 @@ func bindingPatternSourceType(ctx rule.Context, pattern *ast.Node) (*checker.Typ
 		if declaration.Initializer == nil {
 			return nil, false
 		}
-		return ctx.TypeChecker.GetTypeAtLocation(declaration.Initializer), true
+		return ruleContext.TypeChecker.GetTypeAtLocation(declaration.Initializer), true
 	}
 
 	if ast.IsParameterDeclaration(parent) {
-		signature := ctx.TypeChecker.GetSignatureFromDeclaration(parent.Parent)
+		signature := ruleContext.TypeChecker.GetSignatureFromDeclaration(parent.Parent)
 		if signature == nil {
 			return nil, false
 		}
@@ -442,7 +442,7 @@ func bindingPatternSourceType(ctx rule.Context, pattern *ast.Node) (*checker.Typ
 		if index < 0 || index >= len(parameters) {
 			return nil, false
 		}
-		return checker.Checker_getTypeOfSymbol(ctx.TypeChecker, parameters[index]), true
+		return checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, parameters[index]), true
 	}
 
 	// A pattern nested inside another binding element: its source is that element's own type,
@@ -454,7 +454,7 @@ func bindingPatternSourceType(ctx rule.Context, pattern *ast.Node) (*checker.Typ
 	if ast.IsBindingElement(parent) {
 		grandparent := parent.Parent
 		if grandparent != nil && ast.IsArrayBindingPattern(grandparent) {
-			outerType, resolved := bindingPatternSourceType(ctx, grandparent)
+			outerType, resolved := bindingPatternSourceType(ruleContext, grandparent)
 			if !resolved || outerType == nil {
 				return nil, false
 			}
@@ -470,9 +470,9 @@ func bindingPatternSourceType(ctx rule.Context, pattern *ast.Node) (*checker.Typ
 			if index < 0 {
 				return nil, false
 			}
-			return arrayElementType(ctx, outerType, index)
+			return arrayElementType(ruleContext, outerType, index)
 		}
-		return defaultTargetType(ctx, parent)
+		return defaultTargetType(ruleContext, parent)
 	}
 
 	return nil, false
@@ -554,15 +554,15 @@ func hasPropertyInAllBranches(expression *ast.Node, propertyName string) bool {
 //
 // A tuple answers from its type arguments when the index is in range. Everything else, including an
 // index past a tuple's end, falls back to the number index type.
-func arrayElementType(ctx rule.Context, arrayType *checker.Type, index int) (*checker.Type, bool) {
+func arrayElementType(ruleContext rule.Context, arrayType *checker.Type, index int) (*checker.Type, bool) {
 	if checker.IsTupleType(arrayType) {
-		typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, arrayType)
+		typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, arrayType)
 		if index < len(typeArguments) {
 			return typeArguments[index], true
 		}
 	}
-	elementType := checker.Checker_getIndexTypeOfType(ctx.TypeChecker, arrayType,
-		checker.Checker_numberType(ctx.TypeChecker))
+	elementType := checker.Checker_getIndexTypeOfType(ruleContext.TypeChecker, arrayType,
+		checker.Checker_numberType(ruleContext.TypeChecker))
 	if elementType == nil {
 		return nil, false
 	}
@@ -647,7 +647,7 @@ func isUndefinedIdentifier(initializer *ast.Node) bool {
 // Trailing trivia between the annotation and the `=` belongs to the annotation, so a comment
 // sitting there survives. The corpus pins that with a parameter carrying five comments, whose
 // repair keeps four of them and takes only the one attached to the deleted default.
-func removeDefaultFix(ctx rule.Context, initializer *ast.Node, name *ast.Node, annotation *ast.Node) rule.Fix {
+func removeDefaultFix(ruleContext rule.Context, initializer *ast.Node, name *ast.Node, annotation *ast.Node) rule.Fix {
 	start := name.End()
 	if annotation != nil {
 		start = annotation.End()
@@ -661,13 +661,13 @@ func removeDefaultFix(ctx rule.Context, initializer *ast.Node, name *ast.Node, a
 // is anchored on the name's end rather than before the annotation, because a comment can sit
 // between them. The corpus pins that with `/* comment */ x?: SomeType`, whose repair keeps the
 // comment where it was.
-func reportPreferOptionalSyntax(ctx rule.Context, node *ast.Node, initializer *ast.Node, name *ast.Node,
+func reportPreferOptionalSyntax(ruleContext rule.Context, node *ast.Node, initializer *ast.Node, name *ast.Node,
 	annotation *ast.Node) {
-	fixes := []rule.Fix{removeDefaultFix(ctx, initializer, name, annotation)}
+	fixes := []rule.Fix{removeDefaultFix(ruleContext, initializer, name, annotation)}
 	if ast.IsIdentifier(name) {
 		fixes = append(fixes, rule.ReplaceRange(core.NewTextRange(name.End(), name.End()), "?"))
 	}
-	ctx.ReportNodeWithFixes(initializer, preferOptionalSyntaxMessage(), fixes...)
+	ruleContext.ReportNodeWithFixes(initializer, preferOptionalSyntaxMessage(), fixes...)
 }
 
 func uselessDefaultAssignmentMessage(kindText string) rule.Message {

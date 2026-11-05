@@ -221,8 +221,8 @@ func Validate(record Record) error {
 		return fmt.Errorf("an idle floor of %g%% is not a share of the cores", record.IdleFloor)
 	}
 	measured := MeasuredModesOf(record)
-	if err := knownModes(measured); err != nil {
-		return err
+	if knownModesError := knownModes(measured); knownModesError != nil {
+		return knownModesError
 	}
 	if measures(measured, ModeEdit) != (record.Edit != "") {
 		return fmt.Errorf("the record names edit file %q, and Edit measured is %v", record.Edit, measures(measured, ModeEdit))
@@ -267,8 +267,8 @@ func Validate(record Record) error {
 			return fmt.Errorf("round %d's runs disagree on its primes, %d and %d", run.Round, primes, run.Primes)
 		}
 		primesByRound[run.Round] = run.Primes
-		if err := cacheFitsMode(run); err != nil {
-			return fmt.Errorf("%s round %d: %w", run.Mode, run.Round, err)
+		if cacheFitsModeError := cacheFitsMode(run); cacheFitsModeError != nil {
+			return fmt.Errorf("%s round %d: %w", run.Mode, run.Round, cacheFitsModeError)
 		}
 	}
 	for _, mode := range measured {
@@ -283,8 +283,8 @@ func Validate(record Record) error {
 		if byLoad || record.Band <= 0 {
 			return fmt.Errorf("the record stopped early with no band to agree within")
 		}
-		if err := agree(Summarize(measured, record.Runs), measured, record.Band); err != nil {
-			return fmt.Errorf("the record stopped early, but %w", err)
+		if agreeError := agree(Summarize(measured, record.Runs), measured, record.Band); agreeError != nil {
+			return fmt.Errorf("the record stopped early, but %w", agreeError)
 		}
 	}
 	want, err := json.Marshal(Summarize(measured, record.Runs))
@@ -349,7 +349,7 @@ func measures(measured []Mode, mode Mode) bool {
 func cacheFitsMode(run Run) error {
 	replayed, inScope := 0, 0
 	partial := false
-	if _, err := fmt.Sscanf(run.Cache, "files %d/%d", &replayed, &inScope); err == nil {
+	if _, scanError := fmt.Sscanf(run.Cache, "files %d/%d", &replayed, &inScope); scanError == nil {
 		partial = replayed > 0 && replayed < inScope
 	}
 	switch {
@@ -364,12 +364,12 @@ func cacheFitsMode(run Run) error {
 
 // Encode is a record as it is committed: validated, indented, with a final newline.
 func Encode(record Record) ([]byte, error) {
-	if err := Validate(record); err != nil {
-		return nil, err
+	if validateError := Validate(record); validateError != nil {
+		return nil, validateError
 	}
-	encoded, err := json.MarshalIndent(record, "", "  ")
-	if err != nil {
-		return nil, err
+	encoded, encodeError := json.MarshalIndent(record, "", "  ")
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	return append(encoded, '\n'), nil
 }
@@ -391,25 +391,25 @@ func FileName(record Record) string {
 // Read reads every record in directory, sorted by file name, and refuses the first that does not
 // validate. A directory that does not exist holds no records.
 func Read(directory string) ([]Record, error) {
-	paths, err := filepath.Glob(filepath.Join(directory, "*.json"))
-	if err != nil {
-		return nil, err
+	paths, globError := filepath.Glob(filepath.Join(directory, "*.json"))
+	if globError != nil {
+		return nil, globError
 	}
 	sort.Strings(paths)
 	records := []Record{}
 	for _, path := range paths {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return nil, readError
 		}
 		var record Record
 		decoder := json.NewDecoder(strings.NewReader(string(contents)))
 		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&record); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
+		if decodeError := decoder.Decode(&record); decodeError != nil {
+			return nil, fmt.Errorf("%s: %w", path, decodeError)
 		}
-		if err := Validate(record); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
+		if validateError := Validate(record); validateError != nil {
+			return nil, fmt.Errorf("%s: %w", path, validateError)
 		}
 		if name := FileName(record); filepath.Base(path) != name {
 			return nil, fmt.Errorf("%s: a record of this run is named %s", path, name)

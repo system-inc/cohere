@@ -145,10 +145,10 @@ var NoUnsafeUnaryMinus = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -158,11 +158,11 @@ var NoUnsafeUnaryMinus = rule.Rule{
 					return
 				}
 
-				argType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, expr.Operand)
+				argType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expr.Operand)
 
 				for t := range type_checking.UnionTypePartsSeq(argType) {
 					if !type_checking.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike) {
-						ctx.ReportNode(node, buildUnaryMinusMessage(ctx.TypeChecker.TypeToString(t)))
+						ruleContext.ReportNode(node, buildUnaryMinusMessage(ruleContext.TypeChecker.TypeToString(t)))
 						break
 					}
 				}

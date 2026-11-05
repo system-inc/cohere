@@ -38,8 +38,8 @@ func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -103,7 +103,7 @@ func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
 // value at all, and no PureRenderMixin".
 var RequireOptimization = rule.Rule{
 	Name: "react/require-optimization",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[RequireOptimizationOptions](options)
 		if !ok {
 			settings = RequireOptimizationOptions{}
@@ -117,7 +117,7 @@ var RequireOptimization = rule.Rule{
 				if requireOptimizationClassIsExempt(node, settings) {
 					return
 				}
-				ctx.ReportRange(requireOptimizationClassRange(ctx, node),
+				ruleContext.ReportRange(requireOptimizationClassRange(ruleContext, node),
 					messageRequireOptimizationNoShouldComponentUpdate)
 			},
 
@@ -136,7 +136,7 @@ var RequireOptimization = rule.Rule{
 				if requireOptimizationObjectIsExempt(specification) {
 					return
 				}
-				ctx.ReportNode(specification, messageRequireOptimizationNoShouldComponentUpdate)
+				ruleContext.ReportNode(specification, messageRequireOptimizationNoShouldComponentUpdate)
 			},
 		}
 	},
@@ -424,8 +424,8 @@ func requireOptimizationPropertyHoldsAFunction(property *ast.Node) bool {
 //
 // A finding pointing at the wrong span is invisible to every message-id fixture, which is why
 // `TestRequireOptimizationSpans` asserts both arrangements.
-func requireOptimizationClassRange(ctx rule.Context, node *ast.Node) core.TextRange {
-	full := rule.TokenRange(ctx.SourceFile, node)
+func requireOptimizationClassRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
+	full := rule.TokenRange(ruleContext.SourceFile, node)
 
 	modifiers := node.Modifiers()
 	if modifiers == nil {
@@ -468,7 +468,7 @@ func requireOptimizationClassRange(ctx rule.Context, node *ast.Node) core.TextRa
 			if modifier.End() >= full.End() {
 				return full
 			}
-			return core.NewTextRange(requireOptimizationScanPastTrivia(ctx.SourceFile, modifier.End()), full.End())
+			return core.NewTextRange(requireOptimizationScanPastTrivia(ruleContext.SourceFile, modifier.End()), full.End())
 		}
 	}
 

@@ -61,13 +61,13 @@ func DecodeConsistentGenericConstructorsOptions(raw []byte) (any, error) {
 
 	// The spelling cohere actually delivers: the mode as a bare string.
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err == nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError == nil {
 		return consistentGenericConstructorsOptionsFor(mode)
 	}
 
 	// The spelling an ESLint config is written in, accepted so a copied setting still works.
 	var modes []string
-	if err := json.Unmarshal(raw, &modes); err == nil && len(modes) == 1 {
+	if decodeError := json.Unmarshal(raw, &modes); decodeError == nil && len(modes) == 1 {
 		return consistentGenericConstructorsOptionsFor(modes[0])
 	}
 
@@ -160,7 +160,7 @@ var ConsistentGenericConstructors = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[ConsistentGenericConstructorsOptions](options)
 		if !isSettings {
 			// A rule configured as a bare severity reaches here with nil options, so the assertion
@@ -177,7 +177,7 @@ var ConsistentGenericConstructors = rule.Rule{
 
 		check := func(node *ast.Node, annotationHost *ast.Node, typeAnnotation *ast.Node,
 			initializer *ast.Node) {
-			if ctx.TypeChecker == nil || initializer == nil {
+			if ruleContext.TypeChecker == nil || initializer == nil {
 				return
 			}
 
@@ -219,7 +219,7 @@ var ConsistentGenericConstructors = rule.Rule{
 				if annotationName.Text() != callee.Text() {
 					return
 				}
-				if isExemptBuiltInArray(ctx, annotationName) {
+				if isExemptBuiltInArray(ruleContext, annotationName) {
 					return
 				}
 			}
@@ -229,15 +229,15 @@ var ConsistentGenericConstructors = rule.Rule{
 				if typeAnnotation != nil || newExpression.TypeArguments == nil {
 					return
 				}
-				reportPreferTypeAnnotation(ctx, node, annotationHost, callee,
+				reportPreferTypeAnnotation(ruleContext, node, annotationHost, callee,
 					newExpression.TypeArguments)
 				return
 			}
 
 			// Constructor mode. `isolatedDeclarations` needs the annotation to stay explicit, so
 			// the repair that removes it is declined outright.
-			if ctx.Program != nil && ctx.Program.Options() != nil &&
-				ctx.Program.Options().IsolatedDeclarations.IsTrue() {
+			if ruleContext.Program != nil && ruleContext.Program.Options() != nil &&
+				ruleContext.Program.Options().IsolatedDeclarations.IsTrue() {
 				return
 			}
 
@@ -246,7 +246,7 @@ var ConsistentGenericConstructors = rule.Rule{
 				return
 			}
 
-			reportPreferConstructor(ctx, node, typeAnnotation, callee, annotationArguments,
+			reportPreferConstructor(ruleContext, node, typeAnnotation, callee, annotationArguments,
 				newExpression)
 		}
 
@@ -306,20 +306,20 @@ var ConsistentGenericConstructors = rule.Rule{
 // Two edits: delete the type arguments, and write `: Callee<Args>` after the name. The annotation
 // text is copied from the source rather than rebuilt through the checker, so whatever spacing the
 // author wrote inside the type arguments survives the move.
-func reportPreferTypeAnnotation(ctx rule.Context, node *ast.Node, annotationHost *ast.Node,
+func reportPreferTypeAnnotation(ruleContext rule.Context, node *ast.Node, annotationHost *ast.Node,
 	callee *ast.Node, typeArguments *ast.NodeList) {
-	sourceText := ctx.SourceFile.Text()
-	calleeRange := rule.TokenRange(ctx.SourceFile, callee)
+	sourceText := ruleContext.SourceFile.Text()
+	calleeRange := rule.TokenRange(ruleContext.SourceFile, callee)
 
 	// The type argument list's own text including its angle brackets, which are not part of any
 	// node in the list.
-	argumentsRange := typeArgumentListRange(ctx, typeArguments)
+	argumentsRange := typeArgumentListRange(ruleContext, typeArguments)
 	annotationText := sourceText[calleeRange.Pos():calleeRange.End()] +
 		sourceText[argumentsRange.Pos():argumentsRange.End()]
 
-	hostRange := rule.TokenRange(ctx.SourceFile, annotationHost)
+	hostRange := rule.TokenRange(ruleContext.SourceFile, annotationHost)
 
-	ctx.ReportNodeWithFixes(node, buildPreferTypeAnnotationMessage(),
+	ruleContext.ReportNodeWithFixes(node, buildPreferTypeAnnotationMessage(),
 		rule.RemoveRange(argumentsRange),
 		rule.ReplaceRange(core.NewTextRange(hostRange.End(), hostRange.End()),
 			": "+annotationText))
@@ -330,15 +330,15 @@ func reportPreferTypeAnnotation(ctx rule.Context, node *ast.Node, annotationHost
 // The annotation is deleted whole, which is why any comment inside it that is NOT inside the type
 // arguments has to be carried over: deleting it would silently drop something a person wrote, and
 // this repair is a fix rather than a suggestion, so nobody is watching when it lands.
-func reportPreferConstructor(ctx rule.Context, node *ast.Node, typeAnnotation *ast.Node,
+func reportPreferConstructor(ruleContext rule.Context, node *ast.Node, typeAnnotation *ast.Node,
 	callee *ast.Node, annotationArguments *ast.NodeList, newExpression *ast.NewExpression) {
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 
 	// The annotation including its leading colon, which is what upstream deletes: its `lhs.parent`
 	// is the type annotation node, and estree's type annotation starts at the colon.
-	annotationRange := typeAnnotationRangeIncludingColon(ctx, typeAnnotation)
-	argumentsRange := typeArgumentListRange(ctx, annotationArguments)
-	calleeRange := rule.TokenRange(ctx.SourceFile, callee)
+	annotationRange := typeAnnotationRangeIncludingColon(ruleContext, typeAnnotation)
+	argumentsRange := typeArgumentListRange(ruleContext, annotationArguments)
+	calleeRange := rule.TokenRange(ruleContext.SourceFile, callee)
 
 	// Everything written after the callee lands at ONE offset, so it is assembled as a single
 	// string rather than as several insertions. Two separate defects came from not doing that:
@@ -359,7 +359,7 @@ func reportPreferConstructor(ctx rule.Context, node *ast.Node, typeAnnotation *a
 	// both of upstream's comment cases lost their comments silently while every message-id
 	// assertion stayed green. `ForFile` is a cached whole-file scan, so the cost is shared with
 	// every other rule that wants comments, and it returns them already sorted by position.
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() < annotationRange.Pos() || comment.Range.End() > annotationRange.End() {
 			continue
 		}
@@ -382,7 +382,7 @@ func reportPreferConstructor(ctx rule.Context, node *ast.Node, typeAnnotation *a
 		rule.ReplaceRange(core.NewTextRange(calleeRange.End(), calleeRange.End()), insertion),
 	}
 
-	ctx.ReportNodeWithFixes(node, buildPreferConstructorMessage(), fixes...)
+	ruleContext.ReportNodeWithFixes(node, buildPreferConstructorMessage(), fixes...)
 }
 
 // typeReferenceTypeArguments reads the type arguments off a type reference, or nil.
@@ -399,8 +399,8 @@ func typeReferenceTypeArguments(typeAnnotation *ast.Node) *ast.NodeList {
 // what makes the copied text a usable type argument list at its destination. Found by scanning
 // outward from the first and last argument rather than by arithmetic, because the author may have
 // written whitespace inside the brackets and the corpus tests that in both directions.
-func typeArgumentListRange(ctx rule.Context, typeArguments *ast.NodeList) core.TextRange {
-	sourceText := ctx.SourceFile.Text()
+func typeArgumentListRange(ruleContext rule.Context, typeArguments *ast.NodeList) core.TextRange {
+	sourceText := ruleContext.SourceFile.Text()
 
 	start := typeArguments.Pos()
 	for start > 0 && sourceText[start-1] != '<' {
@@ -426,9 +426,9 @@ func typeArgumentListRange(ctx rule.Context, typeArguments *ast.NodeList) core.T
 // Upstream deletes `lhs.parent`, which in estree is the TSTypeAnnotation node and starts AT the
 // colon. Our parser has no such node: the annotation is the type itself, hanging off the declaration,
 // so the colon has to be found by scanning back. Without it the repair leaves a dangling `:`.
-func typeAnnotationRangeIncludingColon(ctx rule.Context, typeAnnotation *ast.Node) core.TextRange {
-	sourceText := ctx.SourceFile.Text()
-	annotationRange := rule.TokenRange(ctx.SourceFile, typeAnnotation)
+func typeAnnotationRangeIncludingColon(ruleContext rule.Context, typeAnnotation *ast.Node) core.TextRange {
+	sourceText := ruleContext.SourceFile.Text()
+	annotationRange := rule.TokenRange(ruleContext.SourceFile, typeAnnotation)
 
 	start := annotationRange.Pos()
 	for start > 0 && sourceText[start-1] != ':' {
@@ -464,18 +464,18 @@ var consistentGenericConstructorsBuiltInArrays = map[string]struct{}{
 // whether the reference reaches a global; we ask the checker whether the symbol has a declaration in
 // source. A locally declared `class Uint8Array` is reported, which the corpus pins, and a port
 // testing only the name would go silent on it.
-func isExemptBuiltInArray(ctx rule.Context, annotationName *ast.Node) bool {
+func isExemptBuiltInArray(ruleContext rule.Context, annotationName *ast.Node) bool {
 	if _, isBuiltIn := consistentGenericConstructorsBuiltInArrays[annotationName.Text()]; !isBuiltIn {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(annotationName)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(annotationName)
 	if symbol == nil {
 		// No symbol at all means nothing in this file declares the name, so it is the global.
 		return true
 	}
 
-	return rule.IsDeclaredOnlyInDefaultLibraries(ctx.Program, symbol)
+	return rule.IsDeclaredOnlyInDefaultLibraries(ruleContext.Program, symbol)
 }
 
 func buildPreferConstructorMessage() rule.Message {

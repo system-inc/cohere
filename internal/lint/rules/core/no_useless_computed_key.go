@@ -48,8 +48,8 @@ func DecodeNoUselessComputedKeyOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUselessComputedKeyWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoUselessComputedKeySettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoUselessComputedKeySettings(), unmarshalOptionsError
 	}
 	settings := DefaultNoUselessComputedKeySettings()
 	if wire.EnforceForClassMembers != nil {
@@ -138,7 +138,7 @@ var messageUnnecessarilyComputedProperty = rule.Message{
 // the repair is shipped rather than declined; see the fixer's own comment.
 var NoUselessComputedKey = rule.Rule{
 	Name: "no-useless-computed-key",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoUselessComputedKeySettings](options)
 		if !ok {
 			// A rule configured as a bare severity is handed nil options, and the zero value of
@@ -147,7 +147,7 @@ var NoUselessComputedKey = rule.Rule{
 		}
 
 		check := func(node *ast.Node) {
-			checkUselessComputedKey(ctx, node, settings)
+			checkUselessComputedKey(ruleContext, node, settings)
 		}
 
 		return rule.Listeners{
@@ -166,8 +166,8 @@ var NoUselessComputedKey = rule.Rule{
 }
 
 // checkUselessComputedKey judges one member and proposes the repair.
-func checkUselessComputedKey(ctx rule.Context, node *ast.Node, settings NoUselessComputedKeySettings) {
-	if ctx.SourceFile == nil {
+func checkUselessComputedKey(ruleContext rule.Context, node *ast.Node, settings NoUselessComputedKeySettings) {
+	if ruleContext.SourceFile == nil {
 		return
 	}
 
@@ -229,8 +229,8 @@ func checkUselessComputedKey(ctx rule.Context, node *ast.Node, settings NoUseles
 	// its fixer writes `key.raw`, so `({ ['A']: 0 })` reports the escape as written and
 	// repairs to `'A'` rather than to `'A'`. Reading `key.Text()` here would cook the escape
 	// and both the message and the repair would silently change what the source says.
-	keyRange := rule.TokenRange(ctx.SourceFile, key)
-	keyText := ctx.SourceFile.Text()[keyRange.Pos():keyRange.End()]
+	keyRange := rule.TokenRange(ruleContext.SourceFile, key)
+	keyText := ruleContext.SourceFile.Text()[keyRange.Pos():keyRange.End()]
 
 	finding := rule.Message{
 		Id: messageUnnecessarilyComputedProperty.Id,
@@ -238,12 +238,12 @@ func checkUselessComputedKey(ctx rule.Context, node *ast.Node, settings NoUseles
 			keyText, messageUnnecessarilyComputedProperty.Description),
 	}
 
-	fix, fixable := uselessComputedKeyRepair(ctx, name, key, keyRange, keyText)
+	fix, fixable := uselessComputedKeyRepair(ruleContext, name, key, keyRange, keyText)
 	if !fixable {
-		ctx.ReportNode(node, finding)
+		ruleContext.ReportNode(node, finding)
 		return
 	}
-	ctx.ReportNodeWithFixes(node, finding, fix)
+	ruleContext.ReportNodeWithFixes(node, finding, fix)
 }
 
 // uselessComputedKeyRepair builds the replacement for the bracketed span, or declines.
@@ -264,16 +264,16 @@ func checkUselessComputedKey(ctx rule.Context, node *ast.Node, settings NoUseles
 //
 // So the enumeration this fixer's span requires is short and complete: the brackets, the key, and
 // any trivia between them. The first two are rewritten deliberately and the third is the decline.
-func uselessComputedKeyRepair(ctx rule.Context, name *ast.Node, key *ast.Node,
+func uselessComputedKeyRepair(ruleContext rule.Context, name *ast.Node, key *ast.Node,
 	keyRange core.TextRange, keyText string) (rule.Fix, bool) {
 
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 
 	// The bracket span. `name.Pos()` includes leading trivia, so the opening bracket is found by
 	// trimming to the token rather than by taking the node's start -- for `({ [/* c */ 'x']: 0 })`
 	// the untrimmed position sits before the space, and for a key written after a line comment it
 	// would sit before the comment.
-	bracketRange := rule.TokenRange(ctx.SourceFile, name)
+	bracketRange := rule.TokenRange(ruleContext.SourceFile, name)
 	openBracket := bracketRange.Pos()
 	closeBracket := bracketRange.End()
 	// Bounds before indexing, because the two lines below read `source[openBracket]` and

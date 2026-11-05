@@ -20,8 +20,8 @@ func TestTransformRunsAfterFixesAndSeesTheFixedText(test *testing.T) {
 	directory := test.TempDir()
 	fileName := filepath.Join(directory, "ordered.ts")
 
-	if err := os.WriteFile(directory+"/ordered.ts", []byte("const a = 'old';\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(directory+"/ordered.ts", []byte("const a = 'old';\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	sawByTransform := ""
@@ -58,8 +58,8 @@ func TestATransformProducingInvalidSyntaxIsRefused(test *testing.T) {
 	directory := test.TempDir()
 	fileName := filepath.Join(directory, "guarded.ts")
 
-	if err := os.WriteFile(fileName, []byte("const a = 'old';\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte("const a = 'old';\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	breaking := func(_ string, text string, _ *ast.SourceFile) (string, error) {
@@ -102,8 +102,8 @@ func TestATransformThatErrorsDoesNotBlockFixes(test *testing.T) {
 	directory := test.TempDir()
 	fileName := filepath.Join(directory, "erroring.ts")
 
-	if err := os.WriteFile(fileName, []byte("const a = 'old';\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte("const a = 'old';\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	failing := func(_ string, _ string, _ *ast.SourceFile) (string, error) {
@@ -144,8 +144,8 @@ func TestTransformRunsWhenNoFixLanded(test *testing.T) {
 	directory := test.TempDir()
 	fileName := filepath.Join(directory, "onlyformat.ts")
 
-	if err := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, text string, _ *ast.SourceFile) (string, error) {
@@ -176,8 +176,8 @@ func TestAnIdentityTransformDoesNotTouchTheFile(test *testing.T) {
 	directory := test.TempDir()
 	fileName := filepath.Join(directory, "already.ts")
 
-	if err := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	before, err := os.Stat(fileName)
 	if err != nil {
@@ -261,8 +261,8 @@ func TestFixFileIsFixAndTransformWithNoTransform(test *testing.T) {
 	source := "const a = 'old';\n"
 
 	for _, name := range []string{withFixFile, withNilTransform} {
-		if err := os.WriteFile(name, []byte(source), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(name, []byte(source), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 
@@ -312,8 +312,8 @@ func TestATransformCanSkipAFileAndTheSkipIsRecorded(test *testing.T) {
 	fileName := filepath.Join(directory, "notes.ts")
 	source := "const a = 1;\n"
 
-	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	before, err := os.Stat(fileName)
 	if err != nil {
@@ -416,15 +416,15 @@ func TestASkipWithNoReasonIsStillCounted(test *testing.T) {
 	directory := test.TempDir()
 	fileName := filepath.Join(directory, "bare.ts")
 
-	if err := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, _ string, _ *ast.SourceFile) (string, error) {
+	result, fixAndTransformFileError := FixAndTransformFile(fileName, proposeOnce(), func(_ string, _ string, _ *ast.SourceFile) (string, error) {
 		return "", ErrSkipped
 	}, DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	if fixAndTransformFileError != nil {
+		test.Fatalf("unexpected error: %v", fixAndTransformFileError)
 	}
 	if !result.TransformSkipped {
 		test.Fatalf("a bare skip was not recorded")
@@ -506,8 +506,8 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(test *testing.T) {
 	checked := filepath.Join(directory, "checked.ts")
 	written := filepath.Join(directory, "written.ts")
 	for _, fileName := range []string{checked, written} {
-		if err := os.WriteFile(fileName, []byte(original), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(fileName, []byte(original), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	transform := func(_ string, text string, _ *ast.SourceFile) (string, error) {
@@ -559,9 +559,9 @@ func TestAFixThePrintedTextTriggersLandsInTheSameRun(test *testing.T) {
 	}
 	repairMultilineArrow := proposeWhileContains("() => {\n", "function() {\n", "no-multiline-arrow")
 
-	result, err := FixAndTransformText("probe.ts", "register(() => { run(); });\n", repairMultilineArrow, breakArrow, DefaultMaxPasses)
-	if err != nil {
-		test.Fatal(err)
+	result, fixAndTransformTextError := FixAndTransformText("probe.ts", "register(() => { run(); });\n", repairMultilineArrow, breakArrow, DefaultMaxPasses)
+	if fixAndTransformTextError != nil {
+		test.Fatal(fixAndTransformTextError)
 	}
 	want := "register(function() {\n    run();\n});\n"
 	if result.Text != want || !result.Changed || !result.Transformed || !result.Converged {
@@ -584,9 +584,9 @@ func TestFixAndFormatThatUndoEachOtherAreBounded(test *testing.T) {
 	toDouble := proposeWhileContains(`'a'`, `"a"`, "prefer-double")
 	source := "const value = \"a\";\n"
 
-	result, err := FixAndTransformText("probe.ts", source, toDouble, toSingle, DefaultMaxPasses)
-	if err != nil {
-		test.Fatal(err)
+	result, fixAndTransformTextError := FixAndTransformText("probe.ts", source, toDouble, toSingle, DefaultMaxPasses)
+	if fixAndTransformTextError != nil {
+		test.Fatal(fixAndTransformTextError)
 	}
 	if result.Text != source || result.Changed || result.Converged {
 		test.Fatalf("an unsettled file was not left as found: %q (changed %v, converged %v)", result.Text, result.Changed, result.Converged)
@@ -617,9 +617,9 @@ func TestAFormattedNonTypeScriptFileIsNotLintedAgain(test *testing.T) {
 		return strings.ReplaceAll(text, "*  ", "- "), nil
 	}
 
-	result, err := FixAndTransformText("Notes.md", "*  one\n", propose, tidy, DefaultMaxPasses)
-	if err != nil {
-		test.Fatal(err)
+	result, fixAndTransformTextError := FixAndTransformText("Notes.md", "*  one\n", propose, tidy, DefaultMaxPasses)
+	if fixAndTransformTextError != nil {
+		test.Fatal(fixAndTransformTextError)
 	}
 	if result.Text != "- one\n" || !result.Transformed {
 		test.Fatalf("the markdown file was not formatted: %q", result.Text)

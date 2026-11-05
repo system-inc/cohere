@@ -74,20 +74,20 @@ var CorrectnessRequireMatchingProviderReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkProviderReturn(ctx, node)
+				checkProviderReturn(ruleContext, node)
 			},
 		}
 	},
 }
 
 // checkProviderReturn judges one decorator against the method it sits on.
-func checkProviderReturn(ctx rule.Context, node *ast.Node) {
+func checkProviderReturn(ruleContext rule.Context, node *ast.Node) {
 	// A method decorator only. The original resolves the decorator's parent and requires a
 	// MethodDefinition; a decorator on a class, a property, an accessor or a parameter reaches this
 	// listener too and none of them is this rule's business.
@@ -104,17 +104,17 @@ func checkProviderReturn(ctx rule.Context, node *ast.Node) {
 	// The type of the decorator value being applied. For `@Provider(token)` that is the factory's
 	// return type; for a bare `@Foo` it is `Foo` itself. Both are read the same way, which is what
 	// makes the brand the whole opt-in mechanism rather than a naming convention.
-	decoratorType := ctx.TypeChecker.GetTypeAtLocation(decorator.Expression)
+	decoratorType := ruleContext.TypeChecker.GetTypeAtLocation(decorator.Expression)
 	if decoratorType == nil {
 		return
 	}
 
-	brandSymbol := ctx.TypeChecker.GetPropertyOfType(decoratorType, expectedReturnTypeBrand)
+	brandSymbol := ruleContext.TypeChecker.GetPropertyOfType(decoratorType, expectedReturnTypeBrand)
 	if brandSymbol == nil {
 		// Not a branded decorator, so it declared no contract and there is nothing to check.
 		return
 	}
-	expectedType := ctx.TypeChecker.GetTypeOfSymbol(brandSymbol)
+	expectedType := ruleContext.TypeChecker.GetTypeOfSymbol(brandSymbol)
 	if expectedType == nil {
 		return
 	}
@@ -135,21 +135,21 @@ func checkProviderReturn(ctx rule.Context, node *ast.Node) {
 		return
 	}
 
-	returnType := declaredReturnTypeOfMethod(ctx, method)
+	returnType := declaredReturnTypeOfMethod(ruleContext, method)
 	if returnType == nil {
 		return
 	}
 
-	if ctx.TypeChecker.IsTypeAssignableTo(returnType, expectedType) {
+	if ruleContext.TypeChecker.IsTypeAssignableTo(returnType, expectedType) {
 		return
 	}
 
-	ctx.ReportNode(method, rule.Message{
+	ruleContext.ReportNode(method, rule.Message{
 		Id: correctnessRequireMatchingProviderReturnText.Id,
 		Description: correctnessRequireMatchingProviderReturnText.Render(map[string]string{
 			"decoratorName": decoratorNameOf(decorator),
-			"expectedType":  ctx.TypeChecker.TypeToString(expectedType),
-			"returnType":    ctx.TypeChecker.TypeToString(returnType),
+			"expectedType":  ruleContext.TypeChecker.TypeToString(expectedType),
+			"returnType":    ruleContext.TypeChecker.TypeToString(returnType),
 		}),
 	})
 }
@@ -159,16 +159,16 @@ func checkProviderReturn(ctx rule.Context, node *ast.Node) {
 // The original reaches the FunctionExpression a MethodDefinition carries and takes the first call
 // signature. Our parser has no separate value node, so the type at the method declaration carries
 // the signature directly; measured, a method declaration yields exactly one.
-func declaredReturnTypeOfMethod(ctx rule.Context, method *ast.Node) *checker.Type {
-	methodType := ctx.TypeChecker.GetTypeAtLocation(method)
+func declaredReturnTypeOfMethod(ruleContext rule.Context, method *ast.Node) *checker.Type {
+	methodType := ruleContext.TypeChecker.GetTypeAtLocation(method)
 	if methodType == nil {
 		return nil
 	}
-	signatures := ctx.TypeChecker.GetSignaturesOfType(methodType, checker.SignatureKindCall)
+	signatures := ruleContext.TypeChecker.GetSignaturesOfType(methodType, checker.SignatureKindCall)
 	if len(signatures) == 0 {
 		return nil
 	}
-	return ctx.TypeChecker.GetReturnTypeOfSignature(signatures[0])
+	return ruleContext.TypeChecker.GetReturnTypeOfSignature(signatures[0])
 }
 
 // decoratorNameOf gives a printable name for a decorator, for the message.

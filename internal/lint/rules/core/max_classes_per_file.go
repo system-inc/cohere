@@ -90,7 +90,7 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 	// The integer arm first, because it is the narrower shape: a JSON number cannot also decode as
 	// an object, so trying it first cannot swallow a case belonging to the other arm.
 	var configuredMaximum int
-	if err := json.Unmarshal(raw, &configuredMaximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &configuredMaximum); decodeError == nil {
 		if configuredMaximum < 1 {
 			return DefaultMaxClassesPerFileSettings(), fmt.Errorf(
 				"max-classes-per-file takes a maximum of at least 1, got %d", configuredMaximum)
@@ -100,8 +100,8 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 	}
 
 	var object maxClassesPerFileObjectShape
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return DefaultMaxClassesPerFileSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return DefaultMaxClassesPerFileSettings(), unmarshalOptionsError
 	}
 	// A nil Max is upstream's `option.max || 1` and stays at the default rather than becoming zero.
 	if object.Max != nil {
@@ -166,7 +166,7 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 // what the new file is called. The audit measured 18 sites in this tree for exactly that reason.
 var MaxClassesPerFile = rule.Rule{
 	Name: "max-classes-per-file",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which the assertion turns into a zero
 		// struct whose pointers are nil. Falling back matters more here than usual: a nil Maximum
 		// read as 0 would report every file holding one class.
@@ -233,11 +233,11 @@ var MaxClassesPerFile = rule.Rule{
 				// and it is reached only through the count test above. A second caller, or a change
 				// letting the count rise without a statement, voids the argument and the guard has
 				// to come back.
-				statements := ctx.SourceFile.Statements.Nodes
-				first := rule.TokenRange(ctx.SourceFile, statements[0])
+				statements := ruleContext.SourceFile.Statements.Nodes
+				first := rule.TokenRange(ruleContext.SourceFile, statements[0])
 				last := statements[len(statements)-1]
 
-				ctx.ReportRange(core.NewTextRange(first.Pos(), last.End()),
+				ruleContext.ReportRange(core.NewTextRange(first.Pos(), last.End()),
 					maxClassesPerFileMessage(classCount, maximum))
 			},
 		}

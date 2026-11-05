@@ -109,7 +109,7 @@ func classMethodsUseThisMissingThis(name string) rule.Message {
 // TypeScript tree is exactly where they matter and upstream had no way to write one.
 var ClassMethodsUseThis = rule.Rule{
 	Name: "class-methods-use-this",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		resolved := DefaultClassMethodsUseThisOptions()
 		if given, isClassMethodsUseThisOptions := rule.OptionsAs[ClassMethodsUseThisOptions](options); isClassMethodsUseThisOptions {
 			resolved = given
@@ -126,7 +126,7 @@ var ClassMethodsUseThis = rule.Rule{
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				checker := &classMethodsUseThisChecker{
-					ctx:                   ctx,
+					ctx:                   ruleContext,
 					exceptMethods:         exceptMethods,
 					enforceForClassFields: enforceForClassFields,
 					ignoreOverrideMethods: resolved.IgnoreOverrideMethods,
@@ -571,8 +571,8 @@ func DecodeClassMethodsUseThisOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var decoded ClassMethodsUseThisOptions
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if decoded.EnforceForClassFields == nil {
 		decoded.EnforceForClassFields = options.EnforceForClassFields

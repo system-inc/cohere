@@ -47,7 +47,7 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 	}
 
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected a mode string, "record" or "index-signature", got %s`, trimmed)
 	}
 	if mode != "index-signature" && mode != "record" {
@@ -116,7 +116,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 	// The circularity test resolves an identifier to its declaration.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[ConsistentIndexedObjectStyleOptions](options)
 		if !isSettings {
 			settings = DefaultConsistentIndexedObjectStyleSettings()
@@ -126,8 +126,8 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			if node == nil {
 				return ""
 			}
-			nodeRange := rule.TokenRange(ctx.SourceFile, node)
-			return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+			return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 		}
 
 		// hasUnpreservedComments answers upstream's helper of the same name: is there a comment
@@ -150,14 +150,14 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// narrower than the one that helper answers, being only "is any byte in this range inside a
 		// comment", so it is answered directly.
 		hasUnpreservedComments := func(nodeRange core.TextRange, preserved ...*ast.Node) bool {
-			text := ctx.SourceFile.Text()
+			text := ruleContext.SourceFile.Text()
 
 			survives := func(start int, end int) bool {
 				for _, target := range preserved {
 					if target == nil {
 						continue
 					}
-					targetRange := rule.TokenRange(ctx.SourceFile, target)
+					targetRange := rule.TokenRange(ruleContext.SourceFile, target)
 					if start >= targetRange.Pos() && end <= targetRange.End() {
 						return true
 					}
@@ -232,7 +232,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 
 			switch node.Kind {
 			case ast.KindIdentifier:
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 				if symbol == nil {
 					return false
 				}
@@ -332,10 +332,10 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		}
 
 		referencesDeclaration := func(body *ast.Node, declarationName *ast.Node) bool {
-			if ctx.TypeChecker == nil || declarationName == nil || body == nil {
+			if ruleContext.TypeChecker == nil || declarationName == nil || body == nil {
 				return false
 			}
-			anchor := ctx.TypeChecker.GetSymbolAtLocation(declarationName)
+			anchor := ruleContext.TypeChecker.GetSymbolAtLocation(declarationName)
 			if anchor == nil {
 				return false
 			}
@@ -392,18 +392,18 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			replacement := prefix + record + postfix
 
 			if !repairIsSafe {
-				ctx.ReportRange(replacedRange, buildPreferRecordMessage())
+				ruleContext.ReportRange(replacedRange, buildPreferRecordMessage())
 				return
 			}
 			fix := rule.ReplaceRange(replacedRange, replacement)
 			if hasUnpreservedComments(replacedRange, keyType, valueType) {
-				ctx.ReportRangeWithSuggestions(replacedRange, buildPreferRecordMessage(), rule.Suggestion{
+				ruleContext.ReportRangeWithSuggestions(replacedRange, buildPreferRecordMessage(), rule.Suggestion{
 					Message: buildPreferRecordSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},
 				})
 				return
 			}
-			ctx.ReportRangeWithFixes(replacedRange, buildPreferRecordMessage(), fix)
+			ruleContext.ReportRangeWithFixes(replacedRange, buildPreferRecordMessage(), fix)
 		}
 
 		listeners := rule.Listeners{}
@@ -431,13 +431,13 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 					keyArgument.Kind == ast.KindSymbolKeyword
 
 				replacement := "{ [key: " + textOf(keyArgument) + "]: " + textOf(valueArgument) + " }"
-				fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement)
+				fix := rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement)
 
-				if repairIsSafe && !hasUnpreservedComments(rule.TokenRange(ctx.SourceFile, node), keyArgument, valueArgument) {
-					ctx.ReportNodeWithFixes(node, buildPreferIndexSignatureMessage(), fix)
+				if repairIsSafe && !hasUnpreservedComments(rule.TokenRange(ruleContext.SourceFile, node), keyArgument, valueArgument) {
+					ruleContext.ReportNodeWithFixes(node, buildPreferIndexSignatureMessage(), fix)
 					return
 				}
-				ctx.ReportNodeWithSuggestions(node, buildPreferIndexSignatureMessage(), rule.Suggestion{
+				ruleContext.ReportNodeWithSuggestions(node, buildPreferIndexSignatureMessage(), rule.Suggestion{
 					Message: buildPreferIndexSignatureSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},
 				})
@@ -455,11 +455,11 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// modifiers. Upstream's estree does put `declare` inside its node and drops it; this keeps it,
 		// since `declare type` is equally valid and the rewrite has no reason to touch it.
 		interfaceReplacedRange := func(node *ast.Node) core.TextRange {
-			nodeRange := rule.TokenRange(ctx.SourceFile, node)
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 			if node.Modifiers() != nil && len(node.Modifiers().Nodes) != 0 {
 				last := node.Modifiers().Nodes[len(node.Modifiers().Nodes)-1]
 				return core.NewTextRange(
-					scanner.SkipTrivia(ctx.SourceFile.Text(), rule.TokenRange(ctx.SourceFile, last).End()),
+					scanner.SkipTrivia(ruleContext.SourceFile.Text(), rule.TokenRange(ruleContext.SourceFile, last).End()),
 					nodeRange.End())
 			}
 			return nodeRange
@@ -505,7 +505,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 				declarationName = parent.AsTypeAliasDeclaration().Name()
 			}
 			reportIndexSignature(literal.Members.Nodes, node, declarationName, "", "", true,
-				rule.TokenRange(ctx.SourceFile, node))
+				rule.TokenRange(ruleContext.SourceFile, node))
 		}
 
 		listeners[ast.KindMappedType] = func(node *ast.Node) {
@@ -534,7 +534,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 
 			// If the key is used to compute the value, the mapping is not uniform and no Record can
 			// express it.
-			if mappedKeyIsUsedInValue(ctx, mapped) {
+			if mappedKeyIsUsedInValue(ruleContext, mapped) {
 				return
 			}
 
@@ -576,18 +576,18 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			}
 
 			if declineRepair {
-				ctx.ReportNode(node, buildPreferRecordMessage())
+				ruleContext.ReportNode(node, buildPreferRecordMessage())
 				return
 			}
-			fix := rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), record)
-			if hasUnpreservedComments(rule.TokenRange(ctx.SourceFile, node), constraint, mapped.Type) {
-				ctx.ReportNodeWithSuggestions(node, buildPreferRecordMessage(), rule.Suggestion{
+			fix := rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), record)
+			if hasUnpreservedComments(rule.TokenRange(ruleContext.SourceFile, node), constraint, mapped.Type) {
+				ruleContext.ReportNodeWithSuggestions(node, buildPreferRecordMessage(), rule.Suggestion{
 					Message: buildPreferRecordSuggestionMessage(),
 					Fixes:   []rule.Fix{fix},
 				})
 				return
 			}
-			ctx.ReportNodeWithFixes(node, buildPreferRecordMessage(), fix)
+			ruleContext.ReportNodeWithFixes(node, buildPreferRecordMessage(), fix)
 		}
 
 		return listeners
@@ -676,7 +676,7 @@ func enclosingTypeAliasDeclaration(node *ast.Node) *ast.Node {
 // upstream declines. It asks its scope manager whether the key variable has any type reference;
 // here the value subtree is walked for an identifier spelled the same, which answers the same
 // question because a mapped type's key is bound to exactly that subtree.
-func mappedKeyIsUsedInValue(ctx rule.Context, mapped *ast.MappedTypeNode) bool {
+func mappedKeyIsUsedInValue(ruleContext rule.Context, mapped *ast.MappedTypeNode) bool {
 	if mapped.Type == nil || mapped.TypeParameter == nil {
 		return false
 	}

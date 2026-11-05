@@ -27,19 +27,19 @@ func TestANestedRepositoryEditReachesItsImportersWarm(test *testing.T) {
 	write := func(name string, contents string) {
 		test.Helper()
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	git := func(directory string, arguments ...string) {
 		test.Helper()
 		command := exec.Command("git", append([]string{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture"}, arguments...)...)
 		command.Dir = directory
-		if output, err := command.CombinedOutput(); err != nil {
-			test.Fatalf("git %v: %v\n%s", arguments, err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, outputError, output)
 		}
 	}
 

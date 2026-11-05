@@ -75,13 +75,13 @@ func DefaultInitDeclarationsSettings() InitDeclarationsOptions {
 // not declare, and a third element.
 func DecodeInitDeclarationsOptions(list []byte) (any, error) {
 	options := DefaultInitDeclarationsSettings()
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	var mode string
-	if err := json.Unmarshal(elements[0], &mode); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &mode); decodeError != nil {
 		return options, fmt.Errorf("init-declarations element 1 takes a mode string, got %s", elements[0])
 	}
 	options.Mode = initDeclarationsModeOf(mode)
@@ -101,8 +101,8 @@ func DecodeInitDeclarationsOptions(list []byte) (any, error) {
 	var second struct {
 		IgnoreForLoopInit *bool `json:"ignoreForLoopInit"`
 	}
-	if err := rule.UnmarshalOptions(elements[1], &second); err != nil {
-		return DefaultInitDeclarationsSettings(), fmt.Errorf("init-declarations element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &second); unmarshalOptionsError != nil {
+		return DefaultInitDeclarationsSettings(), fmt.Errorf("init-declarations element 2: %w", unmarshalOptionsError)
 	}
 	if second.IgnoreForLoopInit != nil {
 		options.IgnoreForLoopInit = *second.IgnoreForLoopInit
@@ -204,7 +204,7 @@ func initDeclarationsModeOf(name string) InitDeclarationsMode {
 var InitDeclarations = rule.Rule{
 	Name: "@typescript-eslint/init-declarations",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[InitDeclarationsOptions](options)
 		if !isSettings {
 			settings = DefaultInitDeclarationsSettings()
@@ -252,7 +252,7 @@ var InitDeclarations = rule.Rule{
 							continue
 						}
 						// The narrowed span: the identifier alone, excluding any type annotation.
-						ctx.ReportNode(name, buildInitDeclarationsMessage(
+						ruleContext.ReportNode(name, buildInitDeclarationsMessage(
 							"initialized", name.AsIdentifier().Text))
 						continue
 					}
@@ -275,7 +275,7 @@ var InitDeclarations = rule.Rule{
 						continue
 					}
 					// The core rule's own span, kept: the whole declarator.
-					ctx.ReportNode(declarator, buildInitDeclarationsMessage(
+					ruleContext.ReportNode(declarator, buildInitDeclarationsMessage(
 						"notInitialized", name.AsIdentifier().Text))
 				}
 			},

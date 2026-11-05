@@ -166,9 +166,9 @@ func locateProject(request locationRequest) (projectLocation, error) {
 		location.Engine = engineTypeScript
 
 	default:
-		root, engine, err := findProjectRoot(base)
-		if err != nil {
-			return projectLocation{}, err
+		root, engine, findProjectRootError := findProjectRoot(base)
+		if findProjectRootError != nil {
+			return projectLocation{}, findProjectRootError
 		}
 		location.Root = root
 		location.Engine = engine
@@ -199,8 +199,8 @@ func findProjectRoot(start string) (string, projectEngine, error) {
 	for {
 		if engine, found := engineAt(directory); found {
 			if engine == engineGo && !isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
-				root, err := goModuleRoot(directory)
-				return root, engineGo, err
+				root, goModuleRootError := goModuleRoot(directory)
+				return root, engineGo, goModuleRootError
 			}
 			return directory, engine, nil
 		}
@@ -248,9 +248,9 @@ func goModuleRoot(module string) (string, error) {
 		if !isRegularFile(filepath.Join(directory, goWorkspaceMarker)) {
 			continue
 		}
-		uses, err := workspaceUses(directory)
-		if err != nil {
-			return "", err
+		uses, workspaceUsesError := workspaceUses(directory)
+		if workspaceUsesError != nil {
+			return "", workspaceUsesError
 		}
 		for _, use := range uses {
 			if filepath.Join(directory, filepath.FromSlash(use)) == module {
@@ -295,8 +295,8 @@ func workspaceUses(directory string) ([]string, error) {
 // isRegularFile reports whether a path names something that is not a directory. A directory named
 // `tsconfig.json` is not a project, and treating it as one would build a graph from nothing.
 func isRegularFile(path string) bool {
-	information, err := os.Stat(path)
-	return err == nil && !information.IsDir()
+	information, statError := os.Stat(path)
+	return statError == nil && !information.IsDir()
 }
 
 // absoluteFrom resolves a path against a directory unless it is already absolute.

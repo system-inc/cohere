@@ -121,8 +121,8 @@ func (options TailwindClassLiteralOptions) ClassLiteralSurfaces() *ClassLiteralS
 // can call it.
 func (options *TailwindClassLiteralOptions) compileClassLiterals() error {
 	if options.Selectors != nil {
-		if err := checkSelectors(*options.Selectors); err != nil {
-			return err
+		if checkSelectorsError := checkSelectors(*options.Selectors); checkSelectorsError != nil {
+			return checkSelectorsError
 		}
 	}
 	options.surfaces = ClassLiteralSurfacesFor(options.ClassLiteralSettings())
@@ -264,8 +264,8 @@ func newNamePatterns(patterns []string, lowercase bool) *namePatterns {
 		if lowercase {
 			pattern = strings.ToLower(pattern)
 		}
-		compiled, err := esregexp.Compile(pattern, "")
-		if err != nil {
+		compiled, compileError := esregexp.Compile(pattern, "")
+		if compileError != nil {
 			continue
 		}
 		compiledPatterns.compiled = append(compiledPatterns.compiled, compiled)
@@ -285,8 +285,8 @@ func (patterns *namePatterns) matchesUnremembered(name string) bool {
 	for _, pattern := range patterns.compiled {
 		// The first match, and only if it is the name: `exec(name)[0] === name`. A pattern whose
 		// first match is shorter does not match, though a longer match exists, exactly as upstream.
-		match, err := pattern.Unwrap().FindStringMatch(name)
-		if err == nil && match != nil && match.RuneIndex == 0 && match.String() == name {
+		match, findStringMatchError := pattern.Unwrap().FindStringMatch(name)
+		if findStringMatchError == nil && match != nil && match.RuneIndex == 0 && match.String() == name {
 			return true
 		}
 	}
@@ -359,9 +359,9 @@ func (surfaces *ClassLiteralSurfaces) bind() *ClassLiteralReader {
 // key is the settings as one string, every selector in order with every field, so two settings share
 // a key only when they would read every node the same way. Built once per configuration selection.
 func (s ClassLiteralSettings) key() string {
-	encoded, err := json.Marshal(s.Selectors)
-	if err != nil {
-		panic(fmt.Sprintf("selectors that decoded do not encode: %v", err))
+	encoded, encodeError := json.Marshal(s.Selectors)
+	if encodeError != nil {
+		panic(fmt.Sprintf("selectors that decoded do not encode: %v", encodeError))
 	}
 	return string(encoded)
 }

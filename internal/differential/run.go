@@ -343,38 +343,38 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 		for _, path := range written {
 			// A control left behind would be linted by the next person to run either gate, so a
 			// failure to remove one is worth saying out loud rather than swallowing.
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "differential: could not remove planted control %s: %v\n", path, err)
+			if removeError := os.Remove(path); removeError != nil && !os.IsNotExist(removeError) {
+				fmt.Fprintf(os.Stderr, "differential: could not remove planted control %s: %v\n", path, removeError)
 			}
 		}
 		// Deepest first, and only the ones this plant created. Remove refuses on a non-empty
 		// directory, which is the guard that matters: if anything else landed in there while the
 		// gates ran, it stays and so does the directory.
 		for index := len(createdDirectories) - 1; index >= 0; index-- {
-			if err := os.Remove(createdDirectories[index]); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "differential: left the directory %s in place: %v\n", createdDirectories[index], err)
+			if removeError := os.Remove(createdDirectories[index]); removeError != nil && !os.IsNotExist(removeError) {
+				fmt.Fprintf(os.Stderr, "differential: left the directory %s in place: %v\n", createdDirectories[index], removeError)
 			}
 		}
 	}
 
 	for _, control := range options.Controls {
 		absolutePath := filepath.Join(options.Root, control.RelativePath)
-		if _, err := os.Stat(absolutePath); err == nil {
+		if _, statError := os.Stat(absolutePath); statError == nil {
 			return planted, cleanup, fmt.Errorf(
 				"control %q would overwrite the existing file %s; choose a path that does not exist",
 				control.Name, control.RelativePath,
 			)
 		}
-		missing, err := missingDirectories(filepath.Dir(absolutePath), options.Root)
-		if err != nil {
-			return planted, cleanup, fmt.Errorf("planning the directory for control %q: %w", control.Name, err)
+		missing, missingDirectoriesError := missingDirectories(filepath.Dir(absolutePath), options.Root)
+		if missingDirectoriesError != nil {
+			return planted, cleanup, fmt.Errorf("planning the directory for control %q: %w", control.Name, missingDirectoriesError)
 		}
-		if err := os.MkdirAll(filepath.Dir(absolutePath), 0o755); err != nil {
-			return planted, cleanup, fmt.Errorf("creating the directory for control %q: %w", control.Name, err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(absolutePath), 0o755); createDirectoryError != nil {
+			return planted, cleanup, fmt.Errorf("creating the directory for control %q: %w", control.Name, createDirectoryError)
 		}
 		createdDirectories = append(createdDirectories, missing...)
-		if err := os.WriteFile(absolutePath, []byte(control.Contents), 0o644); err != nil {
-			return planted, cleanup, fmt.Errorf("writing control %q: %w", control.Name, err)
+		if writeError := os.WriteFile(absolutePath, []byte(control.Contents), 0o644); writeError != nil {
+			return planted, cleanup, fmt.Errorf("writing control %q: %w", control.Name, writeError)
 		}
 		written = append(written, absolutePath)
 		planted = append(planted, control)
@@ -403,11 +403,11 @@ func runGate(ctx context.Context, command GateCommand) (string, error) {
 	var standardError strings.Builder
 	execution.Stderr = &standardError
 
-	output, err := execution.Output()
-	if err != nil {
+	output, outputError := execution.Output()
+	if outputError != nil {
 		var exitError *exec.ExitError
-		if !errors.As(err, &exitError) {
-			return "", fmt.Errorf("%s did not run: %w%s", command, err, stderrTail(standardError.String()))
+		if !errors.As(outputError, &exitError) {
+			return "", fmt.Errorf("%s did not run: %w%s", command, outputError, stderrTail(standardError.String()))
 		}
 
 		// It ran and exited non-zero, which is what a gate with findings does. But a gate that
@@ -490,7 +490,7 @@ func missingDirectories(directory string, root string) ([]string, error) {
 
 	var missing []string
 	for current := absoluteDirectory; strings.HasPrefix(current, absoluteRoot) && current != absoluteRoot; {
-		if _, err := os.Stat(current); err == nil {
+		if _, statError := os.Stat(current); statError == nil {
 			break
 		}
 		missing = append(missing, current)
@@ -535,8 +535,8 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	}
 
 	var document map[string]any
-	if err := json.Unmarshal(existing, &document); err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", err)
+	if decodeError := json.Unmarshal(existing, &document); decodeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", decodeError)
 	}
 
 	rules, _ := document["rules"].(map[string]any)
@@ -566,18 +566,18 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	// override globs resolve against. A config in a temporary directory elsewhere would silently
 	// change which files those patterns match.
 	extendedPath := filepath.Join(options.Root, ".oxlintrc.differential.json")
-	if _, err := os.Stat(extendedPath); err == nil {
+	if _, statError := os.Stat(extendedPath); statError == nil {
 		return options.Cohere, noCleanup, fmt.Errorf(
 			"%s already exists, so a differential run is in flight or one was interrupted; not overwriting it", extendedPath,
 		)
 	}
-	if err := os.WriteFile(extendedPath, extended, 0o644); err != nil {
-		return options.Cohere, noCleanup, fmt.Errorf("writing the extended lint config: %w", err)
+	if writeError := os.WriteFile(extendedPath, extended, 0o644); writeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("writing the extended lint config: %w", writeError)
 	}
 
 	cleanup := func() {
-		if err := os.Remove(extendedPath); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "differential: could not remove %s: %v\n", extendedPath, err)
+		if removeError := os.Remove(extendedPath); removeError != nil && !os.IsNotExist(removeError) {
+			fmt.Fprintf(os.Stderr, "differential: could not remove %s: %v\n", extendedPath, removeError)
 		}
 	}
 
@@ -600,9 +600,9 @@ func cohereVersionOf(ctx context.Context, command GateCommand) string {
 	probe := command
 	probe.Arguments = []string{"-version"}
 
-	output, err := runGate(ctx, probe)
-	if err != nil {
-		return "version unknown: " + err.Error()
+	output, runGateError := runGate(ctx, probe)
+	if runGateError != nil {
+		return "version unknown: " + runGateError.Error()
 	}
 
 	return versionLineFrom(output)
@@ -723,8 +723,8 @@ func sourceLineReaderAt(root string) SourceLineReader {
 	return func(file string, line int) (string, bool) {
 		lines, read := linesByFile[file]
 		if !read {
-			content, err := os.ReadFile(filepath.Join(root, file))
-			if err == nil {
+			content, readError := os.ReadFile(filepath.Join(root, file))
+			if readError == nil {
 				lines = strings.Split(string(content), "\n")
 			}
 			linesByFile[file] = lines

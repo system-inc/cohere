@@ -33,16 +33,16 @@ func main() {
 	check := flag.Bool("check", false, "regenerate and fail if the committed file disagrees")
 	flag.Parse()
 
-	generated, err := generate()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	generated, generateError := generate()
+	if generateError != nil {
+		fmt.Fprintln(os.Stderr, generateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			fmt.Fprintln(os.Stderr, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, generated) {
@@ -52,16 +52,16 @@ func main() {
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		fmt.Fprintln(os.Stderr, writeError)
 		os.Exit(1)
 	}
 }
 
 func generate() ([]byte, error) {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		return nil, err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		return nil, bundlesError
 	}
 	markdown := string(bundles.Files["plugins/markdown.js"])
 
@@ -95,12 +95,12 @@ func generate() ([]byte, error) {
 		if markdown[end] != '}' {
 			continue
 		}
-		value, err := runtime.RunString("JSON.stringify((" + markdown[start:end+1] + "))")
-		if err != nil {
+		value, runStringError := runtime.RunString("JSON.stringify((" + markdown[start:end+1] + "))")
+		if runStringError != nil {
 			continue
 		}
-		if err := json.Unmarshal([]byte(value.String()), &entities); err != nil {
-			return nil, err
+		if decodeError := json.Unmarshal([]byte(value.String()), &entities); decodeError != nil {
+			return nil, decodeError
 		}
 		break
 	}

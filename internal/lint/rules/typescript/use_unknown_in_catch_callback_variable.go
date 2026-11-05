@@ -120,12 +120,12 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declines the file once rather than per node. Unreachable through registration, since
 		// NeedsTypeChecker is declared above; this covers the harness path, where a Context can be
 		// built by hand. Without it every listener below would read a nil checker and go silent,
 		// which is the vacuous-green failure rather than a visible one.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -160,13 +160,13 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 				return false
 			}
 			for unionPart := range type_checking.UnionTypePartsSeq(handlerType) {
-				for _, callSignature := range type_checking.GetCallSignatures(ctx.TypeChecker, unionPart) {
+				for _, callSignature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, unionPart) {
 					parameters := checker.Signature_parameters(callSignature)
 					if len(parameters) == 0 {
 						continue
 					}
 					firstParameter := parameters[0]
-					firstParameterType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, firstParameter)
+					firstParameterType := checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, firstParameter)
 					if firstParameterType == nil {
 						continue
 					}
@@ -178,9 +178,9 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 					if declaration := firstParameter.ValueDeclaration; declaration != nil &&
 						type_checking.IsRestParameterDeclaration(declaration) {
 						switch {
-						case checker.Checker_isArrayType(ctx.TypeChecker, firstParameterType),
+						case checker.Checker_isArrayType(ruleContext.TypeChecker, firstParameterType),
 							checker.IsTupleType(firstParameterType):
-							typeArguments := checker.Checker_getTypeArguments(ctx.TypeChecker, firstParameterType)
+							typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, firstParameterType)
 							if len(typeArguments) == 0 {
 								// `...args: []` has no element type to judge, so there is no badly
 								// typed catch variable here. Upstream indexes [0] unguarded and
@@ -241,7 +241,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 				return collectFlaggedCallbacks(conditional.WhenFalse, into)
 
 			case ast.IsArrowFunction(node), ast.IsFunctionExpression(node):
-				if isFlaggableHandlerType(ctx.TypeChecker.GetTypeAtLocation(node)) {
+				if isFlaggableHandlerType(ruleContext.TypeChecker.GetTypeAtLocation(node)) {
 					return append(into, node)
 				}
 				return into
@@ -261,7 +261,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 					return
 				}
 
-				receiver, methodName := useUnknownStaticMemberAccess(ctx.TypeChecker, callee)
+				receiver, methodName := useUnknownStaticMemberAccess(ruleContext.TypeChecker, callee)
 				if receiver == nil {
 					return
 				}
@@ -297,13 +297,13 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 
 				// The receiver has to be thenable. Without this, any object with a `catch` method
 				// reports, and the corpus writes that object deliberately.
-				receiverType := ctx.TypeChecker.GetTypeAtLocation(receiver)
-				if !type_checking.IsThenableType(ctx.TypeChecker, callee, receiverType) {
+				receiverType := ruleContext.TypeChecker.GetTypeAtLocation(receiver)
+				if !type_checking.IsThenableType(ruleContext.TypeChecker, callee, receiverType) {
 					return
 				}
 
 				for _, callback := range collectFlaggedCallbacks(arguments[argumentIndexToCheck], nil) {
-					useUnknownReport(ctx, callback, methodName, messageAppend)
+					useUnknownReport(ruleContext, callback, methodName, messageAppend)
 				}
 			},
 		}
@@ -398,7 +398,7 @@ func useUnknownStaticMemberAccess(typeChecker *checker.Checker, callee *ast.Node
 // rule.TokenRange of the parameter node. Our parser folds ESTree's AssignmentPattern into the
 // parameter's Initializer, so upstream's outer/inner split collapses: the outer is the parameter and
 // the inner is its Name.
-func useUnknownReport(ctx rule.Context, callback *ast.Node, methodName string, messageAppend string) {
+func useUnknownReport(ruleContext rule.Context, callback *ast.Node, methodName string, messageAppend string) {
 	parameters := callback.Parameters()
 	if len(parameters) == 0 {
 		// Unreachable through the rule: isFlaggableHandlerType only answers true for a signature
@@ -421,25 +421,25 @@ func useUnknownReport(ctx rule.Context, callback *ast.Node, methodName string, m
 	case name.Kind == ast.KindArrayBindingPattern && parameterDeclaration.DotDotDotToken == nil:
 		// Destructuring an array asserts the thrown value is iterable, which nothing guarantees, so
 		// there is no annotation to repair and upstream offers none.
-		ctx.ReportNode(parameter, buildUseUnknownArrayDestructuringMessage(methodName, messageAppend))
+		ruleContext.ReportNode(parameter, buildUseUnknownArrayDestructuringMessage(methodName, messageAppend))
 		return
 
 	case name.Kind == ast.KindObjectBindingPattern && parameterDeclaration.DotDotDotToken == nil:
 		// Same, for shape and nullability.
-		ctx.ReportNode(parameter, buildUseUnknownObjectDestructuringMessage(methodName, messageAppend))
+		ruleContext.ReportNode(parameter, buildUseUnknownObjectDestructuringMessage(methodName, messageAppend))
 		return
 
 	case parameterDeclaration.DotDotDotToken != nil:
 		// A rest parameter's correct annotation is the one-element TUPLE `[unknown]` rather than
 		// `unknown`, because the parameter holds the argument list and not the error.
 		if parameterDeclaration.Type == nil {
-			ctx.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
 				Message: buildAddUnknownRestTypeAnnotationMessage(),
 				Fixes:   []rule.Fix{useUnknownInsertAnnotation(parameterDeclaration, ": [unknown]")},
 			})
 			return
 		}
-		ctx.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
+		ruleContext.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
 			Message: buildWrongRestTypeAnnotationMessage(),
 			Fixes:   []rule.Fix{rule.ReplaceRange(useUnknownAnnotationRange(parameterDeclaration), ": [unknown]")},
 		})
@@ -452,23 +452,23 @@ func useUnknownReport(ctx rule.Context, callback *ast.Node, methodName string, m
 		// parentheses too. `err => {}` becomes `(err: unknown) => {}` rather than `err: unknown => {}`,
 		// which does not parse.
 		if ast.IsArrowFunction(callback) && type_checking.IsParenlessArrowFunction(callback) {
-			ctx.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
 				Message: buildAddUnknownTypeAnnotationMessage(),
 				Fixes: []rule.Fix{
-					ctx.InsertBefore(name, "("),
+					ruleContext.InsertBefore(name, "("),
 					useUnknownInsertAnnotation(parameterDeclaration, ": unknown)"),
 				},
 			})
 			return
 		}
-		ctx.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
+		ruleContext.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
 			Message: buildAddUnknownTypeAnnotationMessage(),
 			Fixes:   []rule.Fix{useUnknownInsertAnnotation(parameterDeclaration, ": unknown")},
 		})
 		return
 	}
 
-	ctx.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
+	ruleContext.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
 		Message: buildWrongTypeAnnotationMessage(),
 		Fixes:   []rule.Fix{rule.ReplaceRange(useUnknownAnnotationRange(parameterDeclaration), ": unknown")},
 	})

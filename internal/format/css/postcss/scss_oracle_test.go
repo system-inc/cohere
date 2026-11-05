@@ -250,7 +250,7 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 	var inputs []input
 	malformed := map[string]bool{}
 	corpusFiles := map[string]bool{}
-	err := filepath.WalkDir(filepath.Join(root, "tests", "format", "scss"), func(path string, entry fs.DirEntry, err error) error {
+	walkError := filepath.WalkDir(filepath.Join(root, "tests", "format", "scss"), func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -268,8 +268,8 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 		corpusFiles[path] = true
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if len(corpusFiles) == 0 {
 		test.Fatalf("no .scss files under %s/tests/format/scss", root)
@@ -292,9 +292,9 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -304,8 +304,8 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 	command.Stdin = &stdin
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	var records []map[string]any
 	seen := map[string]bool{}
@@ -314,8 +314,8 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 			continue
 		}
 		var record map[string]any
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		records = append(records, record)
 		seen[record["name"].(string)] = true

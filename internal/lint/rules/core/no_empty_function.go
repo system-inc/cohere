@@ -80,8 +80,8 @@ func DecodeNoEmptyFunctionOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	for _, kind := range options.Allow {
 		if !slices.Contains(noEmptyFunctionAllowKinds, kind) {
@@ -149,7 +149,7 @@ var messageNoEmptyFunctionSuggestComment = rule.Message{
 // nothing may apply it unattended.
 var NoEmptyFunction = rule.Rule{
 	Name: "no-empty-function",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. Correct here only because `allow` defaults to empty.
 		settings, _ := rule.OptionsAs[NoEmptyFunctionOptions](options)
@@ -165,15 +165,15 @@ var NoEmptyFunction = rule.Rule{
 			if len(body.AsBlock().Statements.Nodes) != 0 {
 				return
 			}
-			if noEmptyFunctionBodyHasComment(ctx, body) {
+			if noEmptyFunctionBodyHasComment(ruleContext, body) {
 				return
 			}
 			if noEmptyFunctionIsAllowed(node, settings.Allow) {
 				return
 			}
 
-			bodyRange := rule.TokenRange(ctx.SourceFile, body)
-			ctx.ReportRangeWithSuggestions(bodyRange, rule.Message{
+			bodyRange := rule.TokenRange(ruleContext.SourceFile, body)
+			ruleContext.ReportRangeWithSuggestions(bodyRange, rule.Message{
 				Id: messageNoEmptyFunction.Id,
 				Description: fmt.Sprintf("Unexpected empty %s.",
 					noEmptyFunctionNameWithKind(node)),
@@ -208,9 +208,9 @@ var NoEmptyFunction = rule.Rule{
 //
 // The range tested is the body's own, which already spans brace to brace, so a comment written
 // before the function or after it falls outside and does not exempt.
-func noEmptyFunctionBodyHasComment(ctx rule.Context, body *ast.Node) bool {
-	bodyRange := rule.TokenRange(ctx.SourceFile, body)
-	for _, comment := range comments.ForFile(ctx) {
+func noEmptyFunctionBodyHasComment(ruleContext rule.Context, body *ast.Node) bool {
+	bodyRange := rule.TokenRange(ruleContext.SourceFile, body)
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= bodyRange.Pos() && comment.Range.End() <= bodyRange.End() {
 			return true
 		}

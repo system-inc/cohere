@@ -106,8 +106,8 @@ var JsxNoCommentTextnodes = rule.Rule{
 	// No namespace prefix beyond the plugin's own. The config writes
 	// `react/jsx-no-comment-textnodes` and the parity guard strips the namespace on a `/` boundary.
 	Name: "react/jsx-no-comment-textnodes",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		sourceText := ctx.SourceFile.Text()
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		sourceText := ruleContext.SourceFile.Text()
 
 		return rule.Listeners{
 			ast.KindJsxText: func(node *ast.Node) {
@@ -123,7 +123,7 @@ var JsxNoCommentTextnodes = rule.Rule{
 				// `ReportRange` with the node's own span rather than `ReportNode`. See the rule
 				// doc: `TokenRange` returns an inverted range for a text node whose content is a
 				// comment, and upstream's span is the whole node including its whitespace anyway.
-				ctx.ReportRange(core.NewTextRange(node.Pos(), node.End()), messageJsxNoCommentTextnodes)
+				ruleContext.ReportRange(core.NewTextRange(node.Pos(), node.End()), messageJsxNoCommentTextnodes)
 			},
 		}
 	},

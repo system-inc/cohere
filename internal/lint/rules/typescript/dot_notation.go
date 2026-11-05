@@ -74,7 +74,7 @@ var DotNotation = rule.Rule{
 	// Whether noPropertyAccessFromIndexSignature is on
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		resolved, isDotNotationOptions := rule.OptionsAs[DotNotationOptions](options)
 		if !isDotNotationOptions {
 			resolved = DefaultDotNotationOptions()
@@ -85,15 +85,15 @@ var DotNotation = rule.Rule{
 		}
 
 		allowIndexSignature := resolved.AllowIndexSignaturePropertyAccess ||
-			(ctx.Program != nil && ctx.Program.Options().NoPropertyAccessFromIndexSignature.IsTrue())
-		if ctx.TypeChecker != nil &&
+			(ruleContext.Program != nil && ruleContext.Program.Options().NoPropertyAccessFromIndexSignature.IsTrue())
+		if ruleContext.TypeChecker != nil &&
 			(resolved.AllowPrivateClassPropertyAccess || resolved.AllowProtectedClassPropertyAccess || allowIndexSignature) {
 			settings.DeclinesComputed = func(access *ast.Node, key *ast.Node) bool {
 				object := access.AsElementAccessExpression().Expression
-				property := ctx.TypeChecker.GetSymbolAtLocation(key)
+				property := ruleContext.TypeChecker.GetSymbolAtLocation(key)
 				if property == nil && key.Kind == ast.KindStringLiteral {
-					objectType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(object))
-					for _, candidate := range ctx.TypeChecker.GetPropertiesOfType(objectType) {
+					objectType := ruleContext.TypeChecker.GetNonNullableType(ruleContext.TypeChecker.GetTypeAtLocation(object))
+					for _, candidate := range ruleContext.TypeChecker.GetPropertiesOfType(objectType) {
 						if candidate.Name == key.Text() {
 							property = candidate
 							break
@@ -113,8 +113,8 @@ var DotNotation = rule.Rule{
 				}
 
 				if property == nil && allowIndexSignature {
-					objectType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(object))
-					for _, indexInfo := range ctx.TypeChecker.GetIndexInfosOfType(objectType) {
+					objectType := ruleContext.TypeChecker.GetNonNullableType(ruleContext.TypeChecker.GetTypeAtLocation(object))
+					for _, indexInfo := range ruleContext.TypeChecker.GetIndexInfosOfType(objectType) {
 						if type_checking.IsTypeFlagSet(indexInfo.KeyType(), checker.TypeFlagsStringLike) {
 							return true
 						}
@@ -123,7 +123,7 @@ var DotNotation = rule.Rule{
 				return false
 			}
 		}
-		return dotnotation.Listeners(ctx, settings)
+		return dotnotation.Listeners(ruleContext, settings)
 	},
 }
 
@@ -163,8 +163,8 @@ func DecodeDotNotationOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var decoded DotNotationOptions
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if decoded.AllowKeywords == nil {
 		decoded.AllowKeywords = options.AllowKeywords

@@ -41,8 +41,8 @@ func DecodePreferStatelessFunctionOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire preferStatelessFunctionWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.IgnorePureComponents = wire.IgnorePureComponents
 	return options, nil
@@ -165,7 +165,7 @@ var messagePreferStatelessFunction = rule.Message{
 // predicate for the outer gate. Both are used here, for their two different questions.
 var PreferStatelessFunction = rule.Rule{
 	Name: "react/prefer-stateless-function",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[PreferStatelessFunctionOptions](options)
 		if !ok {
 			settings = DefaultPreferStatelessFunctionOptions()
@@ -191,7 +191,7 @@ var PreferStatelessFunction = rule.Rule{
 						if preferStatelessFunctionShouldReport(
 							node, settings, fileUsesRef, declaresChildContextTypes,
 						) {
-							ctx.ReportNode(node, messagePreferStatelessFunction)
+							ruleContext.ReportNode(node, messagePreferStatelessFunction)
 						}
 					}
 					node.ForEachChild(func(child *ast.Node) bool {

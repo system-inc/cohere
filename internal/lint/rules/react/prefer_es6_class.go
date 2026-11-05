@@ -51,7 +51,7 @@ func DecodePreferEs6ClassOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected a mode string, "always" or "never", got %s`, raw)
 	}
 	switch mode {
@@ -185,7 +185,7 @@ var PreferEs6Class = rule.Rule{
 	// No namespace prefix beyond the plugin's own. The config writes `react/prefer-es6-class` and
 	// the parity guard strips the namespace on a `/` boundary.
 	Name: "react/prefer-es6-class",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[PreferEs6ClassOptions](options)
 		if !ok {
 			// A rule configured as bare `"error"` reaches here with nil options, which type-asserts
@@ -203,7 +203,7 @@ var PreferEs6Class = rule.Rule{
 					if !preferEs6ClassIsFactoryArgument(node) {
 						return
 					}
-					ctx.ReportNode(node, messagePreferEs6ClassShouldUseEs6Class)
+					ruleContext.ReportNode(node, messagePreferEs6ClassShouldUseEs6Class)
 				},
 			}
 		}
@@ -215,7 +215,7 @@ var PreferEs6Class = rule.Rule{
 				if !preferEs6ClassExtendsAComponent(node) {
 					return
 				}
-				ctx.ReportNode(node, messagePreferEs6ClassShouldUseCreateClass)
+				ruleContext.ReportNode(node, messagePreferEs6ClassShouldUseCreateClass)
 			},
 		}
 	},

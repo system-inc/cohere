@@ -42,8 +42,8 @@ func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUselessRenameWireShape
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoUselessRenameSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoUselessRenameSettings(), unmarshalOptionsError
 	}
 
 	settings := DefaultNoUselessRenameSettings()
@@ -105,7 +105,7 @@ func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
 // those inside the replacement, and that comparison is what draws the line.
 var NoUselessRename = rule.Rule{
 	Name: "no-useless-rename",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoUselessRenameSettings](options)
 		if !ok {
 			settings = DefaultNoUselessRenameSettings()
@@ -116,7 +116,7 @@ var NoUselessRename = rule.Rule{
 				if settings.IgnoreDestructuring {
 					return
 				}
-				checkUselessRenameInBindingPattern(ctx, node)
+				checkUselessRenameInBindingPattern(ruleContext, node)
 			},
 			// A destructuring ASSIGNMENT rather than a declaration reaches the parser as an object
 			// literal on the left of an `=`, so its properties are property assignments rather than
@@ -126,7 +126,7 @@ var NoUselessRename = rule.Rule{
 				if settings.IgnoreDestructuring || !isADestructuringTarget(node) {
 					return
 				}
-				checkUselessRenameInObjectLiteral(ctx, node)
+				checkUselessRenameInObjectLiteral(ruleContext, node)
 			},
 			ast.KindImportSpecifier: func(node *ast.Node) {
 				if settings.IgnoreImport {
@@ -137,7 +137,7 @@ var NoUselessRename = rule.Rule{
 					return
 				}
 				// An import keeps its local name, which is the one after `as`.
-				checkUselessRenameSpecifier(ctx, node, specifier.PropertyName, specifier.Name(),
+				checkUselessRenameSpecifier(ruleContext, node, specifier.PropertyName, specifier.Name(),
 					specifier.Name())
 			},
 			ast.KindExportSpecifier: func(node *ast.Node) {
@@ -150,7 +150,7 @@ var NoUselessRename = rule.Rule{
 				}
 				// An export keeps its local name too, and in an export that is the name BEFORE
 				// `as`, which the parser stores as the property name.
-				checkUselessRenameSpecifier(ctx, node, specifier.PropertyName, specifier.Name(),
+				checkUselessRenameSpecifier(ruleContext, node, specifier.PropertyName, specifier.Name(),
 					specifier.PropertyName)
 			},
 		}
@@ -188,7 +188,7 @@ func isADestructuringTarget(node *ast.Node) bool {
 }
 
 // checkUselessRenameInBindingPattern judges the declaration form, `let {foo: foo} = obj`.
-func checkUselessRenameInBindingPattern(ctx rule.Context, node *ast.Node) {
+func checkUselessRenameInBindingPattern(ruleContext rule.Context, node *ast.Node) {
 	for _, element := range node.AsBindingPattern().Elements.Nodes {
 		if element.Kind != ast.KindBindingElement {
 			continue
@@ -216,12 +216,12 @@ func checkUselessRenameInBindingPattern(ctx rule.Context, node *ast.Node) {
 		if nameTextOf(binding.PropertyName) != name.Text() {
 			continue
 		}
-		reportUselessRename(ctx, element, keptTextRangeOfBindingElement(ctx, binding))
+		reportUselessRename(ruleContext, element, keptTextRangeOfBindingElement(ruleContext, binding))
 	}
 }
 
 // checkUselessRenameInObjectLiteral judges the assignment form, `({foo: foo} = obj)`.
-func checkUselessRenameInObjectLiteral(ctx rule.Context, node *ast.Node) {
+func checkUselessRenameInObjectLiteral(ruleContext rule.Context, node *ast.Node) {
 	for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
 		if property.Kind != ast.KindPropertyAssignment {
 			continue
@@ -241,7 +241,7 @@ func checkUselessRenameInObjectLiteral(ctx rule.Context, node *ast.Node) {
 		if local == nil || nameTextOf(assignment.Name()) != local.Text() {
 			continue
 		}
-		reportUselessRename(ctx, property, valueRangeOfPropertyAssignment(ctx, assignment))
+		reportUselessRename(ruleContext, property, valueRangeOfPropertyAssignment(ruleContext, assignment))
 	}
 }
 
@@ -291,7 +291,7 @@ func localNameOfDestructuringValue(value *ast.Node) *ast.Node {
 // `node.local`, and `local` is the second name in an import and the first in an export. Both
 // spellings are in the corpus with opposite outputs, so nothing but an output comparison could tell
 // them apart, and a port keeping the same side at both sites passes every message-id assertion.
-func checkUselessRenameSpecifier(ctx rule.Context, node *ast.Node, propertyName *ast.Node,
+func checkUselessRenameSpecifier(ruleContext rule.Context, node *ast.Node, propertyName *ast.Node,
 	local *ast.Node, keep *ast.Node) {
 	if propertyName == nil || local == nil {
 		return
@@ -299,7 +299,7 @@ func checkUselessRenameSpecifier(ctx rule.Context, node *ast.Node, propertyName 
 	if nameTextOf(propertyName) != nameTextOf(local) {
 		return
 	}
-	reportUselessRename(ctx, node, rangeOfNode(ctx, keep))
+	reportUselessRename(ruleContext, node, rangeOfNode(ruleContext, keep))
 }
 
 // nameTextOf reads a name's value, whether it is written as an identifier or as a string.
@@ -320,9 +320,9 @@ func nameTextOf(name *ast.Node) string {
 }
 
 // reportUselessRename reports a finding, with the repair when it can be offered safely.
-func reportUselessRename(ctx rule.Context, node *ast.Node, kept textSpan) {
+func reportUselessRename(ruleContext rule.Context, node *ast.Node, kept textSpan) {
 	if !kept.ok {
-		ctx.ReportNode(node, messageUnnecessarilyRenamed)
+		ruleContext.ReportNode(node, messageUnnecessarilyRenamed)
 		return
 	}
 
@@ -334,20 +334,20 @@ func reportUselessRename(ctx rule.Context, node *ast.Node, kept textSpan) {
 	// it. Upstream's getCommentsInside asks about the node's own range, where a leading comment is
 	// not inside, so `import {/* comment */foo as foo}` still fixes. Seven of upstream's fix
 	// vectors are that shape and every one of them was a withheld repair here first.
-	if commentsInsideCount(ctx, rule.TokenRange(ctx.SourceFile, node).Pos(), node.End()) >
-		commentsInsideCount(ctx, kept.start, kept.end) {
-		ctx.ReportNode(node, messageUnnecessarilyRenamed)
+	if commentsInsideCount(ruleContext, rule.TokenRange(ruleContext.SourceFile, node).Pos(), node.End()) >
+		commentsInsideCount(ruleContext, kept.start, kept.end) {
+		ruleContext.ReportNode(node, messageUnnecessarilyRenamed)
 		return
 	}
 
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 	if kept.start < 0 || kept.end > len(source) || kept.start > kept.end {
-		ctx.ReportNode(node, messageUnnecessarilyRenamed)
+		ruleContext.ReportNode(node, messageUnnecessarilyRenamed)
 		return
 	}
 
-	ctx.ReportNodeWithFixes(node, messageUnnecessarilyRenamed,
-		ctx.ReplaceNode(node, source[kept.start:kept.end]))
+	ruleContext.ReportNodeWithFixes(node, messageUnnecessarilyRenamed,
+		ruleContext.ReplaceNode(node, source[kept.start:kept.end]))
 }
 
 // textSpan is the part of a node the repair keeps, or a statement that no repair is available.
@@ -363,7 +363,7 @@ type textSpan struct {
 // `{foo: foo = 1}` keeps `foo = 1`. The start is the name's token start rather than its Pos(), since
 // Pos() sits before leading trivia and a repair built from it would swallow the space after the
 // colon.
-func keptTextRangeOfBindingElement(ctx rule.Context, binding *ast.BindingElement) textSpan {
+func keptTextRangeOfBindingElement(ruleContext rule.Context, binding *ast.BindingElement) textSpan {
 	name := binding.Name()
 	if name == nil {
 		return textSpan{}
@@ -372,7 +372,7 @@ func keptTextRangeOfBindingElement(ctx rule.Context, binding *ast.BindingElement
 	// colon in `{foo: foo}` belongs to nobody, and a repair built from Pos() writes `{ foo}`. That
 	// was 86 failing fix vectors here before this line, and it reads as a broken fixer rather than
 	// as a range bug.
-	return textSpan{start: rule.TokenRange(ctx.SourceFile, name).Pos(),
+	return textSpan{start: rule.TokenRange(ruleContext.SourceFile, name).Pos(),
 		end: binding.AsNode().End(), ok: true}
 }
 
@@ -381,7 +381,7 @@ func keptTextRangeOfBindingElement(ctx rule.Context, binding *ast.BindingElement
 // Upstream refuses a parenthesized left side of a default here, because parentheses are not legal in
 // a shorthand property: `({foo: (foo) = a} = obj)` cannot become `({(foo) = a} = obj)`. That refusal
 // is the reason this returns a span rather than a range, so the caller can report without a fix.
-func valueRangeOfPropertyAssignment(ctx rule.Context, assignment *ast.PropertyAssignment) textSpan {
+func valueRangeOfPropertyAssignment(ruleContext rule.Context, assignment *ast.PropertyAssignment) textSpan {
 	value := assignment.Initializer
 	if value == nil {
 		return textSpan{}
@@ -405,7 +405,7 @@ func valueRangeOfPropertyAssignment(ctx rule.Context, assignment *ast.PropertyAs
 		}
 		kept = inner
 	}
-	return textSpan{start: rule.TokenRange(ctx.SourceFile, kept).Pos(), end: kept.End(), ok: true}
+	return textSpan{start: rule.TokenRange(ruleContext.SourceFile, kept).Pos(), end: kept.End(), ok: true}
 }
 
 // rangeOfNode gives a whole node's span as the kept text.
@@ -413,11 +413,11 @@ func valueRangeOfPropertyAssignment(ctx rule.Context, assignment *ast.PropertyAs
 // TokenRange rather than Pos() for the same reason as the binding element above: Pos() sits before
 // leading trivia, so the space after `as` in `{foo as foo}` would be carried into the repair and
 // produce `{ foo}`.
-func rangeOfNode(ctx rule.Context, node *ast.Node) textSpan {
+func rangeOfNode(ruleContext rule.Context, node *ast.Node) textSpan {
 	if node == nil {
 		return textSpan{}
 	}
-	return textSpan{start: rule.TokenRange(ctx.SourceFile, node).Pos(), end: node.End(), ok: true}
+	return textSpan{start: rule.TokenRange(ruleContext.SourceFile, node).Pos(), end: node.End(), ok: true}
 }
 
 // commentsInsideCount counts the comments lying wholly inside a span.
@@ -425,9 +425,9 @@ func rangeOfNode(ctx rule.Context, node *ast.Node) textSpan {
 // Upstream's `getCommentsInside` returns comments contained by the node, which is why this asks for
 // containment rather than for overlap. The comment cache is per file, so this costs one scan across
 // every finding in a file.
-func commentsInsideCount(ctx rule.Context, start int, end int) int {
+func commentsInsideCount(ruleContext rule.Context, start int, end int) int {
 	count := 0
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= start && comment.Range.End() <= end {
 			count++
 		}

@@ -184,12 +184,12 @@ var RelatedGetterSetterPairs = rule.Rule{
 	Name:             "@typescript-eslint/related-getter-setter-pairs",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A typed rule handed a nil checker goes silent rather than crashing, which is the more
 		// dangerous of the two failure modes because a whole StaysSilent suite passes vacuously
 		// over it. Kept at the top of the only listener, and it is also the `.TypeChecker`
 		// selector the registry's declaration guard reads in this file.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return rule.Listeners{}
 		}
 
@@ -239,7 +239,7 @@ var RelatedGetterSetterPairs = rule.Rule{
 					if member.Type() == nil {
 						continue
 					}
-					name, ok := relatedAccessorName(ctx, member)
+					name, ok := relatedAccessorName(ruleContext, member)
 					if !ok {
 						continue
 					}
@@ -257,7 +257,7 @@ var RelatedGetterSetterPairs = rule.Rule{
 					if len(parameters) != 1 {
 						continue
 					}
-					name, ok := relatedAccessorName(ctx, member)
+					name, ok := relatedAccessorName(ruleContext, member)
 					if !ok {
 						continue
 					}
@@ -282,8 +282,8 @@ var RelatedGetterSetterPairs = rule.Rule{
 				// setter's type by inference and the type node does not exist to ask. The
 				// annotation filter above declines every one of those before this line, so the
 				// divergence is behind an earlier guard rather than absent.
-				getterType := ctx.TypeChecker.GetTypeAtLocation(candidate.getter)
-				setterType := ctx.TypeChecker.GetTypeAtLocation(candidate.setter.Parameters()[0])
+				getterType := ruleContext.TypeChecker.GetTypeAtLocation(candidate.getter)
+				setterType := ruleContext.TypeChecker.GetTypeAtLocation(candidate.setter.Parameters()[0])
 				// No nil check on either type, and its absence is measured rather than assumed. A
 				// mutant deleting one survived the whole suite, which sent me to the source:
 				// `GetTypeAtLocation` is `getTypeOfNode`, whose every failing path returns the
@@ -294,13 +294,13 @@ var RelatedGetterSetterPairs = rule.Rule{
 				// The callers this verdict was taken over are the four container listeners at the
 				// bottom of this file, and nothing else calls into here. Adding a caller that can
 				// reach this line with a node the checker has never seen voids the verdict.
-				if shimchecker.Checker_isTypeAssignableTo(ctx.TypeChecker, getterType, setterType) {
+				if shimchecker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, getterType, setterType) {
 					continue
 				}
 				// The getter's return TYPE, unwrapped past parentheses. TSESTree has no
 				// parenthesized-type node, so upstream reports `string` for `(string)` and
 				// reporting `member.Type()` here would span the parens instead. See the span note.
-				ctx.ReportNode(ast.SkipTypeParentheses(candidate.getter.Type()), messageRelatedGetterSetterPairs)
+				ruleContext.ReportNode(ast.SkipTypeParentheses(candidate.getter.Type()), messageRelatedGetterSetterPairs)
 			}
 		}
 
@@ -366,7 +366,7 @@ func isAbstractAccessor(member *ast.Node) bool {
 // inner expression. The callers this was taken over are the two arms of the member loop in the rule
 // above and nothing else; if a caller is added that hands this a node from somewhere other than a
 // container's member list, the verdict is void and both guards have to be re-argued.
-func relatedAccessorName(ctx rule.Context, member *ast.Node) (string, bool) {
+func relatedAccessorName(ruleContext rule.Context, member *ast.Node) (string, bool) {
 	name := member.Name()
 
 	// A computed key in TSESTree is not a wrapper node: `member.key` IS the inner expression, so
@@ -374,14 +374,14 @@ func relatedAccessorName(ctx rule.Context, member *ast.Node) (string, bool) {
 	// than inferred, on six computed spellings.
 	if name.Kind == ast.KindComputedPropertyName {
 		inner := name.AsComputedPropertyName().Expression
-		return relatedKeyName(ctx, inner)
+		return relatedKeyName(ruleContext, inner)
 	}
-	return relatedKeyName(ctx, name)
+	return relatedKeyName(ruleContext, name)
 }
 
 // relatedKeyName answers the key string for one key expression, matching `getNameFromMember`'s four
 // arms.
-func relatedKeyName(ctx rule.Context, key *ast.Node) (string, bool) {
+func relatedKeyName(ruleContext rule.Context, key *ast.Node) (string, bool) {
 	switch key.Kind {
 	case ast.KindIdentifier:
 		return key.Text(), true
@@ -432,6 +432,6 @@ func relatedKeyName(ctx rule.Context, key *ast.Node) (string, bool) {
 	// `Pos()` includes leading trivia here, which upstream's `range` does not, so a key written
 	// after a newline would key with the whitespace attached and stop pairing with the same key
 	// written inline. `rule.TokenRange` is the same token-start walk `ReportNode` uses.
-	trimmed := rule.TokenRange(ctx.SourceFile, key)
-	return ctx.SourceFile.Text()[trimmed.Pos():trimmed.End()], true
+	trimmed := rule.TokenRange(ruleContext.SourceFile, key)
+	return ruleContext.SourceFile.Text()[trimmed.Pos():trimmed.End()], true
 }

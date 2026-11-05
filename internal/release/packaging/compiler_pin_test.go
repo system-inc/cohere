@@ -65,8 +65,8 @@ func moduleWithCompiler(test *testing.T) compilerFixture {
 
 	template := sharedModuleWithCompiler(test)
 	module := filepath.Join(test.TempDir(), "module")
-	if err := os.CopyFS(module, os.DirFS(template.Module)); err != nil {
-		test.Fatalf("copying the compiler fixture: %v", err)
+	if copyFSError := os.CopyFS(module, os.DirFS(template.Module)); copyFSError != nil {
+		test.Fatalf("copying the compiler fixture: %v", copyFSError)
 	}
 	return compilerFixture{Module: module, Recorded: template.Recorded, Later: template.Later}
 }
@@ -81,8 +81,8 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 		if failed != nil {
 			return ""
 		}
-		output, err := gitRun(directory, arguments...)
-		failed = err
+		output, gitRunError := gitRun(directory, arguments...)
+		failed = gitRunError
 		return output
 	}
 	write := func(path string, contents string) {
@@ -94,8 +94,8 @@ func buildModuleWithCompiler(root string) (compilerFixture, error) {
 	compiler := filepath.Join(root, "compiler")
 	module := filepath.Join(root, "module")
 	for _, directory := range []string{compiler, module} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			return compilerFixture{}, err
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			return compilerFixture{}, createDirectoryError
 		}
 	}
 
@@ -138,9 +138,9 @@ func TestCompilerPinIsTheCommitsGitlink(test *testing.T) {
 
 	fixture := sharedModuleWithCompiler(test)
 
-	pin, err := readCompilerPin(fixture.Module)
-	if err != nil {
-		test.Fatalf("a compiler checked out at its pin was refused: %v", err)
+	pin, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError != nil {
+		test.Fatalf("a compiler checked out at its pin was refused: %v", readCompilerPinError)
 	}
 	if pin.Commit != fixture.Recorded {
 		test.Fatalf("the pin is %s, and the commit records %s", pin.Commit, fixture.Recorded)
@@ -164,8 +164,8 @@ func TestCompilerPinAcceptsARelativeModuleDirectory(test *testing.T) {
 		test.Fatalf("could not name the fixture relatively (%q, %v), so this test would prove nothing", relative, err)
 	}
 
-	if _, err := readCompilerPin(relative); err != nil {
-		test.Fatalf("a compiler checked out at its pin was refused when named as %s: %v", relative, err)
+	if _, readCompilerPinError := readCompilerPin(relative); readCompilerPinError != nil {
+		test.Fatalf("a compiler checked out at its pin was refused when named as %s: %v", relative, readCompilerPinError)
 	}
 }
 
@@ -178,13 +178,13 @@ func TestReleaseRefusesACompilerMovedWithoutACommit(test *testing.T) {
 	fixture := moduleWithCompiler(test)
 	gitIn(test, filepath.Join(fixture.Module, "TypeScript"), "checkout", "--quiet", fixture.Later)
 
-	_, err := readCompilerPin(fixture.Module)
-	if err == nil {
+	_, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError == nil {
 		test.Fatal("a compiler moved without a commit was released")
 	}
 	for _, commit := range []string{fixture.Recorded, fixture.Later} {
-		if !strings.Contains(err.Error(), commit) {
-			test.Fatalf("the refusal does not name %s: %v", commit, err)
+		if !strings.Contains(readCompilerPinError.Error(), commit) {
+			test.Fatalf("the refusal does not name %s: %v", commit, readCompilerPinError)
 		}
 	}
 }
@@ -201,9 +201,9 @@ func TestPatchedCompilerAtThePinProceeds(test *testing.T) {
 		test.Fatal("the patch did not change the checkout, so this test would prove nothing")
 	}
 
-	pin, err := readCompilerPin(fixture.Module)
-	if err != nil {
-		test.Fatalf("a patched compiler at its pin was refused: %v", err)
+	pin, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError != nil {
+		test.Fatalf("a patched compiler at its pin was refused: %v", readCompilerPinError)
 	}
 	if pin.Commit != fixture.Recorded {
 		test.Fatalf("the pin is %s, and the commit records %s", pin.Commit, fixture.Recorded)
@@ -219,17 +219,17 @@ func TestUncheckedOutCompilerIsNamedAsSuch(test *testing.T) {
 	fixture := moduleWithCompiler(test)
 	submodule := filepath.Join(fixture.Module, "TypeScript")
 	for _, name := range []string{".git", "checker.go"} {
-		if err := os.RemoveAll(filepath.Join(submodule, name)); err != nil {
-			test.Fatal(err)
+		if removeError := os.RemoveAll(filepath.Join(submodule, name)); removeError != nil {
+			test.Fatal(removeError)
 		}
 	}
 
-	_, err := readCompilerPin(fixture.Module)
-	if err == nil {
+	_, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError == nil {
 		test.Fatal("a compiler that is not checked out was released")
 	}
-	if !strings.Contains(err.Error(), "not checked out") {
-		test.Fatalf("an uninitialized submodule was reported as something else: %v", err)
+	if !strings.Contains(readCompilerPinError.Error(), "not checked out") {
+		test.Fatalf("an uninitialized submodule was reported as something else: %v", readCompilerPinError)
 	}
 }
 
@@ -244,9 +244,9 @@ func TestUpstreamIsReadFromTheCommittedGitmodules(test *testing.T) {
 	writeFile(test, filepath.Join(fixture.Module, ".gitmodules"),
 		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/someone/else.git\n")
 
-	pin, err := readCompilerPin(fixture.Module)
-	if err != nil {
-		test.Fatal(err)
+	pin, readCompilerPinError := readCompilerPin(fixture.Module)
+	if readCompilerPinError != nil {
+		test.Fatal(readCompilerPinError)
 	}
 	if pin.Upstream != "system-inc/TypeScript" {
 		test.Fatalf("the upstream is %q, and the commit's .gitmodules names system-inc/TypeScript", pin.Upstream)
@@ -287,11 +287,11 @@ func TestBuildRefusesAMovedCompiler(test *testing.T) {
 	fixture := moduleWithCompiler(test)
 	gitIn(test, filepath.Join(fixture.Module, "TypeScript"), "checkout", "--quiet", fixture.Later)
 
-	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: test.TempDir()})
-	if err == nil {
+	_, buildError := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: test.TempDir()})
+	if buildError == nil {
 		test.Fatal("Build released a compiler moved without a commit")
 	}
-	if !strings.Contains(err.Error(), fixture.Later) {
-		test.Fatalf("Build failed, but not on the moved compiler: %v", err)
+	if !strings.Contains(buildError.Error(), fixture.Later) {
+		test.Fatalf("Build failed, but not on the moved compiler: %v", buildError)
 	}
 }

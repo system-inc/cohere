@@ -114,19 +114,19 @@ func Resolve(searchRoots []string) (string, error) {
 		for _, candidate := range binaryCandidates(root, packageName, binaryFileName) {
 			attempted = append(attempted, candidate)
 
-			information, err := os.Stat(candidate)
-			if err != nil {
+			information, statError := os.Stat(candidate)
+			if statError != nil {
 				continue
 			}
 			if information.IsDir() {
 				continue
 			}
-			if err := requireExecutable(candidate, information); err != nil {
+			if requireExecutableError := requireExecutable(candidate, information); requireExecutableError != nil {
 				// A binary that exists but cannot run is reported rather than skipped. Continuing
 				// past it would end in "no binary for this platform", which sends whoever reads it
 				// looking for a packaging bug that is not there — the file shipped fine, its mode
 				// did not survive.
-				return "", err
+				return "", requireExecutableError
 			}
 			return candidate, nil
 		}
@@ -158,8 +158,8 @@ func resolveOverride(path string) (string, error) {
 	if information.IsDir() {
 		return "", fmt.Errorf("%s points at %s, which is a directory rather than a binary", BinaryOverrideVariable, absolutePath)
 	}
-	if err := requireExecutable(absolutePath, information); err != nil {
-		return "", err
+	if requireExecutableError := requireExecutable(absolutePath, information); requireExecutableError != nil {
+		return "", requireExecutableError
 	}
 
 	return absolutePath, nil

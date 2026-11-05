@@ -287,9 +287,9 @@ var classMethodsUseThisSilentCases = []classMethodsUseThisCase{
 // decodedClassMethodsUseThis routes a row's raw JSON through the rule's own exported decoder.
 func decodedClassMethodsUseThis(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeClassMethodsUseThisOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", raw, err)
+	decoded, decodeClassMethodsUseThisOptionsError := DecodeClassMethodsUseThisOptions([]byte(raw))
+	if decodeClassMethodsUseThisOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeClassMethodsUseThisOptionsError)
 	}
 	return decoded
 }

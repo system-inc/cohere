@@ -806,7 +806,7 @@ func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
 	for _, name := range names {
 		departure := lintConfig.Departures[name]
 		file := departure.File
-		if relative, err := filepath.Rel(lintConfig.Root, departure.File); err == nil {
+		if relative, relativePathError := filepath.Rel(lintConfig.Root, departure.File); relativePathError == nil {
 			file = relative
 		}
 		fmt.Fprintf(out, "  departure: %s is set differently from the house ruling in %s: %s\n", name, file, departure.Reason)
@@ -826,7 +826,7 @@ func writeOverrideReasons(out io.Writer, lintConfig *configuration.Config) {
 			continue
 		}
 		file := override.File
-		if relative, err := filepath.Rel(lintConfig.Root, override.File); err == nil {
+		if relative, relativePathError := filepath.Rel(lintConfig.Root, override.File); relativePathError == nil {
 			file = relative
 		}
 		names := make([]string, 0, len(override.Rules))

@@ -33,9 +33,9 @@ func decodeArrayTypeOptions(test *testing.T, configuration string) any {
 		// here is what puts the rule's own fallback under test rather than the decoder's.
 		return nil
 	}
-	options, err := DecodeArrayTypeOptions([]byte(configuration))
-	if err != nil {
-		test.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(configuration))
+	if decodeArrayTypeOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeArrayTypeOptionsError)
 	}
 	return options
 }
@@ -1828,9 +1828,9 @@ func TestArrayTypeDecoderResolvesBothAxes(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeArrayTypeOptions([]byte(testCase.configuration))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.configuration, err)
+			decoded, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(testCase.configuration))
+			if decodeArrayTypeOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeArrayTypeOptionsError)
 			}
 			options, ok := decoded.(ArrayTypeOptions)
 			if !ok {
@@ -1936,9 +1936,9 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 		{`{"default": "generic"}`, ArrayTypeGeneric, ArrayTypeGeneric},
 		{`{"default": "array-simple", "readonly": "array"}`, ArrayTypeArraySimple, ArrayTypeArray},
 	} {
-		decoded, err := DecodeArrayTypeOptions([]byte(accepted.wire))
-		if err != nil {
-			test.Errorf("%s was refused: %v", accepted.wire, err)
+		decoded, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(accepted.wire))
+		if decodeArrayTypeOptionsError != nil {
+			test.Errorf("%s was refused: %v", accepted.wire, decodeArrayTypeOptionsError)
 			continue
 		}
 		options, isType := decoded.(ArrayTypeOptions)
@@ -1955,13 +1955,13 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 		{`{"readonly": "simple"}`, "simple"},
 		{`"generic"`, "generic"},
 	} {
-		_, err := DecodeArrayTypeOptions([]byte(refused.wire))
-		if err == nil {
+		_, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(refused.wire))
+		if decodeArrayTypeOptionsError == nil {
 			test.Errorf("%s decoded; it must be refused", refused.wire)
 			continue
 		}
-		if !strings.Contains(err.Error(), refused.named) {
-			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		if !strings.Contains(decodeArrayTypeOptionsError.Error(), refused.named) {
+			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, decodeArrayTypeOptionsError)
 		}
 	}
 }

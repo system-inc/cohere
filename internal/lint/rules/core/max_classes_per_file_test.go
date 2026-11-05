@@ -24,9 +24,9 @@ func decodedMaxClassesPerFileOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeMaxClassesPerFileOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeMaximumClassesPerFileOptionsError := DecodeMaxClassesPerFileOptions(json.RawMessage(raw))
+	if decodeMaximumClassesPerFileOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeMaximumClassesPerFileOptionsError)
 	}
 	return options
 }
@@ -193,9 +193,9 @@ func TestDecodeMaxClassesPerFileOptions(test *testing.T) {
 
 	settingsFrom := func(test *testing.T, raw string) MaxClassesPerFileOptions {
 		test.Helper()
-		decoded, err := DecodeMaxClassesPerFileOptions(json.RawMessage(raw))
-		if err != nil {
-			test.Fatalf("the decoder refused %s: %v", raw, err)
+		decoded, decodeMaximumClassesPerFileOptionsError := DecodeMaxClassesPerFileOptions(json.RawMessage(raw))
+		if decodeMaximumClassesPerFileOptionsError != nil {
+			test.Fatalf("the decoder refused %s: %v", raw, decodeMaximumClassesPerFileOptionsError)
 		}
 		options, isOptions := decoded.(MaxClassesPerFileOptions)
 		if !isOptions {
@@ -242,7 +242,7 @@ func TestDecodeMaxClassesPerFileOptions(test *testing.T) {
 		// rather than at lint time. Accepting them here would report every file holding a single
 		// class.
 		for _, raw := range []string{"0", `{"max": 0}`, "-1"} {
-			if _, err := DecodeMaxClassesPerFileOptions(json.RawMessage(raw)); err == nil {
+			if _, decodeMaximumClassesPerFileOptionsError := DecodeMaxClassesPerFileOptions(json.RawMessage(raw)); decodeMaximumClassesPerFileOptionsError == nil {
 				test.Fatalf("%s should have been refused", raw)
 			}
 		}

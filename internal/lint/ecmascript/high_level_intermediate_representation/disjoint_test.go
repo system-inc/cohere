@@ -1148,7 +1148,7 @@ func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	err := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -1157,8 +1157,8 @@ func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking the corpus: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
 	}
 	sort.Strings(files)
 	if len(files) > 200 {
@@ -1171,23 +1171,23 @@ func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 	var functions, members, classes, singletons, largest int
 
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)
 		probe := rule.Rule{
 			Name:             "disjoint-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
+						if ruleContext.TypeChecker == nil {
 							test.Fatal("the typed harness handed this probe a nil checker, so every " +
 								"count below would be a fact about the harness rather than the code")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}

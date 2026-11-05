@@ -278,7 +278,7 @@ var NoFloatingPromises = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		opts, ok := rule.OptionsAs[NoFloatingPromisesOptions](options)
 		if !ok {
 			opts = NoFloatingPromisesOptions{
@@ -312,15 +312,15 @@ var NoFloatingPromises = rule.Rule{
 			node *ast.ExpressionStatement,
 		) []rule.Fix {
 			if ast.IsVoidExpression(expression) {
-				voidTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expression.Pos())
+				voidTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, expression.Pos())
 				return []rule.Fix{rule.ReplaceRange(voidTokenRange, "await")}
 			}
 			if isHigherPrecedenceThanUnary(node.Expression) {
-				return []rule.Fix{ctx.InsertBefore(&node.Node, "await ")}
+				return []rule.Fix{ruleContext.InsertBefore(&node.Node, "await ")}
 			}
 			return []rule.Fix{
-				ctx.InsertBefore(&node.Node, "await ("),
-				ctx.InsertAfter(expression, ")"),
+				ruleContext.InsertBefore(&node.Node, "await ("),
+				ruleContext.InsertAfter(expression, ")"),
 			}
 		}
 
@@ -329,7 +329,7 @@ var NoFloatingPromises = rule.Rule{
 			matcher func(signature *checker.Signature) bool,
 		) bool {
 			for part := range type_checking.UnionTypePartsSeq(t) {
-				if type_checking.Some(type_checking.GetCallSignatures(ctx.TypeChecker, part), matcher) {
+				if type_checking.Some(type_checking.GetCallSignatures(ruleContext.TypeChecker, part), matcher) {
 					return true
 				}
 			}
@@ -341,10 +341,10 @@ var NoFloatingPromises = rule.Rule{
 			param *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(ctx.TypeChecker, ctx.TypeChecker.GetTypeOfSymbolAtLocation(param, node))
+			t := checker.Checker_getApparentType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(param, node))
 
 			for part := range type_checking.UnionTypePartsSeq(t) {
-				if len(type_checking.GetCallSignatures(ctx.TypeChecker, part)) != 0 {
+				if len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0 {
 					return true
 				}
 			}
@@ -353,7 +353,7 @@ var NoFloatingPromises = rule.Rule{
 
 		isPromiseLike := func(node *ast.Node, t *checker.Type) bool {
 			if t == nil {
-				t = ctx.TypeChecker.GetTypeAtLocation(node)
+				t = ruleContext.TypeChecker.GetTypeAtLocation(node)
 			}
 
 			// The highest priority is to allow anything allowlisted
@@ -361,15 +361,15 @@ var NoFloatingPromises = rule.Rule{
 				t,
 				opts.AllowForKnownSafePromises,
 				opts.AllowForKnownSafePromisesInline,
-				ctx.Program,
+				ruleContext.Program,
 			) {
 				return false
 			}
 
 			// Otherwise, we always consider the built-in Promise to be Promise-like...
-			typeParts := type_checking.UnionTypeParts(checker.Checker_getApparentType(ctx.TypeChecker, t))
+			typeParts := type_checking.UnionTypeParts(checker.Checker_getApparentType(ruleContext.TypeChecker, t))
 			if type_checking.Some(typeParts, func(typePart *checker.Type) bool {
-				return type_checking.IsPromiseLike(ctx.Program, ctx.TypeChecker, typePart)
+				return type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, typePart)
 			}) {
 				return true
 			}
@@ -384,12 +384,12 @@ var NoFloatingPromises = rule.Rule{
 			//
 			//   https://github.com/ajafff/tsutils/blob/49d0d31050b44b81e918eae4fbaf1dfe7b7286af/util/type.ts#L95-L125
 			for _, typePart := range typeParts {
-				then := checker.Checker_getPropertyOfType(ctx.TypeChecker, typePart, "then")
+				then := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, typePart, "then")
 				if then == nil {
 					continue
 				}
 
-				thenType := ctx.TypeChecker.GetTypeOfSymbolAtLocation(then, node)
+				thenType := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(then, node)
 				if hasMatchingSignature(
 					thenType,
 					func(signature *checker.Signature) bool {
@@ -403,19 +403,19 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isPromiseArray := func(node *ast.Node) bool {
-			t := ctx.TypeChecker.GetTypeAtLocation(node)
+			t := ruleContext.TypeChecker.GetTypeAtLocation(node)
 			for typePart := range type_checking.UnionTypePartsSeq(t) {
-				apparent := checker.Checker_getApparentType(ctx.TypeChecker, typePart)
+				apparent := checker.Checker_getApparentType(ruleContext.TypeChecker, typePart)
 
-				if checker.Checker_isArrayType(ctx.TypeChecker, apparent) {
-					arrayType := checker.Checker_getTypeArguments(ctx.TypeChecker, apparent)[0]
+				if checker.Checker_isArrayType(ruleContext.TypeChecker, apparent) {
+					arrayType := checker.Checker_getTypeArguments(ruleContext.TypeChecker, apparent)[0]
 					if isPromiseLike(node, arrayType) {
 						return true
 					}
 				}
 
 				if checker.IsTupleType(apparent) {
-					for _, tupleElementType := range checker.Checker_getTypeArguments(ctx.TypeChecker, apparent) {
+					for _, tupleElementType := range checker.Checker_getTypeArguments(ruleContext.TypeChecker, apparent) {
 						if isPromiseLike(node, tupleElementType) {
 							return true
 						}
@@ -430,13 +430,13 @@ var NoFloatingPromises = rule.Rule{
 				return false
 			}
 
-			t := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+			t := ruleContext.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
 
 			return type_checking.TypeMatchesSomeSpecifier(
 				t,
 				opts.AllowForKnownSafeCalls,
 				opts.AllowForKnownSafeCallsInline,
-				ctx.Program,
+				ruleContext.Program,
 			)
 		}
 
@@ -451,7 +451,7 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isValidRejectionHandler := func(rejectionHandler *ast.Node) bool {
-			return len(type_checking.GetCallSignatures(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(rejectionHandler))) > 0
+			return len(type_checking.GetCallSignatures(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(rejectionHandler))) > 0
 		}
 
 		var isUnhandledPromise func(
@@ -521,7 +521,7 @@ var NoFloatingPromises = rule.Rule{
 					// TODO(port): getStaticMemberAccessValue -> GetAccessedPropertyName is an
 					// enhancement, we should probably add tests for it
 					// const methodName = getStaticMemberAccessValue(callee, context);
-					methodName, _ := checker.Checker_getAccessedPropertyName(ctx.TypeChecker, callee)
+					methodName, _ := checker.Checker_getAccessedPropertyName(ruleContext.TypeChecker, callee)
 
 					if methodName == "catch" && len(callExpr.Arguments.Nodes) >= 1 {
 						if isValidRejectionHandler(callExpr.Arguments.Nodes[0]) {
@@ -572,7 +572,7 @@ var NoFloatingPromises = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -600,7 +600,7 @@ var NoFloatingPromises = rule.Rule{
 					} else {
 						msg = buildFloatingPromiseArrayMessage()
 					}
-					ctx.ReportNode(node, msg)
+					ruleContext.ReportNode(node, msg)
 				} else if *opts.IgnoreVoid {
 					var msg rule.Message
 					if nonFunctionHandler {
@@ -609,15 +609,15 @@ var NoFloatingPromises = rule.Rule{
 						msg = buildFloatingVoidMessage()
 					}
 
-					ctx.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
 						Message: buildFloatingFixVoidMessage(),
 						Fixes: (func() []rule.Fix {
 							if isHigherPrecedenceThanUnary(exprStatement.Expression) {
-								return []rule.Fix{ctx.InsertBefore(node, "void ")}
+								return []rule.Fix{ruleContext.InsertBefore(node, "void ")}
 							}
 							return []rule.Fix{
-								ctx.InsertBefore(node, "void ("),
-								ctx.InsertAfter(expression, ")"),
+								ruleContext.InsertBefore(node, "void ("),
+								ruleContext.InsertAfter(expression, ")"),
 							}
 						})(),
 					}, rule.Suggestion{
@@ -631,7 +631,7 @@ var NoFloatingPromises = rule.Rule{
 					} else {
 						msg = buildFloatingMessage()
 					}
-					ctx.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
 						Message: buildFloatingFixAwaitMessage(),
 						Fixes:   addAwait(expression, exprStatement),
 					})
@@ -674,7 +674,7 @@ type noFloatingPromisesRawSpecifier struct {
 // of failing the run.
 func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
 	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
+	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
 		*s = noFloatingPromisesRawSpecifier{inline: asString}
 		return nil
 	}
@@ -685,20 +685,20 @@ func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
 		Path    string          `json:"path"`
 		Package string          `json:"package"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 
 	*s = noFloatingPromisesRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
 
 	var names []string
-	if err := json.Unmarshal(object.Name, &names); err == nil {
+	if decodeError := json.Unmarshal(object.Name, &names); decodeError == nil {
 		s.Name = names
 		return nil
 	}
 	var name string
-	if err := json.Unmarshal(object.Name, &name); err != nil {
-		return err
+	if decodeError := json.Unmarshal(object.Name, &name); decodeError != nil {
+		return decodeError
 	}
 	s.Name = []string{name}
 	return nil

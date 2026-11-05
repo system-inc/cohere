@@ -33,9 +33,9 @@ import (
 func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	// The fixtures whose golden carries this rule's message. Everything else is another rule's
@@ -323,9 +323,9 @@ func TestPreserveManualMemoizationAgainstGoldens(test *testing.T) {
 func TestPreserveManualMemoizationFalsePositiveRate(test *testing.T) {
 	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	const ruleMessage = "Existing memoization could not be preserved"
@@ -542,20 +542,20 @@ func findingsForSource(test *testing.T, source string) ([]PreserveManualMemoizat
 	probe := rule.Rule{
 		Name:             "preserve-manual-memoization-score",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						lowered = true
-						all = append(all, pipelineFindings(function, ctx.TypeChecker)...)
+						all = append(all, pipelineFindings(function, ruleContext.TypeChecker)...)
 					})
 				},
 			}
@@ -593,8 +593,8 @@ func pipelineFindings(function *Function, checker *shimchecker.Checker) []Preser
 // silently dropped from the population.
 func upstreamReportsInLogs(test *testing.T, expectPath string, ruleMessage string) bool {
 	test.Helper()
-	body, err := os.ReadFile(expectPath)
-	if err != nil {
+	body, readError := os.ReadFile(expectPath)
+	if readError != nil {
 		return false
 	}
 	text := string(body)

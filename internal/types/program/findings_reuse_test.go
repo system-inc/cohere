@@ -72,23 +72,23 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 	}
 	files := graph.ProjectFiles()
 	rules := findingsReuseRules(test)
-	ctx := context.Background()
+	backgroundContext := context.Background()
 	key := program.HashRuleSet([]string{"fixture"})
 
-	plain, err := graph.Walk(ctx, files, rules)
+	plain, err := graph.Walk(backgroundContext, files, rules)
 	if err != nil {
 		test.Fatalf("plain walk: %v", err)
 	}
 
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
-	if _, err := graph.Walk(ctx, files, rules); err != nil {
-		test.Fatalf("recording walk: %v", err)
+	if _, walkError := graph.Walk(backgroundContext, files, rules); walkError != nil {
+		test.Fatalf("recording walk: %v", walkError)
 	}
 	recorded := recording.Recorded()
 
 	graph.FindingsReuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
-	replayed, err := graph.Walk(ctx, files, rules)
+	replayed, err := graph.Walk(backgroundContext, files, rules)
 	if err != nil {
 		test.Fatalf("replaying walk: %v", err)
 	}
@@ -137,20 +137,20 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 	})
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-		if err != nil {
-			test.Fatalf("build: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+		if buildError != nil {
+			test.Fatalf("build: %v", buildError)
 		}
 		return graph
 	}
 	rules := findingsReuseRules(test)
-	ctx := context.Background()
+	backgroundContext := context.Background()
 	key := program.HashRuleSet([]string{"fixture"})
 
 	first := build()
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	first.FindingsReuse = recording
-	before, err := first.Walk(ctx, first.ProjectFiles(), rules)
+	before, err := first.Walk(backgroundContext, first.ProjectFiles(), rules)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -159,12 +159,12 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 	}
 
 	// The edit removes the finding. A cache keyed on path would replay it; keyed on bytes it cannot.
-	if err := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export function f(x: number): boolean {\n  return x === 1;\n}\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export function f(x: number): boolean {\n  return x === 1;\n}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	second := build()
 	second.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
-	after, err := second.Walk(ctx, second.ProjectFiles(), rules)
+	after, err := second.Walk(backgroundContext, second.ProjectFiles(), rules)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -188,8 +188,8 @@ func TestAFindingsCacheUnderAnotherKeyServesNothing(test *testing.T) {
 	rules := findingsReuseRules(test)
 	recording := program.NewFindingsReuse(program.HashRuleSet([]string{"old"}), nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
-	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules); err != nil {
-		test.Fatal(err)
+	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules); walkError != nil {
+		test.Fatal(walkError)
 	}
 	if len(recording.Recorded().Entries) == 0 {
 		test.Fatal("nothing was recorded, so a miss below would prove nothing")
@@ -233,21 +233,21 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 			pure = append(pure, subject)
 		}
 	}
-	ctx := context.Background()
+	backgroundContext := context.Background()
 	key := program.HashRuleSet([]string{"fixture"})
 	files := graph.ProjectFiles()
 
-	plain, err := graph.Walk(ctx, files, pure)
+	plain, err := graph.Walk(backgroundContext, files, pure)
 	if err != nil {
 		test.Fatal(err)
 	}
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
-	if _, err := graph.Walk(ctx, files, pure); err != nil {
-		test.Fatal(err)
+	if _, walkError := graph.Walk(backgroundContext, files, pure); walkError != nil {
+		test.Fatal(walkError)
 	}
 	graph.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
-	replayed, err := graph.Walk(ctx, files, pure)
+	replayed, err := graph.Walk(backgroundContext, files, pure)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(test *testing.T) {
 	})
 	panicking := rule.Rule{
 		Name: "test-panics-on-every-declaration",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) { panic("simulated") }}
 		},
 	}
@@ -377,8 +377,8 @@ func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(test *testing.T
 		test.Fatal("consumer.ts was not recorded with a type-aware finding, so its replay is untested here")
 	}
 
-	if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	after, refreshed := walkAndRecord(test, root, rules, recorded)
 	truth := plainWalk(test, root, rules)
@@ -428,8 +428,8 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(test *testing.T)
 	if len(before.Diagnostics) == 0 {
 		test.Fatal("consumer.ts produced no finding before the edit, so this proves nothing")
 	}
-	if err := os.WriteFile(filepath.Join(root, "globals.d.ts"), []byte("declare const ambient: number;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "globals.d.ts"), []byte("declare const ambient: number;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	after, _ := walkAndRecord(test, root, rules, recorded)
 	truth := plainWalk(test, root, rules)
@@ -494,15 +494,15 @@ func TestCacheClassesSplitsFiveWays(test *testing.T) {
 // the old pure notes and no typed ones, and the run after that replays the refreshed entry.
 func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	test.Parallel()
-	noting := func(name string, needsTypeChecker bool, reads rule.ProgramRead, key func(ctx rule.Context, declaration *ast.Node) string) rule.Rule {
+	noting := func(name string, needsTypeChecker bool, reads rule.ProgramRead, key func(ruleContext rule.Context, declaration *ast.Node) string) rule.Rule {
 		return rule.Rule{
 			Name:             name,
 			NeedsTypeChecker: needsTypeChecker,
 			ProgramReads:     reads,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-					if noted := key(ctx, node); noted != "" {
-						ctx.Note(noted)
+					if noted := key(ruleContext, node); noted != "" {
+						ruleContext.Note(noted)
 					}
 				}}
 			},
@@ -511,14 +511,14 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	// The type-aware rule notes only strings, so after lib.ts turns its value into a number it notes nothing
 	// in consumer.ts, and a refresh that kept its old notes would show.
 	rules := []rule.Rule{
-		noting("test-notes-pure", false, 0, func(ctx rule.Context, declaration *ast.Node) string { return "declared" }),
-		noting("test-notes-typed", true, 0, func(ctx rule.Context, declaration *ast.Node) string {
-			if rendered := ctx.TypeChecker.TypeToString(ctx.TypeChecker.GetTypeAtLocation(declaration.Name())); rendered == "string" {
+		noting("test-notes-pure", false, 0, func(ruleContext rule.Context, declaration *ast.Node) string { return "declared" }),
+		noting("test-notes-typed", true, 0, func(ruleContext rule.Context, declaration *ast.Node) string {
+			if rendered := ruleContext.TypeChecker.TypeToString(ruleContext.TypeChecker.GetTypeAtLocation(declaration.Name())); rendered == "string" {
 				return "a string"
 			}
 			return ""
 		}),
-		noting("test-notes-uncacheable", false, rule.ReadsOtherFiles, func(ctx rule.Context, declaration *ast.Node) string { return "walked" }),
+		noting("test-notes-uncacheable", false, rule.ReadsOtherFiles, func(ruleContext rule.Context, declaration *ast.Node) string { return "walked" }),
 	}
 	if pure, typeAware, _, _, uncacheable := program.CacheClasses(rules); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {
 		test.Fatalf("the noting rules are not one per class (%d pure, %d type-aware, %d uncacheable), so this proves nothing",
@@ -534,12 +534,12 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 		table := program.NewCacheTable()
 		table.Findings = cache
 		directory := test.TempDir()
-		if err := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); err != nil {
-			test.Fatalf("writing: %v", err)
+		if writeCacheTableError := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); writeCacheTableError != nil {
+			test.Fatalf("writing: %v", writeCacheTableError)
 		}
-		read, err := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
-		if err != nil {
-			test.Fatalf("reading: %v", err)
+		read, readCacheTableError := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
+		if readCacheTableError != nil {
+			test.Fatalf("reading: %v", readCacheTableError)
 		}
 		return read.Findings
 	}
@@ -561,8 +561,8 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	warm, recorded := walkAndRecord(test, root, rules, throughTheTable(recorded))
 	sameNotes("unchanged", warm)
 
-	if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	refreshing, recorded := walkAndRecord(test, root, rules, throughTheTable(recorded))
 	if refreshing.TypeAwareRerun == 0 {

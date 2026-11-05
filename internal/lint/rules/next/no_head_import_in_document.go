@@ -135,10 +135,10 @@ var NoHeadImportInDocument = rule.Rule{
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name:       "@next/next/no-head-import-in-document",
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Every file that is not the document registers no listener at all rather than testing the
 		// path at every import, which is how upstream spells it too.
-		if !nextjs.IsDocumentFile(ctx.SourceFile.FileName().AsString()) {
+		if !nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -158,7 +158,7 @@ var NoHeadImportInDocument = rule.Rule{
 				}
 				// Unconditional. The import clause is never examined, so a type-only import and an
 				// import binding nothing both report.
-				ctx.ReportNode(node, messageNoHeadImportInDocument)
+				ruleContext.ReportNode(node, messageNoHeadImportInDocument)
 			},
 		}
 	},

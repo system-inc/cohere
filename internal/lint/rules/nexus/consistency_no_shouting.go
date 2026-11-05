@@ -52,8 +52,8 @@ type ConsistencyNoShoutingOptions struct {
 // and the repair is usually to state the reason instead, which a rule cannot write.
 var ConsistencyNoShouting = rule.Rule{
 	Name: "nexus/consistency-no-shouting",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -66,7 +66,7 @@ var ConsistencyNoShouting = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				for _, comment := range comments.ForFile(ctx) {
+				for _, comment := range comments.ForFile(ruleContext) {
 					tokens := shoutedTokensIn(comment.Text)
 
 					kept := tokens[:0]
@@ -79,7 +79,7 @@ var ConsistencyNoShouting = rule.Rule{
 						continue
 					}
 
-					ctx.ReportRange(comment.Range, messageShoutingInComment(kept))
+					ruleContext.ReportRange(comment.Range, messageShoutingInComment(kept))
 				}
 			},
 		}

@@ -23,14 +23,14 @@ func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(test *testing.T) {
 	command := exec.Command(fixture.binary, verboseArguments([]string{"--no-format"})...)
 	command.Dir = fixture.root
 	command.Env = append([]string{"HOME=" + fixture.home, "COHERE_TEST_CREATE_AFTER_DISCOVERY=" + late}, withoutHome(os.Environ())...)
-	if output, err := command.CombinedOutput(); err != nil && !strings.Contains(string(output), "late.ts") {
+	if output, outputError := command.CombinedOutput(); outputError != nil && !strings.Contains(string(output), "late.ts") {
 		// A run that saw the file fails on it, which is fine; one that failed for any other reason is not.
-		if _, isExit := err.(*exec.ExitError); !isExit {
-			test.Fatalf("the run that created the file failed: %v\n%s", err, output)
+		if _, isExit := outputError.(*exec.ExitError); !isExit {
+			test.Fatalf("the run that created the file failed: %v\n%s", outputError, output)
 		}
 	}
-	if _, err := os.Stat(late); err != nil {
-		test.Fatalf("the instrument created no file, so nothing below is about it: %v", err)
+	if _, statError := os.Stat(late); statError != nil {
+		test.Fatalf("the instrument created no file, so nothing below is about it: %v", statError)
 	}
 
 	output, _ := fixture.run(true)
@@ -54,9 +54,9 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
 		command := exec.Command(fixture.binary, verboseArguments(nil)...)
 		command.Dir = fixture.root
 		command.Env = append(append([]string{"HOME=" + fixture.home}, environment...), withoutHome(os.Environ())...)
-		output, err := command.CombinedOutput()
-		if _, isExit := err.(*exec.ExitError); err != nil && !isExit {
-			test.Fatalf("running cohere: %v\n%s", err, output)
+		output, outputError := command.CombinedOutput()
+		if _, isExit := outputError.(*exec.ExitError); outputError != nil && !isExit {
+			test.Fatalf("running cohere: %v\n%s", outputError, output)
 		}
 		return string(output)
 	}
@@ -71,8 +71,8 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
 	late := filepath.Join(fixture.root, "docs", "late.md")
 	unformatted := "#   Late\n\n\n\nA paragraph.\n"
 	formatting("COHERE_TEST_CREATE_AFTER_DISCOVERY="+late, "COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT="+unformatted)
-	if contents, err := os.ReadFile(late); err != nil || string(contents) == "" {
-		test.Fatalf("the instrument created no file, so nothing below is about it: %v", err)
+	if contents, readError := os.ReadFile(late); readError != nil || string(contents) == "" {
+		test.Fatalf("the instrument created no file, so nothing below is about it: %v", readError)
 	}
 
 	if output := formatting(); isRunCacheReplay(output) {

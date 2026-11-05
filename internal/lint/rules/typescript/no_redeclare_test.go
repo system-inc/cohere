@@ -31,13 +31,13 @@ func noRedeclareTsconfig(test *testing.T, lib []string) string {
 		CompilerOptions map[string]any `json:"compilerOptions"`
 		Include         []string       `json:"include"`
 	}
-	if err := json.Unmarshal([]byte(noRedeclareCorpusTsconfig), &configuration); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal([]byte(noRedeclareCorpusTsconfig), &configuration); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	configuration.CompilerOptions["lib"] = lib
-	encoded, err := json.Marshal(configuration)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(configuration)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	return string(encoded)
 }
@@ -73,15 +73,15 @@ func TestNoRedeclareUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			options, err := DecodeNoRedeclareOptions([]byte(row.options))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", row.options, err)
+			options, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions([]byte(row.options))
+			if decodeNoRedeclareOptionsError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeNoRedeclareOptionsError)
 			}
 			configuration := noRedeclareTsconfig(test, row.lib)
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoRedeclare, map[string]string{"file.ts": row.source}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-						test.Fatal(err)
+					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 

@@ -19,13 +19,13 @@ func trackedIn(test *testing.T, code string, traceMap map[string]*reference.Trac
 	rule_testing.RunTyped(test, rule.Rule{
 		Name:             "tracker-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					tracker := reference.NewTracker(ctx.SourceFile, ctx.TypeChecker, nil)
-					source := ctx.SourceFile.Text()
+					tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
+					source := ruleContext.SourceFile.Text()
 					for _, tracked := range tracker.GlobalReferences(traceMap) {
-						span := rule.TokenRange(ctx.SourceFile, tracked.Node)
+						span := rule.TokenRange(ruleContext.SourceFile, tracked.Node)
 						usage := map[reference.Usage]string{reference.Read: "Read", reference.Call: "Call", reference.Construct: "Construct"}[tracked.Usage]
 						rendered = append(rendered, usage+" "+strings.Join(tracked.Path, ".")+" "+source[span.Pos():span.End()])
 					}
@@ -41,8 +41,8 @@ func trackedIn(test *testing.T, code string, traceMap map[string]*reference.Trac
 func decodeTraceMap(test *testing.T, raw string) map[string]*reference.TraceMap {
 	test.Helper()
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		test.Fatalf("trace map %s: %v", raw, err)
+	if decodeError := json.Unmarshal([]byte(raw), &decoded); decodeError != nil {
+		test.Fatalf("trace map %s: %v", raw, decodeError)
 	}
 	members := map[string]*reference.TraceMap{}
 	for key, value := range decoded {
@@ -54,8 +54,8 @@ func decodeTraceMap(test *testing.T, raw string) map[string]*reference.TraceMap 
 func decodeTraceNode(test *testing.T, raw json.RawMessage) *reference.TraceMap {
 	test.Helper()
 	var decoded map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		test.Fatalf("trace node %s: %v", raw, err)
+	if decodeError := json.Unmarshal(raw, &decoded); decodeError != nil {
+		test.Fatalf("trace node %s: %v", raw, decodeError)
 	}
 	node := &reference.TraceMap{Members: map[string]*reference.TraceMap{}}
 	for key, value := range decoded {
@@ -281,7 +281,7 @@ func TestConstantString(test *testing.T) {
 		var settled bool
 		rule_testing.Run(test, rule.Rule{
 			Name: "constant-probe",
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindElementAccessExpression: func(node *ast.Node) {
 						got, settled = reference.ConstantString(node.AsElementAccessExpression().ArgumentExpression)
@@ -334,14 +334,14 @@ func TestConstantStringIn(test *testing.T) {
 		rule_testing.RunTyped(test, rule.Rule{
 			Name:             "constant-in-probe",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindCallExpression: func(node *ast.Node) {
 						call := node.AsCallExpression()
 						if call.Expression.Text() != "probe" {
 							return
 						}
-						got, constant = reference.ConstantStringIn(ctx, call.Arguments.Nodes[0])
+						got, constant = reference.ConstantStringIn(ruleContext, call.Arguments.Nodes[0])
 					},
 				}
 			},
@@ -375,12 +375,12 @@ func TestIsConstantRegExpIn(test *testing.T) {
 		rule_testing.RunTyped(test, rule.Rule{
 			Name:             "constant-regexp-probe",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindCallExpression: func(node *ast.Node) {
 						call := node.AsCallExpression()
 						if call.Expression.Text() == "probe" {
-							got = reference.IsConstantRegExpIn(ctx, call.Arguments.Nodes[0])
+							got = reference.IsConstantRegExpIn(ruleContext, call.Arguments.Nodes[0])
 						}
 					},
 				}

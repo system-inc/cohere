@@ -86,14 +86,14 @@ func DecodeIdMatchOptions(list []byte) (any, error) {
 	}
 
 	var patternText string
-	if err := json.Unmarshal(elements[0], &patternText); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &patternText); decodeError != nil {
 		return settings, fmt.Errorf("id-match element 1 takes a pattern string, got %s", elements[0])
 	}
 
 	if len(elements) > 1 {
 		var flags idMatchRawOptions
-		if err := rule.UnmarshalOptions(elements[1], &flags); err != nil {
-			return settings, fmt.Errorf("id-match element 2: %w", err)
+		if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &flags); unmarshalOptionsError != nil {
+			return settings, fmt.Errorf("id-match element 2: %w", unmarshalOptionsError)
 		}
 		settings.CheckProperties = flags.Properties
 		settings.CheckClassFields = flags.ClassFields
@@ -259,7 +259,7 @@ var IdMatch = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := idMatchSettingsFrom(options)
 		if settings.Pattern == nil {
 			// Upstream's default pattern `^.+$` matches every non-empty name, so an unconfigured
@@ -269,10 +269,10 @@ var IdMatch = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				checkIdMatchIdentifier(ctx, node, settings)
+				checkIdMatchIdentifier(ruleContext, node, settings)
 			},
 			ast.KindPrivateIdentifier: func(node *ast.Node) {
-				checkIdMatchPrivateIdentifier(ctx, node, settings)
+				checkIdMatchPrivateIdentifier(ruleContext, node, settings)
 			},
 		}
 	},
@@ -285,18 +285,18 @@ func idMatchIsInvalid(settings IdMatchSettings, name string) bool {
 }
 
 // reportIdMatch emits the finding, rendering the name and the pattern the way upstream does.
-func reportIdMatch(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
+func reportIdMatch(ruleContext rule.Context, node *ast.Node, settings IdMatchSettings) {
 	name := node.Text()
 	if node.Kind == ast.KindPrivateIdentifier {
 		// `Text()` already carries the `#`, and upstream renders it too, from a name that does not.
-		ctx.ReportNode(node, rule.Message{
+		ruleContext.ReportNode(node, rule.Message{
 			Id: messageIdMatchNotMatchPrivate.Id,
 			Description: fmt.Sprintf("Identifier '%s' does not match the pattern '%s'. %s",
 				name, settings.PatternText, messageIdMatchNotMatchPrivate.Description),
 		})
 		return
 	}
-	ctx.ReportNode(node, rule.Message{
+	ruleContext.ReportNode(node, rule.Message{
 		Id: messageIdMatchNotMatch.Id,
 		Description: fmt.Sprintf("Identifier '%s' does not match the pattern '%s'. %s",
 			name, settings.PatternText, messageIdMatchNotMatch.Description),
@@ -310,7 +310,7 @@ func reportIdMatch(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
 // METHOD is checked regardless of the `classFields` option, and a private FIELD only when it is on.
 // Measured: `class C { #no_under() {} }` reports with classFields off and
 // `class C { #no_under = 1; }` does not.
-func checkIdMatchPrivateIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
+func checkIdMatchPrivateIdentifier(ruleContext rule.Context, node *ast.Node, settings IdMatchSettings) {
 	if node.Parent != nil && node.Parent.Kind == ast.KindPropertyDeclaration && !settings.CheckClassFields {
 		return
 	}
@@ -320,7 +320,7 @@ func checkIdMatchPrivateIdentifier(ctx rule.Context, node *ast.Node, settings Id
 		name = name[1:]
 	}
 	if idMatchIsInvalid(settings, name) {
-		reportIdMatch(ctx, node, settings)
+		reportIdMatch(ruleContext, node, settings)
 	}
 }
 
@@ -328,7 +328,7 @@ func checkIdMatchPrivateIdentifier(ctx rule.Context, node *ast.Node, settings Id
 //
 // The order matters: the arms are a chain of `else if`, so the first one whose shape matches wins
 // and the rest never run. Reordering them changes verdicts.
-func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSettings) {
+func checkIdMatchIdentifier(ruleContext rule.Context, node *ast.Node, settings IdMatchSettings) {
 	parent := node.Parent
 	if parent == nil {
 		return
@@ -336,7 +336,7 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 	name := node.Text()
 
 	// Upstream's three unconditional exits, in its order.
-	if idDenylistIsReferenceToGlobalVariable(ctx, node) {
+	if idDenylistIsReferenceToGlobalVariable(ruleContext, node) {
 		return
 	}
 	if idDenylistIsImportAttributeKey(node) {
@@ -353,7 +353,7 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 	// the property-access kind can satisfy them and the element-access kind falls through to the
 	// default arm exactly as a computed member does upstream.
 	case parent.Kind == ast.KindPropertyAccessExpression:
-		checkIdMatchMemberAccess(ctx, node, parent, name, settings)
+		checkIdMatchMemberAccess(ruleContext, node, parent, name, settings)
 
 	// An object literal's own key, which upstream separated out for eslint/eslint#15123 so that a
 	// key is governed by `properties` alone rather than by the destructuring logic below.
@@ -362,12 +362,12 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 		parent.AsPropertyAssignment() != nil && parent.AsPropertyAssignment().Name() == node &&
 		!idDenylistIsDestructuringTarget(parent.Parent):
 		if settings.CheckProperties && idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// The destructuring arms, in the two spellings this tree has for them.
 	case parent.Kind == ast.KindBindingElement:
-		checkIdMatchBindingElement(ctx, node, parent, name, settings)
+		checkIdMatchBindingElement(ruleContext, node, parent, name, settings)
 
 	// The assignment-destructuring spelling. The guard is the destructuring test rather than the
 	// node kind alone, because an ordinary object literal uses the same kinds: without it, a
@@ -379,27 +379,27 @@ func checkIdMatchIdentifier(ctx rule.Context, node *ast.Node, settings IdMatchSe
 		parent.Kind == ast.KindPropertyAssignment) &&
 		parent.Parent != nil && parent.Parent.Kind == ast.KindObjectLiteralExpression &&
 		idDenylistIsDestructuringTarget(parent.Parent):
-		checkIdMatchAssignmentPattern(ctx, node, parent, name, settings)
+		checkIdMatchAssignmentPattern(ruleContext, node, parent, name, settings)
 
 	// An import binding. Only the LOCAL name is ours; the exported name on the far side of an `as`
 	// was chosen by the module we import from.
 	case parent.Kind == ast.KindImportSpecifier || parent.Kind == ast.KindImportClause ||
 		parent.Kind == ast.KindNamespaceImport:
 		if idMatchIsLocalImportBinding(node, parent) && idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// A class field's name, public. The private spelling is a different node kind and has its own
 	// listener above.
 	case parent.Kind == ast.KindPropertyDeclaration:
 		if settings.CheckClassFields && idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 
 	// Everything else, gated by `onlyDeclarations` and by the callee exclusion.
 	default:
 		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 	}
 }
@@ -446,7 +446,7 @@ func idMatchIsAllowedParent(node *ast.Node) bool {
 }
 
 // checkIdMatchMemberAccess is upstream's MemberExpression branch, all three arms.
-func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node, name string,
+func checkIdMatchMemberAccess(ruleContext rule.Context, node *ast.Node, access *ast.Node, name string,
 	settings IdMatchSettings) {
 
 	if !settings.CheckProperties {
@@ -467,7 +467,7 @@ func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node
 	if expression.Expression != nil && expression.Expression.Kind == ast.KindIdentifier &&
 		expression.Expression.Text() == name {
 		if idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 		return
 	}
@@ -487,7 +487,7 @@ func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node
 		if left := assignment.Left.AsPropertyAccessExpression(); left != nil &&
 			left.Name() != nil && left.Name().Text() == name {
 			if idMatchIsInvalid(settings, name) {
-				reportIdMatch(ctx, node, settings)
+				reportIdMatch(ruleContext, node, settings)
 			}
 			return
 		}
@@ -498,7 +498,7 @@ func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node
 	// may not own is not our naming decision.
 	if assignment.Right != nil && assignment.Right.Kind != ast.KindPropertyAccessExpression {
 		if idMatchIsInvalid(settings, name) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 	}
 }
@@ -515,7 +515,7 @@ func checkIdMatchMemberAccess(ctx rule.Context, node *ast.Node, access *ast.Node
 //
 // So "did this pattern coin a new name", which is what `ignoreDestructuring` turns on, is exactly
 // "does this element rename or spread".
-func checkIdMatchBindingElement(ctx rule.Context, node *ast.Node, element *ast.Node, name string,
+func checkIdMatchBindingElement(ruleContext rule.Context, node *ast.Node, element *ast.Node, name string,
 	settings IdMatchSettings) {
 
 	binding := element.AsBindingElement()
@@ -540,7 +540,7 @@ func checkIdMatchBindingElement(ctx rule.Context, node *ast.Node, element *ast.N
 	// and upstream reaches them through its default arm rather than its Property branch.
 	if element.Parent != nil && element.Parent.Kind == ast.KindArrayBindingPattern {
 		if idMatchShouldReport(idMatchEffectiveParentOf(node), name, settings) {
-			reportIdMatch(ctx, node, settings)
+			reportIdMatch(ruleContext, node, settings)
 		}
 		return
 	}
@@ -574,7 +574,7 @@ func checkIdMatchBindingElement(ctx rule.Context, node *ast.Node, element *ast.N
 		return
 	}
 	if idMatchIsInvalid(settings, name) {
-		reportIdMatch(ctx, node, settings)
+		reportIdMatch(ruleContext, node, settings)
 	}
 }
 
@@ -598,7 +598,7 @@ func idMatchEnclosingDeclarationOf(element *ast.Node) *ast.Node {
 //
 //	({ a } = x)       KindShorthandPropertyAssignment
 //	({ a: b } = x)    KindPropertyAssignment, name a, initializer b
-func checkIdMatchAssignmentPattern(ctx rule.Context, node *ast.Node, property *ast.Node, name string,
+func checkIdMatchAssignmentPattern(ruleContext rule.Context, node *ast.Node, property *ast.Node, name string,
 	settings IdMatchSettings) {
 
 	objectLiteral := property.Parent
@@ -653,7 +653,7 @@ func checkIdMatchAssignmentPattern(ctx rule.Context, node *ast.Node, property *a
 	// the time either gate is consulted. Reproducing the gates here reproduced a structure upstream
 	// does not have.
 	if idMatchIsInvalid(settings, name) {
-		reportIdMatch(ctx, node, settings)
+		reportIdMatch(ruleContext, node, settings)
 	}
 }
 

@@ -36,8 +36,8 @@ func DecodeSortVarsOptions(raw []byte) (any, error) {
 	var wire struct {
 		IgnoreCase bool `json:"ignoreCase"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	settings.IgnoreCase = wire.IgnoreCase
 	return settings, nil
@@ -101,12 +101,12 @@ var messageSortVarsSortVars = rule.Message{
 var SortVars = rule.Rule{
 	Name: "sort-vars",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := sortVarsSettingsFrom(options)
 
 		return rule.Listeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
-				checkSortVarsDeclarationList(ctx, node, settings)
+				checkSortVarsDeclarationList(ruleContext, node, settings)
 			},
 		}
 	},
@@ -124,7 +124,7 @@ type sortVarsDeclarator struct {
 }
 
 // checkSortVarsDeclarationList judges one declaration block.
-func checkSortVarsDeclarationList(ctx rule.Context, node *ast.Node, settings SortVarsSettings) {
+func checkSortVarsDeclarationList(ruleContext rule.Context, node *ast.Node, settings SortVarsSettings) {
 	list := node.AsVariableDeclarationList()
 	if list == nil || list.Declarations == nil {
 		return
@@ -149,7 +149,7 @@ func checkSortVarsDeclarationList(ctx rule.Context, node *ast.Node, settings Sor
 		declarators = append(declarators, sortVarsDeclarator{
 			node:  declaration,
 			name:  name.Text(),
-			start: scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, declaration.Pos()).Pos(),
+			start: scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, declaration.Pos()).Pos(),
 			end:   declaration.End(),
 		})
 	}
@@ -169,10 +169,10 @@ func checkSortVarsDeclarationList(ctx rule.Context, node *ast.Node, settings Sor
 		}
 
 		if unfixable || fixed {
-			ctx.ReportNode(current.node, messageSortVarsSortVars)
+			ruleContext.ReportNode(current.node, messageSortVarsSortVars)
 		} else {
-			ctx.ReportNodeWithFixes(current.node, messageSortVarsSortVars,
-				sortVarsFix(ctx, declarators, settings))
+			ruleContext.ReportNodeWithFixes(current.node, messageSortVarsSortVars,
+				sortVarsFix(ruleContext, declarators, settings))
 		}
 		fixed = true
 		// Deliberately NOT advancing `previous`. Upstream returns `memo` from this branch, so an
@@ -212,10 +212,10 @@ func sortVarsIsLiteral(node *ast.Node) bool {
 // `index+1`'s start in the ORIGINAL order, which is upstream's `textAfterIdentifier`. That is what
 // keeps a comment or a newline attached to its position in the block rather than to the name that
 // happened to be there.
-func sortVarsFix(ctx rule.Context, declarators []sortVarsDeclarator,
+func sortVarsFix(ruleContext rule.Context, declarators []sortVarsDeclarator,
 	settings SortVarsSettings) rule.Fix {
 
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 
 	sorted := make([]sortVarsDeclarator, len(declarators))
 	copy(sorted, declarators)

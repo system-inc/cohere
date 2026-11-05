@@ -117,8 +117,8 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 	}
 
 	var wire preferNullishCoalescingWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	if wire.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing != nil {
@@ -143,9 +143,9 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 		options.ReactCompiler = *wire.ReactCompiler
 	}
 
-	primitives, err := decodePreferNullishCoalescingPrimitives(wire.IgnorePrimitives)
-	if err != nil {
-		return options, err
+	primitives, decodePreferNullishCoalescingPrimitivesError := decodePreferNullishCoalescingPrimitives(wire.IgnorePrimitives)
+	if decodePreferNullishCoalescingPrimitivesError != nil {
+		return options, decodePreferNullishCoalescingPrimitivesError
 	}
 	options.IgnorePrimitives = primitives
 	return options, nil
@@ -189,8 +189,8 @@ func decodePreferNullishCoalescingPrimitives(raw json.RawMessage) (
 		Number  *bool `json:"number"`
 		String  *bool `json:"string"`
 	}
-	if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
-		return primitives, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &asObject); unmarshalOptionsError != nil {
+		return primitives, unmarshalOptionsError
 	}
 	primitives.Bigint = asObject.Bigint != nil && *asObject.Bigint
 	primitives.Boolean = asObject.Boolean != nil && *asObject.Boolean
@@ -310,7 +310,7 @@ var PreferNullishCoalescing = rule.Rule{
 	TypeReach:        rule.TypeReachShapes,
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[PreferNullishCoalescingOptions](options)
 		if !ok {
 			settings = DefaultPreferNullishCoalescingOptions()
@@ -338,11 +338,11 @@ var PreferNullishCoalescing = rule.Rule{
 					reports := false
 					switch current.Kind {
 					case ast.KindBinaryExpression:
-						finding, reports = preferNullishCoalescingJudge(ctx, current, settings)
+						finding, reports = preferNullishCoalescingJudge(ruleContext, current, settings)
 					case ast.KindConditionalExpression:
-						finding, reports = preferNullishCoalescingJudgeTernary(ctx, current, settings)
+						finding, reports = preferNullishCoalescingJudgeTernary(ruleContext, current, settings)
 					case ast.KindIfStatement:
-						finding, reports = preferNullishCoalescingJudgeIf(ctx, current, settings)
+						finding, reports = preferNullishCoalescingJudgeIf(ruleContext, current, settings)
 					}
 					if reports {
 						pending = append(pending, finding)
@@ -356,7 +356,7 @@ var PreferNullishCoalescing = rule.Rule{
 					return pending[left].reportRange.Pos() < pending[right].reportRange.Pos()
 				})
 				for _, finding := range pending {
-					ctx.ReportRangeWithSuggestions(finding.reportRange, finding.message,
+					ruleContext.ReportRangeWithSuggestions(finding.reportRange, finding.message,
 						rule.Suggestion{Message: finding.suggestion, Fixes: finding.fixes})
 				}
 			},
@@ -381,7 +381,7 @@ type preferNullishCoalescingFinding struct {
 // `AssignmentExpression[operator="||="]`, both calling the same check. Our parser makes both a
 // KindBinaryExpression, so they are separated here by the operator token. The `||=` half is 32 of
 // the 123 preferNullishOverOr cases, so omitting it is not a rounding error.
-func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
+func preferNullishCoalescingJudge(ruleContext rule.Context, node *ast.Node,
 	settings PreferNullishCoalescingOptions) (preferNullishCoalescingFinding, bool) {
 
 	expression := node.AsBinaryExpression()
@@ -397,14 +397,14 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 		return preferNullishCoalescingFinding{}, false
 	}
 
-	if !preferNullishCoalescingEligible(ctx, node, expression.Left, settings) {
+	if !preferNullishCoalescingEligible(ruleContext, node, expression.Left, settings) {
 		return preferNullishCoalescingFinding{}, false
 	}
 	if settings.IgnoreMixedLogicalExpressions && preferNullishCoalescingIsMixed(node) {
 		return preferNullishCoalescingFinding{}, false
 	}
 
-	operatorRange := rule.TokenRange(ctx.SourceFile, expression.OperatorToken)
+	operatorRange := rule.TokenRange(ruleContext.SourceFile, expression.OperatorToken)
 	return preferNullishCoalescingFinding{
 		reportRange: operatorRange,
 		message: rule.Message{
@@ -415,7 +415,7 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 			Id:          messagePreferNullishSuggest.Id,
 			Description: preferNullishCoalescingSuggestion(replacement),
 		},
-		fixes: preferNullishCoalescingRepair(ctx, node, operatorRange, replacement),
+		fixes: preferNullishCoalescingRepair(ruleContext, node, operatorRange, replacement),
 	}, true
 }
 
@@ -444,7 +444,7 @@ func preferNullishCoalescingJudge(ctx rule.Context, node *ast.Node,
 // id and this rule has exactly one id for both arms. A port writing `??` everywhere passes all 398
 // cases and proposes a syntax error on every chained expression it touches. Found by reading the
 // suggestion text out of the installed rule while measuring spans, not by the corpus.
-func preferNullishCoalescingRepair(ctx rule.Context, node *ast.Node, operatorRange core.TextRange,
+func preferNullishCoalescingRepair(ruleContext rule.Context, node *ast.Node, operatorRange core.TextRange,
 	replacement string) []rule.Fix {
 
 	parent := node.Parent
@@ -481,9 +481,9 @@ func preferNullishCoalescingRepair(ctx rule.Context, node *ast.Node, operatorRan
 		leftNode = unwrapped.AsBinaryExpression().Right
 	}
 
-	text := ctx.SourceFile.Text()
-	leftRange := rule.TokenRange(ctx.SourceFile, leftNode)
-	rightRange := rule.TokenRange(ctx.SourceFile, expression.Right)
+	text := ruleContext.SourceFile.Text()
+	leftRange := rule.TokenRange(ruleContext.SourceFile, leftNode)
+	rightRange := rule.TokenRange(ruleContext.SourceFile, expression.Right)
 	return []rule.Fix{rule.ReplaceRange(
 		core.NewTextRange(leftRange.Pos(), rightRange.End()),
 		"("+text[leftRange.Pos():leftRange.End()]+" "+replacement+" "+
@@ -491,7 +491,7 @@ func preferNullishCoalescingRepair(ctx rule.Context, node *ast.Node, operatorRan
 }
 
 // preferNullishCoalescingEligible is upstream's `isTruthinessCheckEligibleForPreferNullish`.
-func preferNullishCoalescingEligible(ctx rule.Context, node *ast.Node, testNode *ast.Node,
+func preferNullishCoalescingEligible(ruleContext rule.Context, node *ast.Node, testNode *ast.Node,
 	settings PreferNullishCoalescingOptions) bool {
 
 	if settings.IgnoreConditionalTests && preferNullishCoalescingIsConditionalTest(node) {
@@ -500,24 +500,24 @@ func preferNullishCoalescingEligible(ctx rule.Context, node *ast.Node, testNode 
 	// A ternary passed straight to `Boolean(...)` is still reported: upstream exempts the coercion
 	// context everywhere except there, since `Boolean(a ? a : b)` and `Boolean(a ?? b)` can differ
 	// when `a` is a falsy non-nullish value. Measured, and pinned by upstream's own corpus.
-	if settings.IgnoreBooleanCoercion && preferNullishCoalescingInBooleanCall(ctx, node) &&
+	if settings.IgnoreBooleanCoercion && preferNullishCoalescingInBooleanCall(ruleContext, node) &&
 		!(node.Kind == ast.KindConditionalExpression &&
 			preferNullishCoalescingParentSkippingParentheses(node) != nil &&
 			preferNullishCoalescingParentSkippingParentheses(node).Kind == ast.KindCallExpression) {
 		return false
 	}
-	if ctx.TypeChecker == nil || testNode == nil {
+	if ruleContext.TypeChecker == nil || testNode == nil {
 		return false
 	}
-	return preferNullishCoalescingTypeEligible(ctx,
-		ctx.TypeChecker.GetTypeAtLocation(testNode), settings)
+	return preferNullishCoalescingTypeEligible(ruleContext,
+		ruleContext.TypeChecker.GetTypeAtLocation(testNode), settings)
 }
 
 // preferNullishCoalescingTypeEligible is upstream's `isTypeEligibleForPreferNullish`.
 //
 // The order is upstream's and it matters: nullable first, then the `any`/`unknown` bail, then the
 // per-primitive exemptions. A type that is not nullable is never reported, whatever else is true.
-func preferNullishCoalescingTypeEligible(ctx rule.Context, subject *checker.Type,
+func preferNullishCoalescingTypeEligible(ruleContext rule.Context, subject *checker.Type,
 	settings PreferNullishCoalescingOptions) bool {
 
 	if !preferNullishCoalescingIsNullable(subject) {
@@ -626,7 +626,7 @@ func preferNullishCoalescingIgnorableFlags(
 //
 // `rule.IsSymbolFromDefaultLibrary` is the shelf's existing question for exactly this, so this
 // is a caller rather than a reimplementation, and it needs no scope resolver at all.
-func preferNullishCoalescingInBooleanCall(ctx rule.Context, node *ast.Node) bool {
+func preferNullishCoalescingInBooleanCall(ruleContext rule.Context, node *ast.Node) bool {
 	for current := node; current != nil; {
 		parent := current.Parent
 		if parent == nil {
@@ -639,11 +639,11 @@ func preferNullishCoalescingInBooleanCall(ctx rule.Context, node *ast.Node) bool
 				call.Expression.Text() != "Boolean" {
 				return false
 			}
-			if ctx.TypeChecker == nil || ctx.Program == nil {
+			if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 				return false
 			}
-			if !rule.IsSymbolFromDefaultLibrary(ctx.Program,
-				ctx.TypeChecker.GetSymbolAtLocation(call.Expression)) {
+			if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program,
+				ruleContext.TypeChecker.GetSymbolAtLocation(call.Expression)) {
 				return false
 			}
 			// Only the FIRST argument is coerced; `Boolean(x, y)` reads y for its side effects.

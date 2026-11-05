@@ -98,18 +98,18 @@ func list(directory string, environment []string, patterns []string) (*listing, 
 
 func runList(directory string, environment []string, patterns []string) (*listing, error) {
 	// No "--" before the patterns: a runner's stand-in go refuses any flag it does not know, that one too.
-	output, err := goCommand(directory, environment, append([]string{"list", "-e", "-deps", "-json=" + listedFields}, patterns...)...)
-	if err != nil {
-		return nil, err
+	output, goCommandError := goCommand(directory, environment, append([]string{"list", "-e", "-deps", "-json=" + listedFields}, patterns...)...)
+	if goCommandError != nil {
+		return nil, goCommandError
 	}
 	result := &listing{byPath: map[string]*listedPackage{}}
 	decoder := json.NewDecoder(bytes.NewReader(output))
 	for {
 		var listed listedPackage
-		if err := decoder.Decode(&listed); errors.Is(err, io.EOF) {
+		if decodeError := decoder.Decode(&listed); errors.Is(decodeError, io.EOF) {
 			break
-		} else if err != nil {
-			return nil, fmt.Errorf("reading go list's output: %w", err)
+		} else if decodeError != nil {
+			return nil, fmt.Errorf("reading go list's output: %w", decodeError)
 		}
 		result.packages = append(result.packages, &listed)
 		result.byPath[listed.ImportPath] = &listed
@@ -168,13 +168,13 @@ func goCommand(directory string, environment []string, arguments ...string) ([]b
 
 // goEnvironmentValues is what go env says of the values that change a package's types, under environment.
 func goEnvironmentValues(directory string, environment []string) (map[string]string, error) {
-	output, err := goCommand(directory, environment, "env", "-json", "GOVERSION", "GOOS", "GOARCH", "GOEXPERIMENT")
-	if err != nil {
-		return nil, err
+	output, goCommandError := goCommand(directory, environment, "env", "-json", "GOVERSION", "GOOS", "GOARCH", "GOEXPERIMENT")
+	if goCommandError != nil {
+		return nil, goCommandError
 	}
 	values := map[string]string{}
-	if err := json.Unmarshal(output, &values); err != nil {
-		return nil, fmt.Errorf("reading go env's output: %w", err)
+	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
+		return nil, fmt.Errorf("reading go env's output: %w", decodeError)
 	}
 	if values["GOVERSION"] == "" || values["GOOS"] == "" || values["GOARCH"] == "" {
 		return nil, fmt.Errorf("go env named no GOVERSION, GOOS or GOARCH: %v", values)
@@ -189,8 +189,8 @@ func moduleAt(directory string) (root string, path string, err error) {
 		return "", "", err
 	}
 	for current := absolute; ; current = filepath.Dir(current) {
-		content, err := os.ReadFile(filepath.Join(current, "go.mod"))
-		if err == nil {
+		content, readError := os.ReadFile(filepath.Join(current, "go.mod"))
+		if readError == nil {
 			for _, line := range strings.Split(string(content), "\n") {
 				if declared, found := strings.CutPrefix(strings.TrimSpace(line), "module "); found {
 					return current, strings.Trim(strings.TrimSpace(declared), `"`), nil

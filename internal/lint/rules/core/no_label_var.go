@@ -53,13 +53,13 @@ var NoLabelVar = rule.Rule{
 	Name:             "no-label-var",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindLabeledStatement: func(node *ast.Node) {
 				// Without this the rule goes completely silent under the plain harness rather than
 				// crashing, which is the more dangerous failure: every clean fixture would pass
 				// vacuously. `TestNoLabelVarRequiresTheTypedHarness` pins it.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -74,9 +74,9 @@ var NoLabelVar = rule.Rule{
 
 				// Asked at the labeled statement rather than inside it, which is upstream's own
 				// anchor and is what makes a binding declared in the label's body not clash.
-				for _, symbol := range ctx.TypeChecker.GetSymbolsInScope(node, ast.SymbolFlagsValue) {
+				for _, symbol := range ruleContext.TypeChecker.GetSymbolsInScope(node, ast.SymbolFlagsValue) {
 					if symbol.Name == labelName {
-						ctx.ReportNode(node, messageNoLabelVar)
+						ruleContext.ReportNode(node, messageNoLabelVar)
 						return
 					}
 				}

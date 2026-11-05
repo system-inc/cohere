@@ -106,8 +106,8 @@ var NoParamReassign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -122,7 +122,7 @@ var NoParamReassign = rule.Rule{
 			// this rule can answer nothing without one. The failure mode without the guard is
 			// silence rather than a panic, because GetSymbolAtLocation tolerates a nil receiver,
 			// and a silent rule whose fixtures all pass is the worse of the two.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			parameters := node.Parameters()
@@ -156,8 +156,8 @@ var NoParamReassign = rule.Rule{
 					return
 				}
 				if current.Kind == ast.KindIdentifier && !isOwnParameterBinding(current, anchors) {
-					if name, isAnchored := anchoredParameterName(ctx, current, anchors); isAnchored {
-						reportParameterUse(ctx, current, name, settings.Props, ignored)
+					if name, isAnchored := anchoredParameterName(ruleContext, current, anchors); isAnchored {
+						reportParameterUse(ruleContext, current, name, settings.Props, ignored)
 					}
 				}
 				current.ForEachChild(func(child *ast.Node) bool {
@@ -276,7 +276,7 @@ func isOwnParameterBinding(identifier *ast.Node, anchors map[*ast.Node]string) b
 // asked through the plain one answers with the PROPERTY's symbol, which reads exactly like a
 // correctly declined shadow. That case is in upstream's corpus as a failing one, so the wrong
 // accessor loses a finding silently.
-func anchoredParameterName(ctx rule.Context, identifier *ast.Node, anchors map[*ast.Node]string) (string, bool) {
+func anchoredParameterName(ruleContext rule.Context, identifier *ast.Node, anchors map[*ast.Node]string) (string, bool) {
 	// A cheap pre-filter before a checker call, since this runs on every identifier in every
 	// function body. Symbol identity already implies the text matches, so this decides nothing.
 	matchesAnyName := false
@@ -290,9 +290,9 @@ func anchoredParameterName(ctx rule.Context, identifier *ast.Node, anchors map[*
 		return "", false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		if valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent); valueSymbol != nil {
+		if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent); valueSymbol != nil {
 			symbol = valueSymbol
 		}
 	}
@@ -300,7 +300,7 @@ func anchoredParameterName(ctx rule.Context, identifier *ast.Node, anchors map[*
 		return "", false
 	}
 	// The anchors are this file's parameters, so only this file's declarations can be one.
-	for _, declaration := range rule.DeclarationsIn(ctx.SourceFile, symbol) {
+	for _, declaration := range rule.DeclarationsIn(ruleContext.SourceFile, symbol) {
 		if name, isAnchored := anchors[declaration]; isAnchored {
 			return name, true
 		}
@@ -314,21 +314,21 @@ func anchoredParameterName(ctx rule.Context, identifier *ast.Node, anchors map[*
 // and STOPS, so the property check never sees it. `({bar} = {})` is a write to `bar` and reports as
 // one; without the ordering it would also satisfy the property climb and report twice.
 func reportParameterUse(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	identifier *ast.Node,
 	name string,
 	props bool,
 	ignored ignoredParameterNames,
 ) {
 	if reference.WritesToBinding(identifier) {
-		ctx.ReportNode(identifier, messageAssignmentToParameter(name))
+		ruleContext.ReportNode(identifier, messageAssignmentToParameter(name))
 		return
 	}
 	if !props || ignored.matches(name) {
 		return
 	}
 	if modifiesPropertyThrough(identifier) {
-		ctx.ReportNode(identifier, messageAssignmentToParameterProperty(name))
+		ruleContext.ReportNode(identifier, messageAssignmentToParameterProperty(name))
 	}
 }
 
@@ -549,7 +549,7 @@ func compileIgnoredNames(options NoParamReassignOptions) ignoredParameterNames {
 		compiled.literal[name] = true
 	}
 	for _, source := range options.IgnorePropertyModificationsForRegex {
-		if pattern, err := esregexp.Compile(source, "u"); err == nil {
+		if pattern, compileError := esregexp.Compile(source, "u"); compileError == nil {
 			compiled.patterns = append(compiled.patterns, pattern)
 		}
 	}
@@ -567,8 +567,8 @@ func DecodeNoParamReassignOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

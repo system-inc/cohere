@@ -49,8 +49,8 @@ func DecodeNoDangerOptions(raw []byte) (any, error) {
 	// Lenient on purpose: eslint-plugin-react 7.37.5's schema leaves this object open (no
 	// `additionalProperties`), so ESLint loads an extra key and so must this.
 	var wire noDangerWireOptions
-	if err := json.Unmarshal(raw, &wire); err != nil {
-		return options, err
+	if decodeError := json.Unmarshal(raw, &wire); decodeError != nil {
+		return options, decodeError
 	}
 	options.CustomComponentNames = wire.CustomComponentNames
 	return options, nil
@@ -162,7 +162,7 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 // port that "fixed" it would break an imported clean case.
 var NoDanger = rule.Rule{
 	Name: "react/no-danger",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoDangerOptions](options)
 		if !ok {
 			// A rule configured as a bare severity reaches here with nil rather than with the
@@ -203,7 +203,7 @@ var NoDanger = rule.Rule{
 				if !readable || name != dangerousPropertyName {
 					continue
 				}
-				ctx.ReportNode(property, rule.Message{
+				ruleContext.ReportNode(property, rule.Message{
 					Id: "dangerousProp",
 					Description: fmt.Sprintf(
 						"This element sets %s, which hands React a raw string and tells it to "+
@@ -307,7 +307,7 @@ func matchesAnyPattern(patterns []string, rendered string) bool {
 	for _, pattern := range patterns {
 		// path.Match, which reads `\` as an escape on every platform. filepath.Match does not on
 		// Windows, so a pattern like `MUI\*` meant something else there than where it was measured.
-		if matched, err := path.Match(pattern, rendered); err == nil && matched {
+		if matched, matchError := path.Match(pattern, rendered); matchError == nil && matched {
 			return true
 		}
 	}

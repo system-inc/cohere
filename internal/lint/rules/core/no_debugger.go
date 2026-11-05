@@ -32,14 +32,14 @@ var messageUnexpectedDebugger = rule.Message{
 // there the finding stands without a repair.
 var NoDebugger = rule.Rule{
 	Name: "no-debugger",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
 				if !noDebuggerSitsInAStatementList(node) {
-					ctx.ReportNode(node, messageUnexpectedDebugger)
+					ruleContext.ReportNode(node, messageUnexpectedDebugger)
 					return
 				}
-				ctx.ReportNodeWithFixes(node, messageUnexpectedDebugger, ctx.RemoveNode(node))
+				ruleContext.ReportNodeWithFixes(node, messageUnexpectedDebugger, ruleContext.RemoveNode(node))
 			},
 		}
 	},

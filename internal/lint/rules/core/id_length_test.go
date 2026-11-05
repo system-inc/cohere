@@ -16,9 +16,9 @@ const idLengthFile = "/repository/source/IdLength.ts"
 // a fixture cannot bypass the decoder or test a shape a config could not deliver. That is section
 // 7c of the standard applied at the fixture rather than only in a contract test.
 func idLengthOf(optionJson string) any {
-	settings, err := DecodeIdLengthOptions([]byte(optionJson))
-	if err != nil {
-		panic(err)
+	settings, decodeIdLengthOptionsError := DecodeIdLengthOptions([]byte(optionJson))
+	if decodeIdLengthOptionsError != nil {
+		panic(decodeIdLengthOptionsError)
 	}
 	return settings
 }
@@ -496,9 +496,9 @@ func TestIdLengthSpansAndMessages(test *testing.T) {
 func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeIdLengthOptions([]byte(`{"min": 3, "max": 9, "properties": "never", "exceptions": ["x"], "exceptionPatterns": ["^_"]}`))
-	if err != nil {
-		test.Fatalf("decoding a full option object: %v", err)
+	decoded, decodeIdLengthOptionsError := DecodeIdLengthOptions([]byte(`{"min": 3, "max": 9, "properties": "never", "exceptions": ["x"], "exceptionPatterns": ["^_"]}`))
+	if decodeIdLengthOptionsError != nil {
+		test.Fatalf("decoding a full option object: %v", decodeIdLengthOptionsError)
 	}
 	settings, ok := decoded.(IdLengthSettings)
 	if !ok {
@@ -523,7 +523,7 @@ func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 
 	// An uncompilable exception pattern is an error rather than a silently dropped exemption,
 	// which would report names the author asked to exempt.
-	if _, err := DecodeIdLengthOptions([]byte(`{"exceptionPatterns": ["^[a-z"]}`)); err == nil {
+	if _, decodeIdLengthOptionsError := DecodeIdLengthOptions([]byte(`{"exceptionPatterns": ["^[a-z"]}`)); decodeIdLengthOptionsError == nil {
 		test.Error("expected an uncompilable exceptionPattern to be reported, got no error")
 	}
 

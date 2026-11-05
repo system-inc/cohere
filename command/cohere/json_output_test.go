@@ -15,14 +15,14 @@ func TestJSONLines(test *testing.T) {
 	test.Parallel()
 	var out bytes.Buffer
 	finding := runFinding{Path: "/repo/a.ts", Line: 3, Column: 7, Severity: "error", Rule: "prefer-const", MessageID: "useConst", Message: "Use const."}
-	if err := writeJSONLine(&out, findingAsJSON(finding)); err != nil {
-		test.Fatal(err)
+	if writeJSONLineError := writeJSONLine(&out, findingAsJSON(finding)); writeJSONLineError != nil {
+		test.Fatal(writeJSONLineError)
 	}
 	for _, line := range changedFilesAsJSON([]changedFile{
 		{Path: "b.ts", Fixed: true, Formatted: true, FixedBy: map[string]int{"prefer-const": 2, "object-shorthand": 1}},
 	}) {
-		if err := writeJSONLine(&out, line); err != nil {
-			test.Fatal(err)
+		if writeJSONLineError := writeJSONLine(&out, line); writeJSONLineError != nil {
+			test.Fatal(writeJSONLineError)
 		}
 	}
 	want := `{"kind":"finding","path":"/repo/a.ts","line":3,"column":7,"severity":"error","rule":"prefer-const","messageId":"useConst","message":"Use const."}
@@ -42,13 +42,13 @@ func TestJSONSummary(test *testing.T) {
 	summary.Changed = []changedFile{{Path: "b.ts", Fixed: true, Formatted: true}, {Path: "c.ts", Formatted: true}}
 	summary.Gaps.CrashedFiles = 1
 
-	encoded, err := json.Marshal(summaryAsJSON(summary))
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(summaryAsJSON(summary))
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	var decoded map[string]any
-	if err := json.Unmarshal(encoded, &decoded); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	for key, want := range map[string]any{
 		"kind": "summary", "schemaVersion": float64(outputSchemaVersion), "verdict": "fail", "seconds": 0.7,
@@ -81,15 +81,15 @@ func TestJSONSummary(test *testing.T) {
 // property the code stopped writing, fails here rather than in a consumer.
 func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 	test.Parallel()
-	raw, err := os.ReadFile("../../schema/CohereOutput.schema.json")
-	if err != nil {
-		test.Fatal(err)
+	raw, readError := os.ReadFile("../../schema/CohereOutput.schema.json")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var schema struct {
 		Defs map[string]schemaObject `json:"$defs"`
 	}
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(raw, &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	summary := schema.Defs["summary"]
 	for name, check := range map[string]struct {

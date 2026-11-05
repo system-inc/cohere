@@ -387,19 +387,19 @@ func (cache *OracleCache) format(oracle Formatter, path string, text string) (st
 	key := hex.EncodeToString(hash.Sum(nil))
 	entry := filepath.Join(cache.Directory, key[:2], key)
 
-	if cached, err := os.ReadFile(entry); err == nil {
+	if cached, readError := os.ReadFile(entry); readError == nil {
 		return string(cached), nil
 	}
 
-	formatted, err := oracle.Format(path, text)
-	if err != nil {
-		return "", err
+	formatted, formatError := oracle.Format(path, text)
+	if formatError != nil {
+		return "", formatError
 	}
 	// A unique temporary per writer, then rename. Two workers can hold the same file (a duplicated
 	// fixture, a copied config) and would otherwise write one shared temporary at the same instant.
 	// The cache is an optimization, so any failure here is swallowed and the answer still returned.
-	if err := os.MkdirAll(filepath.Dir(entry), 0o755); err == nil {
-		if temporary, err := os.CreateTemp(filepath.Dir(entry), key+".*.tmp"); err == nil {
+	if createDirectoryError := os.MkdirAll(filepath.Dir(entry), 0o755); createDirectoryError == nil {
+		if temporary, temporaryFileError := os.CreateTemp(filepath.Dir(entry), key+".*.tmp"); temporaryFileError == nil {
 			_, writeError := temporary.WriteString(formatted)
 			closeError := temporary.Close()
 			if writeError == nil && closeError == nil {

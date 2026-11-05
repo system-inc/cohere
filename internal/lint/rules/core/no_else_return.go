@@ -45,8 +45,8 @@ func DecodeNoElseReturnOptions(raw []byte) (any, error) {
 	}
 
 	var wire noElseReturnWireShape
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoElseReturnSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoElseReturnSettings(), unmarshalOptionsError
 	}
 
 	settings := DefaultNoElseReturnSettings()
@@ -125,7 +125,7 @@ var NoElseReturn = rule.Rule{
 	// can answer. The rule reports without it, and declines to repair.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoElseReturnSettings](options)
 		if !ok {
 			settings = DefaultNoElseReturnSettings()
@@ -133,14 +133,14 @@ var NoElseReturn = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
-				checkNoElseReturn(ctx, node, settings.AllowElseIf)
+				checkNoElseReturn(ruleContext, node, settings.AllowElseIf)
 			},
 		}
 	},
 }
 
 // checkNoElseReturn decides one if statement.
-func checkNoElseReturn(ctx rule.Context, node *ast.Node, allowElseIf bool) {
+func checkNoElseReturn(ruleContext rule.Context, node *ast.Node, allowElseIf bool) {
 	// Fixing this would mean splitting one statement into two, so an `if` somewhere only a single
 	// statement is legal is left alone. Upstream words this as a check against its statement-list
 	// parent set; asking whether the parent holds a statement list is the same question.
@@ -176,14 +176,14 @@ func checkNoElseReturn(ctx rule.Context, node *ast.Node, allowElseIf bool) {
 			alternate = currentStatement.ElseStatement
 			current = currentStatement.ElseStatement
 		}
-		reportElse(ctx, node, alternate)
+		reportElse(ruleContext, node, alternate)
 		return
 	}
 
 	// With `else if` disallowed, only this one consequent is judged, so an `else if` after a
 	// returning branch reports immediately rather than waiting for the chain to end.
 	if alwaysReturns(statement.ThenStatement) {
-		reportElse(ctx, node, statement.ElseStatement)
+		reportElse(ruleContext, node, statement.ElseStatement)
 	}
 }
 
@@ -260,24 +260,24 @@ func naiveHasReturn(node *ast.Node) bool {
 }
 
 // reportElse reports the else and offers the repair when it can be shown safe.
-func reportElse(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node) {
-	if repair, ok := elseUnwrapFix(ctx, ifStatement, alternate); ok {
-		ctx.ReportNodeWithFixes(alternate, messageNoElseReturn, repair)
+func reportElse(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node) {
+	if repair, ok := elseUnwrapFix(ruleContext, ifStatement, alternate); ok {
+		ruleContext.ReportNodeWithFixes(alternate, messageNoElseReturn, repair)
 		return
 	}
-	ctx.ReportNode(alternate, messageNoElseReturn)
+	ruleContext.ReportNode(alternate, messageNoElseReturn)
 }
 
 // elseUnwrapFix builds the repair that removes an else, or declines to.
 //
 // Three independent declines, each reproducing one of upstream's. See the rule's doc comment for
 // why each exists; the order here is upstream's and is cheapest-first only by accident.
-func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node) (rule.Fix, bool) {
-	if !isSafeFromNameCollisions(ctx, ifStatement, alternate) {
+func elseUnwrapFix(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node) (rule.Fix, bool) {
+	if !isSafeFromNameCollisions(ruleContext, ifStatement, alternate) {
 		return rule.Fix{}, false
 	}
 
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 	elseKeyword := elseKeywordOffset(source, ifStatement, alternate)
 	if elseKeyword < 0 {
 		return rule.Fix{}, false
@@ -289,7 +289,7 @@ func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node)
 	// TokenRange rather than Pos(): Pos() reaches back over the whitespace between `else` and the
 	// statement, and the removal already covers that span, so keeping it too writes a double space.
 	// `if (true) return x; else return y;` came out as `... return x;  return y;` until this line.
-	keptStart, keptEnd := rule.TokenRange(ctx.SourceFile, alternate).Pos(), alternate.End()
+	keptStart, keptEnd := rule.TokenRange(ruleContext.SourceFile, alternate).Pos(), alternate.End()
 	if alternate.Kind == ast.KindBlock {
 		keptStart, keptEnd = alternate.Pos()+1, alternate.End()-1
 		if openBrace := indexOfByteFrom(source, '{', alternate.Pos(), alternate.End()); openBrace >= 0 {
@@ -303,7 +303,7 @@ func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node)
 		return rule.Fix{}, false
 	}
 
-	if rejoinsAtTheFront(ctx, ifStatement, source, keptStart, keptEnd) {
+	if rejoinsAtTheFront(ruleContext, ifStatement, source, keptStart, keptEnd) {
 		return rule.Fix{}, false
 	}
 	if rejoinsAtTheBack(source, alternate, keptStart, keptEnd) {
@@ -330,14 +330,14 @@ func elseUnwrapFix(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node)
 //
 // A conditional function declaration is refused outright, matching upstream: its scoping and
 // hoisting differ between engines, so no analysis here would be worth trusting.
-func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node) bool {
+func isSafeFromNameCollisions(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node) bool {
 	if alternate.Kind == ast.KindFunctionDeclaration {
 		return false
 	}
 	if alternate.Kind != ast.KindBlock {
 		return true
 	}
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		// No checker means the collision question cannot be asked, so the repair is withheld rather
 		// than guessed at. The finding still fires.
 		return false
@@ -369,7 +369,7 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 	// a scope where the name is taken and changes what the program means, and the edit engine's
 	// parse check cannot refuse that because the result parses. The finding still fires either way,
 	// so nothing is missed, only the automatic repair on one shape.
-	for _, symbol := range ctx.TypeChecker.GetSymbolsInScope(ifStatement, ^ast.SymbolFlags(0)) {
+	for _, symbol := range ruleContext.TypeChecker.GetSymbolsInScope(ifStatement, ^ast.SymbolFlags(0)) {
 		if !names[symbol.Name] {
 			continue
 		}
@@ -397,7 +397,7 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 	//
 	// Measured against the installed rule: `function foo() { if (bar) { return true; } else { let a;
 	// } a; }` is declined and the same input without the trailing `a;` is fixed.
-	if mentionsAnyNameOutside(ctx, ifStatement, alternate, names) {
+	if mentionsAnyNameOutside(ruleContext, ifStatement, alternate, names) {
 		return false
 	}
 
@@ -409,7 +409,7 @@ func isSafeFromNameCollisions(ctx rule.Context, ifStatement *ast.Node, alternate
 // Only identifiers outside the else block count, since a mention inside it already refers to the
 // declaration being moved. The search is bounded by the nearest enclosing function or the file,
 // because a name mentioned beyond that cannot be captured by a declaration landing here.
-func mentionsAnyNameOutside(ctx rule.Context, ifStatement *ast.Node, alternate *ast.Node,
+func mentionsAnyNameOutside(ruleContext rule.Context, ifStatement *ast.Node, alternate *ast.Node,
 	names map[string]bool) bool {
 	// The block the unwrapped declarations LAND in, which is the if statement's own parent, and
 	// nothing wider. A name mentioned further out belongs to a scope the lifted declaration never
@@ -550,7 +550,7 @@ func collectBindingNames(name *ast.Node, into map[string]bool) {
 //
 // Upstream's test is deliberately textual and both halves are needed: a braced consequent cannot
 // rejoin, and neither can one already ending in a semicolon.
-func rejoinsAtTheFront(ctx rule.Context, ifStatement *ast.Node, source string,
+func rejoinsAtTheFront(ruleContext rule.Context, ifStatement *ast.Node, source string,
 	keptStart int, keptEnd int) bool {
 	consequent := ifStatement.AsIfStatement().ThenStatement
 	if consequent == nil || consequent.Kind == ast.KindBlock {

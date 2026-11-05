@@ -225,17 +225,17 @@ func (index *importerIndex) provablyUnimported(sourceFile *ast.SourceFile, names
 // Missing this cost a false finding: `PensieveCommandBoundary.ts` declares
 // `const IdentitySafePensieveCommandPaths` and exports it on line 39 with `export { ... }`, and the
 // rule called it file-local and told it to become camelCase, which would have renamed an export.
-func exportedNamesOf(ctx rule.Context, statement *ast.Node, name *ast.Node) []string {
+func exportedNamesOf(ruleContext rule.Context, statement *ast.Node, name *ast.Node) []string {
 	if module.IsExported(statement) {
 		return []string{name.Text()}
 	}
-	clauses := localExportClausesFor(ctx)
-	if len(clauses) == 0 || ctx.TypeChecker == nil {
+	clauses := localExportClausesFor(ruleContext)
+	if len(clauses) == 0 || ruleContext.TypeChecker == nil {
 		return nil
 	}
 	// A nil here would match every clause whose own target is unresolved. A const's declaration name
 	// always resolves, so no fixture reaches this; it is the guard that keeps nil from equalling nil.
-	declared := ctx.TypeChecker.GetSymbolAtLocation(name)
+	declared := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if declared == nil {
 		return nil
 	}
@@ -245,7 +245,7 @@ func exportedNamesOf(ctx rule.Context, statement *ast.Node, name *ast.Node) []st
 		if exportedName == nil || exportedName.Text() == "default" {
 			continue
 		}
-		if ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(specifier) == declared {
+		if ruleContext.TypeChecker.GetExportSpecifierLocalTargetSymbol(specifier) == declared {
 			names = append(names, exportedName.Text())
 		}
 	}
@@ -258,13 +258,13 @@ func exportedNamesOf(ctx rule.Context, statement *ast.Node, name *ast.Node) []st
 // Leaving out the `from` clauses is cost, not correctness, and a mutation confirms it: their local
 // target is the other module's binding, so the checker comparison already rejects them. The filter
 // keeps them from costing a checker call per constant.
-func localExportClausesFor(ctx rule.Context) []*ast.Node {
-	return rule.Cached(ctx.FileCache, "nexus/constant-casing/local-export-clauses", func() []*ast.Node {
+func localExportClausesFor(ruleContext rule.Context) []*ast.Node {
+	return rule.Cached(ruleContext.FileCache, "nexus/constant-casing/local-export-clauses", func() []*ast.Node {
 		var specifiers []*ast.Node
-		if ctx.SourceFile == nil {
+		if ruleContext.SourceFile == nil {
 			return specifiers
 		}
-		for _, statement := range ctx.SourceFile.Statements.Nodes {
+		for _, statement := range ruleContext.SourceFile.Statements.Nodes {
 			if statement.Kind != ast.KindExportDeclaration {
 				continue
 			}

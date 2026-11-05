@@ -30,8 +30,8 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-differential: %v\n", err)
+	if runError := run(); runError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-differential: %v\n", runError)
 		os.Exit(1)
 	}
 }
@@ -47,8 +47,8 @@ func run() error {
 		return fmt.Errorf("loading the lint config: %w", err)
 	}
 
-	if err := checkControlsAreLintable(lintConfig, options.controls, cohereOnlyRuleSettings(options.root)); err != nil {
-		return err
+	if checkControlsAreLintableError := checkControlsAreLintable(lintConfig, options.controls, cohereOnlyRuleSettings(options.root)); checkControlsAreLintableError != nil {
+		return checkControlsAreLintableError
 	}
 
 	// Asked of the binary being measured, not of this one. `registry.All()` is the registry linked
@@ -165,9 +165,9 @@ func parseArguments(rest []string) (arguments, error) {
 		}
 	}
 
-	absoluteRoot, err := filepath.Abs(parsed.root)
-	if err != nil {
-		return parsed, fmt.Errorf("resolving the root %s: %w", parsed.root, err)
+	absoluteRoot, absolutePathError := filepath.Abs(parsed.root)
+	if absolutePathError != nil {
+		return parsed, fmt.Errorf("resolving the root %s: %w", parsed.root, absolutePathError)
 	}
 	parsed.root = absoluteRoot
 

@@ -175,9 +175,9 @@ func TestNoUnescapedEntitiesFires(test *testing.T) {
 // empty distinction on `forbid`, and the dispatch between a string element and an object one.
 func decodeNoUnescapedEntitiesOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeNoUnescapedEntitiesOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", raw, err)
+	decoded, decodeNoUnescapedEntitiesOptionsError := DecodeNoUnescapedEntitiesOptions(json.RawMessage(raw))
+	if decodeNoUnescapedEntitiesOptionsError != nil {
+		test.Fatalf("decoding %s: %v", raw, decodeNoUnescapedEntitiesOptionsError)
 	}
 	return decoded
 }

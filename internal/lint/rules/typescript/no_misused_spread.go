@@ -118,53 +118,53 @@ var NoMisusedSpread = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
 		settings, _ := rule.OptionsAs[NoMisusedSpreadOptions](options)
 
 		allowed := func(t *checker.Type) bool {
-			return type_checking.TypeMatchesSomeSpecifier(t, settings.Allow, settings.AllowInline, ctx.Program)
+			return type_checking.TypeMatchesSomeSpecifier(t, settings.Allow, settings.AllowInline, ruleContext.Program)
 		}
 
 		// checkObjectSpread is the cascade. Every arm returns, so the first match wins.
 		checkObjectSpread := func(spread *ast.Node, argument *ast.Node) {
-			argumentType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
+			argumentType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, argument)
 			if argumentType == nil || allowed(argumentType) {
 				return
 			}
 
 			if noMisusedSpreadIsTypeRecurser(argumentType, func(t *checker.Type) bool {
-				return type_checking.IsPromiseLike(ctx.Program, ctx.TypeChecker, t)
+				return type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, t)
 			}) {
-				ctx.ReportNodeWithSuggestions(spread, buildNoPromiseSpreadInObjectMessage(),
-					noMisusedSpreadAwaitSuggestion(ctx, argument))
+				ruleContext.ReportNodeWithSuggestions(spread, buildNoPromiseSpreadInObjectMessage(),
+					noMisusedSpreadAwaitSuggestion(ruleContext, argument))
 				return
 			}
 
-			if noMisusedSpreadIsFunctionWithoutProperties(ctx.TypeChecker, argumentType) {
-				ctx.ReportNode(spread, buildNoFunctionSpreadInObjectMessage())
+			if noMisusedSpreadIsFunctionWithoutProperties(ruleContext.TypeChecker, argumentType) {
+				ruleContext.ReportNode(spread, buildNoFunctionSpreadInObjectMessage())
 				return
 			}
 
-			if noMisusedSpreadIsMap(ctx, argumentType) {
-				ctx.ReportNodeWithSuggestions(spread, buildNoMapSpreadInObjectMessage(),
-					noMisusedSpreadMapSuggestions(ctx, spread, argument, argumentType)...)
+			if noMisusedSpreadIsMap(ruleContext, argumentType) {
+				ruleContext.ReportNodeWithSuggestions(spread, buildNoMapSpreadInObjectMessage(),
+					noMisusedSpreadMapSuggestions(ruleContext, spread, argument, argumentType)...)
 				return
 			}
 
-			if noMisusedSpreadIsArray(ctx.TypeChecker, argumentType) {
-				ctx.ReportNode(spread, buildNoArraySpreadInObjectMessage())
+			if noMisusedSpreadIsArray(ruleContext.TypeChecker, argumentType) {
+				ruleContext.ReportNode(spread, buildNoArraySpreadInObjectMessage())
 				return
 			}
 
 			// The string exclusion is upstream's and it is not an optimisation: TypeScript already
 			// errors on spreading a string into an object, so reporting here would double a
 			// diagnostic the compiler already gives.
-			if noMisusedSpreadIsIterable(ctx.TypeChecker, argumentType) && !noMisusedSpreadIsString(argumentType) {
-				ctx.ReportNode(spread, buildNoIterableSpreadInObjectMessage())
+			if noMisusedSpreadIsIterable(ruleContext.TypeChecker, argumentType) && !noMisusedSpreadIsString(argumentType) {
+				ruleContext.ReportNode(spread, buildNoIterableSpreadInObjectMessage())
 				return
 			}
 
@@ -172,16 +172,16 @@ var NoMisusedSpread = rule.Rule{
 			// instance's symbol has the class as its value declaration, so the declaration arm below
 			// would otherwise report it under the wrong message. See noMisusedSpreadCopiesCompletely.
 			if noMisusedSpreadIsTypeRecurser(argumentType, func(part *checker.Type) bool {
-				return noMisusedSpreadIsClassInstance(ctx.TypeChecker, part) && !noMisusedSpreadCopiesCompletely(ctx, part)
+				return noMisusedSpreadIsClassInstance(ruleContext.TypeChecker, part) && !noMisusedSpreadCopiesCompletely(ruleContext, part)
 			}) {
-				ctx.ReportNode(spread, buildNoClassInstanceSpreadInObjectMessage())
+				ruleContext.ReportNode(spread, buildNoClassInstanceSpreadInObjectMessage())
 				return
 			}
 
 			if noMisusedSpreadIsTypeRecurser(argumentType, func(part *checker.Type) bool {
-				return !noMisusedSpreadIsClassInstance(ctx.TypeChecker, part) && noMisusedSpreadIsClassDeclaration(part)
+				return !noMisusedSpreadIsClassInstance(ruleContext.TypeChecker, part) && noMisusedSpreadIsClassDeclaration(part)
 			}) {
-				ctx.ReportNode(spread, buildNoClassDeclarationSpreadInObjectMessage())
+				ruleContext.ReportNode(spread, buildNoClassDeclarationSpreadInObjectMessage())
 			}
 		}
 
@@ -258,9 +258,9 @@ func noMisusedSpreadIsIterable(typeChecker *checker.Checker, t *checker.Type) bo
 	})
 }
 
-func noMisusedSpreadIsMap(ctx rule.Context, t *checker.Type) bool {
+func noMisusedSpreadIsMap(ruleContext rule.Context, t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		return type_checking.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, part, "Map", "ReadonlyMap", "WeakMap")
+		return type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, part, "Map", "ReadonlyMap", "WeakMap")
 	})
 }
 
@@ -358,23 +358,23 @@ func noMisusedSpreadIsClassDeclaration(t *checker.Type) bool {
 //
 // A union exempts only when every class instance in it is exempt, because the caller's recurser
 // reports on the first constituent that is not.
-func noMisusedSpreadCopiesCompletely(ctx rule.Context, t *checker.Type) bool {
+func noMisusedSpreadCopiesCompletely(ruleContext rule.Context, t *checker.Type) bool {
 	symbol := checker.Type_symbol(t)
 	if symbol == nil {
 		return false
 	}
 	seen := map[*ast.Symbol]bool{}
 	for symbol != nil {
-		if seen[symbol] || !noMisusedSpreadClassLosesNothing(ctx, symbol) {
+		if seen[symbol] || !noMisusedSpreadClassLosesNothing(ruleContext, symbol) {
 			return false
 		}
 		seen[symbol] = true
 
-		declared := checker.Checker_getDeclaredTypeOfSymbol(ctx.TypeChecker, symbol)
+		declared := checker.Checker_getDeclaredTypeOfSymbol(ruleContext.TypeChecker, symbol)
 		if declared == nil {
 			return false
 		}
-		bases := checker.Checker_getBaseTypes(ctx.TypeChecker, declared)
+		bases := checker.Checker_getBaseTypes(ruleContext.TypeChecker, declared)
 		switch len(bases) {
 		case 0:
 			return true
@@ -390,7 +390,7 @@ func noMisusedSpreadCopiesCompletely(ctx rule.Context, t *checker.Type) bool {
 }
 
 // noMisusedSpreadClassLosesNothing is one link of the chain: the symbol's own declarations.
-func noMisusedSpreadClassLosesNothing(ctx rule.Context, symbol *ast.Symbol) bool {
+func noMisusedSpreadClassLosesNothing(ruleContext rule.Context, symbol *ast.Symbol) bool {
 	if len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -408,7 +408,7 @@ func noMisusedSpreadClassLosesNothing(ctx rule.Context, symbol *ast.Symbol) bool
 				return false
 			}
 		}
-		if !noMisusedSpreadDecoratorsAreOwnSource(ctx, declaration) {
+		if !noMisusedSpreadDecoratorsAreOwnSource(ruleContext, declaration) {
 			return false
 		}
 	}
@@ -419,7 +419,7 @@ func noMisusedSpreadClassLosesNothing(ctx rule.Context, symbol *ast.Symbol) bool
 // member's, and each constructor parameter's. Those are the only places one can sit on a class whose
 // members are all fields, and reading them never enters a function body, which the rule's Shapes
 // reach promises not to do.
-func noMisusedSpreadDecoratorsAreOwnSource(ctx rule.Context, classNode *ast.Node) bool {
+func noMisusedSpreadDecoratorsAreOwnSource(ruleContext rule.Context, classNode *ast.Node) bool {
 	holders := []*ast.Node{classNode}
 	for _, member := range classNode.Members() {
 		holders = append(holders, member)
@@ -433,7 +433,7 @@ func noMisusedSpreadDecoratorsAreOwnSource(ctx rule.Context, classNode *ast.Node
 			continue
 		}
 		for _, modifier := range modifiers.Nodes {
-			if ast.IsDecorator(modifier) && !noMisusedSpreadDecoratorIsOwnSource(ctx, modifier.AsDecorator().Expression) {
+			if ast.IsDecorator(modifier) && !noMisusedSpreadDecoratorIsOwnSource(ruleContext, modifier.AsDecorator().Expression) {
 				return false
 			}
 		}
@@ -443,7 +443,7 @@ func noMisusedSpreadDecoratorsAreOwnSource(ctx rule.Context, classNode *ast.Node
 
 // noMisusedSpreadDecoratorIsOwnSource resolves `@Name`, `@Name(...)`, `@namespace.Name` and
 // `@namespace.Name(...)` through any import alias to the declarations of the function applied.
-func noMisusedSpreadDecoratorIsOwnSource(ctx rule.Context, expression *ast.Node) bool {
+func noMisusedSpreadDecoratorIsOwnSource(ruleContext rule.Context, expression *ast.Node) bool {
 	target := ast.SkipParentheses(expression)
 	if ast.IsCallExpression(target) {
 		target = ast.SkipParentheses(target.AsCallExpression().Expression)
@@ -454,11 +454,11 @@ func noMisusedSpreadDecoratorIsOwnSource(ctx rule.Context, expression *ast.Node)
 	if !ast.IsIdentifier(target) {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(target)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(target)
 	if symbol == nil {
 		return false
 	}
-	symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
+	symbol = checker.SkipAlias(symbol, ruleContext.TypeChecker)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -488,7 +488,7 @@ func noMisusedSpreadIsOwnSource(declaration *ast.Node) bool {
 //
 // The shelf's `IsHigherPrecedenceThanAwait` answers this, comparing the node's expression precedence
 // against the await operator's. Upstream asks the identical question of its own tree.
-func noMisusedSpreadAwaitSuggestion(ctx rule.Context, argument *ast.Node) rule.Suggestion {
+func noMisusedSpreadAwaitSuggestion(ruleContext rule.Context, argument *ast.Node) rule.Suggestion {
 	// The precedence question is asked of the node INSIDE any parentheses, not of the parenthesized
 	// expression, and that is a substrate difference rather than a refinement. ESTree has no
 	// parenthesis node, so upstream asks this of the `||` or the conditional directly. Ours wraps
@@ -509,7 +509,7 @@ func noMisusedSpreadAwaitSuggestion(ctx rule.Context, argument *ast.Node) rule.S
 	if type_checking.IsHigherPrecedenceThanAwait(inner) {
 		return rule.Suggestion{
 			Message: buildAddAwaitMessage(),
-			Fixes:   []rule.Fix{ctx.InsertBefore(argument, "await ")},
+			Fixes:   []rule.Fix{ruleContext.InsertBefore(argument, "await ")},
 		}
 	}
 	// The wrap goes around the INNER node rather than around the argument, for the same substrate
@@ -521,8 +521,8 @@ func noMisusedSpreadAwaitSuggestion(ctx rule.Context, argument *ast.Node) rule.S
 	return rule.Suggestion{
 		Message: buildAddAwaitMessage(),
 		Fixes: []rule.Fix{
-			ctx.InsertBefore(inner, "await ("),
-			ctx.InsertAfter(inner, ")"),
+			ruleContext.InsertBefore(inner, "await ("),
+			ruleContext.InsertAfter(inner, ")"),
 		},
 	}
 }
@@ -535,9 +535,9 @@ func noMisusedSpreadAwaitSuggestion(ctx rule.Context, argument *ast.Node) rule.S
 //
 // Returns nothing when the type is a union with a non-Map constituent, matching upstream: the
 // rewrite is only sound if every constituent is a Map, and the finding is still reported without it.
-func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument *ast.Node, argumentType *checker.Type) []rule.Suggestion {
+func noMisusedSpreadMapSuggestions(ruleContext rule.Context, spread *ast.Node, argument *ast.Node, argumentType *checker.Type) []rule.Suggestion {
 	for part := range type_checking.UnionTypePartsSeq(argumentType) {
-		if !noMisusedSpreadIsMap(ctx, part) {
+		if !noMisusedSpreadIsMap(ruleContext, part) {
 			return nil
 		}
 	}
@@ -549,8 +549,8 @@ func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument 
 	if unwrapped := ast.SkipParentheses(argument); unwrapped != nil {
 		inner = unwrapped
 	}
-	innerRange := rule.TokenRange(ctx.SourceFile, inner)
-	innerText := ctx.SourceFile.Text()[innerRange.Pos():innerRange.End()]
+	innerRange := rule.TokenRange(ruleContext.SourceFile, inner)
+	innerText := ruleContext.SourceFile.Text()[innerRange.Pos():innerRange.End()]
 
 	// A weak-precedence inner node keeps its parentheses, because `Object.fromEntries(map, map)`
 	// would pass two arguments where the comma expression meant one. Upstream's general fixer makes
@@ -568,7 +568,7 @@ func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument 
 		len(parent.AsObjectLiteralExpression().Properties.Nodes) == 1 {
 		return []rule.Suggestion{{
 			Message: buildReplaceMapSpreadInObjectMessage(),
-			Fixes:   []rule.Fix{rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, parent), replacement)},
+			Fixes:   []rule.Fix{rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, parent), replacement)},
 		}}
 	}
 
@@ -586,7 +586,7 @@ func noMisusedSpreadMapSuggestions(ctx rule.Context, spread *ast.Node, argument 
 	// parentheses. Tidying is not fidelity, so upstream's answer is reproduced and pinned below.
 	return []rule.Suggestion{{
 		Message: buildReplaceMapSpreadInObjectMessage(),
-		Fixes:   []rule.Fix{rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, inner), replacement)},
+		Fixes:   []rule.Fix{rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, inner), replacement)},
 	}}
 }
 

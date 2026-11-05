@@ -41,9 +41,9 @@ func decodeNoUnnecessaryBooleanLiteralCompareOptions(test *testing.T, configurat
 		// here is what puts the rule's own fallback under test rather than the decoder's.
 		return nil
 	}
-	options, err := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(configuration))
-	if err != nil {
-		test.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(configuration))
+	if decodeNoUnnecessaryBooleanLiteralCompareOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeNoUnnecessaryBooleanLiteralCompareOptionsError)
 	}
 	return options
 }
@@ -825,9 +825,9 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(test *tes
 	for index, testCase := range cases {
 		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(testCase.configuration))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.configuration, err)
+			decoded, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(testCase.configuration))
+			if decodeNoUnnecessaryBooleanLiteralCompareOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeNoUnnecessaryBooleanLiteralCompareOptionsError)
 			}
 			options, ok := decoded.(NoUnnecessaryBooleanLiteralCompareOptions)
 			if !ok {

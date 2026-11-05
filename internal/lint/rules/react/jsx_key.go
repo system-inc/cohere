@@ -87,8 +87,8 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -195,9 +195,9 @@ var JsxKey = rule.Rule{
 	// namespace on a `/` boundary, so `react-jsx-key` would match no inventory entry and lint no
 	// files while passing every fixture in this package.
 	Name: "react/jsx-key",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[JsxKeyOptions](options)
-		pragma := reactPragmaFor(ctx)
+		pragma := reactPragmaFor(ruleContext)
 
 		// Upstream keeps a WeakSet so a key attribute reported once as a duplicate is not reported
 		// again. THERE IS NO EQUIVALENT HERE, because in this anchoring nothing can be reported
@@ -248,13 +248,13 @@ var JsxKey = rule.Rule{
 					// Guarded by the anchor: a keyless element nested in another element is
 					// silent, and only an array literal reports here.
 					if isArrayLiteral {
-						ctx.ReportNode(element, messageJsxKeyMissingArrayKey)
+						ruleContext.ReportNode(element, messageJsxKeyMissingArrayKey)
 					}
 					continue
 				}
 
 				for _, keyAttribute := range keyAttributes {
-					text := keyAttributeValueText(ctx, keyAttribute)
+					text := keyAttributeValueText(ruleContext, keyAttribute)
 					if _, seen := byKeyText[text]; !seen {
 						keyOrder = append(keyOrder, text)
 					}
@@ -265,7 +265,7 @@ var JsxKey = rule.Rule{
 					// element. Both measured: the span for an array literal covers the whole
 					// `[...]` and for a nested element covers the whole parent element.
 					if settings.CheckKeyMustBeforeSpread && isKeyAfterSpread(attributes) {
-						ctx.ReportNode(node, messageJsxKeyBeforeSpread)
+						ruleContext.ReportNode(node, messageJsxKeyBeforeSpread)
 					}
 				}
 			}
@@ -280,7 +280,7 @@ var JsxKey = rule.Rule{
 				}
 				for _, keyAttribute := range group {
 					// The KEY ATTRIBUTE, not the element. Measured: the span covers `key="a"`.
-					ctx.ReportNode(keyAttribute, messageJsxKeyNonUniqueKeys)
+					ruleContext.ReportNode(keyAttribute, messageJsxKeyNonUniqueKeys)
 				}
 			}
 		}
@@ -301,17 +301,17 @@ var JsxKey = rule.Rule{
 				attributes := attributesOfJsxElement(node)
 				// Case-INSENSITIVE here, unlike the collection arm. See the rule's doc comment.
 				if !hasKeyAttributeIgnoringCase(attributes) {
-					ctx.ReportNode(node, messageJsxKeyMissingIterKey)
+					ruleContext.ReportNode(node, messageJsxKeyMissingIterKey)
 					return
 				}
 				if settings.CheckKeyMustBeforeSpread && isKeyAfterSpread(attributes) {
 					// The ELEMENT here, where the collection arm reports the container. Measured.
-					ctx.ReportNode(node, messageJsxKeyBeforeSpread)
+					ruleContext.ReportNode(node, messageJsxKeyBeforeSpread)
 				}
 				return
 			}
 			if settings.CheckFragmentShorthand && node.Kind == ast.KindJsxFragment {
-				ctx.ReportNode(node, messageJsxKeyMissingIterKeyUsePragma)
+				ruleContext.ReportNode(node, messageJsxKeyMissingIterKeyUsePragma)
 			}
 		}
 
@@ -365,7 +365,7 @@ var JsxKey = rule.Rule{
 				if node.Parent == nil || node.Parent.Kind != ast.KindArrayLiteralExpression {
 					return
 				}
-				ctx.ReportNode(node, messageJsxKeyMissingArrayKeyUsePragma)
+				ruleContext.ReportNode(node, messageJsxKeyMissingArrayKeyUsePragma)
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -831,10 +831,10 @@ func jsxElementsAmong(nodes []*ast.Node) []*ast.Node {
 //
 // A `key` with no value at all yields the empty string, which is what `getText(context, undefined)`
 // returns upstream, and two valueless keys therefore collide with each other.
-func keyAttributeValueText(ctx rule.Context, attribute *ast.Node) string {
+func keyAttributeValueText(ruleContext rule.Context, attribute *ast.Node) string {
 	initializer := attribute.AsJsxAttribute().Initializer
 	if initializer == nil {
 		return ""
 	}
-	return sourceSliceOf(ctx, initializer)
+	return sourceSliceOf(ruleContext, initializer)
 }

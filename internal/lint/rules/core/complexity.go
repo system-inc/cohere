@@ -59,7 +59,7 @@ func DecodeComplexityOptions(raw []byte) (any, error) {
 	}
 
 	var maximum int
-	if err := json.Unmarshal(raw, &maximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &maximum); decodeError == nil {
 		settings.Maximum = maximum
 		return settings, nil
 	}
@@ -69,8 +69,8 @@ func DecodeComplexityOptions(raw []byte) (any, error) {
 		Max     *int    `json:"max"`
 		Variant *string `json:"variant"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 
 	if object.Variant != nil && *object.Variant == "modified" {
@@ -189,7 +189,7 @@ var messageComplexityComplex = rule.Message{
 var Complexity = rule.Rule{
 	Name: "complexity",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := complexitySettingsFrom(options)
 
 		return rule.Listeners{
@@ -197,7 +197,7 @@ var Complexity = rule.Rule{
 				// One walk maintaining a frame stack, for the same reason max-depth does it: the
 				// rule needs a counter that belongs to the innermost enclosing function, and the
 				// listener walk is pre-order with no exit hook to pop on.
-				walker := &complexityWalker{ctx: ctx, settings: settings}
+				walker := &complexityWalker{ctx: ruleContext, settings: settings}
 				walker.walk(node)
 			},
 		}
@@ -392,7 +392,7 @@ func complexityIsLogicalOperator(node *ast.Node) bool {
 // Simpler than upstream's 77 lines because our parser has no MethodDefinition wrapper: the member
 // and the function are one node, so the modifiers and the kind word come off the node itself rather
 // than off a parent. The 14 renderings the corpus exercises are all produced here.
-func complexityNameOf(ctx rule.Context, node *ast.Node) string {
+func complexityNameOf(ruleContext rule.Context, node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindClassStaticBlockDeclaration:
 		return "Class static block"
@@ -563,19 +563,19 @@ func complexityIsGenerator(node *ast.Node) bool {
 // From the declaration's start to the opening parenthesis of its parameters, so the reported span
 // is the function's HEAD rather than its body. Two shapes differ: an arrow reports on its `=>`
 // token, and a class field initializer reports on the initializer expression.
-func complexityHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
+func complexityHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
 	switch node.Kind {
 	case ast.KindPropertyDeclaration:
 		// Upstream reports a class field initializer on `node.loc`, where `node` is the
 		// initializer expression the code path belongs to rather than the whole member.
 		if declaration := node.AsPropertyDeclaration(); declaration != nil && declaration.Initializer != nil {
-			return rule.TokenRange(ctx.SourceFile, declaration.Initializer)
+			return rule.TokenRange(ruleContext.SourceFile, declaration.Initializer)
 		}
-		return rule.TokenRange(ctx.SourceFile, node)
+		return rule.TokenRange(ruleContext.SourceFile, node)
 
 	case ast.KindClassStaticBlockDeclaration:
 		// Upstream's `getFirstToken(node).loc`, which is the `static` keyword alone.
-		return scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
+		return scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())
 
 	case ast.KindArrowFunction:
 		// An arrow that borrows a property's name also borrows its span, so this arm is only
@@ -584,10 +584,10 @@ func complexityHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
 		// arrow in a property position never reaches the arrow arm at all.
 		if complexityNamingOwnerOf(node) == nil {
 			if arrow := node.AsArrowFunction(); arrow != nil && arrow.EqualsGreaterThanToken != nil {
-				return scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, arrow.EqualsGreaterThanToken.Pos()).
+				return scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, arrow.EqualsGreaterThanToken.Pos()).
 					WithEnd(arrow.EqualsGreaterThanToken.End())
 			}
-			return rule.TokenRange(ctx.SourceFile, node)
+			return rule.TokenRange(ruleContext.SourceFile, node)
 		}
 	}
 
@@ -601,10 +601,10 @@ func complexityHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
 	if owner := complexityNamingOwnerOf(node); owner != nil {
 		anchor = owner
 	}
-	start := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, anchor.Pos()).Pos()
-	end := complexityParameterListStart(ctx, node)
+	start := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, anchor.Pos()).Pos()
+	end := complexityParameterListStart(ruleContext, node)
 	if end <= start {
-		return rule.TokenRange(ctx.SourceFile, node)
+		return rule.TokenRange(ruleContext.SourceFile, node)
 	}
 	return core.NewTextRange(start, end)
 }
@@ -614,8 +614,8 @@ func complexityHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
 //
 // Derived from the source text rather than from a token list, because the parameters themselves may
 // be absent and a type parameter list can sit between the name and the paren.
-func complexityParameterListStart(ctx rule.Context, node *ast.Node) int {
-	text := ctx.SourceFile.Text()
+func complexityParameterListStart(ruleContext rule.Context, node *ast.Node) int {
+	text := ruleContext.SourceFile.Text()
 	body := complexityBodyOf(node)
 	limit := node.End()
 	if body != nil {

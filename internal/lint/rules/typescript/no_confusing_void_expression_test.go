@@ -39,9 +39,9 @@ func decodeNoConfusingVoidExpressionOptionsForTest(test *testing.T, optionsJson 
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeNoConfusingVoidExpressionOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeNoConfusingVoidExpressionOptionsError := DecodeNoConfusingVoidExpressionOptions(json.RawMessage(optionsJson))
+	if decodeNoConfusingVoidExpressionOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoConfusingVoidExpressionOptionsError)
 	}
 	return decoded
 }

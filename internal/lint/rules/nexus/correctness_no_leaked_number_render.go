@@ -106,8 +106,8 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 	// The rule asks only for the operand's type, never into an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
@@ -119,7 +119,7 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 				if node.Parent.Kind != ast.KindJsxElement && node.Parent.Kind != ast.KindJsxFragment {
 					return
 				}
-				correctnessNoLeakedNumberRenderRendered(ctx, container.Expression)
+				correctnessNoLeakedNumberRenderRendered(ruleContext, container.Expression)
 			},
 		}
 	},
@@ -127,54 +127,54 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 
 // correctnessNoLeakedNumberRenderRendered walks an expression whose value is rendered as a JSX
 // child, and checks the falsy operand of every `&&` whose result is rendered.
-func correctnessNoLeakedNumberRenderRendered(ctx rule.Context, expression *ast.Node) {
+func correctnessNoLeakedNumberRenderRendered(ruleContext rule.Context, expression *ast.Node) {
 	expression = ast.SkipParentheses(expression)
 	switch expression.Kind {
 	case ast.KindConditionalExpression:
 		conditional := expression.AsConditionalExpression()
-		correctnessNoLeakedNumberRenderRendered(ctx, conditional.WhenTrue)
-		correctnessNoLeakedNumberRenderRendered(ctx, conditional.WhenFalse)
+		correctnessNoLeakedNumberRenderRendered(ruleContext, conditional.WhenTrue)
+		correctnessNoLeakedNumberRenderRendered(ruleContext, conditional.WhenFalse)
 	case ast.KindBinaryExpression:
 		binary := expression.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken:
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Left)
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Left)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Right)
 		case ast.KindBarBarToken:
 			// The left side is rendered only when it is truthy, which is a value the author chose.
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Right)
 		case ast.KindQuestionQuestionToken:
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Left)
-			correctnessNoLeakedNumberRenderRendered(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Left)
+			correctnessNoLeakedNumberRenderRendered(ruleContext, binary.Right)
 		}
 	}
 }
 
 // correctnessNoLeakedNumberRenderFalsy checks every leaf whose value an expression returns when it
 // is falsy, and reports a leaf whose type says that value can be a number.
-func correctnessNoLeakedNumberRenderFalsy(ctx rule.Context, expression *ast.Node) {
+func correctnessNoLeakedNumberRenderFalsy(ruleContext rule.Context, expression *ast.Node) {
 	expression = ast.SkipParentheses(expression)
 	switch expression.Kind {
 	case ast.KindConditionalExpression:
 		conditional := expression.AsConditionalExpression()
-		correctnessNoLeakedNumberRenderFalsy(ctx, conditional.WhenTrue)
-		correctnessNoLeakedNumberRenderFalsy(ctx, conditional.WhenFalse)
+		correctnessNoLeakedNumberRenderFalsy(ruleContext, conditional.WhenTrue)
+		correctnessNoLeakedNumberRenderFalsy(ruleContext, conditional.WhenFalse)
 		return
 	case ast.KindBinaryExpression:
 		binary := expression.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Left)
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Left)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Right)
 			return
 		case ast.KindBarBarToken:
 			// `a || b` is falsy only when it returns `b`.
-			correctnessNoLeakedNumberRenderFalsy(ctx, binary.Right)
+			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Right)
 			return
 		}
 	}
-	if correctnessNoLeakedNumberRenderCanLeak(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression)) {
-		ctx.ReportNode(expression, correctnessNoLeakedNumberRenderMessage())
+	if correctnessNoLeakedNumberRenderCanLeak(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(expression)) {
+		ruleContext.ReportNode(expression, correctnessNoLeakedNumberRenderMessage())
 	}
 }
 

@@ -131,9 +131,9 @@ func formatParsed(fileName string, tree parsed, text string, hasByteOrderMark bo
 	if tree.err != "" {
 		return "", fmt.Errorf("the parser failed: %s", tree.err)
 	}
-	formatted, err := printFile(fileName, tree.root, text, options, proseWrap, textToDoc, 0)
-	if err != nil {
-		return "", err
+	formatted, printFileError := printFile(fileName, tree.root, text, options, proseWrap, textToDoc, 0)
+	if printFileError != nil {
+		return "", printFileError
 	}
 	if hasByteOrderMark {
 		formatted = "\ufeff" + formatted
@@ -145,9 +145,9 @@ func formatParsed(fileName string, tree parsed, text string, hasByteOrderMark bo
 // normalized before, the mark restored after.
 func formatFullStack(fileName string, input string, options formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
 	text, hasByteOrderMark := normalizeInput(input)
-	formatted, err := formatWithProseWrap(fileName, text, options, proseWrap, textToDoc)
-	if err != nil {
-		return "", err
+	formatted, formatWithProseWrapError := formatWithProseWrap(fileName, text, options, proseWrap, textToDoc)
+	if formatWithProseWrapError != nil {
+		return "", formatWithProseWrapError
 	}
 	if hasByteOrderMark {
 		formatted = "\ufeff" + formatted
@@ -202,10 +202,10 @@ func compareFormat(test *testing.T, inputs []string) int {
 				fullStackFailures++
 				test.Errorf("variant %d, %q: Format: %s", variantIndex, input, differential.FirstDifference(expected, fullStack))
 			}
-			actual, err := formatParsed("fixture.yaml", trees[index], texts[index], byteOrderMarks[index], options, "preserve", nil)
-			if err != nil {
+			actual, formatParsedError := formatParsed("fixture.yaml", trees[index], texts[index], byteOrderMarks[index], options, "preserve", nil)
+			if formatParsedError != nil {
 				failures++
-				test.Errorf("variant %d, %q: %v", variantIndex, input, err)
+				test.Errorf("variant %d, %q: %v", variantIndex, input, formatParsedError)
 				continue
 			}
 			if actual != expected {
@@ -251,9 +251,9 @@ func TestFormatOracleCanFail(test *testing.T) {
 func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	texts, _, trees := parseInputs(test, []string{"a: b\n"})
-	document, err := PrintDoc(trees[0].root, texts[0], formatoptions.Default(), nil)
-	if err != nil {
-		test.Fatal(err)
+	document, printDocError := PrintDoc(trees[0].root, texts[0], formatoptions.Default(), nil)
+	if printDocError != nil {
+		test.Fatal(printDocError)
 	}
 	printed := docString(document)
 	if printed != "a: b\n" {
@@ -283,20 +283,20 @@ process.stdout.write(JSON.stringify(inputs));
 // dump.
 func suiteInputs(test *testing.T) []string {
 	test.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed")
 	}
 	script := filepath.Join(test.TempDir(), "suite.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(test))), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(suiteScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	output, err := exec.Command("node", script).Output()
-	if err != nil {
-		test.Skipf("the yaml-test-suite is not loadable: %v", err)
+	output, outputError := exec.Command("node", script).Output()
+	if outputError != nil {
+		test.Skipf("the yaml-test-suite is not loadable: %v", outputError)
 	}
 	var inputs []string
-	if err := json.Unmarshal(output, &inputs); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &inputs); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(inputs) < 400 {
 		test.Fatalf("the suite gave %d inputs", len(inputs))

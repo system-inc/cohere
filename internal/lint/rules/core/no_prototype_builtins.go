@@ -77,8 +77,8 @@ var prototypeBuiltinMethods = map[string]struct{}{
 // only `hasOwnProperty`, has no analogue for the other two names, and requires ES2022.
 var NoPrototypeBuiltins = rule.Rule{
 	Name: "no-prototype-builtins",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -122,7 +122,7 @@ var NoPrototypeBuiltins = rule.Rule{
 				// The finding points at the member expression, matching oxc. ESLint points at the
 				// property name alone; oxc's span is the wider of the two and is what the imported
 				// corpus was snapshotted against.
-				ctx.ReportNode(callee, messageNoPrototypeBuiltins)
+				ruleContext.ReportNode(callee, messageNoPrototypeBuiltins)
 			},
 		}
 	},

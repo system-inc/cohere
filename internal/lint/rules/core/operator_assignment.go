@@ -76,8 +76,8 @@ func DecodeOperatorAssignmentOptions(raw []byte) (any, error) {
 	}
 
 	var configured string
-	if err := json.Unmarshal(raw, &configured); err != nil {
-		return DefaultOperatorAssignmentSettings(), err
+	if decodeError := json.Unmarshal(raw, &configured); decodeError != nil {
+		return DefaultOperatorAssignmentSettings(), decodeError
 	}
 
 	setting := OperatorAssignmentSetting(configured)
@@ -196,7 +196,7 @@ var operatorAssignmentLongForm = func() map[ast.Kind]struct {
 // than reaching for `ast.SkipParentheses`, which dereferences its argument.
 var OperatorAssignment = rule.Rule{
 	Name: "operator-assignment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[OperatorAssignmentOptions](options)
 		if settings.Require == nil {
 			settings = DefaultOperatorAssignmentSettings()
@@ -206,10 +206,10 @@ var OperatorAssignment = rule.Rule{
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				if never {
-					operatorAssignmentProhibit(ctx, node)
+					operatorAssignmentProhibit(ruleContext, node)
 					return
 				}
-				operatorAssignmentVerify(ctx, node)
+				operatorAssignmentVerify(ruleContext, node)
 			},
 		}
 	},
@@ -227,7 +227,7 @@ func operatorAssignmentUnwrapParentheses(node *ast.Node) *ast.Node {
 }
 
 // operatorAssignmentVerify is upstream's `cohere`, the `always` arm.
-func operatorAssignmentVerify(ctx rule.Context, node *ast.Node) {
+func operatorAssignmentVerify(ruleContext rule.Context, node *ast.Node) {
 	assignment := node.AsBinaryExpression()
 	if assignment.OperatorToken == nil || assignment.OperatorToken.Kind != ast.KindEqualsToken {
 		return
@@ -251,11 +251,11 @@ func operatorAssignmentVerify(ctx rule.Context, node *ast.Node) {
 	operationRight := operatorAssignmentUnwrapParentheses(operation.Right)
 
 	if operatorAssignmentIsSameReference(target, operationLeft) {
-		if fix, canFix := operatorAssignmentContractFix(ctx, node, assignment, right, shorthand.text); canFix {
-			ctx.ReportNodeWithFixes(node, operatorAssignmentReplacedMessage(shorthand.text), fix)
+		if fix, canFix := operatorAssignmentContractFix(ruleContext, node, assignment, right, shorthand.text); canFix {
+			ruleContext.ReportNodeWithFixes(node, operatorAssignmentReplacedMessage(shorthand.text), fix)
 			return
 		}
-		ctx.ReportNode(node, operatorAssignmentReplacedMessage(shorthand.text))
+		ruleContext.ReportNode(node, operatorAssignmentReplacedMessage(shorthand.text))
 		return
 	}
 
@@ -263,12 +263,12 @@ func operatorAssignmentVerify(ctx rule.Context, node *ast.Node) {
 	// comment gives the reason and it is a real one rather than caution: `x = b * a` reads `b`
 	// first and `x *= b` reads `x` first, so a custom valueOf on either operand observes the swap.
 	if shorthand.commutative && operatorAssignmentIsSameReference(target, operationRight) {
-		ctx.ReportNode(node, operatorAssignmentReplacedMessage(shorthand.text))
+		ruleContext.ReportNode(node, operatorAssignmentReplacedMessage(shorthand.text))
 	}
 }
 
 // operatorAssignmentProhibit is upstream's `prohibit`, the `never` arm.
-func operatorAssignmentProhibit(ctx rule.Context, node *ast.Node) {
+func operatorAssignmentProhibit(ruleContext rule.Context, node *ast.Node) {
 	assignment := node.AsBinaryExpression()
 	if assignment.OperatorToken == nil {
 		return
@@ -278,11 +278,11 @@ func operatorAssignmentProhibit(ctx rule.Context, node *ast.Node) {
 		return
 	}
 
-	if fix, canFix := operatorAssignmentExpandFix(ctx, node, assignment, longForm.binary, longForm.text); canFix {
-		ctx.ReportNodeWithFixes(node, operatorAssignmentUnexpectedMessage(longForm.text+"="), fix)
+	if fix, canFix := operatorAssignmentExpandFix(ruleContext, node, assignment, longForm.binary, longForm.text); canFix {
+		ruleContext.ReportNodeWithFixes(node, operatorAssignmentUnexpectedMessage(longForm.text+"="), fix)
 		return
 	}
-	ctx.ReportNode(node, operatorAssignmentUnexpectedMessage(longForm.text+"="))
+	ruleContext.ReportNode(node, operatorAssignmentUnexpectedMessage(longForm.text+"="))
 }
 
 // operatorAssignmentIsSameReference asks whether two expressions name the same place.
@@ -399,8 +399,8 @@ func operatorAssignmentIsLiteral(node *ast.Node) bool {
 // Upstream calls `sourceCode.commentsExistBetween` and declines the repair when one does, because
 // both fixers rewrite a span that would swallow it. The shelf's per-file comment scan answers the
 // same question and is cached across every rule that asks.
-func operatorAssignmentCommentsExistBetween(ctx rule.Context, from int, to int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func operatorAssignmentCommentsExistBetween(ruleContext rule.Context, from int, to int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= from && comment.Range.End() <= to {
 			return true
 		}
@@ -417,7 +417,7 @@ func operatorAssignmentCommentsExistBetween(ctx rule.Context, from int, to int) 
 // here, so a type annotation, a non-null assertion or a generic argument inside either slice
 // survives because it is copied as bytes.
 func operatorAssignmentContractFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	assignment *ast.BinaryExpression,
 	operation *ast.Node,
@@ -431,14 +431,14 @@ func operatorAssignmentContractFix(
 		return rule.Fix{}, false
 	}
 
-	text := ctx.SourceFile.Text()
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	equalsRange := rule.TokenRange(ctx.SourceFile, assignment.OperatorToken)
-	operatorRange := rule.TokenRange(ctx.SourceFile, operation.AsBinaryExpression().OperatorToken)
+	text := ruleContext.SourceFile.Text()
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	equalsRange := rule.TokenRange(ruleContext.SourceFile, assignment.OperatorToken)
+	operatorRange := rule.TokenRange(ruleContext.SourceFile, operation.AsBinaryExpression().OperatorToken)
 
 	// A comment anywhere between the `=` and the binary operator would be discarded by the rewrite,
 	// since that whole stretch is replaced by the compound operator.
-	if operatorAssignmentCommentsExistBetween(ctx, equalsRange.End(), operatorRange.Pos()) {
+	if operatorAssignmentCommentsExistBetween(ruleContext, equalsRange.End(), operatorRange.Pos()) {
 		return rule.Fix{}, false
 	}
 
@@ -468,7 +468,7 @@ func operatorAssignmentContractFix(
 // would lex as `++`. Upstream asks a tokenizer whether the two can sit adjacent; the set of pairs
 // that cannot is small and closed, and it was enumerated rather than reasoned about.
 func operatorAssignmentExpandFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	assignment *ast.BinaryExpression,
 	binaryOperator ast.Kind,
@@ -479,12 +479,12 @@ func operatorAssignmentExpandFix(
 		return rule.Fix{}, false
 	}
 
-	text := ctx.SourceFile.Text()
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	operatorRange := rule.TokenRange(ctx.SourceFile, assignment.OperatorToken)
+	text := ruleContext.SourceFile.Text()
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	operatorRange := rule.TokenRange(ruleContext.SourceFile, assignment.OperatorToken)
 
 	// A comment before the operator would be duplicated, since the left text is written twice.
-	if operatorAssignmentCommentsExistBetween(ctx, nodeRange.Pos(), operatorRange.Pos()) {
+	if operatorAssignmentCommentsExistBetween(ruleContext, nodeRange.Pos(), operatorRange.Pos()) {
 		return rule.Fix{}, false
 	}
 
@@ -495,7 +495,7 @@ func operatorAssignmentExpandFix(
 	switch {
 	case operatorAssignmentNeedsParentheses(right, binaryOperator):
 		// The gap between the operator and the operand is preserved, then the operand is wrapped.
-		rightRange := rule.TokenRange(ctx.SourceFile, right)
+		rightRange := rule.TokenRange(ruleContext.SourceFile, right)
 		gap := text[operatorRange.End():rightRange.Pos()]
 		rightText = gap + "(" + text[rightRange.Pos():right.End()] + ")"
 	default:

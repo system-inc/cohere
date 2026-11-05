@@ -67,8 +67,8 @@ var messageBannedWrapperObjectType = rule.Message{
 // cannot implement a primitive.
 var NoWrapperObjectTypes = rule.Rule{
 	Name: "@typescript-eslint/no-wrapper-object-types",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -81,7 +81,7 @@ var NoWrapperObjectTypes = rule.Rule{
 		for name := range wrapperObjectTypes {
 			wrapperNames[name] = true
 		}
-		shadowed := module.DeclaredTypeNames(ctx.SourceFile, wrapperNames)
+		shadowed := module.DeclaredTypeNames(ruleContext.SourceFile, wrapperNames)
 
 		return rule.Listeners{
 			ast.KindTypeReference: func(node *ast.Node) {
@@ -103,11 +103,11 @@ var NoWrapperObjectTypes = rule.Rule{
 				if isImplementsHeritage(node) {
 					// No fix. `class Thing implements number {}` does not compile, so the repair a
 					// reader would expect is not available here.
-					ctx.ReportNode(name, messageBannedWrapperObjectType)
+					ruleContext.ReportNode(name, messageBannedWrapperObjectType)
 					return
 				}
 
-				ctx.ReportNodeWithFixes(name, messageBannedWrapperObjectType, ctx.ReplaceNode(name, primitive))
+				ruleContext.ReportNodeWithFixes(name, messageBannedWrapperObjectType, ruleContext.ReplaceNode(name, primitive))
 			},
 		}
 	},

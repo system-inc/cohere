@@ -136,9 +136,9 @@ func TextToDoc(options formatoptions.Options, parentParser string, docs *arena.S
 			}
 			return doc.StripTrailingHardlineWith(printed, docs), nil
 		}
-		formatted, err := Formatter{Options: options}.Format(fileName, text)
-		if err != nil {
-			return nil, err
+		formatted, formatError := Formatter{Options: options}.Format(fileName, text)
+		if formatError != nil {
+			return nil, formatError
 		}
 		// textToDoc strips the trailing hardline the embedded printer ends with.
 		return doc.Text(strings.TrimSuffix(formatted, "\n")), nil

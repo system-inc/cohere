@@ -86,8 +86,8 @@ func niceness() (int, error) {
 	if value == "" {
 		return testNiceness, nil
 	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil || parsed < 0 || parsed > 19 {
+	parsed, parseError := strconv.Atoi(value)
+	if parseError != nil || parsed < 0 || parsed > 19 {
 		return 0, fmt.Errorf("%s is %q, want a whole number from 0 to 19", nicenessVariable, value)
 	}
 	return parsed, nil
@@ -97,13 +97,13 @@ func niceness() (int, error) {
 func run(verb string, arguments []string) int {
 	arguments, fullPriority := withoutFlag(arguments, fullPriorityFlag)
 	if !fullPriority {
-		level, err := niceness()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		level, nicenessError := niceness()
+		if nicenessError != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", nicenessError)
 			return 2
 		}
-		if err := lowerPriority(level); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: lowering this run's priority: %v\n", err)
+		if lowerPriorityError := lowerPriority(level); lowerPriorityError != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: lowering this run's priority: %v\n", lowerPriorityError)
 			return 1
 		}
 	}
@@ -154,9 +154,9 @@ func run(verb string, arguments []string) int {
 	// A whole-module run from the root covers what the landing gate covers: every module go.work names
 	// outside a submodule (workspace.go).
 	if wholeModule(arguments) {
-		expanded, err := withWorkspaceModules(arguments)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to test: %v\n", err)
+		expanded, withWorkspaceModulesError := withWorkspaceModules(arguments)
+		if withWorkspaceModulesError != nil {
+			fmt.Fprintf(os.Stderr, "cohere-dev: reading the modules to test: %v\n", withWorkspaceModulesError)
 			return 2
 		}
 		arguments = expanded
@@ -244,7 +244,7 @@ func withWorkspaceModules(arguments []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := os.Stat(filepath.Join(root, "go.work")); err != nil {
+	if _, statError := os.Stat(filepath.Join(root, "go.work")); statError != nil {
 		return arguments, nil
 	}
 	covered, err := readGatedWorkspace(root)
@@ -286,20 +286,20 @@ func countsOnce(arguments []string) bool {
 
 // goTest runs go test with the caller's terminal and returns its exit code.
 func goTest(base []string, arguments []string) int {
-	environment, uncovered, err := testEnvironment(base)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	environment, uncovered, testEnvironmentError := testEnvironment(base)
+	if testEnvironmentError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", testEnvironmentError)
 		return 2
 	}
 	command := exec.Command("go", append([]string{"test"}, arguments...)...)
 	command.Env = environment
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
 	defer printUncovered(os.Stderr, uncovered)
-	if err := command.Run(); err != nil {
-		if exited, ok := err.(*exec.ExitError); ok {
+	if runError := command.Run(); runError != nil {
+		if exited, ok := runError.(*exec.ExitError); ok {
 			return exited.ExitCode()
 		}
-		fmt.Fprintf(os.Stderr, "cohere-dev: running go test: %v\n", err)
+		fmt.Fprintf(os.Stderr, "cohere-dev: running go test: %v\n", runError)
 		return 1
 	}
 	return 0
@@ -310,11 +310,11 @@ func runCommand(environment []string, name string, arguments []string) int {
 	command := exec.Command(name, arguments...)
 	command.Env = environment
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
-	if err := command.Run(); err != nil {
-		if exited, ok := err.(*exec.ExitError); ok {
+	if runError := command.Run(); runError != nil {
+		if exited, ok := runError.(*exec.ExitError); ok {
 			return exited.ExitCode()
 		}
-		fmt.Fprintf(os.Stderr, "cohere-dev: running %s: %v\n", name, err)
+		fmt.Fprintf(os.Stderr, "cohere-dev: running %s: %v\n", name, runError)
 		return 1
 	}
 	return 0
@@ -330,8 +330,8 @@ func holderLine(what string) string {
 func holders(directory string, slots int) []string {
 	lines := []string{}
 	for slot := 1; slot <= slots; slot++ {
-		contents, err := os.ReadFile(holderPath(directory, slot))
-		if err == nil && len(contents) > 0 {
+		contents, readError := os.ReadFile(holderPath(directory, slot))
+		if readError == nil && len(contents) > 0 {
 			lines = append(lines, strings.TrimSpace(string(contents)))
 		}
 	}
@@ -376,10 +376,10 @@ func takeSlot(directory string, slots int, what string) (*heldSlot, error) {
 			continue
 		}
 		holder := holderPath(directory, slot)
-		if err := os.WriteFile(holder, []byte(holderLine(what)+"\n"), 0o644); err != nil {
+		if writeError := os.WriteFile(holder, []byte(holderLine(what)+"\n"), 0o644); writeError != nil {
 			unlockFile(lock)
 			lock.Close()
-			return nil, err
+			return nil, writeError
 		}
 		return &heldSlot{number: slot, lock: lock, holder: holder}, nil
 	}

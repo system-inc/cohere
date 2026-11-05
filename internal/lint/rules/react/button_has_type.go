@@ -125,8 +125,8 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 	}
 
 	var wire buttonHasTypeWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.Button != nil {
 		options.Button = *wire.Button
@@ -203,7 +203,7 @@ var ButtonHasType = rule.Rule{
 	Name:             "react/button-has-type",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ButtonHasTypeOptions](options)
 		if !ok {
 			// Nil options reach here when the config layer turns a decoder error into nil for a
@@ -213,17 +213,17 @@ var ButtonHasType = rule.Rule{
 		}
 
 		reportMissing := func(node *ast.Node) {
-			ctx.ReportNode(node, messageButtonMissingType)
+			ruleContext.ReportNode(node, messageButtonMissingType)
 		}
 
 		checkValue := func(node *ast.Node, value string) {
 			permitted, known := settings.allows(value)
 			if !known {
-				ctx.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeInvalidId, value))
+				ruleContext.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeInvalidId, value))
 				return
 			}
 			if !permitted {
-				ctx.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeForbiddenId, value))
+				ruleContext.ReportNode(node, buttonHasTypeValueMessage(buttonHasTypeForbiddenId, value))
 			}
 		}
 
@@ -272,12 +272,12 @@ var ButtonHasType = rule.Rule{
 				// checker proves every value this expression can take is a written-out type the
 				// config permits, nothing is computed in the sense the message means, so there is
 				// nothing to report. See buttonHasTypeProvenPermitted.
-				if buttonHasTypeProvenPermitted(ctx, expression, settings) {
+				if buttonHasTypeProvenPermitted(ruleContext, expression, settings) {
 					return
 				}
 				// The complex report anchors on the EXPRESSION rather than on the element, which is
 				// upstream's `reportComplex(expression)` and is the one place these two nodes differ.
-				ctx.ReportNode(expression, messageButtonComplexType)
+				ruleContext.ReportNode(expression, messageButtonComplexType)
 			}
 		}
 
@@ -300,10 +300,10 @@ var ButtonHasType = rule.Rule{
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !isPragmaCreateElementCall(ctx, node) {
+				if !isPragmaCreateElementCall(ruleContext, node) {
 					return
 				}
 				arguments := node.AsCallExpression().Arguments
@@ -450,14 +450,14 @@ func buttonHasTypePropertyValue(property *ast.Node) *ast.Node {
 // HTML's `submit` default applies), `string`, `any`, an error type and a type parameter all keep
 // reporting. Every literal must be PERMITTED rather than merely known, so a config that switches
 // `reset` off still reports a union that contains it.
-func buttonHasTypeProvenPermitted(ctx rule.Context, expression *ast.Node, settings ButtonHasTypeOptions) bool {
-	if ctx.TypeChecker == nil {
+func buttonHasTypeProvenPermitted(ruleContext rule.Context, expression *ast.Node, settings ButtonHasTypeOptions) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	// A shorthand `{type}` arrives as the property node itself (see buttonHasTypePropertyValue), and
 	// the checker types it as the binding it names, so it needs no unwrapping. Measured: unwrapping to
 	// its name changed no fixture.
-	expressionType := ctx.TypeChecker.GetTypeAtLocation(expression)
+	expressionType := ruleContext.TypeChecker.GetTypeAtLocation(expression)
 	if expressionType == nil {
 		return false
 	}

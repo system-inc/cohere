@@ -75,8 +75,8 @@ var SeveritySpellings = []string{"off", "allow", "warn", "warning", "error", "de
 
 // ParseSeverity is parseSeverity, for the test that holds SeveritySpellings to it.
 func ParseSeverity(name string) error {
-	_, err := parseSeverity(name)
-	return err
+	_, parseSeverityError := parseSeverity(name)
+	return parseSeverityError
 }
 
 type jsonField struct {

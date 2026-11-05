@@ -12,9 +12,9 @@ import (
 func gitIn(test *testing.T, directory string, arguments ...string) string {
 	test.Helper()
 
-	output, err := gitRun(directory, arguments...)
-	if err != nil {
-		test.Fatal(err)
+	output, gitRunError := gitRun(directory, arguments...)
+	if gitRunError != nil {
+		test.Fatal(gitRunError)
 	}
 	return output
 }
@@ -22,9 +22,9 @@ func gitIn(test *testing.T, directory string, arguments ...string) string {
 // gitRun is gitIn for a fixture built outside any one test, which has no *testing.T to fail.
 func gitRun(directory string, arguments ...string) (string, error) {
 	command := exec.Command("git", append([]string{"-C", directory, "-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, arguments...)...)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(arguments, " "), err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(arguments, " "), outputError, output)
 	}
 	return strings.TrimSpace(string(output)), nil
 }
@@ -59,8 +59,8 @@ func TestReleaseProceedsFromACommitContainingTheMinimum(test *testing.T) {
 
 	directory, checkedOut, _ := repositoryWithSideCommit(test)
 
-	if err := requireAncestor(directory, checkedOut, "the reason"); err != nil {
-		test.Fatalf("a checkout containing the minimum was refused: %v", err)
+	if requireAncestorError := requireAncestor(directory, checkedOut, "the reason"); requireAncestorError != nil {
+		test.Fatalf("a checkout containing the minimum was refused: %v", requireAncestorError)
 	}
 }
 
@@ -71,12 +71,12 @@ func TestReleaseRefusesACommitMissingTheMinimum(test *testing.T) {
 
 	directory, _, notContained := repositoryWithSideCommit(test)
 
-	err := requireAncestor(directory, notContained, "the reason it matters")
-	if err == nil {
+	requireAncestorError := requireAncestor(directory, notContained, "the reason it matters")
+	if requireAncestorError == nil {
 		test.Fatal("a checkout missing the minimum was allowed to release")
 	}
-	if !strings.Contains(err.Error(), "the reason it matters") {
-		test.Fatalf("the refusal does not carry the reason: %v", err)
+	if !strings.Contains(requireAncestorError.Error(), "the reason it matters") {
+		test.Fatalf("the refusal does not carry the reason: %v", requireAncestorError)
 	}
 }
 
@@ -87,12 +87,12 @@ func TestReleaseRefusesWhenGitCannotTell(test *testing.T) {
 
 	directory, _, _ := repositoryWithSideCommit(test)
 
-	err := requireAncestor(directory, strings.Repeat("0", 40), "the reason")
-	if err == nil {
+	requireAncestorError := requireAncestor(directory, strings.Repeat("0", 40), "the reason")
+	if requireAncestorError == nil {
 		test.Fatal("a minimum git could not find was treated as present")
 	}
-	if !strings.Contains(err.Error(), "could not tell") {
-		test.Fatalf("an undecidable check was reported as a plain refusal: %v", err)
+	if !strings.Contains(requireAncestorError.Error(), "could not tell") {
+		test.Fatalf("an undecidable check was reported as a plain refusal: %v", requireAncestorError)
 	}
 }
 
@@ -105,16 +105,16 @@ func TestBuildRefusesBeforeTheMinimum(test *testing.T) {
 
 	fixture := moduleWithCompiler(test)
 
-	_, err := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: test.TempDir()})
-	if err == nil {
+	_, buildError := Build(Options{Version: "1.0.0", ModuleDirectory: fixture.Module, OutputDirectory: test.TempDir()})
+	if buildError == nil {
 		test.Fatal("Build released from a repository that never contained the minimum commit")
 	}
 	// Refused for the minimum, by name. Any earlier refusal also returns an error, and passed this test
 	// unnoticed when the copyright check first stopped the fixture on a missing license.
-	if !strings.Contains(err.Error(), ShortCommit(MinimumReleaseCommit)) {
-		test.Fatalf("Build refused, but not for the minimum commit: %v", err)
+	if !strings.Contains(buildError.Error(), ShortCommit(MinimumReleaseCommit)) {
+		test.Fatalf("Build refused, but not for the minimum commit: %v", buildError)
 	}
-	if !strings.Contains(err.Error(), ShortCommit(MinimumReleaseCommit)) {
-		test.Fatalf("Build failed, but not on the minimum commit: %v", err)
+	if !strings.Contains(buildError.Error(), ShortCommit(MinimumReleaseCommit)) {
+		test.Fatalf("Build failed, but not on the minimum commit: %v", buildError)
 	}
 }

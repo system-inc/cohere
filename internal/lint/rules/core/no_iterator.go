@@ -57,12 +57,12 @@ var messageUseSymbolIterator = rule.Message{
 // without either case needing its own arm.
 var NoIterator = rule.Rule{
 	Name: "no-iterator",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// Both access kinds, because `staticPropertyName` answers for both and a rule watching
 			// only the dotted form is silent on `test['__iterator__']`, which upstream reports.
-			ast.KindPropertyAccessExpression: reportIfIteratorAccess(ctx),
-			ast.KindElementAccessExpression:  reportIfIteratorAccess(ctx),
+			ast.KindPropertyAccessExpression: reportIfIteratorAccess(ruleContext),
+			ast.KindElementAccessExpression:  reportIfIteratorAccess(ruleContext),
 		}
 	},
 }
@@ -77,7 +77,7 @@ var NoIterator = rule.Rule{
 //
 // It is broader than this rule needs in one way, accepting a numeric-literal subscript, which is
 // harmless: no number spells `__iterator__`.
-func reportIfIteratorAccess(ctx rule.Context) func(*ast.Node) {
+func reportIfIteratorAccess(ruleContext rule.Context) func(*ast.Node) {
 	return func(node *ast.Node) {
 		// The second return is not read, and that is measured rather than sloppy: it is false only
 		// when the name is "", which the comparison below already rejects. A mutation dropping the
@@ -91,7 +91,7 @@ func reportIfIteratorAccess(ctx rule.Context) func(*ast.Node) {
 		if object == nil {
 			return
 		}
-		ctx.ReportNodeWithSuggestions(node, messageNoIterator, rule.Suggestion{
+		ruleContext.ReportNodeWithSuggestions(node, messageNoIterator, rule.Suggestion{
 			Message: messageUseSymbolIterator,
 			Fixes: []rule.Fix{
 				// The span runs from the end of the object to the end of the access, which removes

@@ -70,8 +70,8 @@ func DecodeNoUnderscoreDangleOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, fmt.Errorf("no-underscore-dangle: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("no-underscore-dangle: %w", unmarshalOptionsError)
 	}
 	return options, nil
 }
@@ -150,11 +150,11 @@ var messageNoUnderscoreDangle = rule.Message{
 // every reference, which a span-local repair cannot do.
 var NoUnderscoreDangle = rule.Rule{
 	Name: "no-underscore-dangle",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[NoUnderscoreDangleOptions](options)
 
 		reportNamed := func(node *ast.Node, identifier string) {
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id: messageNoUnderscoreDangle.Id,
 				Description: fmt.Sprintf("Unexpected dangling '_' in '%s'. %s",
 					identifier, messageNoUnderscoreDangle.Description),

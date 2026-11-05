@@ -125,7 +125,7 @@ var NoWillUpdateSetState = rule.Rule{
 	// No namespace prefix. The config writes `react/no-will-update-set-state` and the parity guard
 	// strips the namespace on a `/` boundary.
 	Name: "react/no-will-update-set-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// An unconfigured rule gets the zero value, which is upstream's permissive default. The
 		// comma-ok form matters: the plain harness and a bare severity in the config both hand this
 		// a nil, and an unchecked assertion would panic on every real file.
@@ -155,7 +155,7 @@ var NoWillUpdateSetState = rule.Rule{
 				// The callee, not the call. Upstream underlines thirteen characters for
 				// `this.setState({...})`, stopping before the parenthesis, on all twelve of its
 				// snapshot diagnostics.
-				ctx.ReportNode(callee, messageNoSetStateInComponentWillUpdate)
+				ruleContext.ReportNode(callee, messageNoSetStateInComponentWillUpdate)
 			},
 		}
 	},

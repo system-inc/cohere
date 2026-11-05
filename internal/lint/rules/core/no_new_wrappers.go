@@ -84,7 +84,7 @@ var NoNewWrappers = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				// No nil guard on the callee, and that is measured rather than assumed.
@@ -115,11 +115,11 @@ var NoNewWrappers = rule.Rule{
 				if !wrapperObjects[name] {
 					return
 				}
-				if !resolvesToAGlobal(ctx, callee) {
+				if !resolvesToAGlobal(ruleContext, callee) {
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "noNewWrappers",
 					Description: fmt.Sprintf(
 						"This calls `new %s()`. Constructed, %s returns an object rather than a "+

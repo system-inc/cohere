@@ -27,8 +27,8 @@ func writeMismatchFixture(test *testing.T, files map[string]string) string {
 
 	directory := test.TempDir()
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", name, err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
 	return directory
@@ -52,9 +52,9 @@ func TestProjectFilesGuardFiresOnMismatch(test *testing.T) {
 		"Beta.ts":       "export const beta = 2;\n",
 	})
 
-	graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	named := graph.Config.FileNames()

@@ -119,14 +119,14 @@ type NoExplicitAnyOptions struct {
 // does not discover the mismatch by grepping the snapshot and quietly "fix" it.
 var NoExplicitAny = rule.Rule{
 	Name: "@typescript-eslint/no-explicit-any",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		// Declining the file rather than the node, matching upstream's `should_run`. It is also the
 		// cheapest possible decline in a tree where one walk serves every rule.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
+		if !isTypeScriptSourceFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -139,12 +139,12 @@ var NoExplicitAny = rule.Rule{
 				}
 
 				if parsed.FixToUnknown {
-					ctx.ReportNodeWithFixes(node, messageNoExplicitAny,
-						rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), "unknown"))
+					ruleContext.ReportNodeWithFixes(node, messageNoExplicitAny,
+						rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "unknown"))
 					return
 				}
 
-				ctx.ReportNode(node, messageNoExplicitAny)
+				ruleContext.ReportNode(node, messageNoExplicitAny)
 			},
 		}
 	},

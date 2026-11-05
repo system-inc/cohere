@@ -91,9 +91,9 @@ func TestStyleForAFileIsPlain(test *testing.T) {
 	// Set first so the test restores whatever the environment held, then unset.
 	test.Setenv("NO_COLOR", "")
 	os.Unsetenv("NO_COLOR")
-	file, err := os.CreateTemp(test.TempDir(), "output")
-	if err != nil {
-		test.Fatal(err)
+	file, temporaryFileError := os.CreateTemp(test.TempDir(), "output")
+	if temporaryFileError != nil {
+		test.Fatal(temporaryFileError)
 	}
 	defer file.Close()
 	if style := styleFor(file); style.color {

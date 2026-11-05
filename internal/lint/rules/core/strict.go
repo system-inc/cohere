@@ -52,7 +52,7 @@ func DecodeStrictOptions(raw []byte) (any, error) {
 		return StrictSafe, nil
 	}
 	var mode StrictMode
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return StrictSafe, fmt.Errorf(
 			"strict: the option is a bare string, one of \"never\", \"global\", \"function\" or "+
 				"\"safe\", got %s", raw)
@@ -206,14 +206,14 @@ var Strict = rule.Rule{
 	// `alwaysStrict` decides whether a TypeScript script is strict, so the cached verdict has to
 	// follow the tsconfig.
 	ProgramReads: rule.ReadsCompilerOptions,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		mode := StrictSafe
 		if decoded, configured := rule.OptionsAs[StrictMode](options); configured {
 			mode = decoded
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
-				checkStrict(ctx, file, mode)
+				checkStrict(ruleContext, file, mode)
 			},
 		}
 	},
@@ -230,10 +230,10 @@ type strictWalker struct {
 }
 
 // checkStrict resolves the mode for this file and walks it.
-func checkStrict(ctx rule.Context, file *ast.Node, mode StrictMode) {
+func checkStrict(ruleContext rule.Context, file *ast.Node, mode StrictMode) {
 	source := file.AsSourceFile()
 
-	if type_checking.CompilerImpliesStrict(ctx, source) {
+	if type_checking.CompilerImpliesStrict(ruleContext, source) {
 		mode = strictModeImplied
 	} else if mode == StrictSafe {
 		// Upstream picks Global when the file is CommonJS or the parser allows a top-level
@@ -261,18 +261,18 @@ func checkStrict(ctx rule.Context, file *ast.Node, mode StrictMode) {
 		mode = strictModeModule
 	}
 
-	walker := strictWalker{ctx: ctx, mode: mode}
+	walker := strictWalker{ctx: ruleContext, mode: mode}
 	statements := source.Statements.Nodes
-	directives := strictDirectivesIn(ctx, statements)
+	directives := strictDirectivesIn(ruleContext, statements)
 
 	if mode == StrictGlobal {
 		// The global form wants exactly one directive at the top. A file with statements and no
 		// directive is reported once, on the span covering every statement, which is upstream's
 		// `loc` spanning the first through the last.
 		if len(statements) > 0 && len(directives) == 0 {
-			span := rule.TokenRange(ctx.SourceFile, statements[0])
+			span := rule.TokenRange(ruleContext.SourceFile, statements[0])
 			last := statements[len(statements)-1]
-			ctx.ReportRange(core.NewTextRange(span.Pos(), last.End()), messageStrictGlobal)
+			ruleContext.ReportRange(core.NewTextRange(span.Pos(), last.End()), messageStrictGlobal)
 		}
 		walker.reportAllExceptFirst(directives, messageStrictMultiple, true)
 	} else {
@@ -501,8 +501,8 @@ func (w strictWalker) reportSlice(
 // The span is the statement's own token range, so nothing outside it can be caught in the deletion.
 // That is the whole reason this fixer is safe on TypeScript: a parameter annotation, a return type
 // and a generic list all live in the function's signature, which is a different node entirely.
-func strictRemoveDirective(ctx rule.Context, directive *ast.Node) rule.Fix {
-	return rule.RemoveRange(rule.TokenRange(ctx.SourceFile, directive))
+func strictRemoveDirective(ruleContext rule.Context, directive *ast.Node) rule.Fix {
+	return rule.RemoveRange(rule.TokenRange(ruleContext.SourceFile, directive))
 }
 
 // strictDirectivesIn returns the `use strict` directives at the head of a statement list.
@@ -514,7 +514,7 @@ func strictRemoveDirective(ctx rule.Context, directive *ast.Node) rule.Fix {
 //
 // Only `use strict` counts. Another directive such as `use asm` occupies a prologue slot and is not
 // this rule's business, and upstream's value comparison skips it the same way.
-func strictDirectivesIn(ctx rule.Context, statements []*ast.Node) []*ast.Node {
+func strictDirectivesIn(ruleContext rule.Context, statements []*ast.Node) []*ast.Node {
 	var directives []*ast.Node
 	for _, statement := range statements {
 		if statement.Kind != ast.KindExpressionStatement {
@@ -585,7 +585,7 @@ func strictFunctionBody(node *ast.Node) *ast.Node {
 // Upstream uses `getFunctionNameWithKind`, which renders `function 'foo'` or `arrow function`. The
 // same shape is produced here from the node's own name, and an anonymous function is described by
 // its kind alone.
-func strictDescribeFunction(ctx rule.Context, node *ast.Node) string {
+func strictDescribeFunction(ruleContext rule.Context, node *ast.Node) string {
 	kind := "function"
 	if node.Kind == ast.KindArrowFunction {
 		kind = "arrow function"

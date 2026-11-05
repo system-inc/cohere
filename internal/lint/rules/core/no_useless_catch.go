@@ -59,8 +59,8 @@ var messageUnnecessaryCatchClause = rule.Message{
 // the clause to become.
 var NoUselessCatch = rule.Rule{
 	Name: "no-useless-catch",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -120,10 +120,10 @@ var NoUselessCatch = rule.Rule{
 				}
 
 				if tryData.FinallyBlock != nil {
-					ctx.ReportNode(node, messageUnnecessaryCatchClause)
+					ruleContext.ReportNode(node, messageUnnecessaryCatchClause)
 					return
 				}
-				ctx.ReportNode(tryStatement, messageUnnecessaryCatch)
+				ruleContext.ReportNode(tryStatement, messageUnnecessaryCatch)
 			},
 		}
 	},

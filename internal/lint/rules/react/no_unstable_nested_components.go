@@ -66,8 +66,8 @@ func DecodeNoUnstableNestedComponentsOptions(raw []byte) (any, error) {
 	// Decoded into a fresh value so an absent key is distinguishable from an explicit empty string,
 	// then folded onto the defaults the way upstream's `||` folds a falsy value.
 	var wire NoUnstableNestedComponentsOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.AllowAsProps = wire.AllowAsProps
 	options.CustomValidators = wire.CustomValidators
@@ -142,7 +142,7 @@ var NoUnstableNestedComponents = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoUnstableNestedComponentsOptions](options)
 		if !ok {
 			// A rule configured as a bare `"error"` is handed nil options, which is not this type.
@@ -161,14 +161,14 @@ var NoUnstableNestedComponents = rule.Rule{
 				// per node also means an ancestor's component-hood is known when a descendant is
 				// judged, which a pre-order walk cannot otherwise guarantee for the shapes where
 				// the ancestor is a wrapping call.
-				detected := collectDetectedComponents(ctx, sourceFile)
+				detected := collectDetectedComponents(ruleContext, sourceFile)
 				isComponent := make(map[*ast.Node]bool, len(detected))
 				for _, component := range detected {
 					isComponent[component.node] = true
 				}
 
 				state := &unstableNestedState{
-					ctx:             ctx,
+					ctx:             ruleContext,
 					isComponent:     isComponent,
 					allowAsProps:    settings.AllowAsProps,
 					propNameMatches: propNameMatches,
@@ -891,8 +891,8 @@ func buildPropNamePattern(pattern string) func(string) bool {
 	}
 	builder.WriteString("$")
 
-	compiled, err := regexp.Compile(builder.String())
-	if err != nil {
+	compiled, compileError := regexp.Compile(builder.String())
+	if compileError != nil {
 		// Unreachable for any pattern this builder produces: every literal is escaped and the two
 		// metacharacters expand to valid fragments. Declining rather than panicking, because a rule
 		// that takes the run down over a configuration string is worse than one that stops matching

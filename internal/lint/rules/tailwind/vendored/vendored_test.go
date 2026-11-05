@@ -13,21 +13,21 @@ func TestTheSnapshotIsWholeAndTheVersionItSays(test *testing.T) {
 	test.Parallel()
 	root := TailwindPackageRoot()
 	for _, name := range []string{"index.css", "theme.css", "preflight.css", "utilities.css", "LICENSE", "package.json"} {
-		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
-			test.Errorf("the snapshot is missing %s: %v", name, err)
+		if _, statError := os.Stat(filepath.Join(root, name)); statError != nil {
+			test.Errorf("the snapshot is missing %s: %v", name, statError)
 		}
 	}
-	contents, err := os.ReadFile(filepath.Join(root, "package.json"))
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(filepath.Join(root, "package.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var manifest struct {
 		Name    string `json:"name"`
 		Version string `json:"version"`
 		License string `json:"license"`
 	}
-	if err := json.Unmarshal(contents, &manifest); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(contents, &manifest); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if manifest.Name != "tailwindcss" || manifest.Version != TailwindVersion || manifest.License != "MIT" {
 		test.Errorf("the snapshot is %s@%s (%s), want tailwindcss@%s (MIT)", manifest.Name, manifest.Version,
@@ -41,23 +41,23 @@ func TestTheSnapshotIsWholeAndTheVersionItSays(test *testing.T) {
 func TestTheSourceDirectoryIsFoundUnderEitherBuild(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.27\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.27\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	working := filepath.Join(root, "internal", "lint", "rules", "tailwind")
-	if err := os.MkdirAll(working, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(working, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	want := filepath.Join(root, "internal", "lint", "rules", "tailwind", "vendored")
 	for _, file := range []string{filepath.Join(want, "vendored.go"), modulePath + "/internal/lint/rules/tailwind/vendored/vendored.go"} {
-		if got, err := sourceDirectory(file, working); err != nil || got != want {
-			test.Errorf("%s gave %q (%v), want %q", file, got, err, want)
+		if got, sourceDirectoryError := sourceDirectory(file, working); sourceDirectoryError != nil || got != want {
+			test.Errorf("%s gave %q (%v), want %q", file, got, sourceDirectoryError, want)
 		}
 	}
-	if _, err := sourceDirectory("example.com/other/vendored.go", working); err == nil {
+	if _, sourceDirectoryError := sourceDirectory("example.com/other/vendored.go", working); sourceDirectoryError == nil {
 		test.Error("a file outside cohere's module was resolved")
 	}
-	if _, err := sourceDirectory(modulePath+"/internal/x.go", test.TempDir()); err == nil {
+	if _, sourceDirectoryError := sourceDirectory(modulePath+"/internal/x.go", test.TempDir()); sourceDirectoryError == nil {
 		test.Error("a module path was resolved with no go.mod above the working directory")
 	}
 }

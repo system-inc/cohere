@@ -64,8 +64,8 @@ func DecodeNoBitwiseOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	for _, spelling := range options.Allow {
 		if !slices.Contains(noBitwiseAllowedSpellings(), spelling) {
@@ -189,7 +189,7 @@ var messageNoBitwise = rule.Message{
 // rule is asking, and a tool that answered it would be guessing at intent.
 var NoBitwise = rule.Rule{
 	Name: "no-bitwise",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the assertion yields the zero value.
 		// Correct here only because both options default to off.
 		settings, _ := rule.OptionsAs[NoBitwiseOptions](options)
@@ -205,7 +205,7 @@ var NoBitwise = rule.Rule{
 			if noBitwiseIsInt32Hint(node, operator, settings) {
 				return
 			}
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id:          messageNoBitwise.Id,
 				Description: fmt.Sprintf("Unexpected use of '%s'. %s", spelling, messageNoBitwise.Description),
 			})

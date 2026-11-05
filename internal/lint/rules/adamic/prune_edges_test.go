@@ -17,12 +17,12 @@ import (
 var offeredSites = rule.Rule{
 	Name:             "adamic/offered-sites",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		return flow.WalkerFor(ctx).Listeners(func(site flow.Site) {
-			ctx.ReportNode(site.Node, rule.Message{Id: "offered", Description: ctx.TypeChecker.TypeToString(site.Target)})
+		return flow.WalkerFor(ruleContext).Listeners(func(site flow.Site) {
+			ruleContext.ReportNode(site.Node, rule.Message{Id: "offered", Description: ruleContext.TypeChecker.TypeToString(site.Target)})
 		})
 	},
 }
@@ -44,12 +44,12 @@ func typeErrorCount(test *testing.T, source string) int {
 	test.Helper()
 	directory := test.TempDir()
 	writeAdamicSupport(test)(directory)
-	if err := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	return len(graph.Program.GetSemanticDiagnostics(context.Background(), nil))
 }

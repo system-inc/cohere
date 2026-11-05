@@ -52,8 +52,8 @@ var messageNoExtraNonNullAssertion = rule.Message{
 // clean fixture for `foo?.bar!.baz` is what pins this, and it is the fixture most worth keeping.
 var NoExtraNonNullAssertion = rule.Rule{
 	Name: "@typescript-eslint/no-extra-non-null-assertion",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -74,7 +74,7 @@ var NoExtraNonNullAssertion = rule.Rule{
 
 				// foo!! — an assertion whose parent is another assertion.
 				if parent.Kind == ast.KindNonNullExpression {
-					reportRedundantAssertion(ctx, node)
+					reportRedundantAssertion(ruleContext, node)
 					return
 				}
 
@@ -85,7 +85,7 @@ var NoExtraNonNullAssertion = rule.Rule{
 					ast.KindElementAccessExpression,
 					ast.KindCallExpression:
 					if ast.IsOptionalChainRoot(parent) && parent.Expression() == outermost {
-						reportRedundantAssertion(ctx, node)
+						reportRedundantAssertion(ruleContext, node)
 					}
 				}
 			},
@@ -99,8 +99,8 @@ var NoExtraNonNullAssertion = rule.Rule{
 // distinction is earned rather than inherited: removing a redundant assertion cannot change what
 // the expression means, because the assertion it duplicates is still there. That is the definition
 // the fix/suggestion split uses.
-func reportRedundantAssertion(ctx rule.Context, node *ast.Node) {
-	ctx.ReportNodeWithFixes(node, messageNoExtraNonNullAssertion,
+func reportRedundantAssertion(ruleContext rule.Context, node *ast.Node) {
+	ruleContext.ReportNodeWithFixes(node, messageNoExtraNonNullAssertion,
 		rule.RemoveRange(nonNullAssertionOperatorRange(node)))
 }
 

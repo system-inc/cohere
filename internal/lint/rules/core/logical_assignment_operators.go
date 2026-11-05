@@ -148,9 +148,9 @@ func DefaultLogicalAssignmentOperatorsSettings() LogicalAssignmentOperatorsOptio
 // enforce a mode nobody asked for and say nothing about it. So is a key the second element's schema
 // does not declare, and a third element.
 func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
-	positional, err := rule.OptionElements(list, 2)
-	if err != nil {
-		return DefaultLogicalAssignmentOperatorsSettings(), err
+	positional, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil {
+		return DefaultLogicalAssignmentOperatorsSettings(), optionElementsError
 	}
 
 	settings := DefaultLogicalAssignmentOperatorsSettings()
@@ -159,8 +159,8 @@ func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
 	}
 
 	var mode string
-	if err := json.Unmarshal(positional[0], &mode); err != nil {
-		return DefaultLogicalAssignmentOperatorsSettings(), err
+	if decodeError := json.Unmarshal(positional[0], &mode); decodeError != nil {
+		return DefaultLogicalAssignmentOperatorsSettings(), decodeError
 	}
 	setting := LogicalAssignmentSetting(mode)
 	switch setting {
@@ -186,9 +186,9 @@ func DecodeLogicalAssignmentOperatorsOptions(list []byte) (any, error) {
 		EnforceForIfStatements *bool `json:"enforceForIfStatements"`
 		ReactCompiler          *bool `json:"reactCompiler"`
 	}
-	if err := rule.UnmarshalOptions(positional[1], &extra); err != nil {
+	if unmarshalOptionsError := rule.UnmarshalOptions(positional[1], &extra); unmarshalOptionsError != nil {
 		return DefaultLogicalAssignmentOperatorsSettings(),
-			fmt.Errorf("logical-assignment-operators element 2: %w", err)
+			fmt.Errorf("logical-assignment-operators element 2: %w", unmarshalOptionsError)
 	}
 	if extra.EnforceForIfStatements != nil {
 		settings.EnforceForIfStatements = *extra.EnforceForIfStatements
@@ -302,15 +302,15 @@ var LogicalAssignmentOperators = rule.Rule{
 	// and is why the untyped fixtures agree on everything else.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[LogicalAssignmentOperatorsOptions](options)
 		if settings.Require == nil {
 			settings = DefaultLogicalAssignmentOperatorsSettings()
 		}
 
 		state := &logicalAssignmentState{
-			ctx:      ctx,
-			isStrict: logicalAssignmentIsStrict(ctx.SourceFile),
+			ctx:      ruleContext,
+			isStrict: logicalAssignmentIsStrict(ruleContext.SourceFile),
 			// Only under `always`: `never` reports the shorthand and expands it, which is the
 			// rewrite the compiler wants rather than the one it refuses.
 			skipCompiledFunctions: *settings.Require == LogicalAssignmentAlways && settings.ReactCompiler,
@@ -776,8 +776,8 @@ func logicalAssignmentContainsOptionalChain(node *ast.Node) bool {
 // Every one of the four fixers declines when one does, because each rewrites a stretch of source
 // that would swallow the comment. Upstream calls `sourceCode.getCommentsInside`; the shelf's
 // per-file scan answers the same question and is cached across every rule that asks.
-func logicalAssignmentCommentsInside(ctx rule.Context, from int, to int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func logicalAssignmentCommentsInside(ruleContext rule.Context, from int, to int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= from && comment.Range.End() <= to {
 			return true
 		}

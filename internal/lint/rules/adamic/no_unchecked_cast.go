@@ -51,11 +51,11 @@ var NoUncheckedCast = rule.Rule{
 	Name:             "adamic/no-unchecked-cast",
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		typeChecker := ctx.TypeChecker
+		typeChecker := ruleContext.TypeChecker
 		judge := func(node *ast.Node) {
 			typeNode := node.Type()
 			if typeNode == nil || ast.IsConstTypeReference(typeNode) {
@@ -74,13 +74,13 @@ var NoUncheckedCast = rule.Rule{
 					return
 				}
 				if checkedDowncast(typeChecker, source, target) {
-					ctx.Note(CheckedDowncastNote)
+					ruleContext.Note(CheckedDowncastNote)
 					return
 				}
 			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 || type_checking.IsTypeUnknownArrayType(target, typeChecker) {
 				return
 			}
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id: "uncheckedCast",
 				Description: noUncheckedCastText.Render(map[string]string{
 					"source": typeChecker.TypeToString(source),

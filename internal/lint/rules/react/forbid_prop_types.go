@@ -45,8 +45,8 @@ func DecodeForbidPropTypesOptions(raw []byte) (any, error) {
 	}
 	// Lenient on purpose: eslint-plugin-react 7.37.5's schema sets `additionalProperties: true` on
 	// this object, so ESLint loads an extra key and so must this.
-	if err := json.Unmarshal(raw, &options); err != nil {
-		return options, err
+	if decodeError := json.Unmarshal(raw, &options); decodeError != nil {
+		return options, decodeError
 	}
 	return options, nil
 }
@@ -191,7 +191,7 @@ var ForbidPropTypes = rule.Rule{
 	// and `resolveToObjectLiteral` guards for it. The fixture below pins that the typed harness is
 	// required, so a later revert fails loudly instead of silently losing one shape.
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ForbidPropTypesOptions](options)
 		if !ok {
 			// A rule configured as bare `"error"` arrives with nil options, which type-asserts to
@@ -202,7 +202,7 @@ var ForbidPropTypes = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				walker := &forbidPropTypesWalker{ctx: ctx, settings: settings}
+				walker := &forbidPropTypesWalker{ctx: ruleContext, settings: settings}
 				walker.collectImports(node)
 				walker.walk(node)
 			},

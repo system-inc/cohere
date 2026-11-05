@@ -20,8 +20,8 @@ func TestASwiftWarningIsAWarning(test *testing.T) {
 	for _, severity := range []string{"warning", "error"} {
 		record := &engineFindingRecord{Source: "compiler", File: "Sources/A.swift", Line: 3, Column: 7,
 			Severity: severity, Rule: "VariableNeverMutated", Message: "never mutated"}
-		if err := run.acceptFinding(record); err != nil {
-			test.Fatal(err)
+		if acceptFindingError := run.acceptFinding(record); acceptFindingError != nil {
+			test.Fatal(acceptFindingError)
 		}
 	}
 	want := "Sources/A.swift:3:7 warn #VariableNeverMutated never mutated\n" +

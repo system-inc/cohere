@@ -70,7 +70,7 @@ import (
 var NoRestrictedTypes = rule.Rule{
 	Name: "@typescript-eslint/no-restricted-types",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoRestrictedTypesOptions](options)
 		if !ok || len(settings.Types) == 0 {
 			// Configured nothing, so there is nothing to enforce. Upstream defaults `types` to an
@@ -90,7 +90,7 @@ var NoRestrictedTypes = rule.Rule{
 				Description: "Don't use `" + name + "` as a type." + banned.customMessage(),
 			}
 
-			nodeRange := rule.TokenRange(ctx.SourceFile, node)
+			nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 
 			// A fix and suggestions are NOT exclusive, and the first version of this rule returned
 			// after the fix and dropped them. Measured on the installed 8.67.0 build:
@@ -120,26 +120,26 @@ var NoRestrictedTypes = rule.Rule{
 
 			switch {
 			case len(fixes) > 0 && len(suggestions) > 0:
-				ctx.Report(rule.Diagnostic{
+				ruleContext.Report(rule.Diagnostic{
 					Range:       nodeRange,
 					Message:     message,
-					SourceFile:  ctx.SourceFile,
+					SourceFile:  ruleContext.SourceFile,
 					Fixes:       fixes,
 					Suggestions: suggestions,
 				})
 			case len(fixes) > 0:
-				ctx.ReportNodeWithFixes(node, message, fixes...)
+				ruleContext.ReportNodeWithFixes(node, message, fixes...)
 			case len(suggestions) > 0:
-				ctx.ReportNodeWithSuggestions(node, message, suggestions...)
+				ruleContext.ReportNodeWithSuggestions(node, message, suggestions...)
 			default:
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 			}
 		}
 
 		// checkBannedNode is the same thing with the name read off the source text, which is what
 		// upstream's default parameter does.
 		checkBannedNode := func(node *ast.Node) {
-			checkBannedType(node, noRestrictedTypesNameOf(ctx, node))
+			checkBannedType(node, noRestrictedTypesNameOf(ruleContext, node))
 		}
 
 		listeners := rule.Listeners{}
@@ -221,9 +221,9 @@ var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
 // Upstream's `removeSpaces` uses the regular expression `\s`, which is Unicode-aware in JavaScript,
 // so `text.IsWhitespace`, JavaScript's set, is the matching predicate rather than a test against the
 // five ASCII ones or Go's `unicode.IsSpace`.
-func noRestrictedTypesNameOf(ctx rule.Context, node *ast.Node) string {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	return noRestrictedTypesRemoveSpaces(ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()])
+func noRestrictedTypesNameOf(ruleContext rule.Context, node *ast.Node) string {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	return noRestrictedTypesRemoveSpaces(ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()])
 }
 
 // noRestrictedTypesRemoveSpaces is upstream's `removeSpaces`, applied to both the configured key and
@@ -316,14 +316,14 @@ func DecodeNoRestrictedTypesOptions(raw []byte) (any, error) {
 	}
 
 	var wire noRestrictedTypesRawOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return nil, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return nil, unmarshalOptionsError
 	}
 
 	for spelling, entry := range wire.Types {
-		ban, include, err := decodeNoRestrictedTypesBan(entry)
-		if err != nil {
-			return nil, fmt.Errorf("types[%q]: %w", spelling, err)
+		ban, include, decodeNoRestrictedTypesBanError := decodeNoRestrictedTypesBan(entry)
+		if decodeNoRestrictedTypesBanError != nil {
+			return nil, fmt.Errorf("types[%q]: %w", spelling, decodeNoRestrictedTypesBanError)
 		}
 		if !include {
 			continue
@@ -354,13 +354,13 @@ func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bo
 	}
 
 	var asBoolean bool
-	if err := json.Unmarshal(entry, &asBoolean); err == nil {
+	if decodeError := json.Unmarshal(entry, &asBoolean); decodeError == nil {
 		// `true` bans with the standard message; `false` explicitly does not ban.
 		return NoRestrictedTypesBan{Allowed: !asBoolean}, true, nil
 	}
 
 	var asString string
-	if err := json.Unmarshal(entry, &asString); err == nil {
+	if decodeError := json.Unmarshal(entry, &asString); decodeError == nil {
 		return NoRestrictedTypesBan{Message: asString}, true, nil
 	}
 
@@ -370,8 +370,8 @@ func decodeNoRestrictedTypesBan(entry json.RawMessage) (NoRestrictedTypesBan, bo
 		Suggest []string `json:"suggest"`
 	}
 	if strings.HasPrefix(trimmed, "{") {
-		if err := rule.UnmarshalOptions(entry, &asObject); err != nil {
-			return NoRestrictedTypesBan{}, false, err
+		if unmarshalOptionsError := rule.UnmarshalOptions(entry, &asObject); unmarshalOptionsError != nil {
+			return NoRestrictedTypesBan{}, false, unmarshalOptionsError
 		}
 		return NoRestrictedTypesBan{
 			Message: asObject.Message,

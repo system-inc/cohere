@@ -53,9 +53,9 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 	}
 
 	directory := writeProject(test, files)
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	if graph.Workers() < 2 {
@@ -74,8 +74,8 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 		// assertion — which is the guard working, and is why that assertion is worth keeping.
 		NeedsTypeChecker: true,
 
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if ctx.TypeChecker == nil {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if ruleContext.TypeChecker == nil {
 				test.Error("a rule was dispatched without a checker")
 				return nil
 			}
@@ -83,7 +83,7 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 				// Every identifier, deliberately. A rule would not query this indiscriminately, and
 				// that is the point: it maximizes the chance of two workers reaching one checker.
 				ast.KindIdentifier: func(node *ast.Node) {
-					if ctx.TypeChecker.GetTypeAtLocation(node) != nil {
+					if ruleContext.TypeChecker.GetTypeAtLocation(node) != nil {
 						queries.Add(1)
 					}
 				},
@@ -96,8 +96,8 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 		test.Fatalf("expected the project to hold many files, got %d", len(projectFiles))
 	}
 
-	if _, err := graph.Walk(context.Background(), projectFiles, []rule.Rule{probe}); err != nil {
-		test.Fatalf("walking with a type-querying rule: %v", err)
+	if _, walkError := graph.Walk(context.Background(), projectFiles, []rule.Rule{probe}); walkError != nil {
+		test.Fatalf("walking with a type-querying rule: %v", walkError)
 	}
 
 	if queries.Load() == 0 {

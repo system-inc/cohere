@@ -2158,9 +2158,9 @@ func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(test *tes
 	test.Parallel()
 
 	decode := func(raw string) PreferNullishCoalescingOptions {
-		decoded, err := DecodePreferNullishCoalescingOptions(json.RawMessage(raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(raw))
+		if decodePreferNullishCoalescingOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodePreferNullishCoalescingOptionsError)
 		}
 		options, isType := decoded.(PreferNullishCoalescingOptions)
 		if !isType {

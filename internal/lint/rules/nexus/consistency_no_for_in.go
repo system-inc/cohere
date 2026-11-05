@@ -56,12 +56,12 @@ func consistencyNoForInMessage() rule.Message {
 var ConsistencyNoForIn = rule.Rule{
 	Name: "nexus/consistency-no-for-in",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// Keyed on the `for...in` kind alone. `for...of` shares `ForInOrOfStatement` in this
 			// parser, and a listener on the shared shape would report every `for...of` in the tree.
 			ast.KindForInStatement: func(node *ast.Node) {
-				ctx.ReportNode(node, consistencyNoForInMessage())
+				ruleContext.ReportNode(node, consistencyNoForInMessage())
 			},
 		}
 	},

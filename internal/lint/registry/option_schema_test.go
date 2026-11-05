@@ -26,14 +26,14 @@ func TestTheConfigLayerRefusesWhatUpstreamsSchemaRefuses(test *testing.T) {
 		// An empty list where upstream says minItems 1.
 		{"no-warning-comments", `["error", {"decoration": []}]`, `["error", {"decoration": ["*"]}]`, "element 1 at decoration"},
 	} {
-		_, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
-		if err == nil {
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
+		if optionsThroughTheConfigurationLayerError == nil {
 			test.Errorf("%s %s loaded, and ESLint refuses it", testCase.rule, testCase.refused)
-		} else if !strings.Contains(err.Error(), testCase.mustName) || !strings.Contains(err.Error(), "upstream's schema") {
-			test.Errorf("%s: the refusal does not name %q and upstream's schema: %v", testCase.rule, testCase.mustName, err)
+		} else if !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), testCase.mustName) || !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), "upstream's schema") {
+			test.Errorf("%s: the refusal does not name %q and upstream's schema: %v", testCase.rule, testCase.mustName, optionsThroughTheConfigurationLayerError)
 		}
-		if _, err := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); err != nil {
-			test.Errorf("%s refused %s, which ESLint accepts: %v", testCase.rule, testCase.accepted, err)
+		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); optionsThroughTheConfigurationLayerError != nil {
+			test.Errorf("%s refused %s, which ESLint accepts: %v", testCase.rule, testCase.accepted, optionsThroughTheConfigurationLayerError)
 		}
 	}
 }

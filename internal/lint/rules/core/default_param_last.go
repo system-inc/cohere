@@ -109,7 +109,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // entire corpus; the same measurement holds here and four fixtures pin it.
 var DefaultParamLast = rule.Rule{
 	Name: "default-param-last",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {
 			// A bodyless construct declares a shape rather than an implementation, and upstream
 			// gives every such construct a node type outside its three listeners. See the doc
@@ -153,7 +153,7 @@ var DefaultParamLast = rule.Rule{
 				// What remains is defaulted, optional or rest, and core reports all three. This is
 				// the whole difference from the namespaced sibling, which gates the report a second
 				// time on optional-or-defaulted and so never reports a rest parameter.
-				ctx.ReportNode(parameter, messageDefaultParamLastShouldBeLast)
+				ruleContext.ReportNode(parameter, messageDefaultParamLastShouldBeLast)
 			}
 		}
 

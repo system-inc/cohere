@@ -31,9 +31,9 @@ func decodeClassLiteralPropertyStyleOptions(test *testing.T, configuration strin
 		// here is what puts the rule's own fallback under test rather than the decoder's.
 		return nil
 	}
-	options, err := DecodeClassLiteralPropertyStyleOptions([]byte(configuration))
-	if err != nil {
-		test.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(configuration))
+	if decodeClassLiteralPropertyStyleOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeClassLiteralPropertyStyleOptionsError)
 	}
 	return options
 }
@@ -760,9 +760,9 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(classLiteralPropertyStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeClassLiteralPropertyStyleOptions([]byte(testCase.configuration))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.configuration, err)
+			decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(testCase.configuration))
+			if decodeClassLiteralPropertyStyleOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeClassLiteralPropertyStyleOptionsError)
 			}
 			options, ok := decoded.(ClassLiteralPropertyStyleOptions)
 			if !ok {
@@ -957,9 +957,9 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(test *testin
 		{`"fields"`, ClassLiteralPropertyStyleFields},
 		{`"getters"`, ClassLiteralPropertyStyleGetters},
 	} {
-		decoded, err := DecodeClassLiteralPropertyStyleOptions([]byte(accepted.wire))
-		if err != nil {
-			test.Errorf("%s was refused: %v", accepted.wire, err)
+		decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(accepted.wire))
+		if decodeClassLiteralPropertyStyleOptionsError != nil {
+			test.Errorf("%s was refused: %v", accepted.wire, decodeClassLiteralPropertyStyleOptionsError)
 			continue
 		}
 		options, isType := decoded.(ClassLiteralPropertyStyleOptions)
@@ -977,13 +977,13 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(test *testin
 		{`{"style": "getters"}`, "style"},
 		{`1`, "1"},
 	} {
-		_, err := DecodeClassLiteralPropertyStyleOptions([]byte(refused.wire))
-		if err == nil {
+		_, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(refused.wire))
+		if decodeClassLiteralPropertyStyleOptionsError == nil {
 			test.Errorf("%s decoded; it must be refused", refused.wire)
 			continue
 		}
-		if !strings.Contains(err.Error(), refused.named) {
-			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, err)
+		if !strings.Contains(decodeClassLiteralPropertyStyleOptionsError.Error(), refused.named) {
+			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, decodeClassLiteralPropertyStyleOptionsError)
 		}
 	}
 }

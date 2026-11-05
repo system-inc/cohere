@@ -203,7 +203,7 @@ var NoImpliedEval = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		getCalleeName := func(node *ast.Expression) string {
 			if ast.IsIdentifier(node) {
 				return node.AsIdentifier().Text
@@ -226,18 +226,18 @@ var NoImpliedEval = rule.Rule{
 		}
 
 		isFunctionType := func(node *ast.Node) bool {
-			t := ctx.TypeChecker.GetTypeAtLocation(node)
+			t := ruleContext.TypeChecker.GetTypeAtLocation(node)
 			symbol := checker.Type_symbol(t)
 
 			if symbol != nil && type_checking.IsSymbolFlagSet(symbol, ast.SymbolFlagsFunction|ast.SymbolFlagsMethod) {
 				return true
 			}
 
-			if type_checking.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "Function") {
+			if type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, t, "Function") {
 				return true
 			}
 
-			return len(type_checking.GetCallSignatures(ctx.TypeChecker, t)) > 0
+			return len(type_checking.GetCallSignatures(ruleContext.TypeChecker, t)) > 0
 		}
 
 		isBind := func(node *ast.Node) bool {
@@ -263,7 +263,7 @@ var NoImpliedEval = rule.Rule{
 		checkImpliedEval := func(
 			node *ast.Node,
 		) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
@@ -273,16 +273,16 @@ var NoImpliedEval = rule.Rule{
 			}
 
 			if calleeName == "Function" {
-				t := ctx.TypeChecker.GetTypeAtLocation(node.Expression())
+				t := ruleContext.TypeChecker.GetTypeAtLocation(node.Expression())
 				symbol := checker.Type_symbol(t)
 
 				if symbol != nil {
-					if type_checking.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, t, "FunctionConstructor") {
-						ctx.ReportNode(node, buildNoFunctionConstructorMessage())
+					if type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, t, "FunctionConstructor") {
+						ruleContext.ReportNode(node, buildNoFunctionConstructorMessage())
 						return
 					}
 				} else {
-					ctx.ReportNode(node, buildNoFunctionConstructorMessage())
+					ruleContext.ReportNode(node, buildNoFunctionConstructorMessage())
 				}
 			}
 
@@ -293,11 +293,11 @@ var NoImpliedEval = rule.Rule{
 			handler := node.Arguments()[0]
 
 			if slices.Contains(evalLikeFunctions, calleeName) && !isFunction(handler) {
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(node.Expression())
+				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node.Expression())
 				if symbol == nil || !type_checking.Some(symbol.Declarations, func(d *ast.Node) bool {
-					return ast.GetSourceFileOfNode(d) == ctx.SourceFile
+					return ast.GetSourceFileOfNode(d) == ruleContext.SourceFile
 				}) {
-					ctx.ReportNode(handler, buildNoImpliedEvalErrorMessage())
+					ruleContext.ReportNode(handler, buildNoImpliedEvalErrorMessage())
 				}
 			}
 		}

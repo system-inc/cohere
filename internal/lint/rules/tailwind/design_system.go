@@ -322,8 +322,8 @@ func FindEntryPoint(projectRoot string, fileExists func(path string) bool) strin
 
 // diskFileExists is fileExists for callers with no program to ask, which is the tests.
 func diskFileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
+	info, statError := os.Stat(path)
+	return statError == nil && !info.IsDir()
 }
 
 // findTailwindPackageRoot walks up from a directory looking for an installed `tailwindcss`.
@@ -387,7 +387,7 @@ func stylesheetsUnder(root string, system *tailwindengine.LoadedDesignSystem) []
 	}
 	relative := make([]string, 0, len(system.Stylesheets))
 	for _, path := range system.Stylesheets {
-		if trimmed, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(trimmed, "..") {
+		if trimmed, relativePathError := filepath.Rel(root, path); relativePathError == nil && !strings.HasPrefix(trimmed, "..") {
 			relative = append(relative, trimmed)
 			continue
 		}

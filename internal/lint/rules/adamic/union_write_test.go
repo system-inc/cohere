@@ -82,9 +82,9 @@ func TestUnionWriteRefused(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			bytes, err := os.ReadFile("testdata/union-write/" + name + ".ts")
-			if err != nil {
-				test.Fatal(err)
+			bytes, readError := os.ReadFile("testdata/union-write/" + name + ".ts")
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			source := string(bytes)
 			if count := typeErrorCount(test, source); count != 0 {
@@ -108,9 +108,9 @@ func TestUnionWriteRefused(test *testing.T) {
 // exact same program no longer throws, so a runtime check that always fails is caught.
 func TestUnionWriteNodeProbes(test *testing.T) {
 	test.Parallel()
-	paths, err := filepath.Glob("testdata/union-write/*.ts")
-	if err != nil {
-		test.Fatal(err)
+	paths, globError := filepath.Glob("testdata/union-write/*.ts")
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	if len(paths) != 54 {
 		test.Fatalf("got %d probes, want 54", len(paths))
@@ -124,8 +124,8 @@ func TestUnionWriteNodeProbes(test *testing.T) {
 			}
 			run := func(source string) ([]byte, error) {
 				file := filepath.Join(test.TempDir(), "probe.mts")
-				if err := os.WriteFile(file, []byte(source), 0600); err != nil {
-					test.Fatal(err)
+				if writeError := os.WriteFile(file, []byte(source), 0600); writeError != nil {
+					test.Fatal(writeError)
 				}
 				return exec.Command("node", file).CombinedOutput()
 			}
@@ -232,9 +232,9 @@ func TestUnionWriteLegalNeighbours(test *testing.T) {
 
 func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
 	test.Parallel()
-	bytes, err := os.ReadFile("testdata/union-write-legal/delete.ts")
-	if err != nil {
-		test.Fatal(err)
+	bytes, readError := os.ReadFile("testdata/union-write-legal/delete.ts")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	source := string(bytes)
 	if count := typeErrorCount(test, source); count != 0 {
@@ -245,12 +245,12 @@ func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
 	rule_testing.ExpectFindings(test, runAdamic(test, unionWriteSubject(), plant), "unionWrite")
 	run := func(source string) string {
 		file := filepath.Join(test.TempDir(), "probe.mts")
-		if err := os.WriteFile(file, []byte(source), 0600); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(file, []byte(source), 0600); writeError != nil {
+			test.Fatal(writeError)
 		}
-		output, err := exec.Command("node", file).CombinedOutput()
-		if err != nil {
-			test.Fatalf("Node: %v: %s", err, output)
+		output, outputError := exec.Command("node", file).CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("Node: %v: %s", outputError, output)
 		}
 		return strings.TrimSpace(string(output))
 	}

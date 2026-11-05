@@ -57,7 +57,7 @@ func (children *projectChildren) forward(received os.Signal) {
 		}
 		// A platform that cannot deliver the signal, Windows for all but a kill, ends the child instead,
 		// since the point is that it does not outlive this run.
-		if err := child.Process.Signal(received); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		if signalError := child.Process.Signal(received); signalError != nil && !errors.Is(signalError, os.ErrProcessDone) {
 			_ = child.Process.Kill()
 		}
 	}
@@ -73,19 +73,19 @@ func (children *projectChildren) run(child *exec.Cmd) error {
 	}
 	// Started under the lock, so a signal arriving now is forwarded to this child once it is held, never
 	// between its start and its holding.
-	if err := child.Start(); err != nil {
+	if startError := child.Start(); startError != nil {
 		children.mutex.Unlock()
-		return err
+		return startError
 	}
 	children.running[child] = true
 	children.mutex.Unlock()
 
-	err := child.Wait()
+	waitError := child.Wait()
 
 	children.mutex.Lock()
 	delete(children.running, child)
 	children.mutex.Unlock()
-	return err
+	return waitError
 }
 
 // received is the number of the signal that stopped this run, or 0 when none did.

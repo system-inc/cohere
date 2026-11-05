@@ -132,8 +132,8 @@ func probe(node any) bool { _, ok := node.(string); return ok }`,
 			test.Parallel()
 
 			path := filepath.Join(test.TempDir(), "probe.go")
-			if err := os.WriteFile(path, []byte(testCase.source), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte(testCase.source), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			facts := readOptionsFacts(test, path)
 			if len(facts.bareAssertions) != testCase.bare || facts.readsThroughOptionsAs != testCase.optionsAsOk {
@@ -157,9 +157,9 @@ func readOptionsFacts(test *testing.T, path string) optionsFacts {
 	test.Helper()
 
 	fileSet := token.NewFileSet()
-	file, err := parser.ParseFile(fileSet, path, nil, 0)
-	if err != nil {
-		test.Fatalf("parsing %s: %v", path, err)
+	file, parseFileError := parser.ParseFile(fileSet, path, nil, 0)
+	if parseFileError != nil {
+		test.Fatalf("parsing %s: %v", path, parseFileError)
 	}
 
 	// Options parameter names, collected per function signature: an `any` parameter beside a

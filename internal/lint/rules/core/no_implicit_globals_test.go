@@ -36,8 +36,8 @@ func runImplicitGlobalsAsAScript(test *testing.T, fileName string, sourceText st
 	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoImplicitGlobals,
 		map[string]string{fileName: sourceText}, fileName, options, func(directory string) {
 			path := filepath.Join(directory, "tsconfig.json")
-			if err := os.WriteFile(path, []byte(implicitGlobalsScriptTsConfig), 0o644); err != nil {
-				test.Fatalf("writing the script tsconfig: %v", err)
+			if writeError := os.WriteFile(path, []byte(implicitGlobalsScriptTsConfig), 0o644); writeError != nil {
+				test.Fatalf("writing the script tsconfig: %v", writeError)
 			}
 		})
 }
@@ -427,9 +427,9 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 
 	test.Run("an absent option leaves lexical bindings off", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoImplicitGlobalsOptions(nil)
-		if err != nil {
-			test.Fatalf("the decoder refused an absent option: %v", err)
+		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(nil)
+		if decodeNoImplicitGlobalsOptionsError != nil {
+			test.Fatalf("the decoder refused an absent option: %v", decodeNoImplicitGlobalsOptionsError)
 		}
 		if decoded.(NoImplicitGlobalsSettings).LexicalBindings {
 			test.Error("expected lexicalBindings to default to false")
@@ -438,9 +438,9 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 
 	test.Run("an empty object leaves it off", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{}`))
-		if err != nil {
-			test.Fatalf("the decoder refused an empty object: %v", err)
+		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{}`))
+		if decodeNoImplicitGlobalsOptionsError != nil {
+			test.Fatalf("the decoder refused an empty object: %v", decodeNoImplicitGlobalsOptionsError)
 		}
 		if decoded.(NoImplicitGlobalsSettings).LexicalBindings {
 			test.Error("expected lexicalBindings to stay false")
@@ -449,9 +449,9 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 
 	test.Run("an explicit true turns it on", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{"lexicalBindings":true}`))
-		if err != nil {
-			test.Fatalf("the decoder refused an explicit true: %v", err)
+		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{"lexicalBindings":true}`))
+		if decodeNoImplicitGlobalsOptionsError != nil {
+			test.Fatalf("the decoder refused an explicit true: %v", decodeNoImplicitGlobalsOptionsError)
 		}
 		if !decoded.(NoImplicitGlobalsSettings).LexicalBindings {
 			test.Error("expected lexicalBindings to be true")

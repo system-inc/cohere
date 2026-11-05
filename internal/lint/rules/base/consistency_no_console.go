@@ -79,7 +79,7 @@ import (
 var ConsistencyNoConsole = rule.Rule{
 	Name: "base/consistency-no-console",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node, receiver *ast.Node, methodName string) {
 			// Parentheses are stepped through before the receiver is read, and this line was
 			// missing on the first writing.
@@ -106,7 +106,7 @@ var ConsistencyNoConsole = rule.Rule{
 			if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != "console" {
 				return
 			}
-			ctx.ReportNode(node, buildNoConsoleMessage(methodName))
+			ruleContext.ReportNode(node, buildNoConsoleMessage(methodName))
 		}
 
 		return rule.Listeners{

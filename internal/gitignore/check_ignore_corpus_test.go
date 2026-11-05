@@ -213,9 +213,9 @@ func checkIgnoreExpectations(test *testing.T, script []string) []checkIgnoreExpe
 		}
 		for _, expectedPath := range paths {
 			if strings.HasPrefix(expectedPath, `"`) {
-				unquoted, err := strconv.Unquote(expectedPath)
-				if err != nil {
-					test.Fatalf("t0008 line %d: path %s does not unquote: %v", index+1, expectedPath, err)
+				unquoted, unquoteError := strconv.Unquote(expectedPath)
+				if unquoteError != nil {
+					test.Fatalf("t0008 line %d: path %s does not unquote: %v", index+1, expectedPath, unquoteError)
 				}
 				expectedPath = unquoted
 			}
@@ -251,8 +251,8 @@ func buildCheckIgnoreFixture(test *testing.T, root string, script []string) {
 	}
 
 	mustMkdir := func(relative string) {
-		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(relative)), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Join(root, filepath.FromSlash(relative)), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
 	}
 	mustMkdir(".git/info")
@@ -269,8 +269,8 @@ func buildCheckIgnoreFixture(test *testing.T, root string, script []string) {
 			}
 		case strings.HasPrefix(line, "ln -s "):
 			fields := strings.Fields(line)
-			if err := os.Symlink(fields[2], filepath.Join(root, filepath.FromSlash(fields[3]))); err != nil {
-				test.Fatal(err)
+			if symlinkError := os.Symlink(fields[2], filepath.Join(root, filepath.FromSlash(fields[3]))); symlinkError != nil {
+				test.Fatal(symlinkError)
 			}
 		case strings.HasPrefix(line, "cd "):
 			currentDirectory = strings.TrimSuffix(strings.TrimPrefix(line, "cd "), " &&")

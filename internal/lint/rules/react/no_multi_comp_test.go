@@ -550,15 +550,15 @@ func TestDecodeNoMultiCompOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoMultiCompOptions([]byte(testCase.raw))
+			decoded, decodeNoMultiCompOptionsError := DecodeNoMultiCompOptions([]byte(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodeNoMultiCompOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			if decodeNoMultiCompOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeNoMultiCompOptionsError)
 			}
 			options, isOptions := decoded.(NoMultiCompOptions)
 			if !isOptions {

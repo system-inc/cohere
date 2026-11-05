@@ -35,8 +35,8 @@ func DecodeConsistentReturnOptions(raw []byte) (any, error) {
 		return DefaultConsistentReturnSettings(), nil
 	}
 	var wire consistentReturnWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultConsistentReturnSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultConsistentReturnSettings(), unmarshalOptionsError
 	}
 	settings := DefaultConsistentReturnSettings()
 	if wire.TreatUndefinedAsUnspecified != nil {
@@ -120,7 +120,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // extension rule is a wrapper around.
 var ConsistentReturn = rule.Rule{
 	Name: "consistent-return",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
 		if !ok {
 			settings = DefaultConsistentReturnSettings()
@@ -138,7 +138,7 @@ var ConsistentReturn = rule.Rule{
 						TreatUndefinedAsUnspecified: settings.TreatUndefinedAsUnspecified,
 					},
 					consistentreturn.Hooks{},
-					ConsistentReturnReporter(ctx),
+					ConsistentReturnReporter(ruleContext),
 					ConsistentReturnDescribe)
 			},
 		}
@@ -150,16 +150,16 @@ var ConsistentReturn = rule.Rule{
 // Exported so the typescript extension builds an identical one rather than writing its own: the
 // three spans this rule computes are the part a second implementation would most easily get wrong,
 // and they are already measured against the installed build here.
-func ConsistentReturnReporter(ctx rule.Context) consistentreturn.Reporter {
+func ConsistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporter {
 	return consistentreturn.Reporter{
 		ReportNode: func(node *ast.Node, messageId string, description string) {
-			ctx.ReportNode(node, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportNode(node, rule.Message{Id: messageId, Description: description})
 		},
 		ReportRange: func(textRange core.TextRange, messageId string, description string) {
-			ctx.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
+			ruleContext.ReportRange(textRange, rule.Message{Id: messageId, Description: description})
 		},
 		TokenRange: func(node *ast.Node) core.TextRange {
-			return rule.TokenRange(ctx.SourceFile, node)
+			return rule.TokenRange(ruleContext.SourceFile, node)
 		},
 	}
 }

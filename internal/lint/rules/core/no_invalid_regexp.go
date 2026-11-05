@@ -129,7 +129,7 @@ var NoInvalidRegexp = rule.Rule{
 	// Whether `RegExp` is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowedFlags := allowedConstructorFlags(options)
 
 		check := func(node *ast.Node, callee *ast.Node, arguments *ast.NodeList) {
@@ -140,7 +140,7 @@ var NoInvalidRegexp = rule.Rule{
 			if callee.AsIdentifier().Text != "RegExp" {
 				return
 			}
-			if ctx.TypeChecker == nil || !rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(callee)) {
+			if ruleContext.TypeChecker == nil || !rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(callee)) {
 				return
 			}
 			// `RegExp()` with no arguments produces the empty pattern and cannot fail.
@@ -164,7 +164,7 @@ var NoInvalidRegexp = rule.Rule{
 
 			if flags != nil {
 				if message := invalidFlagsMessage(*flags, allowedFlags); message != "" {
-					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
+					ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 					return
 				}
 			}
@@ -181,7 +181,7 @@ var NoInvalidRegexp = rule.Rule{
 					return
 				}
 				if message := invalidPatternMessage(pattern, *flags); message != "" {
-					ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
+					ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: message})
 				}
 				return
 			}
@@ -192,7 +192,7 @@ var NoInvalidRegexp = rule.Rule{
 			withUnicode := invalidPatternMessage(pattern, "u")
 			withNeither := invalidPatternMessage(pattern, "")
 			if withUnicode != "" && withNeither != "" {
-				ctx.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: withNeither})
+				ruleContext.ReportNode(node, rule.Message{Id: messageInvalidRegexp.Id, Description: withNeither})
 			}
 		}
 
@@ -260,13 +260,13 @@ func invalidPatternMessage(pattern string, flags string) string {
 		compileFlags += "u"
 	}
 
-	if _, err := esregexp.Compile(pattern, compileFlags); err != nil {
-		text := err.Error()
+	if _, compileError := esregexp.Compile(pattern, compileFlags); compileError != nil {
+		text := compileError.Error()
 		// The underlying engine prefixes "error parsing regexp: ", which repeats what the message
 		// already says. Trimming to the first ": " drops it. Our parser's own refusals put the
 		// refused construct after that same separator, so trimming there would keep the construct
 		// and throw away the explanation, which is why they are excluded.
-		if !errors.Is(err, esregexp.ErrUnsupportedSyntax) && !errors.Is(err, esregexp.ErrUnsupportedFlag) {
+		if !errors.Is(compileError, esregexp.ErrUnsupportedSyntax) && !errors.Is(compileError, esregexp.ErrUnsupportedFlag) {
 			if separator := strings.Index(text, ": "); separator != -1 {
 				text = text[separator+2:]
 			}

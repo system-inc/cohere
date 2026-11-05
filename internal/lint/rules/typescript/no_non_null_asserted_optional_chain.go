@@ -88,8 +88,8 @@ var messageSuggestRemovingNonNull = rule.Message{
 // gates contains zero non-null assertions of any kind, so a clean run over it proves nothing.
 var NoNonNullAssertedOptionalChain = rule.Rule{
 	Name: "@typescript-eslint/no-non-null-asserted-optional-chain",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -102,7 +102,7 @@ var NoNonNullAssertedOptionalChain = rule.Rule{
 				// removing the assertion can obviously break type checking, because the assertion
 				// is what was making the surrounding code compile. The value may genuinely need a
 				// null check the author now has to write, and only they can decide what it does.
-				ctx.ReportNodeWithSuggestions(node, messageNoNonNullOptionalChain, rule.Suggestion{
+				ruleContext.ReportNodeWithSuggestions(node, messageNoNonNullOptionalChain, rule.Suggestion{
 					Message: messageSuggestRemovingNonNull,
 					Fixes:   []rule.Fix{rule.RemoveRange(nonNullAssertionOperatorRange(node))},
 				})

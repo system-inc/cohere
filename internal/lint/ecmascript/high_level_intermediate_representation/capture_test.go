@@ -25,14 +25,14 @@ func lowerTypedFunctions(test *testing.T, name string, code string) []*Function 
 	probe := rule.Rule{
 		Name:             "capture-test-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the harness produced no type checker, so this test would prove nothing")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
-						if fn := Lower(function, ctx.TypeChecker); fn != nil {
+						if fn := Lower(function, ruleContext.TypeChecker); fn != nil {
 							lowered = append(lowered, fn)
 						}
 					})
@@ -93,7 +93,7 @@ export function Outer() {
 	probe := rule.Rule{
 		Name:             "symbol-identity-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					var occurrences []*ast.Symbol
@@ -103,7 +103,7 @@ export function Outer() {
 							return
 						}
 						if current.Kind == ast.KindIdentifier && current.Text() == "captured" {
-							occurrences = append(occurrences, ctx.TypeChecker.GetSymbolAtLocation(current))
+							occurrences = append(occurrences, ruleContext.TypeChecker.GetSymbolAtLocation(current))
 						}
 						current.ForEachChild(func(child *ast.Node) bool { walk(child); return false })
 					}

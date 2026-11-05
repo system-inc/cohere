@@ -44,9 +44,9 @@ var flagDefault = regexp.MustCompile(` \(default ("(?:[^"\\]|\\.)*"|[^()"]*)\)$`
 
 // parseCli reads the top-level help and each verb's.
 func parseCli(help []byte, verbHelp map[string][]byte) (Cli, error) {
-	_, flags, err := parseFlagHelp(help)
-	if err != nil {
-		return Cli{}, fmt.Errorf("docsdata: cohere -help: %w", err)
+	_, flags, parseFlagHelpError := parseFlagHelp(help)
+	if parseFlagHelpError != nil {
+		return Cli{}, fmt.Errorf("docsdata: cohere -help: %w", parseFlagHelpError)
 	}
 	cli := Cli{Flags: flags}
 	verbs := make([]string, 0, len(verbHelp))
@@ -55,9 +55,9 @@ func parseCli(help []byte, verbHelp map[string][]byte) (Cli, error) {
 	}
 	sort.Strings(verbs)
 	for _, verb := range verbs {
-		preamble, flags, err := parseFlagHelp(verbHelp[verb])
-		if err != nil {
-			return Cli{}, fmt.Errorf("docsdata: cohere %s -help: %w", verb, err)
+		preamble, flags, parseFlagHelpError := parseFlagHelp(verbHelp[verb])
+		if parseFlagHelpError != nil {
+			return Cli{}, fmt.Errorf("docsdata: cohere %s -help: %w", verb, parseFlagHelpError)
 		}
 		entry := CliVerb{Name: verb, Flags: flags}
 		var summary []string
@@ -102,9 +102,9 @@ func parseFlagHelp(help []byte) ([]string, []CliFlag, error) {
 		if match := flagDefault.FindStringSubmatchIndex(text); match != nil {
 			value := text[match[2]:match[3]]
 			if strings.HasPrefix(value, `"`) {
-				unquoted, err := strconv.Unquote(value)
-				if err != nil {
-					return fmt.Errorf("flag -%s: default %s: %w", current.Name, value, err)
+				unquoted, unquoteError := strconv.Unquote(value)
+				if unquoteError != nil {
+					return fmt.Errorf("flag -%s: default %s: %w", current.Name, value, unquoteError)
 				}
 				value = unquoted
 			}

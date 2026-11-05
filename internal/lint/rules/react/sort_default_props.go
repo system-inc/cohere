@@ -34,8 +34,8 @@ func DecodeSortDefaultPropsOptions(raw []byte) (any, error) {
 	var wire struct {
 		IgnoreCase bool `json:"ignoreCase"`
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.IgnoreCase = wire.IgnoreCase
 	return options, nil
@@ -102,8 +102,8 @@ var SortDefaultProps = rule.Rule{
 	Name:             "react/sort-default-props",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -113,25 +113,25 @@ var SortDefaultProps = rule.Rule{
 		}
 
 		check := func(value *ast.Node) {
-			if value == nil || ctx.TypeChecker == nil {
+			if value == nil || ruleContext.TypeChecker == nil {
 				return
 			}
 			switch value.Kind {
 			case ast.KindObjectLiteralExpression:
-				sortDefaultPropsReportUnsorted(ctx, settings, value)
+				sortDefaultPropsReportUnsorted(ruleContext, settings, value)
 
 			case ast.KindIdentifier:
 				// `C.defaultProps = someObject`. Upstream resolves the name and reads the
 				// initializer of its first definition; the checker answers the same question, and
 				// the loop over declarations rather than an index is the standing hazard here.
-				symbol := ctx.TypeChecker.GetSymbolAtLocation(value)
+				symbol := ruleContext.TypeChecker.GetSymbolAtLocation(value)
 				if symbol == nil {
 					return
 				}
 				for _, declaration := range symbol.Declarations {
 					if initializer := sortDefaultPropsInitializerOf(declaration); initializer != nil &&
 						initializer.Kind == ast.KindObjectLiteralExpression {
-						sortDefaultPropsReportUnsorted(ctx, settings, initializer)
+						sortDefaultPropsReportUnsorted(ruleContext, settings, initializer)
 						return
 					}
 				}
@@ -211,7 +211,7 @@ func sortDefaultPropsInitializerOf(declaration *ast.Node) *ast.Node {
 // When a property IS out of order the accumulator does NOT advance past it. So `{c, b, a}` reports
 // twice, both against `c`, rather than reporting once and resyncing. Measured.
 func sortDefaultPropsReportUnsorted(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	settings SortDefaultPropsOptions,
 	object *ast.Node,
 ) {
@@ -243,15 +243,15 @@ func sortDefaultPropsReportUnsorted(
 			continue
 		}
 
-		previousKey := sortDefaultPropsKeyText(ctx, previous)
-		currentKey := sortDefaultPropsKeyText(ctx, current)
+		previousKey := sortDefaultPropsKeyText(ruleContext, previous)
+		currentKey := sortDefaultPropsKeyText(ruleContext, current)
 		if settings.IgnoreCase {
 			previousKey = strings.ToLower(previousKey)
 			currentKey = strings.ToLower(currentKey)
 		}
 
 		if currentKey < previousKey {
-			ctx.ReportNode(current, messageDefaultPropsNotSorted)
+			ruleContext.ReportNode(current, messageDefaultPropsNotSorted)
 			// The accumulator deliberately does not advance, matching upstream's `return prev`.
 			continue
 		}
@@ -267,7 +267,7 @@ func sortDefaultPropsReportUnsorted(
 //
 // `node.argument` is the spread's operand upstream; spreads never reach here because the caller
 // skips them, and the fallback is kept for a property whose name node is absent.
-func sortDefaultPropsKeyText(ctx rule.Context, property *ast.Node) string {
+func sortDefaultPropsKeyText(ruleContext rule.Context, property *ast.Node) string {
 	name := property.Name()
 	if name == nil {
 		return ""
@@ -290,8 +290,8 @@ func sortDefaultPropsKeyText(ctx rule.Context, property *ast.Node) string {
 	// `rule.TokenRange` reproduces; trimming whitespace by hand is NOT enough, because a comment
 	// between two keys survives it. Both shapes measured silent upstream and both reported here
 	// before this used the token range.
-	keyRange := rule.TokenRange(ctx.SourceFile, name)
-	text := ctx.SourceFile.Text()
+	keyRange := rule.TokenRange(ruleContext.SourceFile, name)
+	text := ruleContext.SourceFile.Text()
 	pos, end := keyRange.Pos(), keyRange.End()
 	if pos < 0 || end > len(text) || pos > end {
 		return ""

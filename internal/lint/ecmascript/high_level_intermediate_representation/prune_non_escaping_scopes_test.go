@@ -197,20 +197,20 @@ func runTypedSource(test *testing.T, source string, visit func(*Function, *shimc
 	probe := rule.Rule{
 		Name:             "prune-non-escaping-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						ran = true
-						visit(function, ctx.TypeChecker)
+						visit(function, ruleContext.TypeChecker)
 					})
 				},
 			}
@@ -397,9 +397,9 @@ func TestMemoMarkersArePrunedOnlyWhenTheirScopeWas(test *testing.T) {
 	// Measured on the vendored corpus rather than on constructed source: whether a marker's value
 	// carries a scope depends on lowering and on four passes upstream of this one, so a hand-written
 	// fixture would be asserting the pipeline rather than the pass.
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	marked, total := 0, 0
@@ -435,19 +435,19 @@ func memoMarkerCountsForSource(test *testing.T, source string) (pruned, reached 
 	probe := rule.Rule{
 		Name:             "memo-marker-counts",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						markerPruned, markerReached := markerCounts(function, ctx.TypeChecker)
+						markerPruned, markerReached := markerCounts(function, ruleContext.TypeChecker)
 						pruned += markerPruned
 						reached += markerReached
 						ok = true

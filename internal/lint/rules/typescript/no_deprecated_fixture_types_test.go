@@ -54,16 +54,16 @@ func installFixtureReact(test *testing.T, types string) func(string) {
 	test.Helper()
 	return func(directory string) {
 		packageDirectory := filepath.Join(directory, "node_modules", "@types", "fixture-react")
-		if err := os.MkdirAll(packageDirectory, 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(packageDirectory, 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
 		files := map[string]string{
 			"package.json": `{"name": "@types/fixture-react", "version": "0.0.0", "types": "index.d.ts"}`,
 			"index.d.ts":   types,
 		}
 		for name, contents := range files {
-			if err := os.WriteFile(filepath.Join(packageDirectory, name), []byte(contents), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(packageDirectory, name), []byte(contents), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
 	}

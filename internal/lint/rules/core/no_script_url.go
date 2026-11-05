@@ -76,13 +76,13 @@ var messageScriptUrl = rule.Message{
 // mechanical repair: replacing the URL means writing a handler somewhere else.
 var NoScriptUrl = rule.Rule{
 	Name: "no-script-url",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if !beginsWithScriptScheme(node.Text()) {
 					return
 				}
-				ctx.ReportNode(node, messageScriptUrl)
+				ruleContext.ReportNode(node, messageScriptUrl)
 			},
 
 			// A template with no expressions, which is the only template shape whose value is
@@ -97,7 +97,7 @@ var NoScriptUrl = rule.Rule{
 				if !beginsWithScriptScheme(node.Text()) {
 					return
 				}
-				ctx.ReportNode(node, messageScriptUrl)
+				ruleContext.ReportNode(node, messageScriptUrl)
 			},
 		}
 	},

@@ -203,11 +203,11 @@ func TestEnforceShorthandClassesSuggestsOnlyClassesThatExist(test *testing.T) {
 			classOrderFixtureStylesheetPath: classOrderFixtureStylesheet,
 		}, "Component.tsx", func(root string) {
 			modules := filepath.Join(root, "node_modules")
-			if err := os.MkdirAll(modules, 0o755); err != nil {
-				test.Fatalf("creating the fixture node_modules: %v", err)
+			if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+				test.Fatalf("creating the fixture node_modules: %v", createDirectoryError)
 			}
-			if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-				test.Fatalf("linking the installed tailwindcss into the fixture: %v", err)
+			if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+				test.Fatalf("linking the installed tailwindcss into the fixture: %v", symlinkError)
 			}
 		})
 	}

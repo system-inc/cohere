@@ -115,9 +115,9 @@ func TestAbbreviationGateCoversTheArmsThatWereLost(test *testing.T) {
 func loadIdentifierCorpus(test *testing.T) []string {
 	test.Helper()
 
-	data, err := os.ReadFile("testdata/identifiers.txt")
-	if err != nil {
-		test.Fatalf("could not read the identifier corpus: %v", err)
+	data, readError := os.ReadFile("testdata/identifiers.txt")
+	if readError != nil {
+		test.Fatalf("could not read the identifier corpus: %v", readError)
 	}
 	corpus := strings.Split(strings.TrimSpace(string(data)), "\n")
 	// A corpus that failed to load would make every assertion above pass vacuously.

@@ -163,8 +163,8 @@ var SecurityNoInterpolatedSqlString = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			// Which values can hold a quote is a question about types. Without a checker every
 			// number and literal union would be reported, so the rule declines the file.
 			return nil
@@ -188,20 +188,20 @@ var SecurityNoInterpolatedSqlString = rule.Rule{
 				}
 				for _, spanIndex := range quotedSpans {
 					expression := template.TemplateSpans.Nodes[spanIndex].AsTemplateSpan().Expression
-					if !securityNoInterpolatedSqlStringCanHoldQuote(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression), 0) {
+					if !securityNoInterpolatedSqlStringCanHoldQuote(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(expression), 0) {
 						continue
 					}
-					if securityNoInterpolatedSqlStringIsEscaped(ctx, expression) {
+					if securityNoInterpolatedSqlStringIsEscaped(ruleContext, expression) {
 						continue
 					}
-					ctx.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlStringId, Description: securityNoInterpolatedSqlStringText.Render(nil)})
+					ruleContext.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlStringId, Description: securityNoInterpolatedSqlStringText.Render(nil)})
 				}
 				for _, spanIndex := range bareSpans {
 					expression := template.TemplateSpans.Nodes[spanIndex].AsTemplateSpan().Expression
-					if !securityNoInterpolatedSqlStringCanHoldText(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(expression), 0) {
+					if !securityNoInterpolatedSqlStringCanHoldText(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(expression), 0) {
 						continue
 					}
-					ctx.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlValueId, Description: securityNoInterpolatedSqlValueText.Render(nil)})
+					ruleContext.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlValueId, Description: securityNoInterpolatedSqlValueText.Render(nil)})
 				}
 			},
 		}
@@ -627,15 +627,15 @@ func securityNoInterpolatedSqlStringPartCanHoldQuote(typeChecker *checker.Checke
 
 // securityNoInterpolatedSqlStringIsEscaped says whether an interpolated expression, or the
 // initializer of the `const` it names, ends in the one escape the doc comment accepts.
-func securityNoInterpolatedSqlStringIsEscaped(ctx rule.Context, expression *ast.Node) bool {
+func securityNoInterpolatedSqlStringIsEscaped(ruleContext rule.Context, expression *ast.Node) bool {
 	expression = ast.SkipParentheses(expression)
-	if securityNoInterpolatedSqlStringIsEscapeChain(ctx, expression) {
+	if securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, expression) {
 		return true
 	}
 	if expression.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
 	if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 		return false
 	}
@@ -645,18 +645,18 @@ func securityNoInterpolatedSqlStringIsEscaped(ctx rule.Context, expression *ast.
 		return false
 	}
 	initializer := declaration.AsVariableDeclaration().Initializer
-	return initializer != nil && securityNoInterpolatedSqlStringIsEscapeChain(ctx, ast.SkipParentheses(initializer))
+	return initializer != nil && securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, ast.SkipParentheses(initializer))
 }
 
 // securityNoInterpolatedSqlStringIsEscapeChain says whether an expression's last two calls are a
 // string `replace` or `replaceAll` doubling every backslash and one doubling every single quote, in
 // either order.
-func securityNoInterpolatedSqlStringIsEscapeChain(ctx rule.Context, expression *ast.Node) bool {
-	outer, outerReceiver := securityNoInterpolatedSqlStringReplaceStep(ctx, expression)
+func securityNoInterpolatedSqlStringIsEscapeChain(ruleContext rule.Context, expression *ast.Node) bool {
+	outer, outerReceiver := securityNoInterpolatedSqlStringReplaceStep(ruleContext, expression)
 	if outer == "" {
 		return false
 	}
-	inner, _ := securityNoInterpolatedSqlStringReplaceStep(ctx, ast.SkipParentheses(outerReceiver))
+	inner, _ := securityNoInterpolatedSqlStringReplaceStep(ruleContext, ast.SkipParentheses(outerReceiver))
 	return (outer == "'" && inner == "\\") || (outer == "\\" && inner == "'")
 }
 
@@ -664,7 +664,7 @@ func securityNoInterpolatedSqlStringIsEscapeChain(ctx rule.Context, expression *
 // `replaceAll` with the string `"'"`, whose replacement is two quotes, and their backslash twins
 // (`/\\/g` or `'\\'` to `'\\\\'`), on a string receiver. It returns which character the step doubles,
 // with the receiver, and an empty character for anything else.
-func securityNoInterpolatedSqlStringReplaceStep(ctx rule.Context, expression *ast.Node) (string, *ast.Node) {
+func securityNoInterpolatedSqlStringReplaceStep(ruleContext rule.Context, expression *ast.Node) (string, *ast.Node) {
 	if expression.Kind != ast.KindCallExpression {
 		return "", nil
 	}
@@ -678,7 +678,7 @@ func securityNoInterpolatedSqlStringReplaceStep(ctx rule.Context, expression *as
 	if method != "replace" && method != "replaceAll" {
 		return "", nil
 	}
-	receiverType := ctx.TypeChecker.GetTypeAtLocation(access.Expression)
+	receiverType := ruleContext.TypeChecker.GetTypeAtLocation(access.Expression)
 	if receiverType == nil || receiverType.Flags()&checker.TypeFlagsStringLike == 0 {
 		return "", nil
 	}

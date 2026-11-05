@@ -17,12 +17,12 @@ func TestDesignSystemKeyDeclinesAMovedFileAndHoldsUntilAChange(test *testing.T) 
 	directory := test.TempDir()
 	theme := filepath.Join(directory, "theme.css")
 	missing := filepath.Join(directory, "missing.css")
-	if err := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	info, err := os.Stat(theme)
-	if err != nil {
-		test.Fatal(err)
+	info, statError := os.Stat(theme)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	read := rule.FileRead{Path: theme, Present: true, Size: info.Size(), ModifiedNanoseconds: info.ModTime().UnixNano()}
 	absent := rule.FileRead{Path: missing}
@@ -43,20 +43,20 @@ func TestDesignSystemKeyDeclinesAMovedFileAndHoldsUntilAChange(test *testing.T) 
 		test.Error("a file whose size moved after it was read was keyed anyway")
 	}
 
-	if err := os.WriteFile(theme, []byte("@theme { --color-x: red; }\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(theme, []byte("@theme { --color-x: red; }\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	if key.stillHolds(PathAnchor{}) {
 		test.Error("the key still holds after the stylesheet it covers was edited")
 	}
-	if err := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(theme, []byte("@theme {}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	if !key.stillHolds(PathAnchor{}) {
 		test.Error("the key does not hold once the stylesheet is back to the bytes it covers")
 	}
-	if err := os.WriteFile(missing, nil, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(missing, nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	if key.stillHolds(PathAnchor{}) {
 		test.Error("the key still holds after a path it recorded absent was created")

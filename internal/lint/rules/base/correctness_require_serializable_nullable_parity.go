@@ -65,10 +65,10 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -99,18 +99,18 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 					return
 				}
 
-				propertyType := ctx.TypeChecker.GetTypeAtLocation(name)
+				propertyType := ruleContext.TypeChecker.GetTypeAtLocation(name)
 				if propertyType == nil {
 					return
 				}
 				typeIsNullable := decorators.IsNullableType(propertyType)
-				typeText := ctx.TypeChecker.TypeToString(propertyType)
+				typeText := ruleContext.TypeChecker.TypeToString(propertyType)
 
 				switch {
 				case declaredOptional && !typeIsNullable:
-					ctx.ReportNode(name, buildDecoratorOptionalButTypeNotMessage(typeText))
+					ruleContext.ReportNode(name, buildDecoratorOptionalButTypeNotMessage(typeText))
 				case !declaredOptional && typeIsNullable:
-					ctx.ReportNode(name, buildTypeOptionalButDecoratorNotMessage(typeText))
+					ruleContext.ReportNode(name, buildTypeOptionalButDecoratorNotMessage(typeText))
 				}
 			},
 		}

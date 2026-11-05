@@ -26,10 +26,10 @@ func readHead(repository string) (string, error) {
 		return "", err
 	}
 	commonDirectory := gitDirectory
-	if contents, err := os.ReadFile(filepath.Join(gitDirectory, "commondir")); err == nil {
+	if contents, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir")); readError == nil {
 		commonDirectory = resolveFrom(gitDirectory, strings.TrimSpace(string(contents)))
 	}
-	if config, err := os.ReadFile(filepath.Join(commonDirectory, "config")); err == nil && strings.Contains(string(config), "reftable") {
+	if config, readError := os.ReadFile(filepath.Join(commonDirectory, "config")); readError == nil && strings.Contains(string(config), "reftable") {
 		return "", fmt.Errorf("%s keeps its refs in the reftable store, which cohere does not read", repository)
 	}
 
@@ -83,18 +83,18 @@ func readReference(gitDirectory string, commonDirectory string, reference string
 		return "", fmt.Errorf("%q is not a ref name", reference)
 	}
 	for _, directory := range []string{gitDirectory, commonDirectory} {
-		contents, err := os.ReadFile(filepath.Join(directory, filepath.FromSlash(reference)))
-		if err == nil {
+		contents, readError := os.ReadFile(filepath.Join(directory, filepath.FromSlash(reference)))
+		if readError == nil {
 			return strings.TrimSpace(string(contents)), nil
 		}
-		if !errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("reading %s: %w", reference, err)
+		if !errors.Is(readError, os.ErrNotExist) {
+			return "", fmt.Errorf("reading %s: %w", reference, readError)
 		}
 	}
 
-	packed, err := os.Open(filepath.Join(commonDirectory, "packed-refs"))
-	if err != nil {
-		return "", fmt.Errorf("%s is neither a loose ref nor packed (%v)", reference, err)
+	packed, openError := os.Open(filepath.Join(commonDirectory, "packed-refs"))
+	if openError != nil {
+		return "", fmt.Errorf("%s is neither a loose ref nor packed (%v)", reference, openError)
 	}
 	defer packed.Close()
 	lines := bufio.NewScanner(packed)

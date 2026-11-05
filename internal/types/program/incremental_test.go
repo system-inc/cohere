@@ -68,12 +68,12 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{
+		graph, buildError := program.Build(program.Options{
 			ConfigFileName:   "tsconfig.json",
 			CurrentDirectory: directory,
 		})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		return graph
 	}
@@ -112,8 +112,8 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 	// the harness can produce a finding at all, which is what makes leg three's result mean
 	// something. Without it, a silent leg three is indistinguishable from a broken detector.
 	plantedPath := filepath.Join(directory, "planted.ts")
-	if err := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); err != nil {
-		test.Fatalf("planting: %v", err)
+	if writeError := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); writeError != nil {
+		test.Fatalf("planting: %v", writeError)
 	}
 
 	planted := build()
@@ -127,8 +127,8 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 	// Leg three: remove the error and confirm the findings clear. A cache that never
 	// invalidates would keep reporting the planted error here, and a cache that reports
 	// nothing regardless would have failed leg two.
-	if err := os.Remove(plantedPath); err != nil {
-		test.Fatalf("removing the planted file: %v", err)
+	if removeError := os.Remove(plantedPath); removeError != nil {
+		test.Fatalf("removing the planted file: %v", removeError)
 	}
 
 	healed := build()
@@ -149,12 +149,12 @@ func TestBuildInfoReaderReturnsNilBeforeAnyBuild(test *testing.T) {
 		"main.ts":       "export const value: number = 1;\n",
 	})
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   "tsconfig.json",
 		CurrentDirectory: directory,
 	})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	if graph.CompilerHost == nil {
 		test.Fatal("Graph.CompilerHost is nil; the incremental path cannot be reached without it")
@@ -188,21 +188,21 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{
+		graph, buildError := program.Build(program.Options{
 			ConfigFileName:   "tsconfig.json",
 			CurrentDirectory: directory,
 		})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		return graph
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	// Leg one: cold. No build info yet, so this is the full pass.
 	cold := build()
-	if findings := messagesOf(cold.IncrementalDiagnostics(ctx)); len(findings) != 0 {
+	if findings := messagesOf(cold.IncrementalDiagnostics(backgroundContext)); len(findings) != 0 {
 		test.Fatalf("the clean fixture produced %d findings, so no later leg can distinguish a "+
 			"planted error from existing noise: %v", len(findings), findings)
 	}
@@ -213,16 +213,16 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	if coldSession == nil {
 		test.Fatal("NewIncrementalSession returned nil on an incremental config")
 	}
-	coldSession.Diagnostics(ctx)
-	if diagnostics := coldSession.Write(ctx); len(diagnostics) != 0 {
+	coldSession.Diagnostics(backgroundContext)
+	if diagnostics := coldSession.Write(backgroundContext); len(diagnostics) != 0 {
 		test.Fatalf("writing the build info reported %d diagnostics: %v",
 			len(diagnostics), messagesOf(diagnostics))
 	}
 	buildInfoPath := filepath.Join(directory, "tsconfig.tsbuildinfo")
-	written, err := os.Stat(buildInfoPath)
-	if err != nil {
+	written, statError := os.Stat(buildInfoPath)
+	if statError != nil {
 		test.Fatalf("no build info on disk after WriteBuildInfo, so every warm leg below would "+
-			"silently run cold: %v", err)
+			"silently run cold: %v", statError)
 	}
 	if written.Size() == 0 {
 		test.Fatal("the build info is empty, which reads as a successful write and behaves as no cache")
@@ -233,12 +233,12 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	// the case a stale cache fails. The file is new, so the cache has never seen it, and a
 	// cache that trusts its snapshot over the filesystem reports nothing here.
 	plantedPath := filepath.Join(directory, "planted.ts")
-	if err := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); err != nil {
-		test.Fatalf("planting: %v", err)
+	if writeError := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); writeError != nil {
+		test.Fatalf("planting: %v", writeError)
 	}
 
 	warmDirty := build()
-	dirtyFindings := messagesOf(warmDirty.IncrementalDiagnostics(ctx))
+	dirtyFindings := messagesOf(warmDirty.IncrementalDiagnostics(backgroundContext))
 	if len(dirtyFindings) == 0 {
 		test.Fatal("a violation planted after the build info was written was NOT found on a warm " +
 			"run. That is a stale cache reporting a clean tree, which is the exact failure this " +
@@ -247,20 +247,20 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	test.Logf("warm run found the planted violation: %v", dirtyFindings)
 
 	// Leg four: remove it and confirm the findings clear rather than persisting.
-	if err := os.Remove(plantedPath); err != nil {
-		test.Fatalf("removing the planted file: %v", err)
+	if removeError := os.Remove(plantedPath); removeError != nil {
+		test.Fatalf("removing the planted file: %v", removeError)
 	}
 	rewriteSession := warmDirty.NewIncrementalSession()
 	if rewriteSession == nil {
 		test.Fatal("NewIncrementalSession returned nil on the rewrite")
 	}
-	rewriteSession.Diagnostics(ctx)
-	if diagnostics := rewriteSession.Write(ctx); len(diagnostics) != 0 {
+	rewriteSession.Diagnostics(backgroundContext)
+	if diagnostics := rewriteSession.Write(backgroundContext); len(diagnostics) != 0 {
 		test.Fatalf("rewriting the build info reported diagnostics: %v", messagesOf(diagnostics))
 	}
 
 	warmClean := build()
-	if findings := messagesOf(warmClean.IncrementalDiagnostics(ctx)); len(findings) != 0 {
+	if findings := messagesOf(warmClean.IncrementalDiagnostics(backgroundContext)); len(findings) != 0 {
 		test.Fatalf("after removing the planted error the warm run still reports findings, which "+
 			"is a stale result rather than a clean tree: %v", findings)
 	}
@@ -279,20 +279,20 @@ func TestIncrementalMatchesFullPass(test *testing.T) {
 
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{
+		graph, buildError := program.Build(program.Options{
 			ConfigFileName:   "tsconfig.json",
 			CurrentDirectory: directory,
 		})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 		return graph
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	first := build()
-	full := messagesOf(first.AllDiagnostics(ctx))
+	full := messagesOf(first.AllDiagnostics(backgroundContext))
 	if len(full) < 2 {
 		test.Fatalf("the fixture was meant to produce at least two findings and produced %d; "+
 			"an equivalence test over an empty set proves nothing: %v", len(full), full)
@@ -301,13 +301,13 @@ func TestIncrementalMatchesFullPass(test *testing.T) {
 	if firstSession == nil {
 		test.Fatal("NewIncrementalSession returned nil on an incremental config")
 	}
-	firstSession.Diagnostics(ctx)
-	if diagnostics := firstSession.Write(ctx); len(diagnostics) != 0 {
+	firstSession.Diagnostics(backgroundContext)
+	if diagnostics := firstSession.Write(backgroundContext); len(diagnostics) != 0 {
 		test.Fatalf("writing the build info reported diagnostics: %v", messagesOf(diagnostics))
 	}
 
 	second := build()
-	warm := messagesOf(second.IncrementalDiagnostics(ctx))
+	warm := messagesOf(second.IncrementalDiagnostics(backgroundContext))
 
 	slices.Sort(full)
 	slices.Sort(warm)

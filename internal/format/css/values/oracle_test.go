@@ -270,7 +270,7 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -290,8 +290,8 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			requests = append(requests, request{Name: path, Path: &path})
 			return nil
 		})
-		if err != nil {
-			test.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	corpusFiles := len(requests)
@@ -306,9 +306,9 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 
 	var stdin bytes.Buffer
 	for _, each := range requests {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
@@ -318,8 +318,8 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 	command.Stdin = &stdin
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 
 	type record struct {
@@ -337,8 +337,8 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			continue
 		}
 		var each record
-		if err := json.Unmarshal([]byte(line), &each); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &each); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		if each.Done {
 			answered[each.Name] = true
@@ -383,20 +383,20 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			loose bool
 		}{{"loose", each.Loose, true}, {"strict", each.Strict, false}} {
 			compared++
-			got, err := dumpValues(each.Text, Options{Loose: mode.loose})
+			got, dumpValuesError := dumpValues(each.Text, Options{Loose: mode.loose})
 			wantError, oracleRefused := mode.want["error"].(string)
 			switch {
-			case oracleRefused && err != nil:
+			case oracleRefused && dumpValuesError != nil:
 				var thrown *Error
-				if !asError(err, &thrown) || thrown.Error() != wantError {
-					fail("%s %s: both refuse, with different messages:\n  library %s\n  Go      %v", label, mode.name, wantError, err)
+				if !asError(dumpValuesError, &thrown) || thrown.Error() != wantError {
+					fail("%s %s: both refuse, with different messages:\n  library %s\n  Go      %v", label, mode.name, wantError, dumpValuesError)
 					continue
 				}
 				refusedByBoth++
 			case oracleRefused:
 				fail("%s %s: the library refuses it (%s) and Go parsed it", label, mode.name, wantError)
-			case err != nil:
-				fail("%s %s: the library parses it and Go refused: %v", label, mode.name, err)
+			case dumpValuesError != nil:
+				fail("%s %s: the library parses it and Go refused: %v", label, mode.name, dumpValuesError)
 			default:
 				if difference := firstValuesDifference(mode.want["tree"], got, "root"); difference != "" {
 					fail("%s %s: %s", label, mode.name, difference)

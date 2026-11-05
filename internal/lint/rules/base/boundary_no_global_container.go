@@ -61,13 +61,13 @@ func messageNoGlobalContainer() rule.Message {
 // a span already reported would mean inventing a duplicate to match a defect.
 var BoundaryNoGlobalContainer = rule.Rule{
 	Name: "base/boundary-no-global-container",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if node.AsIdentifier().Text != "getGlobalContainer" {
 					return
 				}
-				ctx.ReportNode(node, messageNoGlobalContainer())
+				ruleContext.ReportNode(node, messageNoGlobalContainer())
 			},
 		}
 	},

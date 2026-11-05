@@ -55,11 +55,11 @@ func runLocationFixture(test *testing.T, options NoUnknownClassesOptions) rule_t
 	}
 	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
 		modules := filepath.Join(root, "node_modules")
-		if err := os.MkdirAll(modules, 0o755); err != nil {
-			test.Fatalf("creating node_modules: %v", err)
+		if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+			test.Fatalf("creating node_modules: %v", createDirectoryError)
 		}
-		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			test.Fatalf("linking tailwindcss: %v", err)
+		if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+			test.Fatalf("linking tailwindcss: %v", symlinkError)
 		}
 	})
 }
@@ -106,9 +106,9 @@ func TestDesignSystemIsCachedPerLocation(test *testing.T) {
 		Name:         "probe/design-system-per-location",
 		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 		NoListener:   rule.NoListenerAnswersInRun,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			for _, location := range []DesignSystemLocation{{}, {ConfigPath: "packages/web/design/brand.css"}, {}} {
-				entryPoints = append(entryPoints, filepath.Base(DesignSystemForProgramAt(ctx.Program, location).EntryPoint))
+				entryPoints = append(entryPoints, filepath.Base(DesignSystemForProgramAt(ruleContext.Program, location).EntryPoint))
 			}
 			return nil
 		},
@@ -120,11 +120,11 @@ func TestDesignSystemIsCachedPerLocation(test *testing.T) {
 	}
 	rule_testing.RunTypedFilesWithSetup(test, probe, files, "Component.tsx", func(root string) {
 		modules := filepath.Join(root, "node_modules")
-		if err := os.MkdirAll(modules, 0o755); err != nil {
-			test.Fatalf("creating node_modules: %v", err)
+		if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+			test.Fatalf("creating node_modules: %v", createDirectoryError)
 		}
-		if err := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); err != nil {
-			test.Fatalf("linking tailwindcss: %v", err)
+		if symlinkError := os.Symlink(packageRoot, filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+			test.Fatalf("linking tailwindcss: %v", symlinkError)
 		}
 	})
 	if want := []string{"globals.css", "brand.css", "globals.css"}; !slices.Equal(entryPoints, want) {

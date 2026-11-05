@@ -128,8 +128,8 @@ func main() {
 	}
 
 	var table extractedTable
-	if err := json.Unmarshal(inputBytes, &table); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing input: %v\n", err)
+	if decodeError := json.Unmarshal(inputBytes, &table); decodeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing input: %v\n", decodeError)
 		os.Exit(1)
 	}
 
@@ -150,8 +150,8 @@ func main() {
 	}
 
 	var tableContext extractedContext
-	if err := json.Unmarshal(contextBytes, &tableContext); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing context: %v\n", err)
+	if decodeError := json.Unmarshal(contextBytes, &tableContext); decodeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: parsing context: %v\n", decodeError)
 		os.Exit(1)
 	}
 
@@ -180,8 +180,8 @@ func main() {
 
 	if *outputPath == "-" {
 		os.Stdout.Write(formatted)
-	} else if err := os.WriteFile(*outputPath, formatted, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_table: writing output: %v\n", err)
+	} else if writeError := os.WriteFile(*outputPath, formatted, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_descriptor_table: writing output: %v\n", writeError)
 		os.Exit(1)
 	}
 

@@ -69,13 +69,13 @@ var CorrectnessNoWriteOnlyCollection = rule.Rule{
 	// Whether `Map`, `Set` and the mutating methods are the default library's, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
-				correctnessNoWriteOnlyCollectionCheck(ctx, node)
+				correctnessNoWriteOnlyCollectionCheck(ruleContext, node)
 			},
 		}
 	},
@@ -89,7 +89,7 @@ var correctnessNoWriteOnlyCollectionWriters = map[string]map[string]bool{
 	"Set":   {"add": true, "delete": true, "clear": true},
 }
 
-func correctnessNoWriteOnlyCollectionCheck(ctx rule.Context, declaration *ast.Node) {
+func correctnessNoWriteOnlyCollectionCheck(ruleContext rule.Context, declaration *ast.Node) {
 	variable := declaration.AsVariableDeclaration()
 	name := declaration.Name()
 	list := declaration.Parent
@@ -101,11 +101,11 @@ func correctnessNoWriteOnlyCollectionCheck(ctx rule.Context, declaration *ast.No
 	if root == nil || root.Kind == ast.KindSourceFile {
 		return
 	}
-	kind := correctnessNoWriteOnlyCollectionKind(ctx, variable.Initializer)
+	kind := correctnessNoWriteOnlyCollectionKind(ruleContext, variable.Initializer)
 	if kind == "" {
 		return
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil || len(symbol.Declarations) != 1 || symbol.Declarations[0] != declaration {
 		return
 	}
@@ -118,14 +118,14 @@ func correctnessNoWriteOnlyCollectionCheck(ctx rule.Context, declaration *ast.No
 			return true
 		}
 		if node.Kind == ast.KindIdentifier && node != name && node.Text() == name.Text() {
-			resolved := ctx.TypeChecker.GetSymbolAtLocation(node)
+			resolved := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				if valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
 					resolved = valueSymbol
 				}
 			}
 			if resolved == symbol {
-				if !correctnessNoWriteOnlyCollectionIsWrite(ctx, node) {
+				if !correctnessNoWriteOnlyCollectionIsWrite(ruleContext, node) {
 					read = true
 					return true
 				}
@@ -139,12 +139,12 @@ func correctnessNoWriteOnlyCollectionCheck(ctx rule.Context, declaration *ast.No
 	if read || writes == 0 {
 		return
 	}
-	ctx.ReportNode(name, correctnessNoWriteOnlyCollectionMessage())
+	ruleContext.ReportNode(name, correctnessNoWriteOnlyCollectionMessage())
 }
 
 // correctnessNoWriteOnlyCollectionKind names the collection an initializer makes, "Array", "Map" or
 // "Set", and "" for anything else.
-func correctnessNoWriteOnlyCollectionKind(ctx rule.Context, initializer *ast.Node) string {
+func correctnessNoWriteOnlyCollectionKind(ruleContext rule.Context, initializer *ast.Node) string {
 	value := initializer
 	for {
 		value = ast.SkipParentheses(value)
@@ -166,7 +166,7 @@ func correctnessNoWriteOnlyCollectionKind(ctx rule.Context, initializer *ast.Nod
 		if constructor.Kind != ast.KindIdentifier || (constructor.Text() != "Map" && constructor.Text() != "Set") {
 			return ""
 		}
-		if !rule.IsSymbolFromDefaultLibrary(ctx.Program, ctx.TypeChecker.GetSymbolAtLocation(constructor)) {
+		if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(constructor)) {
 			return ""
 		}
 		return constructor.Text()
@@ -176,7 +176,7 @@ func correctnessNoWriteOnlyCollectionKind(ctx rule.Context, initializer *ast.Nod
 
 // correctnessNoWriteOnlyCollectionIsWrite says whether one reference to the collection only writes
 // it: a dropped call of a default-library mutating method, or the target of `name[key] = value`.
-func correctnessNoWriteOnlyCollectionIsWrite(ctx rule.Context, reference *ast.Node) bool {
+func correctnessNoWriteOnlyCollectionIsWrite(ruleContext rule.Context, reference *ast.Node) bool {
 	parent := reference.Parent
 	if parent == nil {
 		return false
@@ -198,7 +198,7 @@ func correctnessNoWriteOnlyCollectionIsWrite(ctx rule.Context, reference *ast.No
 		if statement == nil || statement.Kind != ast.KindExpressionStatement {
 			return false
 		}
-		return correctnessNoWriteOnlyCollectionIsWriter(ctx, access.Name())
+		return correctnessNoWriteOnlyCollectionIsWriter(ruleContext, access.Name())
 	case ast.KindElementAccessExpression:
 		if parent.AsElementAccessExpression().Expression != reference {
 			return false
@@ -219,8 +219,8 @@ func correctnessNoWriteOnlyCollectionIsWrite(ctx rule.Context, reference *ast.No
 
 // correctnessNoWriteOnlyCollectionIsWriter says whether a method name resolves to a mutating method
 // of the default library's Array, Map or Set, with every declaration there.
-func correctnessNoWriteOnlyCollectionIsWriter(ctx rule.Context, name *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+func correctnessNoWriteOnlyCollectionIsWriter(ruleContext rule.Context, name *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -234,7 +234,7 @@ func correctnessNoWriteOnlyCollectionIsWriter(ctx rule.Context, name *ast.Node) 
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ruleContext.Program, file) {
 			return false
 		}
 	}

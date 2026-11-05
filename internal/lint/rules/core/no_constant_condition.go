@@ -42,7 +42,7 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 		return fmt.Errorf("checkLoops is null, which upstream's schema refuses")
 	}
 	var enabled bool
-	if err := json.Unmarshal(raw, &enabled); err == nil {
+	if decodeError := json.Unmarshal(raw, &enabled); decodeError == nil {
 		*checkLoops = "none"
 		if enabled {
 			*checkLoops = "all"
@@ -50,7 +50,7 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 		return nil
 	}
 	var spelling string
-	if err := json.Unmarshal(raw, &spelling); err != nil {
+	if decodeError := json.Unmarshal(raw, &spelling); decodeError != nil {
 		return fmt.Errorf(`checkLoops is %s, which is neither a string nor a boolean`, raw)
 	}
 	switch spelling {
@@ -86,7 +86,7 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 // positive on code that redefines `undefined`, which has larger problems.
 var NoConstantCondition = rule.Rule{
 	Name: "no-constant-condition",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		checkLoops := NoConstantConditionCheckLoops("allExceptWhileTrue")
 		if parsed, ok := rule.OptionsAs[NoConstantConditionOptions](options); ok && parsed.CheckLoops != "" {
 			checkLoops = parsed.CheckLoops
@@ -94,7 +94,7 @@ var NoConstantCondition = rule.Rule{
 
 		reportIfConstant := func(condition *ast.Node) {
 			if condition != nil && isConstantExpression(condition, true) {
-				ctx.ReportNode(condition, messageUnexpectedConstantCondition)
+				ruleContext.ReportNode(condition, messageUnexpectedConstantCondition)
 			}
 		}
 

@@ -191,7 +191,7 @@ var OnlyThrowError = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[OnlyThrowErrorOptions](options)
 
 		// A rule configured as bare `"error"` is handed nil options, and `options.(T)` on nil yields
@@ -203,7 +203,7 @@ var OnlyThrowError = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -253,16 +253,16 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if allowRethrowing && onlyThrowErrorIsRethrown(ctx, subject) {
+				if allowRethrowing && onlyThrowErrorIsRethrown(ruleContext, subject) {
 					return
 				}
 
-				argumentType := ctx.TypeChecker.GetTypeAtLocation(subject)
+				argumentType := ruleContext.TypeChecker.GetTypeAtLocation(subject)
 				if argumentType == nil {
 					return
 				}
 
-				if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ctx.Program) {
+				if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ruleContext.Program) {
 					return
 				}
 
@@ -270,7 +270,7 @@ var OnlyThrowError = rule.Rule{
 				// sits above the any/unknown escapes on purpose: `throw undefined` reports even
 				// with every default still permissive.
 				if type_checking.IsTypeFlagSet(argumentType, checker.TypeFlagsUndefined) {
-					ctx.ReportNode(subject, buildOnlyThrowErrorUndefMessage())
+					ruleContext.ReportNode(subject, buildOnlyThrowErrorUndefMessage())
 					return
 				}
 
@@ -282,11 +282,11 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if type_checking.IsErrorLike(ctx.Program, ctx.TypeChecker, argumentType) {
+				if type_checking.IsErrorLike(ruleContext.Program, ruleContext.TypeChecker, argumentType) {
 					return
 				}
 
-				ctx.ReportNode(subject, buildOnlyThrowErrorObjectMessage())
+				ruleContext.ReportNode(subject, buildOnlyThrowErrorObjectMessage())
 			},
 		}
 	},
@@ -297,12 +297,12 @@ var OnlyThrowError = rule.Rule{
 // Two shapes count, and they are the two upstream names: a catch clause binding, and the rejection
 // handler parameter of a `.catch`/`.then` on something thenable. Anything that is not a bare
 // identifier is not a rethrow, which is what keeps `throw 'literal'` reportable.
-func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
+func onlyThrowErrorIsRethrown(ruleContext rule.Context, node *ast.Node) bool {
 	if !ast.IsIdentifier(node) {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return false
 	}
@@ -357,7 +357,7 @@ func onlyThrowErrorIsRethrown(ctx rule.Context, node *ast.Node) bool {
 
 	// The name alone is not enough: any object can have a method called `catch`. Upstream tests the
 	// receiver's type, and a plain `{ catch(cb) {} }` object reports.
-	return type_checking.IsThenableType(ctx.TypeChecker, receiver, nil)
+	return type_checking.IsThenableType(ruleContext.TypeChecker, receiver, nil)
 }
 
 // onlyThrowErrorParsePromiseHandlingCall reads a syntactically possible `.catch`/`.then` call,
@@ -492,7 +492,7 @@ type onlyThrowErrorRawSpecifier struct {
 // rather than silently meaning `file`, which is the zero value.
 func (s *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
 	var asString string
-	if err := json.Unmarshal(raw, &asString); err == nil {
+	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
 		*s = onlyThrowErrorRawSpecifier{inline: asString}
 		return nil
 	}
@@ -503,20 +503,20 @@ func (s *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
 		Path    string          `json:"path"`
 		Package string          `json:"package"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 
 	*s = onlyThrowErrorRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
 
 	var names []string
-	if err := json.Unmarshal(object.Name, &names); err == nil {
+	if decodeError := json.Unmarshal(object.Name, &names); decodeError == nil {
 		s.Name = names
 		return nil
 	}
 	var name string
-	if err := json.Unmarshal(object.Name, &name); err != nil {
-		return err
+	if decodeError := json.Unmarshal(object.Name, &name); decodeError != nil {
+		return decodeError
 	}
 	s.Name = []string{name}
 	return nil

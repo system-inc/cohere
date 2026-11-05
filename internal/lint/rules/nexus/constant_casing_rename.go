@@ -41,8 +41,8 @@ var unbindableGlobals = map[string]bool{
 // refuses the fix, which is broader than a scope walk needs to be and is the version that cannot be
 // wrong: the rename can then neither capture a reference to something else nor be captured by it.
 // A refused fix still reports, so the author renames by hand where the rule cannot prove safety.
-func fileLocalRenameFix(ctx rule.Context, name *ast.Node, newName string) (rule.Fix, bool) {
-	if ctx.TypeChecker == nil || ctx.SourceFile == nil || name == nil || newName == "" {
+func fileLocalRenameFix(ruleContext rule.Context, name *ast.Node, newName string) (rule.Fix, bool) {
+	if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil || name == nil || newName == "" {
 		return rule.Fix{}, false
 	}
 	oldName := name.Text()
@@ -56,7 +56,7 @@ func fileLocalRenameFix(ctx rule.Context, name *ast.Node, newName string) (rule.
 		return rule.Fix{}, false
 	}
 
-	declared := ctx.TypeChecker.GetSymbolAtLocation(name)
+	declared := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	// One declaration, or something merged into the name (a type alias, a namespace) answers to the
 	// old spelling where the checker's value lookup cannot see it.
 	if declared == nil || len(declared.Declarations) != 1 {
@@ -81,20 +81,20 @@ func fileLocalRenameFix(ctx rule.Context, name *ast.Node, newName string) (rule.
 				refused = true
 				return true
 			case oldName:
-				edit, isReference, refuses := renameSite(ctx, node, name, declared, oldName, newName)
+				edit, isReference, refuses := renameSite(ruleContext, node, name, declared, oldName, newName)
 				if refuses {
 					refused = true
 					return true
 				}
 				if isReference {
-					edits = append(edits, siteEdit{textRange: rule.TokenRange(ctx.SourceFile, node), text: edit})
+					edits = append(edits, siteEdit{textRange: rule.TokenRange(ruleContext.SourceFile, node), text: edit})
 				}
 			}
 		}
 		node.ForEachChild(visit)
 		return refused
 	}
-	ctx.SourceFile.AsNode().ForEachChild(visit)
+	ruleContext.SourceFile.AsNode().ForEachChild(visit)
 
 	// The declaration's own name is always a site, since the walk visits every identifier and the
 	// first comparison in `renameSite` is identity, so the length test cannot fire and no fixture
@@ -110,7 +110,7 @@ func fileLocalRenameFix(ctx rule.Context, name *ast.Node, newName string) (rule.
 		return edits[first].textRange.Pos() < edits[second].textRange.Pos()
 	})
 
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 	start := edits[0].textRange.Pos()
 	end := edits[len(edits)-1].textRange.End()
 	var replacement strings.Builder
@@ -128,7 +128,7 @@ func fileLocalRenameFix(ctx rule.Context, name *ast.Node, newName string) (rule.
 // renameSite decides one identifier spelled like the constant: whether it is the constant, what it
 // becomes, and whether its position forbids the rename altogether.
 func renameSite(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	identifier *ast.Node,
 	declarationName *ast.Node,
 	declared *ast.Symbol,
@@ -144,20 +144,20 @@ func renameSite(
 		switch parent.Kind {
 		case ast.KindShorthandPropertyAssignment:
 			if parent.Name() == identifier {
-				if ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent) != declared {
+				if ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent) != declared {
 					return "", false, false
 				}
 				return oldName + ": " + newName, true, false
 			}
 		case ast.KindExportSpecifier:
-			if ctx.TypeChecker.GetExportSpecifierLocalTargetSymbol(parent) == declared {
+			if ruleContext.TypeChecker.GetExportSpecifierLocalTargetSymbol(parent) == declared {
 				return "", false, true
 			}
 			return "", false, false
 		}
 	}
 
-	if ctx.TypeChecker.GetSymbolAtLocation(identifier) == declared {
+	if ruleContext.TypeChecker.GetSymbolAtLocation(identifier) == declared {
 		return newName, true, false
 	}
 	return "", false, false

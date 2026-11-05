@@ -71,8 +71,8 @@ func TestEveryReleaseTargetCompiles(test *testing.T) {
 				return
 			}
 			command := release.GoBuildCommand(moduleDirectory, target, strings.Join(release.StripFlags, " "), filepath.Join(test.TempDir(), target.BinaryFileName()))
-			if output, err := command.CombinedOutput(); err != nil {
-				test.Fatalf("cohere does not compile for %s, so a release would fail there: %v\n%s", target, err, output)
+			if output, outputError := command.CombinedOutput(); outputError != nil {
+				test.Fatalf("cohere does not compile for %s, so a release would fail there: %v\n%s", target, outputError, output)
 			}
 		})
 	}
@@ -90,13 +90,13 @@ func typeCheckTarget(moduleDirectory string, target release.Target) []string {
 // `go list -deps -json` and `go env`, which read and never build, so a runner of prebuilt tests can run it
 // (#qnnnkbf): go/packages asked go list for -compiled files and test variants, flags such a runner refuses.
 func typeCheck(moduleDirectory string, target release.Target, tests bool, patterns ...string) []string {
-	loaded, err := gotypes.Load(gotypes.Config{
+	loaded, loadError := gotypes.Load(gotypes.Config{
 		Directory:   moduleDirectory,
 		Environment: []string{"GOOS=" + target.GoOperatingSystem, "GOARCH=" + target.GoArchitecture, "CGO_ENABLED=0"},
 		Tests:       tests,
 	}, patterns...)
-	if err != nil {
-		return []string{err.Error()}
+	if loadError != nil {
+		return []string{loadError.Error()}
 	}
 	if len(loaded.Source) == 0 {
 		return []string{fmt.Sprintf("nothing was loaded for %s, so nothing was checked", target)}
@@ -203,13 +203,13 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(test *testing.T) {
 	writeFile(test, filepath.Join(directory, "command", "cohere", "only_darwin.go"), "package main\n\nfunc onlyOnDarwin() {}\n")
 
 	darwin := release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
-	if output, err := release.GoBuildCommand(directory, darwin, "", filepath.Join(test.TempDir(), "cohere")).CombinedOutput(); err != nil {
-		test.Fatalf("the control does not compile even for darwin, so it cannot show anything: %v\n%s", err, output)
+	if output, outputError := release.GoBuildCommand(directory, darwin, "", filepath.Join(test.TempDir(), "cohere")).CombinedOutput(); outputError != nil {
+		test.Fatalf("the control does not compile even for darwin, so it cannot show anything: %v\n%s", outputError, output)
 	}
 
 	windows := release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}
-	output, err := release.GoBuildCommand(directory, windows, "", filepath.Join(test.TempDir(), "cohere.exe")).CombinedOutput()
-	if err == nil {
+	output, outputError := release.GoBuildCommand(directory, windows, "", filepath.Join(test.TempDir(), "cohere.exe")).CombinedOutput()
+	if outputError == nil {
 		test.Fatal("a call to a darwin-only function compiled for windows, so the cross-compile check cannot catch a platform-only break")
 	}
 	if !strings.Contains(string(output), "onlyOnDarwin") {
@@ -219,10 +219,10 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(test *testing.T) {
 
 func writeFile(test *testing.T, path string, contents string) {
 	test.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 }

@@ -121,8 +121,8 @@ func jsxNoConstructedContextValuesNearestFunction(node *ast.Node) *ast.Node {
 //
 // Only `const`, because a `let` can be reassigned to something stable after its initializer, and
 // following the initializer alone would report a value the code later replaced.
-func jsxNoConstructedContextValuesRenderConst(ctx rule.Context, identifier *ast.Node, scope *ast.Node, render *ast.Node) *ast.Node {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func jsxNoConstructedContextValuesRenderConst(ruleContext rule.Context, identifier *ast.Node, scope *ast.Node, render *ast.Node) *ast.Node {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return nil
 	}
@@ -182,7 +182,7 @@ func jsxNoConstructedContextValuesRunsWith(owner *ast.Node, scope *ast.Node, ren
 
 // jsxNoConstructedContextValuesMemoOf finds the memo call behind a provider's value expression: the
 // call written inline, or the call a render-scoped `const` was initialized with.
-func jsxNoConstructedContextValuesMemoOf(ctx rule.Context, value *ast.Node, scope *ast.Node) *ast.Node {
+func jsxNoConstructedContextValuesMemoOf(ruleContext rule.Context, value *ast.Node, scope *ast.Node) *ast.Node {
 	value = jsxNoConstructedContextValuesUnwrap(value)
 	if value == nil {
 		return nil
@@ -193,7 +193,7 @@ func jsxNoConstructedContextValuesMemoOf(ctx rule.Context, value *ast.Node, scop
 	if value.Kind != ast.KindIdentifier {
 		return nil
 	}
-	declaration := jsxNoConstructedContextValuesRenderConst(ctx, value, scope, scope)
+	declaration := jsxNoConstructedContextValuesRenderConst(ruleContext, value, scope, scope)
 	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 		return nil
 	}
@@ -582,11 +582,11 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) functionEvaluation(
 // jsxNoConstructedContextValuesLocalDeclaration resolves an identifier to a variable declared
 // directly in `scope`, of any kind, or nil. It is what an assignment target has to be for the
 // assignment to be a holder rather than an escape.
-func jsxNoConstructedContextValuesLocalDeclaration(ctx rule.Context, target *ast.Node, scope *ast.Node) *ast.Node {
+func jsxNoConstructedContextValuesLocalDeclaration(ruleContext rule.Context, target *ast.Node, scope *ast.Node) *ast.Node {
 	if target == nil || target.Kind != ast.KindIdentifier {
 		return nil
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(target)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(target)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return nil
 	}
@@ -776,33 +776,33 @@ func jsxNoConstructedContextValuesCalleeName(call *ast.Node) string {
 }
 
 // jsxNoConstructedContextValuesDependencyText is a dependency's source text, trimmed of trivia.
-func jsxNoConstructedContextValuesDependencyText(ctx rule.Context, dependency *ast.Node) string {
-	span := rule.TokenRange(ctx.SourceFile, dependency)
-	return ctx.SourceFile.Text()[span.Pos():span.End()]
+func jsxNoConstructedContextValuesDependencyText(ruleContext rule.Context, dependency *ast.Node) string {
+	span := rule.TokenRange(ruleContext.SourceFile, dependency)
+	return ruleContext.SourceFile.Text()[span.Pos():span.End()]
 }
 
 // jsxNoConstructedContextValuesCheckMemo reports a provider value that is memoized over an input
 // that changes every render, or memoized with no dependency list at all.
-func jsxNoConstructedContextValuesCheckMemo(ctx rule.Context, value *ast.Node, provider *ast.Node) {
+func jsxNoConstructedContextValuesCheckMemo(ruleContext rule.Context, value *ast.Node, provider *ast.Node) {
 	// The caller has already established the provider sits in a component, so there is a function.
 	scope := jsxNoConstructedContextValuesNearestFunction(provider)
-	memo := jsxNoConstructedContextValuesMemoOf(ctx, value, scope)
+	memo := jsxNoConstructedContextValuesMemoOf(ruleContext, value, scope)
 	if memo == nil {
 		return
 	}
 	hook := jsxNoConstructedContextValuesMemoHookName(memo)
 	lineOf := func(node *ast.Node) int {
-		line, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, rule.TokenRange(ctx.SourceFile, node).Pos())
+		line, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, rule.TokenRange(ruleContext.SourceFile, node).Pos())
 		return line + 1
 	}
 
-	walk := &jsxNoConstructedContextValuesStabilityWalk{ctx: ctx, active: map[*ast.Node]bool{}, render: scope}
+	walk := &jsxNoConstructedContextValuesStabilityWalk{ctx: ruleContext, active: map[*ast.Node]bool{}, render: scope}
 	found, _ := walk.memoFinding(memo, scope, 0)
 	if found == nil {
 		return
 	}
 	if found.dependency == nil {
-		ctx.ReportNode(memo.AsCallExpression().Expression, rule.Message{
+		ruleContext.ReportNode(memo.AsCallExpression().Expression, rule.Message{
 			Id: "memoWithoutDependenciesMsg",
 			Description: fmt.Sprintf(
 				"The %s that builds the Context provider's value (at line %d) has no dependency list, "+
@@ -815,12 +815,12 @@ func jsxNoConstructedContextValuesCheckMemo(ctx rule.Context, value *ast.Node, p
 		return
 	}
 
-	dependencyText := jsxNoConstructedContextValuesDependencyText(ctx, found.dependency)
+	dependencyText := jsxNoConstructedContextValuesDependencyText(ruleContext, found.dependency)
 	location := ""
-	if ast.GetSourceFileOfNode(found.origin) == ctx.SourceFile {
+	if ast.GetSourceFileOfNode(found.origin) == ruleContext.SourceFile {
 		location = fmt.Sprintf(" (at line %d)", lineOf(found.origin))
 	}
-	ctx.ReportNode(found.dependency, rule.Message{
+	ruleContext.ReportNode(found.dependency, rule.Message{
 		Id: "unstableDependencyMsg",
 		Description: fmt.Sprintf(
 			"The %q dependency of the %s that builds the Context provider's value (at line %d) %s%s, "+

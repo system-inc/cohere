@@ -89,7 +89,7 @@ var messageDefaultCaseMissingDefaultCase = rule.Message{
 // helper before it existed.
 var DefaultCase = rule.Rule{
 	Name: "default-case",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		pattern := defaultCaseDefaultCommentPattern
 		if resolved, isDefaultCaseOptions := rule.OptionsAs[DefaultCaseOptions](options); isDefaultCaseOptions &&
 			resolved.CommentPattern != "" {
@@ -100,7 +100,7 @@ var DefaultCase = rule.Rule{
 			// enforcing rather than crashing, and a crash costs every OTHER rule its verdict on that
 			// file because the walk recovers per file. Same drop `core/no-param-reassign` takes for
 			// the same reason.
-			if compiled, err := esregexp.Compile(resolved.CommentPattern, "u"); err == nil {
+			if compiled, compileError := esregexp.Compile(resolved.CommentPattern, "u"); compileError == nil {
 				pattern = compiled
 			}
 		}
@@ -129,11 +129,11 @@ var DefaultCase = rule.Rule{
 					}
 				}
 
-				if defaultCaseHasExcusingComment(ctx, clauses[len(clauses)-1], statement.CaseBlock, pattern) {
+				if defaultCaseHasExcusingComment(ruleContext, clauses[len(clauses)-1], statement.CaseBlock, pattern) {
 					return
 				}
 
-				ctx.ReportNode(node, messageDefaultCaseMissingDefaultCase)
+				ruleContext.ReportNode(node, messageDefaultCaseMissingDefaultCase)
 			},
 		}
 	},
@@ -151,7 +151,7 @@ var DefaultCase = rule.Rule{
 // inherits, and it is the conservative direction: reporting where upstream might not is visible,
 // while silently excusing is not.
 func defaultCaseHasExcusingComment(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	lastClause *ast.Node,
 	caseBlock *ast.Node,
 	pattern *esregexp.RegExp,
@@ -164,7 +164,7 @@ func defaultCaseHasExcusingComment(
 
 	// Read the shared list ONCE. `ForFile` is cached per file, so calling it inside the loop is
 	// not a rescan, but it is a map lookup and a closure call per comment for no reason.
-	fileComments := comments.ForFile(ctx)
+	fileComments := comments.ForFile(ruleContext)
 
 	var lastComment *comments.Comment
 	for index := range fileComments {
@@ -217,8 +217,8 @@ func DecodeDefaultCaseOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

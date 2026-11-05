@@ -89,9 +89,9 @@ type markdownCorpus struct {
 // ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 	test.Helper()
-	enumerator, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var corpora []markdownCorpus
 	pending := strings.Split(roots, ":")
@@ -174,9 +174,9 @@ func standInEmbeds(options formatoptions.Options, engine *prettier.Engine, fellB
 		if fileName == "" {
 			return nil, fmt.Errorf("no file name for parser %s", parserOrFile)
 		}
-		formatted, err := engine.Format(fileName, text)
-		if err != nil {
-			return nil, err
+		formatted, formatError := engine.Format(fileName, text)
+		if formatError != nil {
+			return nil, formatError
 		}
 		fellBack[parserOrFile] = true
 		return doc.Text(strings.TrimSuffix(formatted, "\n")), nil
@@ -256,8 +256,8 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 				// Attribution: with the oracle's embedded output, does markdown match?
 				if len(markdown.EmbeddedParsers(input)) > 0 {
 					fellBack := map[string]bool{}
-					standIn, err := markdown.Format(input, job.options, standInEmbeds(job.options, engine, fellBack))
-					if err == nil && standIn == expected && len(fellBack) > 0 {
+					standIn, formatError := markdown.Format(input, job.options, standInEmbeds(job.options, engine, fellBack))
+					if formatError == nil && standIn == expected && len(fellBack) > 0 {
 						var parsers []string
 						for parser := range fellBack {
 							parsers = append(parsers, parser)
@@ -309,8 +309,8 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 	test.Logf("perturbed markdown: %d/%d identical over %d inputs, %d oracle failures excluded; attributed %v",
 		identical, measured, len(jobs), oracleFailures, attributed)
 	if path := os.Getenv("COHERE_MARKDOWN_PERTURB_REPORT"); path != "" {
-		if err := os.WriteFile(path, []byte(strings.Join(misses, "\n")+"\n"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(strings.Join(misses, "\n")+"\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	for index, line := range unattributed {

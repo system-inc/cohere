@@ -51,9 +51,9 @@ func TestCorpora(test *testing.T) {
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			test.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
@@ -176,7 +176,7 @@ func describeOptions(options formatoptions.Options) string {
 
 func expandHome(path string) string {
 	if strings.HasPrefix(path, "~/") {
-		if home, err := os.UserHomeDir(); err == nil {
+		if home, homeDirectoryError := os.UserHomeDir(); homeDirectoryError == nil {
 			return filepath.Join(home, path[2:])
 		}
 	}

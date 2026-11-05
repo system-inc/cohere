@@ -47,8 +47,8 @@ func DecodeNoPromiseExecutorReturnOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -120,7 +120,7 @@ var NoPromiseExecutorReturn = rule.Rule{
 	TypeReach:        rule.TypeReachShapes,
 	Name:             "no-promise-executor-return",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. Correct here only because the option defaults to false; written out so a later
 		// default change cannot invert the rule silently.
@@ -142,7 +142,7 @@ var NoPromiseExecutorReturn = rule.Rule{
 			// Kept anyway. The verdict names the callers that exist right now and expires the moment
 			// a second checker call is added to this listener, and a typed rule reading the checker
 			// without guarding is the shape three shipped rules got wrong.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			arrow := node.AsArrowFunction()
@@ -150,7 +150,7 @@ var NoPromiseExecutorReturn = rule.Rule{
 			if body == nil || body.Kind == ast.KindBlock {
 				return
 			}
-			if !isPromiseExecutorFunction(ctx, node) {
+			if !isPromiseExecutorFunction(ruleContext, node) {
 				return
 			}
 			// `=> void 0` is already saying the value is discarded, which is what allowVoid asks
@@ -161,22 +161,22 @@ var NoPromiseExecutorReturn = rule.Rule{
 
 			suggestions := []rule.Suggestion{}
 			if allowVoid {
-				suggestions = append(suggestions, promiseExecutorPrependVoidSuggestion(ctx, body))
+				suggestions = append(suggestions, promiseExecutorPrependVoidSuggestion(ruleContext, body))
 			}
 			if promiseExecutorCanWrapInBraces(body) {
-				suggestions = append(suggestions, promiseExecutorWrapBracesSuggestion(ctx, body))
+				suggestions = append(suggestions, promiseExecutorWrapBracesSuggestion(ruleContext, body))
 			}
 
 			// The reported node is the UNWRAPPED expression while the brace anchors above are the
 			// body as written, which is the parser difference the doc comment describes.
-			ctx.ReportNodeWithSuggestions(unwrapParentheses(body), messageNoPromiseExecutorReturn,
+			ruleContext.ReportNodeWithSuggestions(unwrapParentheses(body), messageNoPromiseExecutorReturn,
 				suggestions...)
 		}
 
 		return rule.Listeners{
 			ast.KindArrowFunction: reportArrowBody,
 			ast.KindReturnStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				argument := node.AsReturnStatement().Expression
@@ -186,21 +186,21 @@ var NoPromiseExecutorReturn = rule.Rule{
 					return
 				}
 				enclosing := enclosingFunctionOf(node)
-				if enclosing == nil || !isPromiseExecutorFunction(ctx, enclosing) {
+				if enclosing == nil || !isPromiseExecutorFunction(ruleContext, enclosing) {
 					return
 				}
 
 				if !allowVoid {
 					// Upstream offers nothing here: `suggestions: null`. Braces cannot help a
 					// statement that already has them, and `void` is what allowVoid is for.
-					ctx.ReportNode(node, messageNoPromiseExecutorReturn)
+					ruleContext.ReportNode(node, messageNoPromiseExecutorReturn)
 					return
 				}
 				if unwrapParentheses(argument).Kind == ast.KindVoidExpression {
 					return
 				}
-				ctx.ReportNodeWithSuggestions(node, messageNoPromiseExecutorReturn,
-					promiseExecutorPrependVoidSuggestion(ctx, argument))
+				ruleContext.ReportNodeWithSuggestions(node, messageNoPromiseExecutorReturn,
+					promiseExecutorPrependVoidSuggestion(ruleContext, argument))
 			},
 		}
 	},
@@ -215,7 +215,7 @@ var NoPromiseExecutorReturn = rule.Rule{
 // The first-argument test is what keeps `new Promise(foo, (resolve, reject) => 1)` clean, and the
 // identifier test is what keeps `new Promise.foo(...)` and `new foo.Promise(...)` clean, since
 // neither callee is an identifier at all.
-func isPromiseExecutorFunction(ctx rule.Context, node *ast.Node) bool {
+func isPromiseExecutorFunction(ruleContext rule.Context, node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil || parent.Kind != ast.KindNewExpression {
 		return false
@@ -233,7 +233,7 @@ func isPromiseExecutorFunction(ctx rule.Context, node *ast.Node) bool {
 	if callee == nil || !ast.IsIdentifier(callee) || callee.Text() != "Promise" {
 		return false
 	}
-	return resolvesToAGlobal(ctx, callee)
+	return resolvesToAGlobal(ruleContext, callee)
 }
 
 // promiseExecutorCanWrapInBraces reports whether `{}` around a concise body would still parse.
@@ -262,12 +262,12 @@ func promiseExecutorCanWrapInBraces(body *ast.Node) bool {
 // Anchored on the body AS WRITTEN rather than unwrapped, which is what makes
 // `new Promise(r => (1))` produce `{(1)}` rather than `({1})`. Upstream anchors on the tokens either
 // side of the arrow, arriving at the same span for a different reason.
-func promiseExecutorWrapBracesSuggestion(ctx rule.Context, body *ast.Node) rule.Suggestion {
+func promiseExecutorWrapBracesSuggestion(ruleContext rule.Context, body *ast.Node) rule.Suggestion {
 	return rule.Suggestion{
 		Message: messageNoPromiseExecutorReturnWrapBraces,
 		Fixes: []rule.Fix{
-			ctx.InsertBefore(body, "{"),
-			ctx.InsertAfter(body, "}"),
+			ruleContext.InsertBefore(body, "{"),
+			ruleContext.InsertAfter(body, "}"),
 		},
 	}
 }
@@ -287,9 +287,9 @@ func promiseExecutorWrapBracesSuggestion(ctx rule.Context, body *ast.Node) rule.
 // parenthesized. Measured across the operators upstream's corpus and this tree write: assignment,
 // conditional and every binary operator need them, while prefix and postfix unary, `new`, a member
 // access, an arrow, an array literal and an already-parenthesized expression do not.
-func promiseExecutorPrependVoidSuggestion(ctx rule.Context, expression *ast.Node) rule.Suggestion {
+func promiseExecutorPrependVoidSuggestion(ruleContext rule.Context, expression *ast.Node) rule.Suggestion {
 	prefix := "void "
-	if promiseExecutorIsAdjacentToReturn(ctx, expression) {
+	if promiseExecutorIsAdjacentToReturn(ruleContext, expression) {
 		prefix = " void "
 	}
 
@@ -297,14 +297,14 @@ func promiseExecutorPrependVoidSuggestion(ctx rule.Context, expression *ast.Node
 		return rule.Suggestion{
 			Message: messageNoPromiseExecutorReturnPrependVoid,
 			Fixes: []rule.Fix{
-				ctx.InsertBefore(expression, prefix+"("),
-				ctx.InsertAfter(expression, ")"),
+				ruleContext.InsertBefore(expression, prefix+"("),
+				ruleContext.InsertAfter(expression, ")"),
 			},
 		}
 	}
 	return rule.Suggestion{
 		Message: messageNoPromiseExecutorReturnPrependVoid,
-		Fixes:   []rule.Fix{ctx.InsertBefore(expression, prefix)},
+		Fixes:   []rule.Fix{ruleContext.InsertBefore(expression, prefix)},
 	}
 }
 
@@ -313,17 +313,17 @@ func promiseExecutorPrependVoidSuggestion(ctx rule.Context, expression *ast.Node
 //
 // `ctx.InsertBefore` anchors on the token range, which starts past leading trivia, so the check is
 // whether the source immediately before that token is the end of `return`.
-func promiseExecutorIsAdjacentToReturn(ctx rule.Context, expression *ast.Node) bool {
+func promiseExecutorIsAdjacentToReturn(ruleContext rule.Context, expression *ast.Node) bool {
 	parent := expression.Parent
 	if parent == nil || parent.Kind != ast.KindReturnStatement {
 		return false
 	}
-	start := rule.TokenRange(ctx.SourceFile, expression).Pos()
+	start := rule.TokenRange(ruleContext.SourceFile, expression).Pos()
 	const keyword = "return"
 	if start < len(keyword) {
 		return false
 	}
-	return ctx.SourceFile.Text()[start-len(keyword):start] == keyword
+	return ruleContext.SourceFile.Text()[start-len(keyword):start] == keyword
 }
 
 // promiseExecutorNeedsParensUnderVoid reports whether prepending `void` would bind tighter than the

@@ -216,9 +216,9 @@ func TestTierMembershipIsTheWholeChainsAndThePredicateFormatAsks(test *testing.T
 		"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-continue": "off"}}`,
 	})
 	path := filepath.Join(inTier, "CohereSettings.json")
-	sources, err := SourcesOf(path)
-	if err != nil || !InOurTiers(sources) {
-		test.Fatalf("a nested tier set must make the chain ours by the shared predicate: %v %v", sources, err)
+	sources, sourcesOfError := SourcesOf(path)
+	if sourcesOfError != nil || !InOurTiers(sources) {
+		test.Fatalf("a nested tier set must make the chain ours by the shared predicate: %v %v", sources, sourcesOfError)
 	}
 	refusedWith(test, path, `turns off "no-continue" in `+path+` with no reason`)
 

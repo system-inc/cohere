@@ -158,11 +158,11 @@ var NoArrayDelete = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		isUnderlyingTypeArray := func(t *checker.Type) bool {
 			if type_checking.IsTypeFlagSet(t, checker.TypeFlagsUnion) {
 				for _, t := range t.Types() {
-					if !checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
+					if !checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, t) {
 						return false
 					}
 				}
@@ -171,19 +171,19 @@ var NoArrayDelete = rule.Rule{
 
 			if type_checking.IsTypeFlagSet(t, checker.TypeFlagsIntersection) {
 				for _, t := range t.Types() {
-					if checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) {
+					if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, t) {
 						return true
 					}
 				}
 				return false
 			}
 
-			return checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
+			return checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, t)
 		}
 
 		return rule.Listeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -198,20 +198,20 @@ var NoArrayDelete = rule.Rule{
 
 				expression := deleteExpression.AsElementAccessExpression()
 
-				argType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression.Expression)
+				argType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expression.Expression)
 
 				if !isUnderlyingTypeArray(argType) {
 					return
 				}
 
-				expressionRange := rule.TokenRange(ctx.SourceFile, expression.Expression)
-				argumentRange := rule.TokenRange(ctx.SourceFile, expression.ArgumentExpression)
+				expressionRange := rule.TokenRange(ruleContext.SourceFile, expression.Expression)
+				argumentRange := rule.TokenRange(ruleContext.SourceFile, expression.ArgumentExpression)
 
-				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
-				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expressionRange.End())
-				rightBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, argumentRange.End())
+				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())
+				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, expressionRange.End())
+				rightBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, argumentRange.End())
 
-				ctx.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.Suggestion{
+				ruleContext.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.Suggestion{
 					Message: buildUseSpliceMessage(),
 					Fixes: []rule.Fix{
 						rule.RemoveRange(deleteTokenRange),

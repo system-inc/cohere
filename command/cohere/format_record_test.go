@@ -69,9 +69,9 @@ func (fixture recordFixture) relative(test *testing.T, files []string) []string 
 	test.Helper()
 	out := []string{}
 	for _, file := range files {
-		relative, err := filepath.Rel(fixture.root, file)
-		if err != nil {
-			test.Fatal(err)
+		relative, relativePathError := filepath.Rel(fixture.root, file)
+		if relativePathError != nil {
+			test.Fatal(relativePathError)
 		}
 		out = append(out, filepath.ToSlash(relative))
 	}
@@ -90,8 +90,8 @@ func (fixture recordFixture) formatEverything(test *testing.T) {
 			test.Fatal(err)
 		}
 	}
-	if err := record.save(universe); err != nil {
-		test.Fatal(err)
+	if saveError := record.save(universe); saveError != nil {
+		test.Fatal(saveError)
 	}
 }
 
@@ -100,8 +100,8 @@ func (fixture recordFixture) formatEverything(test *testing.T) {
 func aged(test *testing.T, path string) {
 	test.Helper()
 	old := time.Now().Add(-time.Minute)
-	if err := os.Chtimes(path, old, old); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(path, old, old); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
 }
 
@@ -170,14 +170,14 @@ func TestTheRecordScopesWhatChangedSinceCohereLastLooked(test *testing.T) {
 func TestADeletedFileLeavesTheScopeAndTheRecord(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
-	if err := os.Remove(fixture.path("B.ts")); err != nil {
-		test.Fatal(err)
+	if removeError := os.Remove(fixture.path("B.ts")); removeError != nil {
+		test.Fatal(removeError)
 	}
 
 	files, universe, record, _ := fixture.scope(test)
 	assertScope(test, files)
-	if err := record.save(universe); err != nil {
-		test.Fatal(err)
+	if saveError := record.save(universe); saveError != nil {
+		test.Fatal(saveError)
 	}
 	stored := readFormatSection(fixture.root)
 	if stored == nil {
@@ -233,8 +233,8 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 
 	stored := readFormatSection(fixture.root)
 	stored.Key = "another cohere"
-	if err := writeFormatSection(fixture.root, stored); err != nil {
-		test.Fatal(err)
+	if writeFormatSectionError := writeFormatSection(fixture.root, stored); writeFormatSectionError != nil {
+		test.Fatal(writeFormatSectionError)
 	}
 
 	files, _, _, description := fixture.scope(test)
@@ -244,8 +244,8 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 	}
 
 	// An unreadable table is the same answer, never an error.
-	if err := os.WriteFile(filepath.Join(cacheDirectory(fixture.root), "format.gob"), []byte("not a cache table"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(cacheDirectory(fixture.root), "format.gob"), []byte("not a cache table"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	files, _, _, _ = fixture.scope(test)
 	assertScope(test, files, "A.ts", "B.ts")
@@ -264,8 +264,8 @@ func TestAVerifiedFileIsAnsweredByStatAndAnEditIsStillSeen(test *testing.T) {
 	// The first read verifies by content and records each signature.
 	files, universe, record, _ := fixture.scope(test)
 	assertScope(test, files)
-	if err := record.save(universe); err != nil {
-		test.Fatal(err)
+	if saveError := record.save(universe); saveError != nil {
+		test.Fatal(saveError)
 	}
 	reloaded := loadFormatRecord(fixture.root)
 	if entry := reloaded.entries[fixture.path("A.ts")]; entry.ModifiedNanoseconds == 0 {
@@ -289,17 +289,17 @@ func TestDeclaredSubmodulesReadsTheGitmodulesPaths(test *testing.T) {
 		"[submodule \"quoted\"]\n" +
 		"\tpath = \"libraries/with space\"\n"})
 
-	declared, err := declaredSubmodules(directory)
-	if err != nil {
-		test.Fatal(err)
+	declared, declaredSubmodulesError := declaredSubmodules(directory)
+	if declaredSubmodulesError != nil {
+		test.Fatal(declaredSubmodulesError)
 	}
 	want := map[string]struct{}{"libraries/structure": {}, "libraries/with space": {}}
 	if !reflect.DeepEqual(declared, want) {
 		test.Fatalf("declared %v, expected %v", declared, want)
 	}
 
-	if none, err := declaredSubmodules(test.TempDir()); err != nil || len(none) != 0 {
-		test.Fatalf("a repository with no .gitmodules declared %v (err %v)", none, err)
+	if none, declaredSubmodulesError := declaredSubmodules(test.TempDir()); declaredSubmodulesError != nil || len(none) != 0 {
+		test.Fatalf("a repository with no .gitmodules declared %v (err %v)", none, declaredSubmodulesError)
 	}
 }
 
@@ -336,8 +336,8 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(test *testing.T) {
 		command := exec.Command("go", "build", "-buildvcs=false", "-trimpath", "-o", binaries[index],
 			"-ldflags=-X "+packaging+".selfCommit="+stamp.selfCommit+" -X "+packaging+".formatterIdentity="+stamp.formatter, "./command/cohere")
 		command.Dir = snapshot
-		if output, err := command.CombinedOutput(); err != nil {
-			failures[index] = fmt.Sprintf("cannot build cohere stamped %s, %s: %v\n%s", stamp.selfCommit, stamp.formatter, err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			failures[index] = fmt.Sprintf("cannot build cohere stamped %s, %s: %v\n%s", stamp.selfCommit, stamp.formatter, outputError, output)
 		}
 	}
 	build(0)
@@ -394,9 +394,9 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(test *testing.T) {
 // 95 MB.
 func sourceSnapshot(test *testing.T) string {
 	test.Helper()
-	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	moduleRoot, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	snapshot := test.TempDir()
 	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
@@ -406,13 +406,13 @@ func sourceSnapshot(test *testing.T) string {
 	// it. A module left out is one the snapshot's go.work names and cannot find.
 	for _, directory := range []string{"command", "internal", "policy", "TypeScript-shim", "static_single_assignment", "mutation_aliasing", "unicodeproperties"} {
 		source := filepath.Join(moduleRoot, directory)
-		err := filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkError error) error {
+		walkError := filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkError error) error {
 			if walkError != nil {
 				return walkError
 			}
-			relative, err := filepath.Rel(moduleRoot, path)
-			if err != nil {
-				return err
+			relative, relativePathError := filepath.Rel(moduleRoot, path)
+			if relativePathError != nil {
+				return relativePathError
 			}
 			if entry.IsDir() {
 				if entry.Name() == "testdata" {
@@ -426,26 +426,26 @@ func sourceSnapshot(test *testing.T) string {
 			copySnapshotFile(test, path, filepath.Join(snapshot, relative))
 			return nil
 		})
-		if err != nil {
-			test.Fatalf("snapshotting %s: %v", directory, err)
+		if walkError != nil {
+			test.Fatalf("snapshotting %s: %v", directory, walkError)
 		}
 	}
-	if err := os.Symlink(filepath.Join(moduleRoot, "TypeScript"), filepath.Join(snapshot, "TypeScript")); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink(filepath.Join(moduleRoot, "TypeScript"), filepath.Join(snapshot, "TypeScript")); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
 	return snapshot
 }
 
 func copySnapshotFile(test *testing.T, source string, destination string) {
 	test.Helper()
-	contents, err := os.ReadFile(source)
-	if err != nil {
-		if os.IsNotExist(err) {
+	contents, readError := os.ReadFile(source)
+	if readError != nil {
+		if os.IsNotExist(readError) {
 			return
 		}
-		test.Fatal(err)
+		test.Fatal(readError)
 	}
-	if err := os.WriteFile(destination, contents, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(destination, contents, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 }

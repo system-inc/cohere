@@ -76,7 +76,7 @@ func DecodeMaxDepthOptions(raw []byte) (any, error) {
 	}
 
 	var maximum int
-	if err := json.Unmarshal(raw, &maximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &maximum); decodeError == nil {
 		settings.Maximum = maximum
 		return settings, nil
 	}
@@ -85,8 +85,8 @@ func DecodeMaxDepthOptions(raw []byte) (any, error) {
 		Maximum *int `json:"maximum"`
 		Max     *int `json:"max"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 
 	// Upstream's `hasOwn` guard: neither key present means the branch is never entered and the
@@ -175,7 +175,7 @@ var messageMaxDepthTooDeeply = rule.Message{
 var MaxDepth = rule.Rule{
 	Name: "max-depth",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := maxDepthSettingsFrom(options)
 		if settings.Disabled {
 			// `{"maximum": 0}` leaves upstream comparing against `undefined`, so it reports
@@ -189,7 +189,7 @@ var MaxDepth = rule.Rule{
 				// The walk is done here rather than through per-kind listeners because the rule
 				// needs a counter that rises entering a block and falls leaving it, and the
 				// listener walk is pre-order with no exit hook to decrement on.
-				walker := &maxDepthWalker{ctx: ctx, settings: settings}
+				walker := &maxDepthWalker{ctx: ruleContext, settings: settings}
 				// Upstream's `Program: startFunction`: the file itself is a function frame, so
 				// top-level blocks are measured rather than ignored.
 				walker.depths = append(walker.depths, 0)

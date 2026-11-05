@@ -86,8 +86,8 @@ func measureTests(test *testing.T, root string, pattern string, environment []st
 	timeout := "-timeout=" + inheritedTimeout(deadline, hasDeadline, time.Now())
 	build := exec.Command("go", "test", "-count=1", timeout, "-run", "^$", pattern)
 	build.Dir = root
-	if output, err := build.CombinedOutput(); err != nil {
-		test.Fatalf("building %s's tests failed, so it measured nothing: %v\n%s", pattern, err, output)
+	if output, outputError := build.CombinedOutput(); outputError != nil {
+		test.Fatalf("building %s's tests failed, so it measured nothing: %v\n%s", pattern, outputError, output)
 	}
 	command := exec.Command("go", "test", "-count=1", timeout, pattern)
 	command.Dir = root
@@ -98,9 +98,9 @@ func measureTests(test *testing.T, root string, pattern string, environment []st
 	}
 	command.Env = append(command.Env, environment...)
 	start := time.Now()
-	output, err := command.CombinedOutput()
-	if err != nil {
-		test.Fatalf("go test -count=1 %s failed, so it measured nothing: %v\n%s", pattern, err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("go test -count=1 %s failed, so it measured nothing: %v\n%s", pattern, outputError, output)
 	}
 	return time.Since(start).Seconds(), (command.ProcessState.UserTime() + command.ProcessState.SystemTime()).Seconds()
 }

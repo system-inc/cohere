@@ -237,10 +237,10 @@ func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
 	oracle := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
 	for _, source := range []string{"a { color: red;\n", "a { color: \"unclosed; }\n", "}\n"} {
-		if _, err := oracle.Format("Probe.css", source); err == nil {
+		if _, formatError := oracle.Format("Probe.css", source); formatError == nil {
 			test.Fatalf("the oracle accepted %q", source)
 		}
-		if formatted, err := Format(source, formatoptions.Default()); err == nil {
+		if formatted, formatError := Format(source, formatoptions.Default()); formatError == nil {
 			test.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
@@ -300,14 +300,14 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 	// The live oracle, not a golden (see oracletest): the corpus is the projects' own CSS as it stands
 	// today, which changes with every edit to them, so recorded answers would only ever be stale.
 	for optionsName, options := range formatOptionSets() {
-		oracle, err := prettier.New(options)
-		if err != nil {
-			test.Fatal(err)
+		oracle, newPrettierError := prettier.New(options)
+		if newPrettierError != nil {
+			test.Fatal(newPrettierError)
 		}
 		for _, file := range files {
-			source, err := os.ReadFile(file)
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			for _, variant := range []string{string(source), stripIndentation(string(source))} {
 				expected, err := oracle.Format("Probe.css", variant)
@@ -364,9 +364,9 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 		oracle := golden.Engine(options)
 		compared, refusedByBoth := 0, 0
 		for _, file := range files {
-			source, err := os.ReadFile(file)
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			text := string(source)
 			actual, nativeErr := Format(text, options)
@@ -622,9 +622,9 @@ func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
 		oracle := golden.Engine(options)
 		compared, matched, rewritten, refusedByBoth, skipped := 0, 0, 0, 0, 0
 		for _, file := range files {
-			source, err := os.ReadFile(file)
-			if err != nil {
-				test.Fatal(err)
+			source, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			// The shared layer normalizes line endings before any printer runs, as Prettier's core does.
 			text := strings.ReplaceAll(string(source), "\r\n", "\n")

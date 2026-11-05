@@ -70,9 +70,9 @@ func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(test *testing.T) {
 	test.Parallel()
 
 	path := filepath.Join("conformance", "testdata", "fixtures", "error.todo-kitchensink.js")
-	sourceBytes, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("reading the vendored fixture: %v", err)
+	sourceBytes, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("reading the vendored fixture: %v", readError)
 	}
 	// A control alongside the zero this asserts: the fixture must actually contain the
 	// declaration, or the clean verdict is about an empty file rather than about the gate.
@@ -784,9 +784,9 @@ func TestUnsupportedSyntaxTranscriptionMatchesTheVendoredCorpus(test *testing.T)
 	test.Parallel()
 
 	path := filepath.Join("conformance", "testdata", "fixtures", "error.invalid-eval-unsupported.js")
-	sourceBytes, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("reading the vendored fixture: %v", err)
+	sourceBytes, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("reading the vendored fixture: %v", readError)
 	}
 	if string(sourceBytes) != upstreamEvalFixture {
 		test.Errorf("transcription drifted from the vendored corpus\n vendored: %q\n     here: %q",

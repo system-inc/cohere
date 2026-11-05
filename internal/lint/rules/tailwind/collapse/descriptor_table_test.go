@@ -86,12 +86,12 @@ type extractedContextFile struct {
 
 func loadTestTable(tableName, contextName string) (*Table, error) {
 	var tableFile extractedTableFile
-	if err := readJSON(filepath.Join("testdata", tableName), &tableFile); err != nil {
-		return nil, err
+	if readJSONError := readJSON(filepath.Join("testdata", tableName), &tableFile); readJSONError != nil {
+		return nil, readJSONError
 	}
 	var contextFile extractedContextFile
-	if err := readJSON(filepath.Join("testdata", contextName), &contextFile); err != nil {
-		return nil, err
+	if readJSONError := readJSON(filepath.Join("testdata", contextName), &contextFile); readJSONError != nil {
+		return nil, readJSONError
 	}
 
 	perDeclaration := make(map[string]bool, len(contextFile.PerDeclarationRoots))
@@ -227,9 +227,9 @@ func readingPointer(value *extractedReading) *Reading {
 }
 
 func readJSON(path string, into any) error {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return err
+	raw, readError := os.ReadFile(path)
+	if readError != nil {
+		return readError
 	}
 	return json.Unmarshal(raw, into)
 }

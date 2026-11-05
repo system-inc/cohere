@@ -49,9 +49,9 @@ func runUseBeforeDefineCase(test *testing.T, testCase useBeforeDefineCase) rule_
 		return rule_testing.RunTyped(test, NoUseBeforeDefine, testCase.fileName, testCase.source)
 	}
 
-	decoded, err := DecodeNoUseBeforeDefineOptions(json.RawMessage(testCase.rawOptions))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", testCase.rawOptions, err)
+	decoded, decodeNoUseBeforeDefineOptionsError := DecodeNoUseBeforeDefineOptions(json.RawMessage(testCase.rawOptions))
+	if decodeNoUseBeforeDefineOptionsError != nil {
+		test.Fatalf("decoding %s: %v", testCase.rawOptions, decodeNoUseBeforeDefineOptionsError)
 	}
 	return rule_testing.RunTypedWithOptions(test, NoUseBeforeDefine, testCase.fileName, testCase.source, decoded)
 }
@@ -2309,9 +2309,9 @@ func TestNoUseBeforeDefineMessageText(test *testing.T) {
 func TestNoUseBeforeDefineDecodesTheStringForm(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeNoUseBeforeDefineOptions(json.RawMessage(`"nofunc"`))
-	if err != nil {
-		test.Fatalf("decoding the string form: %v", err)
+	decoded, decodeNoUseBeforeDefineOptionsError := DecodeNoUseBeforeDefineOptions(json.RawMessage(`"nofunc"`))
+	if decodeNoUseBeforeDefineOptionsError != nil {
+		test.Fatalf("decoding the string form: %v", decodeNoUseBeforeDefineOptionsError)
 	}
 
 	settings := resolveNoUseBeforeDefineSettings(decoded)

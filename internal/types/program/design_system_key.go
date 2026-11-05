@@ -44,13 +44,13 @@ func designSystemKeyFromReads(reads []rule.FileRead, anchor PathAnchor) (*Design
 	key := &DesignSystemKey{Reads: make([]DesignSystemKeyRead, 0, len(reads))}
 	for _, read := range reads {
 		if read.Present {
-			info, err := os.Stat(read.Path)
-			if err != nil || info.Size() != read.Size || info.ModTime().UnixNano() != read.ModifiedNanoseconds {
+			info, statError := os.Stat(read.Path)
+			if statError != nil || info.Size() != read.Size || info.ModTime().UnixNano() != read.ModifiedNanoseconds {
 				return nil, false
 			}
 		}
-		current, err := readDesignSystemPath(read.Path)
-		if err != nil || current.Present != read.Present {
+		current, readDesignSystemPathError := readDesignSystemPath(read.Path)
+		if readDesignSystemPathError != nil || current.Present != read.Present {
 			return nil, false
 		}
 		current.Path = anchor.Stable(read.Path)
@@ -73,9 +73,9 @@ func (key *DesignSystemKey) stillHolds(anchor PathAnchor) bool {
 		return false
 	}
 	for _, recorded := range key.Reads {
-		current, err := readDesignSystemPath(anchor.Spelled(recorded.Path))
+		current, readDesignSystemPathError := readDesignSystemPath(anchor.Spelled(recorded.Path))
 		current.Path = recorded.Path
-		if err != nil || current != recorded {
+		if readDesignSystemPathError != nil || current != recorded {
 			return false
 		}
 	}
@@ -87,12 +87,12 @@ func (key *DesignSystemKey) stillHolds(anchor PathAnchor) bool {
 // than risking a stale replay.
 func readDesignSystemPath(path string) (DesignSystemKeyRead, error) {
 	read := DesignSystemKeyRead{Path: path}
-	info, err := os.Lstat(path)
-	if errors.Is(err, fs.ErrNotExist) {
+	info, statError := os.Lstat(path)
+	if errors.Is(statError, fs.ErrNotExist) {
 		return read, nil
 	}
-	if err != nil {
-		return read, err
+	if statError != nil {
+		return read, statError
 	}
 	read.Present = true
 	hash := sha256.New()
@@ -108,9 +108,9 @@ func readDesignSystemPath(path string) (DesignSystemKeyRead, error) {
 	}
 	if info.IsDir() {
 		read.Directory = true
-		entries, err := os.ReadDir(path)
-		if err != nil {
-			return read, err
+		entries, readDirectoryError := os.ReadDir(path)
+		if readDirectoryError != nil {
+			return read, readDirectoryError
 		}
 		names := make([]string, 0, len(entries))
 		for _, entry := range entries {
@@ -125,9 +125,9 @@ func readDesignSystemPath(path string) (DesignSystemKeyRead, error) {
 			hash.Write([]byte(name + "\x00"))
 		}
 	} else {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return read, err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return read, readError
 		}
 		hash.Write(contents)
 	}

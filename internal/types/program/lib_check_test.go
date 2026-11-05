@@ -19,9 +19,9 @@ func TestTheLibFilesAreNotCheckedAndTheProjectsFilesAre(test *testing.T) {
 		"tsconfig.json": `{"compilerOptions": {"target": "ES2022", "strict": true, "noEmit": true}, "include": ["./*.ts"]}`,
 		"globals.ts":    "interface Array<T> {\n  length: string;\n}\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	libraries, checked := 0, 0

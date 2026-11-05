@@ -26,9 +26,9 @@ var lintTypes = gotypes.Product{
 // Not parallel: it builds the product every other test here reads, so it finishes before they resume. A
 // runner of prebuilt tests skips it and finds the product Workshop built.
 func TestProduct_LintTypes(test *testing.T) {
-	exports, err := lintTypes.Build()
-	if err != nil {
-		test.Fatal(err)
+	exports, buildError := lintTypes.Build()
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	test.Logf("the lint types product is %s", exports.Key()[:12])
 }

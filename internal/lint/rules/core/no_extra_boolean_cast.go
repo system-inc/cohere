@@ -54,8 +54,8 @@ func (options *NoExtraBooleanCastOptions) UnmarshalJSON(raw []byte) error {
 		EnforceForInnerExpressions *bool `json:"enforceForInnerExpressions"`
 		EnforceForLogicalOperands  *bool `json:"enforceForLogicalOperands"`
 	}
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	// The newer name wins when both are written, matching serde's alias resolution, where the
 	// canonical field name takes the value and the alias only fills an absent one.
@@ -109,8 +109,8 @@ func (options *NoExtraBooleanCastOptions) UnmarshalJSON(raw []byte) error {
 // something else entirely. The precedence comparison below is the whole of that decision.
 var NoExtraBooleanCast = rule.Rule{
 	Name: "no-extra-boolean-cast",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -120,8 +120,8 @@ var NoExtraBooleanCast = rule.Rule{
 		}
 
 		reporter := booleanCastReporter{
-			context:                    ctx,
-			sourceText:                 ctx.SourceFile.Text(),
+			context:                    ruleContext,
+			sourceText:                 ruleContext.SourceFile.Text(),
 			enforceForInnerExpressions: enforceForInnerExpressions,
 		}
 

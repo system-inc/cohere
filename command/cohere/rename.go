@@ -61,8 +61,8 @@ func runRenameVerb(arguments []string) error {
 		fmt.Fprintf(os.Stderr, "Nothing is written without --write.\n\n")
 		flags.PrintDefaults()
 	}
-	if err := flags.Parse(arguments); err != nil {
-		return err
+	if parseError := flags.Parse(arguments); parseError != nil {
+		return parseError
 	}
 
 	positional := flags.Args()
@@ -94,13 +94,13 @@ func runRenameVerb(arguments []string) error {
 		return fmt.Errorf("building the type graph: %w", err)
 	}
 
-	ctx := context.Background()
+	backgroundContext := context.Background()
 
 	position, isPosition := rename.ParsePosition(target)
 	if isPosition {
-		resolved, err := absolutePath(position.FileName, *directory)
-		if err != nil {
-			return err
+		resolved, absolutePathError := absolutePath(position.FileName, *directory)
+		if absolutePathError != nil {
+			return absolutePathError
 		}
 		// In the compiler's spelling, which is how the program names its files and what the anchor is
 		// matched against. On Windows Clean leaves `C:\work\a.ts`, which no program file's
@@ -110,9 +110,9 @@ func runRenameVerb(arguments []string) error {
 		// The bare-name form is sugar, and it refuses rather than guesses. A bare name is not a
 		// symbol: if three files each declare a local `err`, this has three valid answers and the
 		// cursor that would disambiguate in an editor does not exist on a command line.
-		candidates, symbols, err := rename.ResolveBareName(ctx, graph, target)
-		if err != nil {
-			return err
+		candidates, symbols, resolveBareNameError := rename.ResolveBareName(backgroundContext, graph, target)
+		if resolveBareNameError != nil {
+			return resolveBareNameError
 		}
 		if len(symbols) == 0 {
 			return fmt.Errorf(
@@ -131,7 +131,7 @@ func runRenameVerb(arguments []string) error {
 		}
 	}
 
-	plan, err := rename.Build(ctx, graph, position, newName)
+	plan, err := rename.Build(backgroundContext, graph, position, newName)
 	if err != nil {
 		return err
 	}
@@ -168,9 +168,9 @@ func absolutePath(fileName string, directory string) (string, error) {
 	}
 	base := directory
 	if base == "" {
-		working, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("resolving %s: %w", fileName, err)
+		working, workingDirectoryError := os.Getwd()
+		if workingDirectoryError != nil {
+			return "", fmt.Errorf("resolving %s: %w", fileName, workingDirectoryError)
 		}
 		base = working
 	}

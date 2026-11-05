@@ -39,8 +39,8 @@ func DecodeNoSelfAssignOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -77,7 +77,7 @@ func DecodeNoSelfAssignOptions(raw []byte) (any, error) {
 // and `??=`. `a += a` doubles a, which is a different statement and not this rule's business.
 var NoSelfAssign = rule.Rule{
 	Name: "no-self-assign",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		props := DefaultNoSelfAssignOptions().Props
 		if resolved, isNoSelfAssignOptions := rule.OptionsAs[NoSelfAssignOptions](options); isNoSelfAssignOptions {
 			props = resolved.Props
@@ -106,7 +106,7 @@ var NoSelfAssign = rule.Rule{
 					return
 				}
 
-				reportSelfAssignments(ctx, binary.Left, binary.Right, props)
+				reportSelfAssignments(ruleContext, binary.Left, binary.Right, props)
 			},
 		}
 	},
@@ -116,7 +116,7 @@ var NoSelfAssign = rule.Rule{
 //
 // Recursive because a destructuring assignment is a tree of targets against a tree of values, and a
 // self-assignment can sit at any depth: `[a, [b]] = [a, [b]]` is two of them.
-func reportSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, props bool) {
 	if left == nil || right == nil {
 		return
 	}
@@ -129,21 +129,21 @@ func reportSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, pr
 	switch {
 	case left.Kind == ast.KindIdentifier && right.Kind == ast.KindIdentifier:
 		if left.Text() == right.Text() {
-			ctx.ReportNode(right, messageSelfAssignment)
+			ruleContext.ReportNode(right, messageSelfAssignment)
 		}
 
 	case left.Kind == ast.KindArrayLiteralExpression && right.Kind == ast.KindArrayLiteralExpression:
-		reportArraySelfAssignments(ctx, left, right, props)
+		reportArraySelfAssignments(ruleContext, left, right, props)
 
 	case left.Kind == ast.KindObjectLiteralExpression && right.Kind == ast.KindObjectLiteralExpression:
-		reportObjectSelfAssignments(ctx, left, right, props)
+		reportObjectSelfAssignments(ruleContext, left, right, props)
 
 	case left.Kind == ast.KindSpreadElement && right.Kind == ast.KindSpreadElement:
-		reportSelfAssignments(ctx, left.AsSpreadElement().Expression, right.AsSpreadElement().Expression, props)
+		reportSelfAssignments(ruleContext, left.AsSpreadElement().Expression, right.AsSpreadElement().Expression, props)
 
 	case props && ast.IsAccessExpression(left) && ast.IsAccessExpression(right):
 		if isSameReference(left, right) {
-			ctx.ReportNode(right, messageSelfAssignment)
+			ruleContext.ReportNode(right, messageSelfAssignment)
 		}
 	}
 }
@@ -152,7 +152,7 @@ func reportSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, pr
 //
 // Positional rather than by membership, which is what keeps `[a, b] = [b, a]` silent: a swap
 // assigns each name a different value and is the reason anyone writes this shape at all.
-func reportArraySelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportArraySelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, props bool) {
 	leftElements := left.AsArrayLiteralExpression().Elements.Nodes
 	rightElements := right.AsArrayLiteralExpression().Elements.Nodes
 
@@ -167,7 +167,7 @@ func reportArraySelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Nod
 			return
 		}
 
-		reportSelfAssignments(ctx, leftElement, rightElement, props)
+		reportSelfAssignments(ruleContext, leftElement, rightElement, props)
 
 		// After a spread on the value side, every later index is unknown, so no further position
 		// can be claimed to match.
@@ -181,7 +181,7 @@ func reportArraySelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Nod
 //
 // By name rather than positionally, because object properties are unordered and `{ a, b } = { b, a }`
 // really is a self-assignment of both.
-func reportObjectSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportObjectSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, props bool) {
 	leftProperties := left.AsObjectLiteralExpression().Properties.Nodes
 	rightProperties := right.AsObjectLiteralExpression().Properties.Nodes
 	if len(rightProperties) == 0 {
@@ -220,7 +220,7 @@ func reportObjectSelfAssignments(ctx rule.Context, left *ast.Node, right *ast.No
 			if !rightOk || leftName != rightName {
 				continue
 			}
-			reportSelfAssignments(ctx, propertyValue(leftProperty), propertyValue(rightProperty), props)
+			reportSelfAssignments(ruleContext, propertyValue(leftProperty), propertyValue(rightProperty), props)
 		}
 	}
 }

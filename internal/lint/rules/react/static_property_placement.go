@@ -73,13 +73,13 @@ func DefaultStaticPropertyPlacementOptions() StaticPropertyPlacementOptions {
 // element is refused too: it was never upstream's.
 func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
 	options := DefaultStaticPropertyPlacementOptions()
-	slots, err := rule.OptionElements(list, 2)
-	if err != nil || len(slots) == 0 {
-		return options, err
+	slots, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(slots) == 0 {
+		return options, optionElementsError
 	}
 
 	var defaultSpelling string
-	if err := json.Unmarshal(slots[0], &defaultSpelling); err != nil {
+	if decodeError := json.Unmarshal(slots[0], &defaultSpelling); decodeError != nil {
 		return options, fmt.Errorf("static-property-placement element 1 takes a position string, got %s", slots[0])
 	}
 	position, recognised := staticPropertyPlacementPositionFor(defaultSpelling)
@@ -95,8 +95,8 @@ func DecodeStaticPropertyPlacementOptions(list []byte) (any, error) {
 	}
 
 	var overrides map[string]string
-	if err := json.Unmarshal(slots[1], &overrides); err != nil {
-		return options, fmt.Errorf("static-property-placement element 2: %w", err)
+	if decodeError := json.Unmarshal(slots[1], &overrides); decodeError != nil {
+		return options, fmt.Errorf("static-property-placement element 2: %w", decodeError)
 	}
 	for property, spelling := range overrides {
 		if _, isKnown := options.Positions[property]; !isKnown {
@@ -216,8 +216,8 @@ var StaticPropertyPlacement = rule.Rule{
 	Name:             "react/static-property-placement",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -241,12 +241,12 @@ var StaticPropertyPlacement = rule.Rule{
 			if !mismatched && !notStaticEnough {
 				return
 			}
-			ctx.ReportNode(node, messageStaticPropertyPlacement(expected, propertyName))
+			ruleContext.ReportNode(node, messageStaticPropertyPlacement(expected, propertyName))
 		}
 
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				if !staticPropertyPlacementInReactClass(node) {
@@ -260,7 +260,7 @@ var StaticPropertyPlacement = rule.Rule{
 			},
 
 			ast.KindGetAccessor: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// Upstream requires static AND a getter before it looks at the name at all, so a
@@ -279,7 +279,7 @@ var StaticPropertyPlacement = rule.Rule{
 			},
 
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				expression := node.AsBinaryExpression()
@@ -300,7 +300,7 @@ var StaticPropertyPlacement = rule.Rule{
 				if !named {
 					return
 				}
-				if !staticPropertyPlacementReceiverIsReactClass(ctx, target.AsPropertyAccessExpression().Expression) {
+				if !staticPropertyPlacementReceiverIsReactClass(ruleContext, target.AsPropertyAccessExpression().Expression) {
 					return
 				}
 				// An assignment is never `static`, and upstream passes `node.static` as undefined
@@ -399,11 +399,11 @@ func staticPropertyPlacementInsideAClass(node *ast.Node) bool {
 //
 // The loop over declarations rather than an index is the standing hazard in this tree: a merged
 // declaration can put the class at a position other than zero.
-func staticPropertyPlacementReceiverIsReactClass(ctx rule.Context, receiver *ast.Node) bool {
+func staticPropertyPlacementReceiverIsReactClass(ruleContext rule.Context, receiver *ast.Node) bool {
 	if receiver == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(receiver)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(receiver)
 	if symbol == nil {
 		return false
 	}

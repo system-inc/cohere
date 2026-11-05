@@ -149,13 +149,13 @@ var CorrectnessNoProcessExitAfterOutput = rule.Rule{
 	// any other `exit`, and the process's own `stdout` from any other stream with a `write`.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				correctnessNoProcessExitAfterOutputScanFile(ctx, sourceFile)
+				correctnessNoProcessExitAfterOutputScanFile(ruleContext, sourceFile)
 			},
 		}
 	},
@@ -192,8 +192,8 @@ type correctnessNoProcessExitAfterOutputRoot struct {
 	hasWrite bool
 }
 
-func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *ast.Node) {
-	writers := correctnessNoProcessExitAfterOutputWriters{ctx: ctx, byDeclaration: map[*ast.Node]bool{}}
+func correctnessNoProcessExitAfterOutputScanFile(ruleContext rule.Context, sourceFile *ast.Node) {
+	writers := correctnessNoProcessExitAfterOutputWriters{ctx: ruleContext, byDeclaration: map[*ast.Node]bool{}}
 	rootsByNode := map[*ast.Node]*correctnessNoProcessExitAfterOutputRoot{}
 	var roots []*correctnessNoProcessExitAfterOutputRoot
 	rootFor := func(call *ast.Node) *correctnessNoProcessExitAfterOutputRoot {
@@ -215,7 +215,7 @@ func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *a
 	// file took the rule's run on ahra from 2.5s to 4.2s.
 	var findExits func(node *ast.Node) bool
 	findExits = func(node *ast.Node) bool {
-		if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+		if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 			if root := rootFor(node); root != nil {
 				root.exits = append(root.exits, node)
 			}
@@ -242,22 +242,22 @@ func correctnessNoProcessExitAfterOutputScanFile(ctx rule.Context, sourceFile *a
 
 	for _, root := range roots {
 		if len(root.exits) > 0 && root.hasWrite {
-			correctnessNoProcessExitAfterOutputAnalyzeRoot(ctx, root, writers)
+			correctnessNoProcessExitAfterOutputAnalyzeRoot(ruleContext, root, writers)
 		}
 	}
 }
 
 // correctnessNoProcessExitAfterOutputIsExit says whether a call is `NodeJS.Process.exit`, reached
 // through any receiver or an imported binding.
-func correctnessNoProcessExitAfterOutputIsExit(ctx rule.Context, call *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputIsExit(ruleContext rule.Context, call *ast.Node) bool {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	name := correctnessNoProcessExitAfterOutputMemberName(callee)
-	return name != nil && name.Text() == "exit" && correctnessNoProcessExitAfterOutputIsProcessMember(ctx, name)
+	return name != nil && name.Text() == "exit" && correctnessNoProcessExitAfterOutputIsProcessMember(ruleContext, name)
 }
 
 // correctnessNoProcessExitAfterOutputIsWrite says whether a call writes to stdout or stderr: a
 // writing method of the global console, or `write` on the process's own `stdout` or `stderr`.
-func correctnessNoProcessExitAfterOutputIsWrite(ctx rule.Context, call *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputIsWrite(ruleContext rule.Context, call *ast.Node) bool {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	if callee.Kind != ast.KindPropertyAccessExpression && callee.Kind != ast.KindElementAccessExpression {
 		return false
@@ -274,14 +274,14 @@ func correctnessNoProcessExitAfterOutputIsWrite(ctx rule.Context, call *ast.Node
 	}
 	if correctnessNoProcessExitAfterOutputConsoleMethods[member] && receiver.Kind == ast.KindIdentifier &&
 		receiver.Text() == "console" {
-		return correctnessNoProcessExitAfterOutputIsGlobalVariable(ctx.TypeChecker.GetSymbolAtLocation(receiver))
+		return correctnessNoProcessExitAfterOutputIsGlobalVariable(ruleContext.TypeChecker.GetSymbolAtLocation(receiver))
 	}
 	if member != "write" {
 		return false
 	}
 	stream := correctnessNoProcessExitAfterOutputMemberName(receiver)
 	return stream != nil && (stream.Text() == "stdout" || stream.Text() == "stderr") &&
-		correctnessNoProcessExitAfterOutputIsProcessMember(ctx, stream)
+		correctnessNoProcessExitAfterOutputIsProcessMember(ruleContext, stream)
 }
 
 // correctnessNoProcessExitAfterOutputWriters answers whether a call writes, directly or through one
@@ -359,7 +359,7 @@ func correctnessNoProcessExitAfterOutputIsAwaited(call *ast.Node) bool {
 // correctnessNoProcessExitAfterOutputBodyWrites says whether a function's own body, nested functions
 // aside, makes a write and never exits. A body that exits is not read as a write: the caller's exit
 // after it may never run.
-func correctnessNoProcessExitAfterOutputBodyWrites(ctx rule.Context, function *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputBodyWrites(ruleContext rule.Context, function *ast.Node) bool {
 	wrote, exits := false, false
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
@@ -367,11 +367,11 @@ func correctnessNoProcessExitAfterOutputBodyWrites(ctx rule.Context, function *a
 			return exits
 		}
 		if node.Kind == ast.KindCallExpression {
-			if correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+			if correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				exits = true
 				return true
 			}
-			if correctnessNoProcessExitAfterOutputIsWrite(ctx, node) {
+			if correctnessNoProcessExitAfterOutputIsWrite(ruleContext, node) {
 				wrote = true
 			}
 		}
@@ -407,10 +407,10 @@ func correctnessNoProcessExitAfterOutputMemberName(expression *ast.Node) *ast.No
 // correctnessNoProcessExitAfterOutputIsProcessMember says whether a name resolves, through an import
 // alias when it is one, to a member declared on `NodeJS.Process` in a declaration file and nowhere
 // else: the interface `@types/node` gives the global `process`.
-func correctnessNoProcessExitAfterOutputIsProcessMember(ctx rule.Context, name *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+func correctnessNoProcessExitAfterOutputIsProcessMember(ruleContext rule.Context, name *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
+		symbol = ruleContext.TypeChecker.GetAliasedSymbol(symbol)
 	}
 	if symbol == nil || len(symbol.Declarations) == 0 || !rule.IsDeclaredOnlyInDeclarationFiles(symbol) {
 		return false
@@ -468,14 +468,14 @@ func correctnessNoProcessExitAfterOutputIsGlobalVariable(symbol *ast.Symbol) boo
 
 // correctnessNoProcessExitAfterOutputHoldsExit says whether an exit runs inside node, in the same
 // code path root: an exit inside a nested function runs when that function is called, not here.
-func correctnessNoProcessExitAfterOutputHoldsExit(ctx rule.Context, node *ast.Node) bool {
+func correctnessNoProcessExitAfterOutputHoldsExit(ruleContext rule.Context, node *ast.Node) bool {
 	held := false
 	var visit func(child *ast.Node) bool
 	visit = func(child *ast.Node) bool {
 		if held || control_flow_graph.IsRoot(child) {
 			return held
 		}
-		if child.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ctx, child) {
+		if child.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ruleContext, child) {
 			held = true
 			return true
 		}
@@ -502,7 +502,7 @@ func correctnessNoProcessExitAfterOutputInCatchBinding(node *ast.Node, root *ast
 // correctnessNoProcessExitAfterOutputAnalyzeRoot builds one root's graph, walks it from the entry,
 // and reports each exit some path reaches having written.
 func correctnessNoProcessExitAfterOutputAnalyzeRoot(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	root *correctnessNoProcessExitAfterOutputRoot,
 	writers correctnessNoProcessExitAfterOutputWriters,
 ) {
@@ -513,12 +513,12 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(
 			if node.Kind != ast.KindCallExpression || correctnessNoProcessExitAfterOutputInCatchBinding(node, root.node) {
 				return
 			}
-			if correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+			if correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				recorded[node] = true
 				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node})
 				return
 			}
-			if writers.writes(node) && !correctnessNoProcessExitAfterOutputHoldsExit(ctx, node) {
+			if writers.writes(node) && !correctnessNoProcessExitAfterOutputHoldsExit(ruleContext, node) {
 				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputWrite, node: node})
 			}
 		},
@@ -586,7 +586,7 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(
 
 	for _, exit := range root.exits {
 		if reported[exit] {
-			ctx.ReportNode(exit, correctnessNoProcessExitAfterOutputMessage())
+			ruleContext.ReportNode(exit, correctnessNoProcessExitAfterOutputMessage())
 		}
 	}
 }

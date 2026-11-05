@@ -101,7 +101,7 @@ var noUnusedClassComponentMethodsEs5Lifecycle = map[string]bool{
 // reports nothing however unused its members are. Measured, and reproduced rather than widened.
 var NoUnusedClassComponentMethods = rule.Rule{
 	Name: "react/no-unused-class-component-methods",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
 				var walk func(node *ast.Node)
@@ -111,10 +111,10 @@ var NoUnusedClassComponentMethods = rule.Rule{
 					}
 					switch {
 					case node.Kind == ast.KindClassDeclaration && reactUtilities.IsEs6ComponentClass(node):
-						noUnusedClassComponentMethodsCheckClass(ctx, node)
+						noUnusedClassComponentMethodsCheckClass(ruleContext, node)
 					case node.Kind == ast.KindObjectLiteralExpression &&
 						noUnusedClassComponentMethodsIsEs5Specification(node):
-						noUnusedClassComponentMethodsCheckObject(ctx, node)
+						noUnusedClassComponentMethodsCheckObject(ruleContext, node)
 					}
 					node.ForEachChild(func(child *ast.Node) bool {
 						walk(child)
@@ -150,7 +150,7 @@ func noUnusedClassComponentMethodsIsEs5Specification(object *ast.Node) bool {
 }
 
 // noUnusedClassComponentMethodsCheckClass gathers and reports for one class component.
-func noUnusedClassComponentMethodsCheckClass(ctx rule.Context, class *ast.Node) {
+func noUnusedClassComponentMethodsCheckClass(ruleContext rule.Context, class *ast.Node) {
 	className := ""
 	if name := class.AsClassDeclaration().Name(); name != nil && name.Kind == ast.KindIdentifier {
 		className = name.Text()
@@ -173,13 +173,13 @@ func noUnusedClassComponentMethodsCheckClass(ctx rule.Context, class *ast.Node) 
 		}
 	}
 
-	state.report(ctx, className, noUnusedClassComponentMethodsEs6Lifecycle)
+	state.report(ruleContext, className, noUnusedClassComponentMethodsEs6Lifecycle)
 }
 
 // noUnusedClassComponentMethodsCheckObject gathers and reports for one createReactClass object.
 //
 // The object has no name, so every finding here uses the `unused` id.
-func noUnusedClassComponentMethodsCheckObject(ctx rule.Context, object *ast.Node) {
+func noUnusedClassComponentMethodsCheckObject(ruleContext rule.Context, object *ast.Node) {
 	state := &noUnusedClassComponentMethodsState{used: map[string]bool{}}
 
 	properties := object.AsObjectLiteralExpression().Properties
@@ -192,7 +192,7 @@ func noUnusedClassComponentMethodsCheckObject(ctx rule.Context, object *ast.Node
 		}
 	}
 
-	state.report(ctx, "", noUnusedClassComponentMethodsEs5Lifecycle)
+	state.report(ruleContext, "", noUnusedClassComponentMethodsEs5Lifecycle)
 }
 
 // noUnusedClassComponentMethodsState is one component's gathered definitions and uses.
@@ -259,7 +259,7 @@ func (s *noUnusedClassComponentMethodsState) collect(node *ast.Node) {
 }
 
 // report emits one finding per definition whose name nothing used.
-func (s *noUnusedClassComponentMethodsState) report(ctx rule.Context, className string, lifecycle map[string]bool) {
+func (s *noUnusedClassComponentMethodsState) report(ruleContext rule.Context, className string, lifecycle map[string]bool) {
 	for _, key := range s.definitions {
 		name, ok := noUnusedClassComponentMethodsLiteralName(key)
 		if !ok {
@@ -270,13 +270,13 @@ func (s *noUnusedClassComponentMethodsState) report(ctx rule.Context, className 
 		}
 
 		if className == "" {
-			ctx.ReportNode(key, rule.Message{
+			ruleContext.ReportNode(key, rule.Message{
 				Id:          "unused",
 				Description: noUnusedClassComponentMethodsDescription(name, ""),
 			})
 			continue
 		}
-		ctx.ReportNode(key, rule.Message{
+		ruleContext.ReportNode(key, rule.Message{
 			Id:          "unusedWithClass",
 			Description: noUnusedClassComponentMethodsDescription(name, className),
 		})

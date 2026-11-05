@@ -26,11 +26,11 @@ type countingRule struct {
 
 func (counter *countingRule) wrap(subject rule.Rule) rule.Rule {
 	run := subject.Run
-	subject.Run = func(ctx rule.Context, options any) rule.Listeners {
+	subject.Run = func(ruleContext rule.Context, options any) rule.Listeners {
 		counter.mutex.Lock()
-		counter.ran[filepath.Base(ctx.SourceFile.FileName().AsString())]++
+		counter.ran[filepath.Base(ruleContext.SourceFile.FileName().AsString())]++
 		counter.mutex.Unlock()
-		return run(ctx, options)
+		return run(ruleContext, options)
 	}
 	return subject
 }
@@ -101,8 +101,8 @@ func TestABodyEditReplaysShapeKeyedFindingsOnImporters(test *testing.T) {
 				test.Fatal("consumer.ts produced no finding, so a replay of it would prove nothing")
 			}
 
-			if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export function value(): string {\n  return \"1\" + \"\";\n}\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export function value(): string {\n  return \"1\" + \"\";\n}\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
 			after, _, _ := shapeWalk(test, root, rules, recorded, shapes)
@@ -152,8 +152,8 @@ func TestAnExportEditReachesShapeKeyedFindingsOnImporters(test *testing.T) {
 	if len(before.Diagnostics) == 0 {
 		test.Fatal("consumer.ts produced no finding before the edit")
 	}
-	if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export function value(): number {\n  return 1;\n}\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export function value(): number {\n  return 1;\n}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	counter.ran = map[string]int{}
 	after, refreshed, refreshedShapes := shapeWalk(test, root, rules, recorded, shapes)
@@ -192,8 +192,8 @@ func TestShapeKeyedRulesWithoutShapesFallBackToContents(test *testing.T) {
 	rules := append(findingsReuseRules(test), counter.wrap(typeAware))
 
 	_, recorded := walkAndRecord(test, root, rules, nil)
-	if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export function value(): string {\n  return \"1\" + \"\";\n}\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export function value(): string {\n  return \"1\" + \"\";\n}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	counter.ran = map[string]int{}
 	walkAndRecord(test, root, rules, recorded)
@@ -223,8 +223,8 @@ func TestACommentEditReplaysShapeKeyedFindingsOnImporters(test *testing.T) {
 			if len(before.Diagnostics) == 0 {
 				test.Fatal("consumer.ts produced no finding, so a replay of it would prove nothing")
 			}
-			if err := os.WriteFile(filepath.Join(root, "lib.ts"), []byte(text), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte(text), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
 			after, _, _ := shapeWalk(test, root, rules, recorded, shapes)
@@ -252,14 +252,14 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 	// Enable the option that actually consults Boolean's default-library provenance.
 	nullish := typescript.PreferNullishCoalescing
 	nullishRun := nullish.Run
-	nullish.Run = func(ctx rule.Context, _ any) rule.Listeners {
-		return nullishRun(ctx, typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true})
+	nullish.Run = func(ruleContext rule.Context, _ any) rule.Listeners {
+		return nullishRun(ruleContext, typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true})
 	}
 	logical := core.LogicalAssignmentOperators
 	logicalRun := logical.Run
 	logicalOptions := core.DefaultLogicalAssignmentOperatorsSettings()
 	logicalOptions.EnforceForIfStatements = true
-	logical.Run = func(ctx rule.Context, _ any) rule.Listeners { return logicalRun(ctx, logicalOptions) }
+	logical.Run = func(ruleContext rule.Context, _ any) rule.Listeners { return logicalRun(ruleContext, logicalOptions) }
 	for _, tc := range []struct {
 		subject    rule.Rule
 		source     string
@@ -317,8 +317,8 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 				test.Fatal("the reporting consumer was not cached with its finding or suppression")
 			}
 			path := filepath.Join(root, "lib.ts")
-			if err := os.WriteFile(path, []byte("export function value(): string { return \"edited body\"; }\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte("export function value(): string { return \"edited body\"; }\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
 			body, bodyCache, bodyShapes := shapeWalk(test, root, rules, recorded, shapes)
@@ -336,8 +336,8 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 			if shapes[path].Signature != bodyShapes[path].Signature || shapes[path].Syntax != bodyShapes[path].Syntax {
 				test.Fatal("body edit moved a shape")
 			}
-			if err := os.WriteFile(path, []byte("export function value(): number { return 1; }\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte("export function value(): number { return 1; }\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
 			signature, _, signatureShapes := shapeWalk(test, root, rules, bodyCache, bodyShapes)
@@ -356,8 +356,8 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 				test.Fatal("signature edit lost the real finding")
 			}
 			if tc.suppressed != 0 {
-				if err := os.WriteFile(filepath.Join(root, "consumer.tsx"), []byte("import { value } from \"./lib\";\nvoid value;\n"+tc.source+"\n"), 0o644); err != nil {
-					test.Fatal(err)
+				if writeError := os.WriteFile(filepath.Join(root, "consumer.tsx"), []byte("import { value } from \"./lib\";\nvoid value;\n"+tc.source+"\n"), 0o644); writeError != nil {
+					test.Fatal(writeError)
 				}
 				active := plainWalk(test, root, rules)
 				if len(active.Diagnostics) != 1 {
@@ -398,8 +398,8 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 			}
 			path := filepath.Join(root, "lib.ts")
 			bodyText := strings.Replace(lib, "return \"before\";", "return \"edited body\";", 1)
-			if err := os.WriteFile(path, []byte(bodyText), 0644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte(bodyText), 0644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
 			body, bodyCache, bodyShapes := shapeWalk(test, root, rules, cache, shapes)
@@ -422,8 +422,8 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 				test.Fatal("body replay differs from cold")
 			}
 			signatureText := strings.Replace(bodyText, "function shapeProbe(): string { return \"edited body\"; }", "function shapeProbe(): number { return 1; }", 1)
-			if err := os.WriteFile(path, []byte(signatureText), 0644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte(signatureText), 0644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
 			signature, signatureCache, signatureShapes := shapeWalk(test, root, rules, bodyCache, bodyShapes)
@@ -439,8 +439,8 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 				test.Fatal("signature refresh differs from cold")
 			}
 			initializerText := strings.Replace(signatureText, "= React.createElement", "= Other.createElement", 1)
-			if err := os.WriteFile(path, []byte(initializerText), 0644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(path, []byte(initializerText), 0644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
 			edited, _, editedShapes := shapeWalk(test, root, rules, signatureCache, signatureShapes)

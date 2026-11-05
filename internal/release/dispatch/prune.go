@@ -121,8 +121,8 @@ func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time
 		if _, named := prunedByName[name]; named || kept[name] {
 			continue
 		}
-		information, err := entry.Info()
-		if err != nil {
+		information, infoError := entry.Info()
+		if infoError != nil {
 			// Gone between the listing and the stat, most likely renamed into place by a build.
 			continue
 		}
@@ -182,20 +182,20 @@ func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time
 // planStaleDirectories lists the directories under parent that are not current and were not touched
 // within the in-flight window, with each one's size. A missing parent holds nothing to remove.
 func planStaleDirectories(parent string, current string, now time.Time) ([]PrunedFile, error) {
-	entries, err := os.ReadDir(parent)
-	if errors.Is(err, os.ErrNotExist) {
+	entries, readDirectoryError := os.ReadDir(parent)
+	if errors.Is(readDirectoryError, os.ErrNotExist) {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
+	if readDirectoryError != nil {
+		return nil, readDirectoryError
 	}
 	stale := []PrunedFile{}
 	for _, entry := range entries {
 		if entry.Name() == current || !entry.IsDir() {
 			continue
 		}
-		information, err := entry.Info()
-		if err != nil || now.Sub(information.ModTime()) < pruneInFlightWindow {
+		information, infoError := entry.Info()
+		if infoError != nil || now.Sub(information.ModTime()) < pruneInFlightWindow {
 			continue
 		}
 		stale = append(stale, PrunedFile{Name: entry.Name(), Bytes: directoryBytes(filepath.Join(parent, entry.Name()))})
@@ -211,7 +211,7 @@ func directoryBytes(directory string) int64 {
 		if err != nil || entry.IsDir() {
 			return nil
 		}
-		if information, err := entry.Info(); err == nil {
+		if information, infoError := entry.Info(); infoError == nil {
 			total += information.Size()
 		}
 		return nil
@@ -230,12 +230,12 @@ func ApplyPrune(paths Paths, plan PrunePlan) ([]PrunedFile, error) {
 		if file.Name == "" || file.Name != filepath.Base(file.Name) {
 			return removed, fmt.Errorf("refusing to remove %q from the binary cache: it is not a plain file name", file.Name)
 		}
-		err := os.Remove(filepath.Join(paths.BinaryDirectory(), file.Name))
-		if errors.Is(err, os.ErrNotExist) {
+		removeError := os.Remove(filepath.Join(paths.BinaryDirectory(), file.Name))
+		if errors.Is(removeError, os.ErrNotExist) {
 			continue
 		}
-		if err != nil {
-			return removed, fmt.Errorf("removing %s from the binary cache: %w", file.Name, err)
+		if removeError != nil {
+			return removed, fmt.Errorf("removing %s from the binary cache: %w", file.Name, removeError)
 		}
 		removed = append(removed, file)
 	}
@@ -255,17 +255,17 @@ func ApplyPrune(paths Paths, plan PrunePlan) ([]PrunedFile, error) {
 				return removed, fmt.Errorf("refusing to remove %q from %s: it is not a plain directory name", directory.Name, group.parent)
 			}
 			path := filepath.Join(group.parent, directory.Name)
-			information, err := os.Lstat(path)
-			if errors.Is(err, os.ErrNotExist) {
+			information, statError := os.Lstat(path)
+			if errors.Is(statError, os.ErrNotExist) {
 				continue
 			}
 			// Asked again at the moment of removal. The plan's size walk takes a moment, and a build that
 			// started meanwhile has marked the extraction in use; its compile must not lose it.
-			if err == nil && time.Since(information.ModTime()) < pruneInFlightWindow {
+			if statError == nil && time.Since(information.ModTime()) < pruneInFlightWindow {
 				continue
 			}
-			if err := os.RemoveAll(path); err != nil {
-				return removed, fmt.Errorf("removing %s: %w", path, err)
+			if removeError := os.RemoveAll(path); removeError != nil {
+				return removed, fmt.Errorf("removing %s: %w", path, removeError)
 			}
 			removed = append(removed, PrunedFile{Name: filepath.Join(filepath.Base(group.parent), directory.Name), Bytes: directory.Bytes})
 		}

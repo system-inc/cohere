@@ -78,19 +78,19 @@ func DecodePreferDestructuringOptions(list []byte) (any, error) {
 		VariableDeclarator:   PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 		AssignmentExpression: PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 	}
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	var enabling preferDestructuringEnablingWire
-	if err := preferDestructuringDecodeStrictly(elements[0], &enabling); err != nil {
-		return options, fmt.Errorf("prefer-destructuring element 1: %w", err)
+	if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(elements[0], &enabling); preferDestructuringDecodeStrictlyError != nil {
+		return options, fmt.Errorf("prefer-destructuring element 1: %w", preferDestructuringDecodeStrictlyError)
 	}
 	if len(elements) > 1 {
 		var renamed preferDestructuringRenamedWire
-		if err := preferDestructuringDecodeStrictly(elements[1], &renamed); err != nil {
-			return options, fmt.Errorf("prefer-destructuring element 2: %w", err)
+		if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(elements[1], &renamed); preferDestructuringDecodeStrictlyError != nil {
+			return options, fmt.Errorf("prefer-destructuring element 2: %w", preferDestructuringDecodeStrictlyError)
 		}
 		if renamed.EnforceForRenamedProperties != nil {
 			options.EnforceForRenamedProperties = *renamed.EnforceForRenamedProperties
@@ -194,7 +194,7 @@ var messagePreferDestructuring = rule.Message{
 // which is the declarator without `var`, and `foo = array[0];` reports columns 1 to 15.
 var PreferDestructuring = rule.Rule{
 	Name: "prefer-destructuring",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[PreferDestructuringOptions](options)
 		if !ok {
 			enabled := true
@@ -211,10 +211,10 @@ var PreferDestructuring = rule.Rule{
 					kind, messagePreferDestructuring.Description),
 			}
 			if len(fixes) == 0 {
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 				return
 			}
-			ctx.ReportNodeWithFixes(node, message, fixes...)
+			ruleContext.ReportNodeWithFixes(node, message, fixes...)
 		}
 
 		performCheck := func(left *ast.Node, right *ast.Node, reportNode *ast.Node,
@@ -244,7 +244,7 @@ var PreferDestructuring = rule.Rule{
 
 			var fixes []rule.Fix
 			if isDeclarator {
-				if fix, repairable := preferDestructuringFix(ctx, reportNode, right); repairable {
+				if fix, repairable := preferDestructuringFix(ruleContext, reportNode, right); repairable {
 					fixes = []rule.Fix{fix}
 				}
 			}
@@ -414,7 +414,7 @@ func preferDestructuringIsUsingDeclaration(node *ast.Node) bool {
 //
 // Two gates, and both are upstream's. `shouldFix` restricts the repair to the one simple shape, and
 // the comment comparison declines whenever the rewrite would delete a comment.
-func preferDestructuringFix(ctx rule.Context, declarator *ast.Node, right *ast.Node) (rule.Fix, bool) {
+func preferDestructuringFix(ruleContext rule.Context, declarator *ast.Node, right *ast.Node) (rule.Fix, bool) {
 	if right.Kind != ast.KindPropertyAccessExpression {
 		return rule.Fix{}, false
 	}
@@ -443,14 +443,14 @@ func preferDestructuringFix(ctx rule.Context, declarator *ast.Node, right *ast.N
 
 	// Upstream: decline when the declarator holds more comments than the object does, because only
 	// the object's own comments survive into the replacement text.
-	declaratorRange := rule.TokenRange(ctx.SourceFile, declarator)
-	objectRange := rule.TokenRange(ctx.SourceFile, object)
-	if preferDestructuringCommentsInside(ctx, declaratorRange) >
-		preferDestructuringCommentsInside(ctx, objectRange) {
+	declaratorRange := rule.TokenRange(ruleContext.SourceFile, declarator)
+	objectRange := rule.TokenRange(ruleContext.SourceFile, object)
+	if preferDestructuringCommentsInside(ruleContext, declaratorRange) >
+		preferDestructuringCommentsInside(ruleContext, objectRange) {
 		return rule.Fix{}, false
 	}
 
-	objectText := ctx.SourceFile.Text()[objectRange.Pos():objectRange.End()]
+	objectText := ruleContext.SourceFile.Text()[objectRange.Pos():objectRange.End()]
 	// Upstream re-parenthesises when the object's precedence is below an assignment expression's.
 	// A comma expression is the only thing that qualifies, which its corpus pins in adjacent cases:
 	// `(a, b).foo` keeps the parens and `(a = b).foo` loses them.
@@ -465,9 +465,9 @@ func preferDestructuringFix(ctx rule.Context, declarator *ast.Node, right *ast.N
 // preferDestructuringCommentsInside counts comments falling wholly inside a range.
 //
 // `comments.ForFile` is the shelf's cached per-file scan, which is upstream's `getCommentsInside`.
-func preferDestructuringCommentsInside(ctx rule.Context, textRange core.TextRange) int {
+func preferDestructuringCommentsInside(ruleContext rule.Context, textRange core.TextRange) int {
 	count := 0
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= textRange.Pos() && comment.Range.End() <= textRange.End() {
 			count++
 		}

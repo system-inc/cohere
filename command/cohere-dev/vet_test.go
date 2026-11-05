@@ -27,11 +27,11 @@ func writeFiles(test *testing.T, directory string, files map[string]string) {
 	test.Helper()
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }
@@ -51,8 +51,8 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 	land := func() (string, error) {
 		landing := exec.Command(fixture.wrapper, "land")
 		landing.Dir, landing.Env = a, fixture.environment
-		output, err := landing.CombinedOutput()
-		return string(output), err
+		output, outputError := landing.CombinedOutput()
+		return string(output), outputError
 	}
 	if output, err := land(); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
 		test.Fatalf("an unkeyed literal of another package's struct did not refuse the landing (%v):\n%s", err, output)
@@ -71,8 +71,8 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 func TestCohereDevTestVetsWithEveryCheck(t *testing.T) {
 	t.Parallel()
 	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		t.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		t.Fatalf("building: %v\n%s", outputError, output)
 	}
 	module := t.TempDir()
 	writeFiles(t, module, unkeyedLiteral)
@@ -81,8 +81,8 @@ func TestCohereDevTestVetsWithEveryCheck(t *testing.T) {
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
 		command.Dir = module
 		command.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "GOWORK=off")
-		output, err := command.CombinedOutput()
-		return string(output), err
+		output, outputError := command.CombinedOutput()
+		return string(output), outputError
 	}
 	if output, err := test("./user"); err == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
 		t.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", err, output)

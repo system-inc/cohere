@@ -182,7 +182,7 @@ var VoidUseMemo = rule.Rule{
 	// namespace on a `/` boundary, so a self-namespaced `react-void-use-memo` would match no
 	// inventory entry and lint nothing.
 	Name: "react-hooks/void-use-memo",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -206,11 +206,11 @@ var VoidUseMemo = rule.Rule{
 				// unused. Measured on React, which gives one finding for
 				// `useMemo(() => { foo(); }, []);` and not two.
 				if !hasNonVoidReturn(callback) {
-					ctx.ReportNode(callback, messageUseMemoCallbackReturnsNothing)
+					ruleContext.ReportNode(callback, messageUseMemoCallbackReturnsNothing)
 					return
 				}
 				if isValueDiscarded(node) {
-					ctx.ReportNode(ast.SkipParentheses(call.Expression), messageUseMemoResultUnused)
+					ruleContext.ReportNode(ast.SkipParentheses(call.Expression), messageUseMemoResultUnused)
 				}
 			},
 		}

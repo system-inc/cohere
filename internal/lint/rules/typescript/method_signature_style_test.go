@@ -30,9 +30,9 @@ func decodeMethodSignatureStyleOptions(test *testing.T, configuration string) an
 		// here is what puts the rule's own fallback under test rather than the decoder's.
 		return nil
 	}
-	options, err := DecodeMethodSignatureStyleOptions([]byte(configuration))
-	if err != nil {
-		test.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeMethodSignatureStyleOptionsError := DecodeMethodSignatureStyleOptions([]byte(configuration))
+	if decodeMethodSignatureStyleOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeMethodSignatureStyleOptionsError)
 	}
 	return options
 }
@@ -745,9 +745,9 @@ func TestMethodSignatureStyleDecoderResolvesTheStyle(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeMethodSignatureStyleOptions([]byte(testCase.configuration))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.configuration, err)
+			decoded, decodeMethodSignatureStyleOptionsError := DecodeMethodSignatureStyleOptions([]byte(testCase.configuration))
+			if decodeMethodSignatureStyleOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeMethodSignatureStyleOptionsError)
 			}
 			options, ok := decoded.(MethodSignatureStyleOptions)
 			if !ok {

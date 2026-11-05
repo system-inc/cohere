@@ -3272,9 +3272,9 @@ var noMisusedPromisesCaseNamePattern = regexp.MustCompile(`^\s*name:\s+"upstream
 func noMisusedPromisesTableSizes(test *testing.T) (silent int, fires int) {
 	test.Helper()
 
-	source, err := os.ReadFile("no_misused_promises_test.go")
-	if err != nil {
-		test.Fatalf("reading this test file to count its own tables: %v", err)
+	source, readError := os.ReadFile("no_misused_promises_test.go")
+	if readError != nil {
+		test.Fatalf("reading this test file to count its own tables: %v", readError)
 	}
 
 	// Matched with a regexp rather than a prefix, because gofmt aligns the values in a struct

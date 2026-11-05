@@ -72,8 +72,8 @@ var messageEmptyArrayPattern = rule.Message{
 // recoverable from the code, and both repairs change what the function receives.
 var NoEmptyPattern = rule.Rule{
 	Name: "no-empty-pattern",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -90,14 +90,14 @@ var NoEmptyPattern = rule.Rule{
 				if settings.AllowObjectPatternsAsParameters && isAllowedEmptyParameterPattern(node) {
 					return
 				}
-				ctx.ReportNode(node, messageEmptyObjectPattern)
+				ruleContext.ReportNode(node, messageEmptyObjectPattern)
 			},
 
 			ast.KindArrayBindingPattern: func(node *ast.Node) {
 				if hasBindingElements(node) {
 					return
 				}
-				ctx.ReportNode(node, messageEmptyArrayPattern)
+				ruleContext.ReportNode(node, messageEmptyArrayPattern)
 			},
 		}
 	},

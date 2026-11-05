@@ -100,15 +100,15 @@ func TestARefreshMergesTheReadinessRecordRuleByRule(test *testing.T) {
 func TestARecordedEntryKeepsOnlyTheCacheableRulesReadiness(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(`{"compilerOptions": {"noEmit": true}}`), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(`{"compilerOptions": {"noEmit": true}}`), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	graph, err := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	sourceFile := graph.ProjectFiles()[0]
 	keys := cacheKeys{contentHash: HashContent(sourceFile.Text()), pure: []string{"adamic/single-spread"}}

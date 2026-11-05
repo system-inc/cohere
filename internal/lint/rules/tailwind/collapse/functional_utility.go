@@ -444,8 +444,8 @@ func isPositiveInteger(input string) bool {
 	// The float round-trip, matching `String(Number(value)) === String(value)`. Parsed as a float
 	// rather than an integer on purpose: the question is what JavaScript's single numeric type does
 	// to this string, and a Go int64 parse would accept values JavaScript cannot represent.
-	parsed, err := strconv.ParseFloat(input, 64)
-	if err != nil {
+	parsed, parseError := strconv.ParseFloat(input, 64)
+	if parseError != nil {
 		return false
 	}
 	return strconv.FormatFloat(parsed, 'f', -1, 64) == input

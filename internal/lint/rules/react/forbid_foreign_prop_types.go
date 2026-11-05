@@ -137,7 +137,7 @@ type ForbidForeignPropTypesOptions struct {
 var ForbidForeignPropTypes = rule.Rule{
 	Name: "react/forbid-foreign-prop-types",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[ForbidForeignPropTypesOptions](options)
 
 		// unwrapParentheses walks up past the parentheses our parser keeps and upstream's folds
@@ -220,7 +220,7 @@ var ForbidForeignPropTypes = rule.Rule{
 			if isAssignmentTarget(access) || isAllowedAssignment(access) {
 				return
 			}
-			ctx.ReportNode(property, messageForbidForeignPropTypes)
+			ruleContext.ReportNode(property, messageForbidForeignPropTypes)
 		}
 
 		return rule.Listeners{
@@ -266,7 +266,7 @@ var ForbidForeignPropTypes = rule.Rule{
 					}
 					// Anchored on the whole element, not on its key, which is what makes
 					// `{propTypes: p}` span both halves. Measured against upstream's own spans.
-					ctx.ReportNode(element, messageForbidForeignPropTypes)
+					ruleContext.ReportNode(element, messageForbidForeignPropTypes)
 					return
 				}
 			},

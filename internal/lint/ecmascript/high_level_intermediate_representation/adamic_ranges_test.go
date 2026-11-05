@@ -49,8 +49,8 @@ func TestExportRangesForAdamic(test *testing.T) {
 	if *exportRanges == "" {
 		test.Skip("writes Adamic's corpus only when -export-ranges names a directory")
 	}
-	if err := os.MkdirAll(*exportRanges, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(*exportRanges, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	pipelines := []struct {
@@ -88,8 +88,8 @@ func TestExportRangesForAdamic(test *testing.T) {
 		if out.Len() == 0 {
 			continue
 		}
-		if err := os.WriteFile(filepath.Join(*exportRanges, fixture.name+".txt"), []byte(out.String()), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(*exportRanges, fixture.name+".txt"), []byte(out.String()), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		fixtures++
 	}

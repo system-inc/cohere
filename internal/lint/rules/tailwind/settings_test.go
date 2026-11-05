@@ -59,13 +59,13 @@ func tailwindDecoders(test *testing.T) map[string]func(raw []byte, base rule.Opt
 // decodedKey re-encodes decoded options and returns one key's value, compacted.
 func decodedKey(test *testing.T, decoded any, key string) string {
 	test.Helper()
-	encoded, err := json.Marshal(decoded)
-	if err != nil {
-		test.Fatalf("encoding %T: %v", decoded, err)
+	encoded, encodeError := json.Marshal(decoded)
+	if encodeError != nil {
+		test.Fatalf("encoding %T: %v", decoded, encodeError)
 	}
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(encoded, &fields); err != nil {
-		test.Fatalf("decoding %T's fields: %v", decoded, err)
+	if decodeError := json.Unmarshal(encoded, &fields); decodeError != nil {
+		test.Fatalf("decoding %T's fields: %v", decoded, decodeError)
 	}
 	return compactJsonForTest(test, fields[key])
 }
@@ -73,7 +73,7 @@ func decodedKey(test *testing.T, decoded any, key string) string {
 func compactJsonForTest(test *testing.T, raw json.RawMessage) string {
 	test.Helper()
 	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if decodeError := json.Unmarshal(raw, &value); decodeError != nil {
 		return string(raw)
 	}
 	compacted, _ := json.Marshal(value)
@@ -184,15 +184,15 @@ func TestSplitTailwindSettingsRefusesWhatNoRuleReads(test *testing.T) {
 		{"not an object", `["cn"]`, "expected an object"},
 	}
 	for _, testCase := range testCases {
-		_, err := splitTailwindSettings([]byte(testCase.block))
-		if err == nil || !strings.Contains(err.Error(), testCase.refused) {
-			test.Errorf("%s: %s was not refused naming %s: %v", testCase.name, testCase.block, testCase.refused, err)
+		_, splitTailwindSettingsError := splitTailwindSettings([]byte(testCase.block))
+		if splitTailwindSettingsError == nil || !strings.Contains(splitTailwindSettingsError.Error(), testCase.refused) {
+			test.Errorf("%s: %s was not refused naming %s: %v", testCase.name, testCase.block, testCase.refused, splitTailwindSettingsError)
 		}
 	}
 
-	parts, err := splitTailwindSettings([]byte(`{"entryPoint": "./theme.css", "order": "desc"}`))
-	if err != nil {
-		test.Fatal(err)
+	parts, splitTailwindSettingsError := splitTailwindSettings([]byte(`{"entryPoint": "./theme.css", "order": "desc"}`))
+	if splitTailwindSettingsError != nil {
+		test.Fatal(splitTailwindSettingsError)
 	}
 	if len(parts) != 12 {
 		test.Fatalf("entryPoint reached %d rules, want all 12", len(parts))

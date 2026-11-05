@@ -195,8 +195,8 @@ var RestrictPlusOperands = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -207,8 +207,8 @@ var RestrictPlusOperands = rule.Rule{
 		// to `string` and a `T extends number` resolves to `number` before anything is judged.
 		typeOf := func(node *ast.Node) *checker.Type {
 			return checker.Checker_getBaseTypeOfLiteralType(
-				ctx.TypeChecker,
-				type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node),
+				ruleContext.TypeChecker,
+				type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node),
 			)
 		}
 
@@ -248,8 +248,8 @@ var RestrictPlusOperands = rule.Rule{
 					(!settings.allowBoolean && restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType, checker.TypeFlagsBooleanLike)) ||
 					(!settings.allowNullish && restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType,
 						checker.TypeFlagsNull|checker.TypeFlagsUndefined)) {
-					ctx.ReportNode(side.node, buildRestrictPlusOperandsInvalidMessage(
-						ctx.TypeChecker.TypeToString(side.baseType), stringLike))
+					ruleContext.ReportNode(side.node, buildRestrictPlusOperandsInvalidMessage(
+						ruleContext.TypeChecker.TypeToString(side.baseType), stringLike))
 					hadIndividualComplaint = true
 					continue
 				}
@@ -258,7 +258,7 @@ var RestrictPlusOperands = rule.Rule{
 				// the generic object test below would swallow it.
 				for subBaseType := range type_checking.UnionTypePartsSeq(side.baseType) {
 					var reportThisPart bool
-					if ctx.TypeChecker.TypeToString(subBaseType) == "RegExp" {
+					if ruleContext.TypeChecker.TypeToString(subBaseType) == "RegExp" {
 						// Reported when RegExps are forbidden, and ALSO when they are allowed but
 						// the other side is a number: `/x/ + 1` is a number-and-string mixture.
 						reportThisPart = !settings.allowRegExp ||
@@ -269,8 +269,8 @@ var RestrictPlusOperands = rule.Rule{
 					}
 
 					if reportThisPart {
-						ctx.ReportNode(side.node, buildRestrictPlusOperandsInvalidMessage(
-							ctx.TypeChecker.TypeToString(subBaseType), stringLike))
+						ruleContext.ReportNode(side.node, buildRestrictPlusOperandsInvalidMessage(
+							ruleContext.TypeChecker.TypeToString(subBaseType), stringLike))
 						hadIndividualComplaint = true
 						continue
 					}
@@ -294,9 +294,9 @@ var RestrictPlusOperands = rule.Rule{
 					restrictPlusOperandsIsTypeFlagSetInUnion(baseType, checker.TypeFlagsStringLike) &&
 					restrictPlusOperandsIsTypeFlagSetInUnion(otherType,
 						checker.TypeFlagsNumberLike|checker.TypeFlagsBigIntLike) {
-					ctx.ReportNode(node, buildRestrictPlusOperandsMismatchedMessage(
-						ctx.TypeChecker.TypeToString(leftType),
-						ctx.TypeChecker.TypeToString(rightType),
+					ruleContext.ReportNode(node, buildRestrictPlusOperandsMismatchedMessage(
+						ruleContext.TypeChecker.TypeToString(leftType),
+						ruleContext.TypeChecker.TypeToString(rightType),
 						stringLike))
 					return
 				}
@@ -305,9 +305,9 @@ var RestrictPlusOperands = rule.Rule{
 				// switches this off.
 				if restrictPlusOperandsIsTypeFlagSetInUnion(baseType, checker.TypeFlagsNumberLike) &&
 					restrictPlusOperandsIsTypeFlagSetInUnion(otherType, checker.TypeFlagsBigIntLike) {
-					ctx.ReportNode(node, buildRestrictPlusOperandsBigintAndNumberMessage(
-						ctx.TypeChecker.TypeToString(leftType),
-						ctx.TypeChecker.TypeToString(rightType)))
+					ruleContext.ReportNode(node, buildRestrictPlusOperandsBigintAndNumberMessage(
+						ruleContext.TypeChecker.TypeToString(leftType),
+						ruleContext.TypeChecker.TypeToString(rightType)))
 					return
 				}
 			}

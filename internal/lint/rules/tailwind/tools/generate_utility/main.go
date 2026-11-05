@@ -56,16 +56,16 @@ func main() {
 		os.Exit(2)
 	}
 
-	generated, err := enumerate(*theme)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "enumerate: %v\n", err)
+	generated, enumerateError := enumerate(*theme)
+	if enumerateError != nil {
+		fmt.Fprintf(os.Stderr, "enumerate: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
 	if *check {
-		committed, err := os.ReadFile(*output)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", err)
+		committed, readError := os.ReadFile(*output)
+		if readError != nil {
+			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", readError)
 			os.Exit(1)
 		}
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
@@ -77,8 +77,8 @@ func main() {
 		return
 	}
 
-	if err := os.WriteFile(*output, generated, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, err)
+	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
 
@@ -92,8 +92,8 @@ func main() {
 		Cases               []json.RawMessage `json:"cases"`
 		NullReadings        int               `json:"nullReadings"`
 	}
-	if err := json.Unmarshal(generated, &summary); err != nil {
-		fmt.Fprintf(os.Stderr, "summarize: %v\n", err)
+	if decodeError := json.Unmarshal(generated, &summary); decodeError != nil {
+		fmt.Fprintf(os.Stderr, "summarize: %v\n", decodeError)
 		os.Exit(1)
 	}
 
@@ -123,9 +123,9 @@ func main() {
 // boundary is here, at generation time, and never at lint time: the committed fixture is what the
 // test reads.
 func enumerate(theme string) ([]byte, error) {
-	directory, err := toolDirectory()
-	if err != nil {
-		return nil, err
+	directory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
+		return nil, toolDirectoryError
 	}
 	script := filepath.Join(directory, "enumerate.mjs")
 
@@ -133,8 +133,8 @@ func enumerate(theme string) ([]byte, error) {
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
-	if err := command.Run(); err != nil {
-		return nil, fmt.Errorf("node %s: %w\n%s", script, err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		return nil, fmt.Errorf("node %s: %w\n%s", script, runError, stderr.String())
 	}
 	return stdout.Bytes(), nil
 }

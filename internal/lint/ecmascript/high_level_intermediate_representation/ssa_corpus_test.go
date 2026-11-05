@@ -54,18 +54,18 @@ func TestSSAOverRealCodebase(test *testing.T) {
 	terminals := map[string]int{}
 
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		probe := rule.Rule{
 			Name:             "ssa-corpus-harness",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(fnNode *ast.Node) {
-							fn := Lower(fnNode, ctx.TypeChecker)
+							fn := Lower(fnNode, ruleContext.TypeChecker)
 							if fn == nil {
 								return
 							}

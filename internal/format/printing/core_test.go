@@ -317,9 +317,9 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 		ast, comments, text := toyProgram(random)
 		cases[index] = toyCase{Ast: ast, Comments: comments, Text: text, Width: 6 + random.Intn(30)}
 	}
-	encoded, err := json.Marshal(cases)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(cases)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 
 	command := exec.Command("node", "--input-type=module", "-e", toyUpstreamScript)
@@ -327,19 +327,19 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 	command.Stdin = bytes.NewReader(encoded)
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	var upstream []toyResult
-	if err := json.Unmarshal(stdout.Bytes(), &upstream); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 
 	// The Go side gets fresh ASTs, decoded from the same JSON, so neither side sees the other's
 	// attachment state.
 	var fresh []toyCase
-	if err := json.Unmarshal(encoded, &fresh); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(encoded, &fresh); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 
 	commentsTotal, upstreamErrors, textMismatches, attachMismatches := 0, 0, 0, 0
@@ -353,9 +353,9 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 			continue
 		}
 		options := &Options[*toyNode]{Printer: toyPrinter(), OriginalText: testCase.Text, EmbeddedLanguageFormatting: "off"}
-		printed, err := PrintAstToDoc(testCase.Ast, testCase.Comments, options)
-		if err != nil {
-			test.Errorf("case %d: %v\ntext %q", index, err, testCase.Text)
+		printed, printAstToDocError := PrintAstToDoc(testCase.Ast, testCase.Comments, options)
+		if printAstToDocError != nil {
+			test.Errorf("case %d: %v\ntext %q", index, printAstToDocError, testCase.Text)
 			continue
 		}
 		formatted := doc.Print(printed, doc.Options{PrintWidth: testCase.Width, TabWidth: 2})

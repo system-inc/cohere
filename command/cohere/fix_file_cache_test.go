@@ -30,9 +30,9 @@ func TestTheFixPathsReLintComputesEachDerivationOncePerText(test *testing.T) {
 	test.Parallel()
 	computed := 0
 	asking := func(name string) rule.Rule {
-		return rule.Rule{Name: name, Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Rule{Name: name, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindIdentifier: func(node *ast.Node) {
-				rule.Cached(ctx.FileCache, "fix-file-cache-probe", func() int {
+				rule.Cached(ruleContext.FileCache, "fix-file-cache-probe", func() int {
 					computed++
 					return computed
 				})
@@ -40,8 +40,8 @@ func TestTheFixPathsReLintComputesEachDerivationOncePerText(test *testing.T) {
 		}}
 	}
 	text := "const first = second;\nconst third = first + second;\n"
-	if _, err := proposalsForText("/Probe.ts", text, &program.Graph{}, []rule.Rule{asking("probe-a"), asking("probe-b")}); err != nil {
-		test.Fatalf("proposalsForText: %v", err)
+	if _, proposalsForTextError := proposalsForText("/Probe.ts", text, &program.Graph{}, []rule.Rule{asking("probe-a"), asking("probe-b")}); proposalsForTextError != nil {
+		test.Fatalf("proposalsForText: %v", proposalsForTextError)
 	}
 	if computed != 1 {
 		test.Errorf("the derivation was computed %d times for one text asked at every identifier by two rules, want once", computed)
@@ -70,8 +70,8 @@ func TestTheFixPathsReLintGrowsLinearlyOnABundle(test *testing.T) {
 	allocations := func(count int) float64 {
 		text := bundle(count)
 		return testing.AllocsPerRun(3, func() {
-			if _, err := proposalsForText("/main.js", text, &program.Graph{}, rules); err != nil {
-				test.Fatalf("proposalsForText: %v", err)
+			if _, proposalsForTextError := proposalsForText("/main.js", text, &program.Graph{}, rules); proposalsForTextError != nil {
+				test.Fatalf("proposalsForText: %v", proposalsForTextError)
 			}
 		})
 	}
@@ -116,13 +116,13 @@ func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(test *testing.T) {
 			test.Parallel()
 			out := &lockedBuffer{}
 			seenWhileRunning := false
-			result, err := watchedFile(out, testCase.after, "/bundle/main.js", func() (edit.FileResult, error) {
+			result, watchedFileError := watchedFile(out, testCase.after, "/bundle/main.js", func() (edit.FileResult, error) {
 				time.Sleep(testCase.takes)
 				seenWhileRunning = strings.Contains(out.String(), "/bundle/main.js")
 				return edit.FileResult{FileName: "/bundle/main.js"}, nil
 			})
-			if err != nil || result.FileName != "/bundle/main.js" {
-				test.Fatalf("the file's own result did not come back: %+v, %v", result, err)
+			if watchedFileError != nil || result.FileName != "/bundle/main.js" {
+				test.Fatalf("the file's own result did not come back: %+v, %v", result, watchedFileError)
 			}
 			if seenWhileRunning != testCase.named {
 				test.Errorf("named while running %t, want %t: %q", seenWhileRunning, testCase.named, out.String())

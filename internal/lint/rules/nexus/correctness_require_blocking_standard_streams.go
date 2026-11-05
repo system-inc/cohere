@@ -158,17 +158,17 @@ var CorrectnessRequireBlockingStandardStreams = rule.Rule{
 	// Only a file that calls `process.exit` can hold a finding, and most files do not.
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
 		// Every exit is a member named `exit`, so a file that never spells it holds none.
-		if !strings.Contains(ctx.SourceFile.Text(), "exit") {
+		if !strings.Contains(ruleContext.SourceFile.Text(), "exit") {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				correctnessRequireBlockingStandardStreamsScanFile(ctx)
+				correctnessRequireBlockingStandardStreamsScanFile(ruleContext)
 			},
 		}
 	},
@@ -386,12 +386,12 @@ type correctnessRequireBlockingStandardStreamsAnalysis struct {
 	functionMayBlock map[*ast.Node]uint8
 }
 
-func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
-	sourceFile := ctx.SourceFile
-	if !correctnessRequireBlockingStandardStreamsHasCandidate(ctx, sourceFile.AsNode()) {
+func correctnessRequireBlockingStandardStreamsScanFile(ruleContext rule.Context) {
+	sourceFile := ruleContext.SourceFile
+	if !correctnessRequireBlockingStandardStreamsHasCandidate(ruleContext, sourceFile.AsNode()) {
 		return
 	}
-	index := correctnessRequireBlockingStandardStreamsIndexFor(ctx.Program)
+	index := correctnessRequireBlockingStandardStreamsIndexFor(ruleContext.Program)
 	reason := correctnessRequireBlockingStandardStreamsShebang
 	if !strings.HasPrefix(sourceFile.Text(), "#!") {
 		if index.imported[sourceFile.PathKey()] {
@@ -400,7 +400,7 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 		reason = correctnessRequireBlockingStandardStreamsUnimported
 	}
 	analysis := &correctnessRequireBlockingStandardStreamsAnalysis{
-		ctx:              ctx,
+		ctx:              ruleContext,
 		index:            index,
 		ordered:          index.canBlock[sourceFile.PathKey()],
 		functionMayBlock: map[*ast.Node]uint8{},
@@ -420,7 +420,7 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 		count = correctnessRequireBlockingStandardStreamsSeveralExits
 		values = map[string]string{"count": strconv.Itoa(len(exits))}
 	}
-	ctx.ReportNode(exits[0], rule.Message{
+	ruleContext.ReportNode(exits[0], rule.Message{
 		Id:          correctnessRequireBlockingStandardStreamsId,
 		Description: correctnessRequireBlockingStandardStreamsText.Render(values, reason, count),
 	})
@@ -428,7 +428,7 @@ func correctnessRequireBlockingStandardStreamsScanFile(ctx rule.Context) {
 
 // correctnessRequireBlockingStandardStreamsHasCandidate says whether some function of the file, or
 // its top level, holds both an exit and a write: the cheap precondition of any finding.
-func correctnessRequireBlockingStandardStreamsHasCandidate(ctx rule.Context, sourceFile *ast.Node) bool {
+func correctnessRequireBlockingStandardStreamsHasCandidate(ruleContext rule.Context, sourceFile *ast.Node) bool {
 	exits := map[*ast.Node]bool{}
 	writes := map[*ast.Node]bool{}
 	found := false
@@ -438,11 +438,11 @@ func correctnessRequireBlockingStandardStreamsHasCandidate(ctx rule.Context, sou
 			return true
 		}
 		if node.Kind == ast.KindCallExpression {
-			if correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+			if correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				root := control_flow_graph.RootOf(node)
 				exits[root] = true
 				found = writes[root]
-			} else if correctnessNoProcessExitAfterOutputIsWrite(ctx, node) {
+			} else if correctnessNoProcessExitAfterOutputIsWrite(ruleContext, node) {
 				root := control_flow_graph.RootOf(node)
 				writes[root] = true
 				found = exits[root]
@@ -832,7 +832,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) reachedExits(
 // analyzeRoot builds one root's graph and walks it from its entry, unblocked. It returns the exits a
 // path reaches having written, and the functions of this file a path starts while still unblocked.
 func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(root *ast.Node) ([]*ast.Node, []*ast.Node) {
-	ctx := analysis.ctx
+	ruleContext := analysis.ctx
 	type event = correctnessRequireBlockingStandardStreamsEvent
 	type builder = control_flow_graph.Builder[event]
 	recorded := map[*ast.Node]bool{}
@@ -855,13 +855,13 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(r
 				}
 				return
 			}
-			if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ctx, node) {
+			if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				recorded[node] = true
 				b.Emit(event{kind: correctnessRequireBlockingStandardStreamsExit, node: node})
 				return
 			}
-			if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsWrite(ctx, node) &&
-				!correctnessNoProcessExitAfterOutputHoldsExit(ctx, node) {
+			if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsWrite(ruleContext, node) &&
+				!correctnessNoProcessExitAfterOutputHoldsExit(ruleContext, node) {
 				b.Emit(event{kind: correctnessRequireBlockingStandardStreamsWrite, node: node})
 			}
 			runs, handsOn := analysis.startedFunctions(node)
@@ -901,7 +901,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(r
 			return true
 		}
 		if node.Kind == ast.KindCallExpression && control_flow_graph.RootOf(node) == root &&
-			correctnessNoProcessExitAfterOutputIsExit(ctx, node) && !recorded[node] {
+			correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) && !recorded[node] {
 			unrecordable = true
 			return true
 		}

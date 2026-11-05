@@ -19,14 +19,14 @@ func designSystemRule(root string) rule.Rule {
 	return rule.Rule{
 		Name:         "fixture/design-system",
 		ProgramReads: rule.ReadsDesignSystem,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				fileSystem := ctx.Program.DesignSystemFS()
+				fileSystem := ruleContext.Program.DesignSystemFS()
 				theme, _ := fileSystem.ReadFile(tspath.RootedFilePath(filepath.Join(root, "theme.css")))
 				// Asked every time, not after the theme in an ||: a question never asked is not in the read set.
 				candidate := fileSystem.FileExists(tspath.RootedFilePath(filepath.Join(root, "candidate.css")))
 				if strings.Contains(theme, "flag") || candidate {
-					ctx.ReportNode(node, rule.Message{Id: "flagged", Description: "the design system flags this"})
+					ruleContext.ReportNode(node, rule.Message{Id: "flagged", Description: "the design system flags this"})
 				}
 			}}
 		},
@@ -52,8 +52,8 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 	rules := []rule.Rule{designSystemRule(root)}
 	write := func(name string, contents string) func() {
 		return func() {
-			if err := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
 	}
@@ -87,8 +87,8 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 		{"nothing changed after the stylesheet edit", func() {}, false},
 		{"a candidate it missed created", write("candidate.css", ""), true},
 		{"that candidate removed", func() {
-			if err := os.Remove(filepath.Join(root, "candidate.css")); err != nil {
-				test.Fatal(err)
+			if removeError := os.Remove(filepath.Join(root, "candidate.css")); removeError != nil {
+				test.Fatal(removeError)
 			}
 		}, true},
 	}
@@ -130,17 +130,17 @@ func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(test *testing.T) {
 		"b.ts":          "export const b = 2;\n",
 	})
 	elsewhere := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "c.ts": "export const c = 3;\n"})
-	other, err := program.Build(program.Options{ConfigFileName: filepath.Join(elsewhere, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	other, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(elsewhere, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	inner := designSystemRule(root)
 	interleaved := inner
-	interleaved.Run = func(ctx rule.Context, options any) rule.Listeners {
+	interleaved.Run = func(ruleContext rule.Context, options any) rule.Listeners {
 		// A concurrent graph asking for its own design system after each time this walk asks for its own, so
 		// the last program to ask before the walk ends is never this one.
 		listeners := rule.Listeners{}
-		for kind, listener := range inner.Run(ctx, options) {
+		for kind, listener := range inner.Run(ruleContext, options) {
 			listeners[kind] = func(node *ast.Node) {
 				listener(node)
 				rule.ViewProgram(other.Program, nil, inner).DesignSystemFS()
@@ -154,8 +154,8 @@ func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(test *testing.T) {
 	if recorded.DesignSystem == nil || len(recorded.DesignSystem.Reads) == 0 {
 		test.Fatalf("this walk's design system was recorded as never loaded: %+v", recorded.DesignSystem)
 	}
-	if err := os.WriteFile(filepath.Join(root, "theme.css"), []byte("plain\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "theme.css"), []byte("plain\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	result, _ := walkAndRecord(test, root, rules, recorded)
 	truth := plainWalk(test, root, rules)

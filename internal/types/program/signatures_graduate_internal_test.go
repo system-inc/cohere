@@ -16,18 +16,18 @@ func graduationProject(test *testing.T, names ...string) (*Graph, []*ast.SourceF
 	test.Helper()
 	root := test.TempDir()
 	config := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
-	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	for _, name := range names {
 		text := "export function " + name + "(value: number): number {\n  return value + 1;\n}\n"
-		if err := os.WriteFile(filepath.Join(root, name+".ts"), []byte(text), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, name+".ts"), []byte(text), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	var sources []*ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -47,8 +47,8 @@ func graduationProject(test *testing.T, names ...string) (*Graph, []*ast.SourceF
 func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(test *testing.T) {
 	test.Parallel()
 	graph, sources := graduationProject(test, "alpha", "beta")
-	ctx := context.Background()
-	shapes, _ := graph.Signatures(ctx, nil)
+	backgroundContext := context.Background()
+	shapes, _ := graph.Signatures(backgroundContext, nil)
 	for _, sourceFile := range sources {
 		if entry := shapes[sourceFile.FileName().AsString()]; entry.Signature != entry.Version {
 			test.Fatalf("%s already has a real signature before graduating, so this proves nothing", sourceFile.FileName())
@@ -59,7 +59,7 @@ func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(test *te
 	if graduated != len(sources) || abandoned != "" {
 		test.Fatalf("graduated %d of %d, abandoned %q; want every one and none abandoned", graduated, len(sources), abandoned)
 	}
-	emitted, _ := graph.Signatures(ctx, RecordedRealSignatures(graph))
+	emitted, _ := graph.Signatures(backgroundContext, RecordedRealSignatures(graph))
 	for _, sourceFile := range sources {
 		entry := shapes[sourceFile.FileName().AsString()]
 		if entry.Signature == entry.Version || entry.Abandoned {

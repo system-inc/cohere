@@ -21,9 +21,9 @@ func main() {
 	check := flag.Bool("check", false, "report stale files and exit 1, writing nothing")
 	flag.Parse()
 
-	files, err := settingsschema.Build(registry.Names())
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	files, buildError := settingsschema.Build(registry.Names())
+	if buildError != nil {
+		fmt.Fprintln(os.Stderr, buildError)
 		os.Exit(1)
 	}
 	paths := make([]string, 0, len(files))
@@ -43,12 +43,12 @@ func main() {
 			fmt.Printf("stale: %s\n", path)
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			fmt.Fprintln(os.Stderr, createDirectoryError)
 			os.Exit(1)
 		}
-		if err := os.WriteFile(path, files[path], 0o644); err != nil {
-			fmt.Fprintln(os.Stderr, err)
+		if writeError := os.WriteFile(path, files[path], 0o644); writeError != nil {
+			fmt.Fprintln(os.Stderr, writeError)
 			os.Exit(1)
 		}
 		fmt.Printf("wrote %s\n", path)

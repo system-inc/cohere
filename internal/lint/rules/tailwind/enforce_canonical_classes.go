@@ -113,8 +113,8 @@ var EnforceCanonicalClasses = rule.Rule{
 	Name: "better-tailwindcss/enforce-canonical-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -126,17 +126,17 @@ var EnforceCanonicalClasses = rule.Rule{
 		// Resolved once per file and before the listeners are built, matching the other two migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will
 		// not parse is reported once per file rather than swallowed.
-		designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location())
+		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
 		if designSystem.Err != nil {
-			if ctx.Program == nil {
+			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ctx, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Err) {
 				return nil
 			}
-			return declineListeners(ctx, "enforce-canonical-classes", designSystem)
+			return declineListeners(ruleContext, "enforce-canonical-classes", designSystem)
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
@@ -153,7 +153,7 @@ var EnforceCanonicalClasses = rule.Rule{
 			ignore = configured.Ignore
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 		ignored := compileIgnorePatterns(ignore)
 		// Every result that built carries its Canonicalizer, from loadedDesignSystemResult. One without it
 		// was put together by hand, and building one here would build a fresh memo for every file, the
@@ -167,12 +167,12 @@ var EnforceCanonicalClasses = rule.Rule{
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				var merged map[string]bool
 				if collapse.enabled {
-					merged = reportCollapses(ctx, literal, ignored, designSystem, collapse)
+					merged = reportCollapses(ruleContext, literal, ignored, designSystem, collapse)
 				}
 				// Upstream signs every class under the same options it collapses with, so a project that
 				// turns collapse off compares signatures without expanding shorthands.
 				canonicalizer := designSystem.Canonicalizer.WithFeatures(tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical))
-				reportSingles(ctx, literal, ignored, designSystem.System, canonicalizer, merged)
+				reportSingles(ruleContext, literal, ignored, designSystem.System, canonicalizer, merged)
 			}
 		}
 
@@ -237,7 +237,7 @@ func (c candidateParts) printedValue() string {
 // `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against the engine, which produces
 // the same single finding for the four-class case.
 func reportCollapses(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	literal ClassLiteral,
 	ignored []*ignorePattern,
 	designSystem DesignSystemResult,
@@ -269,7 +269,7 @@ func reportCollapses(
 			return reported
 		}
 
-		ctx.ReportRange(literal.Range, messageCanonicalCollapse(inputs, output))
+		ruleContext.ReportRange(literal.Range, messageCanonicalCollapse(inputs, output))
 		for _, input := range inputs {
 			reported[input] = true
 		}
@@ -299,7 +299,7 @@ func reportCollapses(
 // reason reportDeprecations gives: `no-duplicate-classes` deletes a repeat, and renaming the same bytes
 // would be refused as an overlap.
 func reportSingles(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	literal ClassLiteral,
 	ignored []*ignorePattern,
 	system *tailwindengine.LoadedDesignSystem,
@@ -313,8 +313,8 @@ func reportSingles(
 
 	var tokens []classToken
 	tokenized := false
-	if ctx.SourceFile != nil {
-		tokens, tokenized = classTokensIn(ctx.SourceFile.Text(), literal.Range, literal.Text)
+	if ruleContext.SourceFile != nil {
+		tokens, tokenized = classTokensIn(ruleContext.SourceFile.Text(), literal.Range, literal.Text)
 	}
 	classTokens := classesOf(tokens)
 	if tokenized && len(classTokens) == len(classes) {
@@ -344,10 +344,10 @@ func reportSingles(
 		if canFix && !containsString(classes[:index], className) {
 			fixes = []rule.Fix{rule.ReplaceRange(classTokens[index].Range, canonical)}
 		}
-		ctx.Report(rule.Diagnostic{
+		ruleContext.Report(rule.Diagnostic{
 			Range:      literal.Range,
 			Message:    messageCanonicalSingle(className, canonical),
-			SourceFile: ctx.SourceFile,
+			SourceFile: ruleContext.SourceFile,
 			Fixes:      fixes,
 		})
 	}
@@ -441,8 +441,8 @@ type ignorePattern struct {
 func compileIgnorePatterns(patterns []string) []*ignorePattern {
 	compiled := make([]*ignorePattern, 0, len(patterns))
 	for _, pattern := range patterns {
-		expression, err := esregexp.Compile(pattern, "")
-		if err != nil {
+		expression, compileError := esregexp.Compile(pattern, "")
+		if compileError != nil {
 			continue
 		}
 		compiled = append(compiled, &ignorePattern{pattern: expression})

@@ -23,8 +23,8 @@ func TestAnEarlyFormatResultIsDiscardedWhenTheFileChangesBeforeTheBuild(test *te
 			test.Parallel()
 			directory := test.TempDir()
 			fileName := filepath.Join(directory, "A.ts")
-			if err := os.WriteFile(fileName, []byte("export const a = 1;\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(fileName, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			unchanged := func(_ string, text string, _ *ast.SourceFile) (string, error) { return text, nil }
 			speculation := speculateFormatOn([]string{fileName}, unchanged, 1, 1, nil)
@@ -34,17 +34,17 @@ func TestAnEarlyFormatResultIsDiscardedWhenTheFileChangesBeforeTheBuild(test *te
 			}
 
 			if edited {
-				if err := os.WriteFile(fileName, []byte("export const a = 2;\n"), 0o644); err != nil {
-					test.Fatal(err)
+				if writeError := os.WriteFile(fileName, []byte("export const a = 2;\n"), 0o644); writeError != nil {
+					test.Fatal(writeError)
 				}
 			}
 			configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
-			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
-			graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-			if err != nil {
-				test.Fatal(err)
+			graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+			if buildError != nil {
+				test.Fatal(buildError)
 			}
 
 			_, kept := speculation.keepable(nil, graph)[fileName]
@@ -64,8 +64,8 @@ func TestANarrowedSpeculationRunsOnFewerWorkersAndStillReachesEveryFile(test *te
 	var candidates []string
 	for index := range 40 {
 		fileName := filepath.Join(directory, fmt.Sprintf("f%02d.md", index))
-		if err := os.WriteFile(fileName, []byte("# Title\n"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(fileName, []byte("# Title\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		candidates = append(candidates, fileName)
 	}

@@ -330,9 +330,9 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 	type input = oracleInput
 	var inputs []input
 	corpusFiles := 0
-	vendored, err := filepath.Abs(filepath.Join("..", "testdata", "prettier", "css"))
-	if err != nil {
-		test.Fatal(err)
+	vendored, absolutePathError := filepath.Abs(filepath.Join("..", "testdata", "prettier", "css"))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	for _, corpus := range append([]string{vendored}, strings.Split(os.Getenv("COHERE_CSS_CORPORA"), ":")...) {
 		corpus = strings.TrimSpace(corpus)
@@ -343,7 +343,7 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		err := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -364,8 +364,8 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			corpusFiles++
 			return nil
 		})
-		if err != nil {
-			test.Fatalf("walking %s: %v", corpus, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", corpus, walkError)
 		}
 	}
 	if corpusFiles == 0 {
@@ -414,11 +414,11 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			fail("%s: the fixture says malformed=%v and the library says %v", name, expectMalformed, each)
 			continue
 		}
-		got, err := dumpSelector(text)
+		got, dumpSelectorError := dumpSelector(text)
 		switch {
-		case oracleRefused && err != nil:
-			if err.Error() != wantError {
-				fail("%s %q: both refuse, with different messages:\n  library %s\n  Go      %s", name, text, wantError, err.Error())
+		case oracleRefused && dumpSelectorError != nil:
+			if dumpSelectorError.Error() != wantError {
+				fail("%s %q: both refuse, with different messages:\n  library %s\n  Go      %s", name, text, wantError, dumpSelectorError.Error())
 				continue
 			}
 			refusedByBoth++
@@ -427,8 +427,8 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			}
 		case oracleRefused:
 			fail("%s %q: the library refuses it (%s) and Go parsed it", name, text, wantError)
-		case err != nil:
-			fail("%s %q: the library parses it and Go refused: %v", name, text, err)
+		case dumpSelectorError != nil:
+			fail("%s %q: the library parses it and Go refused: %v", name, text, dumpSelectorError)
 		default:
 			if difference := firstSelectorDifference(oracleInBytes(each["ast"], text), got, "root"); difference != "" {
 				fail("%s %q: %s", name, text, difference)
@@ -488,17 +488,17 @@ func runSelectorOracle(test *testing.T, root string, inputs []oracleInput) []map
 	test.Helper()
 	var stdin bytes.Buffer
 	for _, each := range inputs {
-		encoded, err := json.Marshal(each)
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(each)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		stdin.Write(encoded)
 		stdin.WriteByte('\n')
 	}
 	// The library hangs on some selectors (see ErrLoopsForever), so the oracle runs on a deadline.
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	command := exec.CommandContext(ctx, "node", "--input-type=module", "-e", selectorParseScript)
+	command := exec.CommandContext(timeoutContext, "node", "--input-type=module", "-e", selectorParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
 	var stdout, stderr bytes.Buffer
@@ -511,11 +511,11 @@ func runSelectorOracle(test *testing.T, root string, inputs []oracleInput) []map
 			continue
 		}
 		var each map[string]any
-		if err := json.Unmarshal([]byte(line), &each); err != nil {
+		if decodeError := json.Unmarshal([]byte(line), &each); decodeError != nil {
 			if runError != nil {
 				break // the last line a killed process was writing
 			}
-			test.Fatal(err)
+			test.Fatal(decodeError)
 		}
 		records = append(records, each)
 	}
@@ -555,8 +555,8 @@ func TestParseAgreesOnRandomSelectors(test *testing.T) {
 	root := corpus.PrettierFork.Root(test)
 	count := 20000
 	if value := os.Getenv("COHERE_SELECTOR_RANDOM"); value != "" {
-		if _, err := fmt.Sscan(value, &count); err != nil {
-			test.Fatalf("COHERE_SELECTOR_RANDOM: %v", err)
+		if _, scanError := fmt.Sscan(value, &count); scanError != nil {
+			test.Fatalf("COHERE_SELECTOR_RANDOM: %v", scanError)
 		}
 	}
 	random := rand.New(rand.NewPCG(2, 3))
@@ -572,7 +572,7 @@ func TestParseAgreesOnRandomSelectors(test *testing.T) {
 			continue
 		}
 		seen[text.String()] = true
-		if _, err := Parse(text.String()); errors.Is(err, ErrLoopsForever) {
+		if _, parseError := Parse(text.String()); errors.Is(parseError, ErrLoopsForever) {
 			loopsForever++
 			continue
 		}
@@ -587,18 +587,18 @@ func TestParseAgreesOnRandomSelectors(test *testing.T) {
 	for index, each := range records {
 		text := inputs[index].Text
 		wantError, oracleRefused := each["error"].(string)
-		got, err := dumpSelector(text)
+		got, dumpSelectorError := dumpSelector(text)
 		difference := ""
 		switch {
-		case oracleRefused && err != nil:
-			if err.Error() != wantError {
-				difference = fmt.Sprintf("both refuse: library %q, Go %q", wantError, err.Error())
+		case oracleRefused && dumpSelectorError != nil:
+			if dumpSelectorError.Error() != wantError {
+				difference = fmt.Sprintf("both refuse: library %q, Go %q", wantError, dumpSelectorError.Error())
 			}
 			messages[wantError]++
 		case oracleRefused:
 			difference = fmt.Sprintf("the library refuses it (%s) and Go parsed it", wantError)
-		case err != nil:
-			difference = fmt.Sprintf("the library parses it and Go refused: %v", err)
+		case dumpSelectorError != nil:
+			difference = fmt.Sprintf("the library parses it and Go refused: %v", dumpSelectorError)
 		default:
 			difference = firstSelectorDifference(oracleInBytes(each["ast"], text), got, "root")
 		}

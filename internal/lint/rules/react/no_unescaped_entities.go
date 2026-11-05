@@ -176,7 +176,7 @@ var messageReplaceWithAlt = rule.Message{
 // empty alternatives list, and that one is reproduced exactly.
 var NoUnescapedEntities = rule.Rule{
 	Name: "react/no-unescaped-entities",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		entities := configuredEntities(options)
 		// An empty forbid list makes every input clean, and returning no listeners is how this rule
 		// says that. **This branch is a cost optimization and nothing else**, measured rather than
@@ -191,11 +191,11 @@ var NoUnescapedEntities = rule.Rule{
 			return nil
 		}
 
-		sourceText := ctx.SourceFile.Text()
+		sourceText := ruleContext.SourceFile.Text()
 
 		return rule.Listeners{
 			ast.KindJsxText: func(node *ast.Node) {
-				reportEntities(ctx, sourceText, node, entities)
+				reportEntities(ruleContext, sourceText, node, entities)
 			},
 		}
 	},
@@ -220,7 +220,7 @@ var NoUnescapedEntities = rule.Rule{
 // The first draft of this function had the loops the other way with a doc comment asserting that
 // upstream's order was observable. It is not. The claim was reasoned from the source and was wrong,
 // and it took reversing the option array against the installed rule to find out.
-func reportEntities(ctx rule.Context, sourceText string, node *ast.Node, entities []forbiddenEntity) {
+func reportEntities(ruleContext rule.Context, sourceText string, node *ast.Node, entities []forbiddenEntity) {
 	nodeRange := core.NewTextRange(node.Pos(), node.End())
 	raw := sourceText[nodeRange.Pos():nodeRange.End()]
 
@@ -237,7 +237,7 @@ func reportEntities(ctx rule.Context, sourceText string, node *ast.Node, entitie
 			characterRange := core.NewTextRange(nodeRange.Pos()+index, nodeRange.Pos()+index+1)
 
 			if !entity.hasAlternatives {
-				ctx.ReportRange(characterRange, rule.Message{
+				ruleContext.ReportRange(characterRange, rule.Message{
 					Id: messageUnescapedEntity.Id,
 					Description: fmt.Sprintf(
 						"HTML entity `%s` is written raw in JSX text and must be escaped.",
@@ -246,7 +246,7 @@ func reportEntities(ctx rule.Context, sourceText string, node *ast.Node, entitie
 				continue
 			}
 
-			ctx.ReportRangeWithSuggestions(
+			ruleContext.ReportRangeWithSuggestions(
 				characterRange,
 				rule.Message{
 					Id: messageUnescapedEntityAlts.Id,
@@ -348,8 +348,8 @@ func DecodeNoUnescapedEntitiesOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUnescapedEntitiesWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return NoUnescapedEntitiesOptions{}, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return NoUnescapedEntitiesOptions{}, unmarshalOptionsError
 	}
 	if wire.Forbid == nil {
 		return NoUnescapedEntitiesOptions{}, nil
@@ -370,7 +370,7 @@ func DecodeNoUnescapedEntitiesOptions(raw []byte) (any, error) {
 // decodeForbiddenEntity reads one `forbid` array element in either of its two spellings.
 func decodeForbiddenEntity(element json.RawMessage) (forbiddenEntity, bool) {
 	var asString string
-	if err := json.Unmarshal(element, &asString); err == nil {
+	if decodeError := json.Unmarshal(element, &asString); decodeError == nil {
 		// The bare-string spelling: the character is forbidden and nothing is offered. Upstream
 		// reports `unescapedEntity` with no suggestions for it, which is a different message from
 		// the object spelling even when the object carries no alternatives.
@@ -381,7 +381,7 @@ func decodeForbiddenEntity(element json.RawMessage) (forbiddenEntity, bool) {
 	// `additionalProperties`), so ESLint loads `{"char": ">", "alternatives": [], "extra": 1}` and so
 	// must this.
 	var asObject noUnescapedEntitiesWireEntry
-	if err := json.Unmarshal(element, &asObject); err != nil {
+	if decodeError := json.Unmarshal(element, &asObject); decodeError != nil {
 		return forbiddenEntity{}, false
 	}
 	if asObject.Char == nil || asObject.Alternatives == nil {

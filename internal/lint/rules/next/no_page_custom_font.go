@@ -120,16 +120,16 @@ var NoPageCustomFont = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-page-custom-font` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-page-custom-font",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A property of the file, so it is asked once rather than at every element. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
-		inDocument := nextjs.IsDocumentFile(ctx.SourceFile.FileName().AsString())
+		inDocument := nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString())
 
 		// Collected once at rule entry rather than by a stateful visitor, because
 		// `export default CustomDocument;` may sit BELOW the JSX it exports and upstream's answer
 		// is order independent: it reads the module record rather than the walk. Upstream's fourth
 		// passing case is exactly that shape and a source-order visitor reports it.
-		defaultExportedNames := defaultExportedLocalNames(ctx.SourceFile)
+		defaultExportedNames := defaultExportedLocalNames(ruleContext.SourceFile)
 
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
@@ -148,13 +148,13 @@ var NoPageCustomFont = rule.Rule{
 			}
 
 			if !inDocument {
-				ctx.ReportNode(node, messageNoPageCustomFontNotInDocument)
+				ruleContext.ReportNode(node, messageNoPageCustomFontNotInDocument)
 				return
 			}
 			if isInsideDefaultExport(node, defaultExportedNames) {
 				return
 			}
-			ctx.ReportNode(node, messageNoPageCustomFontOutsideDefaultExport)
+			ruleContext.ReportNode(node, messageNoPageCustomFontOutsideDefaultExport)
 		}
 
 		// Two kinds where oxc registers one. `<link />` is a void element and is written

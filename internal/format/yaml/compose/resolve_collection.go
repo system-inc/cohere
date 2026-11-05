@@ -20,10 +20,10 @@ func nodeClass(tag *Tag, fallback string) string {
 
 const startColMsg = "All mapping items must start at the same column"
 
-func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, tag *Tag) *Node {
-	yamlMap := ctx.newCollection(nodeClass(tag, "YAMLMap"))
-	if ctx.atRoot {
-		ctx.atRoot = false
+func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onErrorFunc, tag *Tag) *Node {
+	yamlMap := composition.newCollection(nodeClass(tag, "YAMLMap"))
+	if composition.atRoot {
+		composition.atRoot = false
 	}
 	offset := bm.Offset
 	// commentEnd is null until set; upstream tests it for truthiness, so 0 counts as unset there.
@@ -71,16 +71,16 @@ func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, ta
 			onError(offset, "BAD_INDENT", startColMsg, false)
 		}
 		// key value
-		ctx.atKey = true
+		composition.atKey = true
 		keyStart := keyProps.end
 		var keyNode *Node
 		if key != nil {
-			keyNode = composeNode(ctx, key, keyProps, onError)
+			keyNode = composeNode(composition, key, keyProps, onError)
 		} else {
-			keyNode = composeEmptyNode(ctx, keyStart, start, keyProps, onError)
+			keyNode = composeEmptyNode(composition, keyStart, start, keyProps, onError)
 		}
-		ctx.atKey = false
-		if mapIncludes(ctx, yamlMap.Items, keyNode) {
+		composition.atKey = false
+		if mapIncludes(composition, yamlMap.Items, keyNode) {
 			onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique", false)
 		}
 		// value properties
@@ -98,7 +98,7 @@ func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, ta
 				if value != nil && value.Type == "block-map" && !valueProps.hasNewline {
 					onError(offset, "BLOCK_AS_IMPLICIT_KEY", "Nested mappings are not allowed in compact mappings", false)
 				}
-				if ctx.options.Strict && keyProps.start < valueProps.found.Offset-1024 {
+				if composition.options.Strict && keyProps.start < valueProps.found.Offset-1024 {
 					onError(keyNode.Range, "KEY_OVER_1024_CHARS",
 						"The : indicator must be at most 1024 chars after the start of an implicit block mapping key", false)
 				}
@@ -106,13 +106,13 @@ func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, ta
 			// value value
 			var valueNode *Node
 			if value != nil {
-				valueNode = composeNode(ctx, value, valueProps, onError)
+				valueNode = composeNode(composition, value, valueProps, onError)
 			} else {
-				valueNode = composeEmptyNode(ctx, offset, sep, valueProps, onError)
+				valueNode = composeEmptyNode(composition, offset, sep, valueProps, onError)
 			}
 			offset = valueNode.Range[2]
-			pair := ctx.newPair(keyNode, valueNode)
-			if ctx.options.KeepSourceTokens {
+			pair := composition.newPair(keyNode, valueNode)
+			if composition.options.KeepSourceTokens {
 				pair.SrcItem = collItem
 			}
 			yamlMap.Items = append(yamlMap.Items, pair)
@@ -128,8 +128,8 @@ func resolveBlockMap(ctx *composeContext, bm *cst.Token, onError onErrorFunc, ta
 					keyNode.Comment = valueProps.comment
 				}
 			}
-			pair := ctx.newPair(keyNode, nil)
-			if ctx.options.KeepSourceTokens {
+			pair := composition.newPair(keyNode, nil)
+			if composition.options.KeepSourceTokens {
 				pair.SrcItem = collItem
 			}
 			yamlMap.Items = append(yamlMap.Items, pair)
@@ -165,13 +165,13 @@ func sepOrEmpty(sep []*cst.Token) []*cst.Token {
 	return sep
 }
 
-func resolveBlockSeq(ctx *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
-	seq := ctx.newCollection(nodeClass(tag, "YAMLSeq"))
-	if ctx.atRoot {
-		ctx.atRoot = false
+func resolveBlockSeq(composition *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
+	seq := composition.newCollection(nodeClass(tag, "YAMLSeq"))
+	if composition.atRoot {
+		composition.atRoot = false
 	}
-	if ctx.atKey {
-		ctx.atKey = false
+	if composition.atKey {
+		composition.atKey = false
 	}
 	offset := bs.Offset
 	commentEnd, commentEndSet := 0, false
@@ -202,9 +202,9 @@ func resolveBlockSeq(ctx *composeContext, bs *cst.Token, onError onErrorFunc, ta
 		}
 		var node *Node
 		if value != nil {
-			node = composeNode(ctx, value, props, onError)
+			node = composeNode(composition, value, props, onError)
 		} else {
-			node = composeEmptyNode(ctx, props.end, start, props, onError)
+			node = composeEmptyNode(composition, props.end, start, props, onError)
 		}
 		offset = node.Range[2]
 		seq.Items = append(seq.Items, node)
@@ -227,7 +227,7 @@ func isBlock(token *cst.Token) bool {
 // where upstream's try/catch around composeCollection does.
 type typeError string
 
-func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFunc, tag *Tag) *Node {
+func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	isMap := equalsASCII(fc.FlowStart.Source, "{")
 	fcName := "flow sequence"
 	fallback := "YAMLSeq"
@@ -235,14 +235,14 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 		fcName = "flow map"
 		fallback = "YAMLMap"
 	}
-	coll := ctx.newCollection(nodeClass(tag, fallback))
+	coll := composition.newCollection(nodeClass(tag, fallback))
 	coll.Flow = true
-	atRoot := ctx.atRoot
+	atRoot := composition.atRoot
 	if atRoot {
-		ctx.atRoot = false
+		composition.atRoot = false
 	}
-	if ctx.atKey {
-		ctx.atKey = false
+	if composition.atKey {
+		composition.atKey = false
 	}
 	offset := fc.Offset + len(fc.FlowStart.Source)
 	for i := 0; i < len(fc.Items); i++ {
@@ -274,7 +274,7 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 				offset = props.end
 				continue
 			}
-			if !isMap && ctx.options.Strict && containsNewline(key) {
+			if !isMap && composition.options.Strict && containsNewline(key) {
 				onError(key, // checked by containsNewline()
 					"MULTILINE_IMPLICIT_KEY", "Implicit keys of flow sequence pairs need to be on a single line", false)
 			}
@@ -329,9 +329,9 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 			// → key & sep are empty, start does not include ? or :
 			var valueNode *Node
 			if value != nil {
-				valueNode = composeNode(ctx, value, props, onError)
+				valueNode = composeNode(composition, value, props, onError)
 			} else {
-				valueNode = composeEmptyNode(ctx, props.end, sep, props, onError)
+				valueNode = composeEmptyNode(composition, props.end, sep, props, onError)
 			}
 			coll.Items = append(coll.Items, valueNode)
 			offset = valueNode.Range[2]
@@ -341,18 +341,18 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 		} else {
 			// item is a key+value pair
 			// key value
-			ctx.atKey = true
+			composition.atKey = true
 			keyStart := props.end
 			var keyNode *Node
 			if key != nil {
-				keyNode = composeNode(ctx, key, props, onError)
+				keyNode = composeNode(composition, key, props, onError)
 			} else {
-				keyNode = composeEmptyNode(ctx, keyStart, start, props, onError)
+				keyNode = composeEmptyNode(composition, keyStart, start, props, onError)
 			}
 			if isBlock(key) {
 				onError(keyNode.Range, "BLOCK_IN_FLOW", blockMsg, false)
 			}
-			ctx.atKey = false
+			composition.atKey = false
 			// value properties
 			valueProps := resolveProps(sepOrEmpty(sep), resolvePropsOptions{
 				flow:           fcName,
@@ -364,7 +364,7 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 				startOnNewline: false,
 			})
 			if valueProps.found != nil {
-				if !isMap && props.found == nil && ctx.options.Strict {
+				if !isMap && props.found == nil && composition.options.Strict {
 					for _, st := range sep {
 						if st == valueProps.found {
 							break
@@ -389,9 +389,9 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 			// value value
 			var valueNode *Node
 			if value != nil {
-				valueNode = composeNode(ctx, value, valueProps, onError)
+				valueNode = composeNode(composition, value, valueProps, onError)
 			} else if valueProps.found != nil {
-				valueNode = composeEmptyNode(ctx, valueProps.end, sep, valueProps, onError)
+				valueNode = composeEmptyNode(composition, valueProps.end, sep, valueProps, onError)
 			}
 			if valueNode != nil {
 				if isBlock(value) {
@@ -404,17 +404,17 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 					keyNode.Comment = valueProps.comment
 				}
 			}
-			pair := ctx.newPair(keyNode, valueNode)
-			if ctx.options.KeepSourceTokens {
+			pair := composition.newPair(keyNode, valueNode)
+			if composition.options.KeepSourceTokens {
 				pair.SrcItem = collItem
 			}
 			if isMap {
-				if mapIncludes(ctx, coll.Items, keyNode) {
+				if mapIncludes(composition, coll.Items, keyNode) {
 					onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique", false)
 				}
 				coll.Items = append(coll.Items, pair)
 			} else {
-				yamlMap := ctx.newCollection("YAMLMap")
+				yamlMap := composition.newCollection("YAMLMap")
 				yamlMap.Flow = true
 				yamlMap.Items = append(yamlMap.Items, pair)
 				endRange := keyNode.Range
@@ -459,7 +459,7 @@ func resolveFlowCollection(ctx *composeContext, fc *cst.Token, onError onErrorFu
 		}
 	}
 	if len(ee) > 0 {
-		end := resolveEnd(ee, cePos, ctx.options.Strict, onError)
+		end := resolveEnd(ee, cePos, composition.options.Strict, onError)
 		if end.comment != "" {
 			if coll.Comment != "" {
 				coll.Comment += "\n" + end.comment
@@ -515,8 +515,8 @@ func containsNewline(key *cst.Token) bool {
 
 // mapIncludes is upstream's with uniqueKeys false or true; upstream's custom comparison function is
 // not an option here.
-func mapIncludes(ctx *composeContext, items []*Node, search *Node) bool {
-	if !ctx.options.UniqueKeys {
+func mapIncludes(composition *composeContext, items []*Node, search *Node) bool {
+	if !composition.options.UniqueKeys {
 		return false
 	}
 	for _, pair := range items {

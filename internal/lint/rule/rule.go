@@ -250,7 +250,7 @@ const (
 // one that looks at a filename and stops.
 type Rule struct {
 	Name string
-	Run  func(ctx Context, options any) Listeners
+	Run  func(ruleContext Context, options any) Listeners
 
 	// NoListener declares why this rule may register no listener on a file it was offered and still
 	// have done its job. See NoListenerKind. Left undeclared, a rule offered files that registers no

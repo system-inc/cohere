@@ -51,7 +51,7 @@ var messageMissingYield = rule.Message{
 // functions.
 var RequireYield = rule.Rule{
 	Name: "require-yield",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node, asteriskToken *ast.Node, body *ast.Node) {
 			if asteriskToken == nil || body == nil {
 				return
@@ -67,7 +67,7 @@ var RequireYield = rule.Rule{
 			if bodyContainsYield(body) {
 				return
 			}
-			ctx.ReportNode(node, messageMissingYield)
+			ruleContext.ReportNode(node, messageMissingYield)
 		}
 
 		return rule.Listeners{

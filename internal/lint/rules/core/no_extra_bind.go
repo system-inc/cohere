@@ -78,8 +78,8 @@ var messageUnnecessaryBind = rule.Message{
 // being handled, and it is stated because it looks like an oversight.
 var NoExtraBind = rule.Rule{
 	Name: "no-extra-bind",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -95,14 +95,14 @@ var NoExtraBind = rule.Rule{
 						// A function expression can only be reported when nothing in its own scope
 						// reads `this`, which is what upstream's stack is for.
 						if !mentionsOwnThis(current) {
-							reportIfBoundOnce(ctx, current)
+							reportIfBoundOnce(ruleContext, current)
 						}
 					case ast.KindArrowFunction:
 						// No scan. An arrow's `this` comes from where it was written, so `.bind()`
 						// cannot change it and the binding is pointless either way. Upstream has a
 						// separate listener for exactly this reason, and its corpus pins it with
 						// `(() => { return this; }).bind(b)`, which reports.
-						reportIfBoundOnce(ctx, current)
+						reportIfBoundOnce(ruleContext, current)
 					}
 					current.ForEachChild(func(child *ast.Node) bool {
 						visit(child)
@@ -196,13 +196,13 @@ type boundCall struct {
 }
 
 // reportIfBoundOnce reports a function that is the receiver of a single-argument `.bind()`.
-func reportIfBoundOnce(ctx rule.Context, function *ast.Node) {
+func reportIfBoundOnce(ruleContext rule.Context, function *ast.Node) {
 	bound := boundCallFor(function)
 	if bound == nil {
 		return
 	}
-	ctx.ReportRangeWithFixes(rule.TokenRange(ctx.SourceFile, bound.property),
-		messageUnnecessaryBind, bindRemovalFixes(ctx, *bound)...)
+	ruleContext.ReportRangeWithFixes(rule.TokenRange(ruleContext.SourceFile, bound.property),
+		messageUnnecessaryBind, bindRemovalFixes(ruleContext, *bound)...)
 }
 
 // boundCallFor recognises `<function>.bind(<one argument>)` around a function node.
@@ -336,7 +336,7 @@ func isStaticallyBind(node *ast.Node) bool {
 // `[` and `(` tokens are not nodes here, and anchoring on the neighbouring node's end sweeps them up
 // without having to find them. It also means the spans are contiguous with the text that stays, so
 // the rewrite cannot leave a stray separator behind.
-func bindRemovalFixes(ctx rule.Context, bound boundCall) []rule.Fix {
+func bindRemovalFixes(ruleContext rule.Context, bound boundCall) []rule.Fix {
 	// An argument that might do something is left alone, because removing the call would stop it
 	// happening. Upstream's set is literal, identifier, `this`, function expression, and its comment
 	// says the set is stricter than it needs to be, so an arrow argument is declined here too even
@@ -345,7 +345,7 @@ func bindRemovalFixes(ctx rule.Context, bound boundCall) []rule.Fix {
 		return nil
 	}
 
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 
 	// Both spans begin at a TOKEN start rather than at the preceding node's end, and that is the
 	// whole reason this reaches for the scanner. `function(){}/**/.bind(b)` has a comment between
@@ -378,7 +378,7 @@ func bindRemovalFixes(ctx rule.Context, bound boundCall) []rule.Fix {
 	// decline, INCLUDING one in the gap the two spans leave alone. Upstream asks the same question
 	// over the same outer bounds rather than per span, and `function(){}.bind/**/(b)` is the case
 	// that separates them: the comment sits between the spans and upstream declines.
-	if commentsExistBetween(ctx, firstRemoval.Pos(), secondRemoval.End()) {
+	if commentsExistBetween(ruleContext, firstRemoval.Pos(), secondRemoval.End()) {
 		return nil
 	}
 
@@ -432,8 +432,8 @@ func isSideEffectFreeArgument(node *ast.Node) bool {
 //
 // Cached per file through the shelf's comment reader rather than rescanning, since this runs once
 // per finding and a file can hold many.
-func commentsExistBetween(ctx rule.Context, from int, to int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func commentsExistBetween(ruleContext rule.Context, from int, to int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= from && comment.Range.Pos() < to {
 			return true
 		}

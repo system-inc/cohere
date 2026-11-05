@@ -98,8 +98,8 @@ var suggestionNoUnnecessaryParameterPropertyAssignment = rule.Message{
 // lands. Shipping this as a fix would let the engine apply those two rewrites unattended.
 var NoUnnecessaryParameterPropertyAssignment = rule.Rule{
 	Name: "@typescript-eslint/no-unnecessary-parameter-property-assignment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -163,7 +163,7 @@ var NoUnnecessaryParameterPropertyAssignment = rule.Rule{
 				assignedBeforeConstructor := propertiesAssignedInClassBody(class)
 
 				visitor := &parameterPropertyAssignmentVisitor{
-					context:                   ctx,
+					context:                   ruleContext,
 					parameterProperties:       parameterProperties,
 					assignedBeforeUnnecessary: map[string]bool{},
 					assignedBeforeConstructor: assignedBeforeConstructor,

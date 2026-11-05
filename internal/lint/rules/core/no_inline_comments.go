@@ -94,7 +94,7 @@ var noInlineCommentsDirectivePattern = regexp.MustCompile(`^(?:eslint[- ]|(?:glo
 // the same shape under a different name.
 var NoInlineComments = rule.Rule{
 	Name: "no-inline-comments",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		var ignorePattern *esregexp.RegExp
 		if resolved, isNoInlineCommentsOptions := rule.OptionsAs[NoInlineCommentsOptions](options); isNoInlineCommentsOptions &&
 			resolved.IgnorePattern != "" {
@@ -103,7 +103,7 @@ var NoInlineComments = rule.Rule{
 			// (#7mztrdd). A pattern that does not compile is dropped rather than crashing the run,
 			// which reports MORE rather than less. Upstream's `new RegExp` throws and takes every
 			// other rule's verdict on that file with it, because the walk recovers per file.
-			if compiled, err := esregexp.Compile(resolved.IgnorePattern, "u"); err == nil {
+			if compiled, compileError := esregexp.Compile(resolved.IgnorePattern, "u"); compileError == nil {
 				ignorePattern = compiled
 			}
 		}
@@ -112,7 +112,7 @@ var NoInlineComments = rule.Rule{
 			// Upstream's listener is `Program`, which fires once and walks every comment. The
 			// equivalent here is `KindSourceFile`, which fires before its children.
 			ast.KindSourceFile: func(node *ast.Node) {
-				sourceFile := ctx.SourceFile
+				sourceFile := ruleContext.SourceFile
 				if sourceFile == nil {
 					return
 				}
@@ -121,11 +121,11 @@ var NoInlineComments = rule.Rule{
 				// Read the shared list once. `ForFile` is cached per file, so calling it in the
 				// loop header is not a rescan, but it is a map lookup and a closure call per
 				// comment for no reason.
-				fileComments := comments.ForFile(ctx)
+				fileComments := comments.ForFile(ruleContext)
 				for index := range fileComments {
 					comment := &fileComments[index]
-					if noInlineCommentsIsInline(ctx, lines, comment, ignorePattern) {
-						ctx.ReportRange(comment.Range, messageNoInlineCommentsUnexpected)
+					if noInlineCommentsIsInline(ruleContext, lines, comment, ignorePattern) {
+						ruleContext.ReportRange(comment.Range, messageNoInlineCommentsUnexpected)
 					}
 				}
 			},
@@ -135,7 +135,7 @@ var NoInlineComments = rule.Rule{
 
 // noInlineCommentsIsInline answers upstream's `testCodeAroundComment`, minus the report.
 func noInlineCommentsIsInline(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	lines []string,
 	comment *comments.Comment,
 	ignorePattern *esregexp.RegExp,
@@ -179,7 +179,7 @@ func noInlineCommentsIsInline(
 	// The JSX exception. A comment alone inside an expression container is idiomatic React and the
 	// braces around it are not "code" in the sense this rule means.
 	if (preamble == "" || preamble == "{") && (postamble == "" || postamble == "}") {
-		if noInlineCommentsIsInsideEmptyJsxExpression(ctx, comment) {
+		if noInlineCommentsIsInsideEmptyJsxExpression(ruleContext, comment) {
 			return false
 		}
 	}
@@ -231,8 +231,8 @@ func noInlineCommentsIsDirective(comment *comments.Comment, body string) bool {
 // Walked from the source file rather than looked up by index, because there is no range-index lookup
 // on the shim. The walk descends only into nodes whose range contains the comment, so it is a
 // descent rather than a scan.
-func noInlineCommentsIsInsideEmptyJsxExpression(ctx rule.Context, comment *comments.Comment) bool {
-	if ctx.SourceFile == nil {
+func noInlineCommentsIsInsideEmptyJsxExpression(ruleContext rule.Context, comment *comments.Comment) bool {
+	if ruleContext.SourceFile == nil {
 		return false
 	}
 	position := comment.Range.Pos()
@@ -257,7 +257,7 @@ func noInlineCommentsIsInsideEmptyJsxExpression(ctx rule.Context, comment *comme
 			return found
 		})
 	}
-	descend(ctx.SourceFile.AsNode())
+	descend(ruleContext.SourceFile.AsNode())
 
 	return found
 }
@@ -276,8 +276,8 @@ func DecodeNoInlineCommentsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

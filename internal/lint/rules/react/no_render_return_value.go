@@ -112,7 +112,7 @@ var NoRenderReturnValue = rule.Rule{
 	// strips the namespace on a `/` boundary, so `react-no-render-return-value` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-render-return-value",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callee := reactDOMRenderCallee(node.AsCallExpression().Expression)
@@ -126,14 +126,14 @@ var NoRenderReturnValue = rule.Rule{
 				}
 
 				if isReturnValueConsumingParent(parent) {
-					ctx.ReportNode(callee, messageNoRenderReturnValue)
+					ruleContext.ReportNode(callee, messageNoRenderReturnValue)
 				}
 
 				// Deliberately not an `else`. Upstream runs both checks unconditionally, so an
 				// input satisfying both reports twice, and that duplicate is measured on oxlint
 				// rather than assumed. See the doc comment above.
 				if isInsideAnArrowExpressionBody(parent) {
-					ctx.ReportNode(callee, messageNoRenderReturnValue)
+					ruleContext.ReportNode(callee, messageNoRenderReturnValue)
 				}
 			},
 		}

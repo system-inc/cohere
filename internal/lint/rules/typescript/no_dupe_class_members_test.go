@@ -233,8 +233,8 @@ func TestNoDupeClassMembersRestoresTheMemberList(test *testing.T) {
 			observed := 0
 			observer := rule.Rule{
 				Name: "test/no-dupe-class-members-restore",
-				Run: func(ctx rule.Context, options any) rule.Listeners {
-					wrapped := NoDupeClassMembers.Run(ctx, options)
+				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+					wrapped := NoDupeClassMembers.Run(ruleContext, options)
 					return rule.Listeners{
 						ast.KindClassDeclaration: func(node *ast.Node) {
 							wrapped[ast.KindClassDeclaration](node)

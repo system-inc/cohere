@@ -20,9 +20,9 @@ import (
 // directory, and a test binary's working directory is its own package directory.
 func fixturePath(test *testing.T, name string) string {
 	test.Helper()
-	absolute, err := filepath.Abs(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("resolving the %s fixture: %v", name, err)
+	absolute, absolutePathError := filepath.Abs(filepath.Join("testdata", name))
+	if absolutePathError != nil {
+		test.Fatalf("resolving the %s fixture: %v", name, absolutePathError)
 	}
 	return absolute
 }
@@ -35,13 +35,13 @@ func fixturePath(test *testing.T, name string) string {
 func buildFixture(test *testing.T) (*program.Graph, string) {
 	test.Helper()
 	root := fixturePath(test, "symbols")
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   root + "/tsconfig.json",
 		CurrentDirectory: root,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the fixture program: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the fixture program: %v", buildError)
 	}
 	return graph, root
 }
@@ -49,13 +49,13 @@ func buildFixture(test *testing.T) (*program.Graph, string) {
 // planFor builds a plan against a position in the fixture, named the way the command line names one.
 func planFor(test *testing.T, graph *program.Graph, root string, relative string, line int, column int, newName string) *Plan {
 	test.Helper()
-	plan, err := Build(context.Background(), graph, Position{
+	plan, buildError := Build(context.Background(), graph, Position{
 		FileName: filepath.Join(root, relative),
 		Line:     line,
 		Column:   column,
 	}, newName)
-	if err != nil {
-		test.Fatalf("building the plan for %s:%d:%d: %v", relative, line, column, err)
+	if buildError != nil {
+		test.Fatalf("building the plan for %s:%d:%d: %v", relative, line, column, buildError)
 	}
 	return plan
 }
@@ -279,9 +279,9 @@ func TestRenameRefusesRenamingToTheSameName(test *testing.T) {
 func TestBareNameRefusesWhenAmbiguous(test *testing.T) {
 	test.Parallel()
 	graph, _ := buildFixture(test)
-	candidates, symbols, err := ResolveBareName(context.Background(), graph, "err")
-	if err != nil {
-		test.Fatalf("resolving the bare name: %v", err)
+	candidates, symbols, resolveBareNameError := ResolveBareName(context.Background(), graph, "err")
+	if resolveBareNameError != nil {
+		test.Fatalf("resolving the bare name: %v", resolveBareNameError)
 	}
 	if len(symbols) < 2 {
 		test.Fatalf("`err` resolved to %d symbols, want at least 2 — the fixture declares it more than once, so a single answer means the search is not seeing them all", len(symbols))
@@ -296,9 +296,9 @@ func TestBareNameRefusesWhenAmbiguous(test *testing.T) {
 func TestBareNameResolvesWhenUnambiguous(test *testing.T) {
 	test.Parallel()
 	graph, _ := buildFixture(test)
-	candidates, symbols, err := ResolveBareName(context.Background(), graph, "taken")
-	if err != nil {
-		test.Fatalf("resolving the bare name: %v", err)
+	candidates, symbols, resolveBareNameError := ResolveBareName(context.Background(), graph, "taken")
+	if resolveBareNameError != nil {
+		test.Fatalf("resolving the bare name: %v", resolveBareNameError)
 	}
 	if len(symbols) != 1 {
 		test.Fatalf("`taken` resolved to %d symbols, want exactly 1", len(symbols))
@@ -318,19 +318,19 @@ func TestBareNameResolvesWhenUnambiguous(test *testing.T) {
 func TestBareNamePositionRoundTrips(test *testing.T) {
 	test.Parallel()
 	graph, _ := buildFixture(test)
-	candidates, _, err := ResolveBareName(context.Background(), graph, "err")
-	if err != nil {
-		test.Fatalf("resolving the bare name: %v", err)
+	candidates, _, resolveBareNameError := ResolveBareName(context.Background(), graph, "err")
+	if resolveBareNameError != nil {
+		test.Fatalf("resolving the bare name: %v", resolveBareNameError)
 	}
 	for _, candidate := range candidates {
-		plan, err := Build(context.Background(), graph, Position{
+		plan, buildError := Build(context.Background(), graph, Position{
 			FileName: candidate.FileName,
 			Line:     candidate.Line,
 			Column:   candidate.Column,
 		}, "roundTripped")
-		if err != nil {
+		if buildError != nil {
 			test.Fatalf("the position this tool printed for %s:%d:%d does not resolve: %v",
-				candidate.FileName, candidate.Line, candidate.Column, err)
+				candidate.FileName, candidate.Line, candidate.Column, buildError)
 		}
 		if plan.OldName != "err" {
 			test.Fatalf("the printed position resolved to %q rather than to `err`", plan.OldName)
@@ -433,8 +433,8 @@ func TestApplyRefusesARefusedPlan(test *testing.T) {
 	working := test.TempDir()
 	target := filepath.Join(working, "writable.ts")
 	original := "export const err = 1;\n"
-	if err := os.WriteFile(target, []byte(original), 0o644); err != nil {
-		test.Fatalf("seeding the writable file: %v", err)
+	if writeError := os.WriteFile(target, []byte(original), 0o644); writeError != nil {
+		test.Fatalf("seeding the writable file: %v", writeError)
 	}
 
 	// An edit that WOULD apply cleanly if the guard were not there: the range covers `err` exactly.
@@ -450,8 +450,8 @@ func TestApplyRefusesARefusedPlan(test *testing.T) {
 		}},
 	}
 
-	written, err := Apply(plan)
-	if err == nil {
+	written, applyError := Apply(plan)
+	if applyError == nil {
 		test.Fatalf("a refused plan was applied, which is the half-renamed tree this verb exists to prevent")
 	}
 	if written != 0 {
@@ -485,7 +485,7 @@ func typeDiagnostics(test *testing.T, graph *program.Graph) []string {
 // copyTree copies a fixture so a writing test never touches the checked-in one.
 func copyTree(test *testing.T, source string, destination string) {
 	test.Helper()
-	err := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -503,8 +503,8 @@ func copyTree(test *testing.T, source string, destination string) {
 		}
 		return os.WriteFile(target, contents, info.Mode())
 	})
-	if err != nil {
-		test.Fatalf("copying the fixture: %v", err)
+	if walkError != nil {
+		test.Fatalf("copying the fixture: %v", walkError)
 	}
 }
 
@@ -528,8 +528,8 @@ func TestApplyRefusesAPlanThatWouldNotParse(test *testing.T) {
 	working := test.TempDir()
 	target := filepath.Join(working, "broken.ts")
 	original := "export const value = 1;\n"
-	if err := os.WriteFile(target, []byte(original), 0o644); err != nil {
-		test.Fatalf("seeding the file: %v", err)
+	if writeError := os.WriteFile(target, []byte(original), 0o644); writeError != nil {
+		test.Fatalf("seeding the file: %v", writeError)
 	}
 
 	// A range that swallows the `const` keyword as well as the name, which is precisely the
@@ -546,12 +546,12 @@ func TestApplyRefusesAPlanThatWouldNotParse(test *testing.T) {
 		}},
 	}
 
-	written, err := Apply(plan)
-	if err == nil {
+	written, applyError := Apply(plan)
+	if applyError == nil {
 		test.Fatalf("a plan producing unparseable source was written, which corrupts the file for every later phase")
 	}
-	if !strings.Contains(err.Error(), "unparseable") {
-		test.Fatalf("the refusal does not name the cause: %v", err)
+	if !strings.Contains(applyError.Error(), "unparseable") {
+		test.Fatalf("the refusal does not name the cause: %v", applyError)
 	}
 	if written != 0 {
 		test.Fatalf("reported %d files written, want 0", written)
@@ -584,8 +584,8 @@ func TestApplyRefusesOverlappingEdits(test *testing.T) {
 	working := test.TempDir()
 	target := filepath.Join(working, "overlap.ts")
 	original := "export const value = 1;\n"
-	if err := os.WriteFile(target, []byte(original), 0o644); err != nil {
-		test.Fatalf("seeding the file: %v", err)
+	if writeError := os.WriteFile(target, []byte(original), 0o644); writeError != nil {
+		test.Fatalf("seeding the file: %v", writeError)
 	}
 
 	plan := &Plan{
@@ -597,8 +597,8 @@ func TestApplyRefusesOverlappingEdits(test *testing.T) {
 		},
 	}
 
-	written, err := Apply(plan)
-	if err == nil {
+	written, applyError := Apply(plan)
+	if applyError == nil {
 		test.Fatalf("overlapping edits were applied, so the tool wrote bytes it could not justify")
 	}
 	if written != 0 {
@@ -668,11 +668,11 @@ func TestPositionResolvesTheIdentifierUnderTheCursor(test *testing.T) {
 
 	// Column 18 on line 22 is `toUpperCase` in `value.toUpperCase()`. The enclosing property-access
 	// expression begins at `value`, so a resolver preferring the outermost match answers `value`.
-	plan, err := Build(context.Background(), graph, Position{
+	plan, buildError := Build(context.Background(), graph, Position{
 		FileName: filepath.Join(root, "src/consumer.ts"), Line: 22, Column: 18,
 	}, "toUpper")
-	if err != nil {
-		test.Fatalf("resolving the inner identifier: %v", err)
+	if buildError != nil {
+		test.Fatalf("resolving the inner identifier: %v", buildError)
 	}
 	if plan.OldName != "toUpperCase" {
 		test.Fatalf("the position resolved to %q, want `toUpperCase` — a column selects the identifier it points at", plan.OldName)

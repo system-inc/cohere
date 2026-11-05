@@ -43,8 +43,8 @@ func DecodeNoMultiCompOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -117,8 +117,8 @@ var NoMultiComp = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -137,11 +137,11 @@ var NoMultiComp = rule.Rule{
 				// more dangerous of the two failure modes because every quiet fixture passes
 				// vacuously. `TestNoMultiCompRequiresTheTypedHarness` fails loudly if this listener
 				// is ever reached without one.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
-				components := collectDetectedComponents(ctx, node)
+				components := collectDetectedComponents(ruleContext, node)
 				if len(components) <= 1 {
 					return
 				}
@@ -162,7 +162,7 @@ var NoMultiComp = rule.Rule{
 					return
 				}
 				for _, component := range kept[1:] {
-					ctx.ReportNode(component.node, messageOnlyOneComponent)
+					ruleContext.ReportNode(component.node, messageOnlyOneComponent)
 				}
 			},
 		}
@@ -173,7 +173,7 @@ var NoMultiComp = rule.Rule{
 //
 // Upstream registers per-kind visitors and lets ESLint order them, which for a single traversal is
 // source order. This walks the tree once and appends as it goes, which produces the same order.
-func collectDetectedComponents(ctx rule.Context, sourceFile *ast.Node) []detectedComponent {
+func collectDetectedComponents(ruleContext rule.Context, sourceFile *ast.Node) []detectedComponent {
 	components := []detectedComponent{}
 	seen := map[*ast.Node]bool{}
 
@@ -245,13 +245,13 @@ func collectDetectedComponents(ctx rule.Context, sourceFile *ast.Node) []detecte
 			if node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
 				name := node.Name()
 				if name != nil && name.Kind == ast.KindIdentifier &&
-					hasComponentCapitalization(name.Text()) && returnsJsx(ctx, node) {
+					hasComponentCapitalization(name.Text()) && returnsJsx(ruleContext, node) {
 					add(node, true)
 				}
 			}
 
 		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
-			if component, isComponent := statelessComponentFor(ctx, node, detectedNames); isComponent {
+			if component, isComponent := statelessComponentFor(ruleContext, node, detectedNames); isComponent {
 				// A pragma wrapper reports on the wrapping call, and upstream still classifies it
 				// as stateless for `ignoreStateless`, through the second half of its `isIgnored`
 				// test. So the flag is read from what was found rather than from what was reported.
@@ -278,7 +278,7 @@ func collectDetectedComponents(ctx rule.Context, sourceFile *ast.Node) []detecte
 //
 // The arms below follow upstream's order, because several of them overlap and the first match wins
 // there too. Reordering them changes the answer on inputs where two arms both apply.
-func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[string]bool) (*ast.Node, bool) {
+func statelessComponentFor(ruleContext rule.Context, node *ast.Node, detectedNames map[string]bool) (*ast.Node, bool) {
 	if node.Kind == ast.KindFunctionDeclaration {
 		// An async generator is banned outright upstream, with confidence 0.
 		if isAsyncGenerator(node) {
@@ -289,7 +289,7 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 		if name != nil && !hasComponentCapitalization(name.Text()) {
 			return nil, false
 		}
-		if !returnsJsxOrNull(ctx, node) {
+		if !returnsJsxOrNull(ruleContext, node) {
 			return nil, false
 		}
 		return node, true
@@ -326,7 +326,7 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 	// an inner function returning only null is declined while one returning an element is kept.
 	if parent.Kind == ast.KindReturnStatement ||
 		(parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == node) {
-		if !returnsJsx(ctx, node) {
+		if !returnsJsx(ruleContext, node) {
 			return nil, false
 		}
 	}
@@ -336,13 +336,13 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 		// `export default () => <div/>`. Upstream requires real JSX here rather than JSX-or-null,
 		// which is the one arm where the two predicates differ, so a default-exported function
 		// returning only null is not a component.
-		if returnsJsx(ctx, node) {
+		if returnsJsx(ruleContext, node) {
 			return node, true
 		}
 		return nil, false
 
 	case ast.KindVariableDeclaration:
-		if !returnsJsxOrNull(ctx, node) {
+		if !returnsJsxOrNull(ruleContext, node) {
 			break
 		}
 		name := parent.AsVariableDeclaration().Name()
@@ -367,7 +367,7 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 		if node.Kind == ast.KindFunctionExpression && node.Name() != nil {
 			break
 		}
-		if parent.AsPropertyAssignment().Name() == nil || !returnsJsx(ctx, node) {
+		if parent.AsPropertyAssignment().Name() == nil || !returnsJsx(ruleContext, node) {
 			return nil, false
 		}
 		key := parent.AsPropertyAssignment().Name()
@@ -379,7 +379,7 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 
 	// `React.memo(...)` and `React.forwardRef(...)`, including the destructured, imported, required
 	// and aliased spellings the corpus writes in eleven separate cases. Reports on the call.
-	if wrapper := pragmaComponentWrapperFor(node, detectedNames); wrapper != nil && returnsJsxOrNull(ctx, node) {
+	if wrapper := pragmaComponentWrapperFor(node, detectedNames); wrapper != nil && returnsJsxOrNull(ruleContext, node) {
 		return wrapper, true
 	}
 
@@ -387,7 +387,7 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 	// MethodDeclaration parent rather than a PropertyAssignment, so it is handled here rather than
 	// in the switch above.
 	if parent.Kind == ast.KindMethodDeclaration {
-		if !returnsJsx(ctx, node) {
+		if !returnsJsx(ruleContext, node) {
 			return nil, false
 		}
 		key := parent.Name()
@@ -397,7 +397,7 @@ func statelessComponentFor(ctx rule.Context, node *ast.Node, detectedNames map[s
 		return nil, false
 	}
 
-	if !isInAllowedPositionForComponent(node) || !returnsJsxOrNull(ctx, node) {
+	if !isInAllowedPositionForComponent(node) || !returnsJsxOrNull(ruleContext, node) {
 		return nil, false
 	}
 
@@ -573,8 +573,8 @@ func isInAllowedPositionForComponent(node *ast.Node) bool {
 }
 
 // returnsJsx reports whether a function returns real JSX, which is upstream's `isReturningJSX`.
-func returnsJsx(ctx rule.Context, node *ast.Node) bool {
-	return returnsJsxValue(ctx, node, false)
+func returnsJsx(ruleContext rule.Context, node *ast.Node) bool {
+	return returnsJsxValue(ruleContext, node, false)
 }
 
 // returnsJsxOrNull additionally accepts a bare `null` return, which is `isReturningJSXOrNull`.
@@ -582,8 +582,8 @@ func returnsJsx(ctx rule.Context, node *ast.Node) bool {
 // The two differ in exactly three arms of `statelessComponentFor` and the difference is real: a
 // default-exported function returning only null is not a component, while the same function
 // assigned to a capitalized const is.
-func returnsJsxOrNull(ctx rule.Context, node *ast.Node) bool {
-	return returnsJsxValue(ctx, node, true)
+func returnsJsxOrNull(ruleContext rule.Context, node *ast.Node) bool {
+	return returnsJsxValue(ruleContext, node, true)
 }
 
 // returnsJsxValue walks the returns of one function and asks whether any returns a JSX value.
@@ -600,7 +600,7 @@ func returnsJsxOrNull(ctx rule.Context, node *ast.Node) bool {
 // resolve identifiers, so that shape is silent here. It costs findings rather than adding them, no
 // corpus case writes it, and adding it means a scope walk this rule otherwise has no use for. Named
 // as a divergence so the next reader does not have to rediscover whether it was deliberate.
-func returnsJsxValue(ctx rule.Context, node *ast.Node, acceptNull bool) bool {
+func returnsJsxValue(ruleContext rule.Context, node *ast.Node, acceptNull bool) bool {
 	if node == nil {
 		return false
 	}
@@ -611,7 +611,7 @@ func returnsJsxValue(ctx rule.Context, node *ast.Node, acceptNull bool) bool {
 		if found || returned == nil {
 			return
 		}
-		if isJsxValue(ctx, returned, acceptNull) {
+		if isJsxValue(ruleContext, returned, acceptNull) {
 			found = true
 		}
 	}
@@ -704,7 +704,7 @@ func functionBodyBlock(node *ast.Node) *ast.Node {
 // this one as a parenthesized expression. `((<div/>))` nests, which is why this is a loop and not a
 // single step. `ast.SkipParentheses` is not used because it dereferences its argument and a return
 // with no expression is a real shape here.
-func isJsxValue(ctx rule.Context, node *ast.Node, acceptNull bool) bool {
+func isJsxValue(ruleContext rule.Context, node *ast.Node, acceptNull bool) bool {
 	for node != nil && node.Kind == ast.KindParenthesizedExpression {
 		node = node.AsParenthesizedExpression().Expression
 	}
@@ -718,7 +718,7 @@ func isJsxValue(ctx rule.Context, node *ast.Node, acceptNull bool) bool {
 
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		return isJsxValue(ctx, conditional.WhenTrue, acceptNull) || isJsxValue(ctx, conditional.WhenFalse, acceptNull)
+		return isJsxValue(ruleContext, conditional.WhenTrue, acceptNull) || isJsxValue(ruleContext, conditional.WhenFalse, acceptNull)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
@@ -727,15 +727,15 @@ func isJsxValue(ctx rule.Context, node *ast.Node, acceptNull bool) bool {
 		}
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return isJsxValue(ctx, binary.Left, acceptNull) || isJsxValue(ctx, binary.Right, acceptNull)
+			return isJsxValue(ruleContext, binary.Left, acceptNull) || isJsxValue(ruleContext, binary.Right, acceptNull)
 		case ast.KindCommaToken:
 			// A sequence carries the value of its last operand and nothing else.
-			return isJsxValue(ctx, binary.Right, acceptNull)
+			return isJsxValue(ruleContext, binary.Right, acceptNull)
 		}
 		return false
 
 	case ast.KindCallExpression:
-		return createElementCallCounts(ctx, node)
+		return createElementCallCounts(ruleContext, node)
 
 	case ast.KindNullKeyword:
 		return acceptNull
@@ -1234,8 +1234,8 @@ const createReactClassName = "createReactClass"
 // "bare calls do not count", but the same call under `import React, { createElement } from 'react'`
 // reports, measured against the installed build on 2026-08-27. Upstream's own passing case 5 writes
 // exactly that import, so a narrowed copy would have failed it.
-func createElementCallCounts(ctx rule.Context, node *ast.Node) bool {
-	return isPragmaCreateElementCall(ctx, node)
+func createElementCallCounts(ruleContext rule.Context, node *ast.Node) bool {
+	return isPragmaCreateElementCall(ruleContext, node)
 }
 
 // isFunctionLikeExpression reports whether a node is a function expression or an arrow function,

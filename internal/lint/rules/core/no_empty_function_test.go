@@ -22,9 +22,9 @@ func decodedEmptyFunctionOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeNoEmptyFunctionOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeNoEmptyFunctionOptionsError := DecodeNoEmptyFunctionOptions(json.RawMessage(raw))
+	if decodeNoEmptyFunctionOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoEmptyFunctionOptionsError)
 	}
 	return options
 }
@@ -2508,9 +2508,9 @@ func TestDecodeNoEmptyFunctionOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoEmptyFunctionOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+			decoded, decodeNoEmptyFunctionOptionsError := DecodeNoEmptyFunctionOptions(json.RawMessage(testCase.raw))
+			if decodeNoEmptyFunctionOptionsError != nil {
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoEmptyFunctionOptionsError)
 			}
 			options, isOptions := decoded.(NoEmptyFunctionOptions)
 			if !isOptions {
@@ -2541,7 +2541,7 @@ func TestDecodeNoEmptyFunctionOptionsRefusesAnUnknownKind(test *testing.T) {
 	} {
 		test.Run(raw, func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeNoEmptyFunctionOptions(json.RawMessage(raw)); err == nil {
+			if _, decodeNoEmptyFunctionOptionsError := DecodeNoEmptyFunctionOptions(json.RawMessage(raw)); decodeNoEmptyFunctionOptionsError == nil {
 				test.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
 			}
 		})

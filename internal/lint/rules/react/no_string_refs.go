@@ -230,7 +230,7 @@ var NoStringRefs = rule.Rule{
 	// namespace on a `/` boundary, so `react-no-string-refs` would match no inventory entry and lint
 	// no files while passing every fixture in this package.
 	Name: "react/no-string-refs",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// An unconfigured rule is handed nil, and the zero value is upstream's answer under this
 		// repository's configuration: template refs unreported, and the `this.refs` half off
 		// because no configured React version means `999.999.999`.
@@ -251,7 +251,7 @@ var NoStringRefs = rule.Rule{
 				}
 				// The whole attribute, not its name. Upstream passes `node` to `report`, and `node`
 				// here is the JSXAttribute.
-				ctx.ReportNode(node, messageStringInRefDeprecated)
+				ruleContext.ReportNode(node, messageStringInRefDeprecated)
 			},
 		}
 
@@ -269,7 +269,7 @@ var NoStringRefs = rule.Rule{
 			if name == nil || name.Text() != "refs" {
 				return
 			}
-			reportRefsUsage(ctx, node, access.Expression)
+			reportRefsUsage(ruleContext, node, access.Expression)
 		}
 
 		// A computed access is upstream's `MemberExpression` with `computed: true`, and it reaches
@@ -282,7 +282,7 @@ var NoStringRefs = rule.Rule{
 			if argument == nil || argument.Kind != ast.KindIdentifier || argument.Text() != "refs" {
 				return
 			}
-			reportRefsUsage(ctx, node, access.Expression)
+			reportRefsUsage(ruleContext, node, access.Expression)
 		}
 
 		return listeners
@@ -295,7 +295,7 @@ var NoStringRefs = rule.Rule{
 // there an enclosing component. Both halves of the object check come from `node.object.type ===
 // 'ThisExpression'`, where the parenthesis skip is what reproduces ESTree rather than what widens
 // past it.
-func reportRefsUsage(ctx rule.Context, node *ast.Node, object *ast.Node) {
+func reportRefsUsage(ruleContext rule.Context, node *ast.Node, object *ast.Node) {
 	object = ast.SkipParentheses(object)
 	if object == nil || object.Kind != ast.KindThisKeyword {
 		return
@@ -303,7 +303,7 @@ func reportRefsUsage(ctx rule.Context, node *ast.Node, object *ast.Node) {
 	if !hasEnclosingComponent(node) {
 		return
 	}
-	ctx.ReportNode(node, messageThisRefsDeprecated)
+	ruleContext.ReportNode(node, messageThisRefsDeprecated)
 }
 
 // hasEnclosingComponent is upstream's `getParentES6Component(...) || getParentES5Component(...)`.
@@ -532,8 +532,8 @@ func DecodeNoStringRefsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return NoStringRefsOptions{}, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return NoStringRefsOptions{}, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return NoStringRefsOptions{}, unmarshalOptionsError
 	}
 
 	options := NoStringRefsOptions{NoTemplateLiterals: wire.NoTemplateLiterals}

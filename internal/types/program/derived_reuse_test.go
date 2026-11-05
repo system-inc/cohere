@@ -26,15 +26,15 @@ func markerRule(name string, fingerprint func(rule.Program, any) [sha256.Size]by
 		Name:               name,
 		ProgramReads:       rule.ReadsOtherFiles,
 		ProgramFingerprint: fingerprint,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if filepath.Base(ctx.SourceFile.FileName().AsString()) == "marker.ts" {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if filepath.Base(ruleContext.SourceFile.FileName().AsString()) == "marker.ts" {
 				return nil
 			}
-			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName().AsString()), new(int))
+			count, _ := runs.LoadOrStore(filepath.Base(ruleContext.SourceFile.FileName().AsString()), new(int))
 			*count.(*int)++
-			marker := markerText(ctx.Program)
+			marker := markerText(ruleContext.Program)
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "marker", Description: "the marker says " + marker})
+				ruleContext.ReportNode(node, rule.Message{Id: "marker", Description: "the marker says " + marker})
 			}}
 		},
 	}
@@ -87,7 +87,7 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 				"a.ts":          "export const a = 1;\n",
 				"b.ts":          "export const b = 2;\n",
 			})
-			ctx := context.Background()
+			backgroundContext := context.Background()
 			key := program.HashRuleSet([]string{"derived"})
 			var recorded *program.LintCache
 			walk := func(cached bool) (program.Result, *sync.Map) {
@@ -103,7 +103,7 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 					graph.FindingsReuse = reuse
 				}
-				result, err := graph.Walk(ctx, graph.ProjectFiles(), rules)
+				result, err := graph.Walk(backgroundContext, graph.ProjectFiles(), rules)
 				if err != nil {
 					test.Fatal(err)
 				}
@@ -128,8 +128,8 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 			}
 
 			// An edit outside what the fingerprint covers: the edited file runs, the other replays.
-			if err := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export const a = 1;\nexport const more = 3;\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export const a = 1;\nexport const more = 3;\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			if runsOf(runs) != 1 {
@@ -140,8 +140,8 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 			}
 
 			// The data the rule reads changes, and no file it reports in does.
-			if err := os.WriteFile(filepath.Join(root, "marker.ts"), []byte("// blue\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "marker.ts"), []byte("// blue\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			stale := !agrees("marker edited", warm)
@@ -175,7 +175,7 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 				"marker.ts":     "// red\n",
 				"a.ts":          "export const a = 1;\n",
 			})
-			ctx := context.Background()
+			backgroundContext := context.Background()
 			key := program.HashRuleSet([]string{"uncacheable"})
 			var recorded *program.LintCache
 			for run := 1; run <= 2; run++ {
@@ -186,7 +186,7 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 				runs := &sync.Map{}
 				reuse := program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 				graph.FindingsReuse = reuse
-				result, err := graph.Walk(ctx, graph.ProjectFiles(), []rule.Rule{markerRule("test-reads-other-files", scenario.fingerprint, runs)})
+				result, err := graph.Walk(backgroundContext, graph.ProjectFiles(), []rule.Rule{markerRule("test-reads-other-files", scenario.fingerprint, runs)})
 				if err != nil {
 					test.Fatal(err)
 				}
@@ -210,15 +210,15 @@ func optionMarkerRule(fingerprint func(rule.Program, any) [sha256.Size]byte, run
 		Name:               "test-derived-options",
 		ProgramReads:       rule.ReadsOtherFiles,
 		ProgramFingerprint: fingerprint,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
-			if strings.HasSuffix(filepath.Base(ctx.SourceFile.FileName().AsString()), "-marker.ts") {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			if strings.HasSuffix(filepath.Base(ruleContext.SourceFile.FileName().AsString()), "-marker.ts") {
 				return nil
 			}
-			count, _ := runs.LoadOrStore(filepath.Base(ctx.SourceFile.FileName().AsString()), new(int))
+			count, _ := runs.LoadOrStore(filepath.Base(ruleContext.SourceFile.FileName().AsString()), new(int))
 			*count.(*int)++
-			marker := namedMarkerText(ctx.Program, options.(string))
+			marker := namedMarkerText(ruleContext.Program, options.(string))
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "marker", Description: "the marker says " + marker})
+				ruleContext.ReportNode(node, rule.Message{Id: "marker", Description: "the marker says " + marker})
 			}}
 		},
 	}
@@ -274,10 +274,10 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 			}
 			registry := configuration.OptionsRegistry{"test-derived-options": {Decode: func(raw json.RawMessage) (any, error) {
 				var marker string
-				err := json.Unmarshal(raw, &marker)
-				return marker, err
+				decodeError := json.Unmarshal(raw, &marker)
+				return marker, decodeError
 			}}}
-			ctx := context.Background()
+			backgroundContext := context.Background()
 			key := program.HashRuleSet([]string{"derived-options"})
 			var recorded *program.LintCache
 			walk := func(cached bool) (program.Result, *sync.Map) {
@@ -298,7 +298,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
 					graph.FindingsReuse = reuse
 				}
-				result, err := graph.Walk(ctx, graph.ProjectFiles(), []rule.Rule{optionMarkerRule(scenario.fingerprint, runs)})
+				result, err := graph.Walk(backgroundContext, graph.ProjectFiles(), []rule.Rule{optionMarkerRule(scenario.fingerprint, runs)})
 				if err != nil {
 					test.Fatal(err)
 				}
@@ -327,8 +327,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 			}
 
 			// Only the blue files' data changes: they run again, and the red files replay.
-			if err := os.WriteFile(filepath.Join(root, "blue-marker.ts"), []byte("// navy\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "blue-marker.ts"), []byte("// navy\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			stale := !agrees(warm)
@@ -341,8 +341,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 			}
 
 			// And the red files' data: they run again, and the blue files replay.
-			if err := os.WriteFile(filepath.Join(root, "red-marker.ts"), []byte("// crimson\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "red-marker.ts"), []byte("// crimson\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			if !scenario.wantStale && (!agrees(warm) || !ran(runs, "a.ts") || ran(runs, "b.ts")) {
@@ -369,9 +369,9 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 		}
 	}
 	root := writeProject(test, files)
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	if graph.Workers() < 2 {
 		test.Fatalf("the walk runs on %d worker, so no two workers ever ask for one fingerprint", graph.Workers())
@@ -389,7 +389,7 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 				computations.Add(1)
 				return sha256.Sum256([]byte(name))
 			},
-			Run: func(ctx rule.Context, options any) rule.Listeners { return nil },
+			Run: func(ruleContext rule.Context, options any) rule.Listeners { return nil },
 		})
 		settings[name] = configuration.RuleSetting{Severity: configuration.SeverityError}
 	}
@@ -400,8 +400,8 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 		{Files: []string{"c/**"}, Rules: map[string]configuration.RuleSetting{"test-derived-b": {Severity: configuration.SeverityError}}},
 	}}
 	graph.FindingsReuse = program.NewFindingsReuse(program.HashRuleSet([]string{"computed-once"}), nil, program.PathAnchor{})
-	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules); err != nil {
-		test.Fatal(err)
+	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules); walkError != nil {
+		test.Fatal(walkError)
 	}
 	if computations.Load() != 6 {
 		test.Fatalf("a walk of six derived rules over three resolutions on %d workers computed %d program fingerprints, want 6",

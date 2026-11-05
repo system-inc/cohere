@@ -17,11 +17,11 @@ import (
 // the docs capture rather than to ship.
 var captureProbe = rule.Rule{
 	Name: "probe-docs-capture",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
-				ctx.ReportNodeWithFixes(node, rule.Message{Id: "debugger", Description: "A debugger statement."},
-					rule.Fix{Range: rule.TokenRange(ctx.SourceFile, node)})
+				ruleContext.ReportNodeWithFixes(node, rule.Message{Id: "debugger", Description: "A debugger statement."},
+					rule.Fix{Range: rule.TokenRange(ruleContext.SourceFile, node)})
 			},
 		}
 	},
@@ -63,7 +63,7 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 		} else {
 			command.Env = append(command.Env, capture.Variable+"=")
 		}
-		output, err := command.CombinedOutput()
+		output, outputError := command.CombinedOutput()
 		paths, globError := filepath.Glob(filepath.Join(directory, "*"))
 		if globError != nil {
 			test.Fatal(globError)
@@ -87,7 +87,7 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 		if !captureOn && len(paths) > 0 {
 			test.Errorf("capture off created %v", paths)
 		}
-		return records, string(output), err
+		return records, string(output), outputError
 	}
 
 	test.Run("a passing ExpectFindings writes one record of the finding", func(test *testing.T) {

@@ -97,8 +97,8 @@ func read(path string, digest string) (map[string]Answer, error) {
 		return nil, fmt.Errorf("%s is not a golden: %v", path, err)
 	}
 	var contents record
-	if err := json.NewDecoder(unzipped).Decode(&contents); err != nil {
-		return nil, fmt.Errorf("%s is not a golden: %v", path, err)
+	if decodeError := json.NewDecoder(unzipped).Decode(&contents); decodeError != nil {
+		return nil, fmt.Errorf("%s is not a golden: %v", path, decodeError)
 	}
 	if contents.Digest != digest {
 		return nil, fmt.Errorf("%s was recorded from Prettier bundles %s, and this build embeds %s", path, contents.Digest, digest)
@@ -113,25 +113,25 @@ func (golden *Golden) write() {
 		golden.t.Logf("not recording %s, since the test failed", golden.path)
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(golden.path), 0o755); err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(golden.path), 0o755); createDirectoryError != nil {
+		golden.t.Errorf("recording %s: %v", golden.path, createDirectoryError)
 		return
 	}
-	file, err := os.Create(golden.path)
-	if err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	file, createError := os.Create(golden.path)
+	if createError != nil {
+		golden.t.Errorf("recording %s: %v", golden.path, createError)
 		return
 	}
 	defer file.Close()
 	zipped, _ := gzip.NewWriterLevel(file, gzip.BestCompression)
 	encoder := json.NewEncoder(zipped)
 	encoder.SetIndent("", " ")
-	if err := encoder.Encode(record{Digest: golden.digest, Answers: golden.answers}); err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	if encodeError := encoder.Encode(record{Digest: golden.digest, Answers: golden.answers}); encodeError != nil {
+		golden.t.Errorf("recording %s: %v", golden.path, encodeError)
 		return
 	}
-	if err := zipped.Close(); err != nil {
-		golden.t.Errorf("recording %s: %v", golden.path, err)
+	if closeError := zipped.Close(); closeError != nil {
+		golden.t.Errorf("recording %s: %v", golden.path, closeError)
 		return
 	}
 	golden.t.Logf("recorded %d oracle answers in %s", len(golden.answers), golden.path)
@@ -210,9 +210,9 @@ var bundlesDigest struct {
 // BundlesDigest is the digest of the Prettier bundles this build embeds, read once.
 func BundlesDigest() (string, error) {
 	bundlesDigest.once.Do(func() {
-		bundles, err := prettier.Bundles()
-		if err != nil {
-			bundlesDigest.err = err
+		bundles, bundlesError := prettier.Bundles()
+		if bundlesError != nil {
+			bundlesDigest.err = bundlesError
 			return
 		}
 		bundlesDigest.digest, bundlesDigest.err = prettier.DigestBundles(bundles.Files)

@@ -92,7 +92,7 @@ var NoFuncAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Each function on the shared walk, reading the writes to its name from the file's identifier
 		// index. Each function used to walk the whole file for writes to its name, which made this
 		// simple rule one of the tree's slowest (177ms on ahra); then the file was walked twice from
@@ -106,10 +106,10 @@ var NoFuncAssign = rule.Rule{
 		check := func(node *ast.Node) {
 			// The engine hands every rule a nil checker when the program could not be built, and
 			// this rule can answer nothing without one.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
-			reportWritesToFunctionName(ctx, node, judged)
+			reportWritesToFunctionName(ruleContext, node, judged)
 		}
 		return rule.Listeners{
 			ast.KindFunctionDeclaration: check,
@@ -137,12 +137,12 @@ var NoFuncAssign = rule.Rule{
 // binding. Anchoring the search on the file and the match on the symbol is what makes the position of
 // the write irrelevant. An identifier resolves to one declaration, so each write is reported by at
 // most one function.
-func reportWritesToFunctionName(ctx rule.Context, function *ast.Node, judged map[*ast.Node]bool) {
+func reportWritesToFunctionName(ruleContext rule.Context, function *ast.Node, judged map[*ast.Node]bool) {
 	name := function.Name()
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return
 	}
-	declaration := declarationAnchoredAt(ctx, name)
+	declaration := declarationAnchoredAt(ruleContext, name)
 	if declaration == nil || judged[declaration] {
 		return
 	}
@@ -152,9 +152,9 @@ func reportWritesToFunctionName(ctx rule.Context, function *ast.Node, judged map
 	// resolves to its declaration, so only the structural half declines it, and that is enough: the
 	// climb from a function name reaches the function itself, which is not an assignment. The
 	// structural test runs first because it is far cheaper than the checker.
-	for _, occurrence := range reference.IdentifiersNamed(ctx, name.Text()) {
-		if reference.WritesToBinding(occurrence) && resolvedDeclarationOf(ctx, occurrence) == declaration {
-			ctx.ReportNode(occurrence, messageNoFuncAssign)
+	for _, occurrence := range reference.IdentifiersNamed(ruleContext, name.Text()) {
+		if reference.WritesToBinding(occurrence) && resolvedDeclarationOf(ruleContext, occurrence) == declaration {
+			ruleContext.ReportNode(occurrence, messageNoFuncAssign)
 		}
 	}
 }

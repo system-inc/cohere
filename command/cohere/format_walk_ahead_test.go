@@ -44,11 +44,11 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 		"nested/i.scss": "a { b: c; }\n",
 	} {
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	resolving, err := native.NewResolving(root)
@@ -77,7 +77,7 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 	if !reflect.DeepEqual(taken, direct) {
 		test.Fatalf("the walk begun ahead differs from a direct walk\nahead:  %+v\ndirect: %+v", taken, direct)
 	}
-	if _, err := enumerateFormatTree(engine, root); err != nil || engine.walks != 2 {
+	if _, enumerateFormatTreeError := enumerateFormatTree(engine, root); enumerateFormatTreeError != nil || engine.walks != 2 {
 		test.Errorf("a second call took the same walk again (%d walks)", engine.walks)
 	}
 
@@ -85,10 +85,10 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 	// Waited for, so the counts below never race the walk's goroutine.
 	<-aheadFormatWalk.done
 	other := &countingEngine{Resolving: resolving}
-	if _, err := enumerateFormatTree(other, root); err != nil || other.walks != 1 {
+	if _, enumerateFormatTreeError := enumerateFormatTree(other, root); enumerateFormatTreeError != nil || other.walks != 1 {
 		test.Errorf("another engine took the walk begun for this one (%d walks of its own)", other.walks)
 	}
-	if _, err := enumerateFormatTree(engine, filepath.Join(root, "other")); err != nil || engine.walks != 4 {
+	if _, enumerateFormatTreeError := enumerateFormatTree(engine, filepath.Join(root, "other")); enumerateFormatTreeError != nil || engine.walks != 4 {
 		test.Errorf("a walk of another root was taken from the walk begun ahead (%d walks)", engine.walks)
 	}
 }

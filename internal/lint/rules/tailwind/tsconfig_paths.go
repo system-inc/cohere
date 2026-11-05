@@ -85,9 +85,9 @@ func findFirstPathRecursive(cwd string, start string, entries []string, fileExis
 
 // loadTsconfigPaths reads a tsconfig and everything it extends into its path mapping.
 func loadTsconfigPaths(configPath string, readFile func(path string) (string, bool), fileExists func(path string) bool) (*tsconfigPaths, error) {
-	config, err := loadTsconfig(configPath, readFile, fileExists, map[string]bool{})
-	if err != nil {
-		return nil, err
+	config, loadTsconfigError := loadTsconfig(configPath, readFile, fileExists, map[string]bool{})
+	if loadTsconfigError != nil {
+		return nil, loadTsconfigError
 	}
 	compilerOptions := config.compilerOptions()
 	var baseUrl string
@@ -98,8 +98,8 @@ func loadTsconfigPaths(configPath string, readFile func(path string) (string, bo
 
 	var paths map[string][]string
 	if raw, isWritten := compilerOptions["paths"]; isWritten {
-		if err := json.Unmarshal(raw, &paths); err != nil {
-			return nil, fmt.Errorf("%s: compilerOptions.paths is not an object of string lists: %w", configPath, err)
+		if decodeError := json.Unmarshal(raw, &paths); decodeError != nil {
+			return nil, fmt.Errorf("%s: compilerOptions.paths is not an object of string lists: %w", configPath, decodeError)
 		}
 	}
 
@@ -168,8 +168,8 @@ func loadTsconfig(configPath string, readFile func(path string) (string, bool), 
 		return nil, nil
 	}
 	config := tsconfigFile{}
-	if err := json.Unmarshal([]byte(stripJsonComments(strings.TrimPrefix(text, "\ufeff"))), &config); err != nil {
-		return nil, fmt.Errorf("%s is malformed: %w; cohere reads a tsconfig as JSON with comments and trailing commas", configPath, err)
+	if decodeError := json.Unmarshal([]byte(stripJsonComments(strings.TrimPrefix(text, "\ufeff"))), &config); decodeError != nil {
+		return nil, fmt.Errorf("%s is malformed: %w; cohere reads a tsconfig as JSON with comments and trailing commas", configPath, decodeError)
 	}
 
 	raw, extends := config["extends"]
@@ -178,20 +178,20 @@ func loadTsconfig(configPath string, readFile func(path string) (string, bool), 
 	}
 	var extended []string
 	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
+	if decodeError := json.Unmarshal(raw, &single); decodeError == nil {
 		if single == "" {
 			return config, nil
 		}
 		extended = []string{single}
-	} else if err := json.Unmarshal(raw, &extended); err != nil {
+	} else if decodeError := json.Unmarshal(raw, &extended); decodeError != nil {
 		return nil, fmt.Errorf("%s: extends is neither a string nor a list of strings", configPath)
 	}
 
 	base := tsconfigFile{}
 	for _, value := range extended {
-		loaded, err := loadTsconfigFromExtends(configPath, value, readFile, fileExists, visiting)
-		if err != nil {
-			return nil, err
+		loaded, loadTsconfigFromExtendsError := loadTsconfigFromExtends(configPath, value, readFile, fileExists, visiting)
+		if loadTsconfigFromExtendsError != nil {
+			return nil, loadTsconfigFromExtendsError
 		}
 		base = mergeTsconfigs(base, loaded)
 	}
@@ -211,9 +211,9 @@ func loadTsconfigFromExtends(configPath, value string, readFile func(path string
 	if strings.Contains(value, "/") && strings.Contains(value, ".") && !fileExists(extendedPath) {
 		extendedPath = filepath.Join(directory, "node_modules", value)
 	}
-	config, err := loadTsconfig(extendedPath, readFile, fileExists, visiting)
-	if err != nil || config == nil {
-		return tsconfigFile{}, err
+	config, loadTsconfigError := loadTsconfig(extendedPath, readFile, fileExists, visiting)
+	if loadTsconfigError != nil || config == nil {
+		return tsconfigFile{}, loadTsconfigError
 	}
 	options := config.compilerOptions()
 	var baseUrl string

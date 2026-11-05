@@ -165,13 +165,13 @@ func WriteAtomically(fileName string, text string) error {
 	directory := filepath.Dir(fileName)
 
 	mode := os.FileMode(0o644)
-	if info, err := os.Stat(fileName); err == nil {
+	if info, statError := os.Stat(fileName); statError == nil {
 		mode = info.Mode().Perm()
 	}
 
-	temporary, err := os.CreateTemp(directory, "."+filepath.Base(fileName)+".cohere-*")
-	if err != nil {
-		return fmt.Errorf("creating a temp file beside %s: %w", fileName, err)
+	temporary, temporaryFileError := os.CreateTemp(directory, "."+filepath.Base(fileName)+".cohere-*")
+	if temporaryFileError != nil {
+		return fmt.Errorf("creating a temp file beside %s: %w", fileName, temporaryFileError)
 	}
 	temporaryName := temporary.Name()
 
@@ -182,9 +182,9 @@ func WriteAtomically(fileName string, text string) error {
 		os.Remove(temporaryName)
 	}
 
-	if _, err := temporary.WriteString(text); err != nil {
+	if _, writeStringError := temporary.WriteString(text); writeStringError != nil {
 		cleanup()
-		return fmt.Errorf("writing %s: %w", temporaryName, err)
+		return fmt.Errorf("writing %s: %w", temporaryName, writeStringError)
 	}
 
 	// Sync before rename. Without it the rename can be durable while the contents are not, which on
@@ -196,23 +196,23 @@ func WriteAtomically(fileName string, text string) error {
 	// test can induce. Every other guard was verified by deliberately breaking it and watching a
 	// fixture go red; this one rests on the argument alone. Treat it accordingly: it is load-bearing
 	// and unverified, so do not remove it because the tests stay green.
-	if err := temporary.Sync(); err != nil {
+	if syncError := temporary.Sync(); syncError != nil {
 		cleanup()
-		return fmt.Errorf("syncing %s: %w", temporaryName, err)
+		return fmt.Errorf("syncing %s: %w", temporaryName, syncError)
 	}
-	if err := temporary.Close(); err != nil {
+	if closeError := temporary.Close(); closeError != nil {
 		os.Remove(temporaryName)
-		return fmt.Errorf("closing %s: %w", temporaryName, err)
+		return fmt.Errorf("closing %s: %w", temporaryName, closeError)
 	}
-	if err := os.Chmod(temporaryName, mode); err != nil {
+	if changeModeError := os.Chmod(temporaryName, mode); changeModeError != nil {
 		os.Remove(temporaryName)
-		return fmt.Errorf("setting the mode on %s: %w", temporaryName, err)
+		return fmt.Errorf("setting the mode on %s: %w", temporaryName, changeModeError)
 	}
 	// replace.File rather than os.Rename: on Windows a rename over a file another process is reading is
 	// refused for as long as the read takes, and is retried through that.
-	if err := replace.File(temporaryName, fileName); err != nil {
+	if fileError := replace.File(temporaryName, fileName); fileError != nil {
 		os.Remove(temporaryName)
-		return fmt.Errorf("renaming %s over %s: %w", temporaryName, fileName, err)
+		return fmt.Errorf("renaming %s over %s: %w", temporaryName, fileName, fileError)
 	}
 
 	return nil

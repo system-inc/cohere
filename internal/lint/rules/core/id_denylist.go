@@ -59,10 +59,10 @@ func DecodeIdDenylistOptions(list []byte) (any, error) {
 	}
 
 	var names []string
-	if err := json.Unmarshal(list, &names); err != nil {
+	if decodeError := json.Unmarshal(list, &names); decodeError != nil {
 		return settings, fmt.Errorf(
 			"id-denylist takes each name as its own string element, as in "+
-				"[\"error\", \"data\", \"err\"]: %w", err)
+				"[\"error\", \"data\", \"err\"]: %w", decodeError)
 	}
 	if len(names) == 0 {
 		return settings, nil
@@ -228,7 +228,7 @@ var IdDenylist = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := idDenylistSettingsFrom(options)
 		if len(settings.Denied) == 0 {
 			// Upstream builds an empty Set and every identifier fails `isRestricted`, so the rule
@@ -248,18 +248,18 @@ var IdDenylist = rule.Rule{
 			if !settings.Denied[idDenylistNameOf(node)] {
 				return
 			}
-			if !idDenylistShouldCheck(ctx, node) {
+			if !idDenylistShouldCheck(ruleContext, node) {
 				return
 			}
 			if node.Kind == ast.KindPrivateIdentifier {
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: messageIdDenylistRestrictedPrivate.Id,
 					Description: fmt.Sprintf("Identifier '#%s' is restricted. %s",
 						idDenylistNameOf(node), messageIdDenylistRestrictedPrivate.Description),
 				})
 				return
 			}
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id: messageIdDenylistRestricted.Id,
 				Description: fmt.Sprintf("Identifier '%s' is restricted. %s",
 					idDenylistNameOf(node), messageIdDenylistRestricted.Description),
@@ -288,7 +288,7 @@ func idDenylistNameOf(node *ast.Node) string {
 }
 
 // idDenylistShouldCheck is upstream's `shouldCheck`, arm for arm and in upstream's order.
-func idDenylistShouldCheck(ctx rule.Context, node *ast.Node) bool {
+func idDenylistShouldCheck(ruleContext rule.Context, node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
@@ -339,7 +339,7 @@ func idDenylistShouldCheck(ctx rule.Context, node *ast.Node) bool {
 	}
 	// The environment named it, not us. See the exemption section on the rule for the four
 	// resolution outcomes and where it diverges.
-	if idDenylistIsReferenceToGlobalVariable(ctx, node) {
+	if idDenylistIsReferenceToGlobalVariable(ruleContext, node) {
 		return false
 	}
 	return true
@@ -370,11 +370,11 @@ func idDenylistShouldCheck(ctx rule.Context, node *ast.Node) bool {
 //	zero declarations           an ambient global    -> exempt   (undefined)
 //	declared only in a .d.ts    an environment global-> exempt   (Number, Map, Object, Array)
 //	declared in source          ours                 -> CHECKED
-func idDenylistIsReferenceToGlobalVariable(ctx rule.Context, node *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func idDenylistIsReferenceToGlobalVariable(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		// Upstream's `globalScope.set.get(name)` found nothing, so this is not a global reference.
 		return false

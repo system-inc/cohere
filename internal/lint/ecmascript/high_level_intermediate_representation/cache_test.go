@@ -61,13 +61,13 @@ func TestForFunctionLowersOncePerFunction(test *testing.T) {
 	probe := rule.Rule{
 		Name:             "hir-cache-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the harness produced no type checker, so this test would prove nothing")
 					}
-					if ctx.FileCache == nil {
+					if ruleContext.FileCache == nil {
 						test.Fatal("the harness produced no file cache, so a hit could not be observed")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
@@ -76,11 +76,11 @@ func TestForFunctionLowersOncePerFunction(test *testing.T) {
 						}
 						// Three asks, standing in for the three rules.
 						for range 3 {
-							results = append(results, ForFunction(ctx, function))
+							results = append(results, ForFunction(ruleContext, function))
 						}
 						// An independent lowering of the same node, to confirm that a fresh one is
 						// genuinely a different object and the identity check above has teeth.
-						directLowering = Lower(function, ctx.TypeChecker)
+						directLowering = Lower(function, ruleContext.TypeChecker)
 					})
 				},
 			}
@@ -118,7 +118,7 @@ func TestForFunctionConstructsExactlyOnce(test *testing.T) {
 	probe := rule.Rule{
 		Name:             "hir-cache-construct-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					done := false
@@ -127,13 +127,13 @@ func TestForFunctionConstructsExactlyOnce(test *testing.T) {
 							return
 						}
 						done = true
-						first := ForFunction(ctx, function)
+						first := ForFunction(ruleContext, function)
 						if first == nil {
 							test.Fatal("the probe function did not lower")
 						}
 						firstPhis = totalPhis(first)
 						for range 3 {
-							lastPhis = totalPhis(ForFunction(ctx, function))
+							lastPhis = totalPhis(ForFunction(ruleContext, function))
 						}
 					})
 				},
@@ -165,10 +165,10 @@ func TestForFunctionWithoutCacheStillLowers(test *testing.T) {
 	probe := rule.Rule{
 		Name:             "hir-cache-nil-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					bare := ctx
+					bare := ruleContext
 					bare.FileCache = nil
 					done := false
 					forEachFunctionLike(node, func(function *ast.Node) {
@@ -207,7 +207,7 @@ func TestForFunctionRecordsOneFillPerFunction(test *testing.T) {
 	probe := rule.Rule{
 		Name:             "hir-cache-fill-probe",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					done := false
@@ -218,10 +218,10 @@ func TestForFunctionRecordsOneFillPerFunction(test *testing.T) {
 						done = true
 						askedKey = cacheKeyFor(function)
 						for range 3 {
-							ForFunction(ctx, function)
+							ForFunction(ruleContext, function)
 						}
 					})
-					for key := range ctx.FileCache.Fills() {
+					for key := range ruleContext.FileCache.Fills() {
 						fillKeys = append(fillKeys, key)
 					}
 				},
@@ -279,7 +279,7 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(test *testing.T
 			probe := rule.Rule{
 				Name:             "hir-cache-escaped-memo-probe",
 				NeedsTypeChecker: true,
-				Run: func(ctx rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options any) rule.Listeners {
 					return rule.Listeners{
 						ast.KindSourceFile: func(node *ast.Node) {
 							done := false
@@ -288,11 +288,11 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(test *testing.T
 									return
 								}
 								done = true
-								independent := Lower(function, ctx.TypeChecker)
+								independent := Lower(function, ruleContext.TypeChecker)
 								Construct(independent)
 								recognised = DropManualMemoization(independent).Recognised
-								shared = ForFunction(ctx, function)
-								erased = ForFunctionWithoutManualMemoization(ctx, function)
+								shared = ForFunction(ruleContext, function)
+								erased = ForFunctionWithoutManualMemoization(ruleContext, function)
 							})
 						},
 					}
@@ -349,11 +349,11 @@ func TestMayHoldComponentOrHookAnswersFromTheText(test *testing.T) {
 			probe := rule.Rule{
 				Name:             "hir-may-hold-component-or-hook-probe",
 				NeedsTypeChecker: true,
-				Run: func(ctx rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options any) rule.Listeners {
 					return rule.Listeners{
 						ast.KindSourceFile: func(node *ast.Node) {
 							answered = true
-							got = MayHoldComponentOrHook(ctx)
+							got = MayHoldComponentOrHook(ruleContext)
 						},
 					}
 				},

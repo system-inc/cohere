@@ -22,14 +22,14 @@ func TestARetiredGraphRecordsNothing(test *testing.T) {
 		"main.ts":       "import { helper } from './helper';\nexport const value: number = helper();\n",
 		"helper.ts":     "export function helper(): number { return 1; }\n",
 	})
-	ctx := context.Background()
+	backgroundContext := context.Background()
 	build := func() *program.Graph {
 		test.Helper()
-		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
-		graph.Shapes, _ = graph.Signatures(ctx, program.RecordedRealSignatures(graph))
+		graph.Shapes, _ = graph.Signatures(backgroundContext, program.RecordedRealSignatures(graph))
 		return graph
 	}
 	key := sha256.Sum256([]byte("compiler options"))
@@ -37,7 +37,7 @@ func TestARetiredGraphRecordsNothing(test *testing.T) {
 	// RecordFull, which a full check records through.
 	live := build()
 	liveReuse := program.NewTypeDiagnosticsReuse(nil, key)
-	live.RecordFull(ctx, liveReuse, live.AllDiagnosticParts(ctx))
+	live.RecordFull(backgroundContext, liveReuse, live.AllDiagnosticParts(backgroundContext))
 	recorded := liveReuse.Recorded()
 	if recorded == nil {
 		test.Fatal("control: a live graph's full check recorded nothing, so the retired case below proves nothing")
@@ -47,7 +47,7 @@ func TestARetiredGraphRecordsNothing(test *testing.T) {
 	retired := build()
 	retired.Retire()
 	retiredReuse := program.NewTypeDiagnosticsReuse(nil, key)
-	retired.RecordFull(ctx, retiredReuse, retired.AllDiagnosticParts(ctx))
+	retired.RecordFull(backgroundContext, retiredReuse, retired.AllDiagnosticParts(backgroundContext))
 	if retiredReuse.Recorded() != nil {
 		test.Error("RecordFull recorded a retired graph's check")
 	}
@@ -55,7 +55,7 @@ func TestARetiredGraphRecordsNothing(test *testing.T) {
 	// CheckReusing, which a check that replays records through, from the section the live graph left.
 	replaying := build()
 	replayReuse := program.NewTypeDiagnosticsReuse(recorded, key)
-	if _, reused := replaying.CheckReusing(ctx, replayReuse); !reused {
+	if _, reused := replaying.CheckReusing(backgroundContext, replayReuse); !reused {
 		test.Fatal("control: a live graph did not replay the section it just recorded")
 	}
 	if replayReuse.Recorded() == nil {
@@ -65,7 +65,7 @@ func TestARetiredGraphRecordsNothing(test *testing.T) {
 	retiredReplaying := build()
 	retiredReplaying.Retire()
 	retiredReplayReuse := program.NewTypeDiagnosticsReuse(recorded, key)
-	if _, reused := retiredReplaying.CheckReusing(ctx, retiredReplayReuse); !reused {
+	if _, reused := retiredReplaying.CheckReusing(backgroundContext, retiredReplayReuse); !reused {
 		test.Fatal("a retired graph did not replay, so whether it records was never asked")
 	}
 	if retiredReplayReuse.Recorded() != nil {

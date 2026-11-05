@@ -533,9 +533,9 @@ func TestNoMisusedSpreadDecoder(test *testing.T) {
 
 	decode := func(test *testing.T, raw string) NoMisusedSpreadOptions {
 		test.Helper()
-		decoded, err := DecodeNoMisusedSpreadOptions([]byte(raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodeNoMisusedSpreadOptionsError := DecodeNoMisusedSpreadOptions([]byte(raw))
+		if decodeNoMisusedSpreadOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodeNoMisusedSpreadOptionsError)
 		}
 		options, _ := decoded.(NoMisusedSpreadOptions)
 		return options

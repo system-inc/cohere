@@ -98,7 +98,7 @@ type privateClassMember struct {
 // looking.
 var NoUnusedPrivateClassMembers = rule.Rule{
 	Name: "no-unused-private-class-members",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		check := func(members *ast.NodeList) {
 			if members == nil {
 				return
@@ -139,7 +139,7 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 				if declared[text].used {
 					continue
 				}
-				ctx.ReportNode(declared[text].name, rule.Message{
+				ruleContext.ReportNode(declared[text].name, rule.Message{
 					Id: "noUnusedPrivateClassMember",
 					// `text` is the name node's own text, which already carries the leading
 					// hash: `#foo`, not `foo`. Measured by the dry run against the real tree,

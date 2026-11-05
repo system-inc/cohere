@@ -65,13 +65,13 @@ var messageTemplateCurlyInString = rule.Message{
 // was intended. Choosing between them needs the author.
 var NoTemplateCurlyInString = rule.Rule{
 	Name: "no-template-curly-in-string",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if !containsTemplatePlaceholder(node.Text()) {
 					return
 				}
-				ctx.ReportNode(node, messageTemplateCurlyInString)
+				ruleContext.ReportNode(node, messageTemplateCurlyInString)
 			},
 		}
 	},

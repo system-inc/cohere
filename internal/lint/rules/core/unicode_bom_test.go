@@ -27,9 +27,9 @@ func decodedUnicodeBomOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeUnicodeBomOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(json.RawMessage(raw))
+	if decodeUnicodeBomOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeUnicodeBomOptionsError)
 	}
 	return options
 }
@@ -173,9 +173,9 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 
 	test.Run("empty input defaults to never", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeUnicodeBomOptions(nil)
-		if err != nil {
-			test.Fatalf("empty input should decode, got %v", err)
+		decoded, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(nil)
+		if decodeUnicodeBomOptionsError != nil {
+			test.Fatalf("empty input should decode, got %v", decodeUnicodeBomOptionsError)
 		}
 		options, isOptions := decoded.(UnicodeBomOptions)
 		if !isOptions {
@@ -188,9 +188,9 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 
 	test.Run("always decodes", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeUnicodeBomOptions(json.RawMessage(`"always"`))
-		if err != nil {
-			test.Fatalf("expected always to decode, got %v", err)
+		decoded, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(json.RawMessage(`"always"`))
+		if decodeUnicodeBomOptionsError != nil {
+			test.Fatalf("expected always to decode, got %v", decodeUnicodeBomOptionsError)
 		}
 		options := decoded.(UnicodeBomOptions)
 		if options.Require == nil || *options.Require != UnicodeBomAlways {
@@ -200,12 +200,12 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 
 	test.Run("an unknown setting is an error naming the value", func(test *testing.T) {
 		test.Parallel()
-		_, err := DecodeUnicodeBomOptions(json.RawMessage(`"alway"`))
-		if err == nil {
+		_, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(json.RawMessage(`"alway"`))
+		if decodeUnicodeBomOptionsError == nil {
 			test.Fatalf("expected an error for an unrecognised setting")
 		}
-		if !strings.Contains(err.Error(), "alway") {
-			test.Fatalf("the error should name the bad value, got %q", err.Error())
+		if !strings.Contains(decodeUnicodeBomOptionsError.Error(), "alway") {
+			test.Fatalf("the error should name the bad value, got %q", decodeUnicodeBomOptionsError.Error())
 		}
 	})
 
@@ -214,7 +214,7 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 		// Upstream's own spelling is `["always"]`. cohere strips the tuple, so an array arriving
 		// here means the config layer's contract changed, and that should fail loudly rather than
 		// quietly enforcing the default.
-		if _, err := DecodeUnicodeBomOptions(json.RawMessage(`["always"]`)); err == nil {
+		if _, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(json.RawMessage(`["always"]`)); decodeUnicodeBomOptionsError == nil {
 			test.Fatalf("expected an array to be refused")
 		}
 	})
@@ -292,14 +292,14 @@ func TestUnicodeBomCannotSeeAMarkThroughTheRealReadPath(test *testing.T) {
 	middle := filepath.Join(directory, "Middle.ts")
 
 	markBytes := []byte{0xef, 0xbb, 0xbf}
-	if err := os.WriteFile(marked, append(append([]byte{}, markBytes...), []byte("export const a = 1;\n")...), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(marked, append(append([]byte{}, markBytes...), []byte("export const a = 1;\n")...), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.WriteFile(unmarked, []byte("export const b = 2;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(unmarked, []byte("export const b = 2;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.WriteFile(middle, append([]byte("export const c = 3;"), append(append([]byte{}, markBytes...), '\n')...), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(middle, append([]byte("export const c = 3;"), append(append([]byte{}, markBytes...), '\n')...), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	read := func(path string) string {

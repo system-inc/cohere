@@ -45,11 +45,11 @@ type FrozenBinary struct {
 // may not match the rules on disk has stated a limitation, which is the same discipline as naming
 // the files a run did not check.
 func ResolveFrozen(paths Paths) (FrozenBinary, error) {
-	entries, err := os.ReadDir(paths.BinaryDirectory())
-	if err != nil {
+	entries, readDirectoryError := os.ReadDir(paths.BinaryDirectory())
+	if readDirectoryError != nil {
 		return FrozenBinary{}, fmt.Errorf(
 			"--frozen was requested but the binary cache at %s cannot be read, so there is nothing to freeze: %w",
-			paths.BinaryDirectory(), err,
+			paths.BinaryDirectory(), readDirectoryError,
 		)
 	}
 
@@ -66,8 +66,8 @@ func ResolveFrozen(paths Paths) (FrozenBinary, error) {
 			continue
 		}
 
-		information, err := entry.Info()
-		if err != nil {
+		information, infoError := entry.Info()
+		if infoError != nil {
 			continue
 		}
 		// A binary the operating system will refuse to execute is not a candidate, and skipping it

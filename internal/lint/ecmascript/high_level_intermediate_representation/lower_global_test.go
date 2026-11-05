@@ -30,13 +30,13 @@ func TestGlobalLoadsRetainBindingProvenance(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			visited, loads := 0, 0
-			probe := rule.Rule{Name: "global-load-provenance", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+			probe := rule.Rule{Name: "global-load-provenance", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(node *ast.Node) {
 						if node.Name() == nil || node.Name().Text() != "Component" {
 							return
 						}
-						function := Lower(node, ctx.TypeChecker)
+						function := Lower(node, ruleContext.TypeChecker)
 						if function == nil {
 							test.Fatal("function did not lower")
 						}

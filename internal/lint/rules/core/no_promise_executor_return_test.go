@@ -23,9 +23,9 @@ func decodedPromiseExecutorOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeNoPromiseExecutorReturnOptionsError := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(raw))
+	if decodeNoPromiseExecutorReturnOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoPromiseExecutorReturnOptionsError)
 	}
 	return options
 }
@@ -321,9 +321,9 @@ func TestDecodeNoPromiseExecutorReturnOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+			decoded, decodeNoPromiseExecutorReturnOptionsError := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(testCase.raw))
+			if decodeNoPromiseExecutorReturnOptionsError != nil {
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoPromiseExecutorReturnOptionsError)
 			}
 			options, isOptions := decoded.(NoPromiseExecutorReturnOptions)
 			if !isOptions {

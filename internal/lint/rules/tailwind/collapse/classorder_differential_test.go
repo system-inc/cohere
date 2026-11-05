@@ -86,14 +86,14 @@ func classOrderLoadFixture(test *testing.T) *classOrderFixture {
 	test.Helper()
 	classOrderFixtureOnce.Do(func() {
 		path := filepath.Join("testdata", "classorder_fixtures.json")
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			classOrderFixtureError = err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			classOrderFixtureError = readError
 			return
 		}
 		classOrderFixtureValue = &classOrderFixture{}
-		if err := json.Unmarshal(contents, classOrderFixtureValue); err != nil {
-			classOrderFixtureError = fmt.Errorf("parse %s: %w", path, err)
+		if decodeError := json.Unmarshal(contents, classOrderFixtureValue); decodeError != nil {
+			classOrderFixtureError = fmt.Errorf("parse %s: %w", path, decodeError)
 		}
 	})
 	if classOrderFixtureError != nil {

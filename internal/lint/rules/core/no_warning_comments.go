@@ -37,8 +37,8 @@ const (
 // equality and an unknown value would silently pick a third behaviour of matching nothing.
 func (location *NoWarningCommentsLocation) UnmarshalJSON(raw []byte) error {
 	var spelling string
-	if err := json.Unmarshal(raw, &spelling); err != nil {
-		return err
+	if decodeError := json.Unmarshal(raw, &spelling); decodeError != nil {
+		return decodeError
 	}
 	switch spelling {
 	case "start":
@@ -94,8 +94,8 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	for index, decoration := range options.Decoration {
 		if len([]rune(decoration)) != 1 || text.TrimWhitespace(decoration) == "" {
@@ -146,7 +146,7 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 // because the quoted text is the part of the message a reader scans.
 var NoWarningComments = rule.Rule{
 	Name: "no-warning-comments",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := NoWarningCommentsOptions{}
 		if decoded, configured := rule.OptionsAs[NoWarningCommentsOptions](options); configured {
 			settings = decoded
@@ -170,7 +170,7 @@ var NoWarningComments = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(file *ast.Node) {
-				checkNoWarningComments(ctx, compiled)
+				checkNoWarningComments(ruleContext, compiled)
 			},
 		}
 	},
@@ -205,8 +205,8 @@ func noWarningCommentsMatchers(
 	matched := make([]string, 0, len(terms))
 	leads := make([]rune, 0, len(terms))
 	for _, term := range terms {
-		matcher, err := noWarningCommentsMatcherFor(term, location, decoration)
-		if err != nil {
+		matcher, noWarningCommentsMatcherForError := noWarningCommentsMatcherFor(term, location, decoration)
+		if noWarningCommentsMatcherForError != nil {
 			// A term that cannot be compiled is a configuration mistake rather than a finding.
 			// Skipped rather than reported, matching upstream, whose `escapeRegExp` makes every
 			// term compilable and which therefore has no failure mode here at all.
@@ -324,8 +324,8 @@ func noWarningCommentsFoldEqual(first rune, second rune) bool {
 // One listener on the source file rather than a per-node one, because a comment is trivia and has
 // no node kind to anchor on. `comments.ForFile` caches one scan per file, so this is a read of an
 // already-built list.
-func checkNoWarningComments(ctx rule.Context, compiled noWarningCommentsCompiled) {
-	for _, comment := range comments.ForFile(ctx) {
+func checkNoWarningComments(ruleContext rule.Context, compiled noWarningCommentsCompiled) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		value := noWarningCommentsValueOf(comment)
 		first, hasFirst := noWarningCommentsFirstUnskipped(value, compiled.skip)
 
@@ -350,7 +350,7 @@ func checkNoWarningComments(ctx rule.Context, compiled noWarningCommentsCompiled
 				}
 				selfDirectiveChecked = true
 			}
-			ctx.ReportRange(comment.Range, rule.Message{
+			ruleContext.ReportRange(comment.Range, rule.Message{
 				Id: "unexpectedComment",
 				Description: fmt.Sprintf(
 					"This comment opens with `%s`, which marks the code as knowingly "+

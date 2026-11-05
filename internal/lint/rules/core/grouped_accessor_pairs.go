@@ -47,15 +47,15 @@ type GroupedAccessorPairsOptions struct {
 // from its schema before the rule runs; there is no schema layer here, so it lives here.
 func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 	options := GroupedAccessorPairsOptions{Order: GroupedAccessorPairsAnyOrder}
-	configured, err := rule.OptionElements(list, 2)
-	if err != nil || len(configured) == 0 {
-		return options, err
+	configured, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(configured) == 0 {
+		return options, optionElementsError
 	}
 
 	var order string
-	if err := json.Unmarshal(configured[0], &order); err != nil {
+	if decodeError := json.Unmarshal(configured[0], &order); decodeError != nil {
 		return options, fmt.Errorf("grouped-accessor-pairs takes a string first, %q: %w",
-			string(configured[0]), err)
+			string(configured[0]), decodeError)
 	}
 	switch GroupedAccessorPairsOrder(order) {
 	case GroupedAccessorPairsAnyOrder, GroupedAccessorPairsGetBeforeSet, GroupedAccessorPairsSetBeforeGet:
@@ -73,8 +73,8 @@ func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 	var second struct {
 		EnforceForTSTypes bool `json:"enforceForTSTypes"`
 	}
-	if err := rule.UnmarshalOptions(configured[1], &second); err != nil {
-		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(configured[1], &second); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", unmarshalOptionsError)
 	}
 	options.EnforceForTSTypes = second.EnforceForTSTypes
 	return options, nil
@@ -147,7 +147,7 @@ var messageGroupedAccessorPairsInvalidOrder = rule.Message{
 // key renders as a bare `getter`, and so does a signature here. The finding and its span agree.
 var GroupedAccessorPairs = rule.Rule{
 	Name: "grouped-accessor-pairs",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the fallback here is what keeps the
 		// order check from comparing against an empty string that matches no arm.
 		settings, isSettings := rule.OptionsAs[GroupedAccessorPairsOptions](options)
@@ -157,22 +157,22 @@ var GroupedAccessorPairs = rule.Rule{
 
 		listeners := rule.Listeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
-				checkGroupedAccessorList(ctx, settings.Order,
+				checkGroupedAccessorList(ruleContext, settings.Order,
 					node.AsObjectLiteralExpression().Properties.Nodes, nil)
 			},
 			ast.KindClassDeclaration: func(node *ast.Node) {
-				checkGroupedAccessorClassBody(ctx, settings.Order, node.AsClassDeclaration().Members.Nodes)
+				checkGroupedAccessorClassBody(ruleContext, settings.Order, node.AsClassDeclaration().Members.Nodes)
 			},
 			ast.KindClassExpression: func(node *ast.Node) {
-				checkGroupedAccessorClassBody(ctx, settings.Order, node.AsClassExpression().Members.Nodes)
+				checkGroupedAccessorClassBody(ruleContext, settings.Order, node.AsClassExpression().Members.Nodes)
 			},
 		}
 		if settings.EnforceForTSTypes {
 			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
-				checkGroupedAccessorList(ctx, settings.Order, node.AsInterfaceDeclaration().Members.Nodes, nil)
+				checkGroupedAccessorList(ruleContext, settings.Order, node.AsInterfaceDeclaration().Members.Nodes, nil)
 			}
 			listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
-				checkGroupedAccessorList(ctx, settings.Order, node.AsTypeLiteralNode().Members.Nodes, nil)
+				checkGroupedAccessorList(ruleContext, settings.Order, node.AsTypeLiteralNode().Members.Nodes, nil)
 			}
 		}
 		return listeners
@@ -184,11 +184,11 @@ var GroupedAccessorPairs = rule.Rule{
 // Upstream's two `checkList` calls over the same class body. Splitting them is what makes a static
 // accessor and an instance accessor of the same name two different properties rather than a split
 // pair, and `class A { get a(){} static set a(foo){} }` is upstream's clean case for it.
-func checkGroupedAccessorClassBody(ctx rule.Context, order GroupedAccessorPairsOrder, members []*ast.Node) {
+func checkGroupedAccessorClassBody(ruleContext rule.Context, order GroupedAccessorPairsOrder, members []*ast.Node) {
 	wantStatic := false
-	checkGroupedAccessorList(ctx, order, members, &wantStatic)
+	checkGroupedAccessorList(ruleContext, order, members, &wantStatic)
 	wantStatic = true
-	checkGroupedAccessorList(ctx, order, members, &wantStatic)
+	checkGroupedAccessorList(ruleContext, order, members, &wantStatic)
 }
 
 // groupedAccessorEntry is one key's getters and setters, with the positions they appeared at.
@@ -206,7 +206,7 @@ type groupedAccessorEntry struct {
 //
 // `wantStatic` nil means "check every member", which is the object-literal case. Non-nil selects one
 // staticness, which is how the class body is scanned twice.
-func checkGroupedAccessorList(ctx rule.Context, order GroupedAccessorPairsOrder,
+func checkGroupedAccessorList(ruleContext rule.Context, order GroupedAccessorPairsOrder,
 	members []*ast.Node, wantStatic *bool) {
 	entries := []*groupedAccessorEntry{}
 
@@ -217,7 +217,7 @@ func checkGroupedAccessorList(ctx rule.Context, order GroupedAccessorPairsOrder,
 		if wantStatic != nil && groupedAccessorIsStatic(member) != *wantStatic {
 			continue
 		}
-		key, hasKey := groupedAccessorKeyText(ctx, member)
+		key, hasKey := groupedAccessorKeyText(ruleContext, member)
 		if !hasKey {
 			continue
 		}
@@ -262,7 +262,7 @@ func checkGroupedAccessorList(ctx rule.Context, order GroupedAccessorPairsOrder,
 			distance = -distance
 		}
 		if distance > 1 {
-			reportGroupedAccessorPair(ctx, messageGroupedAccessorPairsNotGrouped,
+			reportGroupedAccessorPair(ruleContext, messageGroupedAccessorPairsNotGrouped,
 				"Accessor pair %s and %s should be grouped.", formerNode, latterNode)
 			continue
 		}
@@ -270,7 +270,7 @@ func checkGroupedAccessorList(ctx rule.Context, order GroupedAccessorPairsOrder,
 		misordered := (order == GroupedAccessorPairsGetBeforeSet && entry.getterIndex > entry.setterIndex) ||
 			(order == GroupedAccessorPairsSetBeforeGet && entry.getterIndex < entry.setterIndex)
 		if misordered {
-			reportGroupedAccessorPair(ctx, messageGroupedAccessorPairsInvalidOrder,
+			reportGroupedAccessorPair(ruleContext, messageGroupedAccessorPairsInvalidOrder,
 				"Expected %[2]s to be before %[1]s.", formerNode, latterNode)
 		}
 	}
@@ -282,14 +282,14 @@ func checkGroupedAccessorList(ctx rule.Context, order GroupedAccessorPairsOrder,
 // message reverses them with an explicit index rather than by swapping the arguments, so the two
 // call sites pass the same pair in the same order and only the template differs. Upstream does the
 // same through its message data.
-func reportGroupedAccessorPair(ctx rule.Context, message rule.Message, format string,
+func reportGroupedAccessorPair(ruleContext rule.Context, message rule.Message, format string,
 	formerNode *ast.Node, latterNode *ast.Node) {
 	rendered := rule.Message{
 		Id: message.Id,
 		Description: fmt.Sprintf(format,
 			groupedAccessorNameWithKind(formerNode), groupedAccessorNameWithKind(latterNode)),
 	}
-	ctx.ReportRange(groupedAccessorHeadRange(ctx, latterNode), rendered)
+	ruleContext.ReportRange(groupedAccessorHeadRange(ruleContext, latterNode), rendered)
 }
 
 // groupedAccessorHeadRange is the accessor's head: the keyword through the key.
@@ -297,14 +297,14 @@ func reportGroupedAccessorPair(ctx rule.Context, message rule.Message, format st
 // `rule.TokenRange` starts past leading trivia and past nothing else, so for a static member it
 // begins at `static` and for a plain one at `get` or `set`. The end is the key's own end, which
 // stops before the parameter list. Measured against seven shapes.
-func groupedAccessorHeadRange(ctx rule.Context, member *ast.Node) core.TextRange {
-	start := rule.TokenRange(ctx.SourceFile, member).Pos()
+func groupedAccessorHeadRange(ruleContext rule.Context, member *ast.Node) core.TextRange {
+	start := rule.TokenRange(ruleContext.SourceFile, member).Pos()
 	name := member.Name()
 	if name == nil {
 		// Not reachable for a get or set accessor, which the grammar requires to have a key, and
 		// the callers only pass those. Guarded rather than asserted because a nil here would be a
 		// panic that costs every rule this file, not just this one.
-		return rule.TokenRange(ctx.SourceFile, member)
+		return rule.TokenRange(ruleContext.SourceFile, member)
 	}
 	return core.NewTextRange(start, name.End())
 }
@@ -342,7 +342,7 @@ func groupedAccessorIsStatic(member *ast.Node) bool {
 //
 // The two halves are tagged apart, because a computed `[a]` compared by text must never collide
 // with a static name that happens to read the same way.
-func groupedAccessorKeyText(ctx rule.Context, member *ast.Node) (string, bool) {
+func groupedAccessorKeyText(ruleContext rule.Context, member *ast.Node) (string, bool) {
 	name := member.Name()
 	if name == nil {
 		return "", false
@@ -372,8 +372,8 @@ func groupedAccessorKeyText(ctx rule.Context, member *ast.Node) (string, bool) {
 	//
 	// Kept because it says which question was asked, and because narrowing this range to the bracket
 	// interior would make it load-bearing overnight with nothing to notice.
-	tokenRange := rule.TokenRange(ctx.SourceFile, name)
-	return "computed:" + ctx.SourceFile.Text()[tokenRange.Pos():tokenRange.End()], true
+	tokenRange := rule.TokenRange(ruleContext.SourceFile, name)
+	return "computed:" + ruleContext.SourceFile.Text()[tokenRange.Pos():tokenRange.End()], true
 }
 
 // groupedAccessorNameWithKind renders an accessor the way upstream's `getFunctionNameWithKind` does.

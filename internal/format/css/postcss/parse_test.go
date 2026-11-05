@@ -12,9 +12,9 @@ import (
 func TestParseTree(test *testing.T) {
 	test.Parallel()
 	// U+00E9 is 2 bytes and 1 unit, the emoji 4 bytes and 2 units.
-	root, err := Parse("\xc3\xa9{b:c ! important}\n\xf0\x9f\x98\x80 {/* x */--d:{e}}")
-	if err != nil {
-		test.Fatal(err)
+	root, parseError := Parse("\xc3\xa9{b:c ! important}\n\xf0\x9f\x98\x80 {/* x */--d:{e}}")
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
 	if root.Type() != "root" || root.Range != [2]int{0, 41} {
 		test.Fatalf("root %s %v", root.Type(), root.Range)
@@ -58,9 +58,9 @@ func TestParseTree(test *testing.T) {
 // TestParseByteOrderMark checks that offsets count from after the byte order mark, as postcss's do.
 func TestParseByteOrderMark(test *testing.T) {
 	test.Parallel()
-	root, err := Parse("\xef\xbb\xbfa{}")
-	if err != nil {
-		test.Fatal(err)
+	root, parseError := Parse("\xef\xbb\xbfa{}")
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
 	rule := root.List("nodes")[0]
 	if rule.Range != [2]int{0, 3} {
@@ -84,10 +84,10 @@ func TestParseErrors(test *testing.T) {
 		{"a{b:c d:e}", "Missed semicolon", 1, 6, 0},
 		{"}", "Unexpected }", 1, 1, 2},
 	} {
-		_, err := Parse(each.text)
+		_, parseError := Parse(each.text)
 		var syntaxError *CssSyntaxError
-		if !printing.IsSyntax(err) || !errors.As(err, &syntaxError) {
-			test.Errorf("%q: %v is not a marked CssSyntaxError", each.text, err)
+		if !printing.IsSyntax(parseError) || !errors.As(parseError, &syntaxError) {
+			test.Errorf("%q: %v is not a marked CssSyntaxError", each.text, parseError)
 			continue
 		}
 		if syntaxError.Reason != each.reason || syntaxError.Line != each.line || syntaxError.Column != each.column || syntaxError.EndColumn != each.endColumn {
@@ -102,9 +102,9 @@ func TestParseNeverPanics(test *testing.T) {
 	test.Parallel()
 	for _, fixture := range parseFixtures {
 		for end := 0; end <= len(fixture.text); end++ {
-			_, err := Parse(fixture.text[:end])
-			if err != nil && !printing.IsSyntax(err) {
-				test.Errorf("%s, first %d bytes: %v", fixture.name, end, err)
+			_, parseError := Parse(fixture.text[:end])
+			if parseError != nil && !printing.IsSyntax(parseError) {
+				test.Errorf("%s, first %d bytes: %v", fixture.name, end, parseError)
 			}
 		}
 	}

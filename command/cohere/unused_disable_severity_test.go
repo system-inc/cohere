@@ -23,13 +23,13 @@ func unusedDisableRecords(test *testing.T, output string) ([]findingJSON, summar
 		switch kind.Kind {
 		case "finding":
 			var finding findingJSON
-			if err := json.Unmarshal([]byte(line), &finding); err != nil {
-				test.Fatal(err)
+			if decodeError := json.Unmarshal([]byte(line), &finding); decodeError != nil {
+				test.Fatal(decodeError)
 			}
 			findings = append(findings, finding)
 		case "summary":
-			if err := json.Unmarshal([]byte(line), &summary); err != nil {
-				test.Fatal(err)
+			if decodeError := json.Unmarshal([]byte(line), &summary); decodeError != nil {
+				test.Fatal(decodeError)
 			}
 		}
 	}
@@ -113,9 +113,9 @@ func TestUnusedDisableSeverity(test *testing.T) {
 						test.Fatalf("--no-fix withheld the repair at error:\n%s", output)
 					}
 				}
-				bytes, err := os.ReadFile(filepath.Join(project.root, "source/a.ts"))
-				if err != nil {
-					test.Fatal(err)
+				bytes, readError := os.ReadFile(filepath.Join(project.root, "source/a.ts"))
+				if readError != nil {
+					test.Fatal(readError)
 				}
 				if string(bytes) != source {
 					test.Fatal("read-only run rewrote the comment")

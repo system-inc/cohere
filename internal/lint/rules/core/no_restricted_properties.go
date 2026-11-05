@@ -61,15 +61,15 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 		return options, nil
 	}
 	var elements []json.RawMessage
-	if err := json.Unmarshal(list, &elements); err != nil {
+	if decodeError := json.Unmarshal(list, &elements); decodeError != nil {
 		return options, fmt.Errorf(
-			"no-restricted-properties: the option list is not a JSON array: %w", err)
+			"no-restricted-properties: the option list is not a JSON array: %w", decodeError)
 	}
 	for index, element := range elements {
 		var restriction NoRestrictedPropertiesRestriction
-		if err := rule.UnmarshalOptions(element, &restriction); err != nil {
+		if unmarshalOptionsError := rule.UnmarshalOptions(element, &restriction); unmarshalOptionsError != nil {
 			return NoRestrictedPropertiesOptions{}, fmt.Errorf(
-				"no-restricted-properties element %d: %w", index+1, err)
+				"no-restricted-properties element %d: %w", index+1, unmarshalOptionsError)
 		}
 		options.Restrictions = append(options.Restrictions, restriction)
 	}
@@ -134,7 +134,7 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 // name to compare. Measured against the installed build.
 var NoRestrictedProperties = rule.Rule{
 	Name: "no-restricted-properties",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, configured := rule.OptionsAs[NoRestrictedPropertiesOptions](options)
 		if !configured || len(settings.Restrictions) == 0 {
 			// Upstream returns an empty visitor object here rather than a no-op listener, so the
@@ -145,18 +145,18 @@ var NoRestrictedProperties = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				checkNoRestrictedPropertiesAccess(ctx, node, index)
+				checkNoRestrictedPropertiesAccess(ruleContext, node, index)
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				checkNoRestrictedPropertiesAccess(ctx, node, index)
+				checkNoRestrictedPropertiesAccess(ruleContext, node, index)
 			},
 			ast.KindObjectBindingPattern: func(node *ast.Node) {
-				checkNoRestrictedPropertiesPattern(ctx, node, index)
+				checkNoRestrictedPropertiesPattern(ruleContext, node, index)
 			},
 			// Destructuring in an ASSIGNMENT position, which our parser gives a different node
 			// kind than destructuring in a declaration. See the doc on the checker below.
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
-				checkNoRestrictedPropertiesAssignmentPattern(ctx, node, index)
+				checkNoRestrictedPropertiesAssignmentPattern(ruleContext, node, index)
 			},
 		}
 	},
@@ -203,7 +203,7 @@ func buildNoRestrictedPropertiesIndex(
 
 // checkNoRestrictedPropertiesAccess judges one member access.
 func checkNoRestrictedPropertiesAccess(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 ) {
@@ -211,7 +211,7 @@ func checkNoRestrictedPropertiesAccess(
 	if !named {
 		return
 	}
-	reportNoRestrictedProperties(ctx, node, index,
+	reportNoRestrictedProperties(ruleContext, node, index,
 		noRestrictedPropertiesReceiverName(node), propertyName)
 }
 
@@ -224,7 +224,7 @@ func checkNoRestrictedPropertiesAccess(
 // Every finding points at the PATTERN rather than at the property, which is upstream's `node` and
 // is why one pattern restricting two properties reports twice on the same span.
 func checkNoRestrictedPropertiesPattern(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 ) {
@@ -248,7 +248,7 @@ func checkNoRestrictedPropertiesPattern(
 		if !named {
 			return false
 		}
-		reportNoRestrictedProperties(ctx, node, index, objectName, propertyName)
+		reportNoRestrictedProperties(ruleContext, node, index, objectName, propertyName)
 		return false
 	})
 }
@@ -271,7 +271,7 @@ func checkNoRestrictedPropertiesPattern(
 // is an ordinary literal. The test is positional, walking up through the nesting a pattern can
 // have -- a nested property, an array element -- to an assignment's left side.
 func checkNoRestrictedPropertiesAssignmentPattern(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 ) {
@@ -294,7 +294,7 @@ func checkNoRestrictedPropertiesAssignmentPattern(
 		if !named {
 			return false
 		}
-		reportNoRestrictedProperties(ctx, node, index, objectName, propertyName)
+		reportNoRestrictedProperties(ruleContext, node, index, objectName, propertyName)
 		return false
 	})
 }
@@ -388,7 +388,7 @@ func noRestrictedPropertiesPatternSource(node *ast.Node) string {
 // an object while allowing one property has said that property is fine on that object, and a
 // property-only rule should not then override it.
 func reportNoRestrictedProperties(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	index noRestrictedPropertiesIndex,
 	objectName string,
@@ -413,7 +413,7 @@ func reportNoRestrictedProperties(
 			allowance = fmt.Sprintf(" Only these properties are allowed: %s.",
 				strings.Join(matched.AllowProperties, ", "))
 		}
-		ctx.ReportNode(node, rule.Message{
+		ruleContext.ReportNode(node, rule.Message{
 			Id: "restrictedObjectProperty",
 			Description: fmt.Sprintf("`%s.%s` is restricted from being used.%s%s",
 				objectName, propertyName, allowance,
@@ -432,7 +432,7 @@ func reportNoRestrictedProperties(
 		allowance = fmt.Sprintf(" Property `%s` is only allowed on these objects: %s.",
 			propertyName, strings.Join(globalMatch.AllowObjects, ", "))
 	}
-	ctx.ReportNode(node, rule.Message{
+	ruleContext.ReportNode(node, rule.Message{
 		Id: "restrictedProperty",
 		Description: fmt.Sprintf("`%s` is restricted from being used.%s%s",
 			propertyName, allowance, noRestrictedPropertiesSuffix(globalMatch.Message)),

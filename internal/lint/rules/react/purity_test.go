@@ -91,9 +91,9 @@ func TestPurityFixturesMatchTheVendoredCorpusByte(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.fileName, func(test *testing.T) {
 			test.Parallel()
-			vendored, err := os.ReadFile(filepath.Join(directory, testCase.fileName))
-			if err != nil {
-				test.Fatalf("reading the vendored fixture: %v", err)
+			vendored, readError := os.ReadFile(filepath.Join(directory, testCase.fileName))
+			if readError != nil {
+				test.Fatalf("reading the vendored fixture: %v", readError)
 			}
 			if string(vendored) != testCase.constant {
 				test.Errorf("the constant and the vendored file differ\n constant: %q\n vendored: %q",

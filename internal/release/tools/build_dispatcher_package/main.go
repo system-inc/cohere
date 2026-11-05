@@ -34,31 +34,31 @@ func main() {
 	}
 
 	directory := filepath.Join(os.Args[1], release.UnscopedDispatcherPackageName)
-	if err := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); err != nil {
-		panic(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "bin"), 0o755); createDirectoryError != nil {
+		panic(createDirectoryError)
 	}
 
 	manifest, err := release.DispatcherManifest("0.1.0")
 	if err != nil {
 		panic(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); err != nil {
-		panic(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "package.json"), manifest, 0o644); writeError != nil {
+		panic(writeError)
 	}
 
 	launcherPath := filepath.Join(directory, "bin", "cohere")
-	if err := os.WriteFile(launcherPath, []byte(release.DispatcherLauncher()), 0o755); err != nil {
-		panic(err)
+	if writeError := os.WriteFile(launcherPath, []byte(release.DispatcherLauncher()), 0o755); writeError != nil {
+		panic(writeError)
 	}
-	if err := os.Chmod(launcherPath, 0o755); err != nil {
-		panic(err)
+	if changeModeError := os.Chmod(launcherPath, 0o755); changeModeError != nil {
+		panic(changeModeError)
 	}
 
 	// The launcher runs only a binary its checksums list, so they are taken from the platform packages
 	// already staged beside this one. With none there it would install and run nothing, so it stops here.
 	var platformDirectories []string
 	for _, target := range release.Targets {
-		if _, err := os.Stat(filepath.Join(os.Args[1], target.DirectoryName(), "bin")); err == nil {
+		if _, statError := os.Stat(filepath.Join(os.Args[1], target.DirectoryName(), "bin")); statError == nil {
 			platformDirectories = append(platformDirectories, target.DirectoryName())
 		}
 	}
@@ -70,8 +70,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if err := os.WriteFile(filepath.Join(directory, release.ChecksumsFileName), checksums, 0o644); err != nil {
-		panic(err)
+	if writeError := os.WriteFile(filepath.Join(directory, release.ChecksumsFileName), checksums, 0o644); writeError != nil {
+		panic(writeError)
 	}
 
 	fmt.Println("staged", directory)

@@ -55,7 +55,7 @@ func DecodeJsxFragmentsOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected a mode string, "syntax" or "element", got %s`, trimmed)
 	}
 	switch mode {
@@ -155,8 +155,8 @@ var JsxFragments = rule.Rule{
 	Name:             "react/jsx-fragments",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -173,10 +173,10 @@ var JsxFragments = rule.Rule{
 			if settings.Mode != JsxFragmentsSyntax {
 				return
 			}
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
-			if !jsxFragmentsNameIsFragment(ctx, tagName) {
+			if !jsxFragmentsNameIsFragment(ruleContext, tagName) {
 				return
 			}
 			// A fragment carrying any prop is left alone, because the shorthand cannot carry one.
@@ -184,7 +184,7 @@ var JsxFragments = rule.Rule{
 			if jsxFragmentsHasAttributes(attributes) {
 				return
 			}
-			ctx.ReportNode(node, messagePreferFragmentShorthand)
+			ruleContext.ReportNode(node, messagePreferFragmentShorthand)
 		}
 
 		return rule.Listeners{
@@ -192,7 +192,7 @@ var JsxFragments = rule.Rule{
 				if settings.Mode != JsxFragmentsElement {
 					return
 				}
-				ctx.ReportNode(node, messagePreferFragmentPragma)
+				ruleContext.ReportNode(node, messagePreferFragmentPragma)
 			},
 
 			ast.KindJsxElement: func(node *ast.Node) {
@@ -235,7 +235,7 @@ func jsxFragmentsHasAttributes(attributes *ast.Node) bool {
 //
 // Two accepting routes, both upstream's. The namespaced spelling is matched structurally, and a
 // bare identifier is resolved through the checker to see whether it binds to the fragment export.
-func jsxFragmentsNameIsFragment(ctx rule.Context, tagName *ast.Node) bool {
+func jsxFragmentsNameIsFragment(ruleContext rule.Context, tagName *ast.Node) bool {
 	if tagName == nil {
 		return false
 	}
@@ -258,7 +258,7 @@ func jsxFragmentsNameIsFragment(ctx rule.Context, tagName *ast.Node) bool {
 			name.Text() == jsxFragmentsFragmentName
 
 	case ast.KindIdentifier:
-		return jsxFragmentsIdentifierBindsToFragment(ctx, tagName)
+		return jsxFragmentsIdentifierBindsToFragment(ruleContext, tagName)
 	}
 	return false
 }
@@ -286,8 +286,8 @@ const jsxFragmentsFragmentName = "Fragment"
 // merging can put the import at a position other than zero, and indexing would go silent on an
 // input upstream reports. `LocalSymbol` is consulted as a fallback because an exported declaration
 // carries a truncated symbol.
-func jsxFragmentsIdentifierBindsToFragment(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func jsxFragmentsIdentifierBindsToFragment(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}

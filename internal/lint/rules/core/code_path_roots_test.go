@@ -27,14 +27,14 @@ func TestCodePathRootsAreIndexedOncePerFile(test *testing.T) {
 		"  console.log(sum);\n" +
 		"}\n"
 	fills := -1
-	probe := rule.Rule{Name: "code-path-roots", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+	probe := rule.Rule{Name: "code-path-roots", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 			for _, gated := range []rule.Rule{NoUselessReturn, NoUnreachableLoop, NoUselessAssignment} {
-				if listener := gated.Run(ctx, nil)[ast.KindSourceFile]; listener != nil {
+				if listener := gated.Run(ruleContext, nil)[ast.KindSourceFile]; listener != nil {
 					listener(node)
 				}
 			}
-			fills = ctx.FileCache.Fills()["control_flow_graph.Roots"]
+			fills = ruleContext.FileCache.Fills()["control_flow_graph.Roots"]
 		}}
 	}}
 	rule_testing.RunTypedFiles(test, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")

@@ -336,9 +336,9 @@ func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 
 	test.Run("nil input keeps the true default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUnneededTernaryOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeNoUnneededTernaryOptionsError := DecodeNoUnneededTernaryOptions(nil)
+		if decodeNoUnneededTernaryOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeNoUnneededTernaryOptionsError)
 		}
 		if !decoded.(NoUnneededTernaryOptions).resolve() {
 			test.Error("defaultAssignment resolved to false, which turns the second judgment on")
@@ -347,9 +347,9 @@ func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 
 	test.Run("an explicit false overrides it", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUnneededTernaryOptions([]byte(`{"defaultAssignment":false}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeNoUnneededTernaryOptionsError := DecodeNoUnneededTernaryOptions([]byte(`{"defaultAssignment":false}`))
+		if decodeNoUnneededTernaryOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeNoUnneededTernaryOptionsError)
 		}
 		if decoded.(NoUnneededTernaryOptions).resolve() {
 			test.Error("an explicit false was read as the default true")

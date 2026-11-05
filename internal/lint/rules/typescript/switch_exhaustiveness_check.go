@@ -191,7 +191,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		opts, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
 		if !ok {
 			opts = SwitchExhaustivenessCheckOptions{}
@@ -255,7 +255,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				defaultCase = cases[defaultCaseIndex].AsCaseOrDefaultClause()
 			}
 
-			discriminantType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.Expression)
+			discriminantType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node.Expression)
 
 			caseTypes := make([]*checker.Type, 0, len(cases))
 			for _, c := range cases {
@@ -263,7 +263,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 					continue
 				}
 
-				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, c.AsCaseOrDefaultClause().Expression))
+				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, c.AsCaseOrDefaultClause().Expression))
 			}
 
 			containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
@@ -293,7 +293,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				MissingLiteralBranchTypes: missingLiteralBranchTypes,
 			}
 			if defaultCase == nil {
-				metadata.DefaultCaseComment, metadata.DefaultCaseCommentOverran = defaultCaseComment(ctx, node, commentPattern)
+				metadata.DefaultCaseComment, metadata.DefaultCaseCommentOverran = defaultCaseComment(ruleContext, node, commentPattern)
 			}
 			return metadata
 		}
@@ -306,8 +306,8 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			}
 
 			if len(metadata.MissingLiteralBranchTypes) > 0 {
-				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage(
-					renderMissingBranches(ctx.TypeChecker, metadata.MissingLiteralBranchTypes)))
+				ruleContext.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage(
+					renderMissingBranches(ruleContext.TypeChecker, metadata.MissingLiteralBranchTypes)))
 			}
 		}
 
@@ -320,11 +320,11 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				metadata.hasDefaultCase() &&
 				!metadata.ContainsNonLiteralType {
 				if metadata.DefaultCase != nil {
-					ctx.ReportNode(&metadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
+					ruleContext.ReportNode(&metadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
 				} else if !metadata.DefaultCaseCommentOverran {
 					// A comment taken as the default only because its match overran is no answer, and no
 					// answer is not a report here.
-					ctx.ReportRange(metadata.DefaultCaseComment.Range, buildDangerousDefaultCaseMessage())
+					ruleContext.ReportRange(metadata.DefaultCaseComment.Range, buildDangerousDefaultCaseMessage())
 				}
 			}
 		}
@@ -334,14 +334,14 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			}
 
 			if metadata.ContainsNonLiteralType && !metadata.hasDefaultCase() {
-				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("default"))
+				ruleContext.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("default"))
 				// TODO(port): missing suggestion
 			}
 		}
 
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -404,7 +404,7 @@ var defaultCaseCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 //	// no default here                        not          the default pattern is anchored at both ends
 //
 // An empty pattern matches every comment, as `new RegExp(”)` does upstream.
-func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, pattern *esregexp.RegExp) (*comments.Comment, bool) {
+func defaultCaseComment(ruleContext rule.Context, statement *ast.SwitchStatement, pattern *esregexp.RegExp) (*comments.Comment, bool) {
 	if pattern == nil {
 		return nil, false
 	}
@@ -415,7 +415,7 @@ func defaultCaseComment(ctx rule.Context, statement *ast.SwitchStatement, patter
 	}
 	after, closingBrace := clauses[len(clauses)-1].End(), caseBlock.End()-1
 	var last *comments.Comment
-	all := comments.ForFile(ctx)
+	all := comments.ForFile(ruleContext)
 	for index := range all {
 		if all[index].Range.Pos() >= after && all[index].Range.End() <= closingBrace {
 			last = &all[index]

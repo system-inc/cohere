@@ -82,7 +82,7 @@ var NoUnsafeMemberAccess = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoUnsafeMemberAccessOptions](options)
 		if !ok {
 			// A rule configured as a bare "error" is handed nil, and the zero value of the settings
@@ -177,7 +177,7 @@ var NoUnsafeMemberAccess = rule.Rule{
 				}
 			}
 
-			objectType := ctx.TypeChecker.GetTypeAtLocation(objectExpression)
+			objectType := ruleContext.TypeChecker.GetTypeAtLocation(objectExpression)
 			state := noUnsafeMemberAccessSafe
 			if objectType != nil && type_checking.IsTypeAnyType(objectType) {
 				state = noUnsafeMemberAccessUnsafe
@@ -187,7 +187,7 @@ var NoUnsafeMemberAccess = rule.Rule{
 				return state
 			}
 
-			propertyText := noUnsafeMemberAccessText(ctx, propertyNode)
+			propertyText := noUnsafeMemberAccessText(ruleContext, propertyNode)
 			rendered := "." + propertyText
 			if isComputed {
 				rendered = "[" + propertyText + "]"
@@ -195,12 +195,12 @@ var NoUnsafeMemberAccess = rule.Rule{
 
 			messageId := ""
 			if !type_checking.IsStrictCompilerOptionEnabled(
-				ctx.Program.Options(), ctx.Program.Options().NoImplicitThis) {
+				ruleContext.Program.Options(), ruleContext.Program.Options().NoImplicitThis) {
 				// See the doc comment: correct, and unreachable through this package's fixtures
 				// because the harness pins the option above the rule.
 				thisExpression := type_checking.GetThisExpression(node)
 				if thisExpression != nil {
-					thisType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
+					thisType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, thisExpression)
 					if thisType != nil && type_checking.IsTypeAnyType(thisType) {
 						messageId = "unsafeThisMemberExpression"
 						if type_checking.IsIntrinsicErrorType(thisType) {
@@ -221,7 +221,7 @@ var NoUnsafeMemberAccess = rule.Rule{
 
 			// Upstream reports on the PROPERTY rather than on the whole access, so `x.a.b.c`
 			// underlines `a` alone.
-			ctx.ReportNode(propertyNode, noUnsafeMemberAccessMessageFor(messageId, rendered))
+			ruleContext.ReportNode(propertyNode, noUnsafeMemberAccessMessageFor(messageId, rendered))
 			return state
 		}
 
@@ -275,7 +275,7 @@ var NoUnsafeMemberAccess = rule.Rule{
 				return
 			}
 
-			keyType := ctx.TypeChecker.GetTypeAtLocation(key)
+			keyType := ruleContext.TypeChecker.GetTypeAtLocation(key)
 			if keyType == nil || !type_checking.IsTypeAnyType(keyType) {
 				return
 			}
@@ -283,11 +283,11 @@ var NoUnsafeMemberAccess = rule.Rule{
 			if type_checking.IsIntrinsicErrorType(keyType) {
 				messageId = "errorComputedMemberAccess"
 			}
-			ctx.ReportNode(key, noUnsafeMemberAccessMessageFor(messageId,
-				"["+noUnsafeMemberAccessText(ctx, key)+"]"))
+			ruleContext.ReportNode(key, noUnsafeMemberAccessMessageFor(messageId,
+				"["+noUnsafeMemberAccessText(ruleContext, key)+"]"))
 		}
 
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return rule.Listeners{}
 		}
 
@@ -339,9 +339,9 @@ func noUnsafeMemberAccessParts(node *ast.Node) (
 // Upstream calls `sourceCode.getText(node)`. Deliberately NOT `node.Text()`, which panics on a
 // property access or a call expression and would take every rule's findings for that whole file
 // with it, since the walk recovers per file rather than per rule.
-func noUnsafeMemberAccessText(ctx rule.Context, node *ast.Node) string {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+func noUnsafeMemberAccessText(ruleContext rule.Context, node *ast.Node) string {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 }
 
 // noUnsafeMemberAccessMessageFor renders one of the rule's six messages.
@@ -406,8 +406,8 @@ func DecodeNoUnsafeMemberAccessOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 	var wire noUnsafeMemberAccessRawOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if wire.AllowOptionalChaining != nil {
 		settings.AllowOptionalChaining = *wire.AllowOptionalChaining

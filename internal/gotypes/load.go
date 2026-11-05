@@ -157,8 +157,8 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 				"nothing here can type-check it from source", listedPackage.ImportPath, strings.Join(listedPackage.CgoFiles, ", "))
 		}
 	}
-	if err := refuseUnreadOverlay(config.Overlay, sourceFiles); err != nil {
-		return nil, err
+	if refuseUnreadOverlayError := refuseUnreadOverlay(config.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
+		return nil, refuseUnreadOverlayError
 	}
 
 	fileSet := token.NewFileSet()
@@ -182,9 +182,9 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 // files it names, and type-checks nothing: for a test that reads syntax alone. Each package's Errors are what
 // go list and the parser reported for it.
 func Parse(config Config, patterns ...string) ([]*Package, error) {
-	listed, err := list(config.Directory, config.Environment, patterns)
-	if err != nil {
-		return nil, err
+	listed, listError := list(config.Directory, config.Environment, patterns)
+	if listError != nil {
+		return nil, listError
 	}
 	fileSet := token.NewFileSet()
 	reader := &loader{config: config, fileSet: fileSet}
@@ -205,8 +205,8 @@ func Parse(config Config, patterns ...string) ([]*Package, error) {
 		reader.parse(listedPackage, listedPackage.GoFiles, true, read)
 		parsed = append(parsed, read)
 	}
-	if err := refuseUnreadOverlay(config.Overlay, sourceFiles); err != nil {
-		return nil, err
+	if refuseUnreadOverlayError := refuseUnreadOverlay(config.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
+		return nil, refuseUnreadOverlayError
 	}
 	return parsed, nil
 }
@@ -300,9 +300,9 @@ func (loader *loader) load() (*Loaded, error) {
 	for _, listedPackage := range loader.listed.packages {
 		if loader.roots[listedPackage.ImportPath] && loader.fromExports[listedPackage.ImportPath] {
 			// A named package read from export data has its types and nothing else.
-			imported, err := loader.importExported(listedPackage.ImportPath)
-			if err != nil {
-				return nil, err
+			imported, importExportedError := loader.importExported(listedPackage.ImportPath)
+			if importExportedError != nil {
+				return nil, importExportedError
 			}
 			loaded.Roots = append(loaded.Roots, &Package{ImportPath: listedPackage.ImportPath, Name: listedPackage.Name, Fset: loader.fileSet, Types: imported})
 		}
@@ -451,9 +451,9 @@ func (loader *loader) parse(listedPackage *listedPackage, names []string, withLi
 		if replacement, ok := loader.config.Overlay[path]; ok {
 			source = replacement
 		}
-		file, err := parser.ParseFile(loader.fileSet, path, source, parser.AllErrors|parser.ParseComments)
-		if err != nil {
-			read.Errors = append(read.Errors, err)
+		file, parseFileError := parser.ParseFile(loader.fileSet, path, source, parser.AllErrors|parser.ParseComments)
+		if parseFileError != nil {
+			read.Errors = append(read.Errors, parseFileError)
 		}
 		if file != nil {
 			read.Files = append(read.Files, path)

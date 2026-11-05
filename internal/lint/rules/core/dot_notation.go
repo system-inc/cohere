@@ -81,7 +81,7 @@ type DotNotationOptions struct {
 // branches against each other.
 var DotNotation = rule.Rule{
 	Name: "dot-notation",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := dotnotation.Settings{AllowKeywords: true}
 		if resolved, isDotNotationOptions := rule.OptionsAs[DotNotationOptions](options); isDotNotationOptions {
 			if resolved.AllowKeywords != nil {
@@ -89,7 +89,7 @@ var DotNotation = rule.Rule{
 			}
 			settings.AllowPattern = dotnotation.CompileAllowPattern(resolved.AllowPattern)
 		}
-		return dotnotation.Listeners(ctx, settings)
+		return dotnotation.Listeners(ruleContext, settings)
 	},
 }
 
@@ -116,8 +116,8 @@ func DecodeDotNotationOptions(raw []byte) (any, error) {
 	// Decode into a fresh value rather than over the default, so an explicit `false` is
 	// distinguishable from an absent field by the pointer being non-nil.
 	var decoded DotNotationOptions
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if decoded.AllowKeywords == nil {
 		decoded.AllowKeywords = options.AllowKeywords

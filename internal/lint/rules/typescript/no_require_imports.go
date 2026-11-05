@@ -155,7 +155,7 @@ var NoRequireImports = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[NoRequireImportsOptions](options)
 
 		return rule.Listeners{
@@ -164,7 +164,7 @@ var NoRequireImports = rule.Rule{
 				// rule does not crash, it goes quiet: GetSymbolAtLocation on a nil checker returns
 				// nil, which this rule reads as "not locally bound" and would report on every
 				// `require` in the file regardless of shadowing.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -177,7 +177,7 @@ var NoRequireImports = rule.Rule{
 				if callee.Text() != "require" {
 					return
 				}
-				if isLocallyBound(ctx, callee) {
+				if isLocallyBound(ruleContext, callee) {
 					return
 				}
 
@@ -189,21 +189,21 @@ var NoRequireImports = rule.Rule{
 				// by the inverse mutation: making the whole check unreachable fails twelve lines,
 				// while relaxing this test to `>= 0` fails none.
 				if len(settings.Allow) > 0 && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
-					if path, isStatic := requiredPathForAllow(ctx, call.Arguments.Nodes[0]); isStatic {
+					if path, isStatic := requiredPathForAllow(ruleContext, call.Arguments.Nodes[0]); isStatic {
 						if matchesAnyAllowPattern(settings.Allow, path) {
 							return
 						}
 					}
 				}
 
-				ctx.ReportNode(node, messageNoRequireImports)
+				ruleContext.ReportNode(node, messageNoRequireImports)
 			},
 
 			ast.KindExternalModuleReference: func(node *ast.Node) {
 				// Present for symmetry with the call arm and because the registry guard reads this
 				// file textually; this arm asks the checker nothing, since `require` here is not an
 				// identifier that anything could shadow.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -238,7 +238,7 @@ var NoRequireImports = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(declaration, messageNoRequireImports)
+				ruleContext.ReportNode(declaration, messageNoRequireImports)
 			},
 		}
 	},
@@ -274,8 +274,8 @@ var NoRequireImports = rule.Rule{
 // implementation in one source file gives `[ambient, real]`, putting the only genuine binding at
 // index 1, and upstream is silent on it. An index-zero read reports that input and is wrong; both
 // orderings are pinned by fixtures.
-func isLocallyBound(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func isLocallyBound(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}
@@ -310,18 +310,18 @@ func isLocallyBound(ctx rule.Context, identifier *ast.Node) bool {
 // intuition; the release binary is silent on that exact input, so the intuition was wrong and this
 // reproduces upstream instead. Recorded at the line because the next reader will have the same
 // instinct.
-func requiredPathForAllow(ctx rule.Context, argument *ast.Node) (string, bool) {
+func requiredPathForAllow(ruleContext rule.Context, argument *ast.Node) (string, bool) {
 	if argument == nil {
 		return "", false
 	}
-	sourceText := ctx.SourceFile.Text()
+	sourceText := ruleContext.SourceFile.Text()
 	switch argument.Kind {
 	case ast.KindStringLiteral:
 		return argument.AsStringLiteral().Text, true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		// The raw source, with the backticks stripped. Slicing the file rather than reading `.Text`
 		// is the whole point; `.Text` is cooked and upstream compares raw.
-		literalRange := rule.TokenRange(ctx.SourceFile, argument)
+		literalRange := rule.TokenRange(ruleContext.SourceFile, argument)
 		raw := sourceText[literalRange.Pos():literalRange.End()]
 		if len(raw) < 2 {
 			return "", false
@@ -334,7 +334,7 @@ func requiredPathForAllow(ctx rule.Context, argument *ast.Node) (string, bool) {
 		if head == nil {
 			return "", false
 		}
-		headRange := rule.TokenRange(ctx.SourceFile, head)
+		headRange := rule.TokenRange(ruleContext.SourceFile, head)
 		raw := sourceText[headRange.Pos():headRange.End()]
 		if len(raw) < 3 {
 			return "", false

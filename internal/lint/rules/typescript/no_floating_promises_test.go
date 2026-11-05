@@ -682,9 +682,9 @@ func TestDecodeNoFloatingPromisesOptions(test *testing.T) {
 
 	decode := func(test *testing.T, raw string) NoFloatingPromisesOptions {
 		test.Helper()
-		decoded, err := DecodeNoFloatingPromisesOptions([]byte(raw))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", raw, err)
+		decoded, decodeNoFloatingPromisesOptionsError := DecodeNoFloatingPromisesOptions([]byte(raw))
+		if decodeNoFloatingPromisesOptionsError != nil {
+			test.Fatalf("decoding %s: %v", raw, decodeNoFloatingPromisesOptionsError)
 		}
 		options, ok := decoded.(NoFloatingPromisesOptions)
 		if !ok {
@@ -775,9 +775,9 @@ func TestDecodeNoFloatingPromisesOptions(test *testing.T) {
 		source := "type SafePromise = Promise<number> & { __linterBrands?: string };\ndeclare const p: SafePromise;\np;\n"
 		rule_testing.ExpectFindings(test, runNoFloatingPromises(test, source, nil), "floatingVoid")
 
-		decoded, err := DecodeNoFloatingPromisesOptions([]byte(`{"allowForKnownSafePromises":[{"from":"file","name":"SafePromise"}]}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		decoded, decodeNoFloatingPromisesOptionsError := DecodeNoFloatingPromisesOptions([]byte(`{"allowForKnownSafePromises":[{"from":"file","name":"SafePromise"}]}`))
+		if decodeNoFloatingPromisesOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoFloatingPromisesOptionsError)
 		}
 		rule_testing.ExpectClean(test, runNoFloatingPromises(test, source, decoded))
 	})

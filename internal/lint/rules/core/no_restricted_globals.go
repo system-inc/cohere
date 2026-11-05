@@ -48,7 +48,7 @@ type noRestrictedGlobalsEntry struct {
 // UnmarshalJSON accepts both a bare string and an object, which is upstream's `oneOf`.
 func (entry *noRestrictedGlobalsEntry) UnmarshalJSON(raw []byte) error {
 	var name string
-	if err := json.Unmarshal(raw, &name); err == nil {
+	if decodeError := json.Unmarshal(raw, &name); decodeError == nil {
 		entry.Name = name
 		entry.Message = ""
 		return nil
@@ -59,8 +59,8 @@ func (entry *noRestrictedGlobalsEntry) UnmarshalJSON(raw []byte) error {
 	}
 	// Strict, which is upstream's `additionalProperties: false`: a misspelled `message` key would
 	// otherwise be accepted and the custom message silently never shown.
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	if object.Name == "" {
 		return fmt.Errorf("no-restricted-globals entry needs a name")
@@ -96,15 +96,15 @@ func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 	}
 
 	var elements []json.RawMessage
-	if err := json.Unmarshal(list, &elements); err != nil {
-		return settings, fmt.Errorf("no-restricted-globals: the option list is not a JSON array: %w", err)
+	if decodeError := json.Unmarshal(list, &elements); decodeError != nil {
+		return settings, fmt.Errorf("no-restricted-globals: the option list is not a JSON array: %w", decodeError)
 	}
 	if len(elements) == 0 {
 		return settings, nil
 	}
 
 	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(elements[0], &probe); err == nil {
+	if decodeError := json.Unmarshal(elements[0], &probe); decodeError == nil {
 		if _, isGlobalsObject := probe["globals"]; isGlobalsObject {
 			if len(elements) > 1 {
 				return settings, fmt.Errorf(
@@ -112,8 +112,8 @@ func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 						"would never be read", elements[1])
 			}
 			var object noRestrictedGlobalsObjectWire
-			if err := rule.UnmarshalOptions(elements[0], &object); err != nil {
-				return settings, fmt.Errorf("no-restricted-globals element 1: %w", err)
+			if unmarshalOptionsError := rule.UnmarshalOptions(elements[0], &object); unmarshalOptionsError != nil {
+				return settings, fmt.Errorf("no-restricted-globals element 1: %w", unmarshalOptionsError)
 			}
 			checkGlobalObject := false
 			if object.CheckGlobalObject != nil {
@@ -125,8 +125,8 @@ func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 
 	entries := make([]noRestrictedGlobalsEntry, len(elements))
 	for index, element := range elements {
-		if err := json.Unmarshal(element, &entries[index]); err != nil {
-			return settings, fmt.Errorf("no-restricted-globals element %d: %w", index+1, err)
+		if decodeError := json.Unmarshal(element, &entries[index]); decodeError != nil {
+			return settings, fmt.Errorf("no-restricted-globals element %d: %w", index+1, decodeError)
 		}
 	}
 	return buildNoRestrictedGlobalsSettings(entries, false, nil), nil
@@ -229,7 +229,7 @@ var NoRestrictedGlobals = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoRestrictedGlobalsSettings](options)
 		if !ok || len(settings.Globals) == 0 {
 			// Upstream returns an empty visitor when nothing is restricted. Registering no listener
@@ -240,25 +240,25 @@ var NoRestrictedGlobals = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
-				checkNoRestrictedGlobalReference(ctx, node, settings)
+				checkNoRestrictedGlobalReference(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
 // checkNoRestrictedGlobalReference judges one identifier.
-func checkNoRestrictedGlobalReference(ctx rule.Context, node *ast.Node,
+func checkNoRestrictedGlobalReference(ruleContext rule.Context, node *ast.Node,
 	settings NoRestrictedGlobalsSettings) {
 
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return
 	}
 
 	// The bare-reference half, which is upstream's `Program` listener.
 	if _, restricted := settings.Globals[node.Text()]; restricted &&
 		reference.IsValueReference(node) &&
-		!rule.IsDeclaredInASourceFile(reference.ReadSymbol(ctx.TypeChecker, node)) {
-		ctx.ReportNode(node, buildNoRestrictedGlobalsMessage(node.Text(), settings))
+		!rule.IsDeclaredInASourceFile(reference.ReadSymbol(ruleContext.TypeChecker, node)) {
+		ruleContext.ReportNode(node, buildNoRestrictedGlobalsMessage(node.Text(), settings))
 		return
 	}
 
@@ -291,14 +291,14 @@ func checkNoRestrictedGlobalReference(ctx rule.Context, node *ast.Node,
 	//
 	// A local binding is still not the global object either, which is upstream's four
 	// `let window; window.foo()` cases, and `identifierIsShadowed` answers that half.
-	if !noRestrictedGlobalsObjectResolves(ctx, node) || identifierIsShadowed(ctx, node) {
+	if !noRestrictedGlobalsObjectResolves(ruleContext, node) || identifierIsShadowed(ruleContext, node) {
 		return
 	}
-	reportNoRestrictedGlobalThroughObject(ctx, node, settings)
+	reportNoRestrictedGlobalThroughObject(ruleContext, node, settings)
 }
 
 // reportNoRestrictedGlobalThroughObject walks out from the global object to the property it reads.
-func reportNoRestrictedGlobalThroughObject(ctx rule.Context, node *ast.Node,
+func reportNoRestrictedGlobalThroughObject(ruleContext rule.Context, node *ast.Node,
 	settings NoRestrictedGlobalsSettings) {
 
 	access := node.Parent
@@ -345,7 +345,7 @@ func reportNoRestrictedGlobalThroughObject(ctx rule.Context, node *ast.Node,
 	if target == nil {
 		return
 	}
-	ctx.ReportNode(target, buildNoRestrictedGlobalsMessage(name, settings))
+	ruleContext.ReportNode(target, buildNoRestrictedGlobalsMessage(name, settings))
 }
 
 // isNoRestrictedGlobalsAccessObject says whether `inner` is the object half of the access `outer`.
@@ -383,11 +383,11 @@ func noRestrictedGlobalsAccessedNameNode(access *ast.Node) *ast.Node {
 // Deliberately NOT `identifierIsShadowed` inverted. That helper answers false for a nil symbol,
 // which is the right answer to "is this shadowed" and the wrong one to "does this exist", and the
 // two questions are both asked at this site for different reasons.
-func noRestrictedGlobalsObjectResolves(ctx rule.Context, node *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func noRestrictedGlobalsObjectResolves(ruleContext rule.Context, node *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	return ctx.TypeChecker.GetSymbolAtLocation(node) != nil
+	return ruleContext.TypeChecker.GetSymbolAtLocation(node) != nil
 }
 
 // isNoRestrictedGlobalsObjectName says whether a name denotes the global object.

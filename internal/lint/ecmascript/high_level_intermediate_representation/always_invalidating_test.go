@@ -165,15 +165,15 @@ func invalidatingAnswers(test *testing.T, source string) map[string]bool {
 	probe := rule.Rule{
 		Name:             "always-invalidating-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"answer below would be the nil-checker default rather than a type")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
@@ -183,7 +183,7 @@ func invalidatingAnswers(test *testing.T, source string) map[string]bool {
 								continue
 							}
 							answers[identifier.Name] = IsAlwaysInvalidatingType(
-								function, identifier.Id, ctx.TypeChecker)
+								function, identifier.Id, ruleContext.TypeChecker)
 						}
 					})
 				},
@@ -212,19 +212,19 @@ func forEachCorpusFunctionWithChecker(test *testing.T, limit int,
 		probe := rule.Rule{
 			Name:             "invalidating-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						if ctx.TypeChecker == nil {
+						if ruleContext.TypeChecker == nil {
 							test.Fatal("the typed harness handed this probe a nil checker")
 						}
 						forEachFunctionLike(node, func(functionNode *ast.Node) {
-							function := Lower(functionNode, ctx.TypeChecker)
+							function := Lower(functionNode, ruleContext.TypeChecker)
 							if function == nil {
 								return
 							}
 							Construct(function)
-							visit(function, ctx.TypeChecker)
+							visit(function, ruleContext.TypeChecker)
 						})
 					},
 				}

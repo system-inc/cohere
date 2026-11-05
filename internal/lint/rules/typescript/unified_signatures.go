@@ -72,8 +72,8 @@ import (
 var UnifiedSignatures = rule.Rule{
 	Name: "@typescript-eslint/unified-signatures",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// The value type, because that is what `DecodeOptionsInto` hands over. This line asserted a
@@ -88,7 +88,7 @@ var UnifiedSignatures = rule.Rule{
 		// exactly the signatures among its own members and nesting is containment.
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checker := &unifiedSignaturesChecker{ctx: ctx, settings: settings}
+				checker := &unifiedSignaturesChecker{ctx: ruleContext, settings: settings}
 				checker.checkScope(node, nil)
 			},
 		}
@@ -261,7 +261,7 @@ func unifiedSignaturesForEachDescendant(node *ast.Node, visit func(*ast.Node) bo
 // The name is read as SOURCE TEXT for anything that is not a plain identifier, which is upstream's
 // `key.raw`. That keeps `'f'` and `f` in separate groups, matching upstream, and it is why the
 // corpus's quoted-name case reports the way it does.
-func unifiedSignaturesOverloadKey(ctx rule.Context, node *ast.Node) string {
+func unifiedSignaturesOverloadKey(ruleContext rule.Context, node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindConstructSignature:
 		return "11constructor"
@@ -308,7 +308,7 @@ func unifiedSignaturesOverloadKey(ctx rule.Context, node *ast.Node) string {
 	case name.Kind == ast.KindPrivateIdentifier:
 		info = "private_identifier_" + name.AsPrivateIdentifier().Text
 	default:
-		info = unifiedSignaturesNodeText(ctx, name)
+		info = unifiedSignaturesNodeText(ruleContext, name)
 	}
 	return computed + staticness + info
 }
@@ -319,12 +319,12 @@ func unifiedSignaturesOverloadKey(ctx rule.Context, node *ast.Node) string {
 // the node itself rather than the node plus whatever comments and whitespace preceded it. That
 // matters here because this text is compared for EQUALITY: without the trim, two identical types
 // would differ whenever one of them happened to follow a comment.
-func unifiedSignaturesNodeText(ctx rule.Context, node *ast.Node) string {
+func unifiedSignaturesNodeText(ruleContext rule.Context, node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	return ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 }
 
 // unifiedSignaturesTypeParameterNames adds a scope's own type parameter names to the set inherited
@@ -812,11 +812,11 @@ func unifiedSignaturesHaveEqualSigils(a *ast.Node, b *ast.Node) bool {
 // With exactly two overloads in the group there is no ambiguity about which other one is meant, so
 // the message says "These overloads". With three or more it names the other one's LINE, which is why
 // the other signature has to be threaded this far down.
-func unifiedSignaturesFailureStart(ctx rule.Context, onlyTwo bool, other *ast.Node) string {
+func unifiedSignaturesFailureStart(ruleContext rule.Context, onlyTwo bool, other *ast.Node) string {
 	if onlyTwo {
 		return "These overloads can be combined into one signature"
 	}
-	line := scanner.GetECMALineOfPosition(ctx.SourceFile, rule.TokenRange(ctx.SourceFile, other).Pos())
+	line := scanner.GetECMALineOfPosition(ruleContext.SourceFile, rule.TokenRange(ruleContext.SourceFile, other).Pos())
 	return fmt.Sprintf("This overload and the one on line %d can be combined into one signature",
 		line+1)
 }
@@ -935,8 +935,8 @@ func (checker *unifiedSignaturesChecker) blockCommentFor(signature *ast.Node) st
 // Only a method declaration is unwrapped. A function declaration has no such split upstream and is
 // reported whole, which the corpus also asserts, so widening this to every kind would move three
 // spans that are currently correct.
-func unifiedSignaturesValueRange(ctx rule.Context, signature *ast.Node) shimcore.TextRange {
-	full := rule.TokenRange(ctx.SourceFile, signature)
+func unifiedSignaturesValueRange(ruleContext rule.Context, signature *ast.Node) shimcore.TextRange {
+	full := rule.TokenRange(ruleContext.SourceFile, signature)
 	if signature.Kind != ast.KindMethodDeclaration {
 		return full
 	}

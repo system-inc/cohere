@@ -156,7 +156,7 @@ var NoUnusedVars = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := resolveNoUnusedVarsOptions(options)
 
 		return rule.Listeners{
@@ -165,7 +165,7 @@ var NoUnusedVars = rule.Rule{
 			// above a declaration inside a hoisted function as easily as below it. `KindSourceFile`
 			// fires before its children, so the gather and the report both happen here.
 			ast.KindSourceFile: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -200,7 +200,7 @@ var NoUnusedVars = rule.Rule{
 					return
 				}
 
-				analyzeUnusedBindings(ctx, node, settings)
+				analyzeUnusedBindings(ruleContext, node, settings)
 			},
 		}
 	},
@@ -260,7 +260,7 @@ func noUnusedVarsUsedOnlyAsTypeMessage(name string, assigned bool) rule.Message 
 	}
 }
 
-func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUnusedVarsOptions) {
+func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, settings NoUnusedVarsOptions) {
 	candidates := collectCandidateBindings(sourceFile)
 	if len(candidates) == 0 {
 		return
@@ -274,7 +274,7 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		interesting[candidate.name.Text()] = true
 	}
 
-	reads, writes, typeOnlyReads := collectReadSymbols(ctx, sourceFile, interesting)
+	reads, writes, typeOnlyReads := collectReadSymbols(ruleContext, sourceFile, interesting)
 
 	// Compiled once per file. An unparseable pattern ignores nothing, as the other patterns do. It is
 	// upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or a
@@ -294,13 +294,13 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		// asked whether it is used. `vars: "local"` first, then an ignored array element, then a class
 		// with a static block, then the two kinds a mode skips whole, then each kind's ignore pattern,
 		// then `using`. See isExemptFromUnusedReport for what follows.
-		if settings.Vars == "local" && isGlobalScopeBinding(ctx.SourceFile, candidate) {
+		if settings.Vars == "local" && isGlobalScopeBinding(ruleContext.SourceFile, candidate) {
 			continue
 		}
 		name := candidate.name.Text()
 		var candidateWrites []*ast.Node
 		usedOnlyAsType := false
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(candidate.name)
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(candidate.name)
 		if symbol != nil {
 			candidateWrites = writes[symbol]
 			usedOnlyAsType = typeOnlyReads[symbol]
@@ -310,7 +310,7 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		arrayElement := destructuredArrayIgnore != nil && isDestructuredFromAnArray(candidate, candidateWrites)
 		// A match that overruns the time bound ignores too: no answer here is a report.
 		if arrayElement && destructuredArrayIgnore.TestOrTimeout(name) {
-			reportUsedIgnoredName(ctx, candidate, symbol, candidateWrites, settings, reads,
+			reportUsedIgnoredName(ruleContext, candidate, symbol, candidateWrites, settings, reads,
 				"destructuredArrayIgnorePattern", settings.DestructuredArrayIgnorePattern, "an element of array destructuring")
 			continue
 		}
@@ -328,13 +328,13 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		}
 		if matchesIgnorePattern(candidate, settings) {
 			option, pattern, noun := ignorePatternFor(candidate.kind, settings)
-			reportUsedIgnoredName(ctx, candidate, symbol, candidateWrites, settings, reads, option, pattern, noun)
+			reportUsedIgnoredName(ruleContext, candidate, symbol, candidateWrites, settings, reads, option, pattern, noun)
 			continue
 		}
 		if settings.IgnoreUsingDeclarations && isUsingDeclaration(candidate) {
 			continue
 		}
-		if isExemptFromUnusedReport(ctx, candidate, symbol, candidates, settings, reads) {
+		if isExemptFromUnusedReport(ruleContext, candidate, symbol, candidates, settings, reads) {
 			continue
 		}
 		// Before either report, as upstream's gate is: a rest sibling read only through `typeof` is
@@ -348,7 +348,7 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 			if candidate.kind == bindingImport {
 				continue
 			}
-			ctx.ReportNode(
+			ruleContext.ReportNode(
 				unusedBindingReportNode(candidate, candidateWrites),
 				noUnusedVarsUsedOnlyAsTypeMessage(name, len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name)),
 			)
@@ -367,11 +367,11 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 		// every binding of the declaration has been reported yet, this one included.
 		reportedUnused[candidate.name] = true
 		if candidate.kind == bindingImport {
-			if removal, removalId, removable := importRemoval(ctx, candidate, symbol, reportedUnused); removable {
+			if removal, removalId, removable := importRemoval(ruleContext, candidate, symbol, reportedUnused); removable {
 				if settings.EnableAutofixRemoval.Imports {
-					ctx.ReportNodeWithFixes(reportNode, message, removal)
+					ruleContext.ReportNodeWithFixes(reportNode, message, removal)
 				} else {
-					ctx.ReportNodeWithSuggestions(reportNode, message, rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(reportNode, message, rule.Suggestion{
 						Message: noUnusedVarsRemovalMessage(removalId, name),
 						Fixes:   []rule.Fix{removal},
 					})
@@ -379,7 +379,7 @@ func analyzeUnusedBindings(ctx rule.Context, sourceFile *ast.Node, settings NoUn
 				continue
 			}
 		}
-		ctx.ReportNode(reportNode, message)
+		ruleContext.ReportNode(reportNode, message)
 	}
 }
 
@@ -465,7 +465,7 @@ func declaringNameIsInitialized(name *ast.Node) bool {
 // `ReturnType<typeof f>`. A symbol here that is also read is exempt before this map is asked, and an
 // import is never reported from it at all, so neither needs excluding here: upstream's exception for
 // a type-only import reaches the same silence.
-func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[string]bool) (map[*ast.Symbol]bool, map[*ast.Symbol][]*ast.Node, map[*ast.Symbol]bool) {
+func collectReadSymbols(ruleContext rule.Context, sourceFile *ast.Node, interesting map[string]bool) (map[*ast.Symbol]bool, map[*ast.Symbol][]*ast.Node, map[*ast.Symbol]bool) {
 	reads := map[*ast.Symbol]bool{}
 	writes := map[*ast.Symbol][]*ast.Node{}
 	typeOnlyReads := map[*ast.Symbol]bool{}
@@ -481,21 +481,21 @@ func collectReadSymbols(ctx rule.Context, sourceFile *ast.Node, interesting map[
 			current.Parent.AsTypePredicateNode().ParameterName == current {
 			// `data is string` names the parameter without reading it. Still no read, as before, but
 			// typescript-eslint words the finding "only used as a type", so it is recorded as one.
-			for _, symbol := range resolveIdentifierSymbols(ctx, current) {
+			for _, symbol := range resolveIdentifierSymbols(ruleContext, current) {
 				typeOnlyReads[symbol] = true
 			}
 		}
 
 		if current.Kind == ast.KindIdentifier && interesting[current.Text()] {
 			isWrite := !isDeclaringName(current) && reference.WritesToBinding(current)
-			for _, symbol := range resolveIdentifierSymbols(ctx, current) {
+			for _, symbol := range resolveIdentifierSymbols(ruleContext, current) {
 				if isWrite {
 					writes[symbol] = append(writes[symbol], current)
 				}
-				if !countsAsRead(current, declaringScopeOf(ctx, symbol)) {
+				if !countsAsRead(current, declaringScopeOf(ruleContext, symbol)) {
 					continue
 				}
-				if isSelfReferenceWithinOwnDeclaration(ctx, current, symbol) {
+				if isSelfReferenceWithinOwnDeclaration(ruleContext, current, symbol) {
 					continue
 				}
 				if isInsideTypeQuery(current) {
@@ -538,9 +538,9 @@ func isInsideTypeQuery(identifier *ast.Node) bool {
 // "where does this name live", which every declaration of a merged symbol answers identically: a
 // symbol's declarations all bind the same name in the same scope, which is what makes them merge.
 // A rule asking a different question of a merged symbol would need a different choice.
-func declaringScopeOf(ctx rule.Context, symbol *ast.Symbol) *ast.Node {
+func declaringScopeOf(ruleContext rule.Context, symbol *ast.Symbol) *ast.Node {
 	// This file's declarations only: the bindings this rule reports are the ones this file declares.
-	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 	if len(declarations) == 0 {
 		return nil
 	}
@@ -818,14 +818,14 @@ func typeQueryIsInsideItsOwnDeclaration(identifier *ast.Node) bool {
 // rather than to the value binding, which reads exactly like a correctly-declined shadow and is
 // therefore silent in the expensive direction. The dedicated accessor is what gets `({a} = o)`
 // right, and it lives in `services.go` rather than `checker.go`.
-func resolveIdentifierSymbols(ctx rule.Context, identifier *ast.Node) []*ast.Symbol {
+func resolveIdentifierSymbols(ruleContext rule.Context, identifier *ast.Node) []*ast.Symbol {
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent); symbol != nil {
+		if symbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent); symbol != nil {
 			return []*ast.Symbol{symbol}
 		}
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return nil
 	}
@@ -833,13 +833,13 @@ func resolveIdentifierSymbols(ctx rule.Context, identifier *ast.Node) []*ast.Sym
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindExportSpecifier &&
 		symbol.Flags&ast.SymbolFlagsAlias != 0 {
 		symbols := []*ast.Symbol{symbol}
-		if aliased := resolvedAlias(ctx, symbol); aliased != nil && aliased != symbol {
+		if aliased := resolvedAlias(ruleContext, symbol); aliased != nil && aliased != symbol {
 			symbols = append(symbols, aliased)
 		}
 		// The local binding the specifier names, looked up in its own scope without following the alias:
 		// `import { a } from 'missing'; export { a }` reads the import even when its module does not
 		// resolve and resolvedAlias has nothing to give.
-		if local := exportedLocalBinding(ctx, identifier); local != nil && !slices.Contains(symbols, local) {
+		if local := exportedLocalBinding(ruleContext, identifier); local != nil && !slices.Contains(symbols, local) {
 			symbols = append(symbols, local)
 		}
 		return symbols
@@ -850,13 +850,13 @@ func resolveIdentifierSymbols(ctx rule.Context, identifier *ast.Node) []*ast.Sym
 
 // exportedLocalBinding is the binding in this file an `export { name }` with no module specifier names,
 // or nil for a re-export from another module, whose names are that module's.
-func exportedLocalBinding(ctx rule.Context, identifier *ast.Node) *ast.Symbol {
+func exportedLocalBinding(ruleContext rule.Context, identifier *ast.Node) *ast.Symbol {
 	exportDeclaration := identifier.Parent.Parent.Parent
 	if exportDeclaration == nil || exportDeclaration.Kind != ast.KindExportDeclaration ||
 		exportDeclaration.AsExportDeclaration().ModuleSpecifier != nil {
 		return nil
 	}
-	return ctx.TypeChecker.ResolveName(identifier.Text(), identifier,
+	return ruleContext.TypeChecker.ResolveName(identifier.Text(), identifier,
 		ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias, false)
 }
 
@@ -869,9 +869,9 @@ func exportedLocalBinding(ctx rule.Context, identifier *ast.Node) *ast.Symbol {
 // typescript-eslint's fixer rows, which import from a module that does not exist). Asked through
 // IsUnknownSymbol rather than by reading the symbol's declarations, which would be a read of an
 // imported declaration and cost the rule its Shapes claim.
-func resolvedAlias(ctx rule.Context, symbol *ast.Symbol) *ast.Symbol {
-	aliased := ctx.TypeChecker.GetAliasedSymbol(symbol)
-	if aliased == nil || ctx.TypeChecker.IsUnknownSymbol(aliased) {
+func resolvedAlias(ruleContext rule.Context, symbol *ast.Symbol) *ast.Symbol {
+	aliased := ruleContext.TypeChecker.GetAliasedSymbol(symbol)
+	if aliased == nil || ruleContext.TypeChecker.IsUnknownSymbol(aliased) {
 		return nil
 	}
 	return aliased
@@ -1121,7 +1121,7 @@ func isDestructuredFromAnArray(candidate candidateBinding, writes []*ast.Node) b
 // upstream asks first (`vars: "local"`, the ignore patterns, `caughtErrors` and `args` at "none",
 // static-block classes and `using`) run before this, in analyzeUnusedBindings, in upstream's order.
 func isExemptFromUnusedReport(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	candidate candidateBinding,
 	symbol *ast.Symbol,
 	all []candidateBinding,
@@ -1177,7 +1177,7 @@ func isExemptFromUnusedReport(
 			return true
 		}
 		if settings.Args != "all" && candidate.declaration.Kind == ast.KindParameter &&
-			isParameterBeforeAUsedOne(ctx, candidate, all, reads) {
+			isParameterBeforeAUsedOne(ruleContext, candidate, all, reads) {
 			return true
 		}
 	}
@@ -1227,14 +1227,14 @@ func isExemptFromUnusedReport(
 		return true
 	}
 
-	return isUsedBinding(ctx, candidate, symbol, reads)
+	return isUsedBinding(ruleContext, candidate, symbol, reads)
 }
 
 // isUsedBinding reports whether something keeps a resolved binding alive: a read, through its own
 // symbol or the one an import aliases, the for-in leading-return idiom, or an export. It is the half
 // of upstream's usedVariables this rule computes, asked both by isExemptFromUnusedReport and, for a
 // name an ignore pattern set aside, by reportUsedIgnorePattern.
-func isUsedBinding(ctx rule.Context, candidate candidateBinding, symbol *ast.Symbol, reads map[*ast.Symbol]bool) bool {
+func isUsedBinding(ruleContext rule.Context, candidate candidateBinding, symbol *ast.Symbol, reads map[*ast.Symbol]bool) bool {
 	if reads[symbol] {
 		return true
 	}
@@ -1252,7 +1252,7 @@ func isUsedBinding(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 	// symbol it aliases lives in another file that this rule never reads.
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 &&
 		candidate.declaration.Kind != ast.KindImportEqualsDeclaration {
-		if aliased := resolvedAlias(ctx, symbol); aliased != nil && reads[aliased] {
+		if aliased := resolvedAlias(ruleContext, symbol); aliased != nil && reads[aliased] {
 			return true
 		}
 	}
@@ -1267,7 +1267,7 @@ func isUsedBinding(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 	// `usage.rs:203` is the whole specification and this reproduces its shape rather than
 	// generalizing it.
 	if isForInOrOfBindingWithLeadingReturn(candidate.declaration) ||
-		hasForInOrOfWriteWithLeadingReturn(ctx, candidate, symbol) {
+		hasForInOrOfWriteWithLeadingReturn(ruleContext, candidate, symbol) {
 		return true
 	}
 
@@ -1284,7 +1284,7 @@ func isUsedBinding(ctx rule.Context, candidate candidateBinding, symbol *ast.Sym
 	// declaration export this", where more declarations only mean more chances to match. An
 	// index-zero test goes silent whenever the exporting declaration is not written first, and the
 	// corpus pins exactly that ordering.
-	for _, declaration := range rule.DeclarationsIn(ctx.SourceFile, symbol) {
+	for _, declaration := range rule.DeclarationsIn(ruleContext.SourceFile, symbol) {
 		if isExportedBinding(declaration) {
 			return true
 		}
@@ -1716,7 +1716,7 @@ func isInsideLoop(node *ast.Node) bool {
 // function, and a name comparison calls it a self-reference and reports a variable upstream calls
 // clean. The same shape arrives as a shadowing parameter in `function foo(foo) { return foo }`.
 // Both are upstream passing cases and both were false positives here until identity replaced text.
-func isSelfReferenceWithinOwnDeclaration(ctx rule.Context, identifier *ast.Node, symbol *ast.Symbol) bool {
+func isSelfReferenceWithinOwnDeclaration(ruleContext rule.Context, identifier *ast.Node, symbol *ast.Symbol) bool {
 	for current := identifier.Parent; current != nil; current = current.Parent {
 		switch current.Kind {
 		// A type that only appears in its own definition is not used. `type Foo = Array<Foo>` and
@@ -1726,7 +1726,7 @@ func isSelfReferenceWithinOwnDeclaration(ctx rule.Context, identifier *ast.Node,
 		// function below, reached for the same reason.
 		case ast.KindTypeAliasDeclaration,
 			ast.KindInterfaceDeclaration:
-			if declarationDeclaresSymbol(ctx, current.Name(), symbol) {
+			if declarationDeclaresSymbol(ruleContext, current.Name(), symbol) {
 				return true
 			}
 
@@ -1735,14 +1735,14 @@ func isSelfReferenceWithinOwnDeclaration(ctx rule.Context, identifier *ast.Node,
 			ast.KindClassDeclaration,
 			ast.KindClassExpression,
 			ast.KindArrowFunction:
-			if declarationDeclaresSymbol(ctx, current.Name(), symbol) {
+			if declarationDeclaresSymbol(ruleContext, current.Name(), symbol) {
 				return true
 			}
 			// A variable declarator holding a function expression names it: `const foo = () => {
 			// return foo }` is upstream's second self-use failure, and the arrow is anonymous, so
 			// the name has to come from the declarator.
 			if current.Parent != nil && current.Parent.Kind == ast.KindVariableDeclaration &&
-				declarationDeclaresSymbol(ctx, current.Parent.Name(), symbol) {
+				declarationDeclaresSymbol(ruleContext, current.Parent.Name(), symbol) {
 				return true
 			}
 
@@ -1755,11 +1755,11 @@ func isSelfReferenceWithinOwnDeclaration(ctx rule.Context, identifier *ast.Node,
 }
 
 // declarationDeclaresSymbol reports whether a declaration's name node binds the given symbol.
-func declarationDeclaresSymbol(ctx rule.Context, name *ast.Node, symbol *ast.Symbol) bool {
+func declarationDeclaresSymbol(ruleContext rule.Context, name *ast.Node, symbol *ast.Symbol) bool {
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return false
 	}
-	return ctx.TypeChecker.GetSymbolAtLocation(name) == symbol
+	return ruleContext.TypeChecker.GetSymbolAtLocation(name) == symbol
 }
 
 // isForInOrOfBindingWithLeadingReturn reports whether a binding is the loop variable of a
@@ -1823,7 +1823,7 @@ func isJsxFactoryImportInJsxFile(candidate candidateBinding) bool {
 // head, so the declaration has no `ForInStatement` above it and the climb in the sibling helper
 // cannot see the loop. Both spellings appear in upstream's corpus, twelve cases apart, and they are
 // the same judgment reached from two directions.
-func hasForInOrOfWriteWithLeadingReturn(ctx rule.Context, candidate candidateBinding, symbol *ast.Symbol) bool {
+func hasForInOrOfWriteWithLeadingReturn(ruleContext rule.Context, candidate candidateBinding, symbol *ast.Symbol) bool {
 	sourceFile := ast.GetSourceFileOfNode(candidate.declaration)
 	if sourceFile == nil {
 		return false
@@ -1839,7 +1839,7 @@ func hasForInOrOfWriteWithLeadingReturn(ctx rule.Context, candidate candidateBin
 		}
 		if current.Kind == ast.KindIdentifier && current.Text() == name &&
 			isForInOrOfBindingWithLeadingReturn(current) &&
-			ctx.TypeChecker.GetSymbolAtLocation(current) == symbol {
+			ruleContext.TypeChecker.GetSymbolAtLocation(current) == symbol {
 			found = true
 			return
 		}
@@ -2034,7 +2034,7 @@ func isInsideSignatureOrAmbientDeclaration(declaration *ast.Node) bool {
 // the third. So upstream reports only the trailing run of unused parameters, and this reproduces
 // that by asking whether any later parameter in the same list is read.
 func isParameterBeforeAUsedOne(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	candidate candidateBinding,
 	all []candidateBinding,
 	reads map[*ast.Symbol]bool,
@@ -2079,7 +2079,7 @@ func isParameterBeforeAUsedOne(
 		if hasDefaultOnTheWayToItsParameter(other.declaration) {
 			return true
 		}
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(other.name); symbol != nil && reads[symbol] {
+		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(other.name); symbol != nil && reads[symbol] {
 			return true
 		}
 	}
@@ -2196,7 +2196,7 @@ func noUnusedVarsUsedIgnoredMessage(name string, option string, pattern string, 
 // reportUsedIgnorePattern is on and the name is used, at the node an unused finding would take.
 // A name the checker cannot resolve is not provably used, so it stays silent.
 func reportUsedIgnoredName(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	candidate candidateBinding,
 	symbol *ast.Symbol,
 	writes []*ast.Node,
@@ -2206,10 +2206,10 @@ func reportUsedIgnoredName(
 	pattern string,
 	noun string,
 ) {
-	if !settings.ReportUsedIgnorePattern || symbol == nil || !isUsedBinding(ctx, candidate, symbol, reads) {
+	if !settings.ReportUsedIgnorePattern || symbol == nil || !isUsedBinding(ruleContext, candidate, symbol, reads) {
 		return
 	}
-	ctx.ReportNode(unusedBindingReportNode(candidate, writes), noUnusedVarsUsedIgnoredMessage(candidate.name.Text(), option, pattern, noun))
+	ruleContext.ReportNode(unusedBindingReportNode(candidate, writes), noUnusedVarsUsedIgnoredMessage(candidate.name.Text(), option, pattern, noun))
 }
 
 // ignorePatternFor names the ignore pattern a kind of binding answers to, as nameMatchesIgnorePattern
@@ -2280,8 +2280,8 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 
 	// Upstream's `new RegExp(pattern, "u")`, read as JavaScript reads it: RE2 refuses a lookaround or a
 	// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
-	compiled, err := esregexp.Compile(pattern, "u")
-	if err != nil {
+	compiled, compileError := esregexp.Compile(pattern, "u")
+	if compileError != nil {
 		// An unparseable pattern ignores nothing rather than everything. The other direction would
 		// silence the whole rule on a typo in a config file, which is the failure that looks clean.
 		return false
@@ -2373,7 +2373,7 @@ var noUnusedVarsModes = []struct {
 // outside upstream's enum is refused by key and value.
 func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 	var shorthand string
-	if err := json.Unmarshal(raw, &shorthand); err == nil {
+	if decodeError := json.Unmarshal(raw, &shorthand); decodeError == nil {
 		if shorthand != "all" && shorthand != "local" {
 			return fmt.Errorf("the string form is \"all\" or \"local\", and the config gives %q", shorthand)
 		}
@@ -2381,8 +2381,8 @@ func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 		return nil
 	}
 	var fields noUnusedVarsOptionFields
-	if err := rule.UnmarshalOptions(raw, &fields); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &fields); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	decoded := NoUnusedVarsOptions(fields)
 	for _, mode := range noUnusedVarsModes {
@@ -2426,8 +2426,8 @@ func DecodeNoUnusedVarsOptions(raw json.RawMessage) (NoUnusedVarsOptions, error)
 	if len(raw) == 0 {
 		return resolveNoUnusedVarsOptions(nil), nil
 	}
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return resolveNoUnusedVarsOptions(nil), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return resolveNoUnusedVarsOptions(nil), unmarshalOptionsError
 	}
 	return resolveNoUnusedVarsOptions(decoded), nil
 }

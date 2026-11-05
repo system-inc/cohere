@@ -62,30 +62,30 @@ func TestSharedReaderFindsWhatEachRuleFindsAlone(test *testing.T) {
 		"tsconfig.json":                 `{"compilerOptions": {"jsx": "preserve", "strict": true, "noEmit": true}, "include": ["*.tsx"]}`,
 	} {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatalf("creating the directory for %s: %v", name, err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatalf("creating the directory for %s: %v", name, createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", name, err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
-	if err := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); err != nil {
-		test.Fatalf("creating node_modules: %v", err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); createDirectoryError != nil {
+		test.Fatalf("creating node_modules: %v", createDirectoryError)
 	}
-	if err := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); err != nil {
-		test.Fatalf("linking the installed tailwindcss: %v", err)
+	if symlinkError := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); symlinkError != nil {
+		test.Fatalf("linking the installed tailwindcss: %v", symlinkError)
 	}
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building the program: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
 	}
 	files := graph.ProjectFiles()
 
 	findings := func(rules []rule.Rule) []string {
-		result, err := graph.Walk(context.Background(), files, rules)
-		if err != nil {
-			test.Fatalf("walking: %v", err)
+		result, walkError := graph.Walk(context.Background(), files, rules)
+		if walkError != nil {
+			test.Fatalf("walking: %v", walkError)
 		}
 		var lines []string
 		for _, diagnostic := range result.Diagnostics {

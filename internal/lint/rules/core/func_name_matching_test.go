@@ -1050,9 +1050,9 @@ var funcNameMatchingSilentCases = []funcNameMatchingCase{
 // decodedFuncNameMatching routes a row's raw JSON through the rule's own exported decoder.
 func decodedFuncNameMatching(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeFuncNameMatchingOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", raw, err)
+	decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(raw))
+	if decodeFuncNameMatchingOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeFuncNameMatchingOptionsError)
 	}
 	return decoded
 }
@@ -1144,9 +1144,9 @@ func TestDecodeFuncNameMatchingOptions(test *testing.T) {
 			FuncNameMatchingOptions{Direction: "always", ConsiderPropertyDescriptor: true}},
 	}
 	for _, testCase := range accepted {
-		decoded, err := DecodeFuncNameMatchingOptions([]byte(testCase.raw))
-		if err != nil {
-			test.Errorf("%s was refused: %v", testCase.raw, err)
+		decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(testCase.raw))
+		if decodeFuncNameMatchingOptionsError != nil {
+			test.Errorf("%s was refused: %v", testCase.raw, decodeFuncNameMatchingOptionsError)
 			continue
 		}
 		if decoded.(FuncNameMatchingOptions) != testCase.want {
@@ -1162,7 +1162,7 @@ func TestDecodeFuncNameMatchingOptions(test *testing.T) {
 		`"never"`,
 		`{"considerPropertyDescriptor": true}`,
 	} {
-		if decoded, err := DecodeFuncNameMatchingOptions([]byte(raw)); err == nil {
+		if decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(raw)); decodeFuncNameMatchingOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

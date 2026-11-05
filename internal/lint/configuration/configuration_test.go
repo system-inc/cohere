@@ -258,13 +258,13 @@ func TestBothRuleShapesLoad(test *testing.T) {
 		"ignorePatterns": ["dist/**"],
 		"overrides": [{"files": ["**/generated/**/*.{ts,tsx}"], "rules": {"plain-rule": "off"}}]
 	}`
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("writing the config: %v", err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
 	}
 
-	loaded, err := Load(path)
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	loaded, loadError := Load(path)
+	if loadError != nil {
+		test.Fatalf("loading: %v", loadError)
 	}
 
 	if loaded.Rules["plain-rule"].Severity != SeverityError {
@@ -291,16 +291,16 @@ func TestBothRuleShapesLoad(test *testing.T) {
 // everything with nothing configured, which looks exactly like a clean run.
 func TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig(test *testing.T) {
 	test.Parallel()
-	if _, err := Load(filepath.Join(test.TempDir(), "absent.json")); err == nil {
+	if _, loadError := Load(filepath.Join(test.TempDir(), "absent.json")); loadError == nil {
 		test.Fatal("a missing config file loaded successfully")
 	}
 
 	directory := test.TempDir()
 	path := filepath.Join(directory, "broken.json")
-	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
-		test.Fatalf("writing: %v", err)
+	if writeError := os.WriteFile(path, []byte("{not json"), 0o644); writeError != nil {
+		test.Fatalf("writing: %v", writeError)
 	}
-	if _, err := Load(path); err == nil {
+	if _, loadError := Load(path); loadError == nil {
 		test.Fatal("a malformed config loaded successfully")
 	}
 }
@@ -310,10 +310,10 @@ func TestAnUnknownSeverityIsRefused(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	path := filepath.Join(directory, "config.json")
-	if err := os.WriteFile(path, []byte(`{"rules":{"a-rule":"errrror"}}`), 0o644); err != nil {
-		test.Fatalf("writing: %v", err)
+	if writeError := os.WriteFile(path, []byte(`{"rules":{"a-rule":"errrror"}}`), 0o644); writeError != nil {
+		test.Fatalf("writing: %v", writeError)
 	}
-	if _, err := Load(path); err == nil {
+	if _, loadError := Load(path); loadError == nil {
 		test.Fatal("an unknown severity was accepted, which would disable the rule silently")
 	}
 }
@@ -333,27 +333,27 @@ func TestUnimplementedTopLevelKeyIsRefused(test *testing.T) {
 	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"a-rule": "error"}, "notAKeyThisLoaderKnows": {"anything": 1}}`
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("writing the config: %v", err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
 	}
 
-	_, err := Load(path)
-	if err == nil {
+	_, loadError := Load(path)
+	if loadError == nil {
 		test.Fatal("a config declaring an unimplemented top-level key loaded successfully, so the key " +
 			"was discarded silently and whatever it configures would never take effect")
 	}
-	if !strings.Contains(err.Error(), "notAKeyThisLoaderKnows") {
-		test.Errorf("the error does not name the offending key, so a reader cannot act on it: %v", err)
+	if !strings.Contains(loadError.Error(), "notAKeyThisLoaderKnows") {
+		test.Errorf("the error does not name the offending key, so a reader cannot act on it: %v", loadError)
 	}
 
 	// The control. The same config without the key must load, or the test above passes for the
 	// wrong reason and this guard would reject every config equally.
 	controlPath := filepath.Join(directory, "control.json")
-	if err := os.WriteFile(controlPath, []byte(`{"rules": {"a-rule": "error"}}`), 0o644); err != nil {
-		test.Fatalf("writing the control config: %v", err)
+	if writeError := os.WriteFile(controlPath, []byte(`{"rules": {"a-rule": "error"}}`), 0o644); writeError != nil {
+		test.Fatalf("writing the control config: %v", writeError)
 	}
-	if _, err := Load(controlPath); err != nil {
-		test.Fatalf("the control config failed to load, so the guard rejects more than it should: %v", err)
+	if _, loadError := Load(controlPath); loadError != nil {
+		test.Fatalf("the control config failed to load, so the guard rejects more than it should: %v", loadError)
 	}
 }
 
@@ -399,17 +399,17 @@ func TestIgnoredKeyWithoutAReasonIsRefused(test *testing.T) {
 	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"a-rule": "error"}, "keyRecordedWithNoReason": true}`
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("writing the config: %v", err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
 	}
 
-	_, err := Load(path)
-	if err == nil {
+	_, loadError := Load(path)
+	if loadError == nil {
 		test.Fatal("a key listed as ignored with no reason loaded successfully; an entry with no " +
 			"reason says only that somebody wanted the config to load")
 	}
-	if !strings.Contains(err.Error(), "no reason") {
-		test.Errorf("the error does not say the reason is what is missing: %v", err)
+	if !strings.Contains(loadError.Error(), "no reason") {
+		test.Errorf("the error does not say the reason is what is missing: %v", loadError)
 	}
 }
 
@@ -481,17 +481,17 @@ func TestTheThreeRealKeysWouldHaveBeenCaught(test *testing.T) {
 			directory := test.TempDir()
 			path := filepath.Join(directory, "CohereSettings.json")
 			contents := `{"rules": {"a-rule": "error"}, "` + key + `": ["something"]}`
-			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-				test.Fatalf("writing the config: %v", err)
+			if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+				test.Fatalf("writing the config: %v", writeError)
 			}
 
-			_, err := Load(path)
-			if err == nil {
+			_, loadError := Load(path)
+			if loadError == nil {
 				test.Fatalf("a config declaring %q loaded successfully with the key unaccounted for; "+
 					"this is the exact state the live config was in and nothing reported it", key)
 			}
-			if !strings.Contains(err.Error(), key) {
-				test.Errorf("the error does not name %q: %v", key, err)
+			if !strings.Contains(loadError.Error(), key) {
+				test.Errorf("the error does not name %q: %v", key, loadError)
 			}
 		})
 	}
@@ -503,13 +503,13 @@ func TestPluginDeclarationEnablesItsRules(test *testing.T) {
 	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"plugins": ["react"], "rules": {"some-named-rule": "error"}}`
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("writing the config: %v", err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
 	}
 
-	loaded, err := Load(path)
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	loaded, loadError := Load(path)
+	if loadError != nil {
+		test.Fatalf("loading: %v", loadError)
 	}
 
 	// A react rule nobody named must now be enabled, at warn.
@@ -547,13 +547,13 @@ func TestAnExplicitLineBeatsAPluginDefault(test *testing.T) {
 	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}, "reasons": {"react/no-children-prop": "turned off on purpose"}}`
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("writing the config: %v", err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
 	}
 
-	loaded, err := Load(path)
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	loaded, loadError := Load(path)
+	if loadError != nil {
+		test.Fatalf("loading: %v", loadError)
 	}
 	if loaded.Rules["react/no-children-prop"].Severity != SeverityOff {
 		test.Error("a plugin default overrode an explicit `off`, so declaring a plugin would silently " +
@@ -570,22 +570,22 @@ func TestTheFormatBlockLoadsAndAnUnknownKeyBesideItStillDoesNot(test *testing.T)
 	path := filepath.Join(directory, "CohereSettings.json")
 
 	accepted := `{"rules": {"a-rule": "error"}, "format": {"printWidth": 120, "tabWidth": 4}}`
-	if err := os.WriteFile(path, []byte(accepted), 0o644); err != nil {
-		test.Fatalf("writing the config: %v", err)
+	if writeError := os.WriteFile(path, []byte(accepted), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
 	}
-	if _, err := Load(path); err != nil {
-		test.Fatalf("a config carrying the formatter's options did not load: %v", err)
+	if _, loadError := Load(path); loadError != nil {
+		test.Fatalf("a config carrying the formatter's options did not load: %v", loadError)
 	}
 
 	refused := `{"rules": {"a-rule": "error"}, "format": {"printWidth": 120}, "formatter": {}}`
-	if err := os.WriteFile(path, []byte(refused), 0o644); err != nil {
-		test.Fatalf("writing the config: %v", err)
+	if writeError := os.WriteFile(path, []byte(refused), 0o644); writeError != nil {
+		test.Fatalf("writing the config: %v", writeError)
 	}
-	_, err := Load(path)
-	if err == nil {
+	_, loadError := Load(path)
+	if loadError == nil {
 		test.Fatal("an unknown top-level key beside \"format\" loaded, so accepting format loosened the guard")
 	}
-	if !strings.Contains(err.Error(), "formatter") {
-		test.Errorf("the refusal does not name the unknown key: %v", err)
+	if !strings.Contains(loadError.Error(), "formatter") {
+		test.Errorf("the refusal does not name the unknown key: %v", loadError)
 	}
 }

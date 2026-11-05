@@ -17,11 +17,11 @@ func writeTree(test *testing.T, files map[string]string) string {
 	root := test.TempDir()
 	for name, contents := range files {
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatalf("mkdir for %s: %v", name, err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatalf("mkdir for %s: %v", name, createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatalf("write %s: %v", name, err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("write %s: %v", name, writeError)
 		}
 	}
 	return root
@@ -43,9 +43,9 @@ func TestEnumerateOffersEveryLanguage(test *testing.T) {
 		"f.graphql": "type F { g: Int }\n",
 	})
 
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	if len(enumeration.Files) != 6 {
 		test.Fatalf("offered %d files, want 6: %v", len(enumeration.Files), enumeration.Files)
@@ -78,9 +78,9 @@ func TestEnumerateNamesWhatItDeclined(test *testing.T) {
 		"README":    "no extension\n",
 	})
 
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	if enumeration.Unhandled != 3 {
 		test.Errorf("Unhandled = %d, want 3", enumeration.Unhandled)
@@ -118,14 +118,14 @@ func TestEnumerateSkipsSymbolicLinks(test *testing.T) {
 		"alias.ts":    filepath.Join(root, "vendor", "real.ts"),
 		"dangling.ts": filepath.Join(root, "missing.ts"),
 	} {
-		if err := os.Symlink(target, filepath.Join(root, link)); err != nil {
-			test.Skipf("this filesystem cannot make symbolic links: %v", err)
+		if symlinkError := os.Symlink(target, filepath.Join(root, link)); symlinkError != nil {
+			test.Skipf("this filesystem cannot make symbolic links: %v", symlinkError)
 		}
 	}
 
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("a tree holding symbolic links failed to enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("a tree holding symbolic links failed to enumerate: %v", enumerateError)
 	}
 	if enumeration.SymbolicLinks != 3 {
 		test.Errorf("SymbolicLinks = %d, want 3", enumeration.SymbolicLinks)
@@ -165,9 +165,9 @@ func TestEnumerateRefusesNestedRepositories(test *testing.T) {
 		"vendor/deep/x.md": "# x\n",
 	})
 
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	for _, file := range enumeration.Files {
 		if filepath.Base(file) == "theirs.ts" || filepath.Base(file) == "x.md" {
@@ -199,14 +199,14 @@ func TestEnumerateNamesTheDirectoriesItEntered(test *testing.T) {
 		"vendor/theirs.ts": "export const theirs = 1;\n",
 	})
 
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	var entered []string
 	for _, directory := range enumeration.Directories {
-		relative, err := filepath.Rel(root, directory)
-		if err != nil || !filepath.IsAbs(directory) {
+		relative, relativePathError := filepath.Rel(root, directory)
+		if relativePathError != nil || !filepath.IsAbs(directory) {
 			test.Fatalf("directory %q is not an absolute path under the root", directory)
 		}
 		entered = append(entered, filepath.ToSlash(relative))
@@ -245,9 +245,9 @@ func TestEnumerateAppliesEveryIgnoreLayer(test *testing.T) {
 		"pnpm-lock.yaml":  "lockfileVersion: 1\n",
 	})
 
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	if len(enumeration.IgnoredByLayer) != 3 {
 		test.Errorf("layers %v, want exactly .gitignore, %s and %s", enumeration.IgnoredByLayer, HouseIgnoreLayer, IgnorePatternsLayer)
@@ -286,13 +286,13 @@ func TestALeftoverPrettierignoreIsRefused(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			root := testCase.root()
-			_, err := Enumerate(root, handlesEveryLanguage)
-			if !errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-				test.Fatalf("a leftover .prettierignore was not refused as Prettier config: %v", err)
+			_, enumerateError := Enumerate(root, handlesEveryLanguage)
+			if !errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+				test.Fatalf("a leftover .prettierignore was not refused as Prettier config: %v", enumerateError)
 			}
 			for _, want := range []string{filepath.Join(root, ".prettierignore"), "delete it"} {
-				if !strings.Contains(err.Error(), want) {
-					test.Errorf("refusal %q does not say %s", err, want)
+				if !strings.Contains(enumerateError.Error(), want) {
+					test.Errorf("refusal %q does not say %s", enumerateError, want)
 				}
 			}
 		})
@@ -300,8 +300,8 @@ func TestALeftoverPrettierignoreIsRefused(test *testing.T) {
 
 	// Only the walk root's: one inside the tree is a file like any other, and nothing reads it.
 	root := settingsTree(test, `["pnpm-lock.yaml"]`, `[]`, map[string]string{"fixtures/.prettierignore": "x\n", "a.ts": "export const a = 1;\n"})
-	if _, err := Enumerate(root, handlesEveryLanguage); err != nil {
-		test.Errorf("a .prettierignore below the root was refused: %v", err)
+	if _, enumerateError := Enumerate(root, handlesEveryLanguage); enumerateError != nil {
+		test.Errorf("a .prettierignore below the root was refused: %v", enumerateError)
 	}
 }
 
@@ -316,9 +316,9 @@ func TestEveryWalkHasAHouseList(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			enumeration, err := Enumerate(root, handlesEveryLanguage)
-			if err != nil {
-				test.Fatal(err)
+			enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+			if enumerateError != nil {
+				test.Fatal(enumerateError)
 			}
 			if enumeration.IgnoredByLayer[".gitignore"] != 1 || enumeration.IgnoredByLayer[HouseIgnoreLayer] != 1 {
 				test.Fatalf("layers %v, want built.ts by .gitignore and pnpm-lock.yaml by %s", enumeration.IgnoredByLayer, HouseIgnoreLayer)
@@ -344,9 +344,9 @@ func TestIgnorePatternsReadAsLintReadsThem(test *testing.T) {
 		"source/odd.code.js/keep.ts": "export const keep = 1;\n",
 	})
 
-	enumeration, err := Enumerate(filepath.Join(root, "source"), handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(filepath.Join(root, "source"), handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	var offered []string
 	for _, file := range enumeration.Files {
@@ -385,14 +385,14 @@ func TestNestedRepositoryContainingNamesTheOutermostBelowTheRoot(test *testing.T
 		filepath.Join(root, "libraries", "structure", "libraries", "nexus"),
 		filepath.Join(root, "source"),
 	} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
 	}
 	// The inner repository is a submodule, whose `.git` is a gitlink file rather than a directory.
 	gitlink := filepath.Join(root, "libraries", "structure", "libraries", "nexus", ".git")
-	if err := os.WriteFile(gitlink, []byte("gitdir: ../../.git/modules/nexus\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(gitlink, []byte("gitdir: ../../.git/modules/nexus\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	cases := []struct {
@@ -435,9 +435,9 @@ func TestIgnorePatternsCoverNestedPaths(test *testing.T) {
 		"logs/nested/run.log":          "line\n",
 	})
 
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	survivors := []string{}
 	for _, file := range enumeration.Files {
@@ -498,9 +498,9 @@ func TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns(test *testing.T) 
 		"projects/listed/b.ts":           "export const b = 1;\n",
 		"projects/listed/pnpm-lock.yaml": "lockfileVersion: 1\n",
 	})
-	enumeration, err := Enumerate(filepath.Join(root, "projects", "listed"), handlesEveryLanguage)
-	if err != nil {
-		test.Fatal(err)
+	enumeration, enumerateError := Enumerate(filepath.Join(root, "projects", "listed"), handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
 	}
 	if len(enumeration.Files) != 1 || filepath.Base(enumeration.Files[0]) != "b.ts" {
 		test.Errorf("offered %v, want b.ts alone: the host's ignorePatterns do not reach in, its house list does", enumeration.Files)
@@ -542,9 +542,9 @@ func TestTheWalkReadsGitsIgnoreRulesAsGitDoes(test *testing.T) {
 		"vendor/.gitignore":   "!lib.ts\n",
 		"vendor/lib.ts":       "export const lib = 1;\n",
 	})
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	survivors := survivorsOf(root, enumeration)
 	for name, want := range map[string]bool{
@@ -579,9 +579,9 @@ func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(test *testing.T) {
 		"nested/.gitignore": "z.ts\n",
 		"nested/e.ts":       "export const e = 1;\n",
 	})
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	var got []string
 	for _, file := range enumeration.IgnoreFiles {
@@ -607,9 +607,9 @@ func TestTheHouseListReadsAsIgnoreFileLines(test *testing.T) {
 		"sub/top.ts": "export const subTop = 1;\n",
 		"sub/b.json": "{}\n",
 	})
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	survivors := survivorsOf(root, enumeration)
 	for name, want := range map[string]bool{"keep.json": true, "sub/top.ts": true, "a.json": false, "top.ts": false, "sub/b.json": false} {
@@ -637,13 +637,13 @@ func TestEnumerateHoldsAdamicFilesBack(test *testing.T) {
 		"nested/deeper.a":   "export const deeper = 1;\n",
 		"nested/Thing.d.ts": "export {};\n",
 	})
-	if err := os.Symlink(filepath.Join(root, "geometry.a"), filepath.Join(root, "link.a")); err != nil {
-		test.Fatal(err)
+	if symlinkError := os.Symlink(filepath.Join(root, "geometry.a"), filepath.Join(root, "link.a")); symlinkError != nil {
+		test.Fatal(symlinkError)
 	}
 
-	enumeration, err := Enumerate(root, func(string) bool { return true })
-	if err != nil {
-		test.Fatalf("enumerate: %v", err)
+	enumeration, enumerateError := Enumerate(root, func(string) bool { return true })
+	if enumerateError != nil {
+		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	for file := range survivorsOf(root, enumeration) {
 		if strings.HasSuffix(file, ".a") {

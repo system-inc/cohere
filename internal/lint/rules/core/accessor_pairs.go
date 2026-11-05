@@ -86,8 +86,8 @@ func DecodeAccessorPairsOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -169,7 +169,7 @@ var AccessorPairs = rule.Rule{
 	TypeReach:        rule.TypeReachShapes,
 	Name:             "accessor-pairs",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := defaultAccessorPairsSettings()
 		if decoded, configured := rule.OptionsAs[AccessorPairsOptions](options); configured {
 			settings = decoded.resolve()
@@ -183,19 +183,19 @@ var AccessorPairs = rule.Rule{
 
 		listeners := rule.Listeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
-				checkAccessorPairsObjectLiteral(ctx, node, settings)
+				checkAccessorPairsObjectLiteral(ruleContext, node, settings)
 			},
 		}
 		if settings.enforceForClassMembers {
 			classBody := func(node *ast.Node) {
-				checkAccessorPairsClassBody(ctx, node, settings)
+				checkAccessorPairsClassBody(ruleContext, node, settings)
 			}
 			listeners[ast.KindClassDeclaration] = classBody
 			listeners[ast.KindClassExpression] = classBody
 		}
 		if settings.enforceForTSTypes {
 			typeBody := func(node *ast.Node) {
-				checkAccessorPairsTypeBody(ctx, node, settings)
+				checkAccessorPairsTypeBody(ruleContext, node, settings)
 			}
 			listeners[ast.KindInterfaceDeclaration] = typeBody
 			listeners[ast.KindTypeLiteral] = typeBody
@@ -232,7 +232,7 @@ type accessorPairsToken struct {
 // accessor joins the FIRST group whose key matches, so the reports come out in the order the
 // accessors were written rather than sorted by key.
 func checkAccessorPairsList(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	accessors []*ast.Node,
 	settings accessorPairsSettings,
 	messageMissingGetter string,
@@ -241,10 +241,10 @@ func checkAccessorPairsList(
 	var groups []*accessorPairsGroup
 
 	for _, accessor := range accessors {
-		key, settled := accessorPairsKeyOf(ctx, accessor)
+		key, settled := accessorPairsKeyOf(ruleContext, accessor)
 		var tokens []accessorPairsToken
 		if !settled {
-			tokens = accessorPairsTokensOf(ctx, accessor)
+			tokens = accessorPairsTokensOf(ruleContext, accessor)
 		}
 
 		group := (*accessorPairsGroup)(nil)
@@ -297,12 +297,12 @@ type accessorPairsFinding struct {
 }
 
 // reportAccessorPairsInSourceOrder emits pending findings ordered by where they appear in the file.
-func reportAccessorPairsInSourceOrder(ctx rule.Context, findings []accessorPairsFinding) {
+func reportAccessorPairsInSourceOrder(ruleContext rule.Context, findings []accessorPairsFinding) {
 	slices.SortStableFunc(findings, func(left, right accessorPairsFinding) int {
 		return left.accessor.Pos() - right.accessor.Pos()
 	})
 	for _, finding := range findings {
-		reportAccessorPairsAccessor(ctx, finding.accessor, finding.messageId,
+		reportAccessorPairsAccessor(ruleContext, finding.accessor, finding.messageId,
 			finding.missingGetter)
 	}
 }
@@ -350,7 +350,7 @@ func accessorPairsKeysEqual(
 // key's token list is a single token whose text is the name, so both routes pair `#a` with `#a` and
 // separate it from `a`. It is written this way so the mechanism matches, because the rendered message
 // differs between the two paths and that IS visible.
-func accessorPairsKeyOf(ctx rule.Context, accessor *ast.Node) (string, bool) {
+func accessorPairsKeyOf(ruleContext rule.Context, accessor *ast.Node) (string, bool) {
 	name := accessor.Name()
 	if name == nil {
 		return "", false
@@ -385,7 +385,7 @@ func accessorPairsKeyOf(ctx rule.Context, accessor *ast.Node) (string, bool) {
 //
 // Only the OUTER parentheses vanish this way, in both parsers: `[(a) + 1]` keeps its inner pair as
 // tokens upstream and as a node here, so the two spellings stay separated on both sides.
-func accessorPairsTokensOf(ctx rule.Context, accessor *ast.Node) []accessorPairsToken {
+func accessorPairsTokensOf(ruleContext rule.Context, accessor *ast.Node) []accessorPairsToken {
 	name := accessor.Name()
 	if name == nil {
 		return nil
@@ -406,7 +406,7 @@ func accessorPairsTokensOf(ctx rule.Context, accessor *ast.Node) []accessorPairs
 	}
 
 	var tokens []accessorPairsToken
-	accessorPairsCollectTokens(ctx, key, &tokens)
+	accessorPairsCollectTokens(ruleContext, key, &tokens)
 	return tokens
 }
 
@@ -422,7 +422,7 @@ func accessorPairsTokensOf(ctx rule.Context, accessor *ast.Node) []accessorPairs
 // Whitespace never contributes, because `TokenRange` strips leading trivia and no marker carries
 // position. That is what pairs `[x + 1]` with `[x  +  1]`, which is upstream's behaviour and the
 // reason this path exists at all.
-func accessorPairsCollectTokens(ctx rule.Context, node *ast.Node, tokens *[]accessorPairsToken) {
+func accessorPairsCollectTokens(ruleContext rule.Context, node *ast.Node, tokens *[]accessorPairsToken) {
 	if node == nil {
 		return
 	}
@@ -435,10 +435,10 @@ func accessorPairsCollectTokens(ctx rule.Context, node *ast.Node, tokens *[]acce
 
 	if !hadChild {
 		// A leaf renders as its own text, which is what makes `[a]` and `[b]` differ.
-		span := rule.TokenRange(ctx.SourceFile, node)
+		span := rule.TokenRange(ruleContext.SourceFile, node)
 		*tokens = append(*tokens, accessorPairsToken{
 			kind: node.Kind,
-			text: ctx.SourceFile.Text()[span.Pos():span.End()],
+			text: ruleContext.SourceFile.Text()[span.Pos():span.End()],
 		})
 		return
 	}
@@ -448,7 +448,7 @@ func accessorPairsCollectTokens(ctx rule.Context, node *ast.Node, tokens *[]acce
 	// prefix or postfix expression stores its operator as a field on the node, and both spellings of
 	// it are recovered from the source text of the operator itself.
 	*tokens = append(*tokens, accessorPairsToken{kind: node.Kind, text: ""})
-	if operator := accessorPairsOperatorTokenOf(ctx, node); operator != "" {
+	if operator := accessorPairsOperatorTokenOf(ruleContext, node); operator != "" {
 		*tokens = append(*tokens, accessorPairsToken{kind: node.Kind, text: operator})
 	}
 
@@ -457,7 +457,7 @@ func accessorPairsCollectTokens(ctx rule.Context, node *ast.Node, tokens *[]acce
 		if child == nil {
 			return false
 		}
-		accessorPairsCollectTokens(ctx, ast.SkipParentheses(child), tokens)
+		accessorPairsCollectTokens(ruleContext, ast.SkipParentheses(child), tokens)
 		return false
 	})
 }
@@ -467,13 +467,13 @@ func accessorPairsCollectTokens(ctx rule.Context, node *ast.Node, tokens *[]acce
 // Three kinds carry an operator the node kind does not identify. Everything else answers "", which
 // costs one token slot and no correctness: two nodes of the same kind with no operator are the same
 // shape, which is the whole question here.
-func accessorPairsOperatorTokenOf(ctx rule.Context, node *ast.Node) string {
+func accessorPairsOperatorTokenOf(ruleContext rule.Context, node *ast.Node) string {
 	var operatorKind ast.Kind
 	switch node.Kind {
 	case ast.KindBinaryExpression:
 		if operator := node.AsBinaryExpression().OperatorToken; operator != nil {
-			span := rule.TokenRange(ctx.SourceFile, operator)
-			return ctx.SourceFile.Text()[span.Pos():span.End()]
+			span := rule.TokenRange(ruleContext.SourceFile, operator)
+			return ruleContext.SourceFile.Text()[span.Pos():span.End()]
 		}
 		return ""
 	case ast.KindPrefixUnaryExpression:
@@ -499,7 +499,7 @@ func accessorPairsOperatorTokenOf(ctx rule.Context, node *ast.Node) string {
 // Built from `TokenRange` rather than `Pos()`, because `Pos()` carries leading trivia and would put
 // the span's start on the whitespace before `set`.
 func reportAccessorPairsAccessor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	accessor *ast.Node,
 	messageId string,
 	missingGetter bool,
@@ -508,7 +508,7 @@ func reportAccessorPairsAccessor(
 	if name == nil {
 		return
 	}
-	head := rule.TokenRange(ctx.SourceFile, accessor)
+	head := rule.TokenRange(ruleContext.SourceFile, accessor)
 	span := core.NewTextRange(head.Pos(), name.End())
 
 	// The two halves fail differently at runtime, so they get different sentences rather than one
@@ -521,7 +521,7 @@ func reportAccessorPairsAccessor(
 			"sloppy mode and throws in strict mode"
 	}
 
-	ctx.ReportRange(span, rule.Message{
+	ruleContext.ReportRange(span, rule.Message{
 		Id: messageId,
 		Description: fmt.Sprintf(
 			"This declares %s with no matching %s beside it, %s. Declare both halves of the "+
@@ -567,17 +567,17 @@ func accessorPairsDescribe(accessor *ast.Node) string {
 
 // checkAccessorPairsObjectLiteral runs both judgments on one object literal.
 func checkAccessorPairsObjectLiteral(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	settings accessorPairsSettings,
 ) {
-	reportAccessorPairsInSourceOrder(ctx,
-		checkAccessorPairsList(ctx, accessorPairsMembersOf(node), settings,
+	reportAccessorPairsInSourceOrder(ruleContext,
+		checkAccessorPairsList(ruleContext, accessorPairsMembersOf(node), settings,
 			messageAccessorPairsMissingGetterInObjectLiteral,
 			messageAccessorPairsMissingSetterInObjectLiteral))
 
-	if accessorPairsIsPropertyDescriptor(ctx, node) {
-		checkAccessorPairsDescriptor(ctx, node, settings)
+	if accessorPairsIsPropertyDescriptor(ruleContext, node) {
+		checkAccessorPairsDescriptor(ruleContext, node, settings)
 	}
 }
 
@@ -586,7 +586,7 @@ func checkAccessorPairsObjectLiteral(
 // Static and instance members are different containers, which is why this is two calls rather than
 // one over the whole body. `class A { get a() {} static set a(v) {} }` reports twice, measured.
 func checkAccessorPairsClassBody(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	settings accessorPairsSettings,
 ) {
@@ -601,21 +601,21 @@ func checkAccessorPairsClassBody(
 	// The two sides are separate containers for PAIRING and one file for REPORTING, so they are
 	// walked apart and merged back into source order. Upstream never has to do this because it
 	// reports as it visits; here the grouping walk is what reorders things.
-	findings := checkAccessorPairsList(ctx, staticSide, settings,
+	findings := checkAccessorPairsList(ruleContext, staticSide, settings,
 		messageAccessorPairsMissingGetterInClass, messageAccessorPairsMissingSetterInClass)
-	findings = append(findings, checkAccessorPairsList(ctx, instanceSide, settings,
+	findings = append(findings, checkAccessorPairsList(ruleContext, instanceSide, settings,
 		messageAccessorPairsMissingGetterInClass, messageAccessorPairsMissingSetterInClass)...)
-	reportAccessorPairsInSourceOrder(ctx, findings)
+	reportAccessorPairsInSourceOrder(ruleContext, findings)
 }
 
 // checkAccessorPairsTypeBody runs the pairing over an interface body or a type literal.
 func checkAccessorPairsTypeBody(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	settings accessorPairsSettings,
 ) {
-	reportAccessorPairsInSourceOrder(ctx,
-		checkAccessorPairsList(ctx, accessorPairsMembersOf(node), settings,
+	reportAccessorPairsInSourceOrder(ruleContext,
+		checkAccessorPairsList(ruleContext, accessorPairsMembersOf(node), settings,
 			messageAccessorPairsMissingGetterInType, messageAccessorPairsMissingSetterInType))
 }
 
@@ -647,7 +647,7 @@ func accessorPairsMembersOf(node *ast.Node) []*ast.Node {
 // The finding is reported on the descriptor object rather than on any property, because there is no
 // accessor node to point at -- the whole point is that one of them is absent.
 func checkAccessorPairsDescriptor(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	settings accessorPairsSettings,
 ) {
@@ -664,10 +664,10 @@ func checkAccessorPairsDescriptor(
 	})
 
 	if settings.setWithoutGet && hasSetter && !hasGetter {
-		ctx.ReportNode(node, messageAccessorPairsMissingGetterInDescriptor)
+		ruleContext.ReportNode(node, messageAccessorPairsMissingGetterInDescriptor)
 	}
 	if settings.getWithoutSet && hasGetter && !hasSetter {
-		ctx.ReportNode(node, messageAccessorPairsMissingSetterInDescriptor)
+		ruleContext.ReportNode(node, messageAccessorPairsMissingSetterInDescriptor)
 	}
 }
 
@@ -710,9 +710,9 @@ func accessorPairsDescriptorPropertyName(member *ast.Node) string {
 // The receiver must resolve to the real global. `var Object = {}; Object.defineProperty(...)` is
 // clean upstream and here, which is one of the two cases in the imported corpus that make this a
 // checker-reading rule rather than a syntactic one.
-func accessorPairsIsPropertyDescriptor(ctx rule.Context, node *ast.Node) bool {
-	if accessorPairsIsArgumentOfGlobalCall(ctx, node, "Object", "defineProperty", 2) ||
-		accessorPairsIsArgumentOfGlobalCall(ctx, node, "Reflect", "defineProperty", 2) {
+func accessorPairsIsPropertyDescriptor(ruleContext rule.Context, node *ast.Node) bool {
+	if accessorPairsIsArgumentOfGlobalCall(ruleContext, node, "Object", "defineProperty", 2) ||
+		accessorPairsIsArgumentOfGlobalCall(ruleContext, node, "Reflect", "defineProperty", 2) {
 		return true
 	}
 
@@ -729,8 +729,8 @@ func accessorPairsIsPropertyDescriptor(ctx rule.Context, node *ast.Node) bool {
 	if grandparent == nil || grandparent.Kind != ast.KindObjectLiteralExpression {
 		return false
 	}
-	return accessorPairsIsArgumentOfGlobalCall(ctx, grandparent, "Object", "defineProperties", 1) ||
-		accessorPairsIsArgumentOfGlobalCall(ctx, grandparent, "Object", "create", 1)
+	return accessorPairsIsArgumentOfGlobalCall(ruleContext, grandparent, "Object", "defineProperties", 1) ||
+		accessorPairsIsArgumentOfGlobalCall(ruleContext, grandparent, "Object", "create", 1)
 }
 
 // accessorPairsIsArgumentOfGlobalCall matches `<Global>.<method>(...)` with `node` at `index`.
@@ -739,7 +739,7 @@ func accessorPairsIsPropertyDescriptor(ctx rule.Context, node *ast.Node) bool {
 // same function and upstream reports it -- measured against the installed rule rather than read off
 // `skipChainExpression`, which is about a node type our parser does not have.
 func accessorPairsIsArgumentOfGlobalCall(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	globalName string,
 	methodName string,
@@ -780,5 +780,5 @@ func accessorPairsIsArgumentOfGlobalCall(
 	}
 	// A local binding of the same name is a different object, and calling `defineProperty` on it
 	// says nothing about property descriptors. This is the whole reason the rule reads the checker.
-	return resolvesToAGlobal(ctx, receiver)
+	return resolvesToAGlobal(ruleContext, receiver)
 }

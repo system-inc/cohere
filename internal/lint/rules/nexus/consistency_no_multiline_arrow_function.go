@@ -70,11 +70,11 @@ func messageMultilineArrow() rule.Message {
 // expression; `arrowFunctionFix` holds the conversion and the places it declines.
 var ConsistencyNoMultilineArrowFunction = rule.Rule{
 	Name: "nexus/consistency-no-multiline-arrow-function",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
-		sourceFile := ctx.SourceFile
+		sourceFile := ruleContext.SourceFile
 
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -99,12 +99,12 @@ var ConsistencyNoMultilineArrowFunction = rule.Rule{
 
 				if isReactHookCallee(objectName, propertyName) && len(arguments) > 0 &&
 					arguments[0].Kind == ast.KindArrowFunction {
-					reportArrow(ctx, arguments[0], messageReactHookArrow(propertyName))
+					reportArrow(ruleContext, arguments[0], messageReactHookArrow(propertyName))
 					return
 				}
 				if propertyName == "addEventListener" && len(arguments) > 1 &&
 					arguments[1].Kind == ast.KindArrowFunction {
-					reportArrow(ctx, arguments[1], messageAddEventListenerArrow())
+					reportArrow(ruleContext, arguments[1], messageAddEventListenerArrow())
 				}
 			},
 
@@ -131,7 +131,7 @@ var ConsistencyNoMultilineArrowFunction = rule.Rule{
 					return
 				}
 
-				reportArrow(ctx, node, messageMultilineArrow())
+				reportArrow(ruleContext, node, messageMultilineArrow())
 			},
 		}
 	},
@@ -213,12 +213,12 @@ func isClaimedByCallExpressionCase(node *ast.Node) bool {
 }
 
 // reportArrow reports an arrow with the conversion attached when the conversion keeps its meaning.
-func reportArrow(ctx rule.Context, arrow *ast.Node, message rule.Message) {
-	if fix, isSafe := arrowFunctionFix(ctx, arrow); isSafe {
-		ctx.ReportNodeWithFixes(arrow, message, fix)
+func reportArrow(ruleContext rule.Context, arrow *ast.Node, message rule.Message) {
+	if fix, isSafe := arrowFunctionFix(ruleContext, arrow); isSafe {
+		ruleContext.ReportNodeWithFixes(arrow, message, fix)
 		return
 	}
-	ctx.ReportNode(arrow, message)
+	ruleContext.ReportNode(arrow, message)
 }
 
 // arrowFunctionFix rewrites an arrow as a function expression, the TypeScript original's fix.
@@ -249,8 +249,8 @@ func reportArrow(ctx rule.Context, arrow *ast.Node, message rule.Message) {
 //
 // An expression body that the parser wraps in parentheses is returned without them, matching the
 // original's output: ESTree has no parenthesized node, so `getText(node.body)` never included them.
-func arrowFunctionFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
-	sourceFile := ctx.SourceFile
+func arrowFunctionFix(ruleContext rule.Context, node *ast.Node) (rule.Fix, bool) {
+	sourceFile := ruleContext.SourceFile
 	if sourceFile == nil || node == nil || node.Kind != ast.KindArrowFunction {
 		return rule.Fix{}, false
 	}
@@ -317,7 +317,7 @@ func arrowFunctionFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
 	if arrowLeadsExpressionStatement(sourceFile, node) {
 		replacement = "(" + replacement + ")"
 	}
-	return ctx.ReplaceNode(node, replacement), true
+	return ruleContext.ReplaceNode(node, replacement), true
 }
 
 // arrowLeadsExpressionStatement reports whether the arrow's first token is its statement's first token,

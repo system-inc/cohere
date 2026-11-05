@@ -59,8 +59,8 @@ var nextApiFunctionNames = map[string]bool{
 // Fixable, since the repair is exactly one identifier and there is only one right answer.
 var NextRequireApiParameterName = rule.Rule{
 	Name: "structure/next-require-api-parameter-name",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		fileContext := FileContextFor(ctx.SourceFile.FileName().AsString())
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if !fileContext.IsPageFile && !fileContext.IsLayoutFile {
 			// Only the files Next calls these functions in. A helper module exporting a function
 			// named generateMetadata is not one the framework will ever call.
@@ -102,11 +102,11 @@ var NextRequireApiParameterName = rule.Rule{
 
 					switch key.Text() {
 					case "parameters":
-						ctx.ReportNodeWithFixes(key, messageUseParamsNotParameters(),
-							ctx.ReplaceNode(key, "params"))
+						ruleContext.ReportNodeWithFixes(key, messageUseParamsNotParameters(),
+							ruleContext.ReplaceNode(key, "params"))
 					case "searchParameters":
-						ctx.ReportNodeWithFixes(key, messageUseSearchParamsNotSearchParameters(),
-							ctx.ReplaceNode(key, "searchParams"))
+						ruleContext.ReportNodeWithFixes(key, messageUseSearchParamsNotSearchParameters(),
+							ruleContext.ReplaceNode(key, "searchParams"))
 					}
 				}
 			},

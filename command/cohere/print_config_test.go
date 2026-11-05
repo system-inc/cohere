@@ -62,8 +62,8 @@ func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 func compacted(test *testing.T, raw json.RawMessage) string {
 	test.Helper()
 	var buffer bytes.Buffer
-	if err := json.Compact(&buffer, raw); err != nil {
-		test.Fatal(err)
+	if compactError := json.Compact(&buffer, raw); compactError != nil {
+		test.Fatal(compactError)
 	}
 	return buffer.String()
 }
@@ -95,8 +95,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		test.Fatalf("print-config: %v\n%s", err, output)
 	}
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal(output, &doc); err != nil {
-		test.Fatalf("JSON: %v\n%s", err, output)
+	if decodeError := json.Unmarshal(output, &doc); decodeError != nil {
+		test.Fatalf("JSON: %v\n%s", decodeError, output)
 	}
 	previous := -1
 	for _, section := range []string{"settings", "languageOptions", "overrides", "departures", "ruleAliases", "rules"} {
@@ -111,12 +111,12 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	wantJSON := func(section string, want string) {
 		test.Helper()
 		var gotValue, wantValue any
-		if err := json.Unmarshal(doc[section], &gotValue); err != nil {
-			test.Errorf("%s: %v", section, err)
+		if decodeError := json.Unmarshal(doc[section], &gotValue); decodeError != nil {
+			test.Errorf("%s: %v", section, decodeError)
 			return
 		}
-		if err := json.Unmarshal([]byte(want), &wantValue); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(want), &wantValue); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		if !reflect.DeepEqual(gotValue, wantValue) {
 			test.Errorf("%s = %s, want %s", section, doc[section], want)
@@ -127,8 +127,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		SourceType, Target, Tsconfig string
 		Globals                      map[string][]string
 	}
-	if err := json.Unmarshal(doc["languageOptions"], &language); err != nil {
-		test.Error(err)
+	if decodeError := json.Unmarshal(doc["languageOptions"], &language); decodeError != nil {
+		test.Error(decodeError)
 	}
 	if language.SourceType != "module" || language.Target != "es2022" || language.Tsconfig != filepath.Join(root, "tsconfig.json") {
 		test.Errorf("language options = %+v", language)
@@ -145,8 +145,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		Reason, File string
 		Rules        map[string][]json.RawMessage
 	}
-	if err := json.Unmarshal(doc["overrides"], &overrides); err != nil {
-		test.Error(err)
+	if decodeError := json.Unmarshal(doc["overrides"], &overrides); decodeError != nil {
+		test.Error(decodeError)
 	}
 	if len(overrides) != 1 {
 		test.Errorf("overrides = %s", doc["overrides"])
@@ -154,19 +154,19 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		test.Errorf("matched override = %+v", overrides[0])
 	}
 	var departures map[string]struct{ File, Reason string }
-	if err := json.Unmarshal(doc["departures"], &departures); err != nil {
-		test.Error(err)
+	if decodeError := json.Unmarshal(doc["departures"], &departures); decodeError != nil {
+		test.Error(decodeError)
 	}
 	if len(departures) != 1 || departures["no-var"].Reason != "migration" || departures["no-var"].File != filepath.Join(root, "CohereSettings.json") {
 		test.Errorf("departures = %s", doc["departures"])
 	}
 	var rules map[string][]json.RawMessage
 	var aliases map[string]string
-	if err := json.Unmarshal(doc["rules"], &rules); err != nil {
-		test.Error(err)
+	if decodeError := json.Unmarshal(doc["rules"], &rules); decodeError != nil {
+		test.Error(decodeError)
 	}
-	if err := json.Unmarshal(doc["ruleAliases"], &aliases); err != nil {
-		test.Error(err)
+	if decodeError := json.Unmarshal(doc["ruleAliases"], &aliases); decodeError != nil {
+		test.Error(decodeError)
 	}
 	for _, name := range []string{"require-await", "no-use-before-define", "logical-assignment-operators", "no-implicit-coercion", "max-classes-per-file"} {
 		if len(rules[name]) == 0 || !reflect.DeepEqual(rules["nexus/"+name], rules[name]) || aliases["nexus/"+name] != name {
@@ -187,8 +187,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		Settings        map[string]json.RawMessage
 		LanguageOptions struct{ SourceType string }
 	}
-	if err := json.Unmarshal(other, &otherDoc); err != nil {
-		test.Error(err)
+	if decodeError := json.Unmarshal(other, &otherDoc); decodeError != nil {
+		test.Error(decodeError)
 	}
 	if len(otherDoc.Settings) != 0 || otherDoc.LanguageOptions.SourceType != "script" {
 		test.Errorf("other file's settings/sourceType = %+v", otherDoc)
@@ -202,8 +202,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	}
 	// The real lint path refuses React settings; inspection must refuse them too, never print them.
 	bad := strings.Replace(settings, `"settings":{`, `"settings":{"react":{"version":"19.2"},`, 1)
-	if err := os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(bad), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(bad), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	if output, err := run("Thing.ts"); err == nil || !bytes.Contains(output, []byte(`"react"`)) {
 		test.Errorf("unread React settings were not refused: %v\n%s", err, output)
@@ -220,8 +220,8 @@ func TestPrintConfigSettingsReaders(test *testing.T) {
 	}}
 	registrations := []rule.SettingsRegistration{{Namespaces: []string{"future-plugin", "future-alias"}, Split: func(raw []byte) (map[string]json.RawMessage, error) {
 		var keys map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &keys); err != nil {
-			return nil, err
+		if decodeError := json.Unmarshal(raw, &keys); decodeError != nil {
+			return nil, decodeError
 		}
 		return map[string]json.RawMessage{
 			"future/read": json.RawMessage(`{"read":` + string(keys["read"]) + `}`),
@@ -265,17 +265,17 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, "--print-config", file)
 		command.Dir = root
-		output, err := command.CombinedOutput()
-		if err != nil {
-			test.Fatalf("print-config: %v\n%s", err, output)
+		output, outputError := command.CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("print-config: %v\n%s", outputError, output)
 		}
 		var doc struct {
 			RuleAliases   map[string]string
 			UnusedDisable *int `json:"unusedDisable"`
 			Rules         map[string][]json.RawMessage
 		}
-		if err := json.Unmarshal(output, &doc); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal(output, &doc); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		return doc.RuleAliases, printedUnusedDisable{severity: doc.UnusedDisable, rules: doc.Rules}
 	}
@@ -320,14 +320,14 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 		if fixture.level == "" {
 			changed = strings.Replace(settings, `"rules":{"unused-disable":"error"}`, `"rules":{}`, 1)
 		}
-		if err := os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(changed), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(changed), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		_, rules = read("Thing.ts")
 		checkSeverity(rules, fixture.want)
 	}
-	if err := os.WriteFile(filepath.Join(root, "Base.json"), []byte(strings.Replace(base, "@typescript-eslint/no-invalid-this", "no-invalid-this", 1)), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(root, "Base.json"), []byte(strings.Replace(base, "@typescript-eslint/no-invalid-this", "no-invalid-this", 1)), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	aliases, rules = read("Thing.ts")
 	if _, ok := aliases["@typescript-eslint/no-invalid-this"]; ok {

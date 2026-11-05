@@ -38,8 +38,8 @@ func spin(iterations int) {
 // called; a rule's panic is contained and shows up below as a rule that ran on fewer files.
 func threadCPU() time.Duration {
 	var spec unix.Timespec
-	if err := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); err != nil {
-		panic(fmt.Sprintf("reading the thread CPU clock: %v", err))
+	if clockGettimeError := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); clockGettimeError != nil {
+		panic(fmt.Sprintf("reading the thread CPU clock: %v", clockGettimeError))
 	}
 	return time.Duration(spec.Nano())
 }
@@ -90,7 +90,7 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	var sleptTotal, spunTotal atomic.Int64
 	sleeper := rule.Rule{
 		Name: "planted-sleeper",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				start := time.Now()
 				time.Sleep(sleepPerFile)
@@ -100,7 +100,7 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	}
 	spinner := rule.Rule{
 		Name: "planted-spinner",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				start := threadCPU()
 				spin(iterations)

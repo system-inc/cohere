@@ -87,7 +87,7 @@ var messageRegexSpaces = rule.Message{
 // parser has already refused, so a second complaint here is noise on a file that does not compile.
 var NoRegexSpaces = rule.Rule{
 	Name: "no-regex-spaces",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// reportLiteral walks a regex literal's pattern and reports its first unquantified,
 		// unclassed run of two or more spaces. A literal's source text and the pattern the engine
 		// receives are the same bytes, so no cooking or offset mapping is involved here; the
@@ -106,7 +106,7 @@ var NoRegexSpaces = rule.Rule{
 			}
 
 			runRange := core.NewTextRange(patternStart+start, patternStart+end)
-			ctx.ReportRangeWithFixes(runRange, messageRegexSpaces,
+			ruleContext.ReportRangeWithFixes(runRange, messageRegexSpaces,
 				rule.ReplaceRange(runRange, " {"+strconv.Itoa(end-start)+"}"))
 		}
 
@@ -145,8 +145,8 @@ var NoRegexSpaces = rule.Rule{
 
 			// TokenRange rather than Loc, because Loc starts before leading trivia and would put
 			// both the finding and its fix into whatever precedes the literal.
-			literalRange := rule.TokenRange(ctx.SourceFile, patternNode)
-			raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+			literalRange := rule.TokenRange(ruleContext.SourceFile, patternNode)
+			raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 			// The quotes are the literal's delimiters rather than part of the pattern. Anything
 			// shorter than two characters has no body to strip them from.
 			if len(raw) < 2 {
@@ -174,7 +174,7 @@ var NoRegexSpaces = rule.Rule{
 			runRange := core.NewTextRange(
 				literalRange.Pos()+1+offsets[start],
 				literalRange.Pos()+1+offsets[end])
-			ctx.ReportRangeWithFixes(runRange, messageRegexSpaces,
+			ruleContext.ReportRangeWithFixes(runRange, messageRegexSpaces,
 				rule.ReplaceRange(runRange, " {"+strconv.Itoa(end-start)+"}"))
 		}
 

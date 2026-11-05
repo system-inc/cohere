@@ -287,9 +287,9 @@ type blockScalarHeader struct {
 	length  int
 }
 
-func resolveBlockScalar(ctx *composeContext, scalar *cst.Token, onError onErrorFunc) scalarResolution {
+func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError onErrorFunc) scalarResolution {
 	start := scalar.Offset
-	header := parseBlockScalarHeader(scalar, ctx.options.Strict, onError)
+	header := parseBlockScalarHeader(scalar, composition.options.Strict, onError)
 	if header == nil {
 		return scalarResolution{value: []uint16{}, valueRange: []int{start, start, start}}
 	}
@@ -348,7 +348,7 @@ func resolveBlockScalar(ctx *composeContext, scalar *cst.Token, onError onErrorF
 				trimIndent = len(indent)
 			}
 			contentStart = i
-			if trimIndent == 0 && !ctx.atRoot {
+			if trimIndent == 0 && !composition.atRoot {
 				message := "Block scalar values in collections must be indented"
 				onError(offset, "BAD_INDENT", message, false)
 			}

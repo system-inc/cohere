@@ -25,9 +25,9 @@ func moduleRoot(test *testing.T) string {
 
 func built(test *testing.T) map[string][]byte {
 	test.Helper()
-	files, err := Build(registry.Names())
-	if err != nil {
-		test.Fatal(err)
+	files, buildError := Build(registry.Names())
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	return files
 }
@@ -38,9 +38,9 @@ func built(test *testing.T) map[string][]byte {
 func TestTheCommittedFilesAreCurrent(test *testing.T) {
 	test.Parallel()
 	for path, contents := range built(test) {
-		committed, err := os.ReadFile(filepath.Join(moduleRoot(test), path))
-		if err != nil {
-			test.Fatalf("%s: %v; run go run ./internal/settingsschema/tools/generate", path, err)
+		committed, readError := os.ReadFile(filepath.Join(moduleRoot(test), path))
+		if readError != nil {
+			test.Fatalf("%s: %v; run go run ./internal/settingsschema/tools/generate", path, readError)
 		}
 		if !bytes.Equal(committed, contents) {
 			test.Errorf("%s is stale; run go run ./internal/settingsschema/tools/generate", path)
@@ -54,11 +54,11 @@ func writeSettings(test *testing.T, files map[string]string) string {
 	root := test.TempDir()
 	for name, contents := range files {
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	return filepath.Join(root, "CohereSettings.json")
@@ -106,15 +106,15 @@ func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
 			test.Errorf("the schema names %q and the test has no settings file using it; add one to keyFixtures", key)
 			continue
 		}
-		if _, err := configuration.Load(writeSettings(test, fixture)); err != nil {
-			test.Errorf("the schema names %q and the loader refuses a file using it: %v", key, err)
+		if _, loadError := configuration.Load(writeSettings(test, fixture)); loadError != nil {
+			test.Errorf("the schema names %q and the loader refuses a file using it: %v", key, loadError)
 		}
 	}
 
 	// The reverse: a key no schema names is refused, and every key the loader's own tables accept is in
 	// the Nexus schema.
 	for _, unknown := range []string{"env", "globals", "excludedFiles", "formatting"} {
-		if _, err := configuration.Load(writeSettings(test, map[string]string{"CohereSettings.json": `{"` + unknown + `": {}}`})); err == nil {
+		if _, loadError := configuration.Load(writeSettings(test, map[string]string{"CohereSettings.json": `{"` + unknown + `": {}}`})); loadError == nil {
 			test.Errorf("the loader accepts %q, which no schema names", unknown)
 		}
 	}
@@ -130,11 +130,11 @@ func TestTheSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
 		test.Errorf("project schema keys %v, want the Nexus schema's: %v", projectKeys, nexusKeys)
 	}
 	outsider := filepath.Dir(writeSettings(test, map[string]string{"CohereSettings.json": `{"format": {"tabWidth": 2}}`}))
-	if resolution, err := formatoptions.Resolve(outsider); err != nil || resolution.Options.TabWidth != 2 {
-		test.Errorf("an outsider's format block did not decide (%+v, %v), so the project schema is wrong to name format", resolution.Options, err)
+	if resolution, resolveError := formatoptions.Resolve(outsider); resolveError != nil || resolution.Options.TabWidth != 2 {
+		test.Errorf("an outsider's format block did not decide (%+v, %v), so the project schema is wrong to name format", resolution.Options, resolveError)
 	}
 	ours := filepath.Dir(writeSettings(test, map[string]string{"CohereSettings.json": `{"extends": "cohere:system-inc/structure", "format": {"tabWidth": 2}}`}))
-	if _, err := formatoptions.Resolve(ours); err == nil {
+	if _, resolveError := formatoptions.Resolve(ours); resolveError == nil {
 		test.Error("a format block in a chain extending cohere:system-inc/structure resolved, so the description is wrong to say it is refused")
 	}
 }
@@ -310,8 +310,8 @@ func TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
 			} `json:"override"`
 		} `json:"$defs"`
 	}
-	if err := json.Unmarshal(built(test)[ProjectSchemaPath], &schema); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(built(test)[ProjectSchemaPath], &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	fixtures := map[string]string{"files": `"files": ["**/*.ts"]`, "rules": `"rules": {"no-debugger": "off"}`, "reason": `"reason": "why"`}
 	for key := range schema.Defs.Override.Properties {
@@ -324,14 +324,14 @@ func TestTheOverrideSchemaHasExactlyTheKeysTheLoaderAccepts(test *testing.T) {
 		if key != "files" {
 			block = `{"files": ["**/*.ts"], ` + fixture + `}`
 		}
-		if _, err := configuration.Load(writeSettings(test, map[string]string{"CohereSettings.json": `{"overrides": [` + block + `]}`})); err != nil {
-			test.Errorf("the override schema names %q and the loader refuses it: %v", key, err)
+		if _, loadError := configuration.Load(writeSettings(test, map[string]string{"CohereSettings.json": `{"overrides": [` + block + `]}`})); loadError != nil {
+			test.Errorf("the override schema names %q and the loader refuses it: %v", key, loadError)
 		}
 	}
 	if len(schema.Defs.Override.Properties) != len(fixtures) {
 		test.Errorf("the override schema names %d keys, the test knows %d", len(schema.Defs.Override.Properties), len(fixtures))
 	}
-	if _, err := configuration.Load(writeSettings(test, map[string]string{"CohereSettings.json": `{"overrides": [{"files": ["**/*.ts"], "excludedFiles": ["x.ts"]}]}`})); err == nil {
+	if _, loadError := configuration.Load(writeSettings(test, map[string]string{"CohereSettings.json": `{"overrides": [{"files": ["**/*.ts"], "excludedFiles": ["x.ts"]}]}`})); loadError == nil {
 		test.Error("the loader accepts an override's excludedFiles, which the schema does not name")
 	}
 }
@@ -348,8 +348,8 @@ func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(test *testing.T) {
 			} `json:"properties"`
 		} `json:"properties"`
 	}
-	if err := json.Unmarshal(built(test)[NexusSchemaPath], &schema); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(built(test)[NexusSchemaPath], &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	options := schema.Properties[FormatKey].Properties
 	if len(options) != len(formatoptions.BlockKeys) {
@@ -367,15 +367,15 @@ func TestTheFormatSchemaHasExactlyTheKeysTheFormatterAccepts(test *testing.T) {
 			"NexusCohereSettings.json": `{"format": {"` + name + `": ` + value + `}}`,
 			"CohereSettings.json":      `{"extends": "./NexusCohereSettings.json"}`,
 		}))
-		if _, err := formatoptions.Resolve(root); err != nil {
-			test.Errorf("the format schema names %q and the formatter refuses it: %v", name, err)
+		if _, resolveError := formatoptions.Resolve(root); resolveError != nil {
+			test.Errorf("the format schema names %q and the formatter refuses it: %v", name, resolveError)
 		}
 	}
 	root := filepath.Dir(writeSettings(test, map[string]string{
 		"NexusCohereSettings.json": `{"format": {"quoteProps": "as-needed"}}`,
 		"CohereSettings.json":      `{"extends": "./NexusCohereSettings.json"}`,
 	}))
-	if _, err := formatoptions.Resolve(root); err == nil {
+	if _, resolveError := formatoptions.Resolve(root); resolveError == nil {
 		test.Error("the formatter accepts quoteProps, which the format schema does not name")
 	}
 }
@@ -391,8 +391,8 @@ func TestTheRulesAreTheRegistrys(test *testing.T) {
 			} `json:"rules"`
 		} `json:"$defs"`
 	}
-	if err := json.Unmarshal(built(test)[ProjectSchemaPath], &schema); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(built(test)[ProjectSchemaPath], &schema); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	var offered []string
 	for name := range schema.Defs.Rules.Properties {
@@ -412,13 +412,13 @@ func TestTheSeveritiesAreTheLoaders(test *testing.T) {
 	test.Parallel()
 	for _, spelling := range configuration.SeveritySpellings {
 		for _, variant := range []string{spelling, strings.ToUpper(spelling), strings.ToUpper(spelling[:1]) + spelling[1:]} {
-			if err := configuration.ParseSeverity(variant); err != nil {
-				test.Errorf("the schema allows %q and the loader refuses it: %v", variant, err)
+			if parseSeverityError := configuration.ParseSeverity(variant); parseSeverityError != nil {
+				test.Errorf("the schema allows %q and the loader refuses it: %v", variant, parseSeverityError)
 			}
 		}
 	}
 	for _, refused := range []string{"fatal", "on", "0", "2", "errors"} {
-		if err := configuration.ParseSeverity(refused); err == nil {
+		if parseSeverityError := configuration.ParseSeverity(refused); parseSeverityError == nil {
 			test.Errorf("the loader accepts %q, which the schema does not allow", refused)
 		}
 	}
@@ -493,13 +493,13 @@ func TestEveryCarriedSetFitsTheSchema(test *testing.T) {
 		return set
 	}
 	for _, name := range configuration.SetNames() {
-		contents, err := configuration.SourceContents(name)
-		if err != nil {
-			test.Fatal(err)
+		contents, sourceContentsError := configuration.SourceContents(name)
+		if sourceContentsError != nil {
+			test.Fatal(sourceContentsError)
 		}
 		var keys map[string]json.RawMessage
-		if err := json.Unmarshal(contents, &keys); err != nil {
-			test.Fatalf("%s: %v", name, err)
+		if decodeError := json.Unmarshal(contents, &keys); decodeError != nil {
+			test.Fatalf("%s: %v", name, decodeError)
 		}
 		schemaKeys := allowed(projectKeys)
 		if name == formatoptions.NexusTierSetName {
@@ -530,11 +530,11 @@ func TestTheDocumentedSetupsWork(test *testing.T) {
 		},
 	} {
 		path := writeSettings(test, files)
-		if _, err := configuration.Load(path); err != nil {
-			test.Errorf("%s: the loader refuses it: %v", name, err)
+		if _, loadError := configuration.Load(path); loadError != nil {
+			test.Errorf("%s: the loader refuses it: %v", name, loadError)
 		}
-		if _, err := formatoptions.Resolve(filepath.Dir(path)); err != nil {
-			test.Errorf("%s: the formatter refuses it: %v", name, err)
+		if _, resolveError := formatoptions.Resolve(filepath.Dir(path)); resolveError != nil {
+			test.Errorf("%s: the formatter refuses it: %v", name, resolveError)
 		}
 	}
 }

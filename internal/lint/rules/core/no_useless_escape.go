@@ -102,7 +102,7 @@ type NoUselessEscapeOptions struct {
 // difference is visible as the literal's parent and nothing else.
 var NoUselessEscape = rule.Rule{
 	Name: "no-useless-escape",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowed := map[rune]bool{}
 		if configured, isConfigured := rule.OptionsAs[NoUselessEscapeOptions](options); isConfigured {
 			for _, entry := range configured.AllowRegexCharacters {
@@ -115,9 +115,9 @@ var NoUselessEscape = rule.Rule{
 		}
 
 		report := func(start int, end int, escaped string) {
-			ctx.Report(rule.Diagnostic{
+			ruleContext.Report(rule.Diagnostic{
 				Range:      core.NewTextRange(start, end),
-				SourceFile: ctx.SourceFile,
+				SourceFile: ruleContext.SourceFile,
 				Message: rule.Message{
 					Id: "noUselessEscape",
 					Description: fmt.Sprintf(
@@ -147,8 +147,8 @@ var NoUselessEscape = rule.Rule{
 				if node.Parent != nil && node.Parent.Kind == ast.KindJsxAttribute {
 					return
 				}
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 				reportQuoted(literalRange.Pos(), raw, uselessStringEscapes(raw))
 			},
 
@@ -156,8 +156,8 @@ var NoUselessEscape = rule.Rule{
 				if isTaggedTemplateBody(node) {
 					return
 				}
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 				reportQuoted(literalRange.Pos(), raw, uselessTemplateEscapes(raw))
 			},
 
@@ -166,8 +166,8 @@ var NoUselessEscape = rule.Rule{
 					return
 				}
 				for _, part := range templateTextParts(node) {
-					partRange := rule.TokenRange(ctx.SourceFile, part)
-					raw := ctx.SourceFile.Text()[partRange.Pos():partRange.End()]
+					partRange := rule.TokenRange(ruleContext.SourceFile, part)
+					raw := ruleContext.SourceFile.Text()[partRange.Pos():partRange.End()]
 					reportQuoted(partRange.Pos(), raw, uselessTemplateEscapes(raw))
 				}
 			},

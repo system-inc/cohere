@@ -43,14 +43,14 @@ func TestExportGraphsForAdamic(test *testing.T) {
 	if *exportGraphs == "" {
 		test.Skip("writes Adamic's corpus only when -export-graphs names a directory")
 	}
-	if err := os.MkdirAll(*exportGraphs, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(*exportGraphs, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	fixtures, functions := 0, 0
 	for _, fixture := range reactCompilerFixtures(test) {
-		lowered := lowerReactCompilerFixture(test, fixture.source, func(ctx rule.Context, node *ast.Node) *Function {
-			return Lower(node, ctx.TypeChecker)
+		lowered := lowerReactCompilerFixture(test, fixture.source, func(ruleContext rule.Context, node *ast.Node) *Function {
+			return Lower(node, ruleContext.TypeChecker)
 		})
 		name := fixture.name
 
@@ -71,8 +71,8 @@ func TestExportGraphsForAdamic(test *testing.T) {
 		if index == 0 {
 			continue
 		}
-		if err := os.WriteFile(filepath.Join(*exportGraphs, name+".txt"), []byte(out.String()), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(*exportGraphs, name+".txt"), []byte(out.String()), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		fixtures++
 	}
@@ -94,7 +94,7 @@ func reactCompilerFixtures(test *testing.T) []reactCompilerFixture {
 	test.Helper()
 	root := filepath.Join("..", "..", "rules", "react", "conformance", "testdata", "fixtures")
 	var paths []string
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -103,8 +103,8 @@ func reactCompilerFixtures(test *testing.T) []reactCompilerFixture {
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	sort.Strings(paths)
 	var fixtures []reactCompilerFixture
@@ -134,14 +134,14 @@ func lowerReactCompilerFixture(test *testing.T, source string, lower func(rule.C
 	probe := rule.Rule{
 		Name:             "adamic-graphs-export",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the harness produced no type checker, so every reference would lower as a global")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
-						if fn := lower(ctx, function); fn != nil {
+						if fn := lower(ruleContext, function); fn != nil {
 							lowered = append(lowered, fn)
 						}
 					})

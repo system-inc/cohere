@@ -17,9 +17,9 @@ const paramReassignFile = "/repository/source/ParamReassign.ts"
 // fresh pattern at every call and this compiles once and caches.
 func decodedParamOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeNoParamReassignOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", raw, err)
+	decoded, decodeNoParameterReassignOptionsError := DecodeNoParamReassignOptions([]byte(raw))
+	if decodeNoParameterReassignOptionsError != nil {
+		test.Fatalf("decoding %s: %v", raw, decodeNoParameterReassignOptionsError)
 	}
 	return decoded
 }
@@ -479,9 +479,9 @@ func TestNoParamReassignOptions(test *testing.T) {
 
 	test.Run("empty input decodes without erroring", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoParamReassignOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding empty input: %v", err)
+		decoded, decodeNoParameterReassignOptionsError := DecodeNoParamReassignOptions(nil)
+		if decodeNoParameterReassignOptionsError != nil {
+			test.Fatalf("decoding empty input: %v", decodeNoParameterReassignOptionsError)
 		}
 		options, ok := decoded.(NoParamReassignOptions)
 		if !ok {
@@ -494,7 +494,7 @@ func TestNoParamReassignOptions(test *testing.T) {
 
 	test.Run("malformed input is an error", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeNoParamReassignOptions([]byte("[")); err == nil {
+		if _, decodeNoParameterReassignOptionsError := DecodeNoParamReassignOptions([]byte("[")); decodeNoParameterReassignOptionsError == nil {
 			test.Error("malformed options decoded without an error")
 		}
 	})

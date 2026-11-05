@@ -82,10 +82,10 @@ var NoThrowLiteral = rule.Rule{
 	Name:             "no-throw-literal",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindThrowStatement: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				argument := node.AsThrowStatement().Expression
@@ -97,15 +97,15 @@ var NoThrowLiteral = rule.Rule{
 				}
 
 				if !couldBeError(argument) {
-					ctx.ReportNode(node, messageNoThrowLiteralObject)
+					ruleContext.ReportNode(node, messageNoThrowLiteralObject)
 					return
 				}
 
 				// Reached only for an argument that could be an Error, which an identifier always
 				// is. Upstream orders these the same way, so `throw undefined` never produces both.
 				if argument.Kind == ast.KindIdentifier && argument.Text() == "undefined" &&
-					!undefinedIsShadowed(ctx, argument) {
-					ctx.ReportNode(node, messageNoThrowLiteralUndef)
+					!undefinedIsShadowed(ruleContext, argument) {
+					ruleContext.ReportNode(node, messageNoThrowLiteralUndef)
 				}
 			},
 		}

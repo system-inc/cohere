@@ -24,9 +24,9 @@ func restrictTemplateExpressionsCaseName(index int) string {
 // The empty string is the shape a bare `"error"` delivers: no bytes at all.
 func restrictTemplateExpressionsSettingsFor(test *testing.T, wire string) any {
 	test.Helper()
-	decoded, err := DecodeRestrictTemplateExpressionsOptions([]byte(wire))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", wire, err)
+	decoded, decodeRestrictTemplateExpressionsOptionsError := DecodeRestrictTemplateExpressionsOptions([]byte(wire))
+	if decodeRestrictTemplateExpressionsOptionsError != nil {
+		test.Fatalf("decoding %q: %v", wire, decodeRestrictTemplateExpressionsOptionsError)
 	}
 	return decoded
 }
