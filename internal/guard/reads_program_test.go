@@ -45,10 +45,11 @@ func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(test *testing.T) {
 	}
 	helpers := programHelperReads(test, append(append(append([]string{}, ruleFiles...), checkingSourceFiles(test)...),
 		ruleInterfaceSourceFiles(test)...))
+	contextFields := contextFieldsByDirectory(test, ruleFiles)
 
 	sawProgramReader := false
 	for _, path := range ruleFiles {
-		facts := readProgramFacts(test, path, helpers)
+		facts := readProgramFacts(test, path, helpers, contextFields[filepath.Dir(path)])
 		if !facts.readsProgram {
 			continue
 		}
@@ -106,7 +107,9 @@ func TestReadProgramFactsSeesCodeNotComments(test *testing.T) {
 	testCases := []struct {
 		name   string
 		source string
-		want   programFacts
+		// sibling is another file of the probe's package, when the shape spans two.
+		sibling string
+		want    programFacts
 	}{
 		{
 			// The shape DesignSystemForProgram had: a helper reading the program for its callers.
@@ -140,6 +143,26 @@ var Probe = rule.Rule[rule.NoOptions]{ProgramReads: rule.ReadsModuleResolution, 
 				reads:        readsModuleResolution,
 				declared:     readsModuleResolution,
 			},
+		},
+		{
+			// A helper reading the program through a field declared in another file of its package, the
+			// shape a walker split from its rule has: the field's type says it is the context, whatever
+			// it is called.
+			name: "a context field declared in another file of the package",
+			source: `package probe
+func (walker probeWalker) helper() bool { return walker.ruleContext.Program.Options() != nil }`,
+			sibling: `package probe
+type probeWalker struct { ruleContext rule.Context }`,
+			want: programFacts{readsProgram: true, reads: readsCompilerOptions},
+		},
+		{
+			// The same name on a field of another type is not the context.
+			name: "a field of another type under a context's name",
+			source: `package probe
+func (walker probeWalker) helper() bool { return walker.ruleContext.Program.Options() != nil }`,
+			sibling: `package probe
+type probeWalker struct { ruleContext probeState }`,
+			want: programFacts{},
 		},
 		{
 			// A read through a helper counts as the helper's reads.
@@ -183,11 +206,20 @@ var Probe = rule.Rule[rule.NoOptions]{Run: func(ctx rule.Context, options rule.G
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			path := filepath.Join(test.TempDir(), "probe.go")
+			directory := test.TempDir()
+			path := filepath.Join(directory, "probe.go")
 			if writeError := os.WriteFile(path, []byte(testCase.source), 0o644); writeError != nil {
 				test.Fatal(writeError)
 			}
-			got := readProgramFacts(test, path, helpers)
+			paths := []string{path}
+			if testCase.sibling != "" {
+				siblingPath := filepath.Join(directory, "sibling.go")
+				if writeError := os.WriteFile(siblingPath, []byte(testCase.sibling), 0o644); writeError != nil {
+					test.Fatal(writeError)
+				}
+				paths = append(paths, siblingPath)
+			}
+			got := readProgramFacts(test, path, helpers, contextFieldsByDirectory(test, paths)[directory])
 			if got.readsProgram != testCase.want.readsProgram || got.definesRule != testCase.want.definesRule ||
 				got.reads != testCase.want.reads || got.declared != testCase.want.declared ||
 				strings.Join(got.unseenCallees, ",") != strings.Join(testCase.want.unseenCallees, ",") {
@@ -360,11 +392,53 @@ func programHelperReads(test *testing.T, paths []string) map[string]programRead 
 	return reads
 }
 
+// contextFieldsByDirectory is, for each directory of paths, the name of every struct field of type
+// rule.Context its files declare. A directory is a package, so a walker's field declared beside its
+// rule is the context in every file of the package that reads it.
+func contextFieldsByDirectory(test *testing.T, paths []string) map[string]map[string]bool {
+	test.Helper()
+
+	fields := map[string]map[string]bool{}
+	for _, path := range paths {
+		file, parseFileError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if parseFileError != nil {
+			test.Fatalf("parsing %s: %v", path, parseFileError)
+		}
+		directory := filepath.Dir(path)
+		ast.Inspect(file, func(node ast.Node) bool {
+			structType, isStruct := node.(*ast.StructType)
+			if !isStruct {
+				return true
+			}
+			for _, field := range structType.Fields.List {
+				if !isRuleSelector(field.Type, "Context") {
+					continue
+				}
+				if fields[directory] == nil {
+					fields[directory] = map[string]bool{}
+				}
+				for _, name := range field.Names {
+					fields[directory][name.Name] = true
+				}
+			}
+			return true
+		})
+	}
+	return fields
+}
+
 // readProgramFacts parses one file and reports what it does with the program.
 //
-// Names of rule.Context parameters are collected first, since a rule may call its context anything;
-// ctx and context are added for the rare function literal whose parameter types are elided.
-func readProgramFacts(test *testing.T, path string, helpers map[string]programRead) programFacts {
+// A context is known by its type: the names of the file's rule.Context parameters, and contextFields,
+// the rule.Context fields its package declares in any file, so `walker.ruleContext.Program` in a helper
+// file is caught as a parameter's is. ctx and context are added for the rare function literal whose
+// parameter types are elided.
+func readProgramFacts(
+	test *testing.T,
+	path string,
+	helpers map[string]programRead,
+	contextFields map[string]bool,
+) programFacts {
 	test.Helper()
 
 	file, parseFileError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
@@ -373,6 +447,9 @@ func readProgramFacts(test *testing.T, path string, helpers map[string]programRe
 	}
 
 	contextNames := map[string]bool{"ctx": true, "context": true}
+	for name := range contextFields {
+		contextNames[name] = true
+	}
 	ast.Inspect(file, func(node ast.Node) bool {
 		if function, isFunction := node.(*ast.FuncType); isFunction && function.Params != nil {
 			for _, field := range function.Params.List {
