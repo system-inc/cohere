@@ -462,7 +462,8 @@ func TestMutatingMethodReceiverSurvivesArgumentControlFlow(test *testing.T) {
 					argumentIsPhi, testCase.wantArgumentPhi)
 			}
 
-			var initializer, storedX Place
+			var initializer Place
+			var storedX Place
 			foundStore := false
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
