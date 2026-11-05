@@ -27,7 +27,8 @@ import (
  *
  * So this reads the rules tree with type information. It takes every struct field reachable from an
  * option decode, the same decodes option_decoding_test.go finds, and looks in every non-test file
- * for a selector that reads it. Two uses are not reads:
+ * for a selector that reads it, or a conversion that copies its struct whole (`Entry(wire)`, which reads
+ * every field of wire though no selector names one). Two uses are not reads:
  *
  *   - the left side of a plain assignment, which is where a default is written;
  *   - the condition of an `if` whose body assigns that same field, which is the defaulting idiom
@@ -233,17 +234,48 @@ func markOptionReads(file *ast.File, info *types.Info, fields map[*types.Var]opt
 	})
 
 	ast.Inspect(file, func(node ast.Node) bool {
-		selector, isSelector := node.(*ast.SelectorExpr)
-		if !isSelector || notReads[selector] {
-			return true
-		}
-		if field := selectedField(info, selector); field != nil {
-			if _, isOption := fields[field]; isOption {
-				read[field] = true
+		switch expression := node.(type) {
+		case *ast.SelectorExpr:
+			if notReads[expression] {
+				return true
 			}
+			if field := selectedField(info, expression); field != nil {
+				if _, isOption := fields[field]; isOption {
+					read[field] = true
+				}
+			}
+		case *ast.CallExpr:
+			markConversionReads(expression, info, fields, read)
 		}
 		return true
 	})
+}
+
+// markConversionReads marks every option field of the struct a conversion copies. `Entry(wire)` reads
+// each field of wire into Entry without a selector naming one, which is how a decoder hands its wire
+// shape to the shape the rule reads. Only the operand's own fields need marking: a conversion needs
+// identical underlying types, so a nested or embedded named struct is the same type on both sides and
+// a read through the result is already a selector on the same field.
+func markConversionReads(
+	call *ast.CallExpr, info *types.Info, fields map[*types.Var]optionField, read map[*types.Var]bool,
+) {
+	if len(call.Args) != 1 || !info.Types[call.Fun].IsType() {
+		return
+	}
+	operandType := types.Unalias(info.TypeOf(call.Args[0]))
+	if pointer, isPointer := operandType.(*types.Pointer); isPointer {
+		operandType = types.Unalias(pointer.Elem())
+	}
+	structure, isStruct := operandType.Underlying().(*types.Struct)
+	if !isStruct {
+		return
+	}
+	for index := range structure.NumFields() {
+		field := structure.Field(index).Origin()
+		if _, isOption := fields[field]; isOption {
+			read[field] = true
+		}
+	}
 }
 
 // selectedField is the field a selector expression selects, at its generic origin, or nil.
@@ -316,6 +348,7 @@ func TestTheOptionReadGuardSeesAnUnreadField(test *testing.T) {
 		"plantedNested.DeepUnread":       true,
 		"plantedEmbedded.PromotedUnread": true,
 		"plantedListEntry.EntryUnread":   true,
+		"plantedKeptWire.KeptUnread":     true,
 	}
 	for key := range want {
 		if !unread[key] {
@@ -332,7 +365,11 @@ func TestTheOptionReadGuardSeesAnUnreadField(test *testing.T) {
 	for _, field := range findings.fields {
 		seen[field.key] = true
 	}
-	for _, key := range []string{"plantedOptions.Read", "plantedOptions.DefaultedThenRead", "plantedNested.DeepRead", "plantedEmbedded.PromotedRead", "plantedListEntry.EntryRead", "plantedSelfDecoding.Mode"} {
+	for _, key := range []string{
+		"plantedOptions.Read", "plantedOptions.DefaultedThenRead", "plantedNested.DeepRead",
+		"plantedEmbedded.PromotedRead", "plantedListEntry.EntryRead", "plantedSelfDecoding.Mode",
+		"plantedWireEntry.ConvertedElement", "plantedWireEntry.ConvertedMessage",
+	} {
 		if !seen[key] {
 			test.Errorf("the planted read field %s was not collected, so its silence proves nothing", key)
 		}
