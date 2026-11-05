@@ -196,8 +196,8 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 				if len(got[wantSetIndex]) != len(want) {
 					test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 				}
-				for j := range want {
-					if got[wantSetIndex][j] != want[j] {
+				for index := range want {
+					if got[wantSetIndex][index] != want[index] {
 						test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 					}
 				}
@@ -1084,8 +1084,8 @@ export function repeat(seed: number) {
 		if len(firstSets[firstSetIndex]) != len(secondSets[firstSetIndex]) {
 			test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 		}
-		for j := range firstSets[firstSetIndex] {
-			if firstSets[firstSetIndex][j] != secondSets[firstSetIndex][j] {
+		for index := range firstSets[firstSetIndex] {
+			if firstSets[firstSetIndex][index] != secondSets[firstSetIndex][index] {
 				test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 			}
 		}
