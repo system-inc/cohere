@@ -63,6 +63,7 @@ func javaScriptNumberString(value float64) string {
 	scientific := strconv.FormatFloat(value, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(scientific, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
+	// Ignored: FormatFloat's 'e' form always writes its exponent as a sign and decimal digits, which Atoi reads.
 	exponent, _ := strconv.Atoi(exponentText)
 	// The specification's n: the value is 0.digits × 10^n.
 	n := exponent + 1

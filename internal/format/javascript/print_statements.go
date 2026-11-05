@@ -146,7 +146,8 @@ func printDoWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 // printTryStatement is upstream's printTryStatement.
 func printTryStatement(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var handler, finalizer Doc = emptyDoc, emptyDoc
+	var handler Doc = emptyDoc
+	var finalizer Doc = emptyDoc
 	if current.Child("handler") != nil {
 		handler = print("handler", nil)
 	}

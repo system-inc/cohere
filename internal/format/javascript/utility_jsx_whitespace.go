@@ -1,6 +1,7 @@
 package javascript
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 )
@@ -24,10 +25,17 @@ func newWhitespaceUtilities(whitespaceCharacters string) *whitespaceUtilities {
 		set[whitespaceCharacters[index]] = true
 		class += regexp.QuoteMeta(whitespaceCharacters[index : index+1])
 	}
+	pattern, patternError := regexp.Compile("[" + class + "]+")
+	capturingPattern, capturingPatternError := regexp.Compile("([" + class + "]+)")
+	if patternError != nil || capturingPatternError != nil {
+		// Invariant: the only caller is jsxWhitespace's initializer, with JSX's " \n\r\t", four characters
+		// that make a valid class.
+		panic(errors.Join(patternError, capturingPatternError))
+	}
 	return &whitespaceUtilities{
 		whitespaceCharacters: set,
-		pattern:              regexp.MustCompile("[" + class + "]+"),
-		capturingPattern:     regexp.MustCompile("([" + class + "]+)"),
+		pattern:              pattern,
+		capturingPattern:     capturingPattern,
 	}
 }
 

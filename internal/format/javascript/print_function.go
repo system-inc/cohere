@@ -150,6 +150,8 @@ func printMethod(path *Path, options *Options, print PrintFunc) Doc {
 	} else {
 		// upstream's assert.ok(kind === "get" || kind === "set")
 		if kind != "get" && kind != "set" {
+			// Invariant: estree builds a method's kind as init, method, constructor, get or set, as upstream's
+			// assert assumes.
 			panic(fmt.Sprintf("javascript: unexpected method kind %q", kind))
 		}
 

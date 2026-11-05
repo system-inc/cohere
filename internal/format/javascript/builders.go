@@ -82,6 +82,8 @@ func toDoc(value any) Doc {
 		}
 		return parts
 	}
+	// Invariant: toDoc's values are built by this printer's own code, never read from input, and every builder
+	// passes a doc, a string, nil or a slice of them.
 	panic(fmt.Sprintf("javascript: %T is not a doc", value))
 }
 
@@ -108,6 +110,8 @@ type docMemory struct {
 	indents   arena.Arena[doc.Indent]
 }
 
+var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
+
 var docMemories = sync.Pool{New: func() any {
 	memory := &docMemory{}
 	memory.parts.Poison = poisonedDoc
@@ -116,8 +120,6 @@ var docMemories = sync.Pool{New: func() any {
 	memory.indents.Poison = doc.Indent{Contents: poisonedDoc}
 	return memory
 }}
-
-var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
 
 // acquireDocMemory is a docMemory for one format, from the pool. Release it once the doc is laid out.
 func acquireDocMemory() *docMemory {

@@ -326,7 +326,8 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 		}
 		// normal mode
 		consequentIsTernary := consequentNode.Is(current.Type())
-		var openParen, closeParen Doc = emptyDoc, emptyDoc
+		var openParen Doc = emptyDoc
+		var closeParen Doc = emptyDoc
 		if consequentIsTernary {
 			openParen = ifBreak("", "(")
 		}

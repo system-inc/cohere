@@ -37,15 +37,16 @@ func shouldAlwaysAddParens(node Node) bool { return node.Is("SequenceExpression"
 // replaced with an empty one, and that empty one is what reaches print("body", args), as upstream's {}
 // does.
 func printArrowFunction(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
-	if args == nil {
-		args = &printArguments{}
+	resolvedArguments := args
+	if resolvedArguments == nil {
+		resolvedArguments = &printArguments{}
 	}
 	var signatureDocs []Doc
 	var bodyDoc Doc
 	var bodyComments []Doc
 	shouldBreakChain := false
 	shouldPrintAsChain :=
-		!args.expandLastArg && node(path).Child("body").Is("ArrowFunctionExpression")
+		!resolvedArguments.expandLastArg && node(path).Child("body").Is("ArrowFunctionExpression")
 	var functionBody Node
 
 	// upstream's immediately invoked `(function rec() { ... })()`, with path.call(rec, "body").
@@ -56,7 +57,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 			path,
 			options,
 			print,
-			args,
+			resolvedArguments,
 		)
 		if len(signatureDocs) == 0 {
 			signatureDocs = append(signatureDocs, signatureDoc)
@@ -77,7 +78,7 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 		}
 
 		if !shouldPrintAsChain || !current.Child("body").Is("ArrowFunctionExpression") {
-			bodyDoc = print("body", args)
+			bodyDoc = print("body", resolvedArguments)
 			functionBody = current.Child("body")
 		} else {
 			call(path, func(path *Path) any { rec(path); return nil }, "body")
@@ -96,14 +97,14 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 	isCallee := keyOf(path) == "callee" && isCallLikeExpression(parentOf(path))
 	chainGroupID := newGroupID("arrow-chain")
 
-	signaturesDoc := printArrowFunctionSignatures(path, args, signatureDocs, shouldBreakChain)
+	signaturesDoc := printArrowFunctionSignatures(path, resolvedArguments, signatureDocs, shouldBreakChain)
 	shouldBreakSignatures := false
 	shouldIndentSignatures := false
 	shouldPrintSoftlineInIndent := false
 	if shouldPrintAsChain &&
 		(isCallee ||
 			// isAssignmentRhs
-			args.assignmentLayout != "") {
+			resolvedArguments.assignmentLayout != "") {
 		shouldIndentSignatures = true
 		// If the arrow function has a leading line comment, there should be a hardline above it
 		// so we should not print a softline in indent call
@@ -117,11 +118,19 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 			nil,
 		)
 		shouldBreakSignatures =
-			args.assignmentLayout == "chain-tail-arrow-chain" ||
+			resolvedArguments.assignmentLayout == "chain-tail-arrow-chain" ||
 				(isCallee && !shouldPutBodyOnSameLine)
 	}
 
-	bodyDoc = printArrowFunctionBody(path, options, args, bodyDoc, bodyComments, functionBody, shouldPutBodyOnSameLine)
+	bodyDoc = printArrowFunctionBody(
+		path,
+		options,
+		resolvedArguments,
+		bodyDoc,
+		bodyComments,
+		functionBody,
+		shouldPutBodyOnSameLine,
+	)
 
 	var signatures Doc = signaturesDoc
 	if shouldIndentSignatures {
@@ -166,6 +175,8 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 		returnTypeDoc := printReturnType(path, print)
 		if shouldExpandParameters {
 			if doc.WillBreak(returnTypeDoc) {
+				// Invariant: expandFirstArg and expandLastArg are set only by printCallArguments, inside
+				// printCatchingArgExpansionBailout, whose recover catches this, as upstream catches its throw.
 				panic(argExpansionBailout{})
 			}
 			returnTypeDoc = groupIn(path, doc.RemoveLines(returnTypeDoc))

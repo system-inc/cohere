@@ -135,22 +135,23 @@ func isNodeMatches(node Node, nameOrPaths []string) bool {
 // is left before it, and second (index 1) when exactly one name is.
 func isNodeMatchesNameOrPath(node Node, nameOrPath string) bool {
 	rest := nameOrPath
+	current := node
 	for {
 		dot := strings.LastIndexByte(rest, '.')
 		name := rest[dot+1:]
 		if dot == -1 {
-			return node.Is("Identifier") && node.String("name") == name
+			return current.Is("Identifier") && current.String("name") == name
 		}
 		rest = rest[:dot]
 		isSecond := strings.IndexByte(rest, '.') == -1
-		if isSecond && node.Is("MetaProperty") && node.Child("property").Is("Identifier") &&
-			node.Child("property").String("name") == name {
-			node = node.Child("meta")
+		if isSecond && current.Is("MetaProperty") && current.Child("property").Is("Identifier") &&
+			current.Child("property").String("name") == name {
+			current = current.Child("meta")
 			continue
 		}
-		if node.Is("MemberExpression") && !node.Truthy("optional") && !node.Truthy("computed") &&
-			node.Child("property").Is("Identifier") && node.Child("property").String("name") == name {
-			node = node.Child("object")
+		if current.Is("MemberExpression") && !current.Truthy("optional") && !current.Truthy("computed") &&
+			current.Child("property").Is("Identifier") && current.Child("property").String("name") == name {
+			current = current.Child("object")
 			continue
 		}
 		return false

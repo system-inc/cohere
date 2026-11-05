@@ -38,7 +38,8 @@ var formatCases = []formatCase{
 	{
 		name:     "control keywords have no space before their parenthesis",
 		fileName: "Probe.ts",
-		source: "if (a) { b() } else if (c) { d() } else { e() }\nfor (let i = 0; i < 3; i++) {}\nfor (const x of y) {}\n" +
+		source: "if (a) { b() } else if (c) { d() } else { e() }\nfor (let i = 0; i < 3; i++) {}\n" +
+			"for (const x of y) {}\n" +
 			"while (a) {}\ndo { a() } while (b)\nswitch (a) { case 1: break; default: }\nfor (;;) {}\n",
 		contains: []string{
 			"if(a) {",
@@ -55,43 +56,55 @@ var formatCases = []formatCase{
 	{
 		name:     "member chains, call arguments and arrow chains break as the fork breaks them",
 		fileName: "Probe.ts",
-		source: "const result = items.filter((item) => item.enabled && item.visible).map((item) => item.identifier).reduce((total, identifier) => total + identifier.length, 0);\n" +
-			"const curried = (a: number) => (b: number) => (c: number) => (d: number) => a + b + c + d + someVeryLongIdentifierName + anotherVeryLongIdentifierName;\n" +
+		source: "const result = items.filter((item) => item.enabled && item.visible).map((item) => " +
+			"item.identifier).reduce((total, identifier) => total + identifier.length, 0);\n" +
+			"const curried = (a: number) => (b: number) => (c: number) => (d: number) => a + b + c + d + " +
+			"someVeryLongIdentifierName + anotherVeryLongIdentifierName;\n" +
 			"useEffect(() => { subscribe(); return () => unsubscribe(); }, [subscribe, unsubscribe]);\n",
 	},
 	{
 		name:     "types: unions, intersections, mapped, conditional, generics and overloads",
 		fileName: "Probe.ts",
-		source: "type Union = 'Moonlight' | 'Starlight' | 'Sunlight' | 'Twilight' | 'Daylight' | 'Midnight' | 'Highnoon' | 'Dawn';\n" +
+		source: "type Union = 'Moonlight' | 'Starlight' | 'Sunlight' | 'Twilight' | 'Daylight' | 'Midnight' | " +
+			"'Highnoon' | 'Dawn';\n" +
 			"type Mapped<T> = { readonly [Key in keyof T]?: T[Key] extends Function ? never : T[Key] };\n" +
-			"type Conditional<T> = T extends string ? 'String' : T extends number ? 'Number' : T extends boolean ? 'Boolean' : 'Other';\n" +
+			"type Conditional<T> = T extends string ? 'String' : T extends number ? 'Number' : T extends boolean ? " +
+			"'Boolean' : 'Other';\n" +
 			"interface Shape extends Base, Other { area(): number; readonly name?: string; [key: string]: unknown }\n" +
-			"export abstract class Square<T extends object = {}> extends Shape implements Area { private readonly side: number = 1; constructor(public value: T) { super() } abstract area(): number; static create<U>(this: void): Square<U> { return null! } }\n" +
+			"export abstract class Square<T extends object = {}> extends Shape implements Area { private readonly " +
+			"side: number = 1; constructor(public value: T) { super() } abstract area(): number; static " +
+			"create<U>(this: void): Square<U> { return null! } }\n" +
 			"enum Direction { Up = 1, Down, Left, Right }\ndeclare module 'probe' { export function f(): void }\n",
 	},
 	{
 		name:     "comments keep their places",
 		fileName: "Probe.ts",
-		source: "// leading\nconst a = 1; // trailing\n/**\n * Documented.\n */\nfunction f(/* inline */ x: number /* after */) {\n  // dangling\n}\n" +
+		source: "// leading\nconst a = 1; // trailing\n/**\n * Documented.\n */\n" +
+			"function f(/* inline */ x: number /* after */) {\n  // dangling\n}\n" +
 			"const o = {\n  // own line\n  a: 1, // end of line\n  b: 2,\n};\nswitch (a) {\n  // before case\n  case 1:\n}\n",
 	},
 	{
 		name:     "imports, exports and template literals",
 		fileName: "Probe.ts",
-		source: "import Default, { a, type B, c as d } from './module';\nimport type { E } from \"./types\";\nexport * as namespace from './namespace';\n" +
+		source: "import Default, { a, type B, c as d } from './module';\nimport type { E } from \"./types\";\n" +
+			"export * as namespace from './namespace';\n" +
 			"export { a, d as renamed };\nexport default class {}\nconst text = `value ${a + b} and ${ call(c) }`;\nconst tagged = tag`raw ${value}`;\n",
 	},
 	{
 		name:     "JSX: elements, attributes, expressions, conditional rendering and text",
 		fileName: "Probe.tsx",
-		source: "export function View(properties: { title: string; items: string[] }) { return <div className=\"view\" onClick={() => properties.onClick()} data-long-attribute-name=\"a long attribute value that forces breaking\">\n" +
-			"{properties.title ? <h1>{properties.title}</h1> : null}{\" \"}some text that is long enough to make the children fill across lines and wrap at the width\n" +
+		source: "export function View(properties: { title: string; items: string[] }) { return <div " +
+			"className=\"view\" onClick={() => properties.onClick()} data-long-attribute-name=\"a long attribute " +
+			"value that forces breaking\">\n" +
+			"{properties.title ? <h1>{properties.title}</h1> : null}{\" \"}some text that is long enough to make the " +
+			"children fill across lines and wrap at the width\n" +
 			"{properties.items.map((item) => <span key={item}>{item}</span>)}<></></div> }\nconst generic = <T,>(value: T) => value;\n",
 	},
 	{
 		name:     "javascript: JSDoc types stay comments, numeric keys unquote under babel, JSX parses",
 		fileName: "Probe.js",
-		source: "/**\n * @typedef {{ a: number }} Shape\n * @param {string} name\n * @returns {Shape}\n */\nexport function make (name) { return /** @type {Shape} */ ({ 'a': 1, '2': name, 'b-c': 3 }) }\n" +
+		source: "/**\n * @typedef {{ a: number }} Shape\n * @param {string} name\n * @returns {Shape}\n */\n" +
+			"export function make (name) { return /** @type {Shape} */ ({ 'a': 1, '2': name, 'b-c': 3 }) }\n" +
 			"const view = <div className='x'>{make('y')}</div>\n",
 		contains: []string{
 			"export function make(name) {",
@@ -102,7 +115,8 @@ var formatCases = []formatCase{
 	{
 		name:     "json: comments, trailing commas, quoting and numbers through the JavaScript printer",
 		fileName: "settings.json",
-		source: "// leading\n{ unquoted: 1, 'single': 'it\\'s', \"nested\": { \"array\": [1.50, -2, +3, 0x1F, 1e3,], /* inside */ \"empty\": {} },\n" +
+		source: "// leading\n{ unquoted: 1, 'single': 'it\\'s', \"nested\": { \"array\": [1.50, -2, +3, 0x1F, 1e3,], " +
+			"/* inside */ \"empty\": {} },\n" +
 			"  \"long\": [\"a value long enough\", \"to make this array break across lines\", \"at the print width of one hundred twenty\"], 10: true, n: null, }\n",
 		contains: []string{`"unquoted": 1`, `"single": "it's"`, `"10": true`, "/* inside */"},
 	},

@@ -188,6 +188,7 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 				groupedSpecifiers = append(groupedSpecifiers, print(nil, nil))
 			} else {
 				// Upstream throws UnexpectedNodeError(node, "specifier").
+				// Invariant: the parser builds no specifier but the six named above, as Prettier's printer assumes.
 				panic(fmt.Sprintf("javascript: unexpected specifier %q", specifierType))
 			}
 		}, "specifiers")

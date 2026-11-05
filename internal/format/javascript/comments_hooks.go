@@ -22,6 +22,8 @@ func printComment(path *Path, options *Options) Doc {
 	if isBlockComment(comment) {
 		return concatIn(path, "/*", replaceEndOfLine(comment.String("value")), "*/")
 	}
+	// Invariant: estree builds every comment as a Line or a Block, which the two tests above take, as Prettier's
+	// printComment assumes before its throw.
 	panic("not a comment: " + comment.Type())
 }
 
@@ -93,7 +95,8 @@ func isTsAsConstTypeReference(node Node, parent Node) bool {
 
 // isTsAsConst is upstream's isTsAsConst.
 func isTsAsConst(node Node, ancestors []Node) bool {
-	var parent, grandparent Node
+	var parent Node
+	var grandparent Node
 	if len(ancestors) > 0 {
 		parent = ancestors[0]
 	}

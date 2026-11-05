@@ -88,11 +88,11 @@ func shouldInlineCondition(node Node) bool {
 	if !isLogicalNot(node) {
 		return false
 	}
-	node = node.Child("argument")
-	if isLogicalNot(node) {
-		node = node.Child("argument")
+	argument := node.Child("argument")
+	if isLogicalNot(argument) {
+		argument = argument.Child("argument")
 	}
-	return node.Is("LogicalExpression")
+	return argument.Is("LogicalExpression")
 }
 
 // printIfOrWhileConditionOrWithStatementObject is upstream's function of that name, exported upstream
@@ -144,10 +144,11 @@ func printDanglingCommentsInList(path *Path, options *Options, filter func(Node)
 // printTrailingComma is upstream's printTrailingComma(options, level). level "" is upstream's default
 // "es5".
 func printTrailingComma(options *Options, level string) Doc {
-	if level == "" {
-		level = "es5"
+	resolvedLevel := level
+	if resolvedLevel == "" {
+		resolvedLevel = "es5"
 	}
-	if shouldPrintTrailingComma(options, level) {
+	if shouldPrintTrailingComma(options, resolvedLevel) {
 		return ifBreak(",", "")
 	}
 	return emptyDoc
