@@ -11,6 +11,8 @@ package goengine
 import (
 	"fmt"
 	"io"
+	"os"
+	"runtime/debug"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -59,6 +61,8 @@ var engineRuleNames = []string{
 // Main runs the engine over the command line the front door sends, writing records to standardOutput and
 // prose to standardError, and returns the exit code.
 func Main(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
+	// Here rather than in run, so a test running the engine in process never changes its own memory limit.
+	capMemory(os.LookupEnv, debug.SetMemoryLimit)
 	return run(arguments, standardOutput, standardError, rules.All())
 }
 
