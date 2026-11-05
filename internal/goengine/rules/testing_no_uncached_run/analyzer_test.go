@@ -22,10 +22,11 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 }
 
 // The flagged fixtures carry a // want at every -count=1 the rule must report, inline, spread from a literal, traced
-// through a local or appended, and past an empty, mentioned or misplaced Uncached marker. analysistest fails on a
-// finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule
-// stays quiet on a cached go test, a reasoned Uncached marker, a slice it cannot read, a local rewritten after its
-// declaration, a count after -args, a program go run runs, and an exec lookalike from another package.
+// through a local or appended, and past an empty, mentioned or misplaced Uncached marker, one trailing or opening the
+// code on the line above included. analysistest fails on a finding no want expects as much as on a want nothing
+// found, so the allowed and lookalike fixtures prove the rule stays quiet on a cached go test, a reasoned Uncached
+// marker, a slice it cannot read, a local rewritten after its declaration, a count after -args, a program go run
+// runs, and an exec lookalike from another package.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

@@ -114,3 +114,9 @@ func markerTrailsLineAbove() (*osexec.Cmd, string) {
 	program := "go"                                          // Uncached: this line's reason, not the next's
 	return osexec.Command("go", "test", "-count=1"), program // want "throws away the test cache"
 }
+
+// A comment before the code on the line above speaks for that code too.
+func markerBeforeCodeAbove() (*osexec.Cmd, string) {
+	/* Uncached: this line's reason, not the next's. */ program := "go"
+	return osexec.Command("go", "test", "-count=1"), program // want "throws away the test cache"
+}

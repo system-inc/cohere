@@ -16,6 +16,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -43,16 +44,6 @@ var uncachedWithoutReasonMessage = policy.MessageOf(Name, "uncachedWithoutReason
 // uncachedMarker opens the comment that excuses a run from the test cache, matched as written.
 const uncachedMarker = "Uncached:"
 
-// excuse is what the comments beside a command's statement say about why it skips the cache.
-type excuse int
-
-const (
-	excuseNone excuse = iota
-	// excuseWithoutReason is a marker with nothing after its colon, which tells the next reader nothing.
-	excuseWithoutReason
-	excuseWithReason
-)
-
 // argument is one element of a command's argument list as the rule reads it. An argument whose value is not a
 // string constant is kept as unknown, holding its place, so a flag and its value are only paired when they are
 // adjacent.
@@ -77,7 +68,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// A literal spread from a local reaches every command that spreads that local, and one finding at it is enough.
 	reported := map[token.Pos]bool{}
 	for _, file := range pass.Files {
-		comments := commentsOf(pass, file)
+		comments := marker.NewIndex(pass.Fset, file)
 		// The nodes from the file down to the one being visited, so a call finds the statement holding it.
 		var enclosing []ast.Node
 		ast.Inspect(file, func(node ast.Node) bool {
@@ -95,12 +86,12 @@ func run(pass *analysis.Pass) (any, error) {
 				return true
 			}
 			message := uncachedRunMessage
-			switch comments.excuseFor(pass, holdingStatement(enclosing)) {
-			case excuseWithReason:
+			switch comments.ExcuseFor(holdingStatement(enclosing), uncachedMarker) {
+			case marker.WithReason:
 				return true
-			case excuseWithoutReason:
+			case marker.WithoutReason:
 				message = uncachedWithoutReasonMessage
-			case excuseNone:
+			case marker.None:
 			}
 			for _, flag := range uncachedFlags(arguments) {
 				if reported[flag.node.Pos()] {
@@ -131,105 +122,6 @@ func holdingStatement(enclosing []ast.Node) ast.Node {
 		}
 	}
 	return enclosing[len(enclosing)-1]
-}
-
-// fileComments is file's comment groups found by line, with the lines a group may excuse from: the group ending on a
-// line, for a comment directly above a statement, and the groups starting on it, for a comment at the end of one.
-type fileComments struct {
-	endingOn   map[int]*ast.CommentGroup
-	startingOn map[int][]*ast.CommentGroup
-	// codeStarts and codeEnds are, for each line, the earliest position at which a node of the file starts or ends
-	// there, so a group with code before it on its first line is known to trail that code.
-	codeStarts map[int]token.Pos
-	codeEnds   map[int]token.Pos
-}
-
-func commentsOf(pass *analysis.Pass, file *ast.File) fileComments {
-	comments := fileComments{
-		endingOn:   map[int]*ast.CommentGroup{},
-		startingOn: map[int][]*ast.CommentGroup{},
-		codeStarts: map[int]token.Pos{},
-		codeEnds:   map[int]token.Pos{},
-	}
-	for _, group := range file.Comments {
-		comments.endingOn[pass.Fset.PositionFor(group.End(), false).Line] = group
-		startLine := pass.Fset.PositionFor(group.Pos(), false).Line
-		comments.startingOn[startLine] = append(comments.startingOn[startLine], group)
-	}
-	earliest := func(onLine map[int]token.Pos, position token.Pos) {
-		line := pass.Fset.PositionFor(position, false).Line
-		if known, found := onLine[line]; !found || position < known {
-			onLine[line] = position
-		}
-	}
-	// Every token of gofmt'd code on a line before a comment is the first or the last token of some node, an
-	// identifier, a literal, or the brace or parenthesis closing one, so the nodes' own bounds find it.
-	ast.Inspect(file, func(node ast.Node) bool {
-		switch node.(type) {
-		case nil:
-			return true
-		case *ast.CommentGroup, *ast.Comment:
-			// A doc or field comment the tree holds is a comment, not code before one.
-			return false
-		}
-		earliest(comments.codeStarts, node.Pos())
-		earliest(comments.codeEnds, node.End())
-		return true
-	})
-	return comments
-}
-
-// opensItsLine is whether no code precedes group on the line it starts on.
-func (comments fileComments) opensItsLine(pass *analysis.Pass, group *ast.CommentGroup) bool {
-	line := pass.Fset.PositionFor(group.Pos(), false).Line
-	if start, found := comments.codeStarts[line]; found && start < group.Pos() {
-		return false
-	}
-	end, found := comments.codeEnds[line]
-	return !found || end > group.Pos()
-}
-
-// excuseFor is the best excuse the comments give statement: a group opening its own line and ending on the line above
-// statement's first line, or one starting after statement on its last line. A comment trailing the code on the line
-// above speaks for that code, not for statement.
-func (comments fileComments) excuseFor(pass *analysis.Pass, statement ast.Node) excuse {
-	found := excuseNone
-	above := comments.endingOn[pass.Fset.PositionFor(statement.Pos(), false).Line-1]
-	if above != nil && comments.opensItsLine(pass, above) {
-		found = excuseOf(above)
-	}
-	for _, group := range comments.startingOn[pass.Fset.PositionFor(statement.End(), false).Line] {
-		// A comment before the statement on its own line, `/* note */ command := ...`, is not at the end of it.
-		if group.Pos() >= statement.End() {
-			found = max(found, excuseOf(group))
-		}
-	}
-	return found
-}
-
-// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a block
-// comment no part of the reason. A nil group says nothing.
-func excuseOf(group *ast.CommentGroup) excuse {
-	if group == nil {
-		return excuseNone
-	}
-	found := excuseNone
-	for _, comment := range group.List {
-		for _, line := range strings.Split(comment.Text, "\n") {
-			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
-			// mentions it, "this was Uncached: once", excuses nothing.
-			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
-			reason, hasMarker := strings.CutPrefix(opening, uncachedMarker)
-			if !hasMarker {
-				continue
-			}
-			if strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(reason), "*/")) != "" {
-				return excuseWithReason
-			}
-			found = excuseWithoutReason
-		}
-	}
-	return found
 }
 
 // goArguments is the argument list, after the program, of a call to os/exec's Command or CommandContext whose program
