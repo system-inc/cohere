@@ -97,7 +97,7 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 			"coverage: 4 rules = 4 ran and found nothing\n",
 			"  0 files crashed · details: cohere --coverage\n",
 			"  config: no CohereSettings.json beside Package.swift, so every house rule ran at error",
-			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
+			"  not checked: /project/Sources/Example/Generated.swift (ignored by git)\n",
 			"phases: fix ran in 31ms · types ran in 820ms · lint reused the fix phase's walk (nothing was rewritten) · unused skipped",
 			"— package 412ms",
 		)
@@ -173,7 +173,7 @@ func TestSwiftRunRendersEachContractFixture(t *testing.T) {
 		}
 		requireLines(t, output,
 			"  not checked: /project/Sources/Example/Latin1.swift (could not be read: it is not valid UTF-8 or could not be opened (Foundation could not decode it as UTF-8))\n",
-			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
+			"  not checked: /project/Sources/Example/Generated.swift (ignored by git)\n",
 			"  this run did not check everything — the notes above name the files nothing checked\n",
 		)
 	})
@@ -359,7 +359,7 @@ func TestSwiftRunGroupsExcludedFiles(t *testing.T) {
 	}
 	requireLines(t, output,
 		"  not checked: 6 files (vendored under Vendor/)\n",
-		"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
+		"  not checked: /project/Sources/Example/Generated.swift (ignored by git)\n",
 	)
 	forbidLines(t, output, "/project/Vendor/Fa.swift")
 }
@@ -496,18 +496,25 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(t *testing.T) {
 	}
 }
 
-// The contract's own fixture lists one file for a reason the engine does not give today, `marked //
-// @generated`, and an unknown reason is a gap, so the clean fixture carries one; its exit is still 0.
+// The contract's clean fixture leaves its one file out for a reason the engine gives today, `ignored by git`,
+// which nobody expects a run to check, so a stand-in run on it is clean with no gap. It carried `marked //
+// @generated`, which the engine stopped giving at d3bd032b, and every stand-in run on it showed one Swift file
+// not checked (#zskc1pa). A reason the engine has never given is still a gap: see
+// TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap.
 // Not parallel: it renders a check run through swiftRun and reads back the package-level activeSummary
-func TestSwiftRunCountsAnUnknownExclusionReasonAsAGap(t *testing.T) {
+func TestSwiftRunFindsNoGapInTheCleanFixture(t *testing.T) {
 	activeSummary = runSummary{}
 	output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Clean.jsonl"), 0)
 	if err != nil || exitCode != 0 {
 		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
 	}
-	want := []uncheckedSwiftFile{{"/project/Sources/Example/Generated.swift", "marked // @generated"}}
-	if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, want) {
-		t.Errorf("the gap is %v, want %v", activeSummary.Gaps.UncheckedSwift, want)
+	if len(activeSummary.Gaps.UncheckedSwift) != 0 {
+		t.Errorf("the clean fixture's gap is %v, want none", activeSummary.Gaps.UncheckedSwift)
+	}
+	for _, marker := range uncheckedMarkers(activeSummary) {
+		if strings.Contains(marker, "Swift file") {
+			t.Errorf("the footer marks %q for the clean fixture, which leaves out only what git ignores", marker)
+		}
 	}
 }
 

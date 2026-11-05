@@ -24,6 +24,14 @@ public enum XcodeProject {
     public enum Source: Equatable, Sendable {
         case xcodeGenSpecification(URL)
         case projectBundle(URL)
+
+        /* The name a person knows the project by in its folder: `project.yml`, or the bundle's `<Name>.xcodeproj`. */
+        public var fileName: String {
+            switch self {
+                case .xcodeGenSpecification(let specification): specification.lastPathComponent
+                case .projectBundle(let bundle): bundle.lastPathComponent
+            }
+        }
     }
 
     /* The root holds Xcode files this engine cannot choose a project from. */

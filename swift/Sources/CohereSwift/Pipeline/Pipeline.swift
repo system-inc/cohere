@@ -70,9 +70,18 @@ public struct Pipeline {
             return 0
         }
 
+        let configurationRoot = options.root ?? workingDirectory
+        /*
+         The file the config is looked for beside, which its note names: the Package.swift that wins below, else the
+         Xcode project's definition. A root that holds neither, or two projects, is refused below before any note prints.
+         */
+        let definition =
+            FileManager.default.fileExists(atPath: configurationRoot.appendingPathComponent("Package.swift").path)
+            ? "Package.swift" : (try? XcodeProject.source(at: configurationRoot))?.fileName ?? "Package.swift"
         let configuration = try RuleConfiguration.load(
-            packageRoot: options.root ?? workingDirectory,
+            packageRoot: configurationRoot,
             explicitPath: options.lintConfiguration,
+            definition: definition,
         )
         if options.listRules || options.listRulesEnabled {
             for name in RuleRegistry.allNames {

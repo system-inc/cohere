@@ -147,6 +147,11 @@ struct XcodeProjectPipelineTests {
             of("summary").first?["complete"] as? Bool
         }
 
+        /* The note the lint record carries when no config was read. */
+        var configurationNote: String {
+            of("lint").first?["configNote"] as? String ?? ""
+        }
+
         /* Each unused record as `<file name>:<line> <subject>`. */
         var unused: [String] {
             of("unused").map {
@@ -909,6 +914,30 @@ struct XcodeProjectPipelineTests {
         #expect(run.filesWithoutRecord.isEmpty)
         let after = try Self.snapshot(of: fixture.repository)
         #expect(after == before, "written into the tree: \(Set(after.keys).symmetricDifference(before.keys).sorted())")
+    }
+
+    /*
+     An Xcode root has no Package.swift, so the config note names the file its project is defined by, which the config
+     is looked for beside: the spec for an xcodegen root, the bundle for a committed project (#zskc1pa).
+     */
+    @Test func theConfigNoteNamesTheXcodeProjectsDefinition() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(counter: Self.cleanCounter)
+        defer { Self.remove(fixture.repository) }
+        let settings = fixture.root.appendingPathComponent("CohereSettings.json").path
+
+        let generated = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache", "--lint"])
+        #expect(
+            generated.configurationNote
+                == "config: no CohereSettings.json beside project.yml, so every house rule ran at error — put one at \(settings) to change that"
+        )
+
+        try Self.commitProject(at: fixture.root)
+        let committed = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache", "--lint"])
+        #expect(
+            committed.configurationNote
+                == "config: no CohereSettings.json beside Fixture.xcodeproj, so every house rule ran at error — put one at \(settings) to change that"
+        )
     }
 
     @Test func twoProjectsAtOneRootAreRefusedByName() async throws {
