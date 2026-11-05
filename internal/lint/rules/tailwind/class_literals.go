@@ -374,8 +374,8 @@ func (surfaces *ClassLiteralSurfaces) bind() *ClassLiteralReader {
 
 // key is the settings as one string, every selector in order with every field, so two settings share
 // a key only when they would read every node the same way. Built once per configuration selection.
-func (s ClassLiteralSettings) key() string {
-	encoded, encodeError := json.Marshal(s.Selectors)
+func (settings ClassLiteralSettings) key() string {
+	encoded, encodeError := json.Marshal(settings.Selectors)
 	if encodeError != nil {
 		// Invariant: a Selector holds only strings, slices of matchers and targets whose MarshalJSON writes a
 		// string or an int, none of which json.Marshal can fail on.
@@ -428,8 +428,8 @@ func ListenerKinds() []ast.Kind {
 // branches of a conditional, which are never applied together. The static text of a template with
 // holes is not a literal here: a class assembled at runtime is `no-concatenated-classes`'s finding,
 // and `ClassSegmentsIn` and `ClassTemplateSegmentsIn` read that text for the rules that edit it.
-func (r *ClassLiteralReader) ClassLiteralsIn(node *ast.Node) []ClassLiteral {
-	return r.classValuesIn(node).literals
+func (reader *ClassLiteralReader) ClassLiteralsIn(node *ast.Node) []ClassLiteral {
+	return reader.classValuesIn(node).literals
 }
 
 // classValues is everything one surface carries in value positions: its strings, and its templates
@@ -457,45 +457,45 @@ type classTemplateValue struct {
 // A template literal is a surface only to a tag selector with a name, which most settings have none of,
 // and every rule asks about every template. Its empty answer costs nothing to give again, so it is not
 // remembered: 3.7 MB over ahra's files was the memo growing for nothing.
-func (r *ClassLiteralReader) classValuesIn(node *ast.Node) classValues {
-	if r.values == nil {
-		return r.readClassValues(node)
+func (reader *ClassLiteralReader) classValuesIn(node *ast.Node) classValues {
+	if reader.values == nil {
+		return reader.readClassValues(node)
 	}
-	if !r.tags.hasNames && (node.Kind == ast.KindNoSubstitutionTemplateLiteral || node.Kind == ast.KindTemplateExpression) {
+	if !reader.tags.hasNames && (node.Kind == ast.KindNoSubstitutionTemplateLiteral || node.Kind == ast.KindTemplateExpression) {
 		return classValues{}
 	}
-	if remembered, isRead := r.values[node]; isRead {
+	if remembered, isRead := reader.values[node]; isRead {
 		return remembered
 	}
-	values := r.readClassValues(node)
-	r.values[node] = values
+	values := reader.readClassValues(node)
+	reader.values[node] = values
 	return values
 }
 
 // readClassValues dispatches on the class surfaces, upstream's createRuleListener.
-func (r *ClassLiteralReader) readClassValues(node *ast.Node) classValues {
+func (reader *ClassLiteralReader) readClassValues(node *ast.Node) classValues {
 	if node == nil {
 		return classValues{}
 	}
 
 	switch node.Kind {
 	case ast.KindJsxAttribute:
-		return r.attributeValues(node)
+		return reader.attributeValues(node)
 
 	case ast.KindCallExpression:
-		return r.calleeValues(node)
+		return reader.calleeValues(node)
 
 	case ast.KindVariableDeclaration:
-		return r.variableValues(node)
+		return reader.variableValues(node)
 
 	case ast.KindExportAssignment:
-		return r.exportDefaultValues(node)
+		return reader.exportDefaultValues(node)
 
 	case ast.KindTaggedTemplateExpression:
-		return r.tagValues(node)
+		return reader.tagValues(node)
 
 	case ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
-		return r.bareTemplateValues(node)
+		return reader.bareTemplateValues(node)
 	}
 
 	return classValues{}
@@ -504,18 +504,18 @@ func (r *ClassLiteralReader) readClassValues(node *ast.Node) classValues {
 // exportDefaultValues is upstream's getLiteralsByESExportDefaultDeclaration: `export default <value>`
 // is read as a variable named `default`. A function or class declared as the default is not an
 // ExportAssignment here and not read there, and `export =` is TypeScript's, which upstream never reads.
-func (r *ClassLiteralReader) exportDefaultValues(node *ast.Node) classValues {
+func (reader *ClassLiteralReader) exportDefaultValues(node *ast.Node) classValues {
 	assignment := node.AsExportAssignment()
 	if assignment == nil || assignment.IsExportEquals || assignment.Expression == nil {
 		return classValues{}
 	}
-	indices := r.variables.matching("default", nil)
+	indices := reader.variables.matching("default", nil)
 	if len(indices) == 0 {
 		return classValues{}
 	}
 	matched := matchedNodes{}
 	for _, index := range indices {
-		readVariableSelector(r.variables.selectors[index], assignment.Expression, &matched)
+		readVariableSelector(reader.variables.selectors[index], assignment.Expression, &matched)
 	}
 	return classValuesOf(matched, ClassLiteralOriginVariable)
 }
@@ -523,7 +523,7 @@ func (r *ClassLiteralReader) exportDefaultValues(node *ast.Node) classValues {
 // tagValues is upstream's getLiteralsByTaggedTemplateExpression: a tagged template named by its tag,
 // twc.div, or by the callee of a tag that is a call, twc.div(Button). A tag selector with no matchers
 // reads the template; one with matchers walks from the tagged template itself.
-func (r *ClassLiteralReader) tagValues(node *ast.Node) classValues {
+func (reader *ClassLiteralReader) tagValues(node *ast.Node) classValues {
 	tagged := node.AsTaggedTemplateExpression()
 	tag := skipOuter(tagged.Tag)
 	if tag != nil && tag.Kind == ast.KindCallExpression {
@@ -532,7 +532,7 @@ func (r *ClassLiteralReader) tagValues(node *ast.Node) classValues {
 	if tag == nil {
 		return classValues{}
 	}
-	indices := r.tags.matching(calleeName(tag), func() string {
+	indices := reader.tags.matching(calleeName(tag), func() string {
 		_, path := calleeNameAndPath(tag)
 		return path
 	})
@@ -541,7 +541,7 @@ func (r *ClassLiteralReader) tagValues(node *ast.Node) classValues {
 	}
 	matched := matchedNodes{}
 	for _, index := range indices {
-		selector := r.tags.selectors[index]
+		selector := reader.tags.selectors[index]
 		if selector.matchers == nil {
 			readDirect(tagged.Template, &matched)
 			continue
@@ -554,8 +554,8 @@ func (r *ClassLiteralReader) tagValues(node *ast.Node) classValues {
 // bareTemplateValues is upstream's getLiteralsByESBareTemplateLiteral: a template no tag holds, read
 // when the comment right before it matches a tag selector's name, `/* tw */` before the backtick. Only
 // a name: a tag selector's path never matches a comment.
-func (r *ClassLiteralReader) bareTemplateValues(node *ast.Node) classValues {
-	if !r.tags.hasNames {
+func (reader *ClassLiteralReader) bareTemplateValues(node *ast.Node) classValues {
+	if !reader.tags.hasNames {
 		return classValues{}
 	}
 	if parent := esParent(node); parent != nil && parent.Kind == ast.KindTaggedTemplateExpression {
@@ -566,8 +566,8 @@ func (r *ClassLiteralReader) bareTemplateValues(node *ast.Node) classValues {
 		return classValues{}
 	}
 	matched := matchedNodes{}
-	for _, index := range r.tags.matching(comment, nil) {
-		selector := r.tags.selectors[index]
+	for _, index := range reader.tags.matching(comment, nil) {
+		selector := reader.tags.selectors[index]
 		if selector.matchers == nil {
 			readDirect(node, &matched)
 			continue
@@ -616,7 +616,7 @@ func leadingComment(node *ast.Node) string {
 
 // attributeValues is upstream's getLiteralsByJSXAttribute: every attribute selector whose name
 // matches, both lowercased, reads the attribute's value.
-func (r *ClassLiteralReader) attributeValues(node *ast.Node) classValues {
+func (reader *ClassLiteralReader) attributeValues(node *ast.Node) classValues {
 	attribute := node.AsJsxAttribute()
 	if attribute == nil || attribute.Initializer == nil {
 		return classValues{}
@@ -628,13 +628,13 @@ func (r *ClassLiteralReader) attributeValues(node *ast.Node) classValues {
 	if name == nil {
 		return classValues{}
 	}
-	indices := r.attributes.matching(name.Text(), nil)
+	indices := reader.attributes.matching(name.Text(), nil)
 	if len(indices) == 0 {
 		return classValues{}
 	}
 	matched := matchedNodes{}
 	for _, index := range indices {
-		readSelector(r.attributes.selectors[index], attribute.Initializer, &matched)
+		readSelector(reader.attributes.selectors[index], attribute.Initializer, &matched)
 	}
 	return classValuesOf(matched, ClassLiteralOriginAttribute)
 }
@@ -642,7 +642,7 @@ func (r *ClassLiteralReader) attributeValues(node *ast.Node) classValues {
 // calleeValues is upstream's getLiteralsByESCallExpression: a call is read once, at the outermost
 // call of a curried chain, and named by the chain's first callee. Each callee selector matching that
 // name or path reads its target calls' target arguments.
-func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
+func (reader *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 	if parent := esParent(node); parent != nil && parent.Kind == ast.KindCallExpression &&
 		skipOuter(parent.AsCallExpression().Expression) == node {
 		return classValues{}
@@ -658,7 +658,7 @@ func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 	if callee == nil {
 		return classValues{}
 	}
-	indices := r.callees.matching(calleeName(callee), func() string {
+	indices := reader.callees.matching(calleeName(callee), func() string {
 		_, path := calleeNameAndPath(callee)
 		return path
 	})
@@ -675,7 +675,7 @@ func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 	slices.Reverse(chain)
 	matched := matchedNodes{}
 	for _, index := range indices {
-		selector := r.callees.selectors[index]
+		selector := reader.callees.selectors[index]
 		for _, call := range targetItems(chain, selector.targetCall, "first") {
 			for _, argument := range targetArguments(call.AsCallExpression().Arguments, selector.targetArgument) {
 				readSelector(selector, argument, &matched)
@@ -688,7 +688,7 @@ func (r *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 // variableValues is upstream's getLiteralsByESVariableDeclarator: a variable named by an identifier,
 // read through every variable selector its name matches. A selector with matchers skips an initializer
 // that is a call or a function, which a callee selector reads if anything does.
-func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
+func (reader *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 	declaration := node.AsVariableDeclaration()
 	if declaration == nil || declaration.Initializer == nil {
 		return classValues{}
@@ -698,13 +698,13 @@ func (r *ClassLiteralReader) variableValues(node *ast.Node) classValues {
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return classValues{}
 	}
-	indices := r.variables.matching(name.Text(), nil)
+	indices := reader.variables.matching(name.Text(), nil)
 	if len(indices) == 0 {
 		return classValues{}
 	}
 	matched := matchedNodes{}
 	for _, index := range indices {
-		readVariableSelector(r.variables.selectors[index], declaration.Initializer, &matched)
+		readVariableSelector(reader.variables.selectors[index], declaration.Initializer, &matched)
 	}
 	return classValuesOf(matched, ClassLiteralOriginVariable)
 }

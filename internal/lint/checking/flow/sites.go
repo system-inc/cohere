@@ -81,17 +81,17 @@ type Site struct {
 // before the walk moves on, so the first rule there finds the node's sites and the others read them. Each
 // rule finding them again asked the checker for every source three times, and an object literal's type is
 // built anew on every ask (#m6tyg79). One listener serves every kind, so a rule costs a file one closure.
-func (w *Walker) Listeners(visit func(Site)) rule.Listeners {
-	if w.typeChecker == nil {
+func (walker *Walker) Listeners(visit func(Site)) rule.Listeners {
+	if walker.typeChecker == nil {
 		return nil
 	}
 	listener := func(node *ast.Node) {
-		if w.sitesNode != node {
-			w.sites = w.sites[:0]
-			siteFinders[node.Kind](w, node)
-			w.sitesNode = node
+		if walker.sitesNode != node {
+			walker.sites = walker.sites[:0]
+			siteFinders[node.Kind](walker, node)
+			walker.sitesNode = node
 		}
-		for _, site := range w.sites {
+		for _, site := range walker.sites {
 			visit(site)
 		}
 	}
@@ -189,25 +189,25 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 // offer adds the site of expression flowing into target, unless the two are one type or the target has no
 // object part or generic indexed access, where no judge can rule (see Judge). The target is read first so such a site never asks the
 // checker for its source.
-func (w *Walker) offer(expression *ast.Node, target *checker.Type) {
-	if expression == nil || target == nil || !w.hasObjectPart(target) {
+func (walker *Walker) offer(expression *ast.Node, target *checker.Type) {
+	if expression == nil || target == nil || !walker.hasObjectPart(target) {
 		return
 	}
-	source := w.typeChecker.GetTypeAtLocation(expression)
+	source := walker.typeChecker.GetTypeAtLocation(expression)
 	if source == nil || source == target {
 		return
 	}
-	w.sites = append(w.sites, Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
+	walker.sites = append(walker.sites, Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
 		NewContainer: isNewContainer(expression)})
 }
 
 // offerPart adds the site of a part of node's value flowing into target, when the part has no expression of its
 // own: `[animals] = pair` puts pair's first element into animals, reported at pair.
-func (w *Walker) offerPart(node *ast.Node, source *checker.Type, target *checker.Type) {
-	if node == nil || source == nil || target == nil || source == target || !w.hasObjectPart(target) {
+func (walker *Walker) offerPart(node *ast.Node, source *checker.Type, target *checker.Type) {
+	if node == nil || source == nil || target == nil || source == target || !walker.hasObjectPart(target) {
 		return
 	}
-	w.sites = append(w.sites, Site{Node: node, Source: source, Target: target})
+	walker.sites = append(walker.sites, Site{Node: node, Source: source, Target: target})
 }
 
 /*
@@ -222,15 +222,15 @@ func (w *Walker) offerPart(node *ast.Node, source *checker.Type, target *checker
  * object of what is left, no one part, and is not paired. A default (`[a = d] = ...`) is an assignment of its
  * own, which the BinaryExpression finder offers.
  */
-func (w *Walker) destructured(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
+func (walker *Walker) destructured(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
 	if kind := ast.SkipParentheses(value).Kind; kind == ast.KindArrayLiteralExpression || kind == ast.KindObjectLiteralExpression {
 		return
 	}
-	w.destructuredParts(pattern, value, valueType)
+	walker.destructuredParts(pattern, value, valueType)
 }
 
 // destructuredParts offers the targets of pattern with the parts of valueType, reported at value.
-func (w *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
+func (walker *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
 	pattern = ast.SkipParentheses(pattern)
 	switch pattern.Kind {
 	case ast.KindArrayLiteralExpression:
@@ -239,7 +239,7 @@ func (w *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valueType
 				return
 			}
 			if element.Kind != ast.KindOmittedExpression {
-				w.destructuredTarget(element, value, w.destructuredElement(valueType, index))
+				walker.destructuredTarget(element, value, walker.destructuredElement(valueType, index))
 			}
 		}
 	case ast.KindObjectLiteralExpression:
@@ -257,77 +257,77 @@ func (w *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valueType
 			if name == nil || name.Kind != ast.KindIdentifier && name.Kind != ast.KindStringLiteral {
 				continue
 			}
-			w.destructuredTarget(target, value, w.destructuredProperty(valueType, name.Text()))
+			walker.destructuredTarget(target, value, walker.destructuredProperty(valueType, name.Text()))
 		}
 	}
 }
 
 // destructuredTarget offers one target of a pattern: a nested pattern is destructured again with its part's
 // type, and anything else is a slot the part is put into.
-func (w *Walker) destructuredTarget(target *ast.Node, value *ast.Node, partType *checker.Type) {
+func (walker *Walker) destructuredTarget(target *ast.Node, value *ast.Node, partType *checker.Type) {
 	target = ast.SkipParentheses(target)
 	if target.Kind == ast.KindBinaryExpression && target.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
 		target = ast.SkipParentheses(target.AsBinaryExpression().Left)
 	}
 	if target.Kind == ast.KindArrayLiteralExpression || target.Kind == ast.KindObjectLiteralExpression {
-		w.destructuredParts(target, value, partType)
+		walker.destructuredParts(target, value, partType)
 		return
 	}
-	w.offerPart(value, partType, w.typeChecker.GetTypeAtLocation(target))
+	walker.offerPart(value, partType, walker.typeChecker.GetTypeAtLocation(target))
 }
 
 // destructuredElement is the element at index of an array or tuple value's type.
-func (w *Walker) destructuredElement(valueType *checker.Type, index int) *checker.Type {
+func (walker *Walker) destructuredElement(valueType *checker.Type, index int) *checker.Type {
 	switch {
 	case valueType == nil:
 		return nil
 	case checker.IsTupleType(valueType):
-		return w.typeArgument(valueType, index)
-	case checker.Checker_isArrayType(w.typeChecker, valueType):
-		return w.typeArgument(valueType, 0)
+		return walker.typeArgument(valueType, index)
+	case checker.Checker_isArrayType(walker.typeChecker, valueType):
+		return walker.typeArgument(valueType, 0)
 	}
 	return nil
 }
 
 // destructuredProperty is the type of the property name of an object value's type.
-func (w *Walker) destructuredProperty(valueType *checker.Type, name string) *checker.Type {
+func (walker *Walker) destructuredProperty(valueType *checker.Type, name string) *checker.Type {
 	if valueType == nil || valueType.Flags()&checker.TypeFlagsObject == 0 {
 		return nil
 	}
-	property := checker.Checker_getPropertyOfType(w.typeChecker, valueType, name)
+	property := checker.Checker_getPropertyOfType(walker.typeChecker, valueType, name)
 	if property == nil {
 		return nil
 	}
-	return checker.Checker_getTypeOfSymbol(w.typeChecker, property)
+	return checker.Checker_getTypeOfSymbol(walker.typeChecker, property)
 }
 
-func (w *Walker) annotated(typeNode *ast.Node, expression *ast.Node) {
+func (walker *Walker) annotated(typeNode *ast.Node, expression *ast.Node) {
 	if typeNode == nil || expression == nil {
 		return
 	}
-	w.offer(expression, checker.Checker_getTypeFromTypeNode(w.typeChecker, typeNode))
+	walker.offer(expression, checker.Checker_getTypeFromTypeNode(walker.typeChecker, typeNode))
 }
 
-func (w *Walker) contextual(expression *ast.Node) {
-	w.offer(expression, checker.Checker_getContextualType(w.typeChecker, expression, checker.ContextFlagsNone))
+func (walker *Walker) contextual(expression *ast.Node) {
+	walker.offer(expression, checker.Checker_getContextualType(walker.typeChecker, expression, checker.ContextFlagsNone))
 }
 
-func (w *Walker) returned(function *ast.Node, expression *ast.Node) {
+func (walker *Walker) returned(function *ast.Node, expression *ast.Node) {
 	if function == nil || function.Type() == nil {
 		return
 	}
 	if ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0 {
 		return
 	}
-	w.offer(expression, checker.Checker_getReturnTypeFromAnnotation(w.typeChecker, function))
+	walker.offer(expression, checker.Checker_getReturnTypeFromAnnotation(walker.typeChecker, function))
 }
 
-func (w *Walker) arguments(call *ast.Node) {
+func (walker *Walker) arguments(call *ast.Node) {
 	for index, argument := range call.Arguments() {
 		if argument.Kind == ast.KindSpreadElement {
 			continue
 		}
-		w.offer(argument, checker.Checker_getContextualTypeForArgumentAtIndex(w.typeChecker, call, index))
+		walker.offer(argument, checker.Checker_getContextualTypeForArgumentAtIndex(walker.typeChecker, call, index))
 	}
 }
 
@@ -337,7 +337,7 @@ func (w *Walker) arguments(call *ast.Node) {
  * only, so its method was never related to Sink's `put(animal: Animal)`. A method written as a property
  * (`put: (dog) => ...`) is a PropertyAssignment the contextual finder already offers.
  */
-func (w *Walker) offerMethod(node *ast.Node) {
+func (walker *Walker) offerMethod(node *ast.Node) {
 	literal, name := node.Parent, node.Name()
 	if literal == nil || literal.Kind != ast.KindObjectLiteralExpression || name == nil || IsDestructuringTarget(literal) {
 		return
@@ -345,20 +345,20 @@ func (w *Walker) offerMethod(node *ast.Node) {
 	if name.Kind != ast.KindIdentifier && name.Kind != ast.KindStringLiteral {
 		return
 	}
-	contextual := checker.Checker_getContextualType(w.typeChecker, literal, checker.ContextFlagsNone)
+	contextual := checker.Checker_getContextualType(walker.typeChecker, literal, checker.ContextFlagsNone)
 	if contextual == nil || contextual.Flags()&checker.TypeFlagsObject == 0 {
 		return
 	}
-	property := checker.Checker_getPropertyOfType(w.typeChecker, contextual, name.Text())
+	property := checker.Checker_getPropertyOfType(walker.typeChecker, contextual, name.Text())
 	if property == nil {
 		return
 	}
-	target := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
-	source := w.typeChecker.GetTypeAtLocation(node)
-	if source == nil || target == nil || source == target || !w.hasObjectPart(target) {
+	target := checker.Checker_getTypeOfSymbol(walker.typeChecker, property)
+	source := walker.typeChecker.GetTypeAtLocation(node)
+	if source == nil || target == nil || source == target || !walker.hasObjectPart(target) {
 		return
 	}
-	w.sites = append(w.sites, Site{Node: name, Source: source, Target: target, Method: true})
+	walker.sites = append(walker.sites, Site{Node: name, Source: source, Target: target, Method: true})
 }
 
 /*
@@ -370,25 +370,25 @@ func (w *Walker) offerMethod(node *ast.Node) {
  * A property written again after an object spread holds the later value, so it is not paired (s3c: sound in
  * Node). A spread in a call's arguments or in a destructuring pattern is no literal's.
  */
-func (w *Walker) offerSpread(node *ast.Node) {
+func (walker *Walker) offerSpread(node *ast.Node) {
 	literal := node.Parent
 	if literal == nil || literal.Kind != ast.KindObjectLiteralExpression && literal.Kind != ast.KindArrayLiteralExpression || IsDestructuringTarget(literal) {
 		return
 	}
 	expression := node.Expression()
-	target := checker.Checker_getContextualType(w.typeChecker, literal, checker.ContextFlagsNone)
-	if expression == nil || target == nil || !w.hasObjectPart(target) || isFresh(expression) {
+	target := checker.Checker_getContextualType(walker.typeChecker, literal, checker.ContextFlagsNone)
+	if expression == nil || target == nil || !walker.hasObjectPart(target) || isFresh(expression) {
 		return
 	}
-	source := w.typeChecker.GetTypeAtLocation(expression)
+	source := walker.typeChecker.GetTypeAtLocation(expression)
 	if source == nil || source == target {
 		return
 	}
 	var overridden []string
 	if literal.Kind == ast.KindObjectLiteralExpression {
-		overridden = w.writtenAfter(literal, node)
+		overridden = walker.writtenAfter(literal, node)
 	}
-	w.sites = append(w.sites, Site{Node: expression, Source: source, Target: target, NewContainer: true,
+	walker.sites = append(walker.sites, Site{Node: expression, Source: source, Target: target, NewContainer: true,
 		FreshElements: mapsToFresh(expression), Overridden: overridden, Spread: true})
 }
 
@@ -455,13 +455,13 @@ func mapReturns(expression *ast.Node) []*ast.Node {
 
 // writtenAfter is the names an object literal writes after spread: its own properties by name, and a later
 // spread's properties that are not optional, which surely overwrite.
-func (w *Walker) writtenAfter(literal *ast.Node, spread *ast.Node) []string {
+func (walker *Walker) writtenAfter(literal *ast.Node, spread *ast.Node) []string {
 	properties := literal.AsObjectLiteralExpression().Properties.Nodes
 	var names []string
 	for _, property := range properties[slices.Index(properties, spread)+1:] {
 		if property.Kind == ast.KindSpreadAssignment {
-			if later := w.typeChecker.GetTypeAtLocation(property.Expression()); later != nil && later.Flags()&checker.TypeFlagsObject != 0 {
-				for _, symbol := range checker.Checker_getPropertiesOfType(w.typeChecker, later) {
+			if later := walker.typeChecker.GetTypeAtLocation(property.Expression()); later != nil && later.Flags()&checker.TypeFlagsObject != 0 {
+				for _, symbol := range checker.Checker_getPropertiesOfType(walker.typeChecker, later) {
 					if symbol.Flags&ast.SymbolFlagsOptional == 0 {
 						names = append(names, symbol.Name)
 					}
@@ -478,28 +478,28 @@ func (w *Walker) writtenAfter(literal *ast.Node, spread *ast.Node) []string {
 
 // offerUpcast hands over a cast that only widens. A downcast is no flow at all, since the value is not
 // being put anywhere wider, and adamic/no-unchecked-cast judges it. `as const` names no slot.
-func (w *Walker) offerUpcast(node *ast.Node) {
+func (walker *Walker) offerUpcast(node *ast.Node) {
 	typeNode := node.Type()
 	if typeNode == nil || ast.IsConstTypeReference(typeNode) {
 		return
 	}
 	expression := node.Expression()
-	target := checker.Checker_getTypeFromTypeNode(w.typeChecker, typeNode)
-	if target == nil || !w.hasObjectPart(target) {
+	target := checker.Checker_getTypeFromTypeNode(walker.typeChecker, typeNode)
+	if target == nil || !walker.hasObjectPart(target) {
 		return
 	}
-	source := w.typeChecker.GetTypeAtLocation(expression)
-	if source == nil || !w.IsAssignable(source, target) {
+	source := walker.typeChecker.GetTypeAtLocation(expression)
+	if source == nil || !walker.IsAssignable(source, target) {
 		return
 	}
-	w.offer(expression, target)
+	walker.offer(expression, target)
 }
 
 // hasObjectPart is a type the walk can relate parts of: an object type, a union with one among its
 // members, a generic indexed access, an intersection with an array, tuple or container member, or a type parameter whose constraint
 // has one (#53w68gt). A union's members are never
 // unions, and a type parameter's base constraint is never a type parameter, so this goes at most two deep.
-func (w *Walker) hasObjectPart(t *checker.Type) bool {
+func (walker *Walker) hasObjectPart(t *checker.Type) bool {
 	switch {
 	case t.Flags()&checker.TypeFlagsObject != 0:
 		return true
@@ -507,17 +507,17 @@ func (w *Walker) hasObjectPart(t *checker.Type) bool {
 		// A generic indexed slot can hold a primitive and still vary with the caller (#xzpba0r).
 		return true
 	case t.Flags()&checker.TypeFlagsUnion != 0:
-		return slices.ContainsFunc(t.Types(), w.hasObjectPart)
+		return slices.ContainsFunc(t.Types(), walker.hasObjectPart)
 	case t.Flags()&checker.TypeFlagsIntersection != 0:
 		// Only the members a walk pairs; see relate. An object member counts unless a primitive one makes it
 		// a brand (#b9a0wgy).
-		return slices.ContainsFunc(t.Types(), w.isSlotContainer) ||
+		return slices.ContainsFunc(t.Types(), walker.isSlotContainer) ||
 			(!hasPrimitiveMember(t) && slices.ContainsFunc(t.Types(), func(member *checker.Type) bool {
 				return member.Flags()&checker.TypeFlagsObject != 0
 			}))
 	case t.Flags()&checker.TypeFlagsTypeParameter != 0:
-		constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, t)
-		return constraint != nil && constraint != t && w.hasObjectPart(constraint)
+		constraint := checker.Checker_getBaseConstraintOfType(walker.typeChecker, t)
+		return constraint != nil && constraint != t && walker.hasObjectPart(constraint)
 	}
 	return false
 }

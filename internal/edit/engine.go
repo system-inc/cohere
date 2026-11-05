@@ -782,9 +782,9 @@ func Summarize(results []FileResult) Summary {
 
 // Refusals is a line for each file whose rewrite did not parse: the file, the rule to look at, and the
 // parser's message. Printed under the summary line, which counts them, so the count can be traced.
-func (s Summary) Refusals() []string {
-	lines := make([]string, 0, len(s.FilesRefused))
-	for _, refused := range s.FilesRefused {
+func (summary Summary) Refusals() []string {
+	lines := make([]string, 0, len(summary.FilesRefused))
+	for _, refused := range summary.FilesRefused {
 		blame := fmt.Sprintf("the fix from %s breaks it", strings.Join(refused.Breaking, " and from "))
 		switch {
 		case len(refused.Rules) == 1 && refused.Rules[0] == transformRuleName:
@@ -817,16 +817,16 @@ func reasonKey(reason string) string {
 // replaces printed a green checkmark over zero files linted for days, because an empty file list is
 // indistinguishable from a clean tree. The same ambiguity is available to a fixer, and this is what
 // closes it.
-func (s Summary) String() string {
+func (summary Summary) String() string {
 	// A checked run states the same numbers in the conditional, because "3 files rewritten" over a tree
 	// nobody wrote to is a count claiming work that never happened.
 	rewritten, applied, reformatted := "rewritten", "applied", "reformatted"
-	if s.Checked {
+	if summary.Checked {
 		rewritten, applied, reformatted = "would be rewritten", "would apply", "would be reformatted"
 	}
 	line := fmt.Sprintf(
 		"fix: %d of %d files %s, %d fixes %s, %d refused",
-		s.FilesChanged, s.FilesConsidered, rewritten, s.FixesApplied, applied, s.FixesRefused,
+		summary.FilesChanged, summary.FilesConsidered, rewritten, summary.FixesApplied, applied, summary.FixesRefused,
 	)
 
 	// The refusal breakdown attaches to the refusal count and must stay adjacent to it. It was
@@ -835,9 +835,9 @@ func (s Summary) String() string {
 	// the second parenthetical reads as a second skip reason. A true number under the wrong heading,
 	// found by reading the rendered line rather than by any assertion, because every fixture checked
 	// for the presence of its own substring and none checked what the whole line said.
-	if len(s.RefusalsByReason) > 0 {
-		reasons := make([]string, 0, len(s.RefusalsByReason))
-		for reason := range s.RefusalsByReason {
+	if len(summary.RefusalsByReason) > 0 {
+		reasons := make([]string, 0, len(summary.RefusalsByReason))
+		for reason := range summary.RefusalsByReason {
 			reasons = append(reasons, reason)
 		}
 		sort.Strings(reasons)
@@ -847,36 +847,36 @@ func (s Summary) String() string {
 			if index > 0 {
 				line += ", "
 			}
-			line += fmt.Sprintf("%d %s", s.RefusalsByReason[reason], reason)
+			line += fmt.Sprintf("%d %s", summary.RefusalsByReason[reason], reason)
 		}
 		line += ")"
 	}
 
 	// Formatting reports its own number rather than hiding inside the rewrite count, so a run where
 	// the formatter did nothing is distinguishable from one where nothing needed formatting.
-	if s.FilesTransformed > 0 {
-		line += fmt.Sprintf(", %d %s", s.FilesTransformed, reformatted)
+	if summary.FilesTransformed > 0 {
+		line += fmt.Sprintf(", %d %s", summary.FilesTransformed, reformatted)
 	}
 
 	// Skips print whenever there are any, and they name the reason. A formatter that declined four
 	// hundred files and one that found four hundred files already correct produce the same reformat
 	// count, and only this line tells them apart.
-	if s.FilesTransformSkipped > 0 {
-		line += fmt.Sprintf(", %d not formatted", s.FilesTransformSkipped)
-		reasons := make([]string, 0, len(s.TransformSkipReasons))
-		for reason := range s.TransformSkipReasons {
+	if summary.FilesTransformSkipped > 0 {
+		line += fmt.Sprintf(", %d not formatted", summary.FilesTransformSkipped)
+		reasons := make([]string, 0, len(summary.TransformSkipReasons))
+		for reason := range summary.TransformSkipReasons {
 			if reason != "" {
 				reasons = append(reasons, reason)
 			}
 		}
 		sort.Strings(reasons)
 		for _, reason := range reasons {
-			line += fmt.Sprintf(" (%d %s)", s.TransformSkipReasons[reason], reason)
+			line += fmt.Sprintf(" (%d %s)", summary.TransformSkipReasons[reason], reason)
 		}
 	}
 
 	maximumPasses := 0
-	for passes := range s.FilesByPasses {
+	for passes := range summary.FilesByPasses {
 		if passes > maximumPasses {
 			maximumPasses = passes
 		}
@@ -885,15 +885,15 @@ func (s Summary) String() string {
 		line += fmt.Sprintf(", up to %d passes", maximumPasses)
 	}
 
-	if len(s.FilesNotConverged) > 0 {
-		line += fmt.Sprintf(", %d files did not converge", len(s.FilesNotConverged))
+	if len(summary.FilesNotConverged) > 0 {
+		line += fmt.Sprintf(", %d files did not converge", len(summary.FilesNotConverged))
 	}
 
 	// Failures print even though they were already written to stderr as they happened. A summary
 	// that omits them reads as a clean run to anyone reading only the last line, which is most
 	// readers most of the time.
-	if len(s.FilesFailed) > 0 {
-		line += fmt.Sprintf(", %d files could not be processed", len(s.FilesFailed))
+	if len(summary.FilesFailed) > 0 {
+		line += fmt.Sprintf(", %d files could not be processed", len(summary.FilesFailed))
 	}
 
 	return line

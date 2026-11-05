@@ -61,8 +61,8 @@ type NotAllowedError struct {
 	Rule string
 }
 
-func (err NotAllowedError) Error() string {
-	return fmt.Sprintf("rule_runner: %q is not a rule another program may run; the allowlist in rule_runner.go decides which are", err.Rule)
+func (notAllowedError NotAllowedError) Error() string {
+	return fmt.Sprintf("rule_runner: %q is not a rule another program may run; the allowlist in rule_runner.go decides which are", notAllowedError.Rule)
 }
 
 // RunRule runs the rule named ruleName over files, which belong to program, with typeChecker answering its

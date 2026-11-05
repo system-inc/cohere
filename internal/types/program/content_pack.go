@@ -152,20 +152,20 @@ func OpenContentPack(directory string) (*ContentPack, error) {
 
 // TrustStats has the pack validate entries against snapshot's stats where it holds one, rather than statting
 // each file served again. See StatSnapshot for why that is sound.
-func (p *ContentPack) TrustStats(snapshot *StatSnapshot) {
-	p.known = snapshot
+func (pack *ContentPack) TrustStats(snapshot *StatSnapshot) {
+	pack.known = snapshot
 }
 
 // Counts reports how many files this run was served from the pack, read from disk, and found damaged.
-func (p *ContentPack) Counts() (hits int, misses int, damaged int) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	return p.hits, p.misses, p.damaged
+func (pack *ContentPack) Counts() (hits int, misses int, damaged int) {
+	pack.mutex.Lock()
+	defer pack.mutex.Unlock()
+	return pack.hits, pack.misses, pack.damaged
 }
 
 // wrap returns a filesystem that serves ReadFile from the pack where it can.
-func (p *ContentPack) wrap(inner vfs.FS) vfs.FS {
-	return &contentPackFS{FS: inner, pack: p}
+func (pack *ContentPack) wrap(inner vfs.FS) vfs.FS {
+	return &contentPackFS{FS: inner, pack: pack}
 }
 
 // contentPackFS answers ReadFile from the pack when the file's stat still matches, and otherwise reads the
@@ -175,47 +175,47 @@ type contentPackFS struct {
 	pack *ContentPack
 }
 
-func (f *contentPackFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	if contents, served := f.pack.serve(path.AsString()); served {
+func (packFS *contentPackFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	if contents, served := packFS.pack.serve(path.AsString()); served {
 		return contents, true
 	}
 	// Stat first, so the key can only be older than the bytes read after it.
 	identity, statted := statIdentity(path.AsString())
-	contents, ok := f.FS.ReadFile(path)
-	f.pack.noteRead(path.AsString(), identity, statted && ok, contents)
+	contents, ok := packFS.FS.ReadFile(path)
+	packFS.pack.noteRead(path.AsString(), identity, statted && ok, contents)
 	return contents, ok
 }
 
 // serve returns a file's recorded bytes when its stat still matches the entry's.
-func (p *ContentPack) serve(path string) (string, bool) {
-	entry, found := p.entries[path]
+func (pack *ContentPack) serve(path string) (string, bool) {
+	entry, found := pack.entries[path]
 	if !found {
 		return "", false
 	}
-	identity, statted := p.known.identityOf(path)
+	identity, statted := pack.known.identityOf(path)
 	if !statted {
 		identity, statted = statIdentity(path)
 	}
 	if !statted || identity != entry.identity {
 		return "", false
 	}
-	contents, whole := p.viewEntry(entry)
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
+	contents, whole := pack.viewEntry(entry)
+	pack.mutex.Lock()
+	defer pack.mutex.Unlock()
 	if !whole {
-		p.damaged++
+		pack.damaged++
 		return "", false
 	}
-	p.used[path] = true
-	p.hits++
+	pack.used[path] = true
+	pack.hits++
 	return contents, true
 }
 
 // viewEntry checks an entry's bytes in the mapping and returns them as a string over the mapping, reporting
 // false for anything out of bounds, faulting or failing its checksum. See the package comment for why the
 // view is safe to hand the compiler.
-func (p *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole bool) {
-	if entry.offset < 0 || entry.length < 0 || entry.offset > int64(len(p.mapped))-entry.length {
+func (pack *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole bool) {
+	if entry.offset < 0 || entry.length < 0 || entry.offset > int64(len(pack.mapped))-entry.length {
 		return "", false
 	}
 	if entry.length == 0 {
@@ -229,7 +229,7 @@ func (p *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole 
 			contents, whole = "", false
 		}
 	}()
-	view := p.mapped[entry.offset : entry.offset+entry.length]
+	view := pack.mapped[entry.offset : entry.offset+entry.length]
 	if crc32.Checksum(view, castagnoli) != entry.checksum {
 		return "", false
 	}
@@ -240,82 +240,82 @@ func (p *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole 
 
 // readIdentity is the stat the program's copy of path was served or read under, when the pack has one: an entry
 // it served, or a file it read whole after a stat. See Graph.ReadUnchanged.
-func (p *ContentPack) readIdentity(path string) (fileIdentity, bool) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	if added, read := p.added[path]; read {
+func (pack *ContentPack) readIdentity(path string) (fileIdentity, bool) {
+	pack.mutex.Lock()
+	defer pack.mutex.Unlock()
+	if added, read := pack.added[path]; read {
 		return added.identity, true
 	}
-	if p.used[path] {
-		return p.entries[path].identity, true
+	if pack.used[path] {
+		return pack.entries[path].identity, true
 	}
 	return fileIdentity{}, false
 }
 
 // noteRead records a file read from disk, keepable when it was statted before the read and read whole.
-func (p *ContentPack) noteRead(path string, identity fileIdentity, keepable bool, contents string) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	p.misses++
+func (pack *ContentPack) noteRead(path string, identity fileIdentity, keepable bool, contents string) {
+	pack.mutex.Lock()
+	defer pack.mutex.Unlock()
+	pack.misses++
 	if keepable {
-		p.added[path] = addedContent{identity: identity, contents: contents}
+		pack.added[path] = addedContent{identity: identity, contents: contents}
 	}
 }
 
 // Save keeps what this run read from disk, appending it to the data file or, when that has grown too dead
 // or something in it was damaged, writing a new one. A run that read nothing new writes nothing. The caller
 // holds the cache directory's lock, so two runs never write at once.
-func (p *ContentPack) Save() error {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	if len(p.added) == 0 && p.damaged == 0 {
+func (pack *ContentPack) Save() error {
+	pack.mutex.Lock()
+	defer pack.mutex.Unlock()
+	if len(pack.added) == 0 && pack.damaged == 0 {
 		return nil
 	}
-	if createDirectoryError := os.MkdirAll(p.directory, 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(pack.directory, 0o755); createDirectoryError != nil {
 		return createDirectoryError
 	}
 
 	// Read again under the lock: another run may have appended or rewritten since this one opened.
 	current := map[string]contentPackEntry{}
 	currentData := ""
-	if index, readError := os.ReadFile(filepath.Join(p.directory, contentPackIndexName)); readError == nil {
+	if index, readError := os.ReadFile(filepath.Join(pack.directory, contentPackIndexName)); readError == nil {
 		if dataName, entries, parseContentPackIndexError := parseContentPackIndex(index); parseContentPackIndexError == nil {
 			currentData, current = dataName, entries
 		}
 	}
 
-	appendable := p.damaged == 0 && currentData != "" && currentData == p.dataName
+	appendable := pack.damaged == 0 && currentData != "" && currentData == pack.dataName
 	if appendable {
 		// Live and dead as they would stand after the append: an entry this run read again is dead in the
 		// data file once its new copy is appended.
 		live, size := int64(0), int64(0)
 		for path, entry := range current {
-			if _, replaced := p.added[path]; !replaced {
+			if _, replaced := pack.added[path]; !replaced {
 				live += entry.length
 			}
 		}
-		if information, statError := os.Stat(filepath.Join(p.directory, currentData)); statError == nil {
+		if information, statError := os.Stat(filepath.Join(pack.directory, currentData)); statError == nil {
 			size = information.Size()
 		}
-		for _, added := range p.added {
+		for _, added := range pack.added {
 			live += int64(len(added.contents))
 			size += int64(len(added.contents))
 		}
-		appendable = size-live <= live && len(current) <= 2*(len(p.used)+len(p.added))
+		appendable = size-live <= live && len(current) <= 2*(len(pack.used)+len(pack.added))
 	}
 	if appendable {
-		return p.appendTo(currentData, current)
+		return pack.appendTo(currentData, current)
 	}
-	return p.rewrite()
+	return pack.rewrite()
 }
 
 // appendTo adds this run's reads to the end of the current data file and writes an index naming them.
 //
 // Mutates: entries gains an entry for each file this run read, as the index written here names them
-func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEntry) error {
-	file, err := os.OpenFile(filepath.Join(p.directory, dataName), os.O_WRONLY|os.O_APPEND, 0)
+func (pack *ContentPack) appendTo(dataName string, entries map[string]contentPackEntry) error {
+	file, err := os.OpenFile(filepath.Join(pack.directory, dataName), os.O_WRONLY|os.O_APPEND, 0)
 	if err != nil {
-		return p.rewrite()
+		return pack.rewrite()
 	}
 	information, err := file.Stat()
 	if err != nil {
@@ -325,7 +325,7 @@ func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEn
 	}
 	offset := information.Size()
 	writer := newPackWriter(file, offset)
-	for path, added := range p.added {
+	for path, added := range pack.added {
 		entries[path] = writer.add(added.identity, added.contents)
 	}
 	if finishError := writer.finish(); finishError != nil {
@@ -336,31 +336,31 @@ func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEn
 	if closeError := file.Close(); closeError != nil {
 		return closeError
 	}
-	return writeContentPackIndex(p.directory, dataName, entries)
+	return writeContentPackIndex(pack.directory, dataName, entries)
 }
 
 // rewrite writes a new data file holding what this run used and read, names it in a new index, and removes
 // every older data file.
-func (p *ContentPack) rewrite() error {
+func (pack *ContentPack) rewrite() error {
 	dataName := "contents-" + strconv.FormatInt(time.Now().UnixNano(), 36) + ".pack"
-	file, openError := os.OpenFile(filepath.Join(p.directory, dataName), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	file, openError := os.OpenFile(filepath.Join(pack.directory, dataName), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if openError != nil {
 		return openError
 	}
 	writer := newPackWriter(file, 0)
-	entries := make(map[string]contentPackEntry, len(p.used)+len(p.added))
-	for path := range p.used {
-		if _, replaced := p.added[path]; replaced {
+	entries := make(map[string]contentPackEntry, len(pack.used)+len(pack.added))
+	for path := range pack.used {
+		if _, replaced := pack.added[path]; replaced {
 			continue
 		}
-		entry := p.entries[path]
-		contents, whole := p.viewEntry(entry)
+		entry := pack.entries[path]
+		contents, whole := pack.viewEntry(entry)
 		if !whole {
 			continue
 		}
 		entries[path] = writer.add(entry.identity, contents)
 	}
-	for path, added := range p.added {
+	for path, added := range pack.added {
 		entries[path] = writer.add(added.identity, added.contents)
 	}
 	// A data file no index names is never read, so removing one on a failure below is tidying, and a removal that
@@ -377,12 +377,12 @@ func (p *ContentPack) rewrite() error {
 		os.Remove(file.Name())
 		return closeError
 	}
-	if writeContentPackIndexError := writeContentPackIndex(p.directory, dataName, entries); writeContentPackIndexError != nil {
+	if writeContentPackIndexError := writeContentPackIndex(pack.directory, dataName, entries); writeContentPackIndexError != nil {
 		// Ignored: no index names this file, as above.
 		os.Remove(file.Name())
 		return writeContentPackIndexError
 	}
-	if older, globError := filepath.Glob(filepath.Join(p.directory, "contents-*.pack")); globError == nil {
+	if older, globError := filepath.Glob(filepath.Join(pack.directory, "contents-*.pack")); globError == nil {
 		for _, path := range older {
 			if filepath.Base(path) != dataName {
 				// Ignored: the new index names only dataName, so an older data file is never read again, and one
@@ -410,39 +410,39 @@ func newPackWriter(file *os.File, offset int64) *packWriter {
 //
 // Unsafe: contents is viewed as bytes without a copy, and the checksum and the file's Write only read them, so
 // the string's bytes never change.
-func (w *packWriter) add(identity fileIdentity, contents string) contentPackEntry {
+func (writer *packWriter) add(identity fileIdentity, contents string) contentPackEntry {
 	entry := contentPackEntry{
 		identity: identity,
-		offset:   w.offset,
+		offset:   writer.offset,
 		length:   int64(len(contents)),
 		checksum: crc32.Update(0, castagnoli, unsafe.Slice(unsafe.StringData(contents), len(contents))),
 	}
-	w.offset += int64(len(contents))
-	if len(w.buffer)+len(contents) > cap(w.buffer) {
-		w.flush()
+	writer.offset += int64(len(contents))
+	if len(writer.buffer)+len(contents) > cap(writer.buffer) {
+		writer.flush()
 	}
-	if len(contents) > cap(w.buffer) {
-		w.write(unsafe.Slice(unsafe.StringData(contents), len(contents)))
+	if len(contents) > cap(writer.buffer) {
+		writer.write(unsafe.Slice(unsafe.StringData(contents), len(contents)))
 	} else {
-		w.buffer = append(w.buffer, contents...)
+		writer.buffer = append(writer.buffer, contents...)
 	}
 	return entry
 }
 
-func (w *packWriter) flush() {
-	w.write(w.buffer)
-	w.buffer = w.buffer[:0]
+func (writer *packWriter) flush() {
+	writer.write(writer.buffer)
+	writer.buffer = writer.buffer[:0]
 }
 
-func (w *packWriter) write(data []byte) {
-	if w.err == nil && len(data) > 0 {
-		_, w.err = w.file.Write(data)
+func (writer *packWriter) write(data []byte) {
+	if writer.err == nil && len(data) > 0 {
+		_, writer.err = writer.file.Write(data)
 	}
 }
 
-func (w *packWriter) finish() error {
-	w.flush()
-	return w.err
+func (writer *packWriter) finish() error {
+	writer.flush()
+	return writer.err
 }
 
 // writeContentPackIndex writes the index by rename, so a reader sees the old one or the new one whole.
@@ -543,32 +543,32 @@ type indexReader struct {
 	err      error
 }
 
-func (r *indexReader) bytes(length int) []byte {
-	if r.err != nil || length < 0 || r.position+length > len(r.data) {
-		r.err = io.ErrUnexpectedEOF
+func (reader *indexReader) bytes(length int) []byte {
+	if reader.err != nil || length < 0 || reader.position+length > len(reader.data) {
+		reader.err = io.ErrUnexpectedEOF
 		return nil
 	}
-	read := r.data[r.position : r.position+length]
-	r.position += length
+	read := reader.data[reader.position : reader.position+length]
+	reader.position += length
 	return read
 }
 
-func (r *indexReader) uint16() uint16 {
-	if read := r.bytes(2); read != nil {
+func (reader *indexReader) uint16() uint16 {
+	if read := reader.bytes(2); read != nil {
 		return binary.LittleEndian.Uint16(read)
 	}
 	return 0
 }
 
-func (r *indexReader) uint32() uint32 {
-	if read := r.bytes(4); read != nil {
+func (reader *indexReader) uint32() uint32 {
+	if read := reader.bytes(4); read != nil {
 		return binary.LittleEndian.Uint32(read)
 	}
 	return 0
 }
 
-func (r *indexReader) uint64() uint64 {
-	if read := r.bytes(8); read != nil {
+func (reader *indexReader) uint64() uint64 {
+	if read := reader.bytes(8); read != nil {
 		return binary.LittleEndian.Uint64(read)
 	}
 	return 0

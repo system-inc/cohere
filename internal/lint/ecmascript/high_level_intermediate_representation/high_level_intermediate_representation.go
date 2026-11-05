@@ -267,8 +267,8 @@ const (
 	FunctionKindHook
 )
 
-func (k FunctionKind) String() string {
-	switch k {
+func (kind FunctionKind) String() string {
+	switch kind {
 	case FunctionKindComponent:
 		return "component"
 	case FunctionKindHook:
@@ -283,24 +283,24 @@ func (k FunctionKind) String() string {
 // The second result is false for InvalidBlock and for an id that no longer names a block, which a
 // pass that removes blocks will produce. Callers that have just read the id out of a terminal of a
 // well-formed function may ignore it; callers walking a function mid-mutation may not.
-func (f *Function) Block(id static_single_assignment.BlockId) (*BasicBlock, bool) {
-	block, ok := f.blocksById[id]
+func (function *Function) Block(id static_single_assignment.BlockId) (*BasicBlock, bool) {
+	block, ok := function.blocksById[id]
 	return block, ok
 }
 
 // Instruction returns the instruction with the given id.
-func (f *Function) Instruction(id InstructionId) *Instruction {
-	return f.Instructions[id]
+func (function *Function) Instruction(id InstructionId) *Instruction {
+	return function.Instructions[id]
 }
 
 // Identifier returns the identifier naming one value.
-func (f *Function) Identifier(id static_single_assignment.IdentifierId) *Identifier {
-	return f.Identifiers[id]
+func (function *Function) Identifier(id static_single_assignment.IdentifierId) *Identifier {
+	return function.Identifiers[id]
 }
 
 // IdentifierOf returns the identifier a place names.
-func (f *Function) IdentifierOf(place Place) *Identifier {
-	return f.Identifiers[place.Identifier]
+func (function *Function) IdentifierOf(place Place) *Identifier {
+	return function.Identifiers[place.Identifier]
 }
 
 // BasicBlock is a straight-line run of instructions ending in exactly one terminal.
@@ -353,8 +353,8 @@ const (
 	BlockKindCatch
 )
 
-func (k BlockKind) String() string {
-	switch k {
+func (kind BlockKind) String() string {
+	switch kind {
 	case BlockKindValue:
 		return "value"
 	case BlockKindLoop:
@@ -502,8 +502,8 @@ const (
 )
 
 // IsMutable reports whether this effect can modify the value.
-func (e Effect) IsMutable() bool {
-	switch e {
+func (effect Effect) IsMutable() bool {
+	switch effect {
 	case EffectCapture, EffectStore, EffectConditionallyMutate, EffectConditionallyMutateIterator, EffectMutate:
 		return true
 	default:
@@ -511,8 +511,8 @@ func (e Effect) IsMutable() bool {
 	}
 }
 
-func (e Effect) String() string {
-	switch e {
+func (effect Effect) String() string {
+	switch effect {
 	case EffectFreeze:
 		return "freeze"
 	case EffectRead:
@@ -558,8 +558,8 @@ const (
 	InstructionKindFunction
 )
 
-func (k InstructionKind) String() string {
-	switch k {
+func (kind InstructionKind) String() string {
+	switch kind {
 	case InstructionKindLet:
 		return "let"
 	case InstructionKindReassign:
@@ -591,11 +591,11 @@ func NewFunction(node *ast.Node, name string, kind FunctionKind) *Function {
 }
 
 // NewBlock appends a block and returns it.
-func (f *Function) NewBlock(kind BlockKind) *BasicBlock {
-	block := &BasicBlock{Id: f.nextBlock, Kind: kind}
-	f.nextBlock++
-	f.Blocks = append(f.Blocks, block)
-	f.blocksById[block.Id] = block
+func (function *Function) NewBlock(kind BlockKind) *BasicBlock {
+	block := &BasicBlock{Id: function.nextBlock, Kind: kind}
+	function.nextBlock++
+	function.Blocks = append(function.Blocks, block)
+	function.blocksById[block.Id] = block
 	return block
 }
 
@@ -603,8 +603,8 @@ func (f *Function) NewBlock(kind BlockKind) *BasicBlock {
 //
 // Every value gets its own IdentifierId. Passing a non-zero declaration groups this value with
 // others of the same binding; passing 0 mints a fresh declaration, which is what a temporary wants.
-func (f *Function) NewIdentifier(name string, node *ast.Node, declaration static_single_assignment.DeclarationId) *Identifier {
-	id := static_single_assignment.IdentifierId(len(f.Identifiers))
+func (function *Function) NewIdentifier(name string, node *ast.Node, declaration static_single_assignment.DeclarationId) *Identifier {
+	id := static_single_assignment.IdentifierId(len(function.Identifiers))
 	if declaration == 0 {
 		declaration = static_single_assignment.DeclarationId(id) + 1
 	}
@@ -616,27 +616,27 @@ func (f *Function) NewIdentifier(name string, node *ast.Node, declaration static
 	// first chunk of 16 cost 0.07 GB of unused slots on a cold ahra run. Each function has its own
 	// chunks, so no identifier of one shares storage with another's, which
 	// TestIdentifiersShareNoStorageAcrossFunctions holds.
-	if len(f.identifierSlab) == cap(f.identifierSlab) {
-		f.identifierSlab = make([]Identifier, 0, min(max(4, len(f.Identifiers)), 256))
+	if len(function.identifierSlab) == cap(function.identifierSlab) {
+		function.identifierSlab = make([]Identifier, 0, min(max(4, len(function.Identifiers)), 256))
 	}
-	f.identifierSlab = append(f.identifierSlab, Identifier{Id: id, Declaration: declaration, Name: name, Node: node})
-	identifier := &f.identifierSlab[len(f.identifierSlab)-1]
-	f.Identifiers = append(f.Identifiers, identifier)
+	function.identifierSlab = append(function.identifierSlab, Identifier{Id: id, Declaration: declaration, Name: name, Node: node})
+	identifier := &function.identifierSlab[len(function.identifierSlab)-1]
+	function.Identifiers = append(function.Identifiers, identifier)
 	return identifier
 }
 
 // AddInstruction appends an instruction to the table and to the given block, returning its id.
-func (f *Function) AddInstruction(block *BasicBlock, instruction *Instruction) InstructionId {
-	id := InstructionId(len(f.Instructions))
+func (function *Function) AddInstruction(block *BasicBlock, instruction *Instruction) InstructionId {
+	id := InstructionId(len(function.Instructions))
 	instruction.Id = id
-	f.Instructions = append(f.Instructions, instruction)
+	function.Instructions = append(function.Instructions, instruction)
 	block.Instructions = append(block.Instructions, id)
 	return id
 }
 
 // String renders a place as its identifier, for printing and tests.
-func (f *Function) PlaceString(place Place) string {
-	identifier := f.Identifiers[place.Identifier]
+func (function *Function) PlaceString(place Place) string {
+	identifier := function.Identifiers[place.Identifier]
 	if identifier.Name != "" {
 		return fmt.Sprintf("%s$%d", identifier.Name, identifier.Id)
 	}

@@ -70,11 +70,11 @@ type Pragma struct {
 }
 
 // String renders a Pragma back into its source spelling, for error messages.
-func (p Pragma) String() string {
-	if p.HasValue {
-		return "@" + p.Key + ":" + p.Value
+func (pragma Pragma) String() string {
+	if pragma.HasValue {
+		return "@" + pragma.Key + ":" + pragma.Value
 	}
-	return "@" + p.Key
+	return "@" + pragma.Key
 }
 
 // UnknownPragmaError reports a directive the runner does not model.
@@ -111,10 +111,10 @@ type UnknownPragmaError struct {
 	Pragma      Pragma
 }
 
-func (e *UnknownPragmaError) Error() string {
+func (pragmaError *UnknownPragmaError) Error() string {
 	return fmt.Sprintf(
 		"%s: unrecognised pragma %s; the runner refuses rather than skipping, because an unmodelled directive changes what the fixture expects and a skipped fixture that reports as a pass is exactly the defect this suite exists to catch. Add it to knownPragmas with a note on what it means, or record it in ignoredPragmas with the evidence that it does not affect diagnostics",
-		e.FixturePath, e.Pragma,
+		pragmaError.FixturePath, pragmaError.Pragma,
 	)
 }
 

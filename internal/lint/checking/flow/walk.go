@@ -127,8 +127,8 @@ const maximumDepth = 8
 //
 // A fresh site is judged at its top only. Its parts are sites of their own, so descending would report
 // one hole twice.
-func (w *Walker) Walk(site Site, judge Judge) (Pair, bool) {
-	return w.WalkWith(site, judge, WalkOptions{})
+func (walker *Walker) Walk(site Site, judge Judge) (Pair, bool) {
+	return walker.WalkWith(site, judge, WalkOptions{})
 }
 
 // WalkOptions widens one walk past what every rule's walk relates.
@@ -150,20 +150,20 @@ type WalkOptions struct {
 }
 
 // WalkWith is Walk with options.
-func (w *Walker) WalkWith(site Site, judge Judge, options WalkOptions) (Pair, bool) {
+func (walker *Walker) WalkWith(site Site, judge Judge, options WalkOptions) (Pair, bool) {
 	top := Pair{Source: site.Source, Target: site.Target, Method: site.Method}
 	if site.Fresh {
 		wrong, _ := judge(top)
 		return top, wrong
 	}
-	w.judge, w.newContainer, w.freshElements = judge, site.NewContainer, site.FreshElements
-	w.objectIntersections, w.methods, w.overridden = options.ObjectIntersections, options.Methods, site.Overridden
-	w.visited, w.path = w.visited[:0], w.path[:0]
-	if len(w.visitedSet) > 0 {
-		clear(w.visitedSet)
+	walker.judge, walker.newContainer, walker.freshElements = judge, site.NewContainer, site.FreshElements
+	walker.objectIntersections, walker.methods, walker.overridden = options.ObjectIntersections, options.Methods, site.Overridden
+	walker.visited, walker.path = walker.visited[:0], walker.path[:0]
+	if len(walker.visitedSet) > 0 {
+		clear(walker.visitedSet)
 	}
-	found, wrong := w.relate(top, 0)
-	w.judge, w.overridden = nil, nil
+	found, wrong := walker.relate(top, 0)
+	walker.judge, walker.overridden = nil, nil
 	return found, wrong
 }
 
@@ -232,52 +232,52 @@ func NewWalker(typeChecker *checker.Checker) *Walker {
 }
 
 // IsAssignable is the checker's isTypeAssignableTo, asked once per pair in the file.
-func (w *Walker) IsAssignable(source *checker.Type, target *checker.Type) bool {
+func (walker *Walker) IsAssignable(source *checker.Type, target *checker.Type) bool {
 	key := [2]*checker.Type{source, target}
-	if answer, asked := w.assignable[key]; asked {
+	if answer, asked := walker.assignable[key]; asked {
 		return answer
 	}
-	answer := checker.Checker_isTypeAssignableTo(w.typeChecker, source, target)
-	if w.assignable == nil {
-		w.assignable = map[[2]*checker.Type]bool{}
+	answer := checker.Checker_isTypeAssignableTo(walker.typeChecker, source, target)
+	if walker.assignable == nil {
+		walker.assignable = map[[2]*checker.Type]bool{}
 	}
-	w.assignable[key] = answer
+	walker.assignable[key] = answer
 	return answer
 }
 
 // WidenedType is the checker's getWidenedType: a fresh literal's type without its freshness or its literal
 // property types.
-func (w *Walker) WidenedType(t *checker.Type) *checker.Type {
-	return checker.Checker_getWidenedType(w.typeChecker, t)
+func (walker *Walker) WidenedType(t *checker.Type) *checker.Type {
+	return checker.Checker_getWidenedType(walker.typeChecker, t)
 }
 
 // meet records that the walk has met key, and says whether it had met it before.
-func (w *Walker) meet(key [2]*checker.Type) bool {
-	if len(w.visited) < visitedListLimit {
-		for _, met := range w.visited {
+func (walker *Walker) meet(key [2]*checker.Type) bool {
+	if len(walker.visited) < visitedListLimit {
+		for _, met := range walker.visited {
 			if met == key {
 				return true
 			}
 		}
-		w.visited = append(w.visited, key)
+		walker.visited = append(walker.visited, key)
 		return false
 	}
-	if w.visitedSet == nil {
-		w.visitedSet = map[[2]*checker.Type]bool{}
+	if walker.visitedSet == nil {
+		walker.visitedSet = map[[2]*checker.Type]bool{}
 	}
-	if len(w.visitedSet) == 0 {
-		for _, met := range w.visited {
-			w.visitedSet[met] = true
+	if len(walker.visitedSet) == 0 {
+		for _, met := range walker.visited {
+			walker.visitedSet[met] = true
 		}
 	}
-	if w.visitedSet[key] {
+	if walker.visitedSet[key] {
 		return true
 	}
-	w.visitedSet[key] = true
+	walker.visitedSet[key] = true
 	return false
 }
 
-func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
+func (walker *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	if pair.Source == nil || pair.Target == nil || depth > maximumDepth {
 		return Pair{}, false
 	}
@@ -288,17 +288,17 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 		if !pair.Mutable || !pair.SourceReadonly {
 			return Pair{}, false
 		}
-		if wrong, _ := w.judge(pair); wrong {
+		if wrong, _ := walker.judge(pair); wrong {
 			pair.Path = slices.Clone(pair.Path)
 			return pair, true
 		}
 		return Pair{}, false
 	}
-	if w.meet([2]*checker.Type{pair.Source, pair.Target}) {
+	if walker.meet([2]*checker.Type{pair.Source, pair.Target}) {
 		return Pair{}, false
 	}
 
-	wrong, descend := w.judge(pair)
+	wrong, descend := walker.judge(pair)
 	if wrong {
 		pair.Path = slices.Clone(pair.Path)
 		return pair, true
@@ -313,7 +313,7 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	// own mutability.
 	if pair.Source.Flags()&checker.TypeFlagsUnion != 0 {
 		for _, member := range pair.Source.Types() {
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
+			if found, isWrong := walker.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -323,10 +323,10 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 		var first Pair
 		failed := false
 		for _, member := range pair.Target.Types() {
-			if !w.IsAssignable(pair.Source, member) {
+			if !walker.IsAssignable(pair.Source, member) {
 				continue
 			}
-			found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1)
+			found, isWrong := walker.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1)
 			if !isWrong {
 				return Pair{}, false
 			}
@@ -350,35 +350,35 @@ func (w *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	 * invariant-mutable. Measured on the four consumers, and left for their own ruling.
 	 */
 	if pair.Target.Flags()&checker.TypeFlagsIntersection != 0 {
-		objectMembers := w.objectIntersections && !hasPrimitiveMember(pair.Target)
+		objectMembers := walker.objectIntersections && !hasPrimitiveMember(pair.Target)
 		for _, member := range pair.Target.Types() {
-			if !w.isSlotContainer(member) && (!objectMembers || member.Flags()&checker.TypeFlagsObject == 0) {
+			if !walker.isSlotContainer(member) && (!objectMembers || member.Flags()&checker.TypeFlagsObject == 0) {
 				continue
 			}
-			if found, isWrong := w.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
+			if found, isWrong := walker.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
 				return found, true
 			}
 		}
 		return Pair{}, false
 	}
-	if pair.Source.Flags()&checker.TypeFlagsIntersection != 0 && w.isSlotContainer(pair.Target) {
+	if pair.Source.Flags()&checker.TypeFlagsIntersection != 0 && walker.isSlotContainer(pair.Target) {
 		for _, member := range pair.Source.Types() {
-			if !w.isSlotContainer(member) || !w.IsAssignable(member, pair.Target) {
+			if !walker.isSlotContainer(member) || !walker.IsAssignable(member, pair.Target) {
 				continue
 			}
-			if found, isWrong := w.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
+			if found, isWrong := walker.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
 				return found, true
 			}
 		}
 		return Pair{}, false
 	}
 	if pair.Target.Flags()&checker.TypeFlagsTypeParameter != 0 {
-		return w.typeParameterSlot(pair)
+		return walker.typeParameterSlot(pair)
 	}
 	if pair.Source.Flags()&checker.TypeFlagsTypeParameter != 0 {
-		return w.sourceTypeParameterSlot(pair, depth)
+		return walker.sourceTypeParameterSlot(pair, depth)
 	}
-	return w.parts(pair, depth)
+	return walker.parts(pair, depth)
 }
 
 // hasPrimitiveMember is an intersection with a member that is no object: `string & { readonly [brand]?: X }`,
@@ -407,8 +407,8 @@ func IsClassInstance(t *checker.Type) bool {
 
 // isSlotContainer is an array, a tuple or a library container: the slots the walk pairs by position or by
 // type argument, as opposed to by property name.
-func (w *Walker) isSlotContainer(t *checker.Type) bool {
-	if IsArrayLike(w.typeChecker, t) {
+func (walker *Walker) isSlotContainer(t *checker.Type) bool {
+	if IsArrayLike(walker.typeChecker, t) {
 		return true
 	}
 	_, _, isContainer := containerOf(t)
@@ -432,19 +432,19 @@ func (w *Walker) isSlotContainer(t *checker.Type) bool {
  *   - `{} & T` into `T` is `T` with its nullishness ruled out, whose parts are `T`'s own (3, SharedState).
  * An `any` or `never` source is no value the slot could be shared with either.
  */
-func (w *Walker) typeParameterSlot(pair Pair) (Pair, bool) {
-	if pair.Source.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsNever) != 0 || !w.IsAssignable(pair.Source, pair.Target) {
+func (walker *Walker) typeParameterSlot(pair Pair) (Pair, bool) {
+	if pair.Source.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsNever) != 0 || !walker.IsAssignable(pair.Source, pair.Target) {
 		return Pair{}, false
 	}
 	if pair.Source.Flags()&checker.TypeFlagsIntersection != 0 && slices.Contains(pair.Source.Types(), pair.Target) {
 		return Pair{}, false
 	}
-	constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, pair.Target)
-	if constraint == nil || constraint == pair.Target || !w.hasWritableSlot(constraint, 0) {
+	constraint := checker.Checker_getBaseConstraintOfType(walker.typeChecker, pair.Target)
+	if constraint == nil || constraint == pair.Target || !walker.hasWritableSlot(constraint, 0) {
 		return Pair{}, false
 	}
 	pair.Mutable = true
-	if wrong, _ := w.judge(pair); wrong {
+	if wrong, _ := walker.judge(pair); wrong {
 		pair.Path = slices.Clone(pair.Path)
 		return pair, true
 	}
@@ -474,21 +474,21 @@ func (w *Walker) typeParameterSlot(pair Pair) (Pair, bool) {
  * elements are what every instantiation narrows. A field holding a container under a parameter (`Pack extends {
  * pets: Animal[] }` seen as `{ pets: Animal[] }`) is the gap this leaves.
  */
-func (w *Walker) sourceTypeParameterSlot(pair Pair, depth int) (Pair, bool) {
-	constraint := checker.Checker_getBaseConstraintOfType(w.typeChecker, pair.Source)
+func (walker *Walker) sourceTypeParameterSlot(pair Pair, depth int) (Pair, bool) {
+	constraint := checker.Checker_getBaseConstraintOfType(walker.typeChecker, pair.Source)
 	if constraint == nil || constraint == pair.Source {
 		return Pair{}, false
 	}
-	if IsClassInstance(pair.Target) || !w.isSlotContainer(constraint) || !w.isSlotContainer(pair.Target) ||
-		!w.hasWritableSlot(pair.Target, 0) {
+	if IsClassInstance(pair.Target) || !walker.isSlotContainer(constraint) || !walker.isSlotContainer(pair.Target) ||
+		!walker.hasWritableSlot(pair.Target, 0) {
 		pair.Source = constraint
-		if found, wrong := w.narrowableFields(pair, depth); wrong {
+		if found, wrong := walker.narrowableFields(pair, depth); wrong {
 			return found, true
 		}
-		return w.relate(pair, depth+1)
+		return walker.relate(pair, depth+1)
 	}
 	pair.Mutable = true
-	if wrong, _ := w.judge(pair); wrong {
+	if wrong, _ := walker.judge(pair); wrong {
 		pair.Path = slices.Clone(pair.Path)
 		return pair, true
 	}
@@ -509,29 +509,29 @@ func (w *Walker) sourceTypeParameterSlot(pair Pair, depth int) (Pair, bool) {
  * every `T extends Element` given to an observer would report; telling a deep container an instantiation can
  * narrow from the DOM's is that task's question.
  */
-func (w *Walker) narrowableFields(pair Pair, depth int) (Pair, bool) {
+func (walker *Walker) narrowableFields(pair Pair, depth int) (Pair, bool) {
 	if pair.Source.Flags()&checker.TypeFlagsObject == 0 || pair.Target.Flags()&checker.TypeFlagsObject == 0 ||
-		IsClassInstance(pair.Source) || w.isSlotContainer(pair.Source) {
+		IsClassInstance(pair.Source) || walker.isSlotContainer(pair.Source) {
 		return Pair{}, false
 	}
-	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, pair.Target) {
+	for _, property := range checker.Checker_getPropertiesOfType(walker.typeChecker, pair.Target) {
 		if property.Flags&ast.SymbolFlagsMethod != 0 {
 			continue
 		}
-		sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, pair.Source, property.Name)
+		sourceProperty := checker.Checker_getPropertyOfType(walker.typeChecker, pair.Source, property.Name)
 		if sourceProperty == nil {
 			continue
 		}
-		source := checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty)
-		target := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
-		if !w.isSlotContainer(source) || !w.isSlotContainer(target) || !w.hasWritableSlot(target, 0) {
+		source := checker.Checker_getTypeOfSymbol(walker.typeChecker, sourceProperty)
+		target := checker.Checker_getTypeOfSymbol(walker.typeChecker, property)
+		if !walker.isSlotContainer(source) || !walker.isSlotContainer(target) || !walker.hasWritableSlot(target, 0) {
 			continue
 		}
 		step := Step{Kind: StepProperty, Name: property.Name, Index: -1}
-		w.path = append(w.path[:len(pair.Path)], step)
-		field := Pair{Source: source, Target: target, Path: w.path, Mutable: true, Narrowable: true}
-		wrong, _ := w.judge(field)
-		w.path = w.path[:len(pair.Path)]
+		walker.path = append(walker.path[:len(pair.Path)], step)
+		field := Pair{Source: source, Target: target, Path: walker.path, Mutable: true, Narrowable: true}
+		wrong, _ := walker.judge(field)
+		walker.path = walker.path[:len(pair.Path)]
 		if wrong {
 			field.Path = slices.Clone(append(slices.Clip(pair.Path), step))
 			return field, true
@@ -545,43 +545,43 @@ func (w *Walker) narrowableFields(pair Pair, depth int) (Pair, bool) {
  * contents of a mutable container, or a property that is not readonly (methods aside, as in parts), at any
  * depth below a readonly one, since `readonly items: Animal[]` still holds a mutable array.
  */
-func (w *Walker) hasWritableSlot(t *checker.Type, depth int) bool {
+func (walker *Walker) hasWritableSlot(t *checker.Type, depth int) bool {
 	if t == nil || depth > maximumDepth {
 		return false
 	}
 	if t.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 {
 		for _, member := range t.Types() {
-			if w.hasWritableSlot(member, depth+1) {
+			if walker.hasWritableSlot(member, depth+1) {
 				return true
 			}
 		}
 		return false
 	}
-	if checker.Checker_isArrayType(w.typeChecker, t) {
-		return !isNamed(t, "ReadonlyArray") || w.hasWritableSlot(w.typeArgument(t, 0), depth+1)
+	if checker.Checker_isArrayType(walker.typeChecker, t) {
+		return !isNamed(t, "ReadonlyArray") || walker.hasWritableSlot(walker.typeArgument(t, 0), depth+1)
 	}
 	if checker.IsTupleType(t) {
 		if !t.TargetTupleType().IsReadonly() {
 			return true
 		}
-		return slices.ContainsFunc(checker.Checker_getTypeArguments(w.typeChecker, t), func(element *checker.Type) bool {
-			return w.hasWritableSlot(element, depth+1)
+		return slices.ContainsFunc(checker.Checker_getTypeArguments(walker.typeChecker, t), func(element *checker.Type) bool {
+			return walker.hasWritableSlot(element, depth+1)
 		})
 	}
 	if _, readonly, isContainer := containerOf(t); isContainer {
-		return !readonly || slices.ContainsFunc(checker.Checker_getTypeArguments(w.typeChecker, t), func(argument *checker.Type) bool {
-			return w.hasWritableSlot(argument, depth+1)
+		return !readonly || slices.ContainsFunc(checker.Checker_getTypeArguments(walker.typeChecker, t), func(argument *checker.Type) bool {
+			return walker.hasWritableSlot(argument, depth+1)
 		})
 	}
 	if t.Flags()&checker.TypeFlagsObject == 0 {
 		return false
 	}
-	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, t) {
+	for _, property := range checker.Checker_getPropertiesOfType(walker.typeChecker, t) {
 		if property.Flags&ast.SymbolFlagsMethod != 0 {
 			continue
 		}
-		if !checker.Checker_isReadonlySymbol(w.typeChecker, property) ||
-			w.hasWritableSlot(checker.Checker_getTypeOfSymbol(w.typeChecker, property), depth+1) {
+		if !checker.Checker_isReadonlySymbol(walker.typeChecker, property) ||
+			walker.hasWritableSlot(checker.Checker_getTypeOfSymbol(walker.typeChecker, property), depth+1) {
 			return true
 		}
 	}
@@ -589,38 +589,38 @@ func (w *Walker) hasWritableSlot(t *checker.Type, depth int) bool {
 }
 
 // into relates part, one step below pair, with the step on the path while the part is judged.
-func (w *Walker) into(pair Pair, part Pair, step Step, depth int) (Pair, bool) {
-	w.path = append(w.path[:len(pair.Path)], step)
-	part.Path = w.path
-	found, wrong := w.relate(part, depth+1)
-	w.path = w.path[:len(pair.Path)]
+func (walker *Walker) into(pair Pair, part Pair, step Step, depth int) (Pair, bool) {
+	walker.path = append(walker.path[:len(pair.Path)], step)
+	part.Path = walker.path
+	found, wrong := walker.relate(part, depth+1)
+	walker.path = walker.path[:len(pair.Path)]
 	return found, wrong
 }
 
 // parts relates the parts of two types that are not unions, one at a time in the order they are listed,
 // and stops at the first that is wrong.
-func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
+func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	source, target := pair.Source, pair.Target
 	// The slots of a container the site just built are no one else's, so writing through the wider type
 	// reaches only this value. Its parts' own slots keep their mutability, unless the site built its elements
 	// too (Site.FreshElements), whose own slots are then no one else's either.
-	ownSlotsShared := !pair.Built && !(w.newContainer && len(pair.Path) == 0) &&
-		!(w.freshElements && len(pair.Path) == 1 && pair.Path[0].Kind == StepElement)
+	ownSlotsShared := !pair.Built && !(walker.newContainer && len(pair.Path) == 0) &&
+		!(walker.freshElements && len(pair.Path) == 1 && pair.Path[0].Kind == StepElement)
 
-	if checker.Checker_isArrayType(w.typeChecker, target) {
-		targetElement := w.typeArgument(target, 0)
+	if checker.Checker_isArrayType(walker.typeChecker, target) {
+		targetElement := walker.typeArgument(target, 0)
 		mutable := ownSlotsShared && !isNamed(target, "ReadonlyArray")
 		switch {
-		case checker.Checker_isArrayType(w.typeChecker, source):
+		case checker.Checker_isArrayType(walker.typeChecker, source):
 			step := Step{Kind: StepElement, Index: -1}
-			built, literals := w.partOf(pair.Literals, step)
-			return w.into(pair, Pair{Source: w.typeArgument(source, 0), Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
+			built, literals := walker.partOf(pair.Literals, step)
+			return walker.into(pair, Pair{Source: walker.typeArgument(source, 0), Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
 				step, depth)
 		case checker.IsTupleType(source):
 			step := Step{Kind: StepElement, Index: -1}
-			built, literals := w.partOf(pair.Literals, step)
-			for _, element := range checker.Checker_getTypeArguments(w.typeChecker, source) {
-				if found, wrong := w.into(pair, Pair{Source: element, Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
+			built, literals := walker.partOf(pair.Literals, step)
+			for _, element := range checker.Checker_getTypeArguments(walker.typeChecker, source) {
+				if found, wrong := walker.into(pair, Pair{Source: element, Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
 					step, depth); wrong {
 					return found, true
 				}
@@ -633,12 +633,12 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 			return Pair{}, false
 		}
 		mutable := ownSlotsShared && !target.TargetTupleType().IsReadonly()
-		sourceElements := checker.Checker_getTypeArguments(w.typeChecker, source)
-		targetElements := checker.Checker_getTypeArguments(w.typeChecker, target)
+		sourceElements := checker.Checker_getTypeArguments(walker.typeChecker, source)
+		targetElements := checker.Checker_getTypeArguments(walker.typeChecker, target)
 		for index := 0; index < len(sourceElements) && index < len(targetElements); index++ {
 			step := Step{Kind: StepElement, Index: index}
-			built, literals := w.partOf(pair.Literals, step)
-			if found, wrong := w.into(pair, Pair{Source: sourceElements[index], Target: targetElements[index], Mutable: mutable, Built: built, Literals: literals},
+			built, literals := walker.partOf(pair.Literals, step)
+			if found, wrong := walker.into(pair, Pair{Source: sourceElements[index], Target: targetElements[index], Mutable: mutable, Built: built, Literals: literals},
 				step, depth); wrong {
 				return found, true
 			}
@@ -650,10 +650,10 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		if !sourceIsContainer || strings.TrimPrefix(sourceContainer, "Readonly") != strings.TrimPrefix(container, "Readonly") {
 			return Pair{}, false
 		}
-		sourceArguments := checker.Checker_getTypeArguments(w.typeChecker, source)
-		targetArguments := checker.Checker_getTypeArguments(w.typeChecker, target)
+		sourceArguments := checker.Checker_getTypeArguments(walker.typeChecker, source)
+		targetArguments := checker.Checker_getTypeArguments(walker.typeChecker, target)
 		for index := 0; index < len(sourceArguments) && index < len(targetArguments); index++ {
-			if found, wrong := w.into(pair, Pair{Source: sourceArguments[index], Target: targetArguments[index], Mutable: ownSlotsShared && !readonly},
+			if found, wrong := walker.into(pair, Pair{Source: sourceArguments[index], Target: targetArguments[index], Mutable: ownSlotsShared && !readonly},
 				Step{Kind: StepTypeArgument, Name: container, Index: index}, depth); wrong {
 				return found, true
 			}
@@ -663,21 +663,21 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	// An intersection source is read property by property under ObjectIntersections, since a property
 	// lookup on an intersection finds it in whichever member holds it.
 	sourceIsObject := source.Flags()&checker.TypeFlagsObject != 0 ||
-		(w.objectIntersections && source.Flags()&checker.TypeFlagsIntersection != 0 && !hasPrimitiveMember(source))
+		(walker.objectIntersections && source.Flags()&checker.TypeFlagsIntersection != 0 && !hasPrimitiveMember(source))
 	if target.Flags()&checker.TypeFlagsObject == 0 || !sourceIsObject {
 		return Pair{}, false
 	}
-	targetSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindCall)
-	sourceSignatures := checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindCall)
+	targetSignatures := checker.Checker_getSignaturesOfType(walker.typeChecker, target, checker.SignatureKindCall)
+	sourceSignatures := checker.Checker_getSignaturesOfType(walker.typeChecker, source, checker.SignatureKindCall)
 	if len(targetSignatures) == 1 && len(sourceSignatures) == 1 {
-		sourceSignature, targetSignature := w.inContextOf(sourceSignatures[0], targetSignatures[0])
-		built, literals := w.returnsBuilt(source)
+		sourceSignature, targetSignature := walker.inContextOf(sourceSignatures[0], targetSignatures[0])
+		built, literals := walker.returnsBuilt(source)
 		// A function's return is paired, and a method's as a function's is (#y0ejf6a): `all(): Dog[] { return
 		// this.dogs }` seen as `all(): Animal[]` hands out the array its object still holds. Unless the function builds
 		// what it returns, every call, which nobody else then holds (#jpdf48x).
-		if found, wrong := w.into(pair, Pair{
-			Source:   checker.Checker_getReturnTypeOfSignature(w.typeChecker, sourceSignature),
-			Target:   checker.Checker_getReturnTypeOfSignature(w.typeChecker, targetSignature),
+		if found, wrong := walker.into(pair, Pair{
+			Source:   checker.Checker_getReturnTypeOfSignature(walker.typeChecker, sourceSignature),
+			Target:   checker.Checker_getReturnTypeOfSignature(walker.typeChecker, targetSignature),
 			Built:    built,
 			Literals: literals,
 		}, Step{Kind: StepReturn, Index: -1}, depth); wrong {
@@ -691,9 +691,9 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 			if isRestParameter(sourceParameters[index]) || isRestParameter(targetParameters[index]) {
 				break
 			}
-			if found, wrong := w.into(pair, Pair{
-				Source:          checker.Checker_getTypeOfSymbol(w.typeChecker, targetParameters[index]),
-				Target:          checker.Checker_getTypeOfSymbol(w.typeChecker, sourceParameters[index]),
+			if found, wrong := walker.into(pair, Pair{
+				Source:          checker.Checker_getTypeOfSymbol(walker.typeChecker, targetParameters[index]),
+				Target:          checker.Checker_getTypeOfSymbol(walker.typeChecker, sourceParameters[index]),
 				MethodParameter: pair.Method,
 				Defaulted:       hasInitializer(sourceParameters[index]),
 			}, Step{Kind: StepParameter, Name: sourceParameters[index].Name, Index: index}, depth); wrong {
@@ -706,39 +706,39 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	// nominal-class still judges what it holds, and skipping it dropped 24 of its api findings. The value decides it, the source:
 	// through an intersection target the walk meets `{ prototype: object }` alone, with no construct
 	// signature of its own. Every `() => typeof Entity` resolver was about 84 findings this way.
-	isConstructor := len(checker.Checker_getSignaturesOfType(w.typeChecker, source, checker.SignatureKindConstruct)) > 0 ||
-		len(checker.Checker_getSignaturesOfType(w.typeChecker, target, checker.SignatureKindConstruct)) > 0
-	for _, property := range checker.Checker_getPropertiesOfType(w.typeChecker, target) {
-		if len(pair.Path) == 0 && slices.Contains(w.overridden, property.Name) {
+	isConstructor := len(checker.Checker_getSignaturesOfType(walker.typeChecker, source, checker.SignatureKindConstruct)) > 0 ||
+		len(checker.Checker_getSignaturesOfType(walker.typeChecker, target, checker.SignatureKindConstruct)) > 0
+	for _, property := range checker.Checker_getPropertiesOfType(walker.typeChecker, target) {
+		if len(pair.Path) == 0 && slices.Contains(walker.overridden, property.Name) {
 			continue
 		}
 		if property.Flags&ast.SymbolFlagsMethod != 0 {
-			if !w.methods {
+			if !walker.methods {
 				continue
 			}
 			// A method is a function the caller passes into, never a slot the walk writes: see WalkOptions.
-			if sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, source, property.Name); sourceProperty != nil {
-				sourceMethod := checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty)
-				targetMethod := checker.Checker_getTypeOfSymbol(w.typeChecker, property)
-				if found, wrong := w.into(pair, Pair{Source: sourceMethod, Target: targetMethod, Method: true},
+			if sourceProperty := checker.Checker_getPropertyOfType(walker.typeChecker, source, property.Name); sourceProperty != nil {
+				sourceMethod := checker.Checker_getTypeOfSymbol(walker.typeChecker, sourceProperty)
+				targetMethod := checker.Checker_getTypeOfSymbol(walker.typeChecker, property)
+				if found, wrong := walker.into(pair, Pair{Source: sourceMethod, Target: targetMethod, Method: true},
 					Step{Kind: StepProperty, Name: property.Name, Index: -1}, depth); wrong {
 					return found, true
 				}
 			}
 			continue
 		}
-		readonly := checker.Checker_isReadonlySymbol(w.typeChecker, property) || (isConstructor && property.Name == "prototype")
-		sourceProperty := checker.Checker_getPropertyOfType(w.typeChecker, source, property.Name)
+		readonly := checker.Checker_isReadonlySymbol(walker.typeChecker, property) || (isConstructor && property.Name == "prototype")
+		sourceProperty := checker.Checker_getPropertyOfType(walker.typeChecker, source, property.Name)
 		if sourceProperty == nil {
 			continue
 		}
 		step := Step{Kind: StepProperty, Name: property.Name, Index: -1}
-		built, literals := w.partOf(pair.Literals, step)
-		if found, wrong := w.into(pair, Pair{
-			Source:         checker.Checker_getTypeOfSymbol(w.typeChecker, sourceProperty),
-			Target:         checker.Checker_getTypeOfSymbol(w.typeChecker, property),
+		built, literals := walker.partOf(pair.Literals, step)
+		if found, wrong := walker.into(pair, Pair{
+			Source:         checker.Checker_getTypeOfSymbol(walker.typeChecker, sourceProperty),
+			Target:         checker.Checker_getTypeOfSymbol(walker.typeChecker, property),
 			Mutable:        ownSlotsShared && !readonly,
-			SourceReadonly: checker.Checker_isReadonlySymbol(w.typeChecker, sourceProperty),
+			SourceReadonly: checker.Checker_isReadonlySymbol(walker.typeChecker, sourceProperty),
 			SourceProperty: sourceProperty,
 			Built:          built,
 			Literals:       literals,
@@ -758,17 +758,17 @@ func (w *Walker) parts(pair Pair, depth int) (Pair, bool) {
  * for `clone<T>`, and a generic function's `Promise<RowType[]>` reached `then` with two unrelated `RowType`s. A
  * target alone with type parameters is compared as it stands, as tsc compares it.
  */
-func (w *Walker) inContextOf(source *checker.Signature, target *checker.Signature) (*checker.Signature, *checker.Signature) {
+func (walker *Walker) inContextOf(source *checker.Signature, target *checker.Signature) (*checker.Signature, *checker.Signature) {
 	if len(source.TypeParameters()) == 0 || slices.Equal(source.TypeParameters(), target.TypeParameters()) {
 		return source, target
 	}
-	target = checker.Checker_getCanonicalSignature(w.typeChecker, target)
+	target = checker.Checker_getCanonicalSignature(walker.typeChecker, target)
 	// No inference context and no comparer, as tsc's relater passes: the comparer is then assignability.
-	return checker.Checker_instantiateSignatureInContextOf(w.typeChecker, source, target, nil, nil), target
+	return checker.Checker_instantiateSignatureInContextOf(walker.typeChecker, source, target, nil, nil), target
 }
 
-func (w *Walker) typeArgument(t *checker.Type, index int) *checker.Type {
-	arguments := checker.Checker_getTypeArguments(w.typeChecker, t)
+func (walker *Walker) typeArgument(t *checker.Type, index int) *checker.Type {
+	arguments := checker.Checker_getTypeArguments(walker.typeChecker, t)
 	if index >= len(arguments) {
 		return nil
 	}
@@ -826,7 +826,7 @@ func declaredInDeclarationFile(symbol *ast.Symbol) bool {
  * project's own source, an interface's or a function type's, is not, since whatever implements it may hand back
  * what it holds.
  */
-func (w *Walker) returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
+func (walker *Walker) returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
 	symbol := function.Symbol()
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false, nil
@@ -854,11 +854,11 @@ func (w *Walker) returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
 		})
 	}
 	for _, expression := range returned {
-		if expression != nil && !w.isBuilt(expression, 0) {
+		if expression != nil && !walker.isBuilt(expression, 0) {
 			return false, nil
 		}
 	}
-	return true, w.literalsOf(returned, 0)
+	return true, walker.literalsOf(returned, 0)
 }
 
 /*
@@ -868,7 +868,7 @@ func (w *Walker) returnsBuilt(function *checker.Type) (bool, []*ast.Node) {
  * or comes before a spread or a computed name, may hold what someone else does there, so it is not Built. A literal
  * that does not write the part at all puts nothing in it.
  */
-func (w *Walker) partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
+func (walker *Walker) partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
 	if len(literals) == 0 {
 		return false, nil
 	}
@@ -921,17 +921,17 @@ func (w *Walker) partOf(literals []*ast.Node, step Step) (bool, []*ast.Node) {
 		}
 	}
 	for _, part := range parts {
-		if !w.isBuilt(part, 0) {
+		if !walker.isBuilt(part, 0) {
 			return false, nil
 		}
 	}
-	return true, w.literalsOf(parts, 0)
+	return true, walker.literalsOf(parts, 0)
 }
 
 // literalsOf is the object and array literals expressions are, through parentheses, a conditional's branches and a
 // local binding's initializer (traced), a `null` or `undefined` adding none, and a `.map` building fresh elements
 // (mapsToFresh) standing for the array of them; nil when any is something else, or nothing is a literal.
-func (w *Walker) literalsOf(expressions []*ast.Node, depth int) []*ast.Node {
+func (walker *Walker) literalsOf(expressions []*ast.Node, depth int) []*ast.Node {
 	var literals []*ast.Node
 	for _, expression := range expressions {
 		if expression == nil {
@@ -943,7 +943,7 @@ func (w *Walker) literalsOf(expressions []*ast.Node, depth int) []*ast.Node {
 			literals = append(literals, expression)
 		case expression.Kind == ast.KindConditionalExpression:
 			conditional := expression.AsConditionalExpression()
-			branches := w.literalsOf([]*ast.Node{conditional.WhenTrue, conditional.WhenFalse}, depth)
+			branches := walker.literalsOf([]*ast.Node{conditional.WhenTrue, conditional.WhenFalse}, depth)
 			if branches == nil {
 				return nil
 			}
@@ -953,11 +953,11 @@ func (w *Walker) literalsOf(expressions []*ast.Node, depth int) []*ast.Node {
 			// A new array whose elements the callback builds, read by partOf as the literals it returns.
 			literals = append(literals, ast.SkipParentheses(expression))
 		default:
-			initializer := w.traced(expression, depth)
+			initializer := walker.traced(expression, depth)
 			if initializer == nil {
 				return nil
 			}
-			traced := w.literalsOf([]*ast.Node{initializer}, depth+1)
+			traced := walker.literalsOf([]*ast.Node{initializer}, depth+1)
 			if traced == nil {
 				return nil
 			}
@@ -969,12 +969,12 @@ func (w *Walker) literalsOf(expressions []*ast.Node, depth int) []*ast.Node {
 
 // isBuilt is an expression whose value is made right here, whole or as a new container, or a local binding of one
 // (traced).
-func (w *Walker) isBuilt(expression *ast.Node, depth int) bool {
+func (walker *Walker) isBuilt(expression *ast.Node, depth int) bool {
 	if isFresh(expression) || isNewContainer(expression) {
 		return true
 	}
-	initializer := w.traced(expression, depth)
-	return initializer != nil && w.isBuilt(initializer, depth+1)
+	initializer := walker.traced(expression, depth)
+	return initializer != nil && walker.isBuilt(initializer, depth+1)
 }
 
 // maximumTraceDepth bounds a chain of bindings traced through one another, `const b = a` after `const a = [x]`.
@@ -989,12 +989,12 @@ const maximumTraceDepth = 4
  * are read through the checker, a shorthand's by its value symbol, and anything not decided by that is not traced,
  * which leaves the value held.
  */
-func (w *Walker) traced(expression *ast.Node, depth int) *ast.Node {
+func (walker *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 	expression = ast.SkipParentheses(expression)
 	if expression.Kind != ast.KindIdentifier || depth >= maximumTraceDepth {
 		return nil
 	}
-	symbol := w.valueSymbol(expression)
+	symbol := walker.valueSymbol(expression)
 	if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 		return nil
 	}
@@ -1012,7 +1012,7 @@ func (w *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 	only := true
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindIdentifier && node.Text() == expression.Text() && node != declaration.Name() && w.valueSymbol(node) == symbol {
+		if node.Kind == ast.KindIdentifier && node.Text() == expression.Text() && node != declaration.Name() && walker.valueSymbol(node) == symbol {
 			references++
 			if node != expression {
 				only = false
@@ -1029,11 +1029,11 @@ func (w *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 }
 
 // valueSymbol is the symbol an identifier reads: a shorthand property's name reads the binding of that name.
-func (w *Walker) valueSymbol(identifier *ast.Node) *ast.Symbol {
+func (walker *Walker) valueSymbol(identifier *ast.Node) *ast.Symbol {
 	if parent := identifier.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == identifier {
-		return w.typeChecker.GetShorthandAssignmentValueSymbol(parent)
+		return walker.typeChecker.GetShorthandAssignmentValueSymbol(parent)
 	}
-	return w.typeChecker.GetSymbolAtLocation(identifier)
+	return walker.typeChecker.GetSymbolAtLocation(identifier)
 }
 
 // hasInitializer is a parameter declared with a default, `value = 1`, which a caller may leave out or pass
@@ -1046,8 +1046,8 @@ func hasInitializer(parameter *ast.Symbol) bool {
 
 // IsAssignableToParameter is source assignable to a parameter of type target, which takes `undefined` as well when
 // it is Defaulted: then every member of source but `undefined` must be assignable.
-func (w *Walker) IsAssignableToParameter(source *checker.Type, target *checker.Type, defaulted bool) bool {
-	if w.IsAssignable(source, target) {
+func (walker *Walker) IsAssignableToParameter(source *checker.Type, target *checker.Type, defaulted bool) bool {
+	if walker.IsAssignable(source, target) {
 		return true
 	}
 	if !defaulted {
@@ -1057,7 +1057,7 @@ func (w *Walker) IsAssignableToParameter(source *checker.Type, target *checker.T
 		return source.Flags()&checker.TypeFlagsUndefined != 0
 	}
 	for _, member := range source.Types() {
-		if member.Flags()&checker.TypeFlagsUndefined == 0 && !w.IsAssignable(member, target) {
+		if member.Flags()&checker.TypeFlagsUndefined == 0 && !walker.IsAssignable(member, target) {
 			return false
 		}
 	}

@@ -673,10 +673,10 @@ type noFloatingPromisesRawSpecifier struct {
 // form. An unrecognized `from` is left as the zero value rather than erroring, which matches how
 // the rest of this config treats a value it cannot use: the specifier then matches nothing instead
 // of failing the run.
-func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
+func (specifier *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
 	var asString string
 	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
-		*s = noFloatingPromisesRawSpecifier{inline: asString}
+		*specifier = noFloatingPromisesRawSpecifier{inline: asString}
 		return nil
 	}
 
@@ -690,18 +690,18 @@ func (s *noFloatingPromisesRawSpecifier) UnmarshalJSON(raw []byte) error {
 		return unmarshalOptionsError
 	}
 
-	*s = noFloatingPromisesRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
+	*specifier = noFloatingPromisesRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
 
 	var names []string
 	if decodeError := json.Unmarshal(object.Name, &names); decodeError == nil {
-		s.Name = names
+		specifier.Name = names
 		return nil
 	}
 	var name string
 	if decodeError := json.Unmarshal(object.Name, &name); decodeError != nil {
 		return decodeError
 	}
-	s.Name = []string{name}
+	specifier.Name = []string{name}
 	return nil
 }
 

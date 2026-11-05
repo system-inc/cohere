@@ -35,7 +35,7 @@ type ClassSegment struct {
 //
 // Covers both plain strings and templates, over the same surfaces the other readers use, so a
 // rule built on this one cannot silently cover less than a rule built on those.
-func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
+func (reader *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 	if node == nil {
 		return nil
 	}
@@ -43,7 +43,7 @@ func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 	// A plain string literal is one segment with no holes on either side, unless it sits inside a
 	// template's hole, where an edge that touches the template's text once substituted keeps its
 	// whitespace as a separator (see holeEdges).
-	values := r.classValuesIn(node)
+	values := reader.classValuesIn(node)
 	var segments []ClassSegment
 	for _, literal := range values.literals {
 		segments = append(segments, ClassSegment{
@@ -76,9 +76,9 @@ func (r *ClassLiteralReader) ClassSegmentsIn(node *ast.Node) []ClassSegment {
 // its own and has to know which runs touch which holes, and that is the template's structure. Every
 // template in a value position is returned, including one inside a conditional or inside another
 // template's hole, which is where Prettier's Tailwind plugin finds them too.
-func (r *ClassLiteralReader) ClassTemplateSegmentsIn(node *ast.Node) [][]ClassSegment {
+func (reader *ClassLiteralReader) ClassTemplateSegmentsIn(node *ast.Node) [][]ClassSegment {
 	templates := [][]ClassSegment{}
-	for _, template := range r.classValuesIn(node).templates {
+	for _, template := range reader.classValuesIn(node).templates {
 		if segments := segmentsOfTemplate(template); len(segments) > 0 {
 			templates = append(templates, segments)
 		}

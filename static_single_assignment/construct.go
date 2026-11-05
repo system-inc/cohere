@@ -160,79 +160,79 @@ type ssaBuilder[G Graph[F, B, P], F any, B comparable, P any] struct {
 	walkingContextStore bool
 }
 
-func (b *ssaBuilder[G, F, B, P]) run() {
-	b.visited = map[BlockId]bool{}
+func (builder *ssaBuilder[G, F, B, P]) run() {
+	builder.visited = map[BlockId]bool{}
 
 	// Parameters are definitions in the entry block. Renaming them is what makes a reassigned
 	// parameter behave like any other binding rather than like a global.
-	entryId := b.graph.Entry(b.function)
-	if _, ok := b.graph.Block(b.function, entryId); !ok {
+	entryId := builder.graph.Entry(builder.function)
+	if _, ok := builder.graph.Block(builder.function, entryId); !ok {
 		return
 	}
-	b.states[entryId] = newSSAState[P]()
-	params := b.graph.Params(b.function)
+	builder.states[entryId] = newSSAState[P]()
+	params := builder.graph.Params(builder.function)
 	for index := range params {
-		b.defineIn(entryId, &params[index])
+		builder.defineIn(entryId, &params[index])
 	}
 
 	// One visitor for every place, made once with the builder, which reads what to do from
 	// b.walking. A visitor handed to a Graph method escapes, since the compiler cannot see through a
 	// type parameter's method, and so does every local it captures; one per instruction would be an
 	// allocation per instruction.
-	visit := func(place *P, role Role) { b.visitPlace(place, role) }
+	visit := func(place *P, role Role) { builder.visitPlace(place, role) }
 	edges := edgeScratchPool.Get().(*edgeScratch)
 	defer edgeScratchPool.Put(edges)
 
-	for _, block := range b.graph.Blocks(b.function) {
-		blockId := b.graph.Id(block)
-		b.walkingBlock = blockId
-		if _, exists := b.states[blockId]; !exists {
-			b.states[blockId] = newSSAState[P]()
+	for _, block := range builder.graph.Blocks(builder.function) {
+		blockId := builder.graph.Id(block)
+		builder.walkingBlock = blockId
+		if _, exists := builder.states[blockId]; !exists {
+			builder.states[blockId] = newSSAState[P]()
 		}
-		b.visited[blockId] = true
+		builder.visited[blockId] = true
 
-		count := b.graph.InstructionCount(b.function, block)
+		count := builder.graph.InstructionCount(builder.function, block)
 		for index := 0; index < count; index++ {
 			// Uses first, then definitions. `x = x + 1` must read the OLD x before the store mints
 			// the new one; visiting in the other order would make the increment read itself.
-			b.walking = walkingUses
-			b.graph.EachInstructionPlace(b.function, block, index, visit)
+			builder.walking = walkingUses
+			builder.graph.EachInstructionPlace(builder.function, block, index, visit)
 			// Only a context store reuses its binding's definition. The guard keys on the
 			// declaration, and a `FunctionExpression` assigned to the same declaration would
 			// otherwise reuse the identifier too -- measured as a duplicate definition of a
 			// function value on `let n = 1; const g = () => n; n = 2`.
-			b.walking = walkingDefinitions
-			b.walkingContextStore = b.graph.IsContextStore(b.function, block, index)
-			b.graph.EachInstructionPlace(b.function, block, index, visit)
+			builder.walking = walkingDefinitions
+			builder.walkingContextStore = builder.graph.IsContextStore(builder.function, block, index)
+			builder.graph.EachInstructionPlace(builder.function, block, index, visit)
 		}
 
-		b.walking = walkingTerminal
-		b.graph.EachTerminalPlace(block, visit)
+		builder.walking = walkingTerminal
+		builder.graph.EachTerminalPlace(block, visit)
 
 		// Seal each successor that this block was the last unprocessed predecessor of.
-		for _, edge := range edgesOf(b.graph, block, edges) {
+		for _, edge := range edgesOf(builder.graph, block, edges) {
 			if edge.edge == Fallthrough {
 				continue
 			}
-			successor, ok := b.graph.Block(b.function, edge.successor)
+			successor, ok := builder.graph.Block(builder.function, edge.successor)
 			if !ok {
 				continue
 			}
-			remaining, seen := b.unsealedPreds[edge.successor]
+			remaining, seen := builder.unsealedPreds[edge.successor]
 			if !seen {
-				remaining = len(b.graph.Predecessors(successor))
+				remaining = len(builder.graph.Predecessors(successor))
 			}
 			remaining--
-			b.unsealedPreds[edge.successor] = remaining
-			if remaining == 0 && b.visited[edge.successor] {
-				b.fixIncompletePhis(edge.successor)
+			builder.unsealedPreds[edge.successor] = remaining
+			if remaining == 0 && builder.visited[edge.successor] {
+				builder.fixIncompletePhis(edge.successor)
 			}
 		}
 	}
 
 	// The function's return value is a definition like any other and is read by nothing inside the
 	// graph, so it is renamed to whatever reaches the end rather than left pointing at the original.
-	b.renameReturns()
+	builder.renameReturns()
 }
 
 // walking is which of run's three visits a place is in.
@@ -248,22 +248,22 @@ const (
 )
 
 // visitPlace is run's one visitor, doing what b.walking says for the block b.walkingBlock.
-func (b *ssaBuilder[G, F, B, P]) visitPlace(place *P, role Role) {
-	switch b.walking {
+func (builder *ssaBuilder[G, F, B, P]) visitPlace(place *P, role Role) {
+	switch builder.walking {
 	case walkingUses:
 		if role != Define {
-			b.useIn(b.walkingBlock, place)
+			builder.useIn(builder.walkingBlock, place)
 		}
 	case walkingDefinitions:
 		if role == Define {
-			b.defineInMaybeContext(b.walkingBlock, place, b.walkingContextStore)
+			builder.defineInMaybeContext(builder.walkingBlock, place, builder.walkingContextStore)
 		}
 	case walkingTerminal:
 		if role == Define {
-			b.defineIn(b.walkingBlock, place)
+			builder.defineIn(builder.walkingBlock, place)
 			return
 		}
-		b.useIn(b.walkingBlock, place)
+		builder.useIn(builder.walkingBlock, place)
 	}
 }
 
@@ -291,13 +291,13 @@ func newSSAState[P any]() *ssaState[P] {
 // value whose range starts there widens nothing -- measured as `{20, 21}` against a memo block
 // spanning 6 to 15, which is why the effect and the lowering were both faithful and the finding
 // still did not fire.
-func (b *ssaBuilder[G, F, B, P]) defineIn(blockId BlockId, place *P) {
-	b.defineInMaybeContext(blockId, place, false)
+func (builder *ssaBuilder[G, F, B, P]) defineIn(blockId BlockId, place *P) {
+	builder.defineInMaybeContext(blockId, place, false)
 }
 
 // defineInMaybeContext is `defineIn`, told whether this definition is a context store.
-func (b *ssaBuilder[G, F, B, P]) defineInMaybeContext(blockId BlockId, place *P, contextStore bool) {
-	binding := b.graph.Declaration(b.function, b.graph.IdentifierOf(*place))
+func (builder *ssaBuilder[G, F, B, P]) defineInMaybeContext(blockId BlockId, place *P, contextStore bool) {
+	binding := builder.graph.Declaration(builder.function, builder.graph.IdentifierOf(*place))
 	// # A context binding is defined once and every later write reuses that definition
 	//
 	// Upstream's two writes to a reassigned-and-captured binding name the SAME identifier --
@@ -314,20 +314,20 @@ func (b *ssaBuilder[G, F, B, P]) defineInMaybeContext(blockId BlockId, place *P,
 	// `FunctionExpression` assigned to the same declaration would otherwise reuse the identifier
 	// too, which is a real duplicate definition -- measured on
 	// `let n = 1; const g = () => n; n = 2`.
-	if contextStore && b.graph.Contextual(b.function, binding) {
-		if existing, defined := b.states[blockId].defs[binding]; defined {
-			*place = b.graph.WithIdentifier(*place, existing)
+	if contextStore && builder.graph.Contextual(builder.function, binding) {
+		if existing, defined := builder.states[blockId].defs[binding]; defined {
+			*place = builder.graph.WithIdentifier(*place, existing)
 			return
 		}
 	}
-	renamed := b.graph.Mint(b.function, b.graph.IdentifierOf(*place))
-	b.states[blockId].defs[binding] = renamed
-	*place = b.graph.WithIdentifier(*place, renamed)
+	renamed := builder.graph.Mint(builder.function, builder.graph.IdentifierOf(*place))
+	builder.states[blockId].defs[binding] = renamed
+	*place = builder.graph.WithIdentifier(*place, renamed)
 }
 
 // useIn rewrites a use to whatever value reaches this block.
-func (b *ssaBuilder[G, F, B, P]) useIn(blockId BlockId, place *P) {
-	*place = b.graph.WithIdentifier(*place, b.valueAt(*place, blockId))
+func (builder *ssaBuilder[G, F, B, P]) useIn(blockId BlockId, place *P) {
+	*place = builder.graph.WithIdentifier(*place, builder.valueAt(*place, blockId))
 }
 
 // valueAt is Braun's lookup: which value does this binding hold on entry to this block.
@@ -343,56 +343,56 @@ func (b *ssaBuilder[G, F, B, P]) useIn(blockId BlockId, place *P) {
 //     construction.
 //  5. Several predecessors - a real join. Mint the result, record it, THEN collect operands; a
 //     predecessor whose lookup comes back around to this block must find the result already bound.
-func (b *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) IdentifierId {
-	original := b.graph.IdentifierOf(place)
-	binding := b.graph.Declaration(b.function, original)
-	if b.unknown[binding] {
+func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) IdentifierId {
+	original := builder.graph.IdentifierOf(place)
+	binding := builder.graph.Declaration(builder.function, original)
+	if builder.unknown[binding] {
 		return original
 	}
 
-	state, ok := b.states[blockId]
+	state, ok := builder.states[blockId]
 	if !ok {
 		state = newSSAState[P]()
-		b.states[blockId] = state
+		builder.states[blockId] = state
 	}
 	if renamed, defined := state.defs[binding]; defined {
 		return renamed
 	}
 
-	block, ok := b.graph.Block(b.function, blockId)
+	block, ok := builder.graph.Block(builder.function, blockId)
 	if !ok {
 		return original
 	}
 
-	predecessors := b.graph.Predecessors(block)
+	predecessors := builder.graph.Predecessors(block)
 	if len(predecessors) == 0 {
-		b.unknown[binding] = true
+		builder.unknown[binding] = true
 		return original
 	}
 
-	remaining, seen := b.unsealedPreds[blockId]
+	remaining, seen := builder.unsealedPreds[blockId]
 	if !seen {
 		remaining = len(predecessors)
 	}
 	if remaining > 0 {
-		renamed := b.graph.Mint(b.function, original)
+		renamed := builder.graph.Mint(builder.function, original)
 		state.defs[binding] = renamed
 		state.incompletePhis = append(state.incompletePhis, incompletePhi[P]{
 			original: place,
-			renamed:  b.graph.WithIdentifier(place, renamed),
+			renamed:  builder.graph.WithIdentifier(place, renamed),
 		})
 		return renamed
 	}
 
 	if len(predecessors) == 1 {
-		renamed := b.valueFromPredecessor(place, predecessors[0], blockId)
+		renamed := builder.valueFromPredecessor(place, predecessors[0], blockId)
 		state.defs[binding] = renamed
 		return renamed
 	}
 
-	renamed := b.graph.Mint(b.function, original)
+	renamed := builder.graph.Mint(builder.function, original)
 	state.defs[binding] = renamed
-	b.addPhi(blockId, place, b.graph.WithIdentifier(place, renamed))
+	builder.addPhi(blockId, place, builder.graph.WithIdentifier(place, renamed))
 	return renamed
 }
 
@@ -405,40 +405,40 @@ func (b *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) IdentifierId 
 // MayThrow emits such edges, and latent in cohere, which emits none. Its fix lands here: snapshot the
 // block's definitions before its throwing instruction while walking it, and answer an Exceptional
 // edge from the snapshot.
-func (b *ssaBuilder[G, F, B, P]) valueFromPredecessor(place P, predecessor BlockId, blockId BlockId) IdentifierId {
-	return b.valueAt(place, predecessor)
+func (builder *ssaBuilder[G, F, B, P]) valueFromPredecessor(place P, predecessor BlockId, blockId BlockId) IdentifierId {
+	return builder.valueAt(place, predecessor)
 }
 
 // addPhi collects one operand per predecessor and attaches the phi to the block.
 //
 // original is the place a lookup reads, and each operand is that place naming the predecessor's
 // value, so whatever else the place carries rides along on every operand.
-func (b *ssaBuilder[G, F, B, P]) addPhi(blockId BlockId, original P, renamed P) {
-	block, ok := b.graph.Block(b.function, blockId)
+func (builder *ssaBuilder[G, F, B, P]) addPhi(blockId BlockId, original P, renamed P) {
+	block, ok := builder.graph.Block(builder.function, blockId)
 	if !ok {
 		return
 	}
 
-	predecessors := b.graph.Predecessors(block)
+	predecessors := builder.graph.Predecessors(block)
 	operands := make(PhiOperands[P], 0, len(predecessors))
 	for _, predecessorId := range predecessors {
-		operands.Set(predecessorId, b.graph.WithIdentifier(original,
-			b.valueFromPredecessor(original, predecessorId, blockId)))
+		operands.Set(predecessorId, builder.graph.WithIdentifier(original,
+			builder.valueFromPredecessor(original, predecessorId, blockId)))
 	}
 
-	b.graph.SetPhis(block, append(b.graph.Phis(block), &Phi[P]{Place: renamed, Operands: operands}))
+	builder.graph.SetPhis(block, append(builder.graph.Phis(block), &Phi[P]{Place: renamed, Operands: operands}))
 }
 
 // fixIncompletePhis fills in the operands of every phi minted before this block was sealed.
-func (b *ssaBuilder[G, F, B, P]) fixIncompletePhis(blockId BlockId) {
-	state, ok := b.states[blockId]
+func (builder *ssaBuilder[G, F, B, P]) fixIncompletePhis(blockId BlockId) {
+	state, ok := builder.states[blockId]
 	if !ok {
 		return
 	}
 	pending := state.incompletePhis
 	state.incompletePhis = nil
 	for _, phi := range pending {
-		b.addPhi(blockId, phi.original, phi.renamed)
+		builder.addPhi(blockId, phi.original, phi.renamed)
 	}
 }
 
@@ -447,22 +447,22 @@ func (b *ssaBuilder[G, F, B, P]) fixIncompletePhis(blockId BlockId) {
 // Every `return` stores into one identifier, so after renaming the stores there are several values
 // and the Returns place still names the original. It is resolved against the blocks that actually
 // end in a Return, which is where the value is observable. An IR with no Returns place skips this.
-func (b *ssaBuilder[G, F, B, P]) renameReturns() {
-	returns := b.graph.Returns(b.function)
+func (builder *ssaBuilder[G, F, B, P]) renameReturns() {
+	returns := builder.graph.Returns(builder.function)
 	if returns == nil {
 		return
 	}
-	binding := b.graph.Declaration(b.function, b.graph.IdentifierOf(*returns))
-	if b.unknown[binding] {
+	binding := builder.graph.Declaration(builder.function, builder.graph.IdentifierOf(*returns))
+	if builder.unknown[binding] {
 		return
 	}
-	for _, block := range b.graph.Blocks(b.function) {
-		if !b.graph.EndsInReturn(block) {
+	for _, block := range builder.graph.Blocks(builder.function) {
+		if !builder.graph.EndsInReturn(block) {
 			continue
 		}
-		if state, ok := b.states[b.graph.Id(block)]; ok {
+		if state, ok := builder.states[builder.graph.Id(block)]; ok {
 			if renamed, defined := state.defs[binding]; defined {
-				*returns = b.graph.WithIdentifier(*returns, renamed)
+				*returns = builder.graph.WithIdentifier(*returns, renamed)
 				return
 			}
 		}

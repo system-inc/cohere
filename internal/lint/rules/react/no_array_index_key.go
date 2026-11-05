@@ -155,7 +155,7 @@ type noArrayIndexKeyWalker struct {
 }
 
 // walk visits one node, pushing and popping the stack around an iterator call.
-func (w *noArrayIndexKeyWalker) walk(node *ast.Node) {
+func (walker *noArrayIndexKeyWalker) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -163,37 +163,37 @@ func (w *noArrayIndexKeyWalker) walk(node *ast.Node) {
 	pushed := false
 	switch node.Kind {
 	case ast.KindCallExpression:
-		if w.checkCreateElementCall(node) {
+		if walker.checkCreateElementCall(node) {
 			// Upstream returns early after handling a createElement call, so such a call never
 			// also pushes an index name. Reproduced: the two arms are exclusive.
 			break
 		}
-		if name, ok := w.indexParameterName(node); ok {
-			w.indexNames = append(w.indexNames, name)
+		if name, ok := walker.indexParameterName(node); ok {
+			walker.indexNames = append(walker.indexNames, name)
 			pushed = true
 		}
 
 	case ast.KindJsxAttribute:
-		w.checkAttribute(node)
+		walker.checkAttribute(node)
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child)
+		walker.walk(child)
 		return false
 	})
 
 	if pushed {
-		w.indexNames = w.indexNames[:len(w.indexNames)-1]
+		walker.indexNames = walker.indexNames[:len(walker.indexNames)-1]
 	}
 }
 
 // isArrayIndex reports whether a node is an identifier naming an index parameter in scope.
-func (w *noArrayIndexKeyWalker) isArrayIndex(node *ast.Node) bool {
+func (walker *noArrayIndexKeyWalker) isArrayIndex(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return false
 	}
 	text := node.Text()
-	for _, name := range w.indexNames {
+	for _, name := range walker.indexNames {
 		if name == text {
 			return true
 		}
@@ -202,8 +202,8 @@ func (w *noArrayIndexKeyWalker) isArrayIndex(node *ast.Node) bool {
 }
 
 // checkAttribute handles a `key={...}` attribute on a JSX element.
-func (w *noArrayIndexKeyWalker) checkAttribute(node *ast.Node) {
-	if len(w.indexNames) == 0 {
+func (walker *noArrayIndexKeyWalker) checkAttribute(node *ast.Node) {
+	if len(walker.indexNames) == 0 {
 		// Not inside any iterator callback, so nothing can be an index. Upstream checks this first
 		// too, and it is what makes `<Foo key={i} />` at the top level clean.
 		//
@@ -230,18 +230,18 @@ func (w *noArrayIndexKeyWalker) checkAttribute(node *ast.Node) {
 		// `key="foo"` or a bare `key`. Both silent upstream.
 		return
 	}
-	w.checkKeyExpression(initializer.AsJsxExpression().Expression)
+	walker.checkKeyExpression(initializer.AsJsxExpression().Expression)
 }
 
 // checkKeyExpression is upstream's `checkPropValue`, the five shapes it accepts and nothing else.
-func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
+func (walker *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 	if node == nil {
 		return
 	}
 
 	// `key={i}`.
-	if w.isArrayIndex(node) {
-		w.ctx.ReportNode(node, messageNoArrayIndexKey)
+	if walker.isArrayIndex(node) {
+		walker.ctx.ReportNode(node, messageNoArrayIndexKey)
 		return
 	}
 
@@ -257,8 +257,8 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 			if span.Kind != ast.KindTemplateSpan {
 				continue
 			}
-			if w.isArrayIndex(span.AsTemplateSpan().Expression) {
-				w.ctx.ReportNode(node, messageNoArrayIndexKey)
+			if walker.isArrayIndex(span.AsTemplateSpan().Expression) {
+				walker.ctx.ReportNode(node, messageNoArrayIndexKey)
 			}
 		}
 		return
@@ -292,8 +292,8 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 		if noArrayIndexKeyIsLogicalOperator(node.AsBinaryExpression().OperatorToken.Kind) {
 			return
 		}
-		for range w.binaryIdentifiersNamingAnIndex(node) {
-			w.ctx.ReportNode(node, messageNoArrayIndexKey)
+		for range walker.binaryIdentifiersNamingAnIndex(node) {
+			walker.ctx.ReportNode(node, messageNoArrayIndexKey)
 		}
 		return
 
@@ -308,10 +308,10 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 		if callee.Kind == ast.KindPropertyAccessExpression {
 			access := callee.AsPropertyAccessExpression()
 			methodName := access.Name()
-			if w.isArrayIndex(access.Expression) &&
+			if walker.isArrayIndex(access.Expression) &&
 				methodName != nil && methodName.Kind == ast.KindIdentifier &&
 				methodName.Text() == "toString" {
-				w.ctx.ReportNode(node, messageNoArrayIndexKey)
+				walker.ctx.ReportNode(node, messageNoArrayIndexKey)
 			}
 			return
 		}
@@ -320,8 +320,8 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 		// whole call, which the span fixtures pin.
 		if callee.Kind == ast.KindIdentifier && callee.Text() == "String" &&
 			call.Arguments != nil && len(call.Arguments.Nodes) > 0 &&
-			w.isArrayIndex(call.Arguments.Nodes[0]) {
-			w.ctx.ReportNode(call.Arguments.Nodes[0], messageNoArrayIndexKey)
+			walker.isArrayIndex(call.Arguments.Nodes[0]) {
+			walker.ctx.ReportNode(call.Arguments.Nodes[0], messageNoArrayIndexKey)
 		}
 	}
 }
@@ -332,12 +332,12 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 // Upstream's `getIdentifiersFromBinaryExpression` recurses only through binary expressions and
 // returns null for anything else, so `'x-' + foo(i)` contributes nothing: the call is not an
 // identifier and not a binary expression. Reproduced rather than widened.
-func (w *noArrayIndexKeyWalker) binaryIdentifiersNamingAnIndex(node *ast.Node) []*ast.Node {
+func (walker *noArrayIndexKeyWalker) binaryIdentifiersNamingAnIndex(node *ast.Node) []*ast.Node {
 	if node == nil {
 		return nil
 	}
 	if node.Kind == ast.KindIdentifier {
-		if w.isArrayIndex(node) {
+		if walker.isArrayIndex(node) {
 			return []*ast.Node{node}
 		}
 		return nil
@@ -351,8 +351,8 @@ func (w *noArrayIndexKeyWalker) binaryIdentifiersNamingAnIndex(node *ast.Node) [
 		// the dispatch above for the measurement.
 		return nil
 	}
-	found := w.binaryIdentifiersNamingAnIndex(binary.Left)
-	return append(found, w.binaryIdentifiersNamingAnIndex(binary.Right)...)
+	found := walker.binaryIdentifiersNamingAnIndex(binary.Left)
+	return append(found, walker.binaryIdentifiersNamingAnIndex(binary.Right)...)
 }
 
 // indexParameterName returns the name of the index parameter an iterator call's callback declares.
@@ -362,7 +362,7 @@ func (w *noArrayIndexKeyWalker) binaryIdentifiersNamingAnIndex(node *ast.Node) [
 // a bare identifier, and `Text()` panics on the first two, so the kind is checked before the text
 // is read every time. Measured: the computed form is silent upstream and the call-as-callee form
 // reports, so neither may crash and they must answer differently.
-func (w *noArrayIndexKeyWalker) indexParameterName(node *ast.Node) (string, bool) {
+func (walker *noArrayIndexKeyWalker) indexParameterName(node *ast.Node) (string, bool) {
 	call := node.AsCallExpression()
 	callee := call.Expression
 	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
@@ -490,15 +490,15 @@ func noArrayIndexKeyIsReactChildrenCall(access *ast.PropertyAccessExpression) bo
 //
 // The boolean is what makes the two arms exclusive: upstream returns early after handling such a
 // call, so a `createElement` call never also pushes an index name.
-func (w *noArrayIndexKeyWalker) checkCreateElementCall(node *ast.Node) bool {
+func (walker *noArrayIndexKeyWalker) checkCreateElementCall(node *ast.Node) bool {
 	call := node.AsCallExpression()
-	if !w.isCreateOrCloneElement(call.Expression) {
+	if !walker.isCreateOrCloneElement(call.Expression) {
 		return false
 	}
 	if call.Arguments == nil || len(call.Arguments.Nodes) <= 1 {
 		return false
 	}
-	if len(w.indexNames) == 0 {
+	if len(walker.indexNames) == 0 {
 		// Upstream checks the stack before reading the props, so a createElement call outside any
 		// iterator is silent and still counts as handled. Measured silent.
 		return true
@@ -526,7 +526,7 @@ func (w *noArrayIndexKeyWalker) checkCreateElementCall(node *ast.Node) bool {
 			// Measured silent.
 			continue
 		}
-		w.checkKeyExpression(assignment.Initializer)
+		walker.checkKeyExpression(assignment.Initializer)
 	}
 	return true
 }
@@ -538,7 +538,7 @@ func (w *noArrayIndexKeyWalker) checkCreateElementCall(node *ast.Node) bool {
 // from the module `react` specifically. The second is upstream's variable lookup, answered here
 // through the checker, and measured both ways: an import of `cloneElement` from `react` reports and
 // the same name imported from another module does not.
-func (w *noArrayIndexKeyWalker) isCreateOrCloneElement(callee *ast.Node) bool {
+func (walker *noArrayIndexKeyWalker) isCreateOrCloneElement(callee *ast.Node) bool {
 	if callee == nil {
 		return false
 	}
@@ -557,7 +557,7 @@ func (w *noArrayIndexKeyWalker) isCreateOrCloneElement(callee *ast.Node) bool {
 		return name.Text() == "createElement" || name.Text() == "cloneElement"
 
 	case ast.KindIdentifier:
-		return w.resolvesToReactImport(callee)
+		return walker.resolvesToReactImport(callee)
 	}
 	return false
 }
@@ -572,8 +572,8 @@ func (w *noArrayIndexKeyWalker) isCreateOrCloneElement(callee *ast.Node) bool {
 // `react` qualifies here, not only `createElement` and `cloneElement`. That is upstream being loose
 // rather than upstream being right, and it is reproduced: the name has already been used as a
 // callee with a props object, so the shapes that reach this are narrow in practice.
-func (w *noArrayIndexKeyWalker) resolvesToReactImport(identifier *ast.Node) bool {
-	symbol := w.ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func (walker *noArrayIndexKeyWalker) resolvesToReactImport(identifier *ast.Node) bool {
+	symbol := walker.ctx.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}

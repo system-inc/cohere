@@ -210,7 +210,7 @@ type maxDepthWalker struct {
 	depths []int
 }
 
-func (w *maxDepthWalker) walk(node *ast.Node) {
+func (walker *maxDepthWalker) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -223,20 +223,20 @@ func (w *maxDepthWalker) walk(node *ast.Node) {
 	// there.
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
 		ast.KindClassStaticBlockDeclaration:
-		w.depths = append(w.depths, 0)
+		walker.depths = append(walker.depths, 0)
 		pushedFunction = true
 
 	// Upstream's pushBlock set, with the else-if exemption folded into the IfStatement arm.
 	case ast.KindIfStatement:
 		if !maxDepthIsElseIf(node) {
-			w.pushBlock(node)
+			walker.pushBlock(node)
 			pushedBlock = true
 		}
 
 	case ast.KindSwitchStatement, ast.KindTryStatement, ast.KindDoStatement,
 		ast.KindWhileStatement, ast.KindWithStatement, ast.KindForStatement,
 		ast.KindForInStatement, ast.KindForOfStatement:
-		w.pushBlock(node)
+		walker.pushBlock(node)
 		pushedBlock = true
 
 	// A class member's body is its own frame, and this arm is what makes that true here.
@@ -264,20 +264,20 @@ func (w *maxDepthWalker) walk(node *ast.Node) {
 	// block's depth instead of starting over. Verified by deleting the arm and watching exactly
 	// those four rows fail.
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		w.depths = append(w.depths, 0)
+		walker.depths = append(walker.depths, 0)
 		pushedFunction = true
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child)
+		walker.walk(child)
 		return false
 	})
 
 	if pushedBlock {
-		w.depths[len(w.depths)-1]--
+		walker.depths[len(walker.depths)-1]--
 	}
 	if pushedFunction {
-		w.depths = w.depths[:len(w.depths)-1]
+		walker.depths = walker.depths[:len(walker.depths)-1]
 	}
 }
 
@@ -286,26 +286,26 @@ func (w *maxDepthWalker) walk(node *ast.Node) {
 //
 // Reporting on the way in rather than on the way out is upstream's order and it matters for a file
 // with several findings, since it decides the sequence they arrive in.
-func (w *maxDepthWalker) pushBlock(node *ast.Node) {
-	if len(w.depths) == 0 {
+func (walker *maxDepthWalker) pushBlock(node *ast.Node) {
+	if len(walker.depths) == 0 {
 		return
 	}
-	w.depths[len(w.depths)-1]++
-	depth := w.depths[len(w.depths)-1]
-	if depth <= w.settings.Maximum {
+	walker.depths[len(walker.depths)-1]++
+	depth := walker.depths[len(walker.depths)-1]
+	if depth <= walker.settings.Maximum {
 		return
 	}
 
 	// The keyword alone, which is upstream's `getFirstToken(node).loc`. See the span section on the
 	// rule for why `rule.TokenRange` is the wrong helper.
-	tokenRange := scanner.GetRangeOfTokenAtPosition(w.ctx.SourceFile, node.Pos())
-	w.ctx.Report(rule.Diagnostic{
+	tokenRange := scanner.GetRangeOfTokenAtPosition(walker.ctx.SourceFile, node.Pos())
+	walker.ctx.Report(rule.Diagnostic{
 		Range:      tokenRange,
-		SourceFile: w.ctx.SourceFile,
+		SourceFile: walker.ctx.SourceFile,
 		Message: rule.Message{
 			Id: messageMaxDepthTooDeeply.Id,
 			Description: fmt.Sprintf("Blocks are nested too deeply (%d). Maximum allowed is %d. %s",
-				depth, w.settings.Maximum, messageMaxDepthTooDeeply.Description),
+				depth, walker.settings.Maximum, messageMaxDepthTooDeeply.Description),
 		},
 	})
 }

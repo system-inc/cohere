@@ -33,8 +33,8 @@ type MissingInput struct {
 // noUncheckedSideEffectImports is on, so the type errors alone cannot say a generated file is missing.
 // generated keeps the answer to output a build writes (a gitignored path), since a missing source file is a
 // mistake in the source, which its own type error already names.
-func (g *Graph) MissingGeneratedInputs(generated func(target string) bool) []MissingInput {
-	fileSystem := g.Program.Host().FS()
+func (graph *Graph) MissingGeneratedInputs(generated func(target string) bool) []MissingInput {
+	fileSystem := graph.Program.Host().FS()
 	exists := func(target string, extensions ...string) bool {
 		for _, extension := range append([]string{""}, extensions...) {
 			if fileSystem.FileExists(tspath.RootedFilePath(target + extension)) {
@@ -56,14 +56,14 @@ func (g *Graph) MissingGeneratedInputs(generated func(target string) bool) []Mis
 		})
 	}
 
-	for _, sourceFile := range g.ProjectFiles() {
+	for _, sourceFile := range graph.ProjectFiles() {
 		directory := tspath.RootedDirectoryPath(tspath.GetDirectoryPath(sourceFile.FileName().AsString()))
 		for _, specifier := range sourceFile.Imports() {
 			name := specifier.Text()
 			if !tspath.IsExternalModuleNameRelative(name) {
 				continue
 			}
-			if resolved := g.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, specifier); resolved != nil && resolved.IsResolved() {
+			if resolved := graph.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, specifier); resolved != nil && resolved.IsResolved() {
 				continue
 			}
 			target := tspath.GetNormalizedAbsolutePath(name, directory)

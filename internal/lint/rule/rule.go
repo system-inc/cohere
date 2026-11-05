@@ -155,19 +155,19 @@ func NewFileCache() *FileCache {
 //
 // Empty for a cache that was never filled, which is the common case for a file no comment rule
 // looked at.
-func (c *FileCache) Fills() map[string]int {
-	if c == nil {
+func (cache *FileCache) Fills() map[string]int {
+	if cache == nil {
 		return nil
 	}
-	return c.fills
+	return cache.fills
 }
 
 // SetAroundFill makes every later fill run inside around. Nil restores plain fills.
-func (c *FileCache) SetAroundFill(around func(key string, fill func())) {
-	if c == nil {
+func (cache *FileCache) SetAroundFill(around func(key string, fill func())) {
+	if cache == nil {
 		return
 	}
-	c.aroundFill = around
+	cache.aroundFill = around
 }
 
 // Cached returns the value stored under key, computing it once on the first ask.

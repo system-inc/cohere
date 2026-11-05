@@ -181,25 +181,25 @@ type DisjointSet struct {
 // Note that upstream's `union` MUTATES the caller's array through `shift()`. This takes the slice by
 // value and never writes to it, which is a difference in the implementation rather than in what it
 // decides; the call sites below would be correct under either.
-func (d *DisjointSet) Union(items []static_single_assignment.IdentifierId) {
+func (set *DisjointSet) Union(items []static_single_assignment.IdentifierId) {
 	if len(items) == 0 {
 		return
 	}
-	if d.parent == nil {
-		d.parent = map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
+	if set.parent == nil {
+		set.parent = map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
 	}
 
 	first := items[0]
-	root, ok := d.Find(first)
+	root, ok := set.Find(first)
 	if !ok {
 		root = first
-		d.parent[first] = first
+		set.parent[first] = first
 	}
 
 	for _, item := range items[1:] {
-		itemParent, present := d.parent[item]
+		itemParent, present := set.parent[item]
 		if !present {
-			d.parent[item] = root
+			set.parent[item] = root
 			continue
 		}
 		if itemParent == root {
@@ -210,9 +210,9 @@ func (d *DisjointSet) Union(items []static_single_assignment.IdentifierId) {
 		// keeps the structure flat when two established classes merge.
 		current := item
 		for itemParent != root {
-			d.parent[current] = root
+			set.parent[current] = root
 			current = itemParent
-			itemParent = d.parent[current]
+			itemParent = set.parent[current]
 		}
 	}
 }
@@ -223,22 +223,22 @@ func (d *DisjointSet) Union(items []static_single_assignment.IdentifierId) {
 // the recursion depth safe. Upstream returns `null` for an absent value; the second return is that
 // null, kept separate from the id because zero is a usable IdentifierId and conflating them would
 // make an absent value read as a member of class zero.
-func (d *DisjointSet) Find(item static_single_assignment.IdentifierId) (static_single_assignment.IdentifierId, bool) {
-	if d.parent == nil {
+func (set *DisjointSet) Find(item static_single_assignment.IdentifierId) (static_single_assignment.IdentifierId, bool) {
+	if set.parent == nil {
 		return 0, false
 	}
-	parent, ok := d.parent[item]
+	parent, ok := set.parent[item]
 	if !ok {
 		return 0, false
 	}
 	if parent == item {
 		return item, true
 	}
-	root, ok := d.Find(parent)
+	root, ok := set.Find(parent)
 	if !ok {
 		return 0, false
 	}
-	d.parent[item] = root
+	set.parent[item] = root
 	return root, true
 }
 
@@ -248,24 +248,24 @@ func (d *DisjointSet) Find(item static_single_assignment.IdentifierId) (static_s
 // (line 43011), written once here so that every consumer does not re-derive the fallback. A value
 // that was never unified is its own representative, which is the answer that lets a caller key a map
 // on the result without first asking whether the value is a member.
-func (d *DisjointSet) RepresentativeOf(item static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
-	if root, ok := d.Find(item); ok {
+func (set *DisjointSet) RepresentativeOf(item static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
+	if root, ok := set.Find(item); ok {
 		return root
 	}
 	return item
 }
 
 // Has reports whether a value was ever unified into a class.
-func (d *DisjointSet) Has(item static_single_assignment.IdentifierId) bool {
-	if d.parent == nil {
+func (set *DisjointSet) Has(item static_single_assignment.IdentifierId) bool {
+	if set.parent == nil {
 		return false
 	}
-	_, ok := d.parent[item]
+	_, ok := set.parent[item]
 	return ok
 }
 
 // Size reports how many values are members of some class.
-func (d *DisjointSet) Size() int { return len(d.parent) }
+func (set *DisjointSet) Size() int { return len(set.parent) }
 
 // Sets returns the classes, each sorted, with the outer list ordered by first member.
 //
@@ -275,12 +275,12 @@ func (d *DisjointSet) Size() int { return len(d.parent) }
 // sorted for that reason. The classes themselves are identical either way -- only the order is
 // pinned, and it is pinned because a non-deterministic ordering is the shape that makes a cache
 // non-reproducible without ever producing a wrong answer.
-func (d *DisjointSet) Sets() [][]static_single_assignment.IdentifierId {
-	if len(d.parent) == 0 {
+func (set *DisjointSet) Sets() [][]static_single_assignment.IdentifierId {
+	if len(set.parent) == 0 {
 		return nil
 	}
-	members := make([]static_single_assignment.IdentifierId, 0, len(d.parent))
-	for item := range d.parent {
+	members := make([]static_single_assignment.IdentifierId, 0, len(set.parent))
+	for item := range set.parent {
 		members = append(members, item)
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i] < members[j] })
@@ -288,7 +288,7 @@ func (d *DisjointSet) Sets() [][]static_single_assignment.IdentifierId {
 	grouped := map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{}
 	var order []static_single_assignment.IdentifierId
 	for _, item := range members {
-		root := d.RepresentativeOf(item)
+		root := set.RepresentativeOf(item)
 		if _, seen := grouped[root]; !seen {
 			order = append(order, root)
 		}

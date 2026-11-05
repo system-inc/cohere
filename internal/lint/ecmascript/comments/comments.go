@@ -311,8 +311,8 @@ func sortByPosition(comments []Comment) {
 }
 
 // IsJsDoc reports whether a block comment is JSDoc: slash-star-star rather than slash-star.
-func (c Comment) IsJsDoc() bool {
-	return c.IsBlock && strings.HasPrefix(c.Text, "/**")
+func (comment Comment) IsJsDoc() bool {
+	return comment.IsBlock && strings.HasPrefix(comment.Text, "/**")
 }
 
 // ContentLines returns a block comment's inner lines with the delimiters and the leading asterisk
@@ -320,8 +320,8 @@ func (c Comment) IsJsDoc() bool {
 //
 // This is what "the comment says one thing" means for the JSDoc rules: the asterisks are furniture,
 // so a comment that is three lines of furniture around one line of prose is a one-line comment.
-func (c Comment) ContentLines() []string {
-	inner := c.Text
+func (comment Comment) ContentLines() []string {
+	inner := comment.Text
 	inner = strings.TrimPrefix(inner, "/**")
 	inner = strings.TrimPrefix(inner, "/*")
 	inner = strings.TrimSuffix(inner, "*/")

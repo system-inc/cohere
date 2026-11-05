@@ -490,10 +490,10 @@ type onlyThrowErrorRawSpecifier struct {
 // rather than erroring, which matches how `no-floating-promises` treats the same field: the
 // specifier then matches nothing instead of failing the whole run, and dropping it says nothing
 // rather than silently meaning `file`, which is the zero value.
-func (s *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
+func (specifier *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
 	var asString string
 	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
-		*s = onlyThrowErrorRawSpecifier{inline: asString}
+		*specifier = onlyThrowErrorRawSpecifier{inline: asString}
 		return nil
 	}
 
@@ -507,18 +507,18 @@ func (s *onlyThrowErrorRawSpecifier) UnmarshalJSON(raw []byte) error {
 		return unmarshalOptionsError
 	}
 
-	*s = onlyThrowErrorRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
+	*specifier = onlyThrowErrorRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
 
 	var names []string
 	if decodeError := json.Unmarshal(object.Name, &names); decodeError == nil {
-		s.Name = names
+		specifier.Name = names
 		return nil
 	}
 	var name string
 	if decodeError := json.Unmarshal(object.Name, &name); decodeError != nil {
 		return decodeError
 	}
-	s.Name = []string{name}
+	specifier.Name = []string{name}
 	return nil
 }
 

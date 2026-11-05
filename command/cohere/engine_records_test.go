@@ -63,7 +63,7 @@ type recordError struct {
 	err   error
 }
 
-func (e *recordError) Error() string { return e.err.Error() }
+func (recordError *recordError) Error() string { return recordError.err.Error() }
 
 func requireLines(test *testing.T, output string, wanted ...string) {
 	test.Helper()

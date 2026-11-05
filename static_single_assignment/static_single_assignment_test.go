@@ -75,39 +75,39 @@ func newTestFunction() *testFunction {
 	return function
 }
 
-func (f *testFunction) block() *testBlock {
-	block := &testBlock{id: f.next}
-	f.next++
-	f.blocks = append(f.blocks, block)
-	f.table[block.id] = block
+func (function *testFunction) block() *testBlock {
+	block := &testBlock{id: function.next}
+	function.next++
+	function.blocks = append(function.blocks, block)
+	function.table[block.id] = block
 	return block
 }
 
 // value mints a new pre-assignment value of a variable, as lowering mints one per store and per read.
-func (f *testFunction) value(name string) testPlace {
-	declaration, ok := f.variables[name]
+func (function *testFunction) value(name string) testPlace {
+	declaration, ok := function.variables[name]
 	if !ok {
-		declaration = ssa.DeclarationId(len(f.variables) + 1)
-		f.variables[name] = declaration
+		declaration = ssa.DeclarationId(len(function.variables) + 1)
+		function.variables[name] = declaration
 	}
-	id := ssa.IdentifierId(len(f.identifiers))
-	f.identifiers = append(f.identifiers, testIdentifier{declaration: declaration, name: name})
+	id := ssa.IdentifierId(len(function.identifiers))
+	function.identifiers = append(function.identifiers, testIdentifier{declaration: declaration, name: name})
 	return testPlace{id: id, tag: name}
 }
 
-func (f *testFunction) define(block *testBlock, name string) *testInstruction {
-	instruction := &testInstruction{defines: []testPlace{f.value(name)}}
+func (function *testFunction) define(block *testBlock, name string) *testInstruction {
+	instruction := &testInstruction{defines: []testPlace{function.value(name)}}
 	block.instructions = append(block.instructions, instruction)
 	return instruction
 }
 
-func (f *testFunction) use(block *testBlock, name string) *testInstruction {
-	instruction := &testInstruction{uses: []testPlace{f.value(name)}}
+func (function *testFunction) use(block *testBlock, name string) *testInstruction {
+	instruction := &testInstruction{uses: []testPlace{function.value(name)}}
 	block.instructions = append(block.instructions, instruction)
 	return instruction
 }
 
-func (f *testFunction) name(id ssa.IdentifierId) string { return f.identifiers[id].name }
+func (function *testFunction) name(id ssa.IdentifierId) string { return function.identifiers[id].name }
 
 type testGraph struct{}
 

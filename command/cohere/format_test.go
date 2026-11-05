@@ -31,8 +31,8 @@ type fakeEngine struct {
 	askedForMutex sync.Mutex
 }
 
-func (e *fakeEngine) Handles(fileName string) bool {
-	for _, extension := range e.handled {
+func (engine *fakeEngine) Handles(fileName string) bool {
+	for _, extension := range engine.handled {
 		if strings.HasSuffix(fileName, extension) {
 			return true
 		}
@@ -45,28 +45,28 @@ func (e *fakeEngine) Handles(fileName string) bool {
 //
 // It returns whatever the fixture set, including the account of what the walk removed, because the
 // numbers in that account are the thing under test rather than the walk itself.
-func (e *fakeEngine) Enumerate(root string) (formatfiles.Enumeration, error) {
-	e.enumeratedRoot = root
-	if e.enumerate != nil {
-		return e.enumerate(root)
+func (engine *fakeEngine) Enumerate(root string) (formatfiles.Enumeration, error) {
+	engine.enumeratedRoot = root
+	if engine.enumerate != nil {
+		return engine.enumerate(root)
 	}
 	return formatfiles.Enumeration{Root: root}, nil
 }
 
 // OptionsFingerprint is one fixed configuration, unless the fixture says otherwise.
-func (e *fakeEngine) OptionsFingerprint(fileName string) (string, error) {
-	if e.options != nil {
-		return e.options(fileName)
+func (engine *fakeEngine) OptionsFingerprint(fileName string) (string, error) {
+	if engine.options != nil {
+		return engine.options(fileName)
 	}
 	return "fake options", nil
 }
 
-func (e *fakeEngine) Format(fileName string, text string) (string, error) {
-	e.askedForMutex.Lock()
-	e.askedFor = append(e.askedFor, fileName)
-	e.askedForMutex.Unlock()
-	if e.format != nil {
-		return e.format(fileName, text)
+func (engine *fakeEngine) Format(fileName string, text string) (string, error) {
+	engine.askedForMutex.Lock()
+	engine.askedFor = append(engine.askedFor, fileName)
+	engine.askedForMutex.Unlock()
+	if engine.format != nil {
+		return engine.format(fileName, text)
 	}
 	return text, nil
 }

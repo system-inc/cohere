@@ -18,7 +18,7 @@ type RegexFlags struct {
 }
 
 // UV reports whether unicode/unicodeSets mode is active (either u or v).
-func (f RegexFlags) UV() bool { return f.Unicode || f.UnicodeSets }
+func (flags RegexFlags) UV() bool { return flags.Unicode || flags.UnicodeSets }
 
 // ParseRegexFlags returns a RegexFlags from a flag string (e.g. "gui").
 func ParseRegexFlags(flags string) RegexFlags {

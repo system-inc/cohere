@@ -593,11 +593,11 @@ type ArrayTypeOptions struct {
 }
 
 // settingFor picks the axis a node is judged on.
-func (o ArrayTypeOptions) settingFor(isReadonly bool) ArrayTypeSetting {
+func (options ArrayTypeOptions) settingFor(isReadonly bool) ArrayTypeSetting {
 	if isReadonly {
-		return o.Readonly
+		return options.Readonly
 	}
-	return o.Default
+	return options.Default
 }
 
 // DefaultArrayTypeOptions is upstream's configured-nothing behavior.

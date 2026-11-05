@@ -77,14 +77,14 @@ var configParsingOptionCodes = map[int32]string{
 
 // IsOptionsDiagnostic reports whether a diagnostic is about the compiler options rather than about
 // source: a code from either list, located in no file or in one outside this program.
-func (g *Graph) IsOptionsDiagnostic(diagnostic *ast.Diagnostic) bool {
+func (graph *Graph) IsOptionsDiagnostic(diagnostic *ast.Diagnostic) bool {
 	_, raisedByProgram := optionsDiagnosticCodes[diagnostic.Code()]
 	_, raisedByConfig := configParsingOptionCodes[diagnostic.Code()]
 	if !raisedByProgram && !raisedByConfig {
 		return false
 	}
 	sourceFile := diagnostic.File()
-	return sourceFile == nil || g.Program.GetSourceFile(sourceFile.FileName()) != sourceFile
+	return sourceFile == nil || graph.Program.GetSourceFile(sourceFile.FileName()) != sourceFile
 }
 
 // onlyOptionValueDiagnostics reports whether every diagnostic from reading a tsconfig is about one

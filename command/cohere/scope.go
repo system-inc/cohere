@@ -81,21 +81,21 @@ type formatScope struct {
 // hold, or the walk did not admit, leaves the named set, so a libfoo.a is never handed to the TypeScript
 // printer or the fix engine's parse guard. claimed is every `.a` file the program holds that the walk
 // admitted, for the format record to keep their entries.
-func (s formatScope) claimAdamic(held map[string]struct{}) (formatScope, []string) {
-	admitted := make(map[string]struct{}, len(s.adamic))
+func (scope formatScope) claimAdamic(held map[string]struct{}) (formatScope, []string) {
+	admitted := make(map[string]struct{}, len(scope.adamic))
 	var claimed []string
-	for _, fileName := range s.adamic {
+	for _, fileName := range scope.adamic {
 		admitted[fileName] = struct{}{}
 		if _, isHeld := held[fileName]; isHeld {
 			claimed = append(claimed, fileName)
 		}
 	}
-	if s.Everything {
-		return s, claimed
+	if scope.Everything {
+		return scope, claimed
 	}
 
-	fileNames := make([]string, 0, len(s.FileNames))
-	for _, fileName := range s.FileNames {
+	fileNames := make([]string, 0, len(scope.FileNames))
+	for _, fileName := range scope.FileNames {
 		_, isHeld := held[fileName]
 		_, isAdmitted := admitted[fileName]
 		if sourcename.IsAdamic(fileName) && !(isHeld && isAdmitted) {
@@ -104,28 +104,28 @@ func (s formatScope) claimAdamic(held map[string]struct{}) (formatScope, []strin
 		fileNames = append(fileNames, fileName)
 	}
 	joining := 0
-	if s.adamicJoins {
+	if scope.adamicJoins {
 		joiners := claimed
-		if s.adamicUnrecorded != nil {
-			joiners = s.adamicUnrecorded(claimed)
+		if scope.adamicUnrecorded != nil {
+			joiners = scope.adamicUnrecorded(claimed)
 		}
 		fileNames = append(fileNames, joiners...)
 		joining = len(joiners)
 		sort.Strings(fileNames)
 	}
-	if len(fileNames) == len(s.FileNames) && joining == 0 {
-		return s, claimed
+	if len(fileNames) == len(scope.FileNames) && joining == 0 {
+		return scope, claimed
 	}
 
 	index := make(map[string]struct{}, len(fileNames))
 	for _, fileName := range fileNames {
 		index[fileName] = struct{}{}
 	}
-	s.FileNames, s.index = fileNames, index
+	scope.FileNames, scope.index = fileNames, index
 	if joining > 0 {
-		s.Description = fmt.Sprintf("%s · and %s the program holds", s.Description, counted(joining, "Adamic .a file", "Adamic .a files"))
+		scope.Description = fmt.Sprintf("%s · and %s the program holds", scope.Description, counted(joining, "Adamic .a file", "Adamic .a files"))
 	}
-	return s, claimed
+	return scope, claimed
 }
 
 // narrowTo reports how many of the scope's files are in a given population, and re-describes the
@@ -138,13 +138,13 @@ func (s formatScope) claimAdamic(held map[string]struct{}) (formatScope, []strin
 // the output explained neither.
 //
 // Both numbers, in one clause, so nobody has to reconstruct the difference.
-func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
-	if s.Everything {
-		return s
+func (scope formatScope) narrowTo(population map[string]struct{}) formatScope {
+	if scope.Everything {
+		return scope
 	}
 
 	inPopulation := 0
-	for _, fileName := range s.FileNames {
+	for _, fileName := range scope.FileNames {
 		if _, present := population[fileName]; present {
 			inPopulation++
 		}
@@ -159,8 +159,8 @@ func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
 	// so the guard was present, tested, and dead. Its fixture only ever called the constructor
 	// directly and never the composition, which is a check that verifies a fragment read as a check
 	// on the behavior.
-	if len(s.FileNames) == 0 {
-		return s
+	if len(scope.FileNames) == 0 {
+		return scope
 	}
 
 	// The scope says how it was decided; this function only adds how much of it is in the program.
@@ -174,8 +174,8 @@ func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
 	// So the wording is no longer decided here. The description a constructor already wrote says how
 	// its files were chosen, and this function appends to it rather than choosing between spellings
 	// it cannot know the caller meant.
-	s.Description = fmt.Sprintf("%s, %d of them in the program", s.Description, inPopulation)
-	return s
+	scope.Description = fmt.Sprintf("%s, %d of them in the program", scope.Description, inPopulation)
+	return scope
 }
 
 // includes reports whether a file is in a narrow scope.
@@ -188,8 +188,8 @@ func (s formatScope) narrowTo(population map[string]struct{}) formatScope {
 //
 // A whole-tree scope never reaches this method. If one does, it has no index and answers false,
 // which is a wrong answer arriving loudly rather than a right answer arriving by accident.
-func (s formatScope) includes(fileName string) bool {
-	_, inScope := s.index[fileName]
+func (scope formatScope) includes(fileName string) bool {
+	_, inScope := scope.index[fileName]
 	return inScope
 }
 
@@ -241,8 +241,8 @@ func scopedTransform(inner edit.Transform, scope formatScope) edit.Transform {
 // before and after the engine's filter, and every declined extension by name. A file the engine
 // cannot handle has to be a named zero rather than an absence, which is the one place in this
 // pipeline where a file could previously be silently missing.
-func (s formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) formatScope {
-	if s.Everything {
+func (scope formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) formatScope {
+	if scope.Everything {
 		// A whole-tree scope becomes the enumeration itself: every file the walk found and the engine
 		// handles, rather than every file in the type graph.
 		index := make(map[string]struct{}, len(enumeration.Files))
@@ -261,14 +261,14 @@ func (s formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) fo
 	// A narrow scope keeps its own file set, which is the named set, and reports how much of it the
 	// formatter will actually see. A named `.a` file stays in it only if the walk admitted it and the
 	// program holds it (claimAdamic).
-	s.adamic = enumeration.Adamic
+	scope.adamic = enumeration.Adamic
 	handled := make(map[string]struct{}, len(enumeration.Files))
 	for _, fileName := range enumeration.Files {
 		handled[fileName] = struct{}{}
 	}
 
 	formattable := 0
-	for _, fileName := range s.FileNames {
+	for _, fileName := range scope.FileNames {
 		if _, present := handled[fileName]; present {
 			formattable++
 		}
@@ -283,10 +283,10 @@ func (s formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) fo
 	// and offer the engine files the walk never found. That is a real hole rather than a hypothetical:
 	// it is what a mutation deleting the branch above produced, and no fixture could see it because
 	// includes is never consulted for a scope that claims to be everything.
-	if !s.Everything && len(s.FileNames) == 0 {
-		return s
+	if !scope.Everything && len(scope.FileNames) == 0 {
+		return scope
 	}
-	if s.Everything {
+	if scope.Everything {
 		// Unreachable through the branch above, and stated rather than assumed. A whole-tree scope that
 		// arrives here has lost its enumeration, and answering with an empty narrow scope is a loud
 		// wrong answer rather than a silent permissive one.
@@ -296,11 +296,11 @@ func (s formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) fo
 		}
 	}
 
-	s.Description = fmt.Sprintf(
+	scope.Description = fmt.Sprintf(
 		"%s, %d the formatter handles · %s",
-		s.Description, formattable, describeEnumeration(enumeration, formattable),
+		scope.Description, formattable, describeEnumeration(enumeration, formattable),
 	)
-	return s
+	return scope
 }
 
 // describeEnumeration renders what the walk actually did.
@@ -374,8 +374,8 @@ func describeEnumeration(enumeration formatfiles.Enumeration, formattable int) s
 //
 // A scope with no formatter configured yields nothing, so a fix-only run visits exactly the files
 // that had proposals and costs what it did before the format phase existed.
-func (s formatScope) formatCandidates() []string {
-	return s.FileNames
+func (scope formatScope) formatCandidates() []string {
+	return scope.FileNames
 }
 
 // namedPathsScope resolves the paths a caller named on the command line.

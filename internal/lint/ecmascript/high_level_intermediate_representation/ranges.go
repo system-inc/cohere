@@ -85,8 +85,8 @@ const (
 	MutationSiteCall
 )
 
-func (k MutationSiteKind) String() string {
-	switch k {
+func (kind MutationSiteKind) String() string {
+	switch kind {
 	case MutationSitePropertyStore:
 		return "property-store"
 	case MutationSiteComputedStore:
@@ -194,8 +194,8 @@ func (rangeGraph) TerminalOrder(block *BasicBlock) static_single_assignment.Eval
 	return TerminalOrder(block.Terminal)
 }
 
-func (g rangeGraph) Effects(function *Function, block *BasicBlock, index int) []AliasingEffect {
-	return g.effects.Get(block.Instructions[index])
+func (graph rangeGraph) Effects(function *Function, block *BasicBlock, index int) []AliasingEffect {
+	return graph.effects.Get(block.Instructions[index])
 }
 
 // ParametersFrozen is React's rule: a component's or a hook's parameters are Frozen, and only a nested
@@ -225,7 +225,7 @@ func (rangeGraph) StoredContextValue(function *Function, block *BasicBlock, inde
 // Closure is React's rule for a FunctionExpression: created Frozen when every capture is immutable,
 // none is derived from a useRef result, and the closure's body only reads them
 // (hasReadOnlyClosureEffectsForCaptures).
-func (g rangeGraph) Closure(function *Function, block *BasicBlock, index int, into static_single_assignment.IdentifierId,
+func (graph rangeGraph) Closure(function *Function, block *BasicBlock, index int, into static_single_assignment.IdentifierId,
 	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) ([]Place, bool) {
 	instruction := function.Instructions[block.Instructions[index]]
 	expression, ok := instruction.Value.(*FunctionExpression)
@@ -235,7 +235,7 @@ func (g rangeGraph) Closure(function *Function, block *BasicBlock, index int, in
 	allImmutable := len(expression.Captures) > 0
 	for _, capture := range expression.Captures {
 		_, immutable := kinds[capture.Identifier]
-		allImmutable = allImmutable && immutable && !g.refs[capture.Identifier]
+		allImmutable = allImmutable && immutable && !graph.refs[capture.Identifier]
 	}
 	frozen := allImmutable && int(expression.Function) < len(function.Functions) &&
 		hasReadOnlyClosureEffectsForCaptures(function.Functions[expression.Function], expression.Captures, kinds)

@@ -4,59 +4,59 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
-func (b *Builder[E]) expr(node *ast.Node) {
+func (builder *Builder[E]) expr(node *ast.Node) {
 	if node == nil {
 		return
 	}
-	if b.hooks.Expression != nil {
-		b.hooks.Expression(b, node)
+	if builder.hooks.Expression != nil {
+		builder.hooks.Expression(builder, node)
 	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
-		b.read(node)
+		builder.read(node)
 		if isThrowableIdentifier(node) {
-			b.firstThrowableFork()
+			builder.firstThrowableFork()
 		}
 
 	case ast.KindParenthesizedExpression:
-		b.expr(node.AsParenthesizedExpression().Expression)
+		builder.expr(node.AsParenthesizedExpression().Expression)
 
 	case ast.KindBinaryExpression:
-		b.binaryExpression(node)
+		builder.binaryExpression(node)
 
 	case ast.KindConditionalExpression:
-		b.conditionalExpression(node)
+		builder.conditionalExpression(node)
 
 	case ast.KindPrefixUnaryExpression:
 		unary := node.AsPrefixUnaryExpression()
 		if unary.Operator == ast.KindPlusPlusToken || unary.Operator == ast.KindMinusMinusToken {
-			b.updateExpression(unary.Operand)
+			builder.updateExpression(unary.Operand)
 			return
 		}
-		b.expr(unary.Operand)
+		builder.expr(unary.Operand)
 
 	case ast.KindPostfixUnaryExpression:
-		b.updateExpression(node.AsPostfixUnaryExpression().Operand)
+		builder.updateExpression(node.AsPostfixUnaryExpression().Operand)
 
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
 		ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression:
-		b.accessOrCall(node)
+		builder.accessOrCall(node)
 
 	case ast.KindYieldExpression:
-		b.expr(node.AsYieldExpression().Expression)
-		b.makeYield()
+		builder.expr(node.AsYieldExpression().Expression)
+		builder.makeYield()
 
 	case ast.KindClassExpression:
-		b.classLike(node)
+		builder.classLike(node)
 
 	default:
 		if IsRoot(node) {
-			b.nestedFunction(node)
+			builder.nestedFunction(node)
 			return
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
-			b.visitUnknown(child)
+			builder.visitUnknown(child)
 			return false
 		})
 	}
@@ -67,32 +67,32 @@ func (b *Builder[E]) expr(node *ast.Node) {
 // all the consumer needs; a control-flow condition cannot merge them before it
 // decides which statement executes, or impossible paths can appear across the
 // join (for example, the short branch of `a || b` reaching an `else` body).
-func (b *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[E]) {
+func (builder *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[E]) {
 	if node == nil {
-		b.link(b.cur, whenTrue)
-		b.link(b.cur, whenFalse)
+		builder.link(builder.cur, whenTrue)
+		builder.link(builder.cur, whenFalse)
 		return
 	}
 
 	switch node.Kind {
 	case ast.KindParenthesizedExpression:
-		if b.hooks.Expression != nil {
-			b.hooks.Expression(b, node)
+		if builder.hooks.Expression != nil {
+			builder.hooks.Expression(builder, node)
 		}
-		b.condition(node.AsParenthesizedExpression().Expression, whenTrue, whenFalse)
+		builder.condition(node.AsParenthesizedExpression().Expression, whenTrue, whenFalse)
 
 	case ast.KindPrefixUnaryExpression:
 		unary := node.AsPrefixUnaryExpression()
 		if unary.Operator != ast.KindExclamationToken {
-			b.expr(node)
-			b.link(b.cur, whenTrue)
-			b.link(b.cur, whenFalse)
+			builder.expr(node)
+			builder.link(builder.cur, whenTrue)
+			builder.link(builder.cur, whenFalse)
 			return
 		}
-		if b.hooks.Expression != nil {
-			b.hooks.Expression(b, node)
+		if builder.hooks.Expression != nil {
+			builder.hooks.Expression(builder, node)
 		}
-		b.condition(unary.Operand, whenFalse, whenTrue)
+		builder.condition(unary.Operand, whenFalse, whenTrue)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
@@ -100,66 +100,66 @@ func (b *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[E]) {
 		if operator != ast.KindAmpersandAmpersandToken &&
 			operator != ast.KindBarBarToken &&
 			operator != ast.KindQuestionQuestionToken {
-			b.expr(node)
-			b.link(b.cur, whenTrue)
-			b.link(b.cur, whenFalse)
+			builder.expr(node)
+			builder.link(builder.cur, whenTrue)
+			builder.link(builder.cur, whenFalse)
 			return
 		}
-		if b.hooks.Expression != nil {
-			b.hooks.Expression(b, node)
+		if builder.hooks.Expression != nil {
+			builder.hooks.Expression(builder, node)
 		}
-		right := b.newBlock()
+		right := builder.newBlock()
 		switch operator {
 		case ast.KindAmpersandAmpersandToken:
-			b.condition(binary.Left, right, whenFalse)
+			builder.condition(binary.Left, right, whenFalse)
 		case ast.KindBarBarToken:
-			b.condition(binary.Left, whenTrue, right)
+			builder.condition(binary.Left, whenTrue, right)
 		case ast.KindQuestionQuestionToken:
 			// A non-nullish left operand may itself be truthy or falsy; a
 			// nullish one evaluates the right operand.
-			b.expr(binary.Left)
-			b.link(b.cur, whenTrue)
-			b.link(b.cur, whenFalse)
-			b.link(b.cur, right)
+			builder.expr(binary.Left)
+			builder.link(builder.cur, whenTrue)
+			builder.link(builder.cur, whenFalse)
+			builder.link(builder.cur, right)
 		}
-		b.enter(right)
-		b.condition(binary.Right, whenTrue, whenFalse)
+		builder.enter(right)
+		builder.condition(binary.Right, whenTrue, whenFalse)
 
 	case ast.KindConditionalExpression:
-		if b.hooks.Expression != nil {
-			b.hooks.Expression(b, node)
+		if builder.hooks.Expression != nil {
+			builder.hooks.Expression(builder, node)
 		}
 		conditional := node.AsConditionalExpression()
-		trueEntry := b.newBlock()
-		falseEntry := b.newBlock()
-		b.condition(conditional.Condition, trueEntry, falseEntry)
-		b.enter(trueEntry)
-		b.condition(conditional.WhenTrue, whenTrue, whenFalse)
-		b.enter(falseEntry)
-		b.condition(conditional.WhenFalse, whenTrue, whenFalse)
+		trueEntry := builder.newBlock()
+		falseEntry := builder.newBlock()
+		builder.condition(conditional.Condition, trueEntry, falseEntry)
+		builder.enter(trueEntry)
+		builder.condition(conditional.WhenTrue, whenTrue, whenFalse)
+		builder.enter(falseEntry)
+		builder.condition(conditional.WhenFalse, whenTrue, whenFalse)
 
 	default:
-		b.expr(node)
-		b.link(b.cur, whenTrue)
-		b.link(b.cur, whenFalse)
+		builder.expr(node)
+		builder.link(builder.cur, whenTrue)
+		builder.link(builder.cur, whenFalse)
 	}
 }
 
 // visitUnknown routes a child of a node the builder has no dedicated handler
 // for. Statements and expressions are handled by their own walkers so control
 // flow inside them is still modelled.
-func (b *Builder[E]) visitUnknown(node *ast.Node) {
+func (builder *Builder[E]) visitUnknown(node *ast.Node) {
 	if node == nil {
 		return
 	}
 	if ast.IsStatement(node) {
-		b.statement(node)
+		builder.statement(node)
 		return
 	}
-	b.expr(node)
+	builder.expr(node)
 }
 
-func (b *Builder[E]) binaryExpression(node *ast.Node) {
+func (builder *Builder[E]) binaryExpression(node *ast.Node) {
 	binary := node.AsBinaryExpression()
 	operator := binary.OperatorToken.Kind
 
@@ -167,178 +167,178 @@ func (b *Builder[E]) binaryExpression(node *ast.Node) {
 	case operator == ast.KindAmpersandAmpersandToken ||
 		operator == ast.KindBarBarToken ||
 		operator == ast.KindQuestionQuestionToken:
-		b.expr(binary.Left)
-		join := b.newBlock()
-		b.link(b.cur, join)
-		right := b.newBlock()
-		b.link(b.cur, right)
-		b.enter(right)
-		b.expr(binary.Right)
-		b.link(b.cur, join)
-		b.enter(join)
+		builder.expr(binary.Left)
+		join := builder.newBlock()
+		builder.link(builder.cur, join)
+		right := builder.newBlock()
+		builder.link(builder.cur, right)
+		builder.enter(right)
+		builder.expr(binary.Right)
+		builder.link(builder.cur, join)
+		builder.enter(join)
 
 	case ast.IsLogicalOrCoalescingAssignmentOperator(operator):
 		// `a ||= b` reads a, then conditionally evaluates b and writes a.
-		b.patternReads(binary.Left)
-		join := b.newBlock()
-		b.link(b.cur, join)
-		right := b.newBlock()
-		b.link(b.cur, right)
-		b.enter(right)
-		b.expr(binary.Right)
-		b.patternWrites(binary.Left)
-		b.link(b.cur, join)
-		b.enter(join)
+		builder.patternReads(binary.Left)
+		join := builder.newBlock()
+		builder.link(builder.cur, join)
+		right := builder.newBlock()
+		builder.link(builder.cur, right)
+		builder.enter(right)
+		builder.expr(binary.Right)
+		builder.patternWrites(binary.Left)
+		builder.link(builder.cur, join)
+		builder.enter(join)
 
 	case operator == ast.KindEqualsToken:
 		if isDestructuringTarget(binary.Left) {
 			// Run-time evaluation order: the right-hand side produces the
 			// value first, then the pattern binds element by element.
-			b.expr(binary.Right)
-			b.patternBind(binary.Left)
+			builder.expr(binary.Right)
+			builder.patternBind(binary.Left)
 			return
 		}
-		b.patternReads(binary.Left)
-		b.expr(binary.Right)
-		b.patternWrites(binary.Left)
+		builder.patternReads(binary.Left)
+		builder.expr(binary.Right)
+		builder.patternWrites(binary.Left)
 
 	case ast.IsAssignmentOperator(operator):
 		// Compound assignment reads the target before writing it.
-		b.patternReads(binary.Left)
-		b.expr(binary.Right)
-		b.patternWrites(binary.Left)
+		builder.patternReads(binary.Left)
+		builder.expr(binary.Right)
+		builder.patternWrites(binary.Left)
 
 	default:
-		b.expr(binary.Left)
-		b.expr(binary.Right)
+		builder.expr(binary.Left)
+		builder.expr(binary.Right)
 	}
 }
 
-func (b *Builder[E]) conditionalExpression(node *ast.Node) {
+func (builder *Builder[E]) conditionalExpression(node *ast.Node) {
 	cond := node.AsConditionalExpression()
-	b.expr(cond.Condition)
-	testEnd := b.cur
-	join := b.newBlock()
+	builder.expr(cond.Condition)
+	testEnd := builder.cur
+	join := builder.newBlock()
 
-	whenTrue := b.newBlock()
-	b.link(testEnd, whenTrue)
-	b.enter(whenTrue)
-	b.expr(cond.WhenTrue)
-	b.link(b.cur, join)
+	whenTrue := builder.newBlock()
+	builder.link(testEnd, whenTrue)
+	builder.enter(whenTrue)
+	builder.expr(cond.WhenTrue)
+	builder.link(builder.cur, join)
 
-	whenFalse := b.newBlock()
-	b.link(testEnd, whenFalse)
-	b.enter(whenFalse)
-	b.expr(cond.WhenFalse)
-	b.link(b.cur, join)
+	whenFalse := builder.newBlock()
+	builder.link(testEnd, whenFalse)
+	builder.enter(whenFalse)
+	builder.expr(cond.WhenFalse)
+	builder.link(builder.cur, join)
 
-	b.enter(join)
+	builder.enter(join)
 }
 
-func (b *Builder[E]) updateExpression(operand *ast.Node) {
-	b.patternReads(operand)
-	b.patternWrites(operand)
+func (builder *Builder[E]) updateExpression(operand *ast.Node) {
+	builder.patternReads(operand)
+	builder.patternWrites(operand)
 }
 
 // accessOrCall walks a member access or call and forks around each `?.` link so
 // the rest of the chain can be skipped.
-func (b *Builder[E]) accessOrCall(node *ast.Node) {
+func (builder *Builder[E]) accessOrCall(node *ast.Node) {
 	outermost := ast.IsOptionalChain(node) && ast.IsOutermostOptionalChain(node)
 	if outermost {
-		b.chainJoins = append(b.chainJoins, b.newBlock())
+		builder.chainJoins = append(builder.chainJoins, builder.newBlock())
 	}
 
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
-		b.expr(node.AsPropertyAccessExpression().Expression)
-		b.forkOptionalChain(node)
+		builder.expr(node.AsPropertyAccessExpression().Expression)
+		builder.forkOptionalChain(node)
 	case ast.KindElementAccessExpression:
 		access := node.AsElementAccessExpression()
-		b.expr(access.Expression)
-		b.forkOptionalChain(node)
-		b.expr(access.ArgumentExpression)
+		builder.expr(access.Expression)
+		builder.forkOptionalChain(node)
+		builder.expr(access.ArgumentExpression)
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
-		b.expr(call.Expression)
-		b.forkOptionalChain(node)
-		b.typeArguments(node)
+		builder.expr(call.Expression)
+		builder.forkOptionalChain(node)
+		builder.typeArguments(node)
 		if call.Arguments != nil {
 			for _, arg := range call.Arguments.Nodes {
-				b.expr(arg)
+				builder.expr(arg)
 			}
 		}
 	case ast.KindNewExpression:
 		newExpr := node.AsNewExpression()
-		b.expr(newExpr.Expression)
-		b.typeArguments(node)
+		builder.expr(newExpr.Expression)
+		builder.typeArguments(node)
 		if newExpr.Arguments != nil {
 			for _, arg := range newExpr.Arguments.Nodes {
-				b.expr(arg)
+				builder.expr(arg)
 			}
 		}
 	case ast.KindTaggedTemplateExpression:
 		tagged := node.AsTaggedTemplateExpression()
-		b.expr(tagged.Tag)
-		b.typeArguments(node)
-		b.expr(tagged.Template)
+		builder.expr(tagged.Tag)
+		builder.typeArguments(node)
+		builder.expr(tagged.Template)
 	}
 
-	b.firstThrowableFork()
+	builder.firstThrowableFork()
 
 	if outermost {
-		join := b.chainJoins[len(b.chainJoins)-1]
-		b.chainJoins = b.chainJoins[:len(b.chainJoins)-1]
-		b.link(b.cur, join)
-		b.enter(join)
+		join := builder.chainJoins[len(builder.chainJoins)-1]
+		builder.chainJoins = builder.chainJoins[:len(builder.chainJoins)-1]
+		builder.link(builder.cur, join)
+		builder.enter(join)
 	}
 }
 
-func (b *Builder[E]) forkOptionalChain(node *ast.Node) {
-	if len(b.chainJoins) == 0 || !ast.IsOptionalChainRoot(node) {
+func (builder *Builder[E]) forkOptionalChain(node *ast.Node) {
+	if len(builder.chainJoins) == 0 || !ast.IsOptionalChainRoot(node) {
 		return
 	}
-	b.link(b.cur, b.chainJoins[len(b.chainJoins)-1])
-	next := b.newBlock()
-	b.link(b.cur, next)
-	b.enter(next)
+	builder.link(builder.cur, builder.chainJoins[len(builder.chainJoins)-1])
+	next := builder.newBlock()
+	builder.link(builder.cur, next)
+	builder.enter(next)
 }
 
 // typeArguments walks an explicit `<T>` argument list, so a `typeof x` inside
 // it still counts as a read even though nothing in it runs.
-func (b *Builder[E]) typeArguments(node *ast.Node) {
+func (builder *Builder[E]) typeArguments(node *ast.Node) {
 	for _, typeArg := range node.TypeArguments() {
-		b.expr(typeArg)
+		builder.expr(typeArg)
 	}
 }
 
 // typeParameters walks a `<T extends U = D>` declaration list, so a `typeof x`
 // inside a constraint or default still counts as a read even though nothing in
 // it runs.
-func (b *Builder[E]) typeParameters(node *ast.Node) {
+func (builder *Builder[E]) typeParameters(node *ast.Node) {
 	for _, typeParam := range node.TypeParameters() {
 		param := typeParam.AsTypeParameterDeclaration()
 		if param == nil {
 			continue
 		}
-		b.expr(param.Constraint)
-		b.expr(param.DefaultType)
+		builder.expr(param.Constraint)
+		builder.expr(param.DefaultType)
 	}
 }
 
 // nestedFunction keeps evaluating the parts of a nested function that belong to
 // the enclosing code path — a computed member name and decorators — while its
 // parameters and body form their own code path root.
-func (b *Builder[E]) nestedFunction(node *ast.Node) {
-	b.memberHeader(node)
+func (builder *Builder[E]) nestedFunction(node *ast.Node) {
+	builder.memberHeader(node)
 }
 
-func (b *Builder[E]) classLike(node *ast.Node) {
+func (builder *Builder[E]) classLike(node *ast.Node) {
 	class := node.ClassLikeData()
 	if class == nil {
 		return
 	}
-	b.decorators(node)
-	b.typeParameters(node)
+	builder.decorators(node)
+	builder.typeParameters(node)
 	if class.HeritageClauses != nil {
 		for _, clause := range class.HeritageClauses.Nodes {
 			heritage := clause.AsHeritageClause()
@@ -346,13 +346,13 @@ func (b *Builder[E]) classLike(node *ast.Node) {
 				continue
 			}
 			for _, typeNode := range heritage.Types.Nodes {
-				b.expr(typeNode)
+				builder.expr(typeNode)
 			}
 		}
 	}
 	if class.Members != nil {
 		for _, member := range class.Members.Nodes {
-			b.memberHeader(member)
+			builder.memberHeader(member)
 		}
 	}
 }
@@ -363,30 +363,30 @@ func (b *Builder[E]) classLike(node *ast.Node) {
 // property initializer — forms its own code path, so its parameters and
 // return type are walked there instead; an index signature has no body, so
 // its parameter and return types are walked here.
-func (b *Builder[E]) memberHeader(node *ast.Node) {
-	b.decorators(node)
+func (builder *Builder[E]) memberHeader(node *ast.Node) {
+	builder.decorators(node)
 	if ast.IsFunctionLikeDeclaration(node) {
 		for _, parameter := range node.Parameters() {
-			b.decorators(parameter)
+			builder.decorators(parameter)
 		}
 	}
 	name := node.Name()
 	if name != nil && name.Kind == ast.KindComputedPropertyName {
-		b.expr(name.AsComputedPropertyName().Expression)
+		builder.expr(name.AsComputedPropertyName().Expression)
 	}
 	switch node.Kind {
 	case ast.KindPropertyDeclaration:
-		b.expr(node.AsPropertyDeclaration().Type)
+		builder.expr(node.AsPropertyDeclaration().Type)
 	case ast.KindIndexSignature:
 		for _, parameter := range node.Parameters() {
-			b.expr(parameter.Type())
+			builder.expr(parameter.Type())
 		}
-		b.expr(node.Type())
+		builder.expr(node.Type())
 	}
 }
 
-func (b *Builder[E]) decorators(node *ast.Node) {
+func (builder *Builder[E]) decorators(node *ast.Node) {
 	for _, decorator := range node.Decorators() {
-		b.expr(decorator.AsDecorator().Expression)
+		builder.expr(decorator.AsDecorator().Expression)
 	}
 }

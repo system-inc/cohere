@@ -79,8 +79,8 @@ func noRestrictedImportsCompileGroup(group []string, caseSensitive bool) (*noRes
 // Every pattern is tested and the last one that matches decides, which is how a negation undoes an
 // earlier match. Testing in order and returning on the first hit would make `["foo/*", "!foo/bar"]`
 // report on `foo/bar`, which is the case upstream's corpus tests directly.
-func (m *noRestrictedImportsMatcher) Ignores(path string) bool {
-	if m == nil {
+func (matcher *noRestrictedImportsMatcher) Ignores(path string) bool {
+	if matcher == nil {
 		return false
 	}
 	// Neither side is `./`-normalised, and that is a measured decision rather than an omission. The
@@ -101,7 +101,7 @@ func (m *noRestrictedImportsMatcher) Ignores(path string) bool {
 	candidate := path
 
 	ignored := false
-	for _, glob := range m.globs {
+	for _, glob := range matcher.globs {
 		if glob.expression.Test(candidate) {
 			ignored = !glob.negated
 		}

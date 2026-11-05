@@ -22,45 +22,45 @@ type walker struct {
 }
 
 // run scans the pattern top to bottom, returning false on malformed input or an early stop.
-func (w *walker) run() bool {
+func (walker *walker) run() bool {
 	index := 0
-	for index < len(w.pattern) {
-		if w.stopped {
+	for index < len(walker.pattern) {
+		if walker.stopped {
 			return false
 		}
 
-		switch w.pattern[index] {
+		switch walker.pattern[index] {
 		case '\\':
-			character, next, ok := w.readEscape(index)
+			character, next, ok := walker.readEscape(index)
 			if !ok {
 				return false
 			}
 			// A class escape like \d matches a set rather than a character, so it has no single
 			// value to report and is skipped rather than invented.
 			if character == nil {
-				index = w.applyQuantifier(next)
+				index = walker.applyQuantifier(next)
 				break
 			}
-			index = w.emitAndQuantify(*character)
-			if w.stopped {
+			index = walker.emitAndQuantify(*character)
+			if walker.stopped {
 				return false
 			}
 
 		case '[':
-			end, ok := regexsyntax.ClassEnd(w.pattern, index, w.flags)
+			end, ok := regexsyntax.ClassEnd(walker.pattern, index, walker.flags)
 			if !ok {
 				return false
 			}
 			// A quantifier after a class governs the whole class, so its contents carry that depth
 			// too. Every character inside a class already carries ClassDepth, so this only matters
 			// to a caller reading the two separately.
-			next, quantified := quantifierAt(w.pattern, end)
+			next, quantified := quantifierAt(walker.pattern, end)
 			if quantified {
-				w.quantifierDepth++
+				walker.quantifierDepth++
 			}
-			walked := w.walkClass(index, end)
+			walked := walker.walkClass(index, end)
 			if quantified {
-				w.quantifierDepth--
+				walker.quantifierDepth--
 			}
 			if !walked {
 				return false
@@ -72,35 +72,35 @@ func (w *walker) run() bool {
 			// than content: the `?:`, `?=`, `?!` and `?<name>` forms would otherwise be emitted as
 			// ordinary matched characters. A probe caught that, reporting the question mark and
 			// colon of a non-capturing group as things the pattern matches.
-			index = groupPrologueEnd(w.pattern, index)
+			index = groupPrologueEnd(walker.pattern, index)
 
 		case ')':
-			index = w.applyQuantifier(index + 1)
+			index = walker.applyQuantifier(index + 1)
 
 		case '|', '^', '$':
 			// Alternation and anchors match positions rather than characters.
 			index++
 
 		case '.':
-			index = w.emitAndQuantify(Character{Value: '.', Kind: KindSymbol, Start: index, End: index + 1})
-			if w.stopped {
+			index = walker.emitAndQuantify(Character{Value: '.', Kind: KindSymbol, Start: index, End: index + 1})
+			if walker.stopped {
 				return false
 			}
 
 		default:
-			value, width := decodeRune(w.pattern, index)
-			index = w.emitAndQuantify(Character{
+			value, width := decodeRune(walker.pattern, index)
+			index = walker.emitAndQuantify(Character{
 				Value: value,
 				Kind:  KindSymbol,
 				Start: index,
 				End:   index + width,
 			})
-			if w.stopped {
+			if walker.stopped {
 				return false
 			}
 		}
 	}
-	return !w.stopped
+	return !walker.stopped
 }
 
 // emitAndQuantify reports a character under the depth of any quantifier governing it, and returns
@@ -108,14 +108,14 @@ func (w *walker) run() bool {
 //
 // The lookahead is what makes the depth right. A quantifier contains the element it repeats, so the
 // character has to be emitted while that depth is raised, not before it is discovered.
-func (w *walker) emitAndQuantify(character Character) int {
-	next, quantified := quantifierAt(w.pattern, character.End)
+func (walker *walker) emitAndQuantify(character Character) int {
+	next, quantified := quantifierAt(walker.pattern, character.End)
 	if quantified {
-		w.quantifierDepth++
+		walker.quantifierDepth++
 	}
-	emitted := w.emit(character)
+	emitted := walker.emit(character)
 	if quantified {
-		w.quantifierDepth--
+		walker.quantifierDepth--
 	}
 	if !emitted {
 		return character.End
@@ -156,11 +156,11 @@ func groupPrologueEnd(pattern string, index int) int {
 }
 
 // emit reports one character, filling in the depths the walker is currently inside.
-func (w *walker) emit(character Character) bool {
-	character.QuantifierDepth = w.quantifierDepth
-	character.ClassDepth = w.classDepth
-	if !w.callback(character) {
-		w.stopped = true
+func (walker *walker) emit(character Character) bool {
+	character.QuantifierDepth = walker.quantifierDepth
+	character.ClassDepth = walker.classDepth
+	if !walker.callback(character) {
+		walker.stopped = true
 		return false
 	}
 	return true
@@ -210,15 +210,15 @@ func quantifierAt(pattern string, index int) (int, bool) {
 // The quantifier is consumed rather than walked into because its braces hold digits that are not
 // characters the pattern matches. Missing that is what would make a two-space run followed by a
 // counted quantifier read as two spaces followed by a literal digit.
-func (w *walker) applyQuantifier(index int) int {
-	if index >= len(w.pattern) {
+func (walker *walker) applyQuantifier(index int) int {
+	if index >= len(walker.pattern) {
 		return index
 	}
-	switch w.pattern[index] {
+	switch walker.pattern[index] {
 	case '*', '+', '?':
 		index++
 	case '{':
-		end, ok := braceQuantifierEnd(w.pattern, index)
+		end, ok := braceQuantifierEnd(walker.pattern, index)
 		if !ok {
 			// A lone brace is a literal in a pattern, and it was already emitted as one by the
 			// default branch. Returning the index unchanged lets the loop move past it.
@@ -229,7 +229,7 @@ func (w *walker) applyQuantifier(index int) int {
 		return index
 	}
 	// A lazy quantifier's question mark is part of the quantifier rather than another one.
-	if index < len(w.pattern) && w.pattern[index] == '?' {
+	if index < len(walker.pattern) && walker.pattern[index] == '?' {
 		index++
 	}
 	return index
@@ -240,11 +240,11 @@ func (w *walker) applyQuantifier(index int) int {
 // The body is re-parsed by regexsyntax rather than scanned here, so the two packages cannot
 // disagree about what a class contains. Same argument as using the shared pattern-and-flags split
 // rather than a second copy: a class body has enough edge cases that two implementations drift.
-func (w *walker) walkClass(start int, end int) bool {
-	w.classDepth++
-	defer func() { w.classDepth-- }()
+func (walker *walker) walkClass(start int, end int) bool {
+	walker.classDepth++
+	defer func() { walker.classDepth-- }()
 
-	elements, _, ok := regexsyntax.ParseRegexCharacterClassWithEnd(w.pattern, start, end, w.flags)
+	elements, _, ok := regexsyntax.ParseRegexCharacterClassWithEnd(walker.pattern, start, end, walker.flags)
 	if !ok {
 		return false
 	}
@@ -254,11 +254,11 @@ func (w *walker) walkClass(start int, end int) bool {
 		case regexsyntax.RegexCharSingle:
 			character := Character{
 				Value: uint32(element.Value),
-				Kind:  w.kindFromSource(element.Start, element.End),
+				Kind:  walker.kindFromSource(element.Start, element.End),
 				Start: element.Start,
 				End:   element.End,
 			}
-			if !w.emit(character) {
+			if !walker.emit(character) {
 				return false
 			}
 
@@ -268,11 +268,11 @@ func (w *walker) walkClass(start int, end int) bool {
 			// down and are not reported.
 			lower := Character{
 				Value: uint32(element.Value),
-				Kind:  w.kindFromSource(element.Start, element.End),
+				Kind:  walker.kindFromSource(element.Start, element.End),
 				Start: element.Start,
 				End:   element.End,
 			}
-			if !w.emit(lower) {
+			if !walker.emit(lower) {
 				return false
 			}
 		}
@@ -286,11 +286,11 @@ func (w *walker) walkClass(start int, end int) bool {
 // The kind cannot be derived from the value: a null character can be written four ways and the rule
 // that cares about this reports three of them and not the fourth. So spelling is read from the
 // bytes rather than inferred from what they mean.
-func (w *walker) kindFromSource(start int, end int) CharacterKind {
-	if start < 0 || end > len(w.pattern) || end-start < 1 {
+func (walker *walker) kindFromSource(start int, end int) CharacterKind {
+	if start < 0 || end > len(walker.pattern) || end-start < 1 {
 		return KindSymbol
 	}
-	text := w.pattern[start:end]
+	text := walker.pattern[start:end]
 	if text[0] != '\\' || len(text) < 2 {
 		return KindSymbol
 	}
@@ -322,13 +322,13 @@ func (w *walker) kindFromSource(start int, end int) CharacterKind {
 //
 // It returns a nil character for an escape matching a set rather than a single character, and for a
 // named backreference, since neither has one value to report.
-func (w *walker) readEscape(index int) (*Character, int, bool) {
-	step, ok := regexsyntax.SkipPatternEscape(w.pattern, index, w.flags)
+func (walker *walker) readEscape(index int) (*Character, int, bool) {
+	step, ok := regexsyntax.SkipPatternEscape(walker.pattern, index, walker.flags)
 	if !ok {
 		return nil, index, false
 	}
 	end := index + step
-	if end > len(w.pattern) {
+	if end > len(walker.pattern) {
 		return nil, index, false
 	}
 
@@ -338,9 +338,9 @@ func (w *walker) readEscape(index int) (*Character, int, bool) {
 	// question a digit escape is two bytes whatever follows it. Reading the character is this
 	// package's job, so the span is extended here rather than by changing a scanner four other
 	// callers depend on. Without this, `\101` reports the letter A followed by two stray digits.
-	end = extendOctalEscape(w.pattern, index, end)
+	end = extendOctalEscape(walker.pattern, index, end)
 
-	text := w.pattern[index:end]
+	text := walker.pattern[index:end]
 	if len(text) < 2 {
 		return nil, end, true
 	}
@@ -360,7 +360,7 @@ func (w *walker) readEscape(index int) (*Character, int, bool) {
 		return nil, end, true
 	}
 
-	kind := w.kindFromSource(index, end)
+	kind := walker.kindFromSource(index, end)
 	value, ok := escapeValue(text, kind)
 	if !ok {
 		return nil, end, true

@@ -178,7 +178,7 @@ type preferArrowCallbackWalker struct {
 // walk visits a node and records on owner, the nearest enclosing function's frame, what the node uses.
 //
 // Mutates: owner the frame is the walk's record of its function, which judge reads once the body is walked
-func (w *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrowCallbackFrame) {
+func (walker *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrowCallbackFrame) {
 	if node == nil {
 		return
 	}
@@ -202,7 +202,7 @@ func (w *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrowCallb
 	case ast.KindIdentifier:
 		// `arguments` belongs to the nearest enclosing function, which is exactly what `owner` is.
 		if owner != nil && node.Text() == "arguments" && !preferArrowCallbackIsDeclarationName(node) &&
-			!preferArrowCallbackResolvesToADeclaration(w.ctx, node) {
+			!preferArrowCallbackResolvesToADeclaration(walker.ctx, node) {
 			owner.usesArguments = true
 		}
 	}
@@ -216,19 +216,19 @@ func (w *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrowCallb
 		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
 		ast.KindConstructor, ast.KindClassStaticBlockDeclaration:
 		opened = &preferArrowCallbackFrame{node: node}
-		w.frames = append(w.frames, opened)
+		walker.frames = append(walker.frames, opened)
 		nextOwner = opened
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child, nextOwner)
+		walker.walk(child, nextOwner)
 		return false
 	})
 
 	if opened != nil {
-		w.frames = w.frames[:len(w.frames)-1]
+		walker.frames = walker.frames[:len(walker.frames)-1]
 		if node.Kind == ast.KindFunctionExpression {
-			w.judge(node, opened)
+			walker.judge(node, opened)
 		}
 	}
 }
@@ -277,13 +277,13 @@ func preferArrowCallbackIsDeclarationName(node *ast.Node) bool {
 }
 
 // judge is upstream's `FunctionExpression:exit`.
-func (w *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArrowCallbackFrame) {
+func (walker *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArrowCallbackFrame) {
 	expression := node.AsFunctionExpression()
 	if expression == nil {
 		return
 	}
 
-	if w.settings.AllowNamedFunctions && expression.Name() != nil {
+	if walker.settings.AllowNamedFunctions && expression.Name() != nil {
 		return
 	}
 	// An arrow cannot be a generator, so there is nothing to convert to.
@@ -291,7 +291,7 @@ func (w *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArrowCall
 		return
 	}
 	// A function that calls itself by name needs that binding, which an arrow does not provide.
-	if preferArrowCallbackReferencesOwnName(w.ctx, node, expression) {
+	if preferArrowCallbackReferencesOwnName(walker.ctx, node, expression) {
 		return
 	}
 	// An arrow has no `arguments` binding either.
@@ -303,7 +303,7 @@ func (w *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArrowCall
 	if !callback.isCallback {
 		return
 	}
-	if w.settings.AllowUnboundThis && frame.usesThis && !callback.isLexicalThis {
+	if walker.settings.AllowUnboundThis && frame.usesThis && !callback.isLexicalThis {
 		return
 	}
 	if frame.usesSuper || frame.usesNewTarget {
@@ -313,11 +313,11 @@ func (w *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArrowCall
 	// The repair is withheld in five cases; see the rule's doc comment. Reporting without a fix is
 	// the subset that can be shown correct, which is what upstream does through a `fix` returning
 	// null.
-	if fix, ok := preferArrowCallbackFix(w.ctx, node, expression, frame, callback); ok {
-		w.ctx.ReportNodeWithFixes(node, messagePreferArrowCallbackPreferArrowCallback, fix...)
+	if fix, ok := preferArrowCallbackFix(walker.ctx, node, expression, frame, callback); ok {
+		walker.ctx.ReportNodeWithFixes(node, messagePreferArrowCallbackPreferArrowCallback, fix...)
 		return
 	}
-	w.ctx.ReportNode(node, messagePreferArrowCallbackPreferArrowCallback)
+	walker.ctx.ReportNode(node, messagePreferArrowCallbackPreferArrowCallback)
 }
 
 // preferArrowCallbackReferencesOwnName is upstream's

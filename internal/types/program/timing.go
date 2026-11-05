@@ -51,8 +51,8 @@ type RuleTiming struct {
 }
 
 // TotalCPU is what the rule cost altogether.
-func (r RuleTiming) TotalCPU() time.Duration {
-	return r.SetupCPU + r.ListenerCPU
+func (timing RuleTiming) TotalCPU() time.Duration {
+	return timing.SetupCPU + timing.ListenerCPU
 }
 
 // Timings collects per-rule cost across a run.
@@ -94,11 +94,11 @@ type Timings struct {
 }
 
 // workerMeter is the meter measuring into this collector, nil when nothing is.
-func (t *Timings) workerMeter() *workerMeter {
-	if t == nil {
+func (timings *Timings) workerMeter() *workerMeter {
+	if timings == nil {
 		return nil
 	}
-	return t.meter
+	return timings.meter
 }
 
 // CPUAccount is where a timed walk's CPU went, beyond the rules' own rows.
@@ -136,14 +136,14 @@ func NewTimings(ruleNames []string) *Timings {
 }
 
 // forRule returns the accumulator for a rule, creating it if the run added one late.
-func (t *Timings) forRule(name string) *RuleTiming {
-	if t == nil {
+func (timings *Timings) forRule(name string) *RuleTiming {
+	if timings == nil {
 		return nil
 	}
-	timing, known := t.byRule[name]
+	timing, known := timings.byRule[name]
 	if !known {
 		timing = &RuleTiming{Name: name}
-		t.byRule[name] = timing
+		timings.byRule[name] = timing
 	}
 	return timing
 }
@@ -152,22 +152,22 @@ func (t *Timings) forRule(name string) *RuleTiming {
 //
 // Workers measure locally and merge once under the mutex, the same way diagnostics and coverage
 // already do. Measuring through a shared lock would put lock contention into the walk being measured.
-func (t *Timings) merge(other *Timings) {
-	if t == nil || other == nil {
+func (timings *Timings) merge(other *Timings) {
+	if timings == nil || other == nil {
 		return
 	}
 	for family, cost := range other.sharedCPU {
-		t.sharedCPU[family] += cost
+		timings.sharedCPU[family] += cost
 	}
-	t.Account.WorkersCPU += other.Account.WorkersCPU
-	t.Account.WalkCPU += other.Account.WalkCPU
-	t.Account.InstrumentCPU += other.Account.InstrumentCPU
-	t.Account.Calls += other.Account.Calls
-	if t.Account.Unavailable == "" {
-		t.Account.Unavailable = other.Account.Unavailable
+	timings.Account.WorkersCPU += other.Account.WorkersCPU
+	timings.Account.WalkCPU += other.Account.WalkCPU
+	timings.Account.InstrumentCPU += other.Account.InstrumentCPU
+	timings.Account.Calls += other.Account.Calls
+	if timings.Account.Unavailable == "" {
+		timings.Account.Unavailable = other.Account.Unavailable
 	}
 	for name, source := range other.byRule {
-		target := t.forRule(name)
+		target := timings.forRule(name)
 		target.SetupCPU += source.SetupCPU
 		target.ListenerCPU += source.ListenerCPU
 		target.FilesListened += source.FilesListened
@@ -181,12 +181,12 @@ func (t *Timings) merge(other *Timings) {
 //
 // Sorted by cost so an outlier is obvious without arithmetic, with the name as a tiebreak so two
 // runs over the same tree produce the same order and a diff between them means something.
-func (t *Timings) Sorted() []RuleTiming {
-	if t == nil {
+func (timings *Timings) Sorted() []RuleTiming {
+	if timings == nil {
 		return nil
 	}
-	sorted := make([]RuleTiming, 0, len(t.byRule))
-	for _, timing := range t.byRule {
+	sorted := make([]RuleTiming, 0, len(timings.byRule))
+	for _, timing := range timings.byRule {
 		sorted = append(sorted, *timing)
 	}
 	sort.SliceStable(sorted, func(first, second int) bool {
@@ -199,20 +199,20 @@ func (t *Timings) Sorted() []RuleTiming {
 }
 
 // SharedCPU is what each family of cached derivations cost across the run, keyed by family.
-func (t *Timings) SharedCPU() map[string]time.Duration {
-	if t == nil {
+func (timings *Timings) SharedCPU() map[string]time.Duration {
+	if timings == nil {
 		return nil
 	}
-	return t.sharedCPU
+	return timings.sharedCPU
 }
 
 // TotalCPU is the summed cost of every rule.
-func (t *Timings) TotalCPU() time.Duration {
-	if t == nil {
+func (timings *Timings) TotalCPU() time.Duration {
+	if timings == nil {
 		return 0
 	}
 	var total time.Duration
-	for _, timing := range t.byRule {
+	for _, timing := range timings.byRule {
 		total += timing.TotalCPU()
 	}
 	return total
@@ -220,20 +220,20 @@ func (t *Timings) TotalCPU() time.Duration {
 
 // closeAccount bills the rest of the process's CPU during the walk, once every worker has merged.
 // processStart is the process's CPU when the walk began.
-func (t *Timings) closeAccount(processStart time.Duration, processKnown bool) {
-	if t == nil || t.Account.Unavailable != "" {
+func (timings *Timings) closeAccount(processStart time.Duration, processKnown bool) {
+	if timings == nil || timings.Account.Unavailable != "" {
 		return
 	}
 	if !processKnown {
-		t.Account.Unavailable = "the process's CPU could not be read"
+		timings.Account.Unavailable = "the process's CPU could not be read"
 		return
 	}
 	processEnd, known := processCPU()
 	if !known {
-		t.Account.Unavailable = "the process's CPU could not be read"
+		timings.Account.Unavailable = "the process's CPU could not be read"
 		return
 	}
-	t.Account.OtherCPU = max(processEnd-processStart-t.Account.WorkersCPU, 0)
+	timings.Account.OtherCPU = max(processEnd-processStart-timings.Account.WorkersCPU, 0)
 }
 
 // workerMeter measures one walk worker: its thread's CPU across the walk, and each call it makes into a
@@ -296,43 +296,43 @@ func startWorkerMeter(timings *Timings) *workerMeter {
 }
 
 // finish stops measuring the worker and unlocks its thread.
-func (w *workerMeter) finish() {
-	if w == nil {
+func (meter *workerMeter) finish() {
+	if meter == nil {
 		return
 	}
 	end, _ := threadCPU()
 	runtime.UnlockOSThread()
 
-	total := end - w.start
-	account := &w.timings.Account
+	total := end - meter.start
+	account := &meter.timings.Account
 	account.WorkersCPU += total
-	account.WalkCPU += max(total-w.outermost, 0)
-	account.InstrumentCPU += time.Duration(w.calls) * w.frameCost
-	account.Calls += w.calls
+	account.WalkCPU += max(total-meter.outermost, 0)
+	account.InstrumentCPU += time.Duration(meter.calls) * meter.frameCost
+	account.Calls += meter.calls
 }
 
 // open begins a frame.
-func (w *workerMeter) open() frame {
-	w.depth++
+func (meter *workerMeter) open() frame {
+	meter.depth++
 	now, _ := threadCPU()
-	return frame{start: now, nestedBefore: w.nested}
+	return frame{start: now, nestedBefore: meter.nested}
 }
 
 // close ends a frame and returns its own CPU: its delta, less the frames nested inside it and less what
 // measuring it cost. Never negative: a frame cheaper than the measurement's average cost is billed zero.
-func (w *workerMeter) close(opened frame) time.Duration {
+func (meter *workerMeter) close(opened frame) time.Duration {
 	now, _ := threadCPU()
 	delta := now - opened.start
-	inside := w.nested - opened.nestedBefore
+	inside := meter.nested - opened.nestedBefore
 
 	// The enclosing frame, if there is one, sees this whole delta as nested work.
-	w.nested = opened.nestedBefore + delta
-	w.depth--
-	if w.depth == 0 {
-		w.outermost += delta
+	meter.nested = opened.nestedBefore + delta
+	meter.depth--
+	if meter.depth == 0 {
+		meter.outermost += delta
 	}
-	w.calls++
-	return max(delta-inside-w.frameCost, 0)
+	meter.calls++
+	return max(delta-inside-meter.frameCost, 0)
 }
 
 // calibrateFrame measures what one measured call costs when the call does nothing: two clock reads and
@@ -355,24 +355,24 @@ func calibrateFrame() time.Duration {
 }
 
 // watchFills bills each of a file's cache fills to its derivation rather than to the rule that asked.
-func (w *workerMeter) watchFills(cache *rule.FileCache) {
-	if w == nil {
+func (meter *workerMeter) watchFills(cache *rule.FileCache) {
+	if meter == nil {
 		return
 	}
-	cache.SetAroundFill(w.aroundFill)
+	cache.SetAroundFill(meter.aroundFill)
 }
 
 // setup runs a rule's Run as a frame billed to the rule's setup. The close is deferred because Run can
 // panic and be recovered by the rule's containment, and the frames must still balance.
 //
 // Mutates: timing gains the CPU the rule's Run took, as its setup
-func (w *workerMeter) setup(timing *RuleTiming, run func()) {
-	if w == nil {
+func (meter *workerMeter) setup(timing *RuleTiming, run func()) {
+	if meter == nil {
 		run()
 		return
 	}
-	opened := w.open()
-	defer func() { timing.SetupCPU += w.close(opened) }()
+	opened := meter.open()
+	defer func() { timing.SetupCPU += meter.close(opened) }()
 	run()
 }
 
@@ -380,34 +380,34 @@ func (w *workerMeter) setup(timing *RuleTiming, run func()) {
 // meter it only calls the listener.
 //
 // Mutates: timing counts the node offered and gains the CPU the listener took
-func (w *workerMeter) call(timing *RuleTiming, listener func(node *ast.Node), node *ast.Node) {
-	if w == nil {
+func (meter *workerMeter) call(timing *RuleTiming, listener func(node *ast.Node), node *ast.Node) {
+	if meter == nil {
 		listener(node)
 		return
 	}
 	timing.NodesOffered++
-	opened := w.open()
-	defer func() { timing.ListenerCPU += w.close(opened) }()
+	opened := meter.open()
+	defer func() { timing.ListenerCPU += meter.close(opened) }()
 	listener(node)
 }
 
 // aroundFill runs one cache fill as a frame billed to its derivation's family: the key up to its first
 // colon, so `hir.Function:175:1001` counts toward `hir.Function`. The rule that asked is billed its
 // call less the fill, because the fill is a frame nested in its call.
-func (w *workerMeter) aroundFill(key string, fill func()) {
+func (meter *workerMeter) aroundFill(key string, fill func()) {
 	family := key
 	if colon := strings.IndexByte(key, ':'); colon >= 0 {
 		family = key[:colon]
 	}
-	opened := w.open()
-	defer func() { w.timings.sharedCPU[family] += w.close(opened) }()
+	opened := meter.open()
+	defer func() { meter.timings.sharedCPU[family] += meter.close(opened) }()
 	fill()
 }
 
 // SetForTest populates one rule's measured cost, for tests that need a known table without running
 // a program. Not used outside tests.
-func (t *Timings) SetForTest(name string, cost time.Duration, nodesOffered int) {
-	timing := t.forRule(name)
+func (timings *Timings) SetForTest(name string, cost time.Duration, nodesOffered int) {
+	timing := timings.forRule(name)
 	if timing == nil {
 		return
 	}
@@ -417,6 +417,6 @@ func (t *Timings) SetForTest(name string, cost time.Duration, nodesOffered int) 
 }
 
 // SetSharedForTest populates one family of shared derivations' cost, for tests. Not used outside tests.
-func (t *Timings) SetSharedForTest(family string, cost time.Duration) {
-	t.sharedCPU[family] += cost
+func (timings *Timings) SetSharedForTest(family string, cost time.Duration) {
+	timings.sharedCPU[family] += cost
 }

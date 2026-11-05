@@ -88,16 +88,16 @@ type lockedBuffer struct {
 	text  strings.Builder
 }
 
-func (b *lockedBuffer) Write(bytes []byte) (int, error) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	return b.text.Write(bytes)
+func (buffer *lockedBuffer) Write(bytes []byte) (int, error) {
+	buffer.mutex.Lock()
+	defer buffer.mutex.Unlock()
+	return buffer.text.Write(bytes)
 }
 
-func (b *lockedBuffer) String() string {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	return b.text.String()
+func (buffer *lockedBuffer) String() string {
+	buffer.mutex.Lock()
+	defer buffer.mutex.Unlock()
+	return buffer.text.String()
 }
 
 // TestAFileStillInTheFixPhaseIsNamedWhileItRuns: a file that outlasts the notice is named, with where to

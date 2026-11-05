@@ -421,8 +421,8 @@ type hookEvent struct {
 	position int
 }
 
-func (f *hookPathFacts) blockOf(call *ast.Node) (*control_flow_graph.Block[hookEvent], bool) {
-	block, found := f.blocks[call.Pos()]
+func (facts *hookPathFacts) blockOf(call *ast.Node) (*control_flow_graph.Block[hookEvent], bool) {
+	block, found := facts.blocks[call.Pos()]
 	return block, found
 }
 

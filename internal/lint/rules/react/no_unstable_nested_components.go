@@ -208,22 +208,22 @@ type unstableNestedState struct {
 // The order of the exceptions is upstream's order and it is load bearing: several of them overlap,
 // and `isDeclaredInsideProps` is computed before the component test because the message depends on
 // it even when component-hood is established by a different route.
-func (s *unstableNestedState) validate(node *ast.Node) {
+func (state *unstableNestedState) validate(node *ast.Node) {
 	if node == nil || node.Parent == nil {
 		return
 	}
 
-	isDeclaredInsideProps := s.isComponentInProp(node)
+	isDeclaredInsideProps := state.isComponentInProp(node)
 
-	if !s.isComponent[node] &&
-		!s.isFunctionComponentInsideClassComponent(node) &&
+	if !state.isComponent[node] &&
+		!state.isFunctionComponentInsideClassComponent(node) &&
 		!isDeclaredInsideProps {
 		return
 	}
 
 	switch {
 	// The `allowAsProps` option, and the render-prop exemption that applies regardless of it.
-	case isDeclaredInsideProps && (s.allowAsProps || s.isComponentInRenderProp(node)):
+	case isDeclaredInsideProps && (state.allowAsProps || state.isComponentInRenderProp(node)):
 		return
 
 	// A component created inside `items.map(...)` is a callback rather than a nested component.
@@ -234,24 +234,24 @@ func (s *unstableNestedState) validate(node *ast.Node) {
 
 	// A component returned from a hook is the hook's product, not the render's. This also covers
 	// the `() => null` cleanup an effect returns.
-	case s.isReturnStatementOfHook(node):
+	case state.isReturnStatementOfHook(node):
 		return
 
 	// An object whose key is a render prop holds a renderer rather than a nested component.
-	case s.isDirectValueOfRenderProperty(node):
+	case state.isDirectValueOfRenderProperty(node):
 		return
 
 	// A class component nested in a render method is reported through the class itself, so the
 	// render method must not report it a second time.
-	case s.isInsideRenderMethod(node):
+	case state.isInsideRenderMethod(node):
 		return
 
 	// A detected "component" that returns no JSX is a handler that happened to be capitalized.
-	case s.isStatelessComponentReturningNull(node):
+	case state.isStatelessComponentReturningNull(node):
 		return
 	}
 
-	parentComponentNode := s.closestComponentAncestor(node)
+	parentComponentNode := state.closestComponentAncestor(node)
 	if parentComponentNode == nil {
 		return
 	}
@@ -278,11 +278,11 @@ func (s *unstableNestedState) validate(node *ast.Node) {
 	// The enumerated callers are this file's own `KindSourceFile` walk and nothing else. If a
 	// second entry point is ever added, this verdict is void.
 	message := unstableNestedMessage(parentName)
-	if isDeclaredInsideProps && !s.allowAsProps {
+	if isDeclaredInsideProps && !state.allowAsProps {
 		message += componentAsPropsInfo
 	}
 
-	s.ctx.ReportNode(node, rule.Message{
+	state.ctx.ReportNode(node, rule.Message{
 		Id:          "unstableNestedComponent",
 		Description: message,
 	})
@@ -322,12 +322,12 @@ func unstableNestedMessage(parentName string) string {
 //
 // It is kept because it states upstream's `node.parent.type === 'Program'` stop at the line, which
 // is a readability claim rather than a behavioural one.
-func (s *unstableNestedState) closestComponentAncestor(node *ast.Node) *ast.Node {
+func (state *unstableNestedState) closestComponentAncestor(node *ast.Node) *ast.Node {
 	for current := semanticParentOf(node); current != nil; current = semanticParentOf(current) {
 		if current.Kind == ast.KindSourceFile {
 			return nil
 		}
-		if s.isComponent[current] {
+		if state.isComponent[current] {
 			return current
 		}
 	}
@@ -431,7 +431,7 @@ var hookNamePattern = regexp.MustCompile(`^use[A-Z0-9].*$`)
 // statement, and the closest enclosing call must have a callee whose name matches `use[A-Z0-9]`.
 // Upstream reads `callExpression.callee.name`, which is undefined for a member callee, so
 // `React.useCallback(() => ...)` does not satisfy this and is exempted by a different route.
-func (s *unstableNestedState) isReturnStatementOfHook(node *ast.Node) bool {
+func (state *unstableNestedState) isReturnStatementOfHook(node *ast.Node) bool {
 	parent := semanticParentOf(node)
 	if parent == nil || parent.Kind != ast.KindReturnStatement {
 		return false
@@ -453,13 +453,13 @@ func (s *unstableNestedState) isReturnStatementOfHook(node *ast.Node) bool {
 // isComponentInRenderProp is upstream's function of the same name.
 //
 // Three routes, checked in upstream's order.
-func (s *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
+func (state *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
 	parent := semanticParentOf(node)
 
 	// `{ renderFooter: () => <div /> }`, matched on the object key.
 	if parent != nil && parent.Kind == ast.KindPropertyAssignment {
 		if key := parent.AsPropertyAssignment().Name(); key != nil &&
-			key.Kind == ast.KindIdentifier && s.propNameMatches(key.Text()) {
+			key.Kind == ast.KindIdentifier && state.propNameMatches(key.Text()) {
 			return true
 		}
 	}
@@ -518,7 +518,7 @@ func (s *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
 		return false
 	}
 	propName := name.Text()
-	return s.propNameMatches(propName) || propName == "children"
+	return state.propNameMatches(propName) || propName == "children"
 }
 
 // isDirectValueOfRenderProperty is upstream's function of the same name.
@@ -526,7 +526,7 @@ func (s *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
 // Narrower than `isComponentInRenderProp`'s first route despite looking identical: this one is not
 // gated on the node being in a prop at all, so it exempts a bare `const rows = { render: () =>
 // <div /> }` written inside a component.
-func (s *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) bool {
+func (state *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) bool {
 	parent := semanticParentOf(node)
 	if parent == nil || parent.Kind != ast.KindPropertyAssignment {
 		return false
@@ -535,7 +535,7 @@ func (s *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) bool
 	if key == nil || key.Kind != ast.KindIdentifier {
 		return false
 	}
-	return s.propNameMatches(key.Text())
+	return state.propNameMatches(key.Text())
 }
 
 // isComponentInProp is upstream's function of the same name.
@@ -556,17 +556,17 @@ func (s *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) bool
 // That is the "never document a limit you did not measure" failure, arriving as a confident
 // paragraph rather than as a missing check, and it is recorded here because a future reader
 // comparing the helper's name against its body will have the same instinct.
-func (s *unstableNestedState) isComponentInProp(node *ast.Node) bool {
+func (state *unstableNestedState) isComponentInProp(node *ast.Node) bool {
 	if parent := semanticParentOf(node); parent != nil &&
 		parent.Kind == ast.KindPropertyAssignment {
-		return returnsJsx(s.ctx, node)
+		return returnsJsx(state.ctx, node)
 	}
 
 	attribute := closestMatchingAncestor(node, isJsxAttributeOfExpressionContainer)
 	if attribute == nil {
-		return s.isComponentInsideCreateElementProps(node)
+		return state.isComponentInsideCreateElementProps(node)
 	}
-	return returnsJsx(s.ctx, node)
+	return returnsJsx(state.ctx, node)
 }
 
 // isJsxAttributeOfExpressionContainer is upstream's matcher of the same name.
@@ -612,8 +612,8 @@ func isJsxAttributeOfExpressionContainer(node *ast.Node) bool {
 // component takes no part in this. Then it requires the closest enclosing object literal to be
 // exactly the second argument of the closest enclosing `createElement` call, which is the props
 // position. Object identity is the test upstream uses and node identity is the same test here.
-func (s *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node) bool {
-	if !s.isComponent[node] {
+func (state *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node) bool {
+	if !state.isComponent[node] {
 		return false
 	}
 
@@ -626,7 +626,7 @@ func (s *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node
 	// The cost of getting this wrong is not this rule's verdict: the walk recovers per file, so a
 	// panic here takes that file away from every rule in the tree.
 	call := closestMatchingAncestor(node, func(candidate *ast.Node) bool {
-		return candidate.Kind == ast.KindCallExpression && createElementCallCounts(s.ctx, candidate)
+		return candidate.Kind == ast.KindCallExpression && createElementCallCounts(state.ctx, candidate)
 	})
 	if call == nil {
 		return false
@@ -658,12 +658,12 @@ func (s *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node
 // It asks `getStatelessComponent(node)` again rather than reading the registry, because the
 // registry holds the anchor a component reports on and this question is about the node itself. A
 // `memo(() => null)` is in the registry under the call while this asks about the arrow.
-func (s *unstableNestedState) isStatelessComponentReturningNull(node *ast.Node) bool {
-	component, isStateless := statelessComponentFor(s.ctx, node, nil)
+func (state *unstableNestedState) isStatelessComponentReturningNull(node *ast.Node) bool {
+	component, isStateless := statelessComponentFor(state.ctx, node, nil)
 	if !isStateless {
 		return false
 	}
-	return !returnsJsx(s.ctx, component)
+	return !returnsJsx(state.ctx, component)
 }
 
 // isInsideRenderMethod is upstream's function of the same name, and here it is structurally
@@ -708,7 +708,7 @@ func (s *unstableNestedState) isStatelessComponentReturningNull(node *ast.Node) 
 // component nested in a render method, which is precisely the population this rule exists to
 // report. It made four of upstream's failing cases silent while all forty passing cases stayed
 // green, and only the corpus caught it.
-func (s *unstableNestedState) isInsideRenderMethod(node *ast.Node) bool {
+func (state *unstableNestedState) isInsideRenderMethod(node *ast.Node) bool {
 	// Upstream additionally requires the parent component to be a class, but the parent test above
 	// can never pass here, so the class test is not consulted. Both halves are named in the doc
 	// comment rather than written as dead code.
@@ -746,8 +746,8 @@ func (s *unstableNestedState) isInsideRenderMethod(node *ast.Node) bool {
 // Three probe shapes were built to find an input where it decides something here, a function
 // component in a render method, one in an ordinary method, and an arrow in a render method, and our
 // detection pass answers true for all three before this is consulted.
-func (s *unstableNestedState) isFunctionComponentInsideClassComponent(node *ast.Node) bool {
-	parentComponentNode := s.parentComponentOf(node)
+func (state *unstableNestedState) isFunctionComponentInsideClassComponent(node *ast.Node) bool {
+	parentComponentNode := state.parentComponentOf(node)
 	if parentComponentNode == nil {
 		return false
 	}
@@ -756,14 +756,14 @@ func (s *unstableNestedState) isFunctionComponentInsideClassComponent(node *ast.
 		return false
 	}
 
-	parentStateless := s.parentStatelessComponentOf(node)
+	parentStateless := state.parentStatelessComponentOf(node)
 	if parentStateless == nil {
 		return false
 	}
-	if _, isStateless := statelessComponentFor(s.ctx, parentStateless, nil); !isStateless {
+	if _, isStateless := statelessComponentFor(state.ctx, parentStateless, nil); !isStateless {
 		return false
 	}
-	return returnsJsx(s.ctx, node)
+	return returnsJsx(state.ctx, node)
 }
 
 // parentComponentOf is upstream's `getParentComponent`, which tries the class forms and then falls
@@ -810,7 +810,7 @@ func (s *unstableNestedState) isFunctionComponentInsideClassComponent(node *ast.
 //
 // The inclusive spelling is kept because it is what upstream does and the measurement above is
 // solid, not because the difference was shown to matter.
-func (s *unstableNestedState) parentComponentOf(node *ast.Node) *ast.Node {
+func (state *unstableNestedState) parentComponentOf(node *ast.Node) *ast.Node {
 	for current := node; current != nil; current = semanticParentOf(current) {
 		if isComponentClass(current) {
 			return current
@@ -819,7 +819,7 @@ func (s *unstableNestedState) parentComponentOf(node *ast.Node) *ast.Node {
 			return current
 		}
 	}
-	return s.parentStatelessComponentOf(node)
+	return state.parentStatelessComponentOf(node)
 }
 
 // parentStatelessComponentOf is upstream's `getParentStatelessComponent`, written as an AST walk.
@@ -831,11 +831,11 @@ func (s *unstableNestedState) parentComponentOf(node *ast.Node) *ast.Node {
 // The node itself is included, matching upstream. See `parentComponentOf` for the measurement:
 // ESLint's scope for a function-like node is the scope it creates, so the first thing upstream's
 // loop asks about is the node itself.
-func (s *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *ast.Node {
+func (state *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *ast.Node {
 	for current := node; current != nil; current = semanticParentOf(current) {
 		switch current.Kind {
 		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
-			if component, isStateless := statelessComponentFor(s.ctx, current, nil); isStateless {
+			if component, isStateless := statelessComponentFor(state.ctx, current, nil); isStateless {
 				return component
 			}
 		}

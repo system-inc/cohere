@@ -186,17 +186,19 @@ type MutableRange struct {
 }
 
 // IsSet reports whether a range was ever opened.
-func (r MutableRange) IsSet() bool { return r.Start != 0 || r.End != 0 }
+func (mutableRange MutableRange) IsSet() bool {
+	return mutableRange.Start != 0 || mutableRange.End != 0
+}
 
 // Contains reports whether an evaluation position lies inside the range.
 //
 // Half-open, matching React's `inRange`: the start is inside and the end is not. An unset range
 // contains nothing, which is the answer that keeps a caller from having to check IsSet first.
-func (r MutableRange) Contains(order static_single_assignment.EvaluationOrder) bool {
-	if !r.IsSet() {
+func (mutableRange MutableRange) Contains(order static_single_assignment.EvaluationOrder) bool {
+	if !mutableRange.IsSet() {
 		return false
 	}
-	return order >= r.Start && order < r.End
+	return order >= mutableRange.Start && order < mutableRange.End
 }
 
 // IsValid reports whether a range satisfies upstream's invariant.
@@ -204,11 +206,11 @@ func (r MutableRange) Contains(order static_single_assignment.EvaluationOrder) b
 // React's `validateMutableRange` asserts `(start === 0 && end === 0) || end > start`. A range that
 // is set but empty or inverted is a bug in whatever produced it, and upstream raises rather than
 // tolerating it.
-func (r MutableRange) IsValid() bool {
-	if !r.IsSet() {
+func (mutableRange MutableRange) IsValid() bool {
+	if !mutableRange.IsSet() {
 		return true
 	}
-	return r.End > r.Start
+	return mutableRange.End > mutableRange.Start
 }
 
 // RangeGap names a range-widening rule this pass cannot apply, for a caller that needs to know.
@@ -268,34 +270,34 @@ type MutableRanges struct {
 }
 
 // Get returns a value's range, or the unset range when this pass never opened one.
-func (m *MutableRanges) Get(id static_single_assignment.IdentifierId) MutableRange {
-	if m == nil || m.ranges == nil {
+func (ranges *MutableRanges) Get(id static_single_assignment.IdentifierId) MutableRange {
+	if ranges == nil || ranges.ranges == nil {
 		return MutableRange{}
 	}
-	return m.ranges[id]
+	return ranges.ranges[id]
 }
 
 // Len reports how many values have a range, for measurement.
-func (m *MutableRanges) Len() int {
-	if m == nil {
+func (ranges *MutableRanges) Len() int {
+	if ranges == nil {
 		return 0
 	}
-	return len(m.ranges)
+	return len(ranges.ranges)
 }
 
 // Contains reports whether a value is still being written at an evaluation position.
 //
 // This is React's `inRange` reached through the table. Half-open, and false for an unset range.
-func (m *MutableRanges) Contains(id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder) bool {
-	return m.Get(id).Contains(order)
+func (ranges *MutableRanges) Contains(id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder) bool {
+	return ranges.Get(id).Contains(order)
 }
 
 // Set writes a range, creating the table lazily.
-func (m *MutableRanges) Set(id static_single_assignment.IdentifierId, r MutableRange) {
-	if m.ranges == nil {
-		m.ranges = map[static_single_assignment.IdentifierId]MutableRange{}
+func (ranges *MutableRanges) Set(id static_single_assignment.IdentifierId, r MutableRange) {
+	if ranges.ranges == nil {
+		ranges.ranges = map[static_single_assignment.IdentifierId]MutableRange{}
 	}
-	m.ranges[id] = r
+	ranges.ranges[id] = r
 }
 
 // InferMutableRanges computes the mutable range of every value in function, returning them as a
@@ -461,28 +463,28 @@ type definitionWalk[G Graph[F, B, P], F any, B comparable, P any] struct {
 }
 
 // visitPlace opens an lvalue's range in the first loop and a widened operand's start in the second.
-func (w *definitionWalk[G, F, B, P]) visitPlace(place *P, role static_single_assignment.Role) {
-	if w.lvalues {
+func (walk *definitionWalk[G, F, B, P]) visitPlace(place *P, role static_single_assignment.Role) {
+	if walk.lvalues {
 		if role == static_single_assignment.Define {
-			w.openLValue(w.graph.IdentifierOf(*place))
+			walk.openLValue(walk.graph.IdentifierOf(*place))
 		}
 		return
 	}
 	if role == static_single_assignment.Define {
 		return
 	}
-	id := w.graph.IdentifierOf(*place)
-	existing := w.result.Get(id)
-	if existing.End > w.order && existing.Start == 0 {
-		existing.Start = w.order
-		w.result.Set(id, existing)
+	id := walk.graph.IdentifierOf(*place)
+	existing := walk.result.Get(id)
+	if existing.End > walk.order && existing.Start == 0 {
+		existing.Start = walk.order
+		walk.result.Set(id, existing)
 	}
 }
 
 // openLValue opens the range of a value an instruction defines, the lvalue loop's body.
-func (w *definitionWalk[G, F, B, P]) openLValue(id static_single_assignment.IdentifierId) {
-	order := w.order
-	existing := w.result.Get(id)
+func (walk *definitionWalk[G, F, B, P]) openLValue(id static_single_assignment.IdentifierId) {
+	order := walk.order
+	existing := walk.result.Get(id)
 	changed := false
 	if existing.Start == 0 {
 		existing.Start = order
@@ -533,7 +535,7 @@ func (w *definitionWalk[G, F, B, P]) openLValue(id static_single_assignment.Iden
 		changed = true
 	}
 	if changed {
-		w.result.Set(id, existing)
+		walk.result.Set(id, existing)
 	}
 }
 
@@ -830,8 +832,8 @@ func newAliasingState() *aliasingState {
 
 // markImmutable records that a value is not Mutable or Context, so a conditional mutation of it
 // widens nothing.
-func (s *aliasingState) markImmutable(id static_single_assignment.IdentifierId, kind EffectValueKind) {
-	s.immutable[id] = kind
+func (state *aliasingState) markImmutable(id static_single_assignment.IdentifierId, kind EffectValueKind) {
+	state.immutable[id] = kind
 }
 
 // freeze marks an already-known abstract value as frozen.
@@ -841,33 +843,33 @@ func (s *aliasingState) markImmutable(id static_single_assignment.IdentifierId, 
 // initialized. This reduced state has no instruction-value sets, so node presence is its
 // initialization predicate. In particular, retaining an immutable bit for an absent node would
 // make a later Assign from that unresolved place frozen retroactively.
-func (s *aliasingState) freeze(id static_single_assignment.IdentifierId) bool {
-	return s.freezeWithSeen(id, map[static_single_assignment.IdentifierId]bool{})
+func (state *aliasingState) freeze(id static_single_assignment.IdentifierId) bool {
+	return state.freezeWithSeen(id, map[static_single_assignment.IdentifierId]bool{})
 }
 
-func (s *aliasingState) freezeWithSeen(id static_single_assignment.IdentifierId, seen map[static_single_assignment.IdentifierId]bool) bool {
+func (state *aliasingState) freezeWithSeen(id static_single_assignment.IdentifierId, seen map[static_single_assignment.IdentifierId]bool) bool {
 	if seen[id] {
 		return false
 	}
 	seen[id] = true
-	if _, initialized := s.nodes[id]; !initialized {
+	if _, initialized := state.nodes[id]; !initialized {
 		return false
 	}
-	if kind, immutable := s.immutable[id]; immutable && kind != EffectValueMaybeFrozen {
+	if kind, immutable := state.immutable[id]; immutable && kind != EffectValueMaybeFrozen {
 		return false
 	}
-	identity, shared := s.identities[id]
+	identity, shared := state.identities[id]
 	if !shared {
-		s.markImmutable(id, EffectValueFrozen)
-		for _, source := range s.freezeSources[id] {
-			s.freezeWithSeen(source, seen)
+		state.markImmutable(id, EffectValueFrozen)
+		for _, source := range state.freezeSources[id] {
+			state.freezeWithSeen(source, seen)
 		}
 		return true
 	}
-	for alias := range s.identityMembers[identity] {
-		s.markImmutable(alias, EffectValueFrozen)
-		for _, source := range s.freezeSources[alias] {
-			s.freezeWithSeen(source, seen)
+	for alias := range state.identityMembers[identity] {
+		state.markImmutable(alias, EffectValueFrozen)
+		for _, source := range state.freezeSources[alias] {
+			state.freezeWithSeen(source, seen)
 		}
 	}
 	return true
@@ -878,8 +880,8 @@ func (s *aliasingState) freezeWithSeen(id static_single_assignment.IdentifierId,
 // The question `state.mutate` asks: its conditional arm mutates for `Mutable` and `Context` and
 // returns `none` for everything else (`InferMutationAliasingEffects.ts:1489`). Absent means mutable,
 // which is the conservative direction for widening and the pre-existing behaviour of this pass.
-func (s *aliasingState) notMutable(id static_single_assignment.IdentifierId) bool {
-	_, present := s.immutable[id]
+func (state *aliasingState) notMutable(id static_single_assignment.IdentifierId) bool {
+	_, present := state.immutable[id]
 	return present
 }
 
@@ -888,12 +890,12 @@ func (s *aliasingState) notMutable(id static_single_assignment.IdentifierId) boo
 // Upstream's `CreateFrom` at `InferMutationAliasingEffects.ts:731` reads the source's kind and
 // initializes the target with it, rewriting the effect into a plain `Create` of that kind when the
 // source is Primitive, Global or Frozen. This is that propagation, in the one bit this pass reads.
-func (s *aliasingState) deriveImmutable(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
-	if kind, present := s.immutable[from]; present {
-		s.immutable[into] = kind
+func (state *aliasingState) deriveImmutable(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+	if kind, present := state.immutable[from]; present {
+		state.immutable[into] = kind
 		return
 	}
-	delete(s.immutable, into)
+	delete(state.immutable, into)
 }
 
 // derivePhiImmutable joins the known kinds after every predecessor has been evaluated.
@@ -948,25 +950,25 @@ func derivePhiImmutable[G Graph[F, B, P], F any, B comparable, P any](s *aliasin
 // `this.nodes.set(...)` in JavaScript both overwrite. A value redefined by a later instruction gets
 // a fresh node with no edges, which is correct in single-assignment form because the redefinition is
 // a different value.
-func (s *aliasingState) create(id static_single_assignment.IdentifierId, value aliasingNodeValue) {
-	s.nodes[id] = newAliasingNode(id, value)
-	delete(s.immutable, id)
-	delete(s.freezeSources, id)
-	s.detachIdentity(id)
-	s.nextIdentity++
-	s.identities[id] = s.nextIdentity
-	s.identityMembers[s.nextIdentity] = map[static_single_assignment.IdentifierId]struct{}{id: {}}
+func (state *aliasingState) create(id static_single_assignment.IdentifierId, value aliasingNodeValue) {
+	state.nodes[id] = newAliasingNode(id, value)
+	delete(state.immutable, id)
+	delete(state.freezeSources, id)
+	state.detachIdentity(id)
+	state.nextIdentity++
+	state.identities[id] = state.nextIdentity
+	state.identityMembers[state.nextIdentity] = map[static_single_assignment.IdentifierId]struct{}{id: {}}
 }
 
 // recordFreezeSources gives a phi or FunctionExpression the values React freezes through when
 // that abstract value is frozen later.
 //
 // The builder hands the sources over as a slice of their own, which the state keeps.
-func (s *aliasingState) recordFreezeSources(into static_single_assignment.IdentifierId, sources []static_single_assignment.IdentifierId) {
+func (state *aliasingState) recordFreezeSources(into static_single_assignment.IdentifierId, sources []static_single_assignment.IdentifierId) {
 	if len(sources) == 0 {
 		return
 	}
-	s.freezeSources[into] = sources
+	state.freezeSources[into] = sources
 }
 
 // shareIdentity makes into denote the same abstract value as from.
@@ -974,31 +976,31 @@ func (s *aliasingState) recordFreezeSources(into static_single_assignment.Identi
 // It is called only for Assign from a mutable/context source. Alias, Capture and MaybeAlias must
 // not call it: upstream records those as effects without changing the InstructionValues either
 // identifier denotes.
-func (s *aliasingState) shareIdentity(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+func (state *aliasingState) shareIdentity(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
 	if from == into {
 		return
 	}
-	identity, ok := s.identities[from]
+	identity, ok := state.identities[from]
 	if !ok {
 		return
 	}
-	s.detachIdentity(into)
-	s.identities[into] = identity
-	s.identityMembers[identity][into] = struct{}{}
+	state.detachIdentity(into)
+	state.identities[into] = identity
+	state.identityMembers[identity][into] = struct{}{}
 }
 
 // detachIdentity removes one identifier from its previous abstract value without disturbing the
 // aliases that still denote it. A later Create or Assign is a new definition of this identifier.
-func (s *aliasingState) detachIdentity(id static_single_assignment.IdentifierId) {
-	identity, ok := s.identities[id]
+func (state *aliasingState) detachIdentity(id static_single_assignment.IdentifierId) {
+	identity, ok := state.identities[id]
 	if !ok {
 		return
 	}
-	delete(s.identities, id)
-	members := s.identityMembers[identity]
+	delete(state.identities, id)
+	members := state.identityMembers[identity]
 	delete(members, id)
 	if len(members) == 0 {
-		delete(s.identityMembers, identity)
+		delete(state.identityMembers, identity)
 	}
 }
 
@@ -1008,12 +1010,12 @@ func (s *aliasingState) detachIdentity(id static_single_assignment.IdentifierId)
 // adds a FORWARD alias edge from -> into and records `created_from` on the target. Note the
 // asymmetry with `assign`: `create_from` does not check that the source node exists, because the
 // target is being created here regardless.
-func (s *aliasingState) createFrom(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
-	s.create(into, aliasingNodeObject)
-	if fromNode, ok := s.nodes[from]; ok {
+func (state *aliasingState) createFrom(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+	state.create(into, aliasingNodeObject)
+	if fromNode, ok := state.nodes[from]; ok {
 		fromNode.edges = append(fromNode.edges, aliasingEdge{index: index, node: into, kind: aliasingEdgeAlias})
 	}
-	if toNode, ok := s.nodes[into]; ok {
+	if toNode, ok := state.nodes[into]; ok {
 		insertBackEdge(toNode.createdFrom, &toNode.createdFromOrder, from, index)
 	}
 }
@@ -1023,9 +1025,9 @@ func (s *aliasingState) createFrom(index int, from static_single_assignment.Iden
 // Both endpoints must already exist or the edge is dropped entirely. That guard is upstream's and it
 // is the reason the entry values (params, context, returns) are created before the walk begins:
 // without those nodes, every edge touching a parameter would be silently discarded.
-func (s *aliasingState) assign(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
-	fromNode, fromOk := s.nodes[from]
-	toNode, toOk := s.nodes[into]
+func (state *aliasingState) assign(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+	fromNode, fromOk := state.nodes[from]
+	toNode, toOk := state.nodes[into]
 	if !fromOk || !toOk {
 		return
 	}
@@ -1037,9 +1039,9 @@ func (s *aliasingState) assign(index int, from static_single_assignment.Identifi
 //
 // A capture edge is followed BACKWARDS only by a transitive mutation. Mutating a container does not
 // mutate what it holds; mutating it transitively does.
-func (s *aliasingState) capture(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
-	fromNode, fromOk := s.nodes[from]
-	toNode, toOk := s.nodes[into]
+func (state *aliasingState) capture(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+	fromNode, fromOk := state.nodes[from]
+	toNode, toOk := state.nodes[into]
 	if !fromOk || !toOk {
 		return
 	}
@@ -1051,9 +1053,9 @@ func (s *aliasingState) capture(index int, from static_single_assignment.Identif
 //
 // Traversing this edge in either direction downgrades the mutation to Conditional, which is the
 // conservative direction: an uncertain alias must not turn into a definite mutation.
-func (s *aliasingState) maybeAlias(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
-	fromNode, fromOk := s.nodes[from]
-	toNode, toOk := s.nodes[into]
+func (state *aliasingState) maybeAlias(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+	fromNode, fromOk := state.nodes[from]
+	toNode, toOk := state.nodes[into]
 	if !fromOk || !toOk {
 		return
 	}
@@ -1138,7 +1140,7 @@ type mutationQueueEntry struct {
 // only because forward edges are appended in index order and therefore sorted. Reproduced as `break`
 // with the sortedness noted here, because a `continue` would be a silent behavior change on any
 // graph where the assumption failed.
-func (s *aliasingState) mutate(
+func (state *aliasingState) mutate(
 	ranges *MutableRanges,
 	index int,
 	start static_single_assignment.IdentifierId,
@@ -1164,7 +1166,7 @@ func (s *aliasingState) mutate(
 		}
 		seen[entry.place] = entry.kind
 
-		node, ok := s.nodes[entry.place]
+		node, ok := state.nodes[entry.place]
 		if !ok {
 			continue
 		}
@@ -1282,14 +1284,14 @@ type AliasingGraph struct {
 
 // Kind is the abstract kind the walk ended with for a value: an immutable kind, or Mutable for a
 // value it holds none for, which is also what a value the walk never reached reads as.
-func (g AliasingGraph) Kind(id static_single_assignment.IdentifierId) EffectValueKind {
-	return g.state.immutable[id]
+func (graph AliasingGraph) Kind(id static_single_assignment.IdentifierId) EffectValueKind {
+	return graph.state.immutable[id]
 }
 
 // MutationCount is how many mutations the walk kept, after the ones upstream drops (a conditional
 // mutation of a value that is not Mutable or Context).
-func (g AliasingGraph) MutationCount() int {
-	return len(g.mutations)
+func (graph AliasingGraph) MutationCount() int {
+	return len(graph.mutations)
 }
 
 // BuildAliasingGraph constructs the data-flow graph and returns it with the mutations to apply.
@@ -1614,8 +1616,8 @@ func BuildAliasingGraph[G Graph[F, B, P], F any, B comparable, P any](graph G, f
 // instruction means `Finalize` never reached the block, and widening to `0 + 1` there would write a
 // range end of 1 onto a value whose start is unset, producing a value that reads as mutable at
 // position 0 in a function where nothing has an order at all.
-func (g AliasingGraph) Widen(result *MutableRanges) {
-	for _, mutation := range g.mutations {
+func (graph AliasingGraph) Widen(result *MutableRanges) {
+	for _, mutation := range graph.mutations {
 		if mutation.end == 0 {
 			// `end` is `instruction.Order + 1`, so zero is impossible for a numbered instruction and
 			// this only fires on an unnumbered one, where `Order + 1` is 1. Guarded on the order
@@ -1626,7 +1628,7 @@ func (g AliasingGraph) Widen(result *MutableRanges) {
 			// Order was zero: unnumbered. See the doc comment.
 			continue
 		}
-		g.state.mutate(
+		graph.state.mutate(
 			result,
 			mutation.index,
 			mutation.place,

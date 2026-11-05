@@ -215,7 +215,7 @@ type noUnusedClassComponentMethodsState struct {
 // wider. A class declaring a component inside one of its methods is rare, and the alternative is
 // reproducing a bug that silently drops findings. `TestNoUnusedClassComponentMethodsNestedClass`
 // records both verdicts.
-func (s *noUnusedClassComponentMethodsState) collect(node *ast.Node) {
+func (state *noUnusedClassComponentMethodsState) collect(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -224,9 +224,9 @@ func (s *noUnusedClassComponentMethodsState) collect(node *ast.Node) {
 		if object, property := noUnusedClassComponentMethodsAccessParts(node); isThisExpression(object) {
 			if name, ok := noUnusedClassComponentMethodsStaticName(node, property); ok {
 				if noUnusedClassComponentMethodsIsAssignmentTarget(node) {
-					s.definitions = append(s.definitions, property)
+					state.definitions = append(state.definitions, property)
 				} else {
-					s.used[name] = true
+					state.used[name] = true
 				}
 			}
 		}
@@ -246,26 +246,26 @@ func (s *noUnusedClassComponentMethodsState) collect(node *ast.Node) {
 					key = binding.Name()
 				}
 				if name, ok := noUnusedClassComponentMethodsLiteralName(key); ok {
-					s.used[name] = true
+					state.used[name] = true
 				}
 			}
 		}
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		s.collect(child)
+		state.collect(child)
 		return false
 	})
 }
 
 // report emits one finding per definition whose name nothing used.
-func (s *noUnusedClassComponentMethodsState) report(ruleContext rule.Context, className string, lifecycle map[string]bool) {
-	for _, key := range s.definitions {
+func (state *noUnusedClassComponentMethodsState) report(ruleContext rule.Context, className string, lifecycle map[string]bool) {
+	for _, key := range state.definitions {
 		name, ok := noUnusedClassComponentMethodsLiteralName(key)
 		if !ok {
 			continue
 		}
-		if s.used[name] || noUnusedClassComponentMethodsLifecycle[name] || lifecycle[name] {
+		if state.used[name] || noUnusedClassComponentMethodsLifecycle[name] || lifecycle[name] {
 			continue
 		}
 

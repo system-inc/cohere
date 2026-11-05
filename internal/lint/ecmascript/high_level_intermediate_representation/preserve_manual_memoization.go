@@ -166,15 +166,15 @@ type manualMemoValidator struct {
 	findings         []PreserveManualMemoizationFinding
 }
 
-func (v *manualMemoValidator) walk(block ReactiveBlock) {
+func (validator *manualMemoValidator) walk(block ReactiveBlock) {
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveInstructionStatement:
-			v.visitInstruction(shape.Instruction)
+			validator.visitInstruction(shape.Instruction)
 
 		case *ReactiveScopeBlock:
-			v.walkedScopes[shape.Scope] = true
-			v.walk(shape.Instructions)
+			validator.walkedScopes[shape.Scope] = true
+			validator.walk(shape.Instructions)
 			// A pruned scope is recorded and NOT compared, which is upstream's split into two
 			// methods: `visitScope` runs `validateInferredDep` over the scope's dependencies,
 			// `visitPrunedScope` only adds the id to `prunedScopes`
@@ -190,34 +190,34 @@ func (v *manualMemoValidator) walk(block ReactiveBlock) {
 			// once the walk has left it, so a memo block inside it is checked against the scopes
 			// that closed before it rather than against its own enclosing scope.
 			if shape.Pruned {
-				v.prunedScopes[shape.Scope] = true
+				validator.prunedScopes[shape.Scope] = true
 				continue
 			}
 			// The inferred-versus-written comparison, after the body and before the scope is
 			// recorded live.
-			v.compareInferredDependencies(shape)
-			v.liveScopes[shape.Scope] = true
+			validator.compareInferredDependencies(shape)
+			validator.liveScopes[shape.Scope] = true
 			for _, absorbed := range shape.Merged {
 				// A scope absorbed by a merge survived under its survivor's identity, so the ids it
 				// carried are live too. This is the only consumer of `Merged`, and the reason the
 				// merge pass was owed.
-				v.liveScopes[absorbed] = true
+				validator.liveScopes[absorbed] = true
 			}
 
 		case *ReactiveTerminalStatement:
-			v.walkTerminal(shape)
+			validator.walkTerminal(shape)
 		}
 	}
 }
 
-func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction) {
+func (validator *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction) {
 	if instruction == nil || instruction.Value == nil {
 		return
 	}
 	// A sequence carries instructions inside a value; a memo marker can sit in one.
 	if sequence, isSequence := instruction.Value.(*ReactiveSequenceValue); isSequence {
 		for _, nested := range sequence.Instructions {
-			v.visitInstruction(nested)
+			validator.visitInstruction(nested)
 		}
 	}
 	plain, isPlain := instruction.Value.(*ReactiveInstructionValue)
@@ -246,9 +246,9 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 		//
 		// The verdict expires if that validation is ever ported: at that point this guard becomes
 		// live and must land with it, or every program failing exhaustive-deps reports twice.
-		v.openMemoBlocks[marker.ManualMemoId] = true
-		if marker.Deps != nil && v.sourceDeps != nil {
-			v.sourceDeps[marker.ManualMemoId] = marker.Deps
+		validator.openMemoBlocks[marker.ManualMemoId] = true
+		if marker.Deps != nil && validator.sourceDeps != nil {
+			validator.sourceDeps[marker.ManualMemoId] = marker.Deps
 		}
 		// A dependency belonging to a scope that neither survived nor was pruned may be mutated
 		// after this point, so the memoization cannot be trusted.
@@ -256,24 +256,24 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 			if dependency.Root.IsGlobal {
 				continue
 			}
-			v.check(dependency.Root.Place.Identifier, instruction.Order,
+			validator.check(dependency.Root.Place.Identifier, instruction.Order,
 				PreserveManualMemoizationDependencyMutable)
 		}
 
 	case *FinishMemoize:
-		if !v.openMemoBlocks[marker.ManualMemoId] {
+		if !validator.openMemoBlocks[marker.ManualMemoId] {
 			// Upstream returns early: a StartMemoize with invalid deps records no state, so its
 			// FinishMemoize has nothing to close and validating it would report against a block
 			// that was never opened.
 			return
 		}
-		delete(v.openMemoBlocks, marker.ManualMemoId)
-		delete(v.sourceDeps, marker.ManualMemoId)
+		delete(validator.openMemoBlocks, marker.ManualMemoId)
+		delete(validator.sourceDeps, marker.ManualMemoId)
 		if marker.Pruned {
 			// A pruned memo block was deliberately discarded, so there is nothing to preserve.
 			return
 		}
-		v.check(marker.Value.Identifier, instruction.Order,
+		validator.check(marker.Value.Identifier, instruction.Order,
 			PreserveManualMemoizationValueUnmemoized)
 
 	default:
@@ -283,16 +283,16 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 		// (:394-397) and every lvalue of a `StoreLocal`, `StoreContext` or `Destructure` (:361-371).
 		// Both reduce here to "what this instruction defines", because a value declared inside the
 		// callback is not something the developer could have named in a dependency array.
-		if len(v.openMemoBlocks) == 0 || v.declsInMemoBlock == nil {
+		if len(validator.openMemoBlocks) == 0 || validator.declsInMemoBlock == nil {
 			return
 		}
 		EachPlace(plain.Value, func(place Place, role PlaceRole) {
 			if role == PlaceRoleDefine {
-				v.declsInMemoBlock[declarationOf(v.function, place.Identifier)] = true
+				validator.declsInMemoBlock[declarationOf(validator.function, place.Identifier)] = true
 			}
 		})
 		if instruction.LValue != nil {
-			v.declsInMemoBlock[declarationOf(v.function, instruction.LValue.Identifier)] = true
+			validator.declsInMemoBlock[declarationOf(validator.function, instruction.LValue.Identifier)] = true
 		}
 	}
 }
@@ -305,19 +305,19 @@ func (v *manualMemoValidator) visitInstruction(instruction *ReactiveInstruction)
 //
 // The `StartMemoize` condition additionally accepts a pruned scope, because a pruned scope was a
 // deliberate decision rather than a lost one. The `FinishMemoize` condition does not.
-func (v *manualMemoValidator) check(identifier static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
+func (validator *manualMemoValidator) check(identifier static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
 	kind PreserveManualMemoizationKind) {
-	if v.scopes == nil {
+	if validator.scopes == nil {
 		return
 	}
-	scope := v.scopes.ScopeOf(identifier)
+	scope := validator.scopes.ScopeOf(identifier)
 	if scope == 0 {
 		return
 	}
-	if v.liveScopes[scope] {
+	if validator.liveScopes[scope] {
 		return
 	}
-	if kind == PreserveManualMemoizationDependencyMutable && v.prunedScopes[scope] {
+	if kind == PreserveManualMemoizationDependencyMutable && validator.prunedScopes[scope] {
 		return
 	}
 	// # A scope the walk never entered is one this condition cannot judge
@@ -340,8 +340,8 @@ func (v *manualMemoValidator) check(identifier static_single_assignment.Identifi
 	//
 	// Measured: false positives 31 to 25, golden unchanged at 25, and all three oracles byte
 	// identical -- `matched` 77, `ours` 120, `under` 5 fixtures / 7 scopes.
-	if kind == PreserveManualMemoizationDependencyMutable && !v.walkedScopes[scope] &&
-		!v.prunedByChain[scope] {
+	if kind == PreserveManualMemoizationDependencyMutable && !validator.walkedScopes[scope] &&
+		!validator.prunedByChain[scope] {
 		return
 	}
 	// # A component or hook parameter's scope is one it inherited, not one it earned
@@ -383,10 +383,10 @@ func (v *manualMemoValidator) check(identifier static_single_assignment.Identifi
 	// asks about one. Kept narrow because the two conditions ask different questions and an
 	// exemption argued from the dependency side should not silently answer the other.
 	if kind == PreserveManualMemoizationDependencyMutable &&
-		isKnownImmutableParameter(v.function, identifier) {
+		isKnownImmutableParameter(validator.function, identifier) {
 		return
 	}
-	v.findings = append(v.findings, PreserveManualMemoizationFinding{
+	validator.findings = append(validator.findings, PreserveManualMemoizationFinding{
 		Identifier: identifier,
 		Scope:      scope,
 		Order:      order,
@@ -395,34 +395,34 @@ func (v *manualMemoValidator) check(identifier static_single_assignment.Identifi
 }
 
 // walkTerminal descends into every block a terminal contains.
-func (v *manualMemoValidator) walkTerminal(statement *ReactiveTerminalStatement) {
+func (validator *manualMemoValidator) walkTerminal(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveIf:
-		v.walk(shape.Consequent)
+		validator.walk(shape.Consequent)
 		if shape.Alternate != nil {
-			v.walk(*shape.Alternate)
+			validator.walk(*shape.Alternate)
 		}
 	case *ReactiveSwitch:
 		for index := range shape.Cases {
 			if shape.Cases[index].Block != nil {
-				v.walk(*shape.Cases[index].Block)
+				validator.walk(*shape.Cases[index].Block)
 			}
 		}
 	case *ReactiveFor:
-		v.walk(shape.Loop)
+		validator.walk(shape.Loop)
 	case *ReactiveForOf:
-		v.walk(shape.Loop)
+		validator.walk(shape.Loop)
 	case *ReactiveForIn:
-		v.walk(shape.Loop)
+		validator.walk(shape.Loop)
 	case *ReactiveWhile:
-		v.walk(shape.Loop)
+		validator.walk(shape.Loop)
 	case *ReactiveDoWhile:
-		v.walk(shape.Loop)
+		validator.walk(shape.Loop)
 	case *ReactiveLabelTerminal:
-		v.walk(shape.Block)
+		validator.walk(shape.Block)
 	case *ReactiveTry:
-		v.walk(shape.Block)
-		v.walk(shape.Handler)
+		validator.walk(shape.Block)
+		validator.walk(shape.Handler)
 	}
 }
 
@@ -550,16 +550,16 @@ func ForEachFunctionLike(root *ast.Node, visit func(*ast.Node)) {
 // A dependency that cannot be normalized is skipped rather than reported. Upstream raises an
 // invariant there; see `NormalizeInferredDependency` for why declining is the honest answer in this
 // tree.
-func (v *manualMemoValidator) compareInferredDependencies(scope *ReactiveScopeBlock) {
-	if scope == nil || v.dependencies == nil || len(v.sourceDeps) == 0 {
+func (validator *manualMemoValidator) compareInferredDependencies(scope *ReactiveScopeBlock) {
+	if scope == nil || validator.dependencies == nil || len(validator.sourceDeps) == 0 {
 		return
 	}
 	// Upstream reads `state.manualMemoState`, a single open block, because it asserts memo blocks do
 	// not nest. This walks whichever blocks are open; with the non-nesting invariant holding there
 	// is exactly one, and if it ever does not hold this compares against each rather than silently
 	// picking one.
-	for id, sourceDependencies := range v.sourceDeps {
-		if !v.openMemoBlocks[id] {
+	for id, sourceDependencies := range validator.sourceDeps {
+		if !validator.openMemoBlocks[id] {
 			continue
 		}
 		// An empty source array is not "nothing to compare against", it is the strictest thing a
@@ -572,13 +572,13 @@ func (v *manualMemoValidator) compareInferredDependencies(scope *ReactiveScopeBl
 		// `Deps`, so the block does get an entry in `sourceDeps` and the loop below reaches it.
 		// The matching check falls through with `matched` false for every inferred dependency,
 		// which is the intended answer.
-		for _, inferred := range v.dependencies.DependenciesOf(scope.Scope) {
-			normalized, ok := v.dependencies.NormalizeInferredDependency(v.function, inferred)
+		for _, inferred := range validator.dependencies.DependenciesOf(scope.Scope) {
+			normalized, ok := validator.dependencies.NormalizeInferredDependency(validator.function, inferred)
 			if !ok {
 				continue
 			}
 			if !normalized.Root.IsGlobal &&
-				v.declsInMemoBlock[declarationOf(v.function, normalized.Root.Place.Identifier)] {
+				validator.declsInMemoBlock[declarationOf(validator.function, normalized.Root.Place.Identifier)] {
 				continue
 			}
 			matched := false
@@ -591,7 +591,7 @@ func (v *manualMemoValidator) compareInferredDependencies(scope *ReactiveScopeBl
 			if matched {
 				continue
 			}
-			v.findings = append(v.findings, PreserveManualMemoizationFinding{
+			validator.findings = append(validator.findings, PreserveManualMemoizationFinding{
 				Identifier: inferred.Identifier,
 				Scope:      scope.Scope,
 				Kind:       PreserveManualMemoizationValueUnmemoized,

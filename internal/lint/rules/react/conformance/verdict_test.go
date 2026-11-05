@@ -13,8 +13,8 @@ import (
 // every fixture expects at least one.
 type declineEverything struct{ reason string }
 
-func (d declineEverything) Analyze(Fixture) (Result, error) {
-	return Result{}, &ErrUnsupported{Reason: d.reason}
+func (everything declineEverything) Analyze(Fixture) (Result, error) {
+	return Result{}, &ErrUnsupported{Reason: everything.reason}
 }
 
 // TestAggregatedScoreAgainstReactsOwnFixtures is the number this package exists to produce.

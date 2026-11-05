@@ -128,12 +128,12 @@ type MergedScopeIdentity struct {
 
 // GroupOf returns the merged group a pre-merge scope belongs to, or the scope itself when the merge
 // left it alone.
-func (m MergedScopeIdentity) GroupOf(scope ScopeId) ScopeId {
+func (identity MergedScopeIdentity) GroupOf(scope ScopeId) ScopeId {
 	if scope == 0 {
 		return 0
 	}
-	if m.Merged != nil {
-		if group := m.Merged.GroupOf(scope); group != 0 {
+	if identity.Merged != nil {
+		if group := identity.Merged.GroupOf(scope); group != 0 {
 			return group
 		}
 	}
@@ -142,14 +142,14 @@ func (m MergedScopeIdentity) GroupOf(scope ScopeId) ScopeId {
 
 // RangeOf returns the surviving scope's range, preferring the merged table and falling back to the
 // aligned one for a scope the merge did not touch.
-func (m MergedScopeIdentity) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
-	if m.Merged != nil {
-		if bounds := m.Merged.RangeOf(scope); bounds.Start != bounds.End {
+func (identity MergedScopeIdentity) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
+	if identity.Merged != nil {
+		if bounds := identity.Merged.RangeOf(scope); bounds.Start != bounds.End {
 			return bounds
 		}
 	}
-	if m.Aligned != nil {
-		return m.Aligned.RangeOf(scope)
+	if identity.Aligned != nil {
+		return identity.Aligned.RangeOf(scope)
 	}
 	return mutation_aliasing.MutableRange{}
 }
@@ -645,10 +645,10 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 //
 // Lives here rather than in high_level_intermediate_representation.go because this is the only pass that replaces the block slice
 // wholesale; lowering appends through `NewBlock`, which maintains the index as it goes.
-func (f *Function) reindexBlocks() {
-	f.blocksById = make(map[static_single_assignment.BlockId]*BasicBlock, len(f.Blocks))
-	for _, block := range f.Blocks {
-		f.blocksById[block.Id] = block
+func (function *Function) reindexBlocks() {
+	function.blocksById = make(map[static_single_assignment.BlockId]*BasicBlock, len(function.Blocks))
+	for _, block := range function.Blocks {
+		function.blocksById[block.Id] = block
 	}
 }
 

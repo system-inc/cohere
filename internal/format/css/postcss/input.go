@@ -94,27 +94,27 @@ func newInput(css string) *input {
 
 // slice is css.slice(start, end) on unit offsets, clamped and emptied the way String.prototype.slice
 // treats a reversed or out-of-range pair.
-func (in *input) slice(start int, end int) string {
-	length := len(in.units)
+func (input *input) slice(start int, end int) string {
+	length := len(input.units)
 	start = min(max(start, 0), length)
 	end = min(max(end, 0), length)
 	if end <= start {
 		return ""
 	}
-	return in.css[in.byteOffsets[start]:in.byteOffsets[end]]
+	return input.css[input.byteOffsets[start]:input.byteOffsets[end]]
 }
 
 // byteOffset converts a unit offset to bytes. postcss can report an offset past the end (freeSemicolon
 // adds the length of the spaces before a semicolon to the semicolon's own offset), so an offset beyond
 // the text keeps its distance past the end, the spaces it counts being one byte each.
-func (in *input) byteOffset(offset int) int {
+func (input *input) byteOffset(offset int) int {
 	if offset < 0 {
 		return offset
 	}
-	if offset > len(in.units) {
-		return len(in.css) + offset - len(in.units)
+	if offset > len(input.units) {
+		return len(input.css) + offset - len(input.units)
 	}
-	return in.byteOffsets[offset]
+	return input.byteOffsets[offset]
 }
 
 // lineAndColumn is the result of fromOffset: { col, line }.
@@ -125,8 +125,8 @@ type lineAndColumn struct {
 
 // fromOffset finds the line holding a unit offset by binary search over lineToIndex, as upstream does,
 // with an offset past the last line's start landing on the last line.
-func (in *input) fromOffset(offset int) lineAndColumn {
-	lineToIndex := in.lineToIndex
+func (input *input) fromOffset(offset int) lineAndColumn {
+	lineToIndex := input.lineToIndex
 	lastLine := lineToIndex[len(lineToIndex)-1]
 
 	low := 0
@@ -154,48 +154,48 @@ func (in *input) fromOffset(offset int) lineAndColumn {
 }
 
 // fromLineAndColumn is the unit offset of a one-based line and column.
-func (in *input) fromLineAndColumn(line int, column int) int {
+func (input *input) fromLineAndColumn(line int, column int) int {
 	index := 0
-	if line-1 >= 0 && line-1 < len(in.lineToIndex) {
-		index = in.lineToIndex[line-1]
+	if line-1 >= 0 && line-1 < len(input.lineToIndex) {
+		index = input.lineToIndex[line-1]
 	}
 	return index + column - 1
 }
 
 // errorAt is input.error(message, offset): a position given as one unit offset.
-func (in *input) errorAt(message string, offset int) *CssSyntaxError {
-	position := in.fromOffset(offset)
+func (input *input) errorAt(message string, offset int) *CssSyntaxError {
+	position := input.fromOffset(offset)
 	return &CssSyntaxError{
 		Reason: message,
 		Line:   position.line,
 		Column: position.column,
-		Offset: in.byteOffset(offset),
+		Offset: input.byteOffset(offset),
 	}
 }
 
 // errorBetween is input.error(message, { offset: start }, { offset: end }): a range of unit offsets.
-func (in *input) errorBetween(message string, start int, end int) *CssSyntaxError {
-	startPosition := in.fromOffset(start)
-	endPosition := in.fromOffset(end)
+func (input *input) errorBetween(message string, start int, end int) *CssSyntaxError {
+	startPosition := input.fromOffset(start)
+	endPosition := input.fromOffset(end)
 	return &CssSyntaxError{
 		Reason:    message,
 		Line:      startPosition.line,
 		Column:    startPosition.column,
 		EndLine:   endPosition.line,
 		EndColumn: endPosition.column,
-		Offset:    in.byteOffset(start),
-		EndOffset: in.byteOffset(end),
+		Offset:    input.byteOffset(start),
+		EndOffset: input.byteOffset(end),
 		HasEnd:    true,
 	}
 }
 
 // errorAtLineAndColumn is input.error(message, line, column).
-func (in *input) errorAtLineAndColumn(message string, line int, column int) *CssSyntaxError {
+func (input *input) errorAtLineAndColumn(message string, line int, column int) *CssSyntaxError {
 	return &CssSyntaxError{
 		Reason: message,
 		Line:   line,
 		Column: column,
-		Offset: in.byteOffset(in.fromLineAndColumn(line, column)),
+		Offset: input.byteOffset(input.fromLineAndColumn(line, column)),
 	}
 }
 

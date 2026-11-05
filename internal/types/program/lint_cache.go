@@ -279,8 +279,8 @@ type LintCacheFinding struct {
 }
 
 // MessageKey is the honest identity of a message: the pair, never the id alone.
-func (f LintCacheFinding) MessageKey() (string, string) {
-	return f.RuleName, f.MessageId
+func (finding LintCacheFinding) MessageKey() (string, string) {
+	return finding.RuleName, finding.MessageId
 }
 
 // HashContent is the key a cached entry is stored under.
@@ -354,16 +354,16 @@ const lintCacheVersion = 10
 //
 // A hit needs the key, the path, the bytes and the applied rule list all to match. The index is built
 // on first use, so a caller that loads a cache and discards it on a key mismatch never pays for it.
-func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha256.Size]byte, rules []string) (LintCacheEntry, bool) {
-	if c == nil || c.Key != key {
+func (cache *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha256.Size]byte, rules []string) (LintCacheEntry, bool) {
+	if cache == nil || cache.Key != key {
 		return LintCacheEntry{}, false
 	}
-	c.ensureIndex()
-	position, found := c.index[path]
+	cache.ensureIndex()
+	position, found := cache.index[path]
 	if !found {
 		return LintCacheEntry{}, false
 	}
-	entry := c.Entries[position]
+	entry := cache.Entries[position]
 	// The path matching is not enough. A file whose contents changed has a stale entry under the same
 	// path, and returning it is precisely the silent failure this cache must not have.
 	if entry.ContentHash != contentHash || !equalStrings(entry.Rules, rules) {
@@ -374,23 +374,23 @@ func (c *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha2
 
 // holds reports whether the cache has an entry for path at all, matching or not, so a miss can say whether the
 // file was never recorded or recorded at other bytes. The index must already be built (ensureIndex).
-func (c *LintCache) holds(path string) bool {
-	if c == nil || c.index == nil {
+func (cache *LintCache) holds(path string) bool {
+	if cache == nil || cache.index == nil {
 		return false
 	}
-	_, found := c.index[path]
+	_, found := cache.index[path]
 	return found
 }
 
 // ensureIndex builds the path index if it is missing. A caller about to share the cache across
 // goroutines calls it first, since building it lazily inside concurrent lookups would race.
-func (c *LintCache) ensureIndex() {
-	if c.index != nil {
+func (cache *LintCache) ensureIndex() {
+	if cache.index != nil {
 		return
 	}
-	c.index = make(map[string]int, len(c.Entries))
-	for position := range c.Entries {
-		c.index[c.Entries[position].Path] = position
+	cache.index = make(map[string]int, len(cache.Entries))
+	for position := range cache.Entries {
+		cache.index[cache.Entries[position].Path] = position
 	}
 }
 
@@ -417,25 +417,25 @@ func equalStrings(first []string, second []string) bool {
 // because most files are clean, and an entry saying "these bytes produce nothing" is a real answer.
 // Skipping it would make a clean file indistinguishable from an unknown one, which is the exact
 // ambiguity Lookup's second return exists to destroy.
-func (c *LintCache) Store(entry LintCacheEntry) {
-	if c == nil {
+func (cache *LintCache) Store(entry LintCacheEntry) {
+	if cache == nil {
 		return
 	}
-	if c.index != nil {
-		if position, found := c.index[entry.Path]; found {
-			c.Entries[position] = entry
+	if cache.index != nil {
+		if position, found := cache.index[entry.Path]; found {
+			cache.Entries[position] = entry
 			return
 		}
 	}
-	for position := range c.Entries {
-		if c.Entries[position].Path == entry.Path {
-			c.Entries[position] = entry
-			c.index = nil
+	for position := range cache.Entries {
+		if cache.Entries[position].Path == entry.Path {
+			cache.Entries[position] = entry
+			cache.index = nil
 			return
 		}
 	}
-	c.Entries = append(c.Entries, entry)
-	c.index = nil
+	cache.Entries = append(cache.Entries, entry)
+	cache.index = nil
 }
 
 // CacheClasses splits a rule set five ways, in order: rules whose findings depend only on the file's

@@ -59,8 +59,8 @@ func isOptionalChainLink(node *ast.Node) bool {
 // alternate when first entering an optional subtree of the ast: if this is a child of an optional
 // node, we use the alternate created by the parent". Both links of `a?.b?.c` short circuit to the
 // same place, and creating a second alternate would lower them as two independent chains.
-func (b *builder) lowerOptionalChain(node *ast.Node, parentAlternate *BasicBlock) Place {
-	result := b.newTemporary(node)
+func (builder *builder) lowerOptionalChain(node *ast.Node, parentAlternate *BasicBlock) Place {
+	result := builder.newTemporary(node)
 
 	object, name, computed, tests := optionalChainParts(node)
 
@@ -77,10 +77,10 @@ func (b *builder) lowerOptionalChain(node *ast.Node, parentAlternate *BasicBlock
 	// with identical ranges, which the reactive-tree builder cannot express as nested blocks, so
 	// only one reached the tree and `PruneNonEscapingScopes` removed it.
 	continuationKind := BlockKindValue
-	if b.currentBlock != nil {
-		continuationKind = b.currentBlock.Kind
+	if builder.currentBlock != nil {
+		continuationKind = builder.currentBlock.Kind
 	}
-	continuation := b.reserve(continuationKind)
+	continuation := builder.reserve(continuationKind)
 
 	// The alternate is filled before the chain is entered so a nested link can be handed the same
 	// one, and it is reached only from the branch below rather than by falling into it. Filling it
@@ -90,17 +90,17 @@ func (b *builder) lowerOptionalChain(node *ast.Node, parentAlternate *BasicBlock
 	// `Optional` and no `Branch`, where upstream produces two of each.
 	alternate := parentAlternate
 	if alternate == nil {
-		alternate = b.reserve(BlockKindValue)
-		saved := b.currentBlock
-		b.enter(alternate)
-		undefined := b.emit(&Primitive{Value: nil}, node)
-		b.emit(&StoreLocal{LValue: result, Value: undefined, Kind: InstructionKindConst}, node)
-		b.gotoBlock(continuation.Id, GotoVariantBreak)
-		b.enter(saved)
+		alternate = builder.reserve(BlockKindValue)
+		saved := builder.currentBlock
+		builder.enter(alternate)
+		undefined := builder.emit(&Primitive{Value: nil}, node)
+		builder.emit(&StoreLocal{LValue: result, Value: undefined, Kind: InstructionKindConst}, node)
+		builder.gotoBlock(continuation.Id, GotoVariantBreak)
+		builder.enter(saved)
 	}
 
-	testBlock := b.reserve(BlockKindValue)
-	b.terminateAndEnter(&Optional{
+	testBlock := builder.reserve(BlockKindValue)
+	builder.terminateAndEnter(&Optional{
 		Optional:    tests,
 		Test:        testBlock.Id,
 		Fallthrough: continuation.Id,
@@ -113,35 +113,35 @@ func (b *builder) lowerOptionalChain(node *ast.Node, parentAlternate *BasicBlock
 	// is a shape `matchOptionalTestBlock` rejects outright.
 	var objectPlace Place
 	if isOptionalChainLink(object) {
-		objectPlace = b.lowerOptionalChain(object, alternate)
+		objectPlace = builder.lowerOptionalChain(object, alternate)
 	} else {
-		objectPlace = b.lowerExpressionToPlace(object)
+		objectPlace = builder.lowerExpressionToPlace(object)
 	}
-	consequent := b.reserve(BlockKindValue)
-	b.terminateWith(&Branch{
+	consequent := builder.reserve(BlockKindValue)
+	builder.terminateWith(&Branch{
 		Test:        objectPlace,
 		Consequent:  consequent.Id,
 		Alternate:   alternate.Id,
 		Fallthrough: continuation.Id,
 	})
 
-	b.enter(consequent)
+	builder.enter(consequent)
 	var loaded Place
 	if computed != nil {
-		property := b.lowerExpressionToPlace(computed)
-		loaded = b.emit(&ComputedLoad{Object: objectPlace, Property: property}, node)
+		property := builder.lowerExpressionToPlace(computed)
+		loaded = builder.emit(&ComputedLoad{Object: objectPlace, Property: property}, node)
 	} else {
-		loaded = b.emit(&PropertyLoad{Object: objectPlace, Property: name}, node)
+		loaded = builder.emit(&PropertyLoad{Object: objectPlace, Property: name}, node)
 	}
 	// `StoreLocal` rather than a load into the result, and the alternate matches. This is the shape
 	// `matchOptionalTestBlock` keys on (`CollectOptionalChainDependencies.ts:176`): a consequent of
 	// exactly `PropertyLoad` then `StoreLocal` ending in `Goto{Break}`, against an alternate of
 	// exactly `Primitive` then `StoreLocal`. A load there would be rejected by the matcher and the
 	// chain would go uncollected, which is the whole reason this lowering exists.
-	b.emit(&StoreLocal{LValue: result, Value: loaded, Kind: InstructionKindConst}, node)
-	b.gotoBlock(continuation.Id, GotoVariantBreak)
+	builder.emit(&StoreLocal{LValue: result, Value: loaded, Kind: InstructionKindConst}, node)
+	builder.gotoBlock(continuation.Id, GotoVariantBreak)
 
-	b.enter(continuation)
+	builder.enter(continuation)
 	return result
 }
 

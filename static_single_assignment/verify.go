@@ -46,7 +46,7 @@ type SSAViolation struct {
 	Detail string
 }
 
-func (v SSAViolation) String() string { return v.Detail }
+func (violation SSAViolation) String() string { return violation.Detail }
 
 // SSAViolationKind is which invariant a violation breaks: one of the two single assignment states, or
 // the precondition Construct rests on.
@@ -435,12 +435,12 @@ func entryPredecessors[G Graph[F, B, P], F any, B comparable, P any](graph G, fu
 // Dominates reports whether every path from the entry to block passes through dominator.
 //
 // A block dominates itself, the standard convention.
-func (t *Dominance) Dominates(dominator, block BlockId) bool {
-	target, ok := t.position[dominator]
+func (dominance *Dominance) Dominates(dominator, block BlockId) bool {
+	target, ok := dominance.position[dominator]
 	if !ok {
 		return false
 	}
-	index, ok := t.position[block]
+	index, ok := dominance.position[block]
 	if !ok {
 		return false
 	}
@@ -448,9 +448,9 @@ func (t *Dominance) Dominates(dominator, block BlockId) bool {
 		if index == target {
 			return true
 		}
-		if index == 0 || t.immediate[index] == -1 {
+		if index == 0 || dominance.immediate[index] == -1 {
 			return false
 		}
-		index = t.immediate[index]
+		index = dominance.immediate[index]
 	}
 }

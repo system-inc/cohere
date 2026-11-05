@@ -226,11 +226,11 @@ type MergedScopes struct {
 // Upstream's `joinedScopes.find(originalScope)` with its `?? originalScope` fallback folded in, so
 // a caller does not re-derive it. A scope this pass never saw answers itself, which is the answer
 // that lets a caller key a map on the result without first asking whether it merged.
-func (m *MergedScopes) GroupOf(scope ScopeId) ScopeId {
-	if m == nil || m.group == nil {
+func (scopes *MergedScopes) GroupOf(scope ScopeId) ScopeId {
+	if scopes == nil || scopes.group == nil {
 		return scope
 	}
-	if group, ok := m.group[scope]; ok {
+	if group, ok := scopes.group[scope]; ok {
 		return group
 	}
 	return scope
@@ -239,41 +239,41 @@ func (m *MergedScopes) GroupOf(scope ScopeId) ScopeId {
 // RangeOf returns a surviving scope's widened range, or the unset range for one that did not survive.
 //
 // Ask `GroupOf` first when holding a pre-merge id: a merged scope's range lives on its group.
-func (m *MergedScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
-	if m == nil || m.ranges == nil {
+func (scopes *MergedScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
+	if scopes == nil || scopes.ranges == nil {
 		return mutation_aliasing.MutableRange{}
 	}
-	return m.ranges[scope]
+	return scopes.ranges[scope]
 }
 
 // MembersOf returns every value belonging to a surviving scope, including the values that arrived
 // through a merge, sorted.
 //
 // The slice is the table's own and must not be modified by a caller.
-func (m *MergedScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
-	if m == nil || m.members == nil {
+func (scopes *MergedScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
+	if scopes == nil || scopes.members == nil {
 		return nil
 	}
-	return m.members[scope]
+	return scopes.members[scope]
 }
 
 // Ids returns the surviving scopes, in the input table's own order.
 //
 // Merged-away scopes are absent. Returned as a slice rather than by ranging a map so a caller gets
 // the same sequence every run.
-func (m *MergedScopes) Ids() []ScopeId {
-	if m == nil {
+func (scopes *MergedScopes) Ids() []ScopeId {
+	if scopes == nil {
 		return nil
 	}
-	return m.order
+	return scopes.order
 }
 
 // Len reports how many scopes survived, for measurement.
-func (m *MergedScopes) Len() int {
-	if m == nil {
+func (scopes *MergedScopes) Len() int {
+	if scopes == nil {
 		return 0
 	}
-	return len(m.order)
+	return len(scopes.order)
 }
 
 // Unions reports how many scopes were merged away, for measurement.
@@ -281,11 +281,11 @@ func (m *MergedScopes) Len() int {
 // This is `Len` subtracted from the input table's length, exposed directly because it is the number
 // the counterfactual in this file's comment is stated in and a test comparing the two spellings
 // needs it without recomputing.
-func (m *MergedScopes) Unions() int {
-	if m == nil {
+func (scopes *MergedScopes) Unions() int {
+	if scopes == nil {
 		return 0
 	}
-	return m.unions
+	return scopes.unions
 }
 
 // scopeSet is a union-find over ScopeId, mirroring upstream's `DisjointSet` including its
@@ -309,25 +309,25 @@ type scopeSet struct {
 // The first item becomes the representative when none of the items is already in the set. An empty
 // list is a no-op here; upstream raises an invariant on it, and the difference is deliberate for the
 // reason `DisjointSet.Union` records: the call sites build the list conditionally.
-func (d *scopeSet) union(items []ScopeId) {
+func (set *scopeSet) union(items []ScopeId) {
 	if len(items) == 0 {
 		return
 	}
-	if d.parent == nil {
-		d.parent = map[ScopeId]ScopeId{}
+	if set.parent == nil {
+		set.parent = map[ScopeId]ScopeId{}
 	}
 	first := items[0]
-	root, ok := d.find(first)
+	root, ok := set.find(first)
 	if !ok {
 		root = first
-		d.parent[first] = first
-		d.order = append(d.order, first)
+		set.parent[first] = first
+		set.order = append(set.order, first)
 	}
 	for _, item := range items[1:] {
-		itemParent, present := d.parent[item]
+		itemParent, present := set.parent[item]
 		if !present {
-			d.parent[item] = root
-			d.order = append(d.order, item)
+			set.parent[item] = root
+			set.order = append(set.order, item)
 			continue
 		}
 		if itemParent == root {
@@ -338,9 +338,9 @@ func (d *scopeSet) union(items []ScopeId) {
 		// established classes merge.
 		current := item
 		for itemParent != root {
-			d.parent[current] = root
+			set.parent[current] = root
 			current = itemParent
-			itemParent = d.parent[current]
+			itemParent = set.parent[current]
 		}
 	}
 }
@@ -350,22 +350,22 @@ func (d *scopeSet) union(items []ScopeId) {
 // Path compression on the way out, which is what keeps the recursion depth safe. The second return
 // is upstream's `null`, kept separate from the id because zero is the absent ScopeId and conflating
 // the two would make an absent scope read as a member of class zero.
-func (d *scopeSet) find(item ScopeId) (ScopeId, bool) {
-	if d.parent == nil {
+func (set *scopeSet) find(item ScopeId) (ScopeId, bool) {
+	if set.parent == nil {
 		return 0, false
 	}
-	parent, ok := d.parent[item]
+	parent, ok := set.parent[item]
 	if !ok {
 		return 0, false
 	}
 	if parent == item {
 		return item, true
 	}
-	root, ok := d.find(parent)
+	root, ok := set.find(parent)
 	if !ok {
 		return 0, false
 	}
-	d.parent[item] = root
+	set.parent[item] = root
 	return root, true
 }
 
@@ -527,20 +527,20 @@ func descendingByPosition(sets map[static_single_assignment.EvaluationOrder]map[
 // Ends are processed before starts, which is upstream's order and is load-bearing: a scope ending at
 // exactly the position another starts must leave the stack before the new one is pushed, or the two
 // would appear to be simultaneously active and union spuriously.
-func (s *mergeSweepState) visitInstructionId(id static_single_assignment.EvaluationOrder) {
-	s.visits++
+func (state *mergeSweepState) visitInstructionId(id static_single_assignment.EvaluationOrder) {
+	state.visits++
 
-	if len(s.ends) > 0 && s.ends[len(s.ends)-1].position <= id {
-		top := s.ends[len(s.ends)-1]
-		s.ends = s.ends[:len(s.ends)-1]
+	if len(state.ends) > 0 && state.ends[len(state.ends)-1].position <= id {
+		top := state.ends[len(state.ends)-1]
+		state.ends = state.ends[:len(state.ends)-1]
 
 		// Sorted by start descending: the scope that started LATEST is closed first, so that when
 		// several scopes end together the unions below see the stack in the order upstream does.
 		closing := append([]ScopeId(nil), top.scopes...)
-		sortByStartDescending(closing, s.rangeOf)
+		sortByStartDescending(closing, state.rangeOf)
 
 		for _, scope := range closing {
-			index := indexOfScope(s.activeScopes, scope)
+			index := indexOfScope(state.activeScopes, scope)
 			if index == -1 {
 				continue
 			}
@@ -561,23 +561,23 @@ func (s *mergeSweepState) visitInstructionId(id static_single_assignment.Evaluat
 			// differences. Upstream's spelling is kept because it is upstream's and because the
 			// no-op insertion it avoids would otherwise grow `joined.order` with entries that mean
 			// nothing.
-			if index != len(s.activeScopes)-1 {
-				s.joined.union(append([]ScopeId{scope}, s.activeScopes[index+1:]...))
+			if index != len(state.activeScopes)-1 {
+				state.joined.union(append([]ScopeId{scope}, state.activeScopes[index+1:]...))
 			}
-			s.activeScopes = append(s.activeScopes[:index], s.activeScopes[index+1:]...)
+			state.activeScopes = append(state.activeScopes[:index], state.activeScopes[index+1:]...)
 		}
 	}
 
-	if len(s.starts) > 0 && s.starts[len(s.starts)-1].position <= id {
-		top := s.starts[len(s.starts)-1]
-		s.starts = s.starts[:len(s.starts)-1]
+	if len(state.starts) > 0 && state.starts[len(state.starts)-1].position <= id {
+		top := state.starts[len(state.starts)-1]
+		state.starts = state.starts[:len(state.starts)-1]
 
 		// Sorted by end descending, so the scope ending LAST goes deepest on the stack. That is the
 		// ordering every union above depends on: "everything above me" is then exactly "everything
 		// that ends before me".
 		opening := append([]ScopeId(nil), top.scopes...)
-		sortByEndDescending(opening, s.rangeOf)
-		s.activeScopes = append(s.activeScopes, opening...)
+		sortByEndDescending(opening, state.rangeOf)
+		state.activeScopes = append(state.activeScopes, opening...)
 
 		// Two scopes starting together AND ending together cannot nest either way, so they are
 		// unioned outright. Adjacent comparison suffices because the slice is sorted by end.
@@ -600,8 +600,8 @@ func (s *mergeSweepState) visitInstructionId(id static_single_assignment.Evaluat
 		// rests on the end branch's ordering, which the same alignment pass could also change.
 		for i := 1; i < len(opening); i++ {
 			previous, current := opening[i-1], opening[i]
-			if s.rangeOf(previous).End == s.rangeOf(current).End {
-				s.joined.union([]ScopeId{previous, current})
+			if state.rangeOf(previous).End == state.rangeOf(current).End {
+				state.joined.union([]ScopeId{previous, current})
 			}
 		}
 	}
@@ -612,7 +612,7 @@ func (s *mergeSweepState) visitInstructionId(id static_single_assignment.Evaluat
 // This is the event with no counterpart in a pairwise-overlap model, and it is where most of the
 // extra unions come from. A value read while its own scope is open but buried under a scope that
 // opened later means the two genuinely interleave, even when their ranges nest perfectly.
-func (s *mergeSweepState) visitPlace(id static_single_assignment.EvaluationOrder, place Place, scopes *ReactiveScopes,
+func (state *mergeSweepState) visitPlace(id static_single_assignment.EvaluationOrder, place Place, scopes *ReactiveScopes,
 	memberRanges *mutation_aliasing.MutableRanges) {
 	placeScope := activeScopeOf(id, place, scopes)
 	if placeScope == 0 {
@@ -624,9 +624,9 @@ func (s *mergeSweepState) visitPlace(id static_single_assignment.EvaluationOrder
 	if !memberRanges.Get(place.Identifier).Contains(id) {
 		return
 	}
-	index := indexOfScope(s.activeScopes, placeScope)
-	if index != -1 && index != len(s.activeScopes)-1 {
-		s.joined.union(append([]ScopeId{placeScope}, s.activeScopes[index+1:]...))
+	index := indexOfScope(state.activeScopes, placeScope)
+	if index != -1 && index != len(state.activeScopes)-1 {
+		state.joined.union(append([]ScopeId{placeScope}, state.activeScopes[index+1:]...))
 	}
 }
 
@@ -663,7 +663,7 @@ func indexOfScope(stack []ScopeId, scope ScopeId) int {
 //
 // The widening is a PLAIN min/max, which is upstream's spelling and is safe because `collectScopeInfo`
 // refuses a scope whose start equals its end. See the doc comment above for the measurement.
-func (s *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
+func (state *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{
 		ranges:  map[ScopeId]mutation_aliasing.MutableRange{},
 		group:   map[ScopeId]ScopeId{},
@@ -676,8 +676,8 @@ func (s *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 	}
 
 	// Upstream's `joinedScopes.forEach`, walking insertion order so the representative is stable.
-	for _, scope := range s.joined.order {
-		group, ok := s.joined.find(scope)
+	for _, scope := range state.joined.order {
+		group, ok := state.joined.find(scope)
 		if !ok || group == scope {
 			continue
 		}
@@ -698,7 +698,7 @@ func (s *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 	// A chain can put a scope's group behind another merge, so resolve to the final representative
 	// before building membership. `find` has already compressed every path, so this is a lookup.
 	for _, scope := range scopes.Ids() {
-		if group, ok := s.joined.find(scope); ok {
+		if group, ok := state.joined.find(scope); ok {
 			result.group[scope] = group
 		}
 	}

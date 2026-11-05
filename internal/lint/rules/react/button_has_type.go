@@ -86,14 +86,14 @@ func DefaultButtonHasTypeOptions() ButtonHasTypeOptions {
 // `invalidValue`; the first says it is one of them and is switched off, which is `forbiddenValue`.
 // Upstream expresses both against the same object, so a name outside the three can never be
 // "forbidden" no matter how the rule is configured.
-func (o ButtonHasTypeOptions) allows(value string) (permitted bool, known bool) {
+func (options ButtonHasTypeOptions) allows(value string) (permitted bool, known bool) {
 	switch value {
 	case "button":
-		return o.Button, true
+		return options.Button, true
 	case "submit":
-		return o.Submit, true
+		return options.Submit, true
 	case "reset":
-		return o.Reset, true
+		return options.Reset, true
 	}
 	return false, false
 }

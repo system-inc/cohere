@@ -14,13 +14,13 @@ type metadataLibraryProgram struct {
 	library tspath.PathKey
 }
 
-func (p metadataLibraryProgram) IsSourceFileDefaultLibrary(path tspath.PathKey) bool {
-	return path == p.library
+func (program metadataLibraryProgram) IsSourceFileDefaultLibrary(path tspath.PathKey) bool {
+	return path == program.library
 }
-func (p metadataLibraryProgram) Options() *core.CompilerOptions {
+func (program metadataLibraryProgram) Options() *core.CompilerOptions {
 	return &core.CompilerOptions{Lib: []string{}}
 }
-func (p metadataLibraryProgram) UseCaseSensitiveFileNames() bool { return true }
+func (program metadataLibraryProgram) UseCaseSensitiveFileNames() bool { return true }
 
 func TestDefaultLibraryReadersPreserveAnyAndVacuousAll(test *testing.T) {
 	test.Parallel()

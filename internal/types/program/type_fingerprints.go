@@ -40,13 +40,13 @@ import (
 // already in the program, moves no edge and no file in the global component: a package.json's "types"
 // changing is enough. Without its resolutions in its hash, the importers of that re-exporter kept their
 // key while the types they see changed (#9bjjk4a, found answering @system_cohere_lint).
-func (g *Graph) TypeFingerprints() map[tspath.PathKey][sha256.Size]byte {
-	global, edges, contents, resolutions := g.typeGraph()
+func (graph *Graph) TypeFingerprints() map[tspath.PathKey][sha256.Size]byte {
+	global, edges, contents, resolutions := graph.typeGraph()
 	members := make(map[tspath.PathKey][sha256.Size]byte, len(resolutions))
 	for path, resolved := range resolutions {
 		members[path] = withResolutions(contents[path], resolved)
 	}
-	return fingerprintComponents(g.Anchor, g.ProjectFiles(), edges, members, global)
+	return fingerprintComponents(graph.Anchor, graph.ProjectFiles(), edges, members, global)
 }
 
 // typeGraphParts is typeGraph's answer.
@@ -63,17 +63,17 @@ type typeGraphParts struct {
 //
 // Computed once per graph. A walk keyed on both fingerprints asked for it twice, about 45ms each on ahra
 // and all of it before the first worker starts (#zqsdzbq). The callers only read what it returns.
-func (g *Graph) typeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
-	g.typeGraphOnce.Do(func() {
-		parts := &g.typeGraphParts
-		parts.global, parts.edges, parts.contents, parts.resolutions = g.computeTypeGraph()
+func (graph *Graph) typeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
+	graph.typeGraphOnce.Do(func() {
+		parts := &graph.typeGraphParts
+		parts.global, parts.edges, parts.contents, parts.resolutions = graph.computeTypeGraph()
 	})
-	return g.typeGraphParts.global, g.typeGraphParts.edges, g.typeGraphParts.contents, g.typeGraphParts.resolutions
+	return graph.typeGraphParts.global, graph.typeGraphParts.edges, graph.typeGraphParts.contents, graph.typeGraphParts.resolutions
 }
 
-func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
-	allFiles := g.Program.GetSourceFiles()
-	projectFiles := g.ProjectFiles()
+func (graph *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
+	allFiles := graph.Program.GetSourceFiles()
+	projectFiles := graph.ProjectFiles()
 
 	contents, beyond := hashContentsInParallel(allFiles)
 
@@ -92,7 +92,7 @@ func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspa
 	// By the anchored path, in sort and in hash, so every spelling of the root hashes alike (#547dhjz).
 	stable := make(map[tspath.PathKey]string, len(globalPaths))
 	for _, path := range globalPaths {
-		stable[path] = g.Anchor.Stable(string(path))
+		stable[path] = graph.Anchor.Stable(string(path))
 	}
 	sort.Slice(globalPaths, func(first, second int) bool { return stable[globalPaths[first]] < stable[globalPaths[second]] })
 	for _, path := range globalPaths {
@@ -105,7 +105,7 @@ func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspa
 	copy(globalSum[:], global.Sum(nil))
 
 	edges := make(map[tspath.PathKey][]tspath.PathKey, len(projectFiles))
-	for fromPath, resolutions := range g.Program.GetResolvedModules() {
+	for fromPath, resolutions := range graph.Program.GetResolvedModules() {
 		if !isProject[fromPath] {
 			continue
 		}
@@ -113,40 +113,40 @@ func (g *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspa
 			if resolution == nil || resolution.ResolvedFileName == "" {
 				continue
 			}
-			toward := g.pathFor(resolution.ResolvedFileName.AsString())
+			toward := graph.pathFor(resolution.ResolvedFileName.AsString())
 			if isProject[toward] && toward != fromPath {
 				edges[fromPath] = append(edges[fromPath], toward)
 			}
 		}
 	}
-	return globalSum, edges, contents, g.resolutionSums(isProject)
+	return globalSum, edges, contents, graph.resolutionSums(isProject)
 }
 
 // resolutionSums hashes, for each project file, every module specifier and type reference it wrote and the
 // file each resolved to, or that it resolved to nothing. Sorted, so the order the compiler resolved in cannot
 // move it.
-func (g *Graph) resolutionSums(isProject map[tspath.PathKey]bool) map[tspath.PathKey][sha256.Size]byte {
+func (graph *Graph) resolutionSums(isProject map[tspath.PathKey]bool) map[tspath.PathKey][sha256.Size]byte {
 	entries := make(map[tspath.PathKey][]string, len(isProject))
-	for fromPath, resolutions := range g.Program.GetResolvedModules() {
+	for fromPath, resolutions := range graph.Program.GetResolvedModules() {
 		if !isProject[fromPath] {
 			continue
 		}
 		for key, resolution := range resolutions {
 			target := ""
 			if resolution != nil {
-				target = g.Anchor.Stable(resolution.ResolvedFileName.AsString())
+				target = graph.Anchor.Stable(resolution.ResolvedFileName.AsString())
 			}
 			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("module\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
 		}
 	}
-	for fromPath, references := range g.Program.GetResolvedTypeReferenceDirectives() {
+	for fromPath, references := range graph.Program.GetResolvedTypeReferenceDirectives() {
 		if !isProject[fromPath] {
 			continue
 		}
 		for key, reference := range references {
 			target := ""
 			if reference != nil {
-				target = g.Anchor.Stable(reference.ResolvedFileName.AsString())
+				target = graph.Anchor.Stable(reference.ResolvedFileName.AsString())
 			}
 			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("type\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
 		}

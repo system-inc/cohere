@@ -220,7 +220,7 @@ type complexityWalker struct {
 	frames   []complexityFrame
 }
 
-func (w *complexityWalker) walk(node *ast.Node) {
+func (walker *complexityWalker) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -240,35 +240,35 @@ func (w *complexityWalker) walk(node *ast.Node) {
 				if child == declaration.Initializer {
 					return false
 				}
-				w.walk(child)
+				walker.walk(child)
 				return false
 			})
-			w.frames = append(w.frames, complexityFrame{node: node, count: 1})
-			w.walk(declaration.Initializer)
-			frame := w.frames[len(w.frames)-1]
-			w.frames = w.frames[:len(w.frames)-1]
-			w.reportIfOverThreshold(frame)
+			walker.frames = append(walker.frames, complexityFrame{node: node, count: 1})
+			walker.walk(declaration.Initializer)
+			frame := walker.frames[len(walker.frames)-1]
+			walker.frames = walker.frames[:len(walker.frames)-1]
+			walker.reportIfOverThreshold(frame)
 			return
 		}
 	}
 
 	pushed := false
 	if complexityStartsAFrame(node) {
-		w.frames = append(w.frames, complexityFrame{node: node, count: 1})
+		walker.frames = append(walker.frames, complexityFrame{node: node, count: 1})
 		pushed = true
 	} else {
-		w.countIfDecisionPoint(node)
+		walker.countIfDecisionPoint(node)
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child)
+		walker.walk(child)
 		return false
 	})
 
 	if pushed {
-		frame := w.frames[len(w.frames)-1]
-		w.frames = w.frames[:len(w.frames)-1]
-		w.reportIfOverThreshold(frame)
+		frame := walker.frames[len(walker.frames)-1]
+		walker.frames = walker.frames[:len(walker.frames)-1]
+		walker.reportIfOverThreshold(frame)
 	}
 }
 
@@ -276,8 +276,8 @@ func (w *complexityWalker) walk(node *ast.Node) {
 //
 // A node that starts a frame is never also counted, matching upstream: a nested function's own
 // complexity belongs to its own code path rather than to its parent's.
-func (w *complexityWalker) countIfDecisionPoint(node *ast.Node) {
-	if len(w.frames) == 0 {
+func (walker *complexityWalker) countIfDecisionPoint(node *ast.Node) {
+	if len(walker.frames) == 0 {
 		// Upstream still counts into the `program` code path here; it simply never reports it,
 		// because `onCodePathEnd` filters origins. Nothing to do.
 		return
@@ -323,29 +323,29 @@ func (w *complexityWalker) countIfDecisionPoint(node *ast.Node) {
 	case ast.KindCaseClause:
 		// Upstream's `SwitchCase[test]`: only a case carrying a test counts, so `default` never
 		// does -- and our parser gives `default` its own kind, so this arm cannot see one.
-		counts = w.settings.Variant != ComplexityModified
+		counts = walker.settings.Variant != ComplexityModified
 	case ast.KindSwitchStatement:
-		counts = w.settings.Variant == ComplexityModified
+		counts = walker.settings.Variant == ComplexityModified
 	}
 
 	if counts {
-		w.frames[len(w.frames)-1].count++
+		walker.frames[len(walker.frames)-1].count++
 	}
 }
 
 // reportIfOverThreshold is upstream's `onCodePathEnd`.
-func (w *complexityWalker) reportIfOverThreshold(frame complexityFrame) {
-	if frame.count <= w.settings.Maximum {
+func (walker *complexityWalker) reportIfOverThreshold(frame complexityFrame) {
+	if frame.count <= walker.settings.Maximum {
 		return
 	}
-	name := complexityNameOf(w.ctx, frame.node)
-	w.ctx.Report(rule.Diagnostic{
-		Range:      complexityHeadRange(w.ctx, frame.node),
-		SourceFile: w.ctx.SourceFile,
+	name := complexityNameOf(walker.ctx, frame.node)
+	walker.ctx.Report(rule.Diagnostic{
+		Range:      complexityHeadRange(walker.ctx, frame.node),
+		SourceFile: walker.ctx.SourceFile,
 		Message: rule.Message{
 			Id: messageComplexityComplex.Id,
 			Description: fmt.Sprintf("%s has a complexity of %d. Maximum allowed is %d. %s",
-				name, frame.count, w.settings.Maximum, messageComplexityComplex.Description),
+				name, frame.count, walker.settings.Maximum, messageComplexityComplex.Description),
 		},
 	})
 }

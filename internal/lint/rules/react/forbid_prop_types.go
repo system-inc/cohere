@@ -52,11 +52,11 @@ func DecodeForbidPropTypesOptions(raw []byte) (any, error) {
 }
 
 // forbiddenTypes returns the effective forbid list.
-func (o ForbidPropTypesOptions) forbiddenTypes() []string {
-	if o.Forbid == nil {
+func (options ForbidPropTypesOptions) forbiddenTypes() []string {
+	if options.Forbid == nil {
 		return forbidPropTypesDefaultForbid
 	}
-	return *o.Forbid
+	return *options.Forbid
 }
 
 // forbidPropTypesMessage builds the finding, which names the offending type.
@@ -232,7 +232,7 @@ type forbidPropTypesWalker struct {
 // ESLint visits the whole program and the import listener happens to fire first for a top-level
 // import, but nothing guarantees that ordering for the shapes this rule meets, and our walk is a
 // single pre-order pass. Collecting first makes the dependence explicit rather than incidental.
-func (w *forbidPropTypesWalker) collectImports(sourceFile *ast.Node) {
+func (walker *forbidPropTypesWalker) collectImports(sourceFile *ast.Node) {
 	sourceFile.ForEachChild(func(child *ast.Node) bool {
 		if child.Kind != ast.KindImportDeclaration {
 			return false
@@ -246,24 +246,24 @@ func (w *forbidPropTypesWalker) collectImports(sourceFile *ast.Node) {
 		switch moduleSpecifier.Text() {
 		case "prop-types":
 			if name := forbidPropTypesFirstLocalName(child); name != "" {
-				w.propTypesPackageName = name
+				walker.propTypesPackageName = name
 			}
 
 		case "react":
 			if name := forbidPropTypesFirstLocalName(child); name != "" {
-				w.reactPackageName = name
+				walker.reactPackageName = name
 			}
 			// `import { PropTypes } from 'react'` binds the prop types package under whatever
 			// local name that specifier uses.
 			if local := forbidPropTypesLocalNameForImported(child, "PropTypes"); local != "" {
-				w.propTypesPackageName = local
+				walker.propTypesPackageName = local
 			}
 
 		default:
 			// Anything named `PropTypes` coming from a third module means the bare name in this
 			// file is somebody else's. Measured: it makes an otherwise reporting file clean.
 			if forbidPropTypesBindsLocalName(child, "PropTypes") {
-				w.isForeignPropTypesPackage = true
+				walker.isForeignPropTypesPackage = true
 			}
 		}
 		return false
@@ -354,43 +354,43 @@ func forbidPropTypesBindsLocalName(node *ast.Node, local string) bool {
 }
 
 // walk visits every node, dispatching the shapes that can carry a prop types object.
-func (w *forbidPropTypesWalker) walk(node *ast.Node) {
+func (walker *forbidPropTypesWalker) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
 
 	switch node.Kind {
 	case ast.KindPropertyDeclaration:
-		w.checkClassProperty(node)
+		walker.checkClassProperty(node)
 
 	case ast.KindBinaryExpression:
-		w.checkMemberAssignment(node)
+		walker.checkMemberAssignment(node)
 
 	case ast.KindObjectLiteralExpression:
-		w.checkObjectLiteral(node)
+		walker.checkObjectLiteral(node)
 
 	case ast.KindGetAccessor:
-		w.checkGetter(node)
+		walker.checkGetter(node)
 
 	case ast.KindCallExpression:
-		w.checkShapeCall(node)
+		walker.checkShapeCall(node)
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child)
+		walker.walk(child)
 		return false
 	})
 }
 
 // declarationNameKind says which of the three declaration names a node carries, or "".
-func (w *forbidPropTypesWalker) declarationNameKind(name string) bool {
+func (walker *forbidPropTypesWalker) declarationNameKind(name string) bool {
 	switch name {
 	case "propTypes":
 		return true
 	case "contextTypes":
-		return w.settings.CheckContextTypes
+		return walker.settings.CheckContextTypes
 	case "childContextTypes":
-		return w.settings.CheckChildContextTypes
+		return walker.settings.CheckChildContextTypes
 	}
 	return false
 }
@@ -399,18 +399,18 @@ func (w *forbidPropTypesWalker) declarationNameKind(name string) bool {
 //
 // Upstream does not require the property to be static and neither does this: `propsUtil` tests the
 // key's name alone.
-func (w *forbidPropTypesWalker) checkClassProperty(node *ast.Node) {
+func (walker *forbidPropTypesWalker) checkClassProperty(node *ast.Node) {
 	property := node.AsPropertyDeclaration()
 	name := property.Name()
 	if name == nil || name.Kind != ast.KindIdentifier ||
-		!w.declarationNameKind(name.Text()) {
+		!walker.declarationNameKind(name.Text()) {
 		return
 	}
-	w.checkNode(property.Initializer)
+	walker.checkNode(property.Initializer)
 }
 
 // checkMemberAssignment handles `C.propTypes = {...}`.
-func (w *forbidPropTypesWalker) checkMemberAssignment(node *ast.Node) {
+func (walker *forbidPropTypesWalker) checkMemberAssignment(node *ast.Node) {
 	assignment := node.AsBinaryExpression()
 	if !ast.IsAssignmentOperator(assignment.OperatorToken.Kind) {
 		// Every assignment operator qualifies, not only `=`, and this line was wrong before it was
@@ -431,10 +431,10 @@ func (w *forbidPropTypesWalker) checkMemberAssignment(node *ast.Node) {
 	}
 	name := target.AsPropertyAccessExpression().Name()
 	if name == nil || name.Kind != ast.KindIdentifier ||
-		!w.declarationNameKind(name.Text()) {
+		!walker.declarationNameKind(name.Text()) {
 		return
 	}
-	w.checkNode(assignment.Right)
+	walker.checkNode(assignment.Right)
 }
 
 // checkObjectLiteral handles `createReactClass({ propTypes: {...} })`.
@@ -442,7 +442,7 @@ func (w *forbidPropTypesWalker) checkMemberAssignment(node *ast.Node) {
 // Upstream visits every object expression and looks for a property with one of the three names, so
 // this is not restricted to a factory call and an ordinary object literal carrying a `propTypes`
 // key is checked too. Measured.
-func (w *forbidPropTypesWalker) checkObjectLiteral(node *ast.Node) {
+func (walker *forbidPropTypesWalker) checkObjectLiteral(node *ast.Node) {
 	properties := node.AsObjectLiteralExpression().Properties
 	if properties == nil {
 		return
@@ -454,7 +454,7 @@ func (w *forbidPropTypesWalker) checkObjectLiteral(node *ast.Node) {
 		assignment := property.AsPropertyAssignment()
 		name := assignment.Name()
 		if name == nil || name.Kind != ast.KindIdentifier ||
-			!w.declarationNameKind(name.Text()) {
+			!walker.declarationNameKind(name.Text()) {
 			continue
 		}
 		// Upstream checks only for an object expression here, not the full `checkNode` surface, so
@@ -474,17 +474,17 @@ func (w *forbidPropTypesWalker) checkObjectLiteral(node *ast.Node) {
 		// this verdict was taken; a caller that skipped that entry guard would void it.
 		value := assignment.Initializer
 		if value != nil && value.Kind == ast.KindObjectLiteralExpression {
-			w.checkProperties(value)
+			walker.checkProperties(value)
 		}
 	}
 }
 
 // checkGetter handles `static get propTypes() { return {...} }`.
-func (w *forbidPropTypesWalker) checkGetter(node *ast.Node) {
+func (walker *forbidPropTypesWalker) checkGetter(node *ast.Node) {
 	accessor := node.AsGetAccessorDeclaration()
 	name := accessor.Name()
 	if name == nil || name.Kind != ast.KindIdentifier ||
-		!w.declarationNameKind(name.Text()) {
+		!walker.declarationNameKind(name.Text()) {
 		return
 	}
 	body := accessor.Body
@@ -502,7 +502,7 @@ func (w *forbidPropTypesWalker) checkGetter(node *ast.Node) {
 		if statement.Kind != ast.KindReturnStatement {
 			continue
 		}
-		w.checkNode(statement.AsReturnStatement().Expression)
+		walker.checkNode(statement.AsReturnStatement().Expression)
 		return
 	}
 }
@@ -513,7 +513,7 @@ func (w *forbidPropTypesWalker) checkGetter(node *ast.Node) {
 // That independence is real and measured: a `shape` call reached through a nested prop type is
 // checked by this arm rather than by the recursion, which is why a shape's own properties report
 // even though `checkProperties` does not recurse into them.
-func (w *forbidPropTypesWalker) checkShapeCall(node *ast.Node) {
+func (walker *forbidPropTypesWalker) checkShapeCall(node *ast.Node) {
 	call := node.AsCallExpression()
 	callee := call.Expression
 	if callee == nil {
@@ -535,7 +535,7 @@ func (w *forbidPropTypesWalker) checkShapeCall(node *ast.Node) {
 	// suggests a validation library is the false positive to worry about.
 	if callee.Kind == ast.KindPropertyAccessExpression {
 		receiver := callee.AsPropertyAccessExpression().Expression
-		if !w.isPropTypesPackage(receiver) && !w.isPropTypesDeclarationAccess(callee) {
+		if !walker.isPropTypesPackage(receiver) && !walker.isPropTypesDeclarationAccess(callee) {
 			return
 		}
 	}
@@ -559,7 +559,7 @@ func (w *forbidPropTypesWalker) checkShapeCall(node *ast.Node) {
 	}
 	argument := call.Arguments.Nodes[0]
 	if argument != nil && argument.Kind == ast.KindObjectLiteralExpression {
-		w.checkProperties(argument)
+		walker.checkProperties(argument)
 	}
 }
 
@@ -567,16 +567,16 @@ func (w *forbidPropTypesWalker) checkShapeCall(node *ast.Node) {
 //
 // Upstream's `checkNode` has a fourth branch for a prop wrapper call, which is not reproduced. See
 // the rule doc: which functions count comes from a shared setting `rule.Context` does not expose.
-func (w *forbidPropTypesWalker) checkNode(node *ast.Node) {
+func (walker *forbidPropTypesWalker) checkNode(node *ast.Node) {
 	if node == nil {
 		return
 	}
 	switch node.Kind {
 	case ast.KindObjectLiteralExpression:
-		w.checkProperties(node)
+		walker.checkProperties(node)
 
 	case ast.KindIdentifier:
-		w.checkProperties(w.resolveToObjectLiteral(node))
+		walker.checkProperties(walker.resolveToObjectLiteral(node))
 	}
 }
 
@@ -585,11 +585,11 @@ func (w *forbidPropTypesWalker) checkNode(node *ast.Node) {
 // Upstream asks its own variable index; the checker answers the same question. Only a variable
 // declaration with an object literal initializer qualifies, which is upstream's
 // `propTypesObject && propTypesObject.properties` test.
-func (w *forbidPropTypesWalker) resolveToObjectLiteral(identifier *ast.Node) *ast.Node {
-	if w.ctx.TypeChecker == nil {
+func (walker *forbidPropTypesWalker) resolveToObjectLiteral(identifier *ast.Node) *ast.Node {
+	if walker.ctx.TypeChecker == nil {
 		return nil
 	}
-	symbol := w.ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := walker.ctx.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return nil
 	}
@@ -609,7 +609,7 @@ func (w *forbidPropTypesWalker) resolveToObjectLiteral(identifier *ast.Node) *as
 //
 // It deliberately does not recurse into a nested object literal. A nested `shape({...})` is reached
 // by the shape arm instead, which visits every such call in the file independently.
-func (w *forbidPropTypesWalker) checkProperties(object *ast.Node) {
+func (walker *forbidPropTypesWalker) checkProperties(object *ast.Node) {
 	if object == nil || object.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
@@ -624,7 +624,7 @@ func (w *forbidPropTypesWalker) checkProperties(object *ast.Node) {
 			// not a `Property`.
 			continue
 		}
-		w.checkPropertyValue(property, property.AsPropertyAssignment().Initializer)
+		walker.checkPropertyValue(property, property.AsPropertyAssignment().Initializer)
 	}
 }
 
@@ -632,7 +632,7 @@ func (w *forbidPropTypesWalker) checkProperties(object *ast.Node) {
 //
 // The finding is anchored on the property rather than on the value, which is upstream passing the
 // declaration node to `report`.
-func (w *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, value *ast.Node) {
+func (walker *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, value *ast.Node) {
 	if value == nil {
 		return
 	}
@@ -653,12 +653,12 @@ func (w *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, value *as
 	// callee so the wrapper's own name is considered too.
 	if value.Kind == ast.KindCallExpression {
 		call := value.AsCallExpression()
-		if !w.isPropTypesPackage(call.Expression) {
+		if !walker.isPropTypesPackage(call.Expression) {
 			return
 		}
 		if call.Arguments != nil {
 			for _, argument := range call.Arguments.Nodes {
-				w.reportIfForbidden(property, forbidPropTypesTypeName(argument))
+				walker.reportIfForbidden(property, forbidPropTypesTypeName(argument))
 			}
 		}
 		value = call.Expression
@@ -667,10 +667,10 @@ func (w *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, value *as
 		}
 	}
 
-	if !w.isPropTypesPackage(value) {
+	if !walker.isPropTypesPackage(value) {
 		return
 	}
-	w.reportIfForbidden(property, forbidPropTypesTypeName(value))
+	walker.reportIfForbidden(property, forbidPropTypesTypeName(value))
 }
 
 // forbidPropTypesTypeName reads the type name off a value, which upstream does two ways.
@@ -701,18 +701,18 @@ func forbidPropTypesTypeName(node *ast.Node) string {
 // `PropTypes` was imported, everything passes. So in an ordinary file with no such import this is
 // always true, and the whole predicate exists to narrow the rule once the name has been claimed by
 // another module. Measured: with a foreign import present, only the recorded local name qualifies.
-func (w *forbidPropTypesWalker) isPropTypesPackage(node *ast.Node) bool {
+func (walker *forbidPropTypesWalker) isPropTypesPackage(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return node.Text() == w.propTypesPackageName || !w.isForeignPropTypesPackage
+		return node.Text() == walker.propTypesPackageName || !walker.isForeignPropTypesPackage
 
 	case ast.KindPropertyAccessExpression:
 		receiver := node.AsPropertyAccessExpression().Expression
 		if receiver == nil {
-			return !w.isForeignPropTypesPackage
+			return !walker.isForeignPropTypesPackage
 		}
 		if receiver.Kind == ast.KindIdentifier {
 			// The member arm compares against `reactPackageName` alone, never against
@@ -728,21 +728,21 @@ func (w *forbidPropTypesWalker) isPropTypesPackage(node *ast.Node) bool {
 			//
 			// The identifier arm above does consult `propTypesPackageName`, which is why the two
 			// arms are not symmetric here.
-			return receiver.Text() == w.reactPackageName || !w.isForeignPropTypesPackage
+			return receiver.Text() == walker.reactPackageName || !walker.isForeignPropTypesPackage
 		}
-		return !w.isForeignPropTypesPackage
+		return !walker.isForeignPropTypesPackage
 	}
 	return false
 }
 
 // reportIfForbidden reports when a type name is on the forbid list.
-func (w *forbidPropTypesWalker) reportIfForbidden(property *ast.Node, typeName string) {
+func (walker *forbidPropTypesWalker) reportIfForbidden(property *ast.Node, typeName string) {
 	if typeName == "" {
 		return
 	}
-	for _, forbidden := range w.settings.forbiddenTypes() {
+	for _, forbidden := range walker.settings.forbiddenTypes() {
 		if forbidden == typeName {
-			w.ctx.ReportNode(property, forbidPropTypesMessage(typeName))
+			walker.ctx.ReportNode(property, forbidPropTypesMessage(typeName))
 			return
 		}
 	}
@@ -754,10 +754,10 @@ func (w *forbidPropTypesWalker) reportIfForbidden(property *ast.Node, typeName s
 // types declaration passes even when its receiver does not look like the package. Reproduced for
 // fidelity; no corpus case reaches it, and the shape it would need is a `shape` call written
 // directly as `something.propTypes(...)`.
-func (w *forbidPropTypesWalker) isPropTypesDeclarationAccess(node *ast.Node) bool {
+func (walker *forbidPropTypesWalker) isPropTypesDeclarationAccess(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
 	name := node.AsPropertyAccessExpression().Name()
-	return name != nil && name.Kind == ast.KindIdentifier && w.declarationNameKind(name.Text())
+	return name != nil && name.Kind == ast.KindIdentifier && walker.declarationNameKind(name.Text())
 }

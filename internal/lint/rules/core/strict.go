@@ -295,8 +295,8 @@ func checkStrict(ruleContext rule.Context, file *ast.Node, mode StrictMode) {
 }
 
 // fileLevelMessage is what a directive at the top of the file means under the current mode.
-func (w strictWalker) fileLevelMessage() rule.Message {
-	switch w.mode {
+func (walker strictWalker) fileLevelMessage() rule.Message {
+	switch walker.mode {
 	case strictModeModule:
 		return messageStrictModule
 	case strictModeImplied:
@@ -329,21 +329,21 @@ func strictShouldFix(mode StrictMode) bool {
 // enclosing function sets the first and not the second. `inClass`
 // whether we are inside a class body, which is always strict. Both are only consulted under the
 // function form; the other modes report every directive they find wherever it is.
-func (w strictWalker) walkStatements(statements []*ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
+func (walker strictWalker) walkStatements(statements []*ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
 	for _, statement := range statements {
-		w.walkNode(statement, insideAnyFunction, parentIsStrict, inClass)
+		walker.walkNode(statement, insideAnyFunction, parentIsStrict, inClass)
 	}
 }
 
 // walkNode visits one node, entering a function or a class body when it meets one.
-func (w strictWalker) walkNode(node *ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
+func (walker strictWalker) walkNode(node *ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
 	if node == nil {
 		return
 	}
 
 	switch node.Kind {
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
-		w.enterFunction(node, insideAnyFunction, parentIsStrict, inClass)
+		walker.enterFunction(node, insideAnyFunction, parentIsStrict, inClass)
 		return
 	case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor,
 		ast.KindSetAccessor:
@@ -352,63 +352,63 @@ func (w strictWalker) walkNode(node *ast.Node, insideAnyFunction bool, parentIsS
 		// while our parser folds the two into one node. Omitting this arm left every
 		// directive inside a method invisible, which upstream's own `class A { foo() {
 		// "use strict"; } }` case caught.
-		w.enterFunction(node, insideAnyFunction, parentIsStrict, inClass)
+		walker.enterFunction(node, insideAnyFunction, parentIsStrict, inClass)
 		return
 	case ast.KindClassDeclaration, ast.KindClassExpression:
 		// A class body is always strict, and that fact travels down rather than the class itself
 		// being checked.
 		node.ForEachChild(func(child *ast.Node) bool {
-			w.walkNode(child, insideAnyFunction, parentIsStrict, true)
+			walker.walkNode(child, insideAnyFunction, parentIsStrict, true)
 			return false
 		})
 		return
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walkNode(child, insideAnyFunction, parentIsStrict, inClass)
+		walker.walkNode(child, insideAnyFunction, parentIsStrict, inClass)
 		return false
 	})
 }
 
 // enterFunction applies the rule to one function and continues into its body.
-func (w strictWalker) enterFunction(node *ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
+func (walker strictWalker) enterFunction(node *ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
 	body := strictFunctionBody(node)
 	var directives []*ast.Node
 	var bodyStatements []*ast.Node
 	if body != nil && body.Kind == ast.KindBlock {
 		bodyStatements = body.AsBlock().Statements.Nodes
-		directives = strictDirectivesIn(w.ctx, bodyStatements)
+		directives = strictDirectivesIn(walker.ctx, bodyStatements)
 	}
 
 	isStrict := len(directives) > 0
 
-	if w.mode == StrictFunction {
-		w.enterFunctionInFunctionMode(node, directives, insideAnyFunction, parentIsStrict, inClass)
+	if walker.mode == StrictFunction {
+		walker.enterFunctionInFunctionMode(node, directives, insideAnyFunction, parentIsStrict, inClass)
 	} else if len(directives) > 0 {
 		// Every other mode reports the directives it finds, unless the parameter list makes them a
 		// syntax error, in which case that is the more urgent thing to say.
 		if strictHasSimpleParameterList(node) {
-			w.reportAll(directives, w.fileLevelMessage(), strictShouldFix(w.mode))
+			walker.reportAll(directives, walker.fileLevelMessage(), strictShouldFix(walker.mode))
 		} else {
-			w.ctx.ReportNode(directives[0], messageStrictNonSimpleParameterList)
-			w.reportAllExceptFirst(directives, messageStrictMultiple, true)
+			walker.ctx.ReportNode(directives[0], messageStrictNonSimpleParameterList)
+			walker.reportAllExceptFirst(directives, messageStrictMultiple, true)
 		}
 	}
 
 	// A function body is strict if it says so or if its parent was. A class body stays strict
 	// throughout, which is why `inClass` travels down unchanged.
-	w.walkStatements(bodyStatements, true, parentIsStrict || isStrict, inClass)
+	walker.walkStatements(bodyStatements, true, parentIsStrict || isStrict, inClass)
 	if body != nil && body.Kind != ast.KindBlock {
 		// A concise arrow body is an expression rather than a block, and can still contain a
 		// function of its own.
-		w.walkNode(body, true, parentIsStrict || isStrict, inClass)
+		walker.walkNode(body, true, parentIsStrict || isStrict, inClass)
 	}
 	// The parameter list can hold functions too, in a default value.
-	w.walkParameters(node, true, parentIsStrict || isStrict, inClass)
+	walker.walkParameters(node, true, parentIsStrict || isStrict, inClass)
 }
 
 // enterFunctionInFunctionMode is the nesting-aware arm, and the only one that uses the stacks.
-func (w strictWalker) enterFunctionInFunctionMode(
+func (walker strictWalker) enterFunctionInFunctionMode(
 	node *ast.Node,
 	directives []*ast.Node,
 	insideAnyFunction bool,
@@ -426,15 +426,15 @@ func (w strictWalker) enterFunctionInFunctionMode(
 		switch {
 		case !strictHasSimpleParameterList(node):
 			// A syntax error since ES2016, and the most urgent thing to say about this function.
-			w.ctx.ReportNode(directives[0], messageStrictNonSimpleParameterList)
+			walker.ctx.ReportNode(directives[0], messageStrictNonSimpleParameterList)
 		case parentIsStrict:
-			w.ctx.ReportNodeWithFixes(directives[0], messageStrictUnnecessary,
-				strictRemoveDirective(w.ctx, directives[0]))
+			walker.ctx.ReportNodeWithFixes(directives[0], messageStrictUnnecessary,
+				strictRemoveDirective(walker.ctx, directives[0]))
 		case inClass:
-			w.ctx.ReportNodeWithFixes(directives[0], messageStrictUnnecessaryInClasses,
-				strictRemoveDirective(w.ctx, directives[0]))
+			walker.ctx.ReportNodeWithFixes(directives[0], messageStrictUnnecessaryInClasses,
+				strictRemoveDirective(walker.ctx, directives[0]))
 		}
-		w.reportAllExceptFirst(directives, messageStrictMultiple, true)
+		walker.reportAllExceptFirst(directives, messageStrictMultiple, true)
 		return
 	}
 
@@ -449,39 +449,39 @@ func (w strictWalker) enterFunctionInFunctionMode(
 		return
 	}
 	if strictHasSimpleParameterList(node) {
-		w.ctx.ReportNode(node, messageStrictFunction)
+		walker.ctx.ReportNode(node, messageStrictFunction)
 		return
 	}
 	// The function cannot carry a directive at all, so upstream asks for a wrapper instead and
 	// names the function so the reader can find it.
-	w.ctx.ReportNode(node, messageStrictWrapFor(strictDescribeFunction(w.ctx, node)))
+	walker.ctx.ReportNode(node, messageStrictWrapFor(strictDescribeFunction(walker.ctx, node)))
 }
 
 // walkParameters descends into parameter default values, which can hold functions.
-func (w strictWalker) walkParameters(node *ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
+func (walker strictWalker) walkParameters(node *ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
 	for _, parameter := range strictParametersOf(node) {
 		if initializer := parameter.AsParameterDeclaration().Initializer; initializer != nil {
-			w.walkNode(initializer, insideAnyFunction, parentIsStrict, inClass)
+			walker.walkNode(initializer, insideAnyFunction, parentIsStrict, inClass)
 		}
 	}
 }
 
 // reportAll reports every directive with one message.
-func (w strictWalker) reportAll(directives []*ast.Node, message rule.Message, fix bool) {
-	w.reportSlice(directives, 0, message, fix)
+func (walker strictWalker) reportAll(directives []*ast.Node, message rule.Message, fix bool) {
+	walker.reportSlice(directives, 0, message, fix)
 }
 
 // reportAllExceptFirst reports every directive after the first, which is upstream's `multiple`.
-func (w strictWalker) reportAllExceptFirst(
+func (walker strictWalker) reportAllExceptFirst(
 	directives []*ast.Node,
 	message rule.Message,
 	fix bool,
 ) {
-	w.reportSlice(directives, 1, message, fix)
+	walker.reportSlice(directives, 1, message, fix)
 }
 
 // reportSlice reports directives from an index onward.
-func (w strictWalker) reportSlice(
+func (walker strictWalker) reportSlice(
 	directives []*ast.Node,
 	from int,
 	message rule.Message,
@@ -489,11 +489,11 @@ func (w strictWalker) reportSlice(
 ) {
 	for index := from; index < len(directives); index++ {
 		if fix {
-			w.ctx.ReportNodeWithFixes(directives[index], message,
-				strictRemoveDirective(w.ctx, directives[index]))
+			walker.ctx.ReportNodeWithFixes(directives[index], message,
+				strictRemoveDirective(walker.ctx, directives[index]))
 			continue
 		}
-		w.ctx.ReportNode(directives[index], message)
+		walker.ctx.ReportNode(directives[index], message)
 	}
 }
 

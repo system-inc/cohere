@@ -724,4 +724,4 @@ func typeCheckExtraDeclarations(
 
 type importerFromMap func(string) (*types.Package, error)
 
-func (i importerFromMap) Import(path string) (*types.Package, error) { return i(path) }
+func (importer importerFromMap) Import(path string) (*types.Package, error) { return importer(path) }

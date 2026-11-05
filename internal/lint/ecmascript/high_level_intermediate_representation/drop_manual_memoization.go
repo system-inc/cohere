@@ -120,8 +120,8 @@ const (
 )
 
 // String renders the kind as its source spelling.
-func (k ManualMemoKind) String() string {
-	switch k {
+func (kind ManualMemoKind) String() string {
+	switch kind {
 	case ManualMemoKindUseMemo:
 		return "useMemo"
 	case ManualMemoKindUseCallback:
@@ -404,8 +404,8 @@ func recogniseManualMemoCall(instruction *Instruction, sidemap *manualMemoSidema
 }
 
 // calleeAnchor is the instruction that defined a temporary, for anchoring `StartMemoize`.
-func (s *manualMemoSidemap) calleeAnchor(identifier static_single_assignment.IdentifierId) InstructionId {
-	return s.anchors[identifier]
+func (sidemap *manualMemoSidemap) calleeAnchor(identifier static_single_assignment.IdentifierId) InstructionId {
+	return sidemap.anchors[identifier]
 }
 
 // extractedMemoArguments is what one recognised call site yielded.

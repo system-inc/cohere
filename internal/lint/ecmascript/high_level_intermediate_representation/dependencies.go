@@ -218,22 +218,22 @@ type ScopeDependencies struct {
 // DependenciesOf returns a scope's inputs, or nil for a scope with none.
 //
 // The slice is the table's own and must not be modified by a caller.
-func (d *ScopeDependencies) DependenciesOf(scope ScopeId) []ReactiveScopeDependency {
-	if d == nil || d.dependencies == nil {
+func (dependencies *ScopeDependencies) DependenciesOf(scope ScopeId) []ReactiveScopeDependency {
+	if dependencies == nil || dependencies.dependencies == nil {
 		return nil
 	}
-	return d.dependencies[scope]
+	return dependencies.dependencies[scope]
 }
 
 // DeclarationsOf returns the values a scope produces that are used outside it.
 //
 // Upstream stores `(IdentifierId, ReactiveScopeDeclaration)` pairs where the second names the
 // declaring scope. The scope is the map key here, so the pair would store it twice.
-func (d *ScopeDependencies) DeclarationsOf(scope ScopeId) []static_single_assignment.IdentifierId {
-	if d == nil || d.declarations == nil {
+func (dependencies *ScopeDependencies) DeclarationsOf(scope ScopeId) []static_single_assignment.IdentifierId {
+	if dependencies == nil || dependencies.declarations == nil {
 		return nil
 	}
-	return d.declarations[scope]
+	return dependencies.declarations[scope]
 }
 
 // OriginOf returns the scope a declared value was produced in, and whether it is known.
@@ -241,11 +241,11 @@ func (d *ScopeDependencies) DeclarationsOf(scope ScopeId) []static_single_assign
 // Distinct from the key of `DeclarationsOf`, which names a scope that holds the declaration and may
 // be an enclosing one. `pruneUnusedScopes` prunes a scope whose declarations all came from within
 // it, and that is the only question this answers.
-func (d *ScopeDependencies) OriginOf(identifier static_single_assignment.IdentifierId) (ScopeId, bool) {
-	if d == nil || d.declarationOrigin == nil {
+func (dependencies *ScopeDependencies) OriginOf(identifier static_single_assignment.IdentifierId) (ScopeId, bool) {
+	if dependencies == nil || dependencies.declarationOrigin == nil {
 		return 0, false
 	}
-	origin, found := d.declarationOrigin[identifier]
+	origin, found := dependencies.declarationOrigin[identifier]
 	return origin, found
 }
 
@@ -275,12 +275,12 @@ func (d *ScopeDependencies) OriginOf(identifier static_single_assignment.Identif
 //
 // A declaration with no recorded last usage is kept, which is the conservative direction: a value
 // this pass knows nothing about is not a value proven dead.
-func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end static_single_assignment.EvaluationOrder,
+func (dependencies *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end static_single_assignment.EvaluationOrder,
 	usage *LastUsage, function *Function) int {
-	if d == nil || d.declarations == nil || usage == nil || function == nil {
+	if dependencies == nil || dependencies.declarations == nil || usage == nil || function == nil {
 		return 0
 	}
-	held := d.declarations[scope]
+	held := dependencies.declarations[scope]
 	if len(held) == 0 {
 		return 0
 	}
@@ -295,7 +295,7 @@ func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end s
 	}
 	removed := len(held) - len(kept)
 	if removed > 0 {
-		d.declarations[scope] = kept
+		dependencies.declarations[scope] = kept
 	}
 	return removed
 }
@@ -308,12 +308,12 @@ func (d *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end s
 //
 // This is the only pass in phase 6 that changes a value the rule reads directly. The rule compares
 // dependency sets, so a set left wider than upstream's is a set that will not correspond.
-func (d *ScopeDependencies) PruneNonReactiveDependenciesOf(scope ScopeId,
+func (dependencies *ScopeDependencies) PruneNonReactiveDependenciesOf(scope ScopeId,
 	reactive map[static_single_assignment.IdentifierId]bool) int {
-	if d == nil || d.dependencies == nil || reactive == nil {
+	if dependencies == nil || dependencies.dependencies == nil || reactive == nil {
 		return 0
 	}
-	held := d.dependencies[scope]
+	held := dependencies.dependencies[scope]
 	if len(held) == 0 {
 		return 0
 	}
@@ -326,17 +326,17 @@ func (d *ScopeDependencies) PruneNonReactiveDependenciesOf(scope ScopeId,
 	}
 	removed := len(held) - len(kept)
 	if removed > 0 {
-		d.dependencies[scope] = kept
+		dependencies.dependencies[scope] = kept
 	}
 	return removed
 }
 
 // ReassignmentsOf returns the bindings a scope reassigns.
-func (d *ScopeDependencies) ReassignmentsOf(scope ScopeId) []static_single_assignment.IdentifierId {
-	if d == nil || d.reassignments == nil {
+func (dependencies *ScopeDependencies) ReassignmentsOf(scope ScopeId) []static_single_assignment.IdentifierId {
+	if dependencies == nil || dependencies.reassignments == nil {
 		return nil
 	}
-	return d.reassignments[scope]
+	return dependencies.reassignments[scope]
 }
 
 // Ids returns every scope this pass recorded, in the order it closed them.
@@ -344,19 +344,19 @@ func (d *ScopeDependencies) ReassignmentsOf(scope ScopeId) []static_single_assig
 // Returned as a slice rather than by ranging a map so a caller iterating scopes gets the same
 // sequence every run. Go map iteration is randomised, and a pass whose output order varies makes a
 // cache non-reproducible without ever producing a wrong answer.
-func (d *ScopeDependencies) Ids() []ScopeId {
-	if d == nil {
+func (dependencies *ScopeDependencies) Ids() []ScopeId {
+	if dependencies == nil {
 		return nil
 	}
-	return d.order
+	return dependencies.order
 }
 
 // Len reports how many scopes carry an entry, for measurement.
-func (d *ScopeDependencies) Len() int {
-	if d == nil {
+func (dependencies *ScopeDependencies) Len() int {
+	if dependencies == nil {
 		return 0
 	}
-	return len(d.order)
+	return len(dependencies.order)
 }
 
 // ---------------------------------------------------------------------------
@@ -423,14 +423,14 @@ func newDependencyNode(access propertyAccessType, reactive bool) *dependencyNode
 }
 
 // makeOrMergeProperty is upstream's `makeOrMergeProperty`: descend one step, creating or merging.
-func (n *dependencyNode) makeOrMergeProperty(property string, access propertyAccessType) *dependencyNode {
-	if existing, ok := n.properties[property]; ok {
+func (node *dependencyNode) makeOrMergeProperty(property string, access propertyAccessType) *dependencyNode {
+	if existing, ok := node.properties[property]; ok {
 		existing.access = mergeAccess(existing.access, access)
 		return existing
 	}
-	child := newDependencyNode(access, n.reactive)
-	n.properties[property] = child
-	n.keys = append(n.keys, property)
+	child := newDependencyNode(access, node.reactive)
+	node.properties[property] = child
+	node.keys = append(node.keys, property)
 	return child
 }
 
@@ -508,17 +508,17 @@ func newDependencyTree(hoistable map[static_single_assignment.IdentifierId]*hois
 // Measured on the corpus, that duplicate submission was the whole gap: 71 bare roots were replaced
 // by 147 specific paths, every added path an extension of a removed root and every removed root
 // replaced. The path distribution moved from 237 deep / 2,205 flat to 386 / 2,136.
-func (t *dependencyTree) addDependency(dep ReactiveScopeDependency) {
-	root, ok := t.roots[dep.Identifier]
+func (tree *dependencyTree) addDependency(dep ReactiveScopeDependency) {
+	root, ok := tree.roots[dep.Identifier]
 	if !ok {
 		root = newDependencyNode(unconditionalAccess, dep.Reactive)
-		t.roots[dep.Identifier] = root
-		t.rootOrder = append(t.rootOrder, dep.Identifier)
+		tree.roots[dep.Identifier] = root
+		tree.rootOrder = append(tree.rootOrder, dep.Identifier)
 	}
 
 	cursor := root
 	var hoistableCursor *hoistableNode
-	if seed, present := t.hoistable[dep.Identifier]; present {
+	if seed, present := tree.hoistable[dep.Identifier]; present {
 		hoistableCursor = seed
 	}
 
@@ -553,10 +553,10 @@ func (t *dependencyTree) addDependency(dep ReactiveScopeDependency) {
 // A node marked as a dependency is emitted and its children are NOT walked, because depending on
 // `props.a` already covers `props.a.b`. That pruning is the whole point of the tree: a scope reading
 // `props.a`, `props.a.b` and `props.a.c` reports one dependency rather than three.
-func (t *dependencyTree) deriveMinimalDependencies() []ReactiveScopeDependency {
+func (tree *dependencyTree) deriveMinimalDependencies() []ReactiveScopeDependency {
 	var results []ReactiveScopeDependency
-	for _, rootId := range t.rootOrder {
-		root := t.roots[rootId]
+	for _, rootId := range tree.rootOrder {
+		root := tree.roots[rootId]
 		collectMinimalInSubtree(root, rootId, nil, &results)
 	}
 	return results
@@ -604,8 +604,8 @@ type temporaries map[static_single_assignment.IdentifierId]ReactiveScopeDependen
 // When the object is itself a known temporary the access EXTENDS that temporary's path; otherwise it
 // starts a new path rooted at the object. The extension copies the path rather than appending in
 // place, because two accesses off one temporary must not share a backing array.
-func (t temporaries) getProperty(object Place, property string, optional bool) ReactiveScopeDependency {
-	if resolved, ok := t[object.Identifier]; ok {
+func (temporaries temporaries) getProperty(object Place, property string, optional bool) ReactiveScopeDependency {
+	if resolved, ok := temporaries[object.Identifier]; ok {
 		path := make([]DependencyPathEntry, len(resolved.Path), len(resolved.Path)+1)
 		copy(path, resolved.Path)
 		path = append(path, DependencyPathEntry{Property: property, Optional: optional})
@@ -623,8 +623,8 @@ func (t temporaries) getProperty(object Place, property string, optional bool) R
 }
 
 // resolve returns the dependency a place names, following the temporaries map.
-func (t temporaries) resolve(place Place) ReactiveScopeDependency {
-	if resolved, ok := t[place.Identifier]; ok {
+func (temporaries temporaries) resolve(place Place) ReactiveScopeDependency {
+	if resolved, ok := temporaries[place.Identifier]; ok {
 		path := make([]DependencyPathEntry, len(resolved.Path))
 		copy(path, resolved.Path)
 		return ReactiveScopeDependency{
@@ -869,16 +869,16 @@ type dependencyCollector struct {
 	assumedInvoked  AssumedInvokedFunctions
 }
 
-func (c *dependencyCollector) currentScope() (ScopeId, bool) {
-	if len(c.scopeStack) == 0 {
+func (collector *dependencyCollector) currentScope() (ScopeId, bool) {
+	if len(collector.scopeStack) == 0 {
 		return 0, false
 	}
-	return c.scopeStack[len(c.scopeStack)-1], true
+	return collector.scopeStack[len(collector.scopeStack)-1], true
 }
 
-func (c *dependencyCollector) enterScope(scope ScopeId) {
-	c.scopeStack = append(c.scopeStack, scope)
-	c.dependencies = append(c.dependencies, nil)
+func (collector *dependencyCollector) enterScope(scope ScopeId) {
+	collector.scopeStack = append(collector.scopeStack, scope)
+	collector.dependencies = append(collector.dependencies, nil)
 }
 
 // exitScope closes a scope, recording its dependencies and propagating them outward.
@@ -886,37 +886,37 @@ func (c *dependencyCollector) enterScope(scope ScopeId) {
 // The propagation is what makes a nested scope's inputs also inputs of its parent: a value the inner
 // scope needs must be available before the outer one runs. Only dependencies that are still VALID
 // at the outer level propagate, which `checkValidDependency` decides.
-func (c *dependencyCollector) exitScope(scope ScopeId) {
-	if len(c.scopeStack) == 0 {
+func (collector *dependencyCollector) exitScope(scope ScopeId) {
+	if len(collector.scopeStack) == 0 {
 		return
 	}
-	scoped := c.dependencies[len(c.dependencies)-1]
-	c.dependencies = c.dependencies[:len(c.dependencies)-1]
-	c.scopeStack = c.scopeStack[:len(c.scopeStack)-1]
+	scoped := collector.dependencies[len(collector.dependencies)-1]
+	collector.dependencies = collector.dependencies[:len(collector.dependencies)-1]
+	collector.scopeStack = collector.scopeStack[:len(collector.scopeStack)-1]
 
 	for _, dep := range scoped {
-		if len(c.dependencies) > 0 && c.checkValidDependency(dep) {
-			c.dependencies[len(c.dependencies)-1] =
-				append(c.dependencies[len(c.dependencies)-1], dep)
+		if len(collector.dependencies) > 0 && collector.checkValidDependency(dep) {
+			collector.dependencies[len(collector.dependencies)-1] =
+				append(collector.dependencies[len(collector.dependencies)-1], dep)
 		}
 	}
 
-	if c.result.dependencies == nil {
-		c.result.dependencies = map[ScopeId][]ReactiveScopeDependency{}
+	if collector.result.dependencies == nil {
+		collector.result.dependencies = map[ScopeId][]ReactiveScopeDependency{}
 	}
-	if _, seen := c.result.dependencies[scope]; !seen {
-		c.result.order = append(c.result.order, scope)
+	if _, seen := collector.result.dependencies[scope]; !seen {
+		collector.result.order = append(collector.result.order, scope)
 	}
-	c.result.dependencies[scope] = append(c.result.dependencies[scope], scoped...)
+	collector.result.dependencies[scope] = append(collector.result.dependencies[scope], scoped...)
 }
 
-func (c *dependencyCollector) declare(id static_single_assignment.IdentifierId, decl declaration) {
-	identifier := c.function.Identifiers[id]
+func (collector *dependencyCollector) declare(id static_single_assignment.IdentifierId, decl declaration) {
+	identifier := collector.function.Identifiers[id]
 	if identifier == nil {
 		return
 	}
-	if _, exists := c.declarations[identifier.Declaration]; !exists {
-		c.declarations[identifier.Declaration] = decl
+	if _, exists := collector.declarations[identifier.Declaration]; !exists {
+		collector.declarations[identifier.Declaration] = decl
 	}
 }
 
@@ -930,33 +930,33 @@ func (c *dependencyCollector) declare(id static_single_assignment.IdentifierId, 
 // The two type-based exclusions upstream also applies are `DependencyGapTypeExclusions`. The object
 // method half is recovered structurally here rather than through a type, because an `ObjectMethod`
 // instruction is identifiable without one; the ref half is not expressible and is 3 accesses.
-func (c *dependencyCollector) checkValidDependency(dep ReactiveScopeDependency) bool {
-	if c.objectMethods[dep.Identifier] {
+func (collector *dependencyCollector) checkValidDependency(dep ReactiveScopeDependency) bool {
+	if collector.objectMethods[dep.Identifier] {
 		return false
 	}
-	scope, ok := c.currentScope()
+	scope, ok := collector.currentScope()
 	if !ok {
 		return false
 	}
-	identifier := c.function.Identifiers[dep.Identifier]
+	identifier := collector.function.Identifiers[dep.Identifier]
 	if identifier == nil {
 		return false
 	}
-	decl, found := c.reassignments[dep.Identifier]
+	decl, found := collector.reassignments[dep.Identifier]
 	if !found {
-		decl, found = c.declarations[identifier.Declaration]
+		decl, found = collector.declarations[identifier.Declaration]
 	}
 	if !found {
 		return false
 	}
-	return decl.order < c.scopeRange(scope).Start
+	return decl.order < collector.scopeRange(scope).Start
 }
 
 // visitDependency records one access, and records a DECLARATION when it crosses a scope boundary.
 //
 // The second half is the `declarations` field: a value produced inside a scope and read outside it
 // must be exported from that scope, because the memoized block has to return it.
-func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
+func (collector *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 	// A `.current` read is not a dependency; the object holding it is.
 	//
 	// Upstream's `visitDependency` does the same, with the comment "ref.current access is not a
@@ -975,21 +975,21 @@ func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 			Reactive:   dep.Reactive,
 		}
 	}
-	identifier := c.function.Identifiers[dep.Identifier]
+	identifier := collector.function.Identifiers[dep.Identifier]
 	if identifier == nil {
 		return
 	}
-	if original, ok := c.declarations[identifier.Declaration]; ok && len(original.scopeStack) > 0 {
+	if original, ok := collector.declarations[identifier.Declaration]; ok && len(original.scopeStack) > 0 {
 		for _, declaringScope := range original.scopeStack {
-			if c.scopeIsActive(declaringScope) {
+			if collector.scopeIsActive(declaringScope) {
 				continue
 			}
-			if c.result.declarations == nil {
-				c.result.declarations = map[ScopeId][]static_single_assignment.IdentifierId{}
+			if collector.result.declarations == nil {
+				collector.result.declarations = map[ScopeId][]static_single_assignment.IdentifierId{}
 			}
-			if !containsIdentifier(c.result.declarations[declaringScope], dep.Identifier) {
-				c.result.declarations[declaringScope] =
-					append(c.result.declarations[declaringScope], dep.Identifier)
+			if !containsIdentifier(collector.result.declarations[declaringScope], dep.Identifier) {
+				collector.result.declarations[declaringScope] =
+					append(collector.result.declarations[declaringScope], dep.Identifier)
 			}
 			// The origin is the innermost scope on the stack recorded at declaration time, which is
 			// the last entry: the stack is pushed outermost-first as scopes open.
@@ -1000,50 +1000,50 @@ func (c *dependencyCollector) visitDependency(dep ReactiveScopeDependency) {
 			// The guard read as protection against a later scope overwriting the origin with
 			// itself, and that cannot happen because the value written does not depend on
 			// `declaringScope` at all.
-			if c.result.declarationOrigin == nil {
-				c.result.declarationOrigin = map[static_single_assignment.IdentifierId]ScopeId{}
+			if collector.result.declarationOrigin == nil {
+				collector.result.declarationOrigin = map[static_single_assignment.IdentifierId]ScopeId{}
 			}
-			c.result.declarationOrigin[dep.Identifier] =
+			collector.result.declarationOrigin[dep.Identifier] =
 				original.scopeStack[len(original.scopeStack)-1]
 		}
 	}
-	if len(c.dependencies) == 0 {
+	if len(collector.dependencies) == 0 {
 		return
 	}
-	if c.checkValidDependency(dep) {
-		c.dependencies[len(c.dependencies)-1] =
-			append(c.dependencies[len(c.dependencies)-1], dep)
+	if collector.checkValidDependency(dep) {
+		collector.dependencies[len(collector.dependencies)-1] =
+			append(collector.dependencies[len(collector.dependencies)-1], dep)
 	}
 }
 
 // visitReassignment records that the current scope writes to a binding declared outside it.
-func (c *dependencyCollector) visitReassignment(place Place) {
-	scope, ok := c.currentScope()
+func (collector *dependencyCollector) visitReassignment(place Place) {
+	scope, ok := collector.currentScope()
 	if !ok {
 		return
 	}
-	if !c.checkValidDependency(ReactiveScopeDependency{
+	if !collector.checkValidDependency(ReactiveScopeDependency{
 		Identifier: place.Identifier, Reactive: place.Reactive}) {
 		return
 	}
-	if c.result.reassignments == nil {
-		c.result.reassignments = map[ScopeId][]static_single_assignment.IdentifierId{}
+	if collector.result.reassignments == nil {
+		collector.result.reassignments = map[ScopeId][]static_single_assignment.IdentifierId{}
 	}
-	target := c.function.Identifiers[place.Identifier]
+	target := collector.function.Identifiers[place.Identifier]
 	if target == nil {
 		return
 	}
-	for _, existing := range c.result.reassignments[scope] {
-		if other := c.function.Identifiers[existing]; other != nil &&
+	for _, existing := range collector.result.reassignments[scope] {
+		if other := collector.function.Identifiers[existing]; other != nil &&
 			other.Declaration == target.Declaration {
 			return
 		}
 	}
-	c.result.reassignments[scope] = append(c.result.reassignments[scope], place.Identifier)
+	collector.result.reassignments[scope] = append(collector.result.reassignments[scope], place.Identifier)
 }
 
-func (c *dependencyCollector) scopeIsActive(scope ScopeId) bool {
-	for _, candidate := range c.scopeStack {
+func (collector *dependencyCollector) scopeIsActive(scope ScopeId) bool {
+	for _, candidate := range collector.scopeStack {
 		if candidate == scope {
 			return true
 		}
@@ -1187,11 +1187,11 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 // Upstream raises `CompilerError.invariant('Conflicting access types')` on any of these. Measured at
 // zero across 400 corpus files, so this exists to make a future non-zero visible rather than to
 // describe current behaviour.
-func (d *ScopeDependencies) Conflicts() int {
-	if d == nil {
+func (dependencies *ScopeDependencies) Conflicts() int {
+	if dependencies == nil {
 		return 0
 	}
-	return d.conflicts
+	return dependencies.conflicts
 }
 
 // objectMethodValues returns the values produced by an ObjectMethod instruction.
@@ -1225,16 +1225,16 @@ func objectMethodValues(function *Function) map[static_single_assignment.Identif
 // One traversal of the blocks in execution order, maintaining the scope stack. Every block, every
 // instruction and every operand is visited exactly once, which is the whole termination argument:
 // the work is linear in the graph and the loops are over slices fixed before the walk begins.
-func (c *dependencyCollector) walk(function *Function, terminals map[static_single_assignment.BlockId]scopeBlockInfo) {
+func (collector *dependencyCollector) walk(function *Function, terminals map[static_single_assignment.BlockId]scopeBlockInfo) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
 		}
 		if info, ok := terminals[block.Id]; ok {
 			if info.begins {
-				c.enterScope(info.scope)
+				collector.enterScope(info.scope)
 			} else {
-				c.exitScope(info.scope)
+				collector.exitScope(info.scope)
 			}
 		}
 
@@ -1259,7 +1259,7 @@ func (c *dependencyCollector) walk(function *Function, terminals map[static_sing
 			// verdict EXPIRES the moment a scope contains a phi -- which `AlignReactiveScopes`
 			// widening a scope across a control-flow join would produce.
 			for _, predecessor := range PhiOperandsInOrder(phi) {
-				c.visitDependency(c.temporaries.resolve(phi.Operands.At(predecessor)))
+				collector.visitDependency(collector.temporaries.resolve(phi.Operands.At(predecessor)))
 			}
 		}
 
@@ -1268,13 +1268,13 @@ func (c *dependencyCollector) walk(function *Function, terminals map[static_sing
 			if instruction == nil {
 				continue
 			}
-			c.handleInstruction(instruction)
+			collector.handleInstruction(instruction)
 		}
 
-		if !c.processedOptionalTests[block.Id] {
+		if !collector.processedOptionalTests[block.Id] {
 			EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
 				if role != PlaceRoleDefine {
-					c.visitDependency(c.temporaries.resolve(place))
+					collector.visitDependency(collector.temporaries.resolve(place))
 				}
 			})
 		}
@@ -1282,8 +1282,8 @@ func (c *dependencyCollector) walk(function *Function, terminals map[static_sing
 
 	// Anything still open at the end is closed in reverse, so a scope whose fallthrough was never
 	// reached still records its dependencies rather than discarding them.
-	for len(c.scopeStack) > 0 {
-		c.exitScope(c.scopeStack[len(c.scopeStack)-1])
+	for len(collector.scopeStack) > 0 {
+		collector.exitScope(collector.scopeStack[len(collector.scopeStack)-1])
 	}
 }
 
@@ -1296,11 +1296,11 @@ func (c *dependencyCollector) walk(function *Function, terminals map[static_sing
 // The DECLARATION is recorded before the deferral check, and before the visit, because a deferred
 // instruction still defines its lvalue -- `checkValidDependency` compares against that order, so
 // skipping the declare would make every later read of the temporary look undeclared.
-func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
-	decl := declaration{order: instruction.Order, scopeStack: c.copyScopeStack()}
-	c.declare(instruction.LValue.Identifier, decl)
+func (collector *dependencyCollector) handleInstruction(instruction *Instruction) {
+	decl := declaration{order: instruction.Order, scopeStack: collector.copyScopeStack()}
+	collector.declare(instruction.LValue.Identifier, decl)
 
-	if c.isDeferredDependency(instruction) {
+	if collector.isDeferredDependency(instruction) {
 		return
 	}
 
@@ -1308,7 +1308,7 @@ func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 	case *FunctionExpression:
 		// The recursion REPLACES the bare capture visit: `EachPlace` would record each capture as
 		// a rootless access, and that bare root prunes away every deeper path in the same subtree.
-		c.visitNestedFunction(value.Function, value.Captures)
+		collector.visitNestedFunction(value.Function, value.Captures)
 	case *StartMemoize:
 		// The marker's operands are the dependencies the developer WROTE, and reading them as
 		// dependencies of the enclosing scope is what makes writing `[x]` change what we infer.
@@ -1344,45 +1344,45 @@ func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 		// rather than the understood one.
 		_ = value
 	case *PropertyLoad:
-		c.visitDependency(c.temporaries.getProperty(value.Object, value.Property, value.Optional))
+		collector.visitDependency(collector.temporaries.getProperty(value.Object, value.Property, value.Optional))
 	case *StoreLocal:
-		c.visitDependency(c.temporaries.resolve(value.Value))
+		collector.visitDependency(collector.temporaries.resolve(value.Value))
 		if value.Kind == InstructionKindReassign {
-			c.visitReassignment(value.LValue)
-			c.reassignments[value.LValue.Identifier] = decl
+			collector.visitReassignment(value.LValue)
+			collector.reassignments[value.LValue.Identifier] = decl
 		}
-		c.declare(value.LValue.Identifier, decl)
+		collector.declare(value.LValue.Identifier, decl)
 	case *StoreContext:
-		c.visitDependency(c.temporaries.resolve(value.Value))
+		collector.visitDependency(collector.temporaries.resolve(value.Value))
 		if value.Kind == InstructionKindReassign {
-			c.visitReassignment(value.LValue)
-			c.reassignments[value.LValue.Identifier] = decl
+			collector.visitReassignment(value.LValue)
+			collector.reassignments[value.LValue.Identifier] = decl
 		}
-		c.declare(value.LValue.Identifier, decl)
+		collector.declare(value.LValue.Identifier, decl)
 	case *DeclareLocal:
-		c.declare(value.LValue.Identifier, decl)
+		collector.declare(value.LValue.Identifier, decl)
 	case *DeclareContext:
-		c.declare(value.LValue.Identifier, decl)
+		collector.declare(value.LValue.Identifier, decl)
 	case *Destructure:
-		c.visitDependency(c.temporaries.resolve(value.Value))
+		collector.visitDependency(collector.temporaries.resolve(value.Value))
 		// The shared `eachPatternPlace` yields defaults and computed keys as USES alongside the
 		// bindings, which is richer than upstream's `eachPatternOperand` and exactly right here: a
 		// default value is read by the destructure and is a genuine dependency.
 		eachPatternPlace(value.LValue, func(place Place, role PlaceRole) {
 			if role != PlaceRoleDefine {
-				c.visitDependency(c.temporaries.resolve(place))
+				collector.visitDependency(collector.temporaries.resolve(place))
 				return
 			}
 			if value.Kind == InstructionKindReassign {
-				c.visitReassignment(place)
-				c.reassignments[place.Identifier] = decl
+				collector.visitReassignment(place)
+				collector.reassignments[place.Identifier] = decl
 			}
-			c.declare(place.Identifier, decl)
+			collector.declare(place.Identifier, decl)
 		})
 	default:
 		EachPlace(instruction.Value, func(place Place, role PlaceRole) {
 			if role != PlaceRoleDefine {
-				c.visitDependency(c.temporaries.resolve(place))
+				collector.visitDependency(collector.temporaries.resolve(place))
 			}
 		})
 	}
@@ -1399,11 +1399,11 @@ func (c *dependencyCollector) handleInstruction(instruction *Instruction) {
 // 324 pairs with zero length or name mismatches, so the map is total.
 //
 // Roots that do not translate are nested-local values and are dropped rather than guessed at.
-func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Place) {
-	if int(id) >= len(c.function.Functions) {
+func (collector *dependencyCollector) visitNestedFunction(id FunctionId, captures []Place) {
+	if int(id) >= len(collector.function.Functions) {
 		return
 	}
-	nested := c.function.Functions[id]
+	nested := collector.function.Functions[id]
 	if nested == nil || len(captures) != len(nested.Context) {
 		return
 	}
@@ -1446,8 +1446,8 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 	// 25 to 20. Latent rather than inert, and recorded because it read as a failed change for a
 	// whole cycle before the other half landed.
 	alwaysReached := blocksAlwaysReached(nested)
-	if c.assumedInvoked == nil {
-		c.assumedInvoked = CollectAssumedInvokedFunctions(c.function)
+	if collector.assumedInvoked == nil {
+		collector.assumedInvoked = CollectAssumedInvokedFunctions(collector.function)
 	}
 	// A root is suppressed only when some OTHER access names it with a deeper path: that bare
 	// root is the redundant evidence that prunes the path away in `collectMinimalInSubtree`.
@@ -1472,16 +1472,16 @@ func (c *dependencyCollector) visitNestedFunction(id FunctionId, captures []Plac
 			Reactive:   outer.Reactive,
 			Path:       dep.Path,
 		}
-		if c.assumedInvoked[id] && len(dep.Path) > 0 && alwaysReached[accessBlocks[index]] &&
-			c.checkValidDependency(translated) {
-			if scope, ok := c.currentScope(); ok {
-				if c.nestedHoistable == nil {
-					c.nestedHoistable = map[ScopeId][]ReactiveScopeDependency{}
+		if collector.assumedInvoked[id] && len(dep.Path) > 0 && alwaysReached[accessBlocks[index]] &&
+			collector.checkValidDependency(translated) {
+			if scope, ok := collector.currentScope(); ok {
+				if collector.nestedHoistable == nil {
+					collector.nestedHoistable = map[ScopeId][]ReactiveScopeDependency{}
 				}
-				c.nestedHoistable[scope] = append(c.nestedHoistable[scope], translated)
+				collector.nestedHoistable[scope] = append(collector.nestedHoistable[scope], translated)
 			}
 		}
-		c.visitDependency(translated)
+		collector.visitDependency(translated)
 	}
 }
 
@@ -1642,8 +1642,8 @@ func blocksAlwaysReached(function *Function) map[static_single_assignment.BlockI
 }
 
 // resolveWithPath resolves a place and appends a suffix path to whatever it resolved to.
-func (t temporaries) resolveWithPath(place Place, suffix []DependencyPathEntry) ReactiveScopeDependency {
-	base := t.resolve(place)
+func (temporaries temporaries) resolveWithPath(place Place, suffix []DependencyPathEntry) ReactiveScopeDependency {
+	base := temporaries.resolve(place)
 	if len(suffix) == 0 {
 		return base
 	}
@@ -1675,20 +1675,20 @@ func (t temporaries) resolveWithPath(place Place, suffix []DependencyPathEntry) 
 // Upstream also defers instructions consumed by an optional chain, via `processedInstrsInOptional`.
 // The optional traversal records those StoreLocal instructions explicitly because their own
 // instruction lvalues are not the stored values keyed in the temporaries sidemap.
-func (c *dependencyCollector) isDeferredDependency(instruction *Instruction) bool {
-	if c.processedOptionalInstructions[instruction.Id] {
+func (collector *dependencyCollector) isDeferredDependency(instruction *Instruction) bool {
+	if collector.processedOptionalInstructions[instruction.Id] {
 		return true
 	}
-	_, deferred := c.temporaries[instruction.LValue.Identifier]
+	_, deferred := collector.temporaries[instruction.LValue.Identifier]
 	return deferred
 }
 
-func (c *dependencyCollector) copyScopeStack() []ScopeId {
-	if len(c.scopeStack) == 0 {
+func (collector *dependencyCollector) copyScopeStack() []ScopeId {
+	if len(collector.scopeStack) == 0 {
 		return nil
 	}
-	copied := make([]ScopeId, len(c.scopeStack))
-	copy(copied, c.scopeStack)
+	copied := make([]ScopeId, len(collector.scopeStack))
+	copy(copied, collector.scopeStack)
 	return copied
 }
 
@@ -1698,47 +1698,47 @@ func (c *dependencyCollector) copyScopeStack() []ScopeId {
 // the minimal set, and append each candidate that is not already present. The dedup predicate is
 // upstream's -- same DECLARATION and equal paths -- so two values of one reassigned binding
 // deduplicate against each other, which comparing identifiers would not do.
-func (c *dependencyCollector) reduce(identity ScopeIdentity) {
-	if c.result.dependencies == nil {
+func (collector *dependencyCollector) reduce(identity ScopeIdentity) {
+	if collector.result.dependencies == nil {
 		return
 	}
-	for _, scope := range c.result.order {
-		accesses := c.result.dependencies[scope]
+	for _, scope := range collector.result.order {
+		accesses := collector.result.dependencies[scope]
 		if len(accesses) == 0 {
 			continue
 		}
 		// The hoistable set for this scope decides how DEEP each dependency path may go. An explicit
 		// caller can still omit it, in which case the dependency tree conservatively truncates paths
 		// to their roots; the production entry point supplies `CollectHoistablePropertyLoads`.
-		seed := c.hoistable[scope]
-		if extra := c.nestedHoistable[scope]; len(extra) > 0 {
+		seed := collector.hoistable[scope]
+		if extra := collector.nestedHoistable[scope]; len(extra) > 0 {
 			seed = appendWithoutOptionalDuplicates(seed, extra)
 		}
 		hoistable, conflicts := hoistableTreeFor(seed)
-		c.result.conflicts += conflicts
+		collector.result.conflicts += conflicts
 		tree := newDependencyTree(hoistable)
 		for _, access := range accesses {
 			tree.addDependency(access)
 		}
 		var reduced []ReactiveScopeDependency
 		for _, candidate := range tree.deriveMinimalDependencies() {
-			if !c.alreadyPresent(reduced, candidate) {
+			if !collector.alreadyPresent(reduced, candidate) {
 				reduced = append(reduced, candidate)
 			}
 		}
-		c.result.dependencies[scope] = reduced
+		collector.result.dependencies[scope] = reduced
 	}
 }
 
 // alreadyPresent is upstream's dedup predicate: same declaration and equal paths.
-func (c *dependencyCollector) alreadyPresent(existing []ReactiveScopeDependency,
+func (collector *dependencyCollector) alreadyPresent(existing []ReactiveScopeDependency,
 	candidate ReactiveScopeDependency) bool {
-	candidateIdentifier := c.function.Identifiers[candidate.Identifier]
+	candidateIdentifier := collector.function.Identifiers[candidate.Identifier]
 	if candidateIdentifier == nil {
 		return false
 	}
 	for _, present := range existing {
-		presentIdentifier := c.function.Identifiers[present.Identifier]
+		presentIdentifier := collector.function.Identifiers[present.Identifier]
 		if presentIdentifier == nil {
 			continue
 		}
@@ -1766,13 +1766,13 @@ func (c *dependencyCollector) alreadyPresent(existing []ReactiveScopeDependency,
 // invariant there; this declines instead, because an unnamed root that is not in the map cannot be
 // compared against anything a developer could have written, and reporting it would be a finding
 // about the lowering rather than about the source.
-func (d *ScopeDependencies) NormalizeInferredDependency(function *Function,
+func (dependencies *ScopeDependencies) NormalizeInferredDependency(function *Function,
 	dependency ReactiveScopeDependency) (ManualMemoDependency, bool) {
-	if d == nil || function == nil {
+	if dependencies == nil || function == nil {
 		return ManualMemoDependency{}, false
 	}
 
-	if resolved, found := d.temporaries[dependency.Identifier]; found {
+	if resolved, found := dependencies.temporaries[dependency.Identifier]; found {
 		path := make([]DependencyPathEntry, 0, len(resolved.Path)+len(dependency.Path))
 		path = append(path, resolved.Path...)
 		path = append(path, dependency.Path...)

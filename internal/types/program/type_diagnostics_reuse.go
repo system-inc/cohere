@@ -109,32 +109,32 @@ func NewTypeDiagnosticsReuse(stored *TypesSection, key [sha256.Size]byte) *TypeD
 
 // Unchanged reports whether what this run recorded is what the table already holds: every file replayed
 // under the same key, and the global verdict the same. Writing it back would rewrite the table for nothing.
-func (r *TypeDiagnosticsReuse) Unchanged() bool {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if r.recorded == nil || r.stored == nil {
-		return r.recorded == nil
+func (reuse *TypeDiagnosticsReuse) Unchanged() bool {
+	reuse.mutex.Lock()
+	defer reuse.mutex.Unlock()
+	if reuse.recorded == nil || reuse.stored == nil {
+		return reuse.recorded == nil
 	}
-	return r.stored.Key == r.recorded.Key && r.stored.GlobalsClean == r.recorded.GlobalsClean &&
-		r.replayed == len(r.recorded.Entries) && len(r.recorded.Entries) == len(r.stored.Entries)
+	return reuse.stored.Key == reuse.recorded.Key && reuse.stored.GlobalsClean == reuse.recorded.GlobalsClean &&
+		reuse.replayed == len(reuse.recorded.Entries) && len(reuse.recorded.Entries) == len(reuse.stored.Entries)
 }
 
 // Replayed is how many files' semantic diagnostics this run took from the section.
-func (r *TypeDiagnosticsReuse) Replayed() int {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	return r.replayed
+func (reuse *TypeDiagnosticsReuse) Replayed() int {
+	reuse.mutex.Lock()
+	defer reuse.mutex.Unlock()
+	return reuse.replayed
 }
 
 // ReplayedAmong is how many of files had their semantic diagnostics taken from the section. The check
 // covers the whole program whatever the run's scope, so Replayed counts files a scoped run never reports
 // on, and a line saying "3955 of 1 files" read as nonsense (#rxqptqp).
-func (r *TypeDiagnosticsReuse) ReplayedAmong(files []*ast.SourceFile) int {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+func (reuse *TypeDiagnosticsReuse) ReplayedAmong(files []*ast.SourceFile) int {
+	reuse.mutex.Lock()
+	defer reuse.mutex.Unlock()
 	count := 0
 	for _, sourceFile := range files {
-		if _, replayed := r.replayedFiles[sourceFile.FileName().AsString()]; replayed {
+		if _, replayed := reuse.replayedFiles[sourceFile.FileName().AsString()]; replayed {
 			count++
 		}
 	}
@@ -142,19 +142,19 @@ func (r *TypeDiagnosticsReuse) ReplayedAmong(files []*ast.SourceFile) int {
 }
 
 // Recorded is the section this run leaves for the next, nil when it recorded nothing.
-func (r *TypeDiagnosticsReuse) Recorded() *TypesSection {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	return r.recorded
+func (reuse *TypeDiagnosticsReuse) Recorded() *TypesSection {
+	reuse.mutex.Lock()
+	defer reuse.mutex.Unlock()
+	return reuse.recorded
 }
 
 // FinishGlobals says whether this run saw any global diagnostic. Until it is told none, what it recorded
 // may only be read as a full check: a run that saw one records nothing to replay.
-func (r *TypeDiagnosticsReuse) FinishGlobals(clean bool) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if r.recorded != nil {
-		r.recorded.GlobalsClean = clean
+func (reuse *TypeDiagnosticsReuse) FinishGlobals(clean bool) {
+	reuse.mutex.Lock()
+	defer reuse.mutex.Unlock()
+	if reuse.recorded != nil {
+		reuse.recorded.GlobalsClean = clean
 	}
 }
 
@@ -168,11 +168,11 @@ type TypeDiagnosticParts struct {
 }
 
 // All is the parts in the order AllDiagnostics returns them.
-func (p TypeDiagnosticParts) All() []*ast.Diagnostic {
-	if len(p.Syntactic) > 0 {
-		return p.Syntactic
+func (parts TypeDiagnosticParts) All() []*ast.Diagnostic {
+	if len(parts.Syntactic) > 0 {
+		return parts.Syntactic
 	}
-	return append(append([]*ast.Diagnostic{}, p.Bind...), p.Semantic...)
+	return append(append([]*ast.Diagnostic{}, parts.Bind...), parts.Semantic...)
 }
 
 // CheckReusing checks the project files whose shape fingerprint moved since the section was recorded and
@@ -182,18 +182,18 @@ func (p TypeDiagnosticParts) All() []*ast.Diagnostic {
 // much changed that the full check, which spreads every checker over every file, is the faster way.
 //
 // Mutates: reuse records what was replayed and the section to save for the next run, unless the graph was retired
-func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
+func (graph *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
 	stored := reuse.stored
-	if stored == nil || stored.Version != typesSectionVersion || stored.Key != reuse.key || !stored.GlobalsClean || g.Shapes == nil {
+	if stored == nil || stored.Version != typesSectionVersion || stored.Key != reuse.key || !stored.GlobalsClean || graph.Shapes == nil {
 		return TypeDiagnosticParts{}, false
 	}
-	syntactic := g.Program.GetSyntacticDiagnostics(ctx, nil)
+	syntactic := graph.Program.GetSyntacticDiagnostics(ctx, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}, true
 	}
 
-	fingerprints := g.SignatureFingerprints(g.Shapes)
-	projectFiles := g.ProjectFiles()
+	fingerprints := graph.SignatureFingerprints(graph.Shapes)
+	projectFiles := graph.ProjectFiles()
 	var replayed []*ast.Diagnostic
 	var toCheck []*ast.SourceFile
 	entries := make(map[string]TypesEntry, len(projectFiles))
@@ -214,8 +214,8 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 		return TypeDiagnosticParts{}, false
 	}
 
-	bind := g.Program.GetBindDiagnostics(ctx, nil)
-	checked := g.semanticDiagnosticsOf(ctx, toCheck)
+	bind := graph.Program.GetBindDiagnostics(ctx, nil)
+	checked := graph.semanticDiagnosticsOf(ctx, toCheck)
 	semantic := replayed
 	for index, sourceFile := range toCheck {
 		semantic = append(semantic, checked[index]...)
@@ -233,10 +233,10 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 	// The replayed files too: a retired check finishing after its successor would otherwise leave the old
 	// graph's count on the types line.
 	reuse.mutex.Lock()
-	if !g.Retired() {
+	if !graph.Retired() {
 		reuse.replayed, reuse.replayedFiles = len(replayedFiles), replayedFiles
 	}
-	if ctx.Err() == nil && !g.Retired() {
+	if ctx.Err() == nil && !graph.Retired() {
 		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
 	}
 	reuse.mutex.Unlock()
@@ -246,24 +246,24 @@ func (g *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (
 // RecordFull records a full check's semantic diagnostics per project file, for the next run to replay.
 //
 // Mutates: reuse records the section to save for the next run, unless the graph was retired
-func (g *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, parts TypeDiagnosticParts) {
-	if len(parts.Syntactic) > 0 || g.Shapes == nil || ctx.Err() != nil {
+func (graph *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, parts TypeDiagnosticParts) {
+	if len(parts.Syntactic) > 0 || graph.Shapes == nil || ctx.Err() != nil {
 		return
 	}
-	fingerprints := g.SignatureFingerprints(g.Shapes)
+	fingerprints := graph.SignatureFingerprints(graph.Shapes)
 	byFile := map[*ast.SourceFile][]*ast.Diagnostic{}
 	for _, diagnostic := range parts.Semantic {
 		byFile[diagnostic.File()] = append(byFile[diagnostic.File()], diagnostic)
 	}
-	entries := make(map[string]TypesEntry, len(g.ProjectFiles()))
-	for _, sourceFile := range g.ProjectFiles() {
+	entries := make(map[string]TypesEntry, len(graph.ProjectFiles()))
+	for _, sourceFile := range graph.ProjectFiles() {
 		if entry, keepable := typesEntryFor(sourceFile, fingerprints[sourceFile.PathKey()], byFile[sourceFile]); keepable {
 			entries[sourceFile.FileName().AsString()] = entry
 		}
 	}
 	reuse.mutex.Lock()
 	// Asked here, under the mutex, for the reason CheckReusing gives: a retired graph never records.
-	if !g.Retired() {
+	if !graph.Retired() {
 		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
 	}
 	reuse.mutex.Unlock()
@@ -271,11 +271,11 @@ func (g *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, par
 
 // semanticDiagnosticsOf checks each file on the checker that owns it, a goroutine per checker, so a handful
 // of files costs a handful of checks and many files still spread across every checker.
-func (g *Graph) semanticDiagnosticsOf(ctx context.Context, files []*ast.SourceFile) [][]*ast.Diagnostic {
+func (graph *Graph) semanticDiagnosticsOf(ctx context.Context, files []*ast.SourceFile) [][]*ast.Diagnostic {
 	results := make([][]*ast.Diagnostic, len(files))
 	groups := map[*checker.Checker][]int{}
 	for index, sourceFile := range files {
-		owner, release := g.Program.GetTypeCheckerForFile(ctx, sourceFile)
+		owner, release := graph.Program.GetTypeCheckerForFile(ctx, sourceFile)
 		release()
 		groups[owner] = append(groups[owner], index)
 	}
@@ -285,7 +285,7 @@ func (g *Graph) semanticDiagnosticsOf(ctx context.Context, files []*ast.SourceFi
 		go func() {
 			defer waitGroup.Done()
 			for _, index := range indices {
-				results[index] = g.Program.GetSemanticDiagnostics(ctx, files[index])
+				results[index] = graph.Program.GetSemanticDiagnostics(ctx, files[index])
 			}
 		}()
 	}

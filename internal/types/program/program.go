@@ -151,13 +151,13 @@ type Graph struct {
 // marks itself cancelled, the compiler then hands it the next file in its group, and GetGlobalDiagnostics
 // panics on a compiler goroutine nothing here can recover. The gate itself died that way, a bare `cohere`
 // in 5 of 6 runs once its fix phase rewrote a file before the early check finished (#sm79kfv).
-func (g *Graph) Retire() {
-	g.retired.Store(true)
+func (graph *Graph) Retire() {
+	graph.retired.Store(true)
 }
 
 // Retired reports whether Retire was called.
-func (g *Graph) Retired() bool {
-	return g.retired.Load()
+func (graph *Graph) Retired() bool {
+	return graph.retired.Load()
 }
 
 // Options controls how a graph is built.
@@ -307,24 +307,24 @@ func Build(options Options) (*Graph, error) {
 }
 
 // yield takes the files a nearer tsconfig owns out of ProjectFiles, and counts them.
-func (g *Graph) yield(yielded map[string]struct{}) {
+func (graph *Graph) yield(yielded map[string]struct{}) {
 	if len(yielded) == 0 {
 		return
 	}
-	kept := g.projectFiles[:0:0]
-	for _, sourceFile := range g.projectFiles {
+	kept := graph.projectFiles[:0:0]
+	for _, sourceFile := range graph.projectFiles {
 		if _, isYielded := yielded[filepath.Clean(filepath.FromSlash(sourceFile.FileName().AsString()))]; isYielded {
-			g.YieldedFiles++
+			graph.YieldedFiles++
 			continue
 		}
 		kept = append(kept, sourceFile)
 	}
-	g.projectFiles = kept
+	graph.projectFiles = kept
 }
 
 // timedVerify is verifyProjectFiles against the disk, timed when the build is. A build over another
 // filesystem asks that one, since the real disk knows nothing of its files.
-func (g *Graph) timedVerify(options Options) (rootsVerdict, []string) {
+func (graph *Graph) timedVerify(options Options) (rootsVerdict, []string) {
 	inspect := inspectRootOnDisk
 	if options.FileSystem != nil {
 		inspect = func(fileName string) rootState {
@@ -336,10 +336,10 @@ func (g *Graph) timedVerify(options Options) (rootsVerdict, []string) {
 	}
 	timing := options.Timing
 	if timing == nil {
-		return g.verifyProjectFiles(inspect)
+		return graph.verifyProjectFiles(inspect)
 	}
 	started := time.Now()
-	verdict, missing := g.verifyProjectFiles(inspect)
+	verdict, missing := graph.verifyProjectFiles(inspect)
 	timing.Verify += time.Since(started)
 	return verdict, missing
 }
@@ -367,21 +367,21 @@ func classifyMissingRoots(missing []string, inspect func(string) rootState) root
 
 // verifyProjectFiles matches the config's files to the program's, keeps the matches for ProjectFiles,
 // and says what any missing ones mean.
-func (g *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict, []string) {
-	rootPaths := make(map[tspath.PathKey]string, len(g.Config.FileNames()))
-	for _, fileName := range g.Config.FileNames() {
-		rootPaths[toPath(fileName.AsString(), g.Anchor.Root(), g.Config.CaseSensitivity())] = fileName.AsString()
+func (graph *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict, []string) {
+	rootPaths := make(map[tspath.PathKey]string, len(graph.Config.FileNames()))
+	for _, fileName := range graph.Config.FileNames() {
+		rootPaths[toPath(fileName.AsString(), graph.Anchor.Root(), graph.Config.CaseSensitivity())] = fileName.AsString()
 	}
 
 	files := make([]*ast.SourceFile, 0, len(rootPaths))
 	loaded := make(map[tspath.PathKey]struct{}, len(rootPaths))
-	for _, sourceFile := range g.Program.GetSourceFiles() {
+	for _, sourceFile := range graph.Program.GetSourceFiles() {
 		if _, isRoot := rootPaths[sourceFile.PathKey()]; isRoot {
 			files = append(files, sourceFile)
 			loaded[sourceFile.PathKey()] = struct{}{}
 		}
 	}
-	g.projectFiles = files
+	graph.projectFiles = files
 
 	missing := []string{}
 	for path, fileName := range rootPaths {
@@ -634,16 +634,16 @@ func buildOnce(options Options) (*Graph, error) {
  *     bytes in UTF-8 can decode to exactly its own size.
  * False on any doubt, so the reader reads the disk, as it would have.
  */
-func (g *Graph) ReadUnchanged(path string, text string) bool {
-	if g == nil {
+func (graph *Graph) ReadUnchanged(path string, text string) bool {
+	if graph == nil {
 		return false
 	}
 	var identity fileIdentity
 	var known bool
-	if g.contentPack != nil {
-		identity, known = g.contentPack.readIdentity(path)
+	if graph.contentPack != nil {
+		identity, known = graph.contentPack.readIdentity(path)
 	} else {
-		identity, known = g.readIdentities.identity(path)
+		identity, known = graph.readIdentities.identity(path)
 	}
 	if !known || identity.size != int64(len(text)) {
 		return false
@@ -657,8 +657,8 @@ func (g *Graph) ReadUnchanged(path string, text string) bool {
 // SourceFiles is every file in the program, third-party declarations included.
 //
 // This is the program's population, not the set a phase should lint. Use ProjectFiles for that.
-func (g *Graph) SourceFiles() []*ast.SourceFile {
-	return g.Program.GetSourceFiles()
+func (graph *Graph) SourceFiles() []*ast.SourceFile {
+	return graph.Program.GetSourceFiles()
 }
 
 // ProjectFiles is the subset of the program that the tsconfig actually named: our code, without
@@ -667,14 +667,14 @@ func (g *Graph) SourceFiles() []*ast.SourceFile {
 // On the ahra tree that is roughly 3,400 files out of 9,530. The other 6,100 are `node_modules`
 // `.d.ts` that the checker needs in order to answer questions and that no rule should visit: a rule
 // walking them would cost most of the run to report findings against code nobody here can edit.
-func (g *Graph) ProjectFiles() []*ast.SourceFile {
+func (graph *Graph) ProjectFiles() []*ast.SourceFile {
 	// Matched and verified once, by Build. A lookup that misses reports the same empty result as a
 	// config that named nothing, and this one has missed twice: the compiler lowercases Path() on a
 	// case-insensitive filesystem while the config keeps its casing (matched zero of 3,407), and a file
 	// can be deleted between the config's glob and the program's read (matched 3,789 of 3,790, with many
 	// writers sharing the tree). Build tells the two apart and fails on the first, so nothing here can
 	// return a silently partial list.
-	return g.projectFiles
+	return graph.projectFiles
 }
 
 // projectFilesMismatchMessage says what went wrong and where to look.
@@ -700,8 +700,8 @@ func projectFilesMismatchMessage(named int, matched int) string {
 // meaningless, which is the worst failure shape available here.
 //
 // The release function must be called, conventionally by defer.
-func (g *Graph) CheckerForFile(ctx context.Context, sourceFile *ast.SourceFile) (*checker.Checker, func()) {
-	return g.Program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
+func (graph *Graph) CheckerForFile(ctx context.Context, sourceFile *ast.SourceFile) (*checker.Checker, func()) {
+	return graph.Program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
 }
 
 // Diagnostics returns TypeScript's own findings for one file: syntax, then binding, then semantics.
@@ -712,14 +712,14 @@ func (g *Graph) CheckerForFile(ctx context.Context, sourceFile *ast.SourceFile) 
 //
 // Prefer AllDiagnostics for a whole-program check. Calling this in a loop over every file is more
 // than three times slower for a reason that is invisible at the call site. See the note there.
-func (g *Graph) Diagnostics(ctx context.Context, sourceFile *ast.SourceFile) []*ast.Diagnostic {
-	syntactic := g.Program.GetSyntacticDiagnostics(ctx, sourceFile)
+func (graph *Graph) Diagnostics(ctx context.Context, sourceFile *ast.SourceFile) []*ast.Diagnostic {
+	syntactic := graph.Program.GetSyntacticDiagnostics(ctx, sourceFile)
 	if len(syntactic) > 0 {
 		return syntactic
 	}
 
-	diagnostics := g.Program.GetBindDiagnostics(ctx, sourceFile)
-	return append(diagnostics, g.Program.GetSemanticDiagnostics(ctx, sourceFile)...)
+	diagnostics := graph.Program.GetBindDiagnostics(ctx, sourceFile)
+	return append(diagnostics, graph.Program.GetSemanticDiagnostics(ctx, sourceFile)...)
 }
 
 // AllDiagnostics returns TypeScript's findings for the whole program.
@@ -733,28 +733,28 @@ func (g *Graph) Diagnostics(ctx context.Context, sourceFile *ast.SourceFile) []*
 //
 // The findings are identical either way. Only the wall clock differs, which is exactly what makes
 // this the kind of mistake that survives review.
-func (g *Graph) AllDiagnostics(ctx context.Context) []*ast.Diagnostic {
-	return g.AllDiagnosticParts(ctx).All()
+func (graph *Graph) AllDiagnostics(ctx context.Context) []*ast.Diagnostic {
+	return graph.AllDiagnosticParts(ctx).All()
 }
 
 // AllDiagnosticParts is AllDiagnostics with its parts kept apart. See TypeDiagnosticParts.
-func (g *Graph) AllDiagnosticParts(ctx context.Context) TypeDiagnosticParts {
-	syntactic := g.Program.GetSyntacticDiagnostics(ctx, nil)
+func (graph *Graph) AllDiagnosticParts(ctx context.Context) TypeDiagnosticParts {
+	syntactic := graph.Program.GetSyntacticDiagnostics(ctx, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-	return TypeDiagnosticParts{Bind: g.Program.GetBindDiagnostics(ctx, nil), Semantic: g.Program.GetSemanticDiagnostics(ctx, nil)}
+	return TypeDiagnosticParts{Bind: graph.Program.GetBindDiagnostics(ctx, nil), Semantic: graph.Program.GetSemanticDiagnostics(ctx, nil)}
 }
 
 // ConfigDiagnostics returns findings about the configuration itself rather than about any file:
 // contradictory options, an unreachable lib, a target that does not exist.
-func (g *Graph) ConfigDiagnostics(ctx context.Context) []*ast.Diagnostic {
+func (graph *Graph) ConfigDiagnostics(ctx context.Context) []*ast.Diagnostic {
 	// GetOptionsDiagnostics was folded into GetProgramDiagnostics upstream: an option that contradicts
 	// another is now reported with the rest of the program's own findings rather than through its own
 	// accessor. The set is the same; only the door changed.
-	diagnostics := g.Program.GetConfigFileParsingDiagnostics()
-	diagnostics = append(diagnostics, g.Program.GetProgramDiagnostics()...)
-	diagnostics = append(diagnostics, g.Program.GetGlobalDiagnostics(ctx)...)
+	diagnostics := graph.Program.GetConfigFileParsingDiagnostics()
+	diagnostics = append(diagnostics, graph.Program.GetProgramDiagnostics()...)
+	diagnostics = append(diagnostics, graph.Program.GetGlobalDiagnostics(ctx)...)
 	return diagnostics
 }
 
@@ -769,13 +769,13 @@ func (g *Graph) ConfigDiagnostics(ctx context.Context) []*ast.Diagnostic {
 // step. Both are reachable now, so the mirror is gone: a count that disagreed with the compiler's
 // would hand files to a worker whose checker does not own them, and types from two checkers cannot
 // be mixed.
-func (g *Graph) Workers() int {
-	if g.Program.SingleThreaded() {
+func (graph *Graph) Workers() int {
+	if graph.Program.SingleThreaded() {
 		return 1
 	}
 
 	checkerCount := defaultCheckerCount()
-	if requested := g.Program.Options().Checkers; requested != nil {
+	if requested := graph.Program.Options().Checkers; requested != nil {
 		checkerCount = *requested
 	}
 
@@ -788,7 +788,7 @@ func (g *Graph) Workers() int {
 	// instance than the one they would be handed. Types from two checkers cannot be mixed, so that is
 	// wrong answers rather than wasted goroutines. Measured: Workers() returned 100 against
 	// upstream's 64 before this.
-	return max(min(checkerCount, len(g.Program.GetSourceFiles()), 256), 1)
+	return max(min(checkerCount, len(graph.Program.GetSourceFiles()), 256), 1)
 }
 
 // defaultCheckerCount is how many checkers we ask for when nobody says otherwise.

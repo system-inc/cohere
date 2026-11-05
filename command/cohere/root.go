@@ -314,9 +314,9 @@ func absoluteFrom(directory string, path string) string {
 // differ it is the most important context in the output: a green run from `modules/tasks` that
 // checked the whole of ahra and a green run that checked only `modules/tasks` would otherwise print
 // the same verdict, and only one of them is what the caller probably assumed.
-func (l projectLocation) rootNote() string {
-	if filepath.Clean(l.Root) == filepath.Clean(l.WorkingDirectory) {
+func (location projectLocation) rootNote() string {
+	if filepath.Clean(location.Root) == filepath.Clean(location.WorkingDirectory) {
 		return ""
 	}
-	return fmt.Sprintf("checked the project at %s (the run started in %s)", l.Root, l.WorkingDirectory)
+	return fmt.Sprintf("checked the project at %s (the run started in %s)", location.Root, location.WorkingDirectory)
 }

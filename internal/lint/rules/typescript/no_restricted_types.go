@@ -282,11 +282,11 @@ type NoRestrictedTypesBan struct {
 // Upstream returns the empty string for a bare `true` and otherwise a space followed by the message,
 // so the standard sentence and the custom one are separated by exactly one space and a bare ban ends
 // at the period.
-func (b NoRestrictedTypesBan) customMessage() string {
-	if b.Message == "" {
+func (ban NoRestrictedTypesBan) customMessage() string {
+	if ban.Message == "" {
 		return ""
 	}
-	return " " + b.Message
+	return " " + ban.Message
 }
 
 // DefaultNoRestrictedTypesOptions is upstream's configured-nothing behavior: ban nothing.

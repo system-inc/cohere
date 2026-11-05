@@ -174,8 +174,8 @@ type pipelineReport struct {
 }
 
 // record notes what a phase did. Called once per phase, in order.
-func (r *pipelineReport) record(name phaseName, outcome phaseOutcome, elapsed time.Duration, detail string) {
-	r.records = append(r.records, phaseRecord{
+func (report *pipelineReport) record(name phaseName, outcome phaseOutcome, elapsed time.Duration, detail string) {
+	report.records = append(report.records, phaseRecord{
 		Name:    name,
 		Outcome: outcome,
 		Elapsed: elapsed,
@@ -185,8 +185,8 @@ func (r *pipelineReport) record(name phaseName, outcome phaseOutcome, elapsed ti
 
 // recordChecked notes the fix phase under `--no-fix`: it ran, wrote nothing, and found this many files
 // that a writing run would change.
-func (r *pipelineReport) recordChecked(name phaseName, elapsed time.Duration, wouldChange int) {
-	r.records = append(r.records, phaseRecord{
+func (report *pipelineReport) recordChecked(name phaseName, elapsed time.Duration, wouldChange int) {
+	report.records = append(report.records, phaseRecord{
 		Name:     name,
 		Outcome:  outcomeChecked,
 		Elapsed:  elapsed,
@@ -196,10 +196,10 @@ func (r *pipelineReport) recordChecked(name phaseName, elapsed time.Duration, wo
 
 // narrow notes that only part of an already recorded phase ran, such as the fix phase under
 // `--format-only`, which formats and proposes no fixes.
-func (r *pipelineReport) narrow(name phaseName, part string) {
-	for index := range r.records {
-		if r.records[index].Name == name {
-			r.records[index].Narrowed = part
+func (report *pipelineReport) narrow(name phaseName, part string) {
+	for index := range report.records {
+		if report.records[index].Name == name {
+			report.records[index].Narrowed = part
 		}
 	}
 }
@@ -221,12 +221,12 @@ type requestedPhases map[phaseName]bool
 // bailed" tells the reader something was taken from them; "not requested" tells them nothing was.
 // Printing the first when the second is true manufactures a gap out of an ordinary run, which is
 // the mirror image of the silent-green failure and just as misleading.
-func (r *pipelineReport) markRemainingNotReached(bailedAt phaseName, reason string) {
-	r.markRemainingNotReachedFor(bailedAt, reason, nil)
+func (report *pipelineReport) markRemainingNotReached(bailedAt phaseName, reason string) {
+	report.markRemainingNotReachedFor(bailedAt, reason, nil)
 }
 
 // markRemainingNotReachedFor is markRemainingNotReached told which opt-in phases were asked for.
-func (r *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, reason string, requested requestedPhases) {
+func (report *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, reason string, requested requestedPhases) {
 	reached := false
 	for _, name := range phaseOrder {
 		if name == bailedAt {
@@ -236,21 +236,21 @@ func (r *pipelineReport) markRemainingNotReachedFor(bailedAt phaseName, reason s
 		if !reached {
 			continue
 		}
-		if r.has(name) {
+		if report.has(name) {
 			continue
 		}
 		// An opt-in phase nobody named was not deprived of anything by the bail.
 		if optInPhases[name] && !requested[name] {
 			// The dash is escaped, not changed: swift/Contract.md fixes this detail's spelling for both engines.
-			r.record(name, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
+			report.record(name, outcomeSkipped, 0, "not requested \u2014 this is a report, ask for it with --unused")
 			continue
 		}
-		r.record(name, outcomeNotReached, 0, fmt.Sprintf("%s bailed: %s", bailedAt, reason))
+		report.record(name, outcomeNotReached, 0, fmt.Sprintf("%s bailed: %s", bailedAt, reason))
 	}
 }
 
-func (r *pipelineReport) has(name phaseName) bool {
-	for _, record := range r.records {
+func (report *pipelineReport) has(name phaseName) bool {
+	for _, record := range report.records {
 		if record.Name == name {
 			return true
 		}
@@ -270,8 +270,8 @@ func (r *pipelineReport) has(name phaseName) bool {
 //
 // A phase that was cut off is always a gap, including the fix phase, because a bail means the run
 // stopped early rather than chose not to act.
-func (r *pipelineReport) checkedEverything() bool {
-	for _, record := range r.records {
+func (report *pipelineReport) checkedEverything() bool {
+	for _, record := range report.records {
 		if record.Outcome == outcomeNotReached {
 			return false
 		}
@@ -312,8 +312,8 @@ func skippedAsNotRequested(record phaseRecord) bool {
 // `--lint` asked for lint and got all of it. Every other skip of a reporting phase still is one, and so
 // is anything not reached. checkedEverything keeps its wider answer for the phase line, which says on a
 // narrowed run that the phases above did not check everything, true of `--lint` in either engine.
-func (r *pipelineReport) checkedEveryRequestedPhase() bool {
-	for _, record := range r.records {
+func (report *pipelineReport) checkedEveryRequestedPhase() bool {
+	for _, record := range report.records {
 		if record.Outcome == outcomeNotReached {
 			return false
 		}
@@ -339,10 +339,10 @@ func narrowedNote(record phaseRecord) string {
 // run which checked nothing must not be able to print like a run that checked everything and found
 // it clean, and a phase summary that only appears when something went wrong reintroduces exactly
 // that ambiguity for the successful case.
-func (r *pipelineReport) Write(out *bufio.Writer) {
-	parts := make([]string, 0, len(r.records))
+func (report *pipelineReport) Write(out *bufio.Writer) {
+	parts := make([]string, 0, len(report.records))
 	for _, name := range phaseOrder {
-		for _, record := range r.records {
+		for _, record := range report.records {
 			if record.Name != name {
 				continue
 			}
@@ -368,10 +368,10 @@ func (r *pipelineReport) Write(out *bufio.Writer) {
 
 	printInvocation(out, "phases: %s\n", strings.Join(parts, " · "))
 
-	r.writeAccounting(out)
+	report.writeAccounting(out)
 	// Under the same condition as the total: both describe the process, and a report with no process
 	// behind it has neither.
-	if !r.processStart.IsZero() {
+	if !report.processStart.IsZero() {
 		printInvocation(out, "  %s\n", activeMemoryPolicy.line())
 	}
 
@@ -393,23 +393,23 @@ func (r *pipelineReport) Write(out *bufio.Writer) {
 	//
 	// Silent on a clean build. A line on every ordinary run is one people learn to skip, which would
 	// cost exactly the case it exists for.
-	r.writeProvenanceWarning(out, release.Current().SourceTreeModified || r.engineSourceTreeModified)
+	report.writeProvenanceWarning(out, release.Current().SourceTreeModified || report.engineSourceTreeModified)
 
-	if r.rootNote != "" {
-		fmt.Fprintf(out, "  %s\n", r.rootNote)
+	if report.rootNote != "" {
+		fmt.Fprintf(out, "  %s\n", report.rootNote)
 	}
-	if r.cacheOff {
+	if report.cacheOff {
 		fmt.Fprintln(out, "  cache: off, by --no-cache: nothing was read from or written to this project's cache table or its incremental build info")
 	}
 	// Said, because keying a shape on content is a choice with a cost: an edit to one of these files re-runs
 	// its importers' shape-keyed rules. The alternative, a declaration emit up front, has no ceiling (#5txm9gg).
-	if r.contentKeyedShapes > 0 {
+	if report.contentKeyedShapes > 0 {
 		subject := "files' shapes are"
-		if r.contentKeyedShapes == 1 {
+		if report.contentKeyedShapes == 1 {
 			subject = "file's shape is"
 		}
 		fmt.Fprintf(out, "  cache: %d %s keyed on content, with no recorded declaration signature (computing one up front has no ceiling), so an edit to one re-runs its importers' shape-keyed rules\n",
-			r.contentKeyedShapes, subject)
+			report.contentKeyedShapes, subject)
 	}
 
 	// File scope is its own dimension and the phase lines cannot express it. A run narrowed to one
@@ -418,15 +418,15 @@ func (r *pipelineReport) Write(out *bufio.Writer) {
 	//
 	// Said first, and with both numbers, because it is the larger gap: skipping a phase withholds one
 	// kind of finding, and checking 1 file of 3,542 withholds every kind on 3,541 files.
-	if r.filesInScope > 0 && r.filesInScope < r.filesInProgram {
+	if report.filesInScope > 0 && report.filesInScope < report.filesInProgram {
 		fmt.Fprintf(out, "  this run checked %d of %d files: the rest were not looked at\n",
-			r.filesInScope, r.filesInProgram)
+			report.filesInScope, report.filesInProgram)
 	}
 
-	if !r.checkedEverything() {
+	if !report.checkedEverything() {
 		fmt.Fprintf(out, "  this run did not check everything: the phases above say what was not checked\n")
-	} else if r.incompleteBeyondPhases != "" {
-		fmt.Fprintf(out, "  this run did not check everything: %s\n", r.incompleteBeyondPhases)
+	} else if report.incompleteBeyondPhases != "" {
+		fmt.Fprintf(out, "  this run did not check everything: %s\n", report.incompleteBeyondPhases)
 	}
 }
 
@@ -440,23 +440,23 @@ func (r *pipelineReport) Write(out *bufio.Writer) {
 //
 // It prints nothing when the process start was never recorded, because a computed total that is
 // silently measuring from the zero time would be worse than no line at all.
-func (r *pipelineReport) writeAccounting(out *bufio.Writer) {
-	if r.processStart.IsZero() {
+func (report *pipelineReport) writeAccounting(out *bufio.Writer) {
+	if report.processStart.IsZero() {
 		return
 	}
 
-	total := time.Since(r.processStart)
+	total := time.Since(report.processStart)
 	graphLabel, graphNotBuiltSentence := "graph", "no graph was built and no phase ran"
-	if r.graphLabel != "" {
-		graphLabel, graphNotBuiltSentence = r.graphLabel, r.graphNotBuiltSentence
+	if report.graphLabel != "" {
+		graphLabel, graphNotBuiltSentence = report.graphLabel, report.graphNotBuiltSentence
 	}
-	if r.graphNotBuilt {
+	if report.graphNotBuilt {
 		printInvocation(out, "  total %s: %s\n", round(total), graphNotBuiltSentence)
 		return
 	}
-	if r.graphSkipped {
+	if report.graphSkipped {
 		phases := time.Duration(0)
-		for _, record := range r.records {
+		for _, record := range report.records {
 			if record.Outcome == outcomeRan || record.Outcome == outcomeChecked {
 				phases += record.Elapsed
 			}
@@ -465,8 +465,8 @@ func (r *pipelineReport) writeAccounting(out *bufio.Writer) {
 			round(total), round(phases), round(max(total-phases, 0)))
 		return
 	}
-	accounted := r.graph
-	for _, record := range r.records {
+	accounted := report.graph
+	for _, record := range report.records {
 		// Only phases that actually spent the time are summed. A reused phase records a zero elapsed
 		// because its work is already counted under the phase that performed it, and adding anything
 		// for it here would double-count a single walk across two rows.
@@ -481,12 +481,12 @@ func (r *pipelineReport) writeAccounting(out *bufio.Writer) {
 		// clock. Reporting a negative remainder would be nonsense; reporting the overlap honestly
 		// is the useful reading.
 		printInvocation(out, "  total %s: %s %s plus phases, overlapping by %s\n",
-			round(total), graphLabel, round(r.graph), round(-unaccounted))
+			round(total), graphLabel, round(report.graph), round(-unaccounted))
 		return
 	}
 
 	printInvocation(out, "  total %s: %s %s, phases %s, %s outside any phase\n",
-		round(total), graphLabel, round(r.graph), round(accounted-r.graph), round(unaccounted))
+		round(total), graphLabel, round(report.graph), round(accounted-report.graph), round(unaccounted))
 }
 
 // writeProvenanceWarning says when the binary cannot be traced to a commit.
@@ -494,7 +494,7 @@ func (r *pipelineReport) writeAccounting(out *bufio.Writer) {
 // Takes the flag rather than reading it, so a fixture can hold both directions. `Current()` reads
 // stamps the linker wrote, which a test cannot vary, and a test that could only observe the build
 // it happens to run under would assert nothing.
-func (r *pipelineReport) writeProvenanceWarning(out *bufio.Writer, sourceTreeModified bool) {
+func (report *pipelineReport) writeProvenanceWarning(out *bufio.Writer, sourceTreeModified bool) {
 	if !sourceTreeModified {
 		return
 	}

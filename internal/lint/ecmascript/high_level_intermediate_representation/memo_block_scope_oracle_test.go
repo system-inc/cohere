@@ -335,49 +335,49 @@ type memoBlockObserver struct {
 	order  []int
 }
 
-func (o *memoBlockObserver) ensure(id int) *memoBlockObservation {
-	if o.byId == nil {
-		o.byId = map[int]*memoBlockObservation{}
+func (observer *memoBlockObserver) ensure(id int) *memoBlockObservation {
+	if observer.byId == nil {
+		observer.byId = map[int]*memoBlockObservation{}
 	}
-	if existing, ok := o.byId[id]; ok {
+	if existing, ok := observer.byId[id]; ok {
 		return existing
 	}
 	fresh := &memoBlockObservation{}
-	o.byId[id] = fresh
-	o.order = append(o.order, id)
+	observer.byId[id] = fresh
+	observer.order = append(observer.order, id)
 	return fresh
 }
 
-func (o *memoBlockObserver) observations() []memoBlockObservation {
-	out := make([]memoBlockObservation, 0, len(o.order))
-	for _, id := range o.order {
-		out = append(out, *o.byId[id])
+func (observer *memoBlockObserver) observations() []memoBlockObservation {
+	out := make([]memoBlockObservation, 0, len(observer.order))
+	for _, id := range observer.order {
+		out = append(out, *observer.byId[id])
 	}
 	return out
 }
 
-func (o *memoBlockObserver) walk(block ReactiveBlock) {
+func (observer *memoBlockObserver) walk(block ReactiveBlock) {
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveInstructionStatement:
-			o.visitInstruction(shape.Instruction)
+			observer.visitInstruction(shape.Instruction)
 
 		case *ReactiveScopeBlock:
-			o.walk(shape.Instructions)
+			observer.walk(shape.Instructions)
 			// Counted on scope EXIT, which is where the validator runs its comparison. A scope that
 			// opened inside a block and closes after it is not comparable, so open-time membership
 			// would count a population the rule cannot act on.
-			carrying := len(o.dependencies.DependenciesOf(shape.Scope)) > 0
-			if len(o.open) > 0 {
-				for id := range o.open {
-					observation := o.ensure(id)
+			carrying := len(observer.dependencies.DependenciesOf(shape.Scope)) > 0
+			if len(observer.open) > 0 {
+				for id := range observer.open {
+					observation := observer.ensure(id)
 					observation.scopesInside++
 					if carrying {
 						observation.carryingInside++
 					} else {
 						observation.emptyInside++
 					}
-					if o.scopeCaptures(shape) {
+					if observer.scopeCaptures(shape) {
 						observation.capturingInside++
 					}
 				}
@@ -386,13 +386,13 @@ func (o *memoBlockObserver) walk(block ReactiveBlock) {
 			if carrying {
 				// Outside every block. Attributed to the most recently closed one, which is the
 				// block such a scope would belong to if the boundary were drawn differently.
-				if len(o.closed) > 0 {
-					o.ensure(o.closed[len(o.closed)-1]).carryingAfter++
+				if len(observer.closed) > 0 {
+					observer.ensure(observer.closed[len(observer.closed)-1]).carryingAfter++
 				}
 			}
 
 		case *ReactiveTerminalStatement:
-			o.walkTerminal(shape)
+			observer.walkTerminal(shape)
 		}
 	}
 }
@@ -402,7 +402,7 @@ func (o *memoBlockObserver) walk(block ReactiveBlock) {
 // Recorded alongside the dependency counts because a scope carrying no dependency but holding a
 // capturing closure is a distinguishable population: the value it reads is real and lives in a
 // nested function, rather than the scope genuinely reading nothing.
-func (o *memoBlockObserver) scopeCaptures(scope *ReactiveScopeBlock) bool {
+func (observer *memoBlockObserver) scopeCaptures(scope *ReactiveScopeBlock) bool {
 	for _, statement := range scope.Instructions {
 		instruction, ok := statement.(*ReactiveInstructionStatement)
 		if !ok || instruction.Instruction == nil || instruction.Instruction.Value == nil {
@@ -421,13 +421,13 @@ func (o *memoBlockObserver) scopeCaptures(scope *ReactiveScopeBlock) bool {
 	return false
 }
 
-func (o *memoBlockObserver) visitInstruction(instruction *ReactiveInstruction) {
+func (observer *memoBlockObserver) visitInstruction(instruction *ReactiveInstruction) {
 	if instruction == nil || instruction.Value == nil {
 		return
 	}
 	if sequence, isSequence := instruction.Value.(*ReactiveSequenceValue); isSequence {
 		for _, nested := range sequence.Instructions {
-			o.visitInstruction(nested)
+			observer.visitInstruction(nested)
 		}
 	}
 	plain, isPlain := instruction.Value.(*ReactiveInstructionValue)
@@ -436,47 +436,47 @@ func (o *memoBlockObserver) visitInstruction(instruction *ReactiveInstruction) {
 	}
 	switch marker := plain.Value.(type) {
 	case *StartMemoize:
-		if o.open == nil {
-			o.open = map[int]bool{}
+		if observer.open == nil {
+			observer.open = map[int]bool{}
 		}
-		o.open[marker.ManualMemoId] = true
-		o.ensure(marker.ManualMemoId)
+		observer.open[marker.ManualMemoId] = true
+		observer.ensure(marker.ManualMemoId)
 	case *FinishMemoize:
-		if !o.open[marker.ManualMemoId] {
+		if !observer.open[marker.ManualMemoId] {
 			return
 		}
-		delete(o.open, marker.ManualMemoId)
-		o.closed = append(o.closed, marker.ManualMemoId)
+		delete(observer.open, marker.ManualMemoId)
+		observer.closed = append(observer.closed, marker.ManualMemoId)
 	}
 }
 
-func (o *memoBlockObserver) walkTerminal(statement *ReactiveTerminalStatement) {
+func (observer *memoBlockObserver) walkTerminal(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveIf:
-		o.walk(shape.Consequent)
+		observer.walk(shape.Consequent)
 		if shape.Alternate != nil {
-			o.walk(*shape.Alternate)
+			observer.walk(*shape.Alternate)
 		}
 	case *ReactiveSwitch:
 		for index := range shape.Cases {
 			if shape.Cases[index].Block != nil {
-				o.walk(*shape.Cases[index].Block)
+				observer.walk(*shape.Cases[index].Block)
 			}
 		}
 	case *ReactiveFor:
-		o.walk(shape.Loop)
+		observer.walk(shape.Loop)
 	case *ReactiveForOf:
-		o.walk(shape.Loop)
+		observer.walk(shape.Loop)
 	case *ReactiveForIn:
-		o.walk(shape.Loop)
+		observer.walk(shape.Loop)
 	case *ReactiveWhile:
-		o.walk(shape.Loop)
+		observer.walk(shape.Loop)
 	case *ReactiveDoWhile:
-		o.walk(shape.Loop)
+		observer.walk(shape.Loop)
 	case *ReactiveLabelTerminal:
-		o.walk(shape.Block)
+		observer.walk(shape.Block)
 	case *ReactiveTry:
-		o.walk(shape.Block)
-		o.walk(shape.Handler)
+		observer.walk(shape.Block)
+		observer.walk(shape.Handler)
 	}
 }

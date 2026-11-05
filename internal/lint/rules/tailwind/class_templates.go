@@ -52,8 +52,8 @@ const (
 //
 // Read from the same reading as ClassLiteralsIn, so a rule reading seams covers exactly the strings a
 // rule reading classes does. Anything else is a difference in coverage that nobody declared.
-func (r *ClassLiteralReader) ClassTemplatesIn(node *ast.Node) []ClassTemplate {
-	values := r.classValuesIn(node)
+func (reader *ClassLiteralReader) ClassTemplatesIn(node *ast.Node) []ClassTemplate {
+	values := reader.classValuesIn(node)
 	var templates []ClassTemplate
 	for _, template := range values.templates {
 		if classTemplate, hasBoundaries := templateBoundaries(template); hasBoundaries {

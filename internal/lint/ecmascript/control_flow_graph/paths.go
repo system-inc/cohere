@@ -70,62 +70,62 @@ func AnalyzePaths[E any](graph *Graph[E]) *PathAnalysis[E] {
 }
 
 // IsCyclic reports whether block belongs to a reachable graph cycle.
-func (a *PathAnalysis[E]) IsCyclic(block *Block[E]) bool {
-	if a == nil || block == nil || block.Index() >= len(a.blocks) {
+func (analysis *PathAnalysis[E]) IsCyclic(block *Block[E]) bool {
+	if analysis == nil || block == nil || block.Index() >= len(analysis.blocks) {
 		return false
 	}
-	if a.cyclePaths != nil {
-		a.cyclePaths.countToEnd(block.Index())
+	if analysis.cyclePaths != nil {
+		analysis.cyclePaths.countToEnd(block.Index())
 	}
-	return a.blocks[block.Index()].flags&pathCyclic != 0
+	return analysis.blocks[block.Index()].flags&pathCyclic != 0
 }
 
 // IsOnEveryFinalPath reports whether every non-throwing path from the graph
 // entry to a final block passes through block. It is true when the graph has no
 // non-throwing final path, matching the vacuous path-count comparison used by
 // ESLint consumers.
-func (a *PathAnalysis[E]) IsOnEveryFinalPath(block *Block[E]) bool {
-	return a != nil && block != nil && block.Index() < len(a.blocks) && a.blocks[block.Index()].flags&pathOnEveryFinal != 0
+func (analysis *PathAnalysis[E]) IsOnEveryFinalPath(block *Block[E]) bool {
+	return analysis != nil && block != nil && block.Index() < len(analysis.blocks) && analysis.blocks[block.Index()].flags&pathOnEveryFinal != 0
 }
 
 // IsExit reports whether block is a reachable final segment, including an
 // uncaught thrown segment. ESLint includes thrown segments in codePath's
 // finalSegments even though path counting deliberately assigns them zero
 // paths.
-func (a *PathAnalysis[E]) IsExit(block *Block[E]) bool {
-	return a != nil && block != nil && block.Index() < len(a.blocks) && a.blocks[block.Index()].flags&pathExit != 0
+func (analysis *PathAnalysis[E]) IsExit(block *Block[E]) bool {
+	return analysis != nil && block != nil && block.Index() < len(analysis.blocks) && analysis.blocks[block.Index()].flags&pathExit != 0
 }
 
 // ShortestPathFromStart returns the number of blocks on the shortest path from
 // the graph entry to block. The second result is false for an unreachable or
 // unknown block.
-func (a *PathAnalysis[E]) ShortestPathFromStart(block *Block[E]) (int, bool) {
-	if a == nil || block == nil || block.Index() >= len(a.blocks) {
+func (analysis *PathAnalysis[E]) ShortestPathFromStart(block *Block[E]) (int, bool) {
+	if analysis == nil || block == nil || block.Index() >= len(analysis.blocks) {
 		return 0, false
 	}
-	distance := a.blocks[block.Index()].shortest
+	distance := analysis.blocks[block.Index()].shortest
 	return int(distance), distance != 0
 }
 
 // ShortestExitPathFromStart returns the number of blocks on the shortest path
 // from the graph entry to any reachable final segment, thrown exits included.
-func (a *PathAnalysis[E]) ShortestExitPathFromStart() (int, bool) {
-	if a == nil || !a.hasExit {
+func (analysis *PathAnalysis[E]) ShortestExitPathFromStart() (int, bool) {
+	if analysis == nil || !analysis.hasExit {
 		return 0, false
 	}
-	return a.shortestExit, true
+	return analysis.shortestExit, true
 }
 
 // HasSingleFinalPath reports whether exactly one non-thrown path reaches a
 // final block. The count saturates at two because consumers asking about a
 // detached ESLint code-path segment only need to distinguish zero, one, and
 // multiple paths.
-func (a *PathAnalysis[E]) HasSingleFinalPath() bool {
-	return a != nil && a.finalPaths == 1
+func (analysis *PathAnalysis[E]) HasSingleFinalPath() bool {
+	return analysis != nil && analysis.finalPaths == 1
 }
 
-func (a *PathAnalysis[E]) countFinalPaths(index int) uint8 {
-	state := &a.blocks[index]
+func (analysis *PathAnalysis[E]) countFinalPaths(index int) uint8 {
+	state := &analysis.blocks[index]
 	if state.flags&pathCounting != 0 {
 		return 0
 	}
@@ -138,11 +138,11 @@ func (a *PathAnalysis[E]) countFinalPaths(index int) uint8 {
 		if state.flags&pathFinal != 0 {
 			count = 1
 		} else {
-			for _, successor := range a.graph.Blocks[index].Successors {
+			for _, successor := range analysis.graph.Blocks[index].Successors {
 				if successor == nil || !successor.Reachable {
 					continue
 				}
-				count += a.countFinalPaths(successor.Index())
+				count += analysis.countFinalPaths(successor.Index())
 				if count > 1 {
 					count = 2
 					break
@@ -156,41 +156,41 @@ func (a *PathAnalysis[E]) countFinalPaths(index int) uint8 {
 	return count
 }
 
-func (a *PathAnalysis[E]) findShortestPaths(graph *Graph[E]) {
+func (analysis *PathAnalysis[E]) findShortestPaths(graph *Graph[E]) {
 	var queue []int
-	if a.cyclePaths != nil && cap(a.cyclePaths.path) >= len(graph.Blocks) {
-		queue = a.cyclePaths.path[:1]
+	if analysis.cyclePaths != nil && cap(analysis.cyclePaths.path) >= len(graph.Blocks) {
+		queue = analysis.cyclePaths.path[:1]
 	} else {
 		queue = make([]int, 1, len(graph.Blocks))
 	}
 	queue[0] = 0
-	a.blocks[0].shortest = 1
+	analysis.blocks[0].shortest = 1
 	for head := 0; head < len(queue); head++ {
 		index := queue[head]
-		distance := a.blocks[index].shortest + 1
+		distance := analysis.blocks[index].shortest + 1
 		for _, successor := range graph.Blocks[index].Successors {
 			if successor == nil || !successor.Reachable {
 				continue
 			}
 			successorIndex := successor.Index()
-			if a.blocks[successorIndex].shortest != 0 {
+			if analysis.blocks[successorIndex].shortest != 0 {
 				continue
 			}
-			a.blocks[successorIndex].shortest = distance
+			analysis.blocks[successorIndex].shortest = distance
 			queue = append(queue, successorIndex)
 		}
 	}
-	if a.cyclePaths != nil {
-		a.cyclePaths.path = queue[:0]
+	if analysis.cyclePaths != nil {
+		analysis.cyclePaths.path = queue[:0]
 	}
 
-	for index := range a.blocks {
-		distance := a.blocks[index].shortest
+	for index := range analysis.blocks {
+		distance := analysis.blocks[index].shortest
 		if distance == 0 {
 			continue
 		}
-		if a.blocks[index].flags&pathExit != 0 && (a.shortestExit == 0 || int(distance) < a.shortestExit) {
-			a.shortestExit = int(distance)
+		if analysis.blocks[index].flags&pathExit != 0 && (analysis.shortestExit == 0 || int(distance) < analysis.shortestExit) {
+			analysis.shortestExit = int(distance)
 		}
 	}
 }
@@ -236,38 +236,38 @@ func newCyclePaths[E any](graph *Graph[E], blocks []pathBlockState) *cyclePaths[
 	return paths
 }
 
-func (p *cyclePaths[E]) countToEnd(index int) bool {
-	return p.count(index, -1)
+func (paths *cyclePaths[E]) countToEnd(index int) bool {
+	return paths.count(index, -1)
 }
 
-func (p *cyclePaths[E]) count(index int, barrierStart int) bool {
-	if active := p.state[index].activeAt; active >= 0 {
+func (paths *cyclePaths[E]) count(index int, barrierStart int) bool {
+	if active := paths.state[index].activeAt; active >= 0 {
 		// ESLint records the segment after its loop context as the start of the
 		// cycle, then marks only the later segments in pathArray. Excluding the
 		// repeated header here gives the same observable result: a for-loop test
 		// is not cyclic, while its body and incrementor are.
 		cycleStart := int(active) + 1
-		cycleEnd := len(p.path)
+		cycleEnd := len(paths.path)
 		if barrierStart > int(active) {
 			cycleEnd = barrierStart
 		}
-		for _, member := range p.path[cycleStart:cycleEnd] {
-			p.blocks[member].flags |= pathCyclic
+		for _, member := range paths.path[cycleStart:cycleEnd] {
+			paths.blocks[member].flags |= pathCyclic
 		}
 		return false
 	}
-	if p.state[index].flags&cycleToKnown != 0 {
-		return p.state[index].flags&cycleToEnd != 0
+	if paths.state[index].flags&cycleToKnown != 0 {
+		return paths.state[index].flags&cycleToEnd != 0
 	}
 
-	p.state[index].activeAt = int32(len(p.path))
-	p.path = append(p.path, index)
+	paths.state[index].activeAt = int32(len(paths.path))
+	paths.path = append(paths.path, index)
 	hasPath := false
 	// An uncaught throw is not a path to a normal exit. A yield is different:
 	// it also has a reachable resumption successor, which must still be walked
 	// to discover a loop back edge.
-	block := p.graph.Blocks[index]
-	traverse := p.state[index].flags&cycleThrown == 0
+	block := paths.graph.Blocks[index]
+	traverse := paths.state[index].flags&cycleThrown == 0
 	if !traverse {
 		for _, successor := range block.Successors {
 			if successor != nil && successor.Reachable {
@@ -277,7 +277,7 @@ func (p *cyclePaths[E]) count(index int, barrierStart int) bool {
 		}
 	}
 	if traverse {
-		hasPath = p.blocks[index].flags&pathFinal != 0
+		hasPath = paths.blocks[index].flags&pathFinal != 0
 		hasSuccessor := false
 		for successorIndex, successor := range block.Successors {
 			if successor == nil || !successor.Reachable {
@@ -286,28 +286,28 @@ func (p *cyclePaths[E]) count(index int, barrierStart int) bool {
 			hasSuccessor = true
 			nextBarrier := barrierStart
 			if successorIndex < len(block.cycleBarrier) && block.cycleBarrier[successorIndex] {
-				nextBarrier = len(p.path)
+				nextBarrier = len(paths.path)
 			}
-			if p.count(successor.Index(), nextBarrier) {
+			if paths.count(successor.Index(), nextBarrier) {
 				hasPath = true
 			}
 		}
-		if !hasSuccessor && p.state[index].flags&cycleThrown == 0 {
+		if !hasSuccessor && paths.state[index].flags&cycleThrown == 0 {
 			hasPath = true
 		}
 	}
-	p.path = p.path[:len(p.path)-1]
-	p.state[index].activeAt = -1
+	paths.path = paths.path[:len(paths.path)-1]
+	paths.state[index].activeAt = -1
 
-	if hasPath || !p.graph.Blocks[index].Reachable {
-		p.state[index].flags |= cycleToKnown
+	if hasPath || !paths.graph.Blocks[index].Reachable {
+		paths.state[index].flags |= cycleToKnown
 		if hasPath {
-			p.state[index].flags |= cycleToEnd
+			paths.state[index].flags |= cycleToEnd
 		} else {
-			p.state[index].flags &^= cycleToEnd
+			paths.state[index].flags &^= cycleToEnd
 		}
 	} else {
-		p.state[index].flags &^= cycleToKnown
+		paths.state[index].flags &^= cycleToKnown
 	}
 	return hasPath
 }
@@ -316,12 +316,12 @@ func (p *cyclePaths[E]) count(index int, barrierStart int) bool {
 // and computes immediate dominators with the Cooper-Harvey-Kennedy algorithm.
 // The real blocks on the synthetic exit's dominator chain are exactly those on
 // every non-throwing final path.
-func (a *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
+func (analysis *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 	blockCount := len(graph.Blocks)
-	if !a.hasFinal {
+	if !analysis.hasFinal {
 		for index, block := range graph.Blocks {
 			if block.Reachable {
-				a.blocks[index].flags |= pathOnEveryFinal
+				analysis.blocks[index].flags |= pathOnEveryFinal
 			}
 		}
 		return
@@ -338,7 +338,7 @@ func (a *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 				predCounts[successor.Index()+1]++
 			}
 		}
-		if a.blocks[index].flags&pathFinal != 0 {
+		if analysis.blocks[index].flags&pathFinal != 0 {
 			predCounts[exit+1]++
 		}
 	}
@@ -366,7 +366,7 @@ func (a *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 			predecessors[predCursor[successorIndex]] = index
 			predCursor[successorIndex]++
 		}
-		if a.blocks[index].flags&pathFinal != 0 {
+		if analysis.blocks[index].flags&pathFinal != 0 {
 			predecessors[predCursor[exit]] = index
 			predCursor[exit]++
 		}
@@ -386,7 +386,7 @@ func (a *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 					visit(successor.Index())
 				}
 			}
-			if a.blocks[index].flags&pathFinal != 0 && rpoPosition[exit] == -1 {
+			if analysis.blocks[index].flags&pathFinal != 0 && rpoPosition[exit] == -1 {
 				visit(exit)
 			}
 		}
@@ -438,7 +438,7 @@ func (a *PathAnalysis[E]) findFinalPathDominators(graph *Graph[E]) {
 	}
 
 	for index := immediate[exit]; index >= 0; index = immediate[index] {
-		a.blocks[index].flags |= pathOnEveryFinal
+		analysis.blocks[index].flags |= pathOnEveryFinal
 		if index == 0 {
 			break
 		}

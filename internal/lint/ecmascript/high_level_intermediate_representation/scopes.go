@@ -185,52 +185,52 @@ type ReactiveScopes struct {
 // A value that never entered an equivalence class has no scope, which is upstream's `null` and is
 // the ordinary answer for most values: 26,962 of a corpus function's values are members and the
 // rest are not. Zero rather than a second return because zero is not a valid ScopeId.
-func (s *ReactiveScopes) ScopeOf(id static_single_assignment.IdentifierId) ScopeId {
-	if s == nil || s.byIdentifier == nil {
+func (scopes *ReactiveScopes) ScopeOf(id static_single_assignment.IdentifierId) ScopeId {
+	if scopes == nil || scopes.byIdentifier == nil {
 		return 0
 	}
-	return s.byIdentifier[id]
+	return scopes.byIdentifier[id]
 }
 
 // RangeOf returns a scope's range, or the unset range for a scope that does not exist.
 //
 // This is the HULL of the member ranges, and after this pass it is also every member's own range.
 // See the package comment for why the two are equal here and are not guaranteed to stay equal.
-func (s *ReactiveScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
-	if s == nil || s.ranges == nil {
+func (scopes *ReactiveScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
+	if scopes == nil || scopes.ranges == nil {
 		return mutation_aliasing.MutableRange{}
 	}
-	return s.ranges[scope]
+	return scopes.ranges[scope]
 }
 
 // MembersOf returns the values belonging to a scope, sorted, or nil for a scope that does not exist.
 //
 // The slice is the table's own and must not be modified by a caller. Sorted because
 // `DisjointSet.Sets` sorts, and the order is load-bearing for determinism rather than cosmetic.
-func (s *ReactiveScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
-	if s == nil || s.members == nil {
+func (scopes *ReactiveScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
+	if scopes == nil || scopes.members == nil {
 		return nil
 	}
-	return s.members[scope]
+	return scopes.members[scope]
 }
 
 // Ids returns every scope this pass created, in assignment order.
 //
 // Assignment order is `DisjointSet.Sets()` order, which is sorted by first member. Returned as a
 // slice rather than by ranging a map so a caller iterating scopes gets the same sequence every run.
-func (s *ReactiveScopes) Ids() []ScopeId {
-	if s == nil {
+func (scopes *ReactiveScopes) Ids() []ScopeId {
+	if scopes == nil {
 		return nil
 	}
-	return s.order
+	return scopes.order
 }
 
 // Len reports how many scopes exist, for measurement.
-func (s *ReactiveScopes) Len() int {
-	if s == nil {
+func (scopes *ReactiveScopes) Len() int {
+	if scopes == nil {
 		return 0
 	}
-	return len(s.order)
+	return len(scopes.order)
 }
 
 // AssignReactiveScopes gives every entangled group of values in function one reactive scope.
@@ -376,14 +376,14 @@ func AssignReactiveScopesWithSets(function *Function, ranges *mutation_aliasing.
 // pre-entanglement range is unrecoverable afterwards; here both are available, which costs one map
 // and lets a consumer ask which of the two it wants. Nothing upstream needs the old value, so this
 // is a capability rather than a divergence in what the pass decides.
-func (s *ReactiveScopes) MemberRanges() *mutation_aliasing.MutableRanges {
+func (scopes *ReactiveScopes) MemberRanges() *mutation_aliasing.MutableRanges {
 	result := &mutation_aliasing.MutableRanges{}
-	if s == nil {
+	if scopes == nil {
 		return result
 	}
-	for _, scope := range s.order {
-		hull := s.ranges[scope]
-		for _, id := range s.members[scope] {
+	for _, scope := range scopes.order {
+		hull := scopes.ranges[scope]
+		for _, id := range scopes.members[scope] {
 			result.Set(id, hull)
 		}
 	}

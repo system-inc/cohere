@@ -136,30 +136,30 @@ type noTyposState struct {
 // Source order matters and is not incidental: upstream's `ImportDeclaration` listener sets the
 // binding as ESLint reaches it, so a `propTypes` object written above the import sees no binding and
 // its prop-type arms stay silent. Pinned by fixture.
-func (s *noTyposState) walk(node *ast.Node) {
+func (state *noTyposState) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
 
 	switch node.Kind {
 	case ast.KindImportDeclaration:
-		s.recordImport(node)
+		state.recordImport(node)
 
 	case ast.KindPropertyDeclaration:
-		s.checkStaticClassProperty(node)
+		state.checkStaticClassProperty(node)
 
 	case ast.KindMethodDeclaration:
-		s.checkClassMethod(node)
+		state.checkClassMethod(node)
 
 	case ast.KindPropertyAccessExpression:
-		s.checkMemberAssignment(node)
+		state.checkMemberAssignment(node)
 
 	case ast.KindObjectLiteralExpression:
-		s.checkEs5Specification(node)
+		state.checkEs5Specification(node)
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		s.walk(child)
+		state.walk(child)
 		return false
 	})
 }
@@ -169,7 +169,7 @@ func (s *noTyposState) walk(node *ast.Node) {
 // Upstream reads `node.specifiers[0].local.name` for both packages, which is the first specifier
 // whatever its kind, and then separately looks for a named `PropTypes` specifier in a react import.
 // A side-effect import with no specifiers is the reporting case for both packages.
-func (s *noTyposState) recordImport(node *ast.Node) {
+func (state *noTyposState) recordImport(node *ast.Node) {
 	declaration := node.AsImportDeclaration()
 	moduleSpecifier := declaration.ModuleSpecifier
 	if moduleSpecifier == nil || moduleSpecifier.Kind != ast.KindStringLiteral {
@@ -181,7 +181,7 @@ func (s *noTyposState) recordImport(node *ast.Node) {
 	switch moduleSpecifier.Text() {
 	case "prop-types":
 		if len(specifiers) == 0 {
-			s.ctx.ReportNode(node, rule.Message{
+			state.ctx.ReportNode(node, rule.Message{
 				Id: "noPropTypesBinding",
 				Description: "This imports `prop-types` for its side effects and never names it, " +
 					"so nothing in the file can reference a prop type. The package has no side " +
@@ -189,11 +189,11 @@ func (s *noTyposState) recordImport(node *ast.Node) {
 			})
 			return
 		}
-		s.propTypesPackageName = specifiers[0].localName
+		state.propTypesPackageName = specifiers[0].localName
 
 	case "react":
 		if len(specifiers) == 0 {
-			s.ctx.ReportNode(node, rule.Message{
+			state.ctx.ReportNode(node, rule.Message{
 				Id: "noReactBinding",
 				Description: "This imports `react` for its side effects and never names it, so " +
 					"nothing in the file can reference React. Write " +
@@ -201,12 +201,12 @@ func (s *noTyposState) recordImport(node *ast.Node) {
 			})
 			return
 		}
-		s.reactPackageName = specifiers[0].localName
+		state.reactPackageName = specifiers[0].localName
 		// A `PropTypes` named specifier from react binds the prop-types package too, which is the
 		// pre-15.5 spelling `import { PropTypes } from 'react'`.
 		for _, specifier := range specifiers {
 			if specifier.importedName == "PropTypes" {
-				s.propTypesPackageName = specifier.localName
+				state.propTypesPackageName = specifier.localName
 			}
 		}
 	}
@@ -267,7 +267,7 @@ func noTyposImportSpecifiers(declaration *ast.Node) []noTyposImportSpecifier {
 // checkStaticClassProperty answers upstream's `ClassProperty, PropertyDefinition` listener.
 //
 // Static only, and only on a class the shelf calls a component.
-func (s *noTyposState) checkStaticClassProperty(node *ast.Node) {
+func (state *noTyposState) checkStaticClassProperty(node *ast.Node) {
 	if !noTyposIsStatic(node) {
 		return
 	}
@@ -275,23 +275,23 @@ func (s *noTyposState) checkStaticClassProperty(node *ast.Node) {
 	if class == nil || !reactUtilities.IsEs6ComponentClass(class) {
 		return
 	}
-	s.reportCasingTypo(node.AsPropertyDeclaration().Initializer, node.Name(), true)
+	state.reportCasingTypo(node.AsPropertyDeclaration().Initializer, node.Name(), true)
 }
 
 // checkClassMethod answers upstream's `MethodDefinition` listener.
-func (s *noTyposState) checkClassMethod(node *ast.Node) {
+func (state *noTyposState) checkClassMethod(node *ast.Node) {
 	class := noTyposEnclosingClass(node)
 	if class == nil || !reactUtilities.IsEs6ComponentClass(class) {
 		return
 	}
-	s.reportLifecycleCasingTypo(node, node.Name(), noTyposIsStatic(node))
+	state.reportLifecycleCasingTypo(node, node.Name(), noTyposIsStatic(node))
 }
 
 // checkMemberAssignment answers upstream's `MemberExpression` listener.
 //
 // This is the widest arm and the only one that accepts a non-class. It fires on `Foo.PropTypes = {}`
 // where `Foo` is a class component or a function whose body returns JSX.
-func (s *noTyposState) checkMemberAssignment(node *ast.Node) {
+func (state *noTyposState) checkMemberAssignment(node *ast.Node) {
 	access := node.AsPropertyAccessExpression()
 	property := access.Name()
 	if property == nil || property.Kind != ast.KindIdentifier {
@@ -341,11 +341,11 @@ func (s *noTyposState) checkMemberAssignment(node *ast.Node) {
 	if target == nil || target.Kind != ast.KindIdentifier {
 		return
 	}
-	if !s.namesAComponent(node, target.Text()) {
+	if !state.namesAComponent(node, target.Text()) {
 		return
 	}
 
-	s.reportCasingTypo(binary.Right, property, true)
+	state.reportCasingTypo(binary.Right, property, true)
 }
 
 // namesAComponent reports whether an identifier names something this rule treats as a component.
@@ -369,7 +369,7 @@ func (s *noTyposState) checkMemberAssignment(node *ast.Node) {
 //
 // The last row is the one a port is most likely to get wrong: JSX inside a nested function belongs
 // to that function, not to this one.
-func (s *noTyposState) namesAComponent(from *ast.Node, name string) bool {
+func (state *noTyposState) namesAComponent(from *ast.Node, name string) bool {
 	declaration := noTyposFindDeclaration(from, name)
 	if declaration == nil {
 		return false
@@ -514,7 +514,7 @@ func noTyposIsJsxExpression(expression *ast.Node) bool {
 //
 // Every property of a `createReactClass` object is checked for both a casing typo and a lifecycle
 // typo, and a spread contributes neither.
-func (s *noTyposState) checkEs5Specification(node *ast.Node) {
+func (state *noTyposState) checkEs5Specification(node *ast.Node) {
 	if !noTyposIsCreateReactClassSpecification(node) {
 		return
 	}
@@ -533,8 +533,8 @@ func (s *noTyposState) checkEs5Specification(node *ast.Node) {
 		if property.Kind == ast.KindSpreadAssignment {
 			continue
 		}
-		s.reportCasingTypo(noTyposPropertyValue(property), property.Name(), false)
-		s.reportLifecycleCasingTypo(property, property.Name(), false)
+		state.reportCasingTypo(noTyposPropertyValue(property), property.Name(), false)
+		state.reportLifecycleCasingTypo(property, property.Name(), false)
 	}
 }
 
@@ -598,20 +598,20 @@ func noTyposPropertyValue(property *ast.Node) *ast.Node {
 // `contextTypes` or `childContextTypes` has its object value walked for prop-type typos. And any
 // property whose lowercased name matches one of the four static names while differing in case is
 // itself a casing typo.
-func (s *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isClassProperty bool) {
+func (state *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isClassProperty bool) {
 	name, ok := noTyposKeyName(key)
 	if !ok {
 		return
 	}
 
 	if name == "propTypes" || name == "contextTypes" || name == "childContextTypes" {
-		s.checkPropObject(value)
+		state.checkPropObject(value)
 	}
 
 	for _, canonical := range noTyposStaticClassProperties {
 		if strings.EqualFold(canonical, name) && canonical != name {
 			if isClassProperty {
-				s.ctx.ReportNode(key, rule.Message{
+				state.ctx.ReportNode(key, rule.Message{
 					Id: "typoStaticClassProp",
 					Description: "This static property is spelled with the wrong casing, so React " +
 						"never reads it. React matches these names exactly, which means the " +
@@ -619,7 +619,7 @@ func (s *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isClassP
 				})
 				return
 			}
-			s.ctx.ReportNode(key, rule.Message{
+			state.ctx.ReportNode(key, rule.Message{
 				Id: "typoPropDeclaration",
 				Description: "This property is spelled with the wrong casing, so React never " +
 					"reads it. React matches these names exactly, which means the declaration " +
@@ -636,7 +636,7 @@ func (s *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isClassP
 // and written without `static` reports `staticLifecycleMethod`. And a name matching any lifecycle
 // method case-insensitively while differing in case reports `typoLifecycleMethod`. A name can trip
 // both, which upstream reports as two findings in that order.
-func (s *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.Node, isStatic bool) {
+func (state *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.Node, isStatic bool) {
 	name, ok := noTyposKeyName(key)
 	if !ok {
 		return
@@ -644,7 +644,7 @@ func (s *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.Node, 
 
 	for _, method := range noTyposStaticLifecycleMethods {
 		if !isStatic && strings.EqualFold(name, method) {
-			s.ctx.ReportNode(node, rule.Message{
+			state.ctx.ReportNode(node, rule.Message{
 				Id: "staticLifecycleMethod",
 				Description: fmt.Sprintf(
 					"`%s` is a static lifecycle method and this one is not declared `static`, so "+
@@ -656,7 +656,7 @@ func (s *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.Node, 
 	for _, method := range append(append([]string{}, noTyposInstanceLifecycleMethods...),
 		noTyposStaticLifecycleMethods...) {
 		if strings.EqualFold(method, name) && method != name {
-			s.ctx.ReportNode(node, rule.Message{
+			state.ctx.ReportNode(node, rule.Message{
 				Id: "typoLifecycleMethod",
 				Description: fmt.Sprintf(
 					"`%s` is spelled with the wrong casing and React calls `%s`, so this method "+
@@ -667,7 +667,7 @@ func (s *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.Node, 
 }
 
 // checkPropObject walks a propTypes object looking for prop-type typos.
-func (s *noTyposState) checkPropObject(node *ast.Node) {
+func (state *noTyposState) checkPropObject(node *ast.Node) {
 	if node == nil || node.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
@@ -676,7 +676,7 @@ func (s *noTyposState) checkPropObject(node *ast.Node) {
 		return
 	}
 	for _, property := range properties.Nodes {
-		s.checkProp(noTyposPropertyValue(property))
+		state.checkProp(noTyposPropertyValue(property))
 	}
 }
 
@@ -685,8 +685,8 @@ func (s *noTyposState) checkPropObject(node *ast.Node) {
 // The leading guard is upstream's and it is load-bearing: with neither package name known, every
 // prop-type arm is silent, so a file that imports nothing produces no typo findings however
 // misspelled it is.
-func (s *noTyposState) checkProp(node *ast.Node) {
-	if s.propTypesPackageName == "" && s.reactPackageName == "" {
+func (state *noTyposState) checkProp(node *ast.Node) {
+	if state.propTypesPackageName == "" && state.reactPackageName == "" {
 		return
 	}
 	if node == nil {
@@ -703,32 +703,32 @@ func (s *noTyposState) checkProp(node *ast.Node) {
 
 		if object.Kind == ast.KindPropertyAccessExpression {
 			inner := object.AsPropertyAccessExpression()
-			if s.isPropTypesPackage(inner.Expression) {
+			if state.isPropTypesPackage(inner.Expression) {
 				// `PropTypes.myProp.isRequired`
-				s.checkPropTypeName(inner.Name())
-				s.checkPropTypeQualifier(property)
+				state.checkPropTypeName(inner.Name())
+				state.checkPropTypeQualifier(property)
 				return
 			}
 		}
 
-		if s.isPropTypesPackage(object) {
+		if state.isPropTypesPackage(object) {
 			// `PropTypes.myProp`, unless the property is itself the qualifier.
 			if property.Kind == ast.KindIdentifier && property.Text() == "isRequired" {
 				return
 			}
-			s.checkPropTypeName(property)
+			state.checkPropTypeName(property)
 			return
 		}
 
 		if object.Kind == ast.KindCallExpression {
-			s.checkPropTypeQualifier(property)
-			s.checkPropCall(object)
+			state.checkPropTypeQualifier(property)
+			state.checkPropCall(object)
 		}
 		return
 	}
 
 	if node.Kind == ast.KindCallExpression {
-		s.checkPropCall(node)
+		state.checkPropCall(node)
 	}
 }
 
@@ -736,7 +736,7 @@ func (s *noTyposState) checkProp(node *ast.Node) {
 //
 // `shape(...)` recurses into the object literal, `oneOfType([...])` recurses into each element, and
 // every other call is left alone.
-func (s *noTyposState) checkPropCall(node *ast.Node) {
+func (state *noTyposState) checkPropCall(node *ast.Node) {
 	call := node.AsCallExpression()
 	callee := call.Expression
 	if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
@@ -753,7 +753,7 @@ func (s *noTyposState) checkPropCall(node *ast.Node) {
 
 	switch name.Text() {
 	case "shape":
-		s.checkPropObject(first)
+		state.checkPropObject(first)
 
 	case "oneOfType":
 		if first.Kind != ast.KindArrayLiteralExpression {
@@ -764,7 +764,7 @@ func (s *noTyposState) checkPropCall(node *ast.Node) {
 			return
 		}
 		for _, element := range elements.Nodes {
-			s.checkProp(element)
+			state.checkProp(element)
 		}
 	}
 }
@@ -772,12 +772,12 @@ func (s *noTyposState) checkPropCall(node *ast.Node) {
 // isPropTypesPackage reports whether an expression names the prop-types package.
 //
 // Either the bare local binding, or `<react binding>.PropTypes`, which is the pre-15.5 spelling.
-func (s *noTyposState) isPropTypesPackage(node *ast.Node) bool {
+func (state *noTyposState) isPropTypesPackage(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
 	if node.Kind == ast.KindIdentifier {
-		return s.propTypesPackageName != "" && node.Text() == s.propTypesPackageName
+		return state.propTypesPackageName != "" && node.Text() == state.propTypesPackageName
 	}
 	if node.Kind == ast.KindPropertyAccessExpression {
 		access := node.AsPropertyAccessExpression()
@@ -785,13 +785,13 @@ func (s *noTyposState) isPropTypesPackage(node *ast.Node) bool {
 		object := access.Expression
 		return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "PropTypes" &&
 			object != nil && object.Kind == ast.KindIdentifier &&
-			s.reactPackageName != "" && object.Text() == s.reactPackageName
+			state.reactPackageName != "" && object.Text() == state.reactPackageName
 	}
 	return false
 }
 
 // checkPropTypeName reports a prop type the package does not export.
-func (s *noTyposState) checkPropTypeName(node *ast.Node) {
+func (state *noTyposState) checkPropTypeName(node *ast.Node) {
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return
 	}
@@ -804,7 +804,7 @@ func (s *noTyposState) checkPropTypeName(node *ast.Node) {
 			return
 		}
 	}
-	s.ctx.ReportNode(node, rule.Message{
+	state.ctx.ReportNode(node, rule.Message{
 		Id: "typoPropType",
 		Description: fmt.Sprintf(
 			"`%s` is not a prop type the `prop-types` package exports, so this validator is "+
@@ -813,14 +813,14 @@ func (s *noTyposState) checkPropTypeName(node *ast.Node) {
 }
 
 // checkPropTypeQualifier reports a chain qualifier that is not `isRequired`.
-func (s *noTyposState) checkPropTypeQualifier(node *ast.Node) {
+func (state *noTyposState) checkPropTypeQualifier(node *ast.Node) {
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return
 	}
 	if node.Text() == "isRequired" {
 		return
 	}
-	s.ctx.ReportNode(node, rule.Message{
+	state.ctx.ReportNode(node, rule.Message{
 		Id: "typoPropTypeChain",
 		Description: fmt.Sprintf(
 			"`isRequired` is the only qualifier a prop type chain accepts, and `%s` is not it, so "+

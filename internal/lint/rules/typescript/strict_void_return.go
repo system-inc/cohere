@@ -227,7 +227,7 @@ type strictVoidReturnState struct {
 // as void-returning only when there is at least one constituent and every one of them is `void`.
 // The emptiness test matters: a type with no call signatures is not a void-returning function, and
 // without it every non-function contextual type would qualify vacuously.
-func (s *strictVoidReturnState) isVoidReturningFunctionType(subject *checker.Type) bool {
+func (state *strictVoidReturnState) isVoidReturningFunctionType(subject *checker.Type) bool {
 	if subject == nil {
 		return false
 	}
@@ -241,8 +241,8 @@ func (s *strictVoidReturnState) isVoidReturningFunctionType(subject *checker.Typ
 	// exposes the raw checker method, which does not.
 	found := 0
 	for part := range type_checking.UnionTypePartsSeq(subject) {
-		for _, signature := range checker.Checker_getSignaturesOfType(s.ctx.TypeChecker, part, checker.SignatureKindCall) {
-			returnType := checker.Checker_getReturnTypeOfSignature(s.ctx.TypeChecker, signature)
+		for _, signature := range checker.Checker_getSignaturesOfType(state.ctx.TypeChecker, part, checker.SignatureKindCall) {
+			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
 			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
 				found++
 				if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsVoid) {
@@ -266,15 +266,15 @@ func (s *strictVoidReturnState) isVoidReturningFunctionType(subject *checker.Typ
 //
 // Returns whether a base was found expecting a void function, so the caller can skip the ordinary
 // contextual path rather than reporting the same member through two routes.
-func (s *strictVoidReturnState) checkAgainstBaseTypes(member *ast.Node) bool {
-	if s.ctx.TypeChecker == nil {
+func (state *strictVoidReturnState) checkAgainstBaseTypes(member *ast.Node) bool {
+	if state.ctx.TypeChecker == nil {
 		return false
 	}
 	name := member.Name()
 	if name == nil {
 		return false
 	}
-	memberSymbol := s.ctx.TypeChecker.GetSymbolAtLocation(name)
+	memberSymbol := state.ctx.TypeChecker.GetSymbolAtLocation(name)
 	if memberSymbol == nil {
 		return false
 	}
@@ -294,16 +294,16 @@ func (s *strictVoidReturnState) checkAgainstBaseTypes(member *ast.Node) bool {
 			continue
 		}
 		for _, baseTypeNode := range types.Nodes {
-			baseType := s.ctx.TypeChecker.GetTypeAtLocation(baseTypeNode)
+			baseType := state.ctx.TypeChecker.GetTypeAtLocation(baseTypeNode)
 			if baseType == nil {
 				continue
 			}
-			baseMemberSymbol := checker.Checker_getPropertyOfType(s.ctx.TypeChecker, baseType, memberSymbol.Name)
+			baseMemberSymbol := checker.Checker_getPropertyOfType(state.ctx.TypeChecker, baseType, memberSymbol.Name)
 			if baseMemberSymbol == nil {
 				continue
 			}
-			baseMemberType := s.ctx.TypeChecker.GetTypeOfSymbolAtLocation(baseMemberSymbol, member)
-			if baseMemberType == nil || !s.isVoidReturningFunctionType(baseMemberType) {
+			baseMemberType := state.ctx.TypeChecker.GetTypeOfSymbolAtLocation(baseMemberSymbol, member)
+			if baseMemberType == nil || !state.isVoidReturningFunctionType(baseMemberType) {
 				continue
 			}
 			// The value judged is the member's own function: a property's initializer, or the
@@ -316,7 +316,7 @@ func (s *strictVoidReturnState) checkAgainstBaseTypes(member *ast.Node) bool {
 				}
 				subject = initializer
 			}
-			s.reportIfNonVoidFunction(subject)
+			state.reportIfNonVoidFunction(subject)
 			// At most one finding per member, however many bases match.
 			return true
 		}
@@ -354,8 +354,8 @@ func strictVoidReturnHeritageClauses(node *ast.Node) *ast.NodeList {
 // expected type is read from the property name instead, which the checker resolves against the
 // contextual object type, and the method itself is then judged exactly as a function literal would
 // be. Upstream reaches the same place through its own object-property path.
-func (s *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.Node) {
-	if s.ctx.TypeChecker == nil {
+func (state *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.Node) {
+	if state.ctx.TypeChecker == nil {
 		return
 	}
 	name := property.Name()
@@ -369,7 +369,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.
 	if object == nil || object.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	objectExpected := checker.Checker_getContextualType(s.ctx.TypeChecker, object, 0)
+	objectExpected := checker.Checker_getContextualType(state.ctx.TypeChecker, object, 0)
 	if objectExpected == nil {
 		return
 	}
@@ -379,39 +379,39 @@ func (s *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.
 	}
 	var expected *checker.Type
 	for part := range type_checking.UnionTypePartsSeq(objectExpected) {
-		symbol := checker.Checker_getPropertyOfType(s.ctx.TypeChecker, part, propertyName)
+		symbol := checker.Checker_getPropertyOfType(state.ctx.TypeChecker, part, propertyName)
 		if symbol == nil {
 			continue
 		}
-		if candidate := s.ctx.TypeChecker.GetTypeOfSymbolAtLocation(symbol, property); candidate != nil {
+		if candidate := state.ctx.TypeChecker.GetTypeOfSymbolAtLocation(symbol, property); candidate != nil {
 			expected = candidate
 			break
 		}
 	}
-	if expected == nil || !s.isVoidReturningFunctionType(expected) {
+	if expected == nil || !state.isVoidReturningFunctionType(expected) {
 		return
 	}
-	s.reportIfNonVoidFunction(property)
+	state.reportIfNonVoidFunction(property)
 }
 
 // checkExpression is upstream's `checkExpressionNode`, and reports whether the position expected a
 // void function.
-func (s *strictVoidReturnState) checkExpression(node *ast.Node) bool {
-	if node == nil || s.ctx.TypeChecker == nil {
+func (state *strictVoidReturnState) checkExpression(node *ast.Node) bool {
+	if node == nil || state.ctx.TypeChecker == nil {
 		return false
 	}
-	expected := checker.Checker_getContextualType(s.ctx.TypeChecker, node, 0)
-	if expected == nil || !s.isVoidReturningFunctionType(expected) {
+	expected := checker.Checker_getContextualType(state.ctx.TypeChecker, node, 0)
+	if expected == nil || !state.isVoidReturningFunctionType(expected) {
 		return false
 	}
-	s.reportIfNonVoidFunction(node)
+	state.reportIfNonVoidFunction(node)
 	return true
 }
 
 // allowedReturnFlags is the set of return types a void position tolerates.
-func (s *strictVoidReturnState) allowedReturnFlags() checker.TypeFlags {
+func (state *strictVoidReturnState) allowedReturnFlags() checker.TypeFlags {
 	allowed := checker.TypeFlagsVoid | checker.TypeFlagsNever | checker.TypeFlagsUndefined
-	if s.settings.AllowReturnAny {
+	if state.settings.AllowReturnAny {
 		allowed |= checker.TypeFlagsAny
 	}
 	return allowed
@@ -421,10 +421,10 @@ func (s *strictVoidReturnState) allowedReturnFlags() checker.TypeFlags {
 // accept, from the value's own type alone. It is the first step of reportIfNonVoidFunction, which
 // is silent whenever this is false, so a position whose expected type is costly to resolve asks it
 // before asking the position (#hekjpw3).
-func (s *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool {
-	allowed := s.allowedReturnFlags()
+func (state *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool {
+	allowed := state.allowedReturnFlags()
 
-	actual := checker.Checker_getApparentType(s.ctx.TypeChecker, s.ctx.TypeChecker.GetTypeAtLocation(node))
+	actual := checker.Checker_getApparentType(state.ctx.TypeChecker, state.ctx.TypeChecker.GetTypeAtLocation(node))
 	if actual == nil {
 		return false
 	}
@@ -433,8 +433,8 @@ func (s *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool {
 	acceptable := true
 	sawOne := false
 	for part := range type_checking.UnionTypePartsSeq(actual) {
-		for _, signature := range checker.Checker_getSignaturesOfType(s.ctx.TypeChecker, part, checker.SignatureKindCall) {
-			returnType := checker.Checker_getReturnTypeOfSignature(s.ctx.TypeChecker, signature)
+		for _, signature := range checker.Checker_getSignaturesOfType(state.ctx.TypeChecker, part, checker.SignatureKindCall) {
+			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
 			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
 				sawOne = true
 				if !type_checking.IsTypeFlagSet(constituent, allowed) {
@@ -449,11 +449,11 @@ func (s *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool {
 }
 
 // reportIfNonVoidFunction is the decision tree, and its order is upstream's.
-func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
-	if !s.isNonVoidFunctionValue(node) {
+func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
+	if !state.isNonVoidFunctionValue(node) {
 		return
 	}
-	allowed := s.allowedReturnFlags()
+	allowed := state.allowedReturnFlags()
 
 	isArrow := node.Kind == ast.KindArrowFunction
 	isFunctionExpression := node.Kind == ast.KindFunctionExpression
@@ -463,17 +463,17 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	isMethod := node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindGetAccessor
 	if !isArrow && !isFunctionExpression && !isMethod {
 		// Not a function literal, so there is nothing to point inside. Upstream reports the node.
-		s.ctx.ReportNode(node, strictVoidReturnNonVoidFuncMessage())
+		state.ctx.ReportNode(node, strictVoidReturnNonVoidFuncMessage())
 		return
 	}
 
 	if strictVoidReturnIsGenerator(node) {
-		s.ctx.ReportRange(strictVoidReturnHeadRange(s.ctx, node), strictVoidReturnNonVoidFuncMessage())
+		state.ctx.ReportRange(strictVoidReturnHeadRange(state.ctx, node), strictVoidReturnNonVoidFuncMessage())
 		return
 	}
 
 	if strictVoidReturnIsAsync(node) {
-		s.ctx.ReportRange(strictVoidReturnHeadRange(s.ctx, node), strictVoidReturnAsyncFuncMessage())
+		state.ctx.ReportRange(strictVoidReturnHeadRange(state.ctx, node), strictVoidReturnAsyncFuncMessage())
 		return
 	}
 
@@ -489,7 +489,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	// in `(chunk) => (total += chunk)` is the assignment and its finding starts at `total`; reporting
 	// our `ParenthesizedExpression` pointed one column early on eight ahra sites.
 	if body := strictVoidReturnBody(node); body != nil && body.Kind != ast.KindBlock {
-		s.ctx.ReportNode(ast.SkipParentheses(body), strictVoidReturnNonVoidReturnMessage())
+		state.ctx.ReportNode(ast.SkipParentheses(body), strictVoidReturnNonVoidReturnMessage())
 		return
 	}
 
@@ -497,7 +497,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	// function.
 	if annotation := strictVoidReturnTypeAnnotation(node); annotation != nil {
 		if annotation.Kind != ast.KindVoidKeyword {
-			s.ctx.ReportNode(annotation, strictVoidReturnNonVoidFuncMessage())
+			state.ctx.ReportNode(annotation, strictVoidReturnNonVoidFuncMessage())
 			return
 		}
 	}
@@ -512,11 +512,11 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 		if argument == nil {
 			continue
 		}
-		returnType := s.ctx.TypeChecker.GetTypeAtLocation(argument)
+		returnType := state.ctx.TypeChecker.GetTypeAtLocation(argument)
 		if type_checking.IsTypeFlagSet(returnType, allowed) {
 			continue
 		}
-		s.ctx.ReportRange(scanner.GetRangeOfTokenAtPosition(s.ctx.SourceFile, statement.Pos()),
+		state.ctx.ReportRange(scanner.GetRangeOfTokenAtPosition(state.ctx.SourceFile, statement.Pos()),
 			strictVoidReturnNonVoidReturnMessage())
 	}
 }
@@ -529,8 +529,8 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 // type would be judged against the wrong one. Upstream therefore collects the expected return type
 // from every signature and only trusts the contextual type when there is a single signature or when
 // all of them agree that the position is void.
-func (s *strictVoidReturnState) checkCall(node *ast.Node) {
-	if s.ctx.TypeChecker == nil {
+func (state *strictVoidReturnState) checkCall(node *ast.Node) {
+	if state.ctx.TypeChecker == nil {
 		return
 	}
 
@@ -549,14 +549,14 @@ func (s *strictVoidReturnState) checkCall(node *ast.Node) {
 		return
 	}
 
-	calleeType := s.ctx.TypeChecker.GetTypeAtLocation(callee)
+	calleeType := state.ctx.TypeChecker.GetTypeAtLocation(callee)
 	if calleeType == nil {
 		return
 	}
 	signatures := []*checker.Signature{}
 	for constituent := range type_checking.UnionTypePartsSeq(calleeType) {
 		signatures = append(signatures,
-			checker.Checker_getSignaturesOfType(s.ctx.TypeChecker, constituent, signatureKind)...)
+			checker.Checker_getSignaturesOfType(state.ctx.TypeChecker, constituent, signatureKind)...)
 	}
 
 	for index, argument := range arguments.Nodes {
@@ -570,15 +570,15 @@ func (s *strictVoidReturnState) checkCall(node *ast.Node) {
 			if index >= len(parameters) {
 				continue
 			}
-			parameterType := s.ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameters[index], callee)
+			parameterType := state.ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameters[index], callee)
 			if parameterType == nil {
 				continue
 			}
 			for constituent := range type_checking.UnionTypePartsSeq(parameterType) {
 				for _, parameterSignature := range checker.Checker_getSignaturesOfType(
-					s.ctx.TypeChecker, constituent, checker.SignatureKindCall) {
+					state.ctx.TypeChecker, constituent, checker.SignatureKindCall) {
 					expectedReturns = append(expectedReturns,
-						checker.Checker_getReturnTypeOfSignature(s.ctx.TypeChecker, parameterSignature))
+						checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, parameterSignature))
 				}
 			}
 		}
@@ -596,7 +596,7 @@ func (s *strictVoidReturnState) checkCall(node *ast.Node) {
 			}
 		}
 
-		if (len(signatures) == 1 || allReturnVoid) && s.checkExpression(argument) {
+		if (len(signatures) == 1 || allReturnVoid) && state.checkExpression(argument) {
 			continue
 		}
 
@@ -611,7 +611,7 @@ func (s *strictVoidReturnState) checkCall(node *ast.Node) {
 			}
 		}
 		if anyVoid && everyNullishOrAny {
-			s.reportIfNonVoidFunction(argument)
+			state.reportIfNonVoidFunction(argument)
 		}
 	}
 }

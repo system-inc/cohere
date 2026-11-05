@@ -89,8 +89,8 @@ const syntaxDefinition = "syntax2:"
 
 // Signatures returns every project file's signature, keyed by file name, and how many were computed rather
 // than carried forward from previous.
-func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEntry) (map[string]SignatureEntry, int) {
-	projectFiles := g.ProjectFiles()
+func (graph *Graph) Signatures(ctx context.Context, previous map[string]SignatureEntry) (map[string]SignatureEntry, int) {
+	projectFiles := graph.ProjectFiles()
 	signatures := make(map[string]SignatureEntry, len(projectFiles))
 	stale := []*ast.SourceFile{}
 	contentKeyed := 0
@@ -120,14 +120,14 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 		}
 		stale = append(stale, sourceFile)
 	}
-	g.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
+	graph.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
 	if len(stale) == 0 {
 		return signatures, contentKeyed
 	}
 
 	var mutex sync.Mutex
-	g.signatureEmits += len(stale)
-	g.Program.Emit(ctx, compiler.EmitOptions{
+	graph.signatureEmits += len(stale)
+	graph.Program.Emit(ctx, compiler.EmitOptions{
 		TargetSourceFiles: stale,
 		EmitOnly:          compiler.EmitOnlyBuilderSignature,
 		WriteFile: func(fileName tspath.RootedFilePath, text string, data *compiler.WriteFileData) error {
@@ -155,7 +155,7 @@ func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEnt
 			signatures[sourceFile.FileName().AsString()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
 		}
 	}
-	g.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
+	graph.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
 	return signatures, len(stale) + contentKeyed
 }
 
@@ -179,9 +179,9 @@ var beforeSignatureEmit func(fileName string)
 // finishes after the deadline is dropped.
 //
 // Mutates: shapes takes each graduated entry and the abandoned one, for the caller to write to the table
-func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline time.Time, abandonAfter time.Duration) (graduated int, abandoned string) {
+func (graph *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline time.Time, abandonAfter time.Duration) (graduated int, abandoned string) {
 	var candidates []*ast.SourceFile
-	for _, sourceFile := range g.ProjectFiles() {
+	for _, sourceFile := range graph.ProjectFiles() {
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
 			continue
 		}
@@ -216,7 +216,7 @@ func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline ti
 				hook(fileName.AsString())
 			}
 			var entry *SignatureEntry
-			g.Program.Emit(context.Background(), compiler.EmitOptions{
+			graph.Program.Emit(context.Background(), compiler.EmitOptions{
 				TargetSourceFiles: []*ast.SourceFile{sourceFile},
 				EmitOnly:          compiler.EmitOnlyBuilderSignature,
 				WriteFile: func(_ tspath.RootedFilePath, text string, data *compiler.WriteFileData) error {
@@ -436,19 +436,19 @@ func isReadableComment(comment string) bool {
 //
 // Only real shapes are taken. An entry whose signature is its version, or that has none, says the compiler
 // never computed a shape for that file, and the file is left to be computed here.
-func (g *Graph) SeedSignatures(previous map[string]SignatureEntry) map[string]SignatureEntry {
+func (graph *Graph) SeedSignatures(previous map[string]SignatureEntry) map[string]SignatureEntry {
 	seeded := make(map[string]SignatureEntry, len(previous))
 	for name, entry := range previous {
 		seeded[name] = entry
 	}
-	if g.CompilerHost == nil || g.Config == nil {
+	if graph.CompilerHost == nil || graph.Config == nil {
 		return seeded
 	}
-	buildInfoFileName := g.Config.GetBuildInfoFileName()
+	buildInfoFileName := graph.Config.GetBuildInfoFileName()
 	if buildInfoFileName == "" {
 		return seeded
 	}
-	buildInfo := incremental.NewBuildInfoReader(g.CompilerHost).ReadBuildInfo(g.Config)
+	buildInfo := incremental.NewBuildInfoReader(graph.CompilerHost).ReadBuildInfo(graph.Config)
 	if buildInfo == nil || len(buildInfo.FileNames) != len(buildInfo.FileInfos) {
 		return seeded
 	}
@@ -459,9 +459,9 @@ func (g *Graph) SeedSignatures(previous map[string]SignatureEntry) map[string]Si
 		if info == nil || info.Signature() == "" || info.Signature() == info.Version() {
 			continue
 		}
-		recorded[g.pathFor(tspath.GetNormalizedAbsolutePath(string(name), tspath.RootedDirectoryPath(directory)))] = SignatureEntry{Version: info.Version(), Signature: info.Signature()}
+		recorded[graph.pathFor(tspath.GetNormalizedAbsolutePath(string(name), tspath.RootedDirectoryPath(directory)))] = SignatureEntry{Version: info.Version(), Signature: info.Signature()}
 	}
-	for _, sourceFile := range g.ProjectFiles() {
+	for _, sourceFile := range graph.ProjectFiles() {
 		if _, found := seeded[sourceFile.FileName().AsString()]; found {
 			continue
 		}
@@ -530,9 +530,9 @@ func writeSignatureDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.Source
 //
 // It is sound only for a rule that sees other files through types. A rule that reads an imported
 // declaration's syntax stays on TypeFingerprints.
-func (g *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[tspath.PathKey][sha256.Size]byte {
-	projectFiles := g.ProjectFiles()
-	global, edges, contents, resolutions := g.typeGraph()
+func (graph *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[tspath.PathKey][sha256.Size]byte {
+	projectFiles := graph.ProjectFiles()
+	global, edges, contents, resolutions := graph.typeGraph()
 
 	shapes := make(map[tspath.PathKey][sha256.Size]byte, len(projectFiles))
 	for _, sourceFile := range projectFiles {
@@ -545,7 +545,7 @@ func (g *Graph) SignatureFingerprints(signatures map[string]SignatureEntry) map[
 		// Where its imports resolve is part of what a file shows its importers; see TypeFingerprints.
 		shapes[sourceFile.PathKey()] = withResolutions(sha256.Sum256([]byte(shape)), resolutions[sourceFile.PathKey()])
 	}
-	components := fingerprintComponents(g.Anchor, projectFiles, edges, shapes, global)
+	components := fingerprintComponents(graph.Anchor, projectFiles, edges, shapes, global)
 
 	fingerprints := make(map[tspath.PathKey][sha256.Size]byte, len(projectFiles))
 	for _, sourceFile := range projectFiles {

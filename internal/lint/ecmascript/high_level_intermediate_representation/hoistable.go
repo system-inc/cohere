@@ -116,17 +116,17 @@ func newPathRegistry() *pathRegistry {
 }
 
 // identifierNode returns the interned node for a bare root, creating it if absent.
-func (r *pathRegistry) identifierNode(id static_single_assignment.IdentifierId, reactive bool) int {
-	if index, ok := r.roots[id]; ok {
+func (registry *pathRegistry) identifierNode(id static_single_assignment.IdentifierId, reactive bool) int {
+	if index, ok := registry.roots[id]; ok {
 		return index
 	}
-	index := len(r.nodes)
-	r.nodes = append(r.nodes, pathNode{
+	index := len(registry.nodes)
+	registry.nodes = append(registry.nodes, pathNode{
 		properties:         map[string]int{},
 		optionalProperties: map[string]int{},
 		fullPath:           ReactiveScopeDependency{Identifier: id, Reactive: reactive},
 	})
-	r.roots[id] = index
+	registry.roots[id] = index
 	return index
 }
 
@@ -135,22 +135,22 @@ func (r *pathRegistry) identifierNode(id static_single_assignment.IdentifierId, 
 // The new node's `fullPath` is the parent's path with the entry appended, COPIED rather than shared:
 // two children of one parent must not alias a backing array, or extending one would corrupt the
 // other.
-func (r *pathRegistry) propertyNode(parent int, entry DependencyPathEntry) int {
-	table := r.nodes[parent].properties
+func (registry *pathRegistry) propertyNode(parent int, entry DependencyPathEntry) int {
+	table := registry.nodes[parent].properties
 	if entry.Optional {
-		table = r.nodes[parent].optionalProperties
+		table = registry.nodes[parent].optionalProperties
 	}
 	if index, ok := table[entry.Property]; ok {
 		return index
 	}
 
-	parentPath := r.nodes[parent].fullPath
+	parentPath := registry.nodes[parent].fullPath
 	path := make([]DependencyPathEntry, len(parentPath.Path), len(parentPath.Path)+1)
 	copy(path, parentPath.Path)
 	path = append(path, entry)
 
-	index := len(r.nodes)
-	r.nodes = append(r.nodes, pathNode{
+	index := len(registry.nodes)
+	registry.nodes = append(registry.nodes, pathNode{
 		properties:         map[string]int{},
 		optionalProperties: map[string]int{},
 		fullPath: ReactiveScopeDependency{
@@ -158,17 +158,17 @@ func (r *pathRegistry) propertyNode(parent int, entry DependencyPathEntry) int {
 			Reactive:   parentPath.Reactive,
 			Path:       path,
 		},
-		hasOptional: r.nodes[parent].hasOptional || entry.Optional,
+		hasOptional: registry.nodes[parent].hasOptional || entry.Optional,
 	})
 	table[entry.Property] = index
 	return index
 }
 
 // pathIndex interns a whole dependency, returning the node naming it.
-func (r *pathRegistry) pathIndex(dep ReactiveScopeDependency) int {
-	current := r.identifierNode(dep.Identifier, dep.Reactive)
+func (registry *pathRegistry) pathIndex(dep ReactiveScopeDependency) int {
+	current := registry.identifierNode(dep.Identifier, dep.Reactive)
 	for _, entry := range dep.Path {
-		current = r.propertyNode(current, entry)
+		current = registry.propertyNode(current, entry)
 	}
 	return current
 }
@@ -306,30 +306,30 @@ type HoistableAnalysis struct {
 // adds proven-non-null accesses, but potentially missing some. A caller that needs upstream's
 // behaviour treats false as an error; a caller that prefers a shallower dependency treats it as a
 // smaller hoistable set, which is the safe direction.
-func (h *HoistableAnalysis) Converged() bool {
-	return h != nil && h.converged
+func (analysis *HoistableAnalysis) Converged() bool {
+	return analysis != nil && analysis.converged
 }
 
 // Iterations reports how many outer passes ran, for measurement.
-func (h *HoistableAnalysis) Iterations() int {
-	if h == nil {
+func (analysis *HoistableAnalysis) Iterations() int {
+	if analysis == nil {
 		return 0
 	}
-	return h.iterations
+	return analysis.iterations
 }
 
 // hoistableAt returns the non-null access paths proven at one block.
-func (h *HoistableAnalysis) hoistableAt(block static_single_assignment.BlockId) []ReactiveScopeDependency {
-	if h == nil || h.blocks == nil {
+func (analysis *HoistableAnalysis) hoistableAt(block static_single_assignment.BlockId) []ReactiveScopeDependency {
+	if analysis == nil || analysis.blocks == nil {
 		return nil
 	}
-	set, ok := h.blocks[block]
+	set, ok := analysis.blocks[block]
 	if !ok {
 		return nil
 	}
 	paths := make([]ReactiveScopeDependency, 0, len(set))
 	for _, index := range sortedNodeIndices(set) {
-		paths = append(paths, h.registry.nodes[index].fullPath)
+		paths = append(paths, analysis.registry.nodes[index].fullPath)
 	}
 	return paths
 }

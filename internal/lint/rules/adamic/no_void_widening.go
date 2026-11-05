@@ -115,7 +115,7 @@ type voidBodyProof struct {
 	empty   map[*ast.Node]bool
 }
 
-func (p *voidBodyProof) signatureEmpty(signature *checker.Signature) bool {
+func (proof *voidBodyProof) signatureEmpty(signature *checker.Signature) bool {
 	if signature == nil {
 		return false
 	}
@@ -123,28 +123,28 @@ func (p *voidBodyProof) signatureEmpty(signature *checker.Signature) bool {
 	if declaration == nil || !ast.IsFunctionLike(declaration) || declaration.Body() == nil {
 		return false
 	}
-	if empty, seen := p.empty[declaration]; seen {
+	if empty, seen := proof.empty[declaration]; seen {
 		return empty
 	}
-	p.empty[declaration] = false
+	proof.empty[declaration] = false
 	body := declaration.Body()
 	empty := true
 	if !ast.IsBlock(body) {
-		empty = p.expressionEmpty(body, 0)
+		empty = proof.expressionEmpty(body, 0)
 	} else {
 		ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
 			expression := statement.AsReturnStatement().Expression
-			if expression != nil && !p.expressionEmpty(expression, 0) {
+			if expression != nil && !proof.expressionEmpty(expression, 0) {
 				empty = false
 			}
 			return !empty
 		})
 	}
-	p.empty[declaration] = empty
+	proof.empty[declaration] = empty
 	return empty
 }
 
-func (p *voidBodyProof) expressionEmpty(expression *ast.Node, depth int) bool {
+func (proof *voidBodyProof) expressionEmpty(expression *ast.Node, depth int) bool {
 	if expression == nil || depth > 8 {
 		return false
 	}
@@ -152,26 +152,26 @@ func (p *voidBodyProof) expressionEmpty(expression *ast.Node, depth int) bool {
 	if unwrapped.Kind == ast.KindVoidExpression {
 		return true
 	}
-	own := p.checker.GetTypeAtLocation(unwrapped)
+	own := proof.checker.GetTypeAtLocation(unwrapped)
 	if own != nil && own.Flags()&(checker.TypeFlagsUndefined|checker.TypeFlagsNever) != 0 {
 		return true
 	}
 	switch unwrapped.Kind {
 	case ast.KindCallExpression:
-		return p.signatureEmpty(p.checker.GetResolvedSignature(unwrapped))
+		return proof.signatureEmpty(proof.checker.GetResolvedSignature(unwrapped))
 	case ast.KindAwaitExpression:
-		return p.expressionEmpty(unwrapped.AsAwaitExpression().Expression, depth+1)
+		return proof.expressionEmpty(unwrapped.AsAwaitExpression().Expression, depth+1)
 	case ast.KindIdentifier:
 		// Only an inferred const retains its initializer's provenance. An annotation
 		// could already have erased a value, and a mutable binding could be replaced.
-		symbol := p.checker.GetSymbolAtLocation(unwrapped)
+		symbol := proof.checker.GetSymbolAtLocation(unwrapped)
 		if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 			return false
 		}
 		declaration := symbol.ValueDeclaration
 		variable := declaration.AsVariableDeclaration()
 		return declaration.Parent != nil && declaration.Parent.Flags&ast.NodeFlagsConst != 0 && variable.Type == nil &&
-			p.expressionEmpty(variable.Initializer, depth+1)
+			proof.expressionEmpty(variable.Initializer, depth+1)
 	}
 	return false
 }
@@ -180,9 +180,9 @@ func (p *voidBodyProof) expressionEmpty(expression *ast.Node, depth int) bool {
 // the expression's resolved signature; for a function's return use the source
 // signature at that path. Container steps preserve that origin. Contravariant
 // parameter paths and unresolved signatures remain conservative.
-func (p *voidBodyProof) promiseOriginEmpty(node *ast.Node, source *checker.Type, path []flow.Step) bool {
+func (proof *voidBodyProof) promiseOriginEmpty(node *ast.Node, source *checker.Type, path []flow.Step) bool {
 	if len(path) == 0 {
-		return p.expressionEmpty(node, 0)
+		return proof.expressionEmpty(node, 0)
 	}
 	walked := source
 	for index, step := range path {
@@ -191,27 +191,27 @@ func (p *voidBodyProof) promiseOriginEmpty(node *ast.Node, source *checker.Type,
 		}
 		switch step.Kind {
 		case flow.StepReturn:
-			signatures := checker.Checker_getSignaturesOfType(p.checker, walked, checker.SignatureKindCall)
+			signatures := checker.Checker_getSignaturesOfType(proof.checker, walked, checker.SignatureKindCall)
 			if len(signatures) != 1 {
 				return false
 			}
 			if index == len(path)-1 {
-				return p.signatureEmpty(signatures[0])
+				return proof.signatureEmpty(signatures[0])
 			}
-			walked = checker.Checker_getReturnTypeOfSignature(p.checker, signatures[0])
+			walked = checker.Checker_getReturnTypeOfSignature(proof.checker, signatures[0])
 		case flow.StepProperty:
-			property := checker.Checker_getPropertyOfType(p.checker, walked, step.Name)
+			property := checker.Checker_getPropertyOfType(proof.checker, walked, step.Name)
 			if property == nil {
 				return false
 			}
-			walked = checker.Checker_getTypeOfSymbol(p.checker, property)
+			walked = checker.Checker_getTypeOfSymbol(proof.checker, property)
 		case flow.StepElement, flow.StepTypeArgument:
 			// The walker may have selected a union member or expanded a constraint.
 			// Its original root then has no reference arguments we can safely inspect.
 			if walked.Flags()&checker.TypeFlagsObject == 0 || walked.ObjectFlags()&checker.ObjectFlagsReference == 0 {
 				return false
 			}
-			arguments := checker.Checker_getTypeArguments(p.checker, walked)
+			arguments := checker.Checker_getTypeArguments(proof.checker, walked)
 			argument := step.Index
 			if argument < 0 {
 				argument = 0

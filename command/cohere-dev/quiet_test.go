@@ -117,10 +117,10 @@ func newQuietTrimCase(test *testing.T) quietTrimCase {
 	return quietTrimCase{wrapper: wrapper, slots: slots, cache: cache, environment: environment}
 }
 
-func (c quietTrimCase) run(test *testing.T, arguments ...string) string {
+func (trimCase quietTrimCase) run(test *testing.T, arguments ...string) string {
 	test.Helper()
-	command := exec.Command(c.wrapper, arguments...)
-	command.Env = c.environment
+	command := exec.Command(trimCase.wrapper, arguments...)
+	command.Env = trimCase.environment
 	output, outputError := command.CombinedOutput()
 	if outputError != nil {
 		test.Fatalf("cohere-dev %s: %v\n%s", strings.Join(arguments, " "), outputError, output)
@@ -128,14 +128,14 @@ func (c quietTrimCase) run(test *testing.T, arguments ...string) string {
 	return string(output)
 }
 
-func (c quietTrimCase) size(test *testing.T) int64 {
+func (trimCase quietTrimCase) size(test *testing.T) int64 {
 	test.Helper()
-	return cacheSize(test, c.cache)
+	return cacheSize(test, trimCase.cache)
 }
 
-func (c quietTrimCase) log(test *testing.T) string {
+func (trimCase quietTrimCase) log(test *testing.T) string {
 	test.Helper()
-	return string(readMaybeMissing(test, filepath.Join(c.slots, "gocache-trim.log")))
+	return string(readMaybeMissing(test, filepath.Join(trimCase.slots, "gocache-trim.log")))
 }
 
 // A quiet window switches the trim off, both ways (#cqfy7cv): with the marker open a trim over its cap

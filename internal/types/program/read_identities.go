@@ -24,25 +24,25 @@ type identityFS struct {
 	identities *readIdentities
 }
 
-func (f *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+func (identityFS *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
 	identity, statted := statIdentity(path.AsString())
-	contents, ok := f.FS.ReadFile(path)
+	contents, ok := identityFS.FS.ReadFile(path)
 	if statted && ok {
-		f.identities.mutex.Lock()
-		f.identities.byPath[path.AsString()] = identity
-		f.identities.mutex.Unlock()
+		identityFS.identities.mutex.Lock()
+		identityFS.identities.byPath[path.AsString()] = identity
+		identityFS.identities.mutex.Unlock()
 	}
 	return contents, ok
 }
 
 // identity is the stat path was read under, when one was recorded.
-func (r *readIdentities) identity(path string) (fileIdentity, bool) {
-	if r == nil {
+func (identities *readIdentities) identity(path string) (fileIdentity, bool) {
+	if identities == nil {
 		return fileIdentity{}, false
 	}
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	identity, known := r.byPath[path]
+	identities.mutex.Lock()
+	defer identities.mutex.Unlock()
+	identity, known := identities.byPath[path]
 	return identity, known
 }
 

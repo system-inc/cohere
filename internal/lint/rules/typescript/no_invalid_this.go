@@ -159,7 +159,7 @@ type noInvalidThisWalker struct {
 	thisIsValid []bool
 }
 
-func (w *noInvalidThisWalker) walk(node *ast.Node) {
+func (walker *noInvalidThisWalker) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -167,29 +167,29 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 	pushed := false
 	switch node.Kind {
 	case ast.KindThisKeyword:
-		if !w.currentlyValid() {
-			w.ctx.ReportNode(node, messageUnexpectedThis)
+		if !walker.currentlyValid() {
+			walker.ctx.ReportNode(node, messageUnexpectedThis)
 		}
 
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
 		// The TypeScript contribution: a declared `this` parameter binds `this` by contract, and
 		// the checker enforces it at every call site.
-		w.thisIsValid = append(w.thisIsValid,
-			declaresThisParameter(node) || !thisIsDefaultBoundIn(w.ctx, node, w.settings))
+		walker.thisIsValid = append(walker.thisIsValid,
+			declaresThisParameter(node) || !thisIsDefaultBoundIn(walker.ctx, node, walker.settings))
 		pushed = true
 
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
 		ast.KindConstructor, ast.KindClassStaticBlockDeclaration:
 		// A method's `this` is the receiver and a static block's is the class. Upstream reaches
 		// these through the same default-binding test, which answers false for all of them.
-		w.thisIsValid = append(w.thisIsValid, true)
+		walker.thisIsValid = append(walker.thisIsValid, true)
 		pushed = true
 
 	case ast.KindPropertyDeclaration:
 		// A field initializer is an implicit function whose `this` is the instance. Upstream pushes
 		// true for PropertyDefinition and AccessorProperty alike; `accessor` is a modifier here
 		// rather than a separate node, so both arrive as this kind.
-		w.thisIsValid = append(w.thisIsValid, true)
+		walker.thisIsValid = append(walker.thisIsValid, true)
 		pushed = true
 
 	case ast.KindArrowFunction:
@@ -198,12 +198,12 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child)
+		walker.walk(child)
 		return false
 	})
 
 	if pushed {
-		w.thisIsValid = w.thisIsValid[:len(w.thisIsValid)-1]
+		walker.thisIsValid = walker.thisIsValid[:len(walker.thisIsValid)-1]
 	}
 }
 
@@ -212,11 +212,11 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 // An empty stack is top level. Every file cohere lints is a TypeScript module, where top-level
 // `this` is `undefined`, so the answer there is false. Core reaches the same answer through
 // `node.sourceType === "module"`.
-func (w *noInvalidThisWalker) currentlyValid() bool {
-	if len(w.thisIsValid) == 0 {
+func (walker *noInvalidThisWalker) currentlyValid() bool {
+	if len(walker.thisIsValid) == 0 {
 		return false
 	}
-	return w.thisIsValid[len(w.thisIsValid)-1]
+	return walker.thisIsValid[len(walker.thisIsValid)-1]
 }
 
 // declaresThisParameter answers whether a function declares an explicit `this` parameter.

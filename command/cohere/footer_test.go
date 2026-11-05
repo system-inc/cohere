@@ -399,8 +399,8 @@ func carriesMarker(footerLine, marker string) error {
 
 type missingMarker struct{ footer, marker string }
 
-func (m *missingMarker) Error() string {
-	return "the footer does not say " + m.marker + ": " + m.footer
+func (marker *missingMarker) Error() string {
+	return "the footer does not say " + marker.marker + ": " + marker.footer
 }
 
 // TestFooterGroupsCounts is Kirk's: a count is exact, its thousands grouped, never abbreviated.

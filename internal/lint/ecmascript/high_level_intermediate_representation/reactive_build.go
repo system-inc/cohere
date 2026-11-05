@@ -109,12 +109,12 @@ func newReactiveContext(function *Function) *reactiveContext {
 	}
 }
 
-func (c *reactiveContext) block(id static_single_assignment.BlockId) *BasicBlock {
-	return c.blockIndex[id]
+func (reactiveContext *reactiveContext) block(id static_single_assignment.BlockId) *BasicBlock {
+	return reactiveContext.blockIndex[id]
 }
 
-func (c *reactiveContext) isScheduled(id static_single_assignment.BlockId) bool {
-	return c.scheduled[id]
+func (reactiveContext *reactiveContext) isScheduled(id static_single_assignment.BlockId) bool {
+	return reactiveContext.scheduled[id]
 }
 
 // schedule records that a parent will emit this block, returning a token to unschedule it with.
@@ -122,11 +122,11 @@ func (c *reactiveContext) isScheduled(id static_single_assignment.BlockId) bool 
 // Upstream raises an invariant when a block is scheduled twice. That cannot be reproduced as a
 // panic in a linter, so a double schedule is counted and the second one is ignored -- which keeps
 // the walk single-visit rather than letting the block be emitted by both parents.
-func (c *reactiveContext) schedule(block static_single_assignment.BlockId, kind controlFlowKind) int {
-	id := c.nextScheduleId
-	c.nextScheduleId++
-	c.scheduled[block] = true
-	c.stack = append(c.stack, controlFlowTarget{block: block, id: id, kind: kind, ownsBlock: true})
+func (reactiveContext *reactiveContext) schedule(block static_single_assignment.BlockId, kind controlFlowKind) int {
+	id := reactiveContext.nextScheduleId
+	reactiveContext.nextScheduleId++
+	reactiveContext.scheduled[block] = true
+	reactiveContext.stack = append(reactiveContext.stack, controlFlowTarget{block: block, id: id, kind: kind, ownsBlock: true})
 	return id
 }
 
@@ -134,13 +134,13 @@ func (c *reactiveContext) schedule(block static_single_assignment.BlockId, kind 
 //
 // `ownsBlock` is upstream's, and it matters: a loop whose fallthrough was ALREADY scheduled by an
 // enclosing construct must not unschedule it on the way out, or the parent's break target vanishes.
-func (c *reactiveContext) scheduleLoop(fallthrough_, continueBlock static_single_assignment.BlockId) int {
-	id := c.nextScheduleId
-	c.nextScheduleId++
-	ownsBlock := !c.scheduled[fallthrough_]
-	c.scheduled[fallthrough_] = true
-	c.scheduled[continueBlock] = true
-	c.stack = append(c.stack, controlFlowTarget{
+func (reactiveContext *reactiveContext) scheduleLoop(fallthrough_, continueBlock static_single_assignment.BlockId) int {
+	id := reactiveContext.nextScheduleId
+	reactiveContext.nextScheduleId++
+	ownsBlock := !reactiveContext.scheduled[fallthrough_]
+	reactiveContext.scheduled[fallthrough_] = true
+	reactiveContext.scheduled[continueBlock] = true
+	reactiveContext.stack = append(reactiveContext.stack, controlFlowTarget{
 		block:         fallthrough_,
 		id:            id,
 		kind:          controlFlowLoop,
@@ -152,19 +152,19 @@ func (c *reactiveContext) scheduleLoop(fallthrough_, continueBlock static_single
 }
 
 // unschedule pops entries down to and including the one this token names.
-func (c *reactiveContext) unschedule(scheduleId int) {
-	for len(c.stack) > 0 {
-		top := c.stack[len(c.stack)-1]
-		c.stack = c.stack[:len(c.stack)-1]
+func (reactiveContext *reactiveContext) unschedule(scheduleId int) {
+	for len(reactiveContext.stack) > 0 {
+		top := reactiveContext.stack[len(reactiveContext.stack)-1]
+		reactiveContext.stack = reactiveContext.stack[:len(reactiveContext.stack)-1]
 		// A loop that did not claim this block must not release it: the enclosing construct that
 		// did claim it is still on the stack and still needs it as a break target. Upstream's
 		// guard is `last.type !== 'loop' || last.ownsBlock !== null`, and dropping it is what
 		// makes a break to an outer construct stop matching part way through a nested loop.
 		if top.kind != controlFlowLoop || top.ownsBlock {
-			delete(c.scheduled, top.block)
+			delete(reactiveContext.scheduled, top.block)
 		}
 		if top.hasContinue {
-			delete(c.scheduled, top.continueBlock)
+			delete(reactiveContext.scheduled, top.continueBlock)
 		}
 		if top.id == scheduleId {
 			return
@@ -172,9 +172,9 @@ func (c *reactiveContext) unschedule(scheduleId int) {
 	}
 }
 
-func (c *reactiveContext) unscheduleAll(ids []int) {
+func (reactiveContext *reactiveContext) unscheduleAll(ids []int) {
 	for index := len(ids) - 1; index >= 0; index-- {
-		c.unschedule(ids[index])
+		reactiveContext.unschedule(ids[index])
 	}
 }
 
@@ -190,10 +190,10 @@ func (c *reactiveContext) unscheduleAll(ids []int) {
 // The `hasPrecedingLoop` tracking is what separates the second from the third, and getting it wrong
 // produces a program that breaks out of the wrong loop while passing any test that only checks
 // which statements exist.
-func (c *reactiveContext) breakTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
+func (reactiveContext *reactiveContext) breakTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
 	hasPrecedingLoop := false
-	for index := len(c.stack) - 1; index >= 0; index-- {
-		target := c.stack[index]
+	for index := len(reactiveContext.stack) - 1; index >= 0; index-- {
+		target := reactiveContext.stack[index]
 		if target.block == block {
 			switch {
 			case target.kind == controlFlowLoop:
@@ -201,7 +201,7 @@ func (c *reactiveContext) breakTarget(block static_single_assignment.BlockId) (R
 					return ReactiveTargetLabeled, true
 				}
 				return ReactiveTargetUnlabeled, true
-			case index == len(c.stack)-1:
+			case index == len(reactiveContext.stack)-1:
 				return ReactiveTargetImplicit, true
 			default:
 				return ReactiveTargetLabeled, true
@@ -218,10 +218,10 @@ func (c *reactiveContext) breakTarget(block static_single_assignment.BlockId) (R
 }
 
 // continueTarget decides how a goto to a loop's back edge should be printed.
-func (c *reactiveContext) continueTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
+func (reactiveContext *reactiveContext) continueTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
 	hasPrecedingLoop := false
-	for index := len(c.stack) - 1; index >= 0; index-- {
-		target := c.stack[index]
+	for index := len(reactiveContext.stack) - 1; index >= 0; index-- {
+		target := reactiveContext.stack[index]
 		if target.hasContinue && target.continueBlock == block {
 			if hasPrecedingLoop {
 				return ReactiveTargetLabeled, true
@@ -466,22 +466,22 @@ func eachTerminalValue(terminal ReactiveTerminal, visit func(ReactiveValue)) {
 // The single most important property here is that a block is visited ONCE. `emitted` is the check on
 // that and `scheduled` is the mechanism: a block a parent has committed to emitting is not emitted
 // by a child, which emits a break to it instead.
-func (c *reactiveContext) visitBlock(block *BasicBlock, into *ReactiveBlock) {
+func (reactiveContext *reactiveContext) visitBlock(block *BasicBlock, into *ReactiveBlock) {
 	if block == nil {
 		return
 	}
-	if c.emitted[block.Id] {
+	if reactiveContext.emitted[block.Id] {
 		// Upstream raises `Cannot emit the same block twice`. Counted and skipped here, because a
 		// linter that panics on a graph it dislikes is worse than one that declines a function, and
 		// because emitting it twice would produce a tree with duplicated statements -- silently
 		// wrong output rather than a visible failure.
-		c.doubleEmit++
+		reactiveContext.doubleEmit++
 		return
 	}
-	c.emitted[block.Id] = true
+	reactiveContext.emitted[block.Id] = true
 
 	for _, instructionId := range block.Instructions {
-		instruction := c.function.Instructions[instructionId]
+		instruction := reactiveContext.function.Instructions[instructionId]
 		if instruction == nil {
 			continue
 		}
@@ -495,7 +495,7 @@ func (c *reactiveContext) visitBlock(block *BasicBlock, into *ReactiveBlock) {
 		})
 	}
 
-	c.visitTerminal(block, into)
+	reactiveContext.visitTerminal(block, into)
 }
 
 // visitTerminal dispatches one block's terminal, emitting a tree terminal and recursing into arms.
@@ -504,7 +504,7 @@ func (c *reactiveContext) visitBlock(block *BasicBlock, into *ReactiveBlock) {
 // fallthrough so nested blocks emit a break rather than re-emitting it, walk the arms, unschedule,
 // then visit the fallthrough as a SIBLING rather than as a child -- which is what flattens
 // `if (a) {...} rest` into two statements instead of nesting `rest` inside the if.
-func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) {
+func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) {
 	var scheduleIds []int
 
 	switch terminal := block.Terminal.(type) {
@@ -525,17 +525,17 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 		// statement for it.
 
 	case *Goto:
-		c.emitGoto(terminal, into)
+		reactiveContext.emitGoto(terminal, into)
 
 	case *If:
-		fallthroughId, scheduled := c.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
-		consequent := c.traverse(terminal.Consequent)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		consequent := reactiveContext.traverse(terminal.Consequent)
 		var alternate *ReactiveBlock
 		if terminal.Alternate != terminal.Fallthrough {
-			built := c.traverse(terminal.Alternate)
+			built := reactiveContext.traverse(terminal.Alternate)
 			alternate = &built
 		}
-		c.unscheduleAll(scheduleIds)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveIf{
 				Test:       terminal.Test,
@@ -543,16 +543,16 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 				Alternate:  alternate,
 				Order:      terminal.Order,
 			},
-			Label: c.labelFor(terminal.Fallthrough, scheduled),
+			Label: reactiveContext.labelFor(terminal.Fallthrough, scheduled),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Branch:
 		// `Branch` is the value-block form of `if`, used inside ternaries and logicals. It has no
 		// fallthrough of its own -- the enclosing value terminal owns it -- so both arms are walked
 		// and nothing is scheduled here.
-		consequent := c.traverse(terminal.Consequent)
-		built := c.traverse(terminal.Alternate)
+		consequent := reactiveContext.traverse(terminal.Consequent)
+		built := reactiveContext.traverse(terminal.Alternate)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveIf{
 				Test:       terminal.Test,
@@ -563,7 +563,7 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 		})
 
 	case *Switch:
-		fallthroughId, scheduled := c.scheduleFallthrough(terminal.Fallthrough, controlFlowSwitch, &scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowSwitch, &scheduleIds)
 		// # Cases are walked in REVERSE, and each is scheduled AFTER it is traversed
 		//
 		// Both halves are upstream's and both are load-bearing. A `switch` with fallthrough has
@@ -584,10 +584,10 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 			arm := terminal.Cases[index]
 			testPlace := arm.Test
 			var body *ReactiveBlock
-			if !c.isScheduled(arm.Block) {
-				built := c.traverse(arm.Block)
+			if !reactiveContext.isScheduled(arm.Block) {
+				built := reactiveContext.traverse(arm.Block)
 				body = &built
-				scheduleIds = append(scheduleIds, c.schedule(arm.Block, controlFlowCase))
+				scheduleIds = append(scheduleIds, reactiveContext.schedule(arm.Block, controlFlowCase))
 			}
 			reversed = append(reversed, ReactiveSwitchCase{Test: testPlace, Block: body})
 		}
@@ -595,143 +595,143 @@ func (c *reactiveContext) visitTerminal(block *BasicBlock, into *ReactiveBlock) 
 		for index, arm := range reversed {
 			cases[len(reversed)-1-index] = arm
 		}
-		c.unscheduleAll(scheduleIds)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveSwitch{Test: terminal.Test, Cases: cases, Order: terminal.Order},
-			Label:    c.labelFor(terminal.Fallthrough, scheduled),
+			Label:    reactiveContext.labelFor(terminal.Fallthrough, scheduled),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *While:
-		fallthroughId := c.scheduleLoopTargets(terminal.Fallthrough, terminal.Test, &scheduleIds)
-		test := c.valueOf(terminal.Test)
-		loop := c.traverse(terminal.Loop)
-		c.unscheduleAll(scheduleIds)
+		fallthroughId := reactiveContext.scheduleLoopTargets(terminal.Fallthrough, terminal.Test, &scheduleIds)
+		test := reactiveContext.valueOf(terminal.Test)
+		loop := reactiveContext.traverse(terminal.Loop)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveWhile{Test: test, Loop: loop, Order: terminal.Order},
-			Label:    c.labelFor(terminal.Fallthrough, true),
+			Label:    reactiveContext.labelFor(terminal.Fallthrough, true),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *DoWhile:
-		fallthroughId := c.scheduleLoopTargets(terminal.Fallthrough, terminal.Test, &scheduleIds)
-		loop := c.traverse(terminal.Loop)
-		test := c.valueOf(terminal.Test)
-		c.unscheduleAll(scheduleIds)
+		fallthroughId := reactiveContext.scheduleLoopTargets(terminal.Fallthrough, terminal.Test, &scheduleIds)
+		loop := reactiveContext.traverse(terminal.Loop)
+		test := reactiveContext.valueOf(terminal.Test)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveDoWhile{Loop: loop, Test: test, Order: terminal.Order},
-			Label:    c.labelFor(terminal.Fallthrough, true),
+			Label:    reactiveContext.labelFor(terminal.Fallthrough, true),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *For:
-		fallthroughId := c.scheduleLoopTargets(terminal.Fallthrough, terminal.Update, &scheduleIds)
-		init := c.valueOf(terminal.Init)
-		test := c.valueOf(terminal.Test)
+		fallthroughId := reactiveContext.scheduleLoopTargets(terminal.Fallthrough, terminal.Update, &scheduleIds)
+		init := reactiveContext.valueOf(terminal.Init)
+		test := reactiveContext.valueOf(terminal.Test)
 		var update ReactiveValue
 		if terminal.Update != terminal.Fallthrough {
-			update = c.valueOf(terminal.Update)
+			update = reactiveContext.valueOf(terminal.Update)
 		}
-		loop := c.traverse(terminal.Loop)
-		c.unscheduleAll(scheduleIds)
+		loop := reactiveContext.traverse(terminal.Loop)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveFor{
 				Init: init, Test: test, Update: update, Loop: loop, Order: terminal.Order,
 			},
-			Label: c.labelFor(terminal.Fallthrough, true),
+			Label: reactiveContext.labelFor(terminal.Fallthrough, true),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *ForOf:
-		fallthroughId := c.scheduleLoopTargets(terminal.Fallthrough, terminal.Test, &scheduleIds)
-		init := c.valueOf(terminal.Init)
-		test := c.valueOf(terminal.Test)
-		loop := c.traverse(terminal.Loop)
-		c.unscheduleAll(scheduleIds)
+		fallthroughId := reactiveContext.scheduleLoopTargets(terminal.Fallthrough, terminal.Test, &scheduleIds)
+		init := reactiveContext.valueOf(terminal.Init)
+		test := reactiveContext.valueOf(terminal.Test)
+		loop := reactiveContext.traverse(terminal.Loop)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveForOf{Init: init, Test: test, Loop: loop, Order: terminal.Order},
-			Label:    c.labelFor(terminal.Fallthrough, true),
+			Label:    reactiveContext.labelFor(terminal.Fallthrough, true),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *ForIn:
-		fallthroughId := c.scheduleLoopTargets(terminal.Fallthrough, terminal.Loop, &scheduleIds)
-		init := c.valueOf(terminal.Init)
-		loop := c.traverse(terminal.Loop)
-		c.unscheduleAll(scheduleIds)
+		fallthroughId := reactiveContext.scheduleLoopTargets(terminal.Fallthrough, terminal.Loop, &scheduleIds)
+		init := reactiveContext.valueOf(terminal.Init)
+		loop := reactiveContext.traverse(terminal.Loop)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveForIn{Init: init, Loop: loop, Order: terminal.Order},
-			Label:    c.labelFor(terminal.Fallthrough, true),
+			Label:    reactiveContext.labelFor(terminal.Fallthrough, true),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Label:
-		fallthroughId, scheduled := c.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
-		body := c.traverse(terminal.Block)
-		c.unscheduleAll(scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		body := reactiveContext.traverse(terminal.Block)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveLabelTerminal{Block: body, Order: terminal.Order},
-			Label:    c.labelFor(terminal.Fallthrough, scheduled),
+			Label:    reactiveContext.labelFor(terminal.Fallthrough, scheduled),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Try:
-		fallthroughId, scheduled := c.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
-		c.catchHandlers[terminal.Handler] = true
-		body := c.traverse(terminal.Block)
-		handler := c.traverse(terminal.Handler)
-		c.unscheduleAll(scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		reactiveContext.catchHandlers[terminal.Handler] = true
+		body := reactiveContext.traverse(terminal.Block)
+		handler := reactiveContext.traverse(terminal.Handler)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveTry{
 				Block: body, HandlerBinding: terminal.HandlerBinding, Handler: handler,
 				Order: terminal.Order,
 			},
-			Label: c.labelFor(terminal.Fallthrough, scheduled),
+			Label: reactiveContext.labelFor(terminal.Fallthrough, scheduled),
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Scope:
-		fallthroughId, scheduled := c.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
 		if scheduled {
 			// Recorded only when this terminal actually claimed the block. If an enclosing construct
 			// already owns it, the break belongs to that construct and eliding it here would drop a
 			// jump the source really makes.
-			c.scopeFallthroughs[terminal.Fallthrough] = true
+			reactiveContext.scopeFallthroughs[terminal.Fallthrough] = true
 		}
-		body := c.traverse(terminal.Block)
-		c.unscheduleAll(scheduleIds)
+		body := reactiveContext.traverse(terminal.Block)
+		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveScopeBlock{
 			Scope:        terminal.Scope,
 			Instructions: body,
-			Pruned:       c.flattenedScopes[terminal.Scope],
+			Pruned:       reactiveContext.flattenedScopes[terminal.Scope],
 		})
-		c.visitFallthrough(fallthroughId, into)
+		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Logical:
-		if !c.emitStructuredValueTerminal(terminal, into, &scheduleIds) {
-			c.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Test)
+		if !reactiveContext.emitStructuredValueTerminal(terminal, into, &scheduleIds) {
+			reactiveContext.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Test)
 		}
 
 	case *Ternary:
-		if !c.emitStructuredValueTerminal(terminal, into, &scheduleIds) {
-			c.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Test)
+		if !reactiveContext.emitStructuredValueTerminal(terminal, into, &scheduleIds) {
+			reactiveContext.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Test)
 		}
 
 	case *Optional:
-		if !c.emitStructuredValueTerminal(terminal, into, &scheduleIds) {
-			c.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Test)
+		if !reactiveContext.emitStructuredValueTerminal(terminal, into, &scheduleIds) {
+			reactiveContext.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Test)
 		}
 
 	case *Sequence:
 		// Never constructed in this tree; see ReactiveFunctionGapUnbuiltTerminals.
-		c.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Block)
+		reactiveContext.emitValueTerminal(terminal.Fallthrough, into, &scheduleIds, terminal.Block)
 
 	case *MaybeThrow:
 		// Upstream's comment: "ReactiveFunction does not explicitly model maybe-throw semantics, so
 		// these terminals flatten away." Never constructed here either, so this arm costs nothing
 		// today and is written to match upstream rather than to run.
-		if !c.isScheduled(terminal.Continuation) {
-			c.visitBlock(c.block(terminal.Continuation), into)
+		if !reactiveContext.isScheduled(terminal.Continuation) {
+			reactiveContext.visitBlock(reactiveContext.block(terminal.Continuation), into)
 		}
 	}
 }
@@ -758,7 +758,7 @@ type reactiveValueTerminalResult struct {
 // A malformed or already-emitted value subtree declines without changing the walk. The caller can
 // then preserve the graph in statement form, which is preferable to producing a partial composite
 // and losing the unvisited arm.
-func (c *reactiveContext) emitStructuredValueTerminal(terminal Terminal, into *ReactiveBlock,
+func (reactiveContext *reactiveContext) emitStructuredValueTerminal(terminal Terminal, into *ReactiveBlock,
 	ids *[]int) bool {
 	var continuation static_single_assignment.BlockId
 	var order static_single_assignment.EvaluationOrder
@@ -776,16 +776,16 @@ func (c *reactiveContext) emitStructuredValueTerminal(terminal Terminal, into *R
 		return false
 	}
 
-	savedEmitted := make(map[static_single_assignment.BlockId]bool, len(c.emitted))
-	for block, emitted := range c.emitted {
+	savedEmitted := make(map[static_single_assignment.BlockId]bool, len(reactiveContext.emitted))
+	for block, emitted := range reactiveContext.emitted {
 		savedEmitted[block] = emitted
 	}
 
-	fallthroughId, _ := c.scheduleFallthrough(continuation, controlFlowIf, ids)
-	result, ok := c.visitValueBlockTerminal(terminal)
+	fallthroughId, _ := reactiveContext.scheduleFallthrough(continuation, controlFlowIf, ids)
+	result, ok := reactiveContext.visitValueBlockTerminal(terminal)
 	if !ok {
-		c.emitted = savedEmitted
-		c.unscheduleAll(*ids)
+		reactiveContext.emitted = savedEmitted
+		reactiveContext.unscheduleAll(*ids)
 		*ids = (*ids)[:0]
 		return false
 	}
@@ -798,20 +798,20 @@ func (c *reactiveContext) emitStructuredValueTerminal(terminal Terminal, into *R
 			Value:  result.value,
 		},
 	})
-	c.unscheduleAll(*ids)
+	reactiveContext.unscheduleAll(*ids)
 	*ids = (*ids)[:0]
-	c.visitFallthrough(fallthroughId, into)
+	reactiveContext.visitFallthrough(fallthroughId, into)
 	return true
 }
 
 // visitValueBlockTerminal mirrors upstream's value reconstruction for the terminal variants that
 // can occur while rebuilding a composite expression. The returned place is the value the expression
 // defines; the terminal's CFG fallthrough is deliberately not traversed here.
-func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveValueTerminalResult,
+func (reactiveContext *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveValueTerminalResult,
 	bool) {
 	switch shape := terminal.(type) {
 	case *Sequence:
-		block, ok := c.visitValueBlock(shape.Block)
+		block, ok := reactiveContext.visitValueBlock(shape.Block)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
@@ -821,11 +821,11 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 		}, true
 
 	case *Optional:
-		test, branch, ok := c.visitTestValueBlock(shape.Test)
+		test, branch, ok := reactiveContext.visitTestValueBlock(shape.Test)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
-		consequent, ok := c.visitValueBlock(branch.Consequent)
+		consequent, ok := reactiveContext.visitValueBlock(branch.Consequent)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
@@ -839,7 +839,7 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 			Value: consequent.value,
 		}
 		return reactiveValueTerminalResult{
-			place: c.valueJoinPlace(shape.Fallthrough, consequent),
+			place: reactiveContext.valueJoinPlace(shape.Fallthrough, consequent),
 			value: &ReactiveOptionalValue{
 				Order: shape.Order, Value: call, Optional: shape.Optional,
 			},
@@ -848,7 +848,7 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 		}, true
 
 	case *Logical:
-		test, branch, ok := c.visitTestValueBlock(shape.Test)
+		test, branch, ok := reactiveContext.visitTestValueBlock(shape.Test)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
@@ -864,11 +864,11 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 		default:
 			return reactiveValueTerminalResult{}, false
 		}
-		leftFinal, ok := c.visitValueBlock(shortCircuitBlock)
+		leftFinal, ok := reactiveContext.visitValueBlock(shortCircuitBlock)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
-		right, ok := c.visitValueBlock(rightBlock)
+		right, ok := reactiveContext.visitValueBlock(rightBlock)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
@@ -882,7 +882,7 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 			Value: leftFinal.value,
 		}
 		return reactiveValueTerminalResult{
-			place: c.valueJoinPlace(shape.Fallthrough, leftFinal, right),
+			place: reactiveContext.valueJoinPlace(shape.Fallthrough, leftFinal, right),
 			value: &ReactiveLogicalValue{
 				Operator: shape.Operator,
 				Left:     left,
@@ -893,20 +893,20 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 		}, true
 
 	case *Ternary:
-		test, branch, ok := c.visitTestValueBlock(shape.Test)
+		test, branch, ok := reactiveContext.visitTestValueBlock(shape.Test)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
-		consequent, ok := c.visitValueBlock(branch.Consequent)
+		consequent, ok := reactiveContext.visitValueBlock(branch.Consequent)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
-		alternate, ok := c.visitValueBlock(branch.Alternate)
+		alternate, ok := reactiveContext.visitValueBlock(branch.Alternate)
 		if !ok {
 			return reactiveValueTerminalResult{}, false
 		}
 		return reactiveValueTerminalResult{
-			place: c.valueJoinPlace(shape.Fallthrough, consequent, alternate),
+			place: reactiveContext.valueJoinPlace(shape.Fallthrough, consequent, alternate),
 			value: &ReactiveTernaryValue{
 				Test:       test.value,
 				Consequent: consequent.value,
@@ -923,12 +923,12 @@ func (c *reactiveContext) visitValueBlockTerminal(terminal Terminal) (reactiveVa
 // to BuildReactiveFunction. Each arm result is an operand of a phi in the value terminal's
 // continuation; the reconstructed composite instruction defines that phi's place directly, so
 // instructions after the expression read a value the reactive tree actually declares.
-func (c *reactiveContext) valueJoinPlace(continuation static_single_assignment.BlockId,
+func (reactiveContext *reactiveContext) valueJoinPlace(continuation static_single_assignment.BlockId,
 	results ...reactiveValueBlockResult) Place {
 	if len(results) == 0 {
 		return Place{}
 	}
-	block := c.block(continuation)
+	block := reactiveContext.block(continuation)
 	if block == nil {
 		return results[0].place
 	}
@@ -951,13 +951,13 @@ func (c *reactiveContext) valueJoinPlace(continuation static_single_assignment.B
 // visitTestValueBlock follows nested value terminals until it reaches the Branch that selects the
 // current composite expression's arms. Nested chains such as `a?.b?.c` require returning the final
 // block rather than assuming the terminal's Test block itself owns that branch.
-func (c *reactiveContext) visitTestValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, *Branch,
+func (reactiveContext *reactiveContext) visitTestValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, *Branch,
 	bool) {
-	test, ok := c.visitValueBlock(block)
+	test, ok := reactiveContext.visitValueBlock(block)
 	if !ok {
 		return reactiveValueBlockResult{}, nil, false
 	}
-	testBlock := c.block(test.block)
+	testBlock := reactiveContext.block(test.block)
 	if testBlock == nil {
 		return reactiveValueBlockResult{}, nil, false
 	}
@@ -972,12 +972,12 @@ func (c *reactiveContext) visitTestValueBlock(block static_single_assignment.Blo
 // temporary is erased exactly as upstream erases it: ReactiveFunction has compound values instead
 // of the join phi that StoreLocal feeds, so the store becomes a LoadLocal of its input and the
 // enclosing composite instruction takes its lvalue.
-func (c *reactiveContext) visitValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, bool) {
-	basic := c.block(block)
-	if basic == nil || c.emitted[basic.Id] {
+func (reactiveContext *reactiveContext) visitValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, bool) {
+	basic := reactiveContext.block(block)
+	if basic == nil || reactiveContext.emitted[basic.Id] {
 		return reactiveValueBlockResult{}, false
 	}
-	c.emitted[basic.Id] = true
+	reactiveContext.emitted[basic.Id] = true
 
 	switch terminal := basic.Terminal.(type) {
 	case *Branch:
@@ -989,25 +989,25 @@ func (c *reactiveContext) visitValueBlock(block static_single_assignment.BlockId
 				order: terminal.Order,
 			}, true
 		}
-		return c.extractValueBlockResult(basic)
+		return reactiveContext.extractValueBlockResult(basic)
 
 	case *Goto:
 		if len(basic.Instructions) == 0 {
 			return reactiveValueBlockResult{}, false
 		}
-		return c.extractValueBlockResult(basic)
+		return reactiveContext.extractValueBlockResult(basic)
 
 	case *Logical, *Optional, *Ternary, *Sequence:
-		init, ok := c.visitValueBlockTerminal(terminal)
+		init, ok := reactiveContext.visitValueBlockTerminal(terminal)
 		if !ok {
 			return reactiveValueBlockResult{}, false
 		}
-		final, ok := c.visitValueBlock(init.continuation)
+		final, ok := reactiveContext.visitValueBlock(init.continuation)
 		if !ok {
 			return reactiveValueBlockResult{}, false
 		}
 
-		instructions := c.reactiveInstructions(basic.Instructions)
+		instructions := reactiveContext.reactiveInstructions(basic.Instructions)
 		initPlace := init.place
 		instructions = append(instructions, &ReactiveInstruction{
 			Order: init.order, LValue: &initPlace, Value: init.value,
@@ -1026,12 +1026,12 @@ func (c *reactiveContext) visitValueBlock(block static_single_assignment.BlockId
 	return reactiveValueBlockResult{}, false
 }
 
-func (c *reactiveContext) extractValueBlockResult(block *BasicBlock) (reactiveValueBlockResult,
+func (reactiveContext *reactiveContext) extractValueBlockResult(block *BasicBlock) (reactiveValueBlockResult,
 	bool) {
 	if block == nil || len(block.Instructions) == 0 {
 		return reactiveValueBlockResult{}, false
 	}
-	last := c.function.Instructions[block.Instructions[len(block.Instructions)-1]]
+	last := reactiveContext.function.Instructions[block.Instructions[len(block.Instructions)-1]]
 	if last == nil {
 		return reactiveValueBlockResult{}, false
 	}
@@ -1039,7 +1039,7 @@ func (c *reactiveContext) extractValueBlockResult(block *BasicBlock) (reactiveVa
 	place := last.LValue
 	value := ReactiveValue(&ReactiveInstructionValue{Value: last.Value})
 	if store, ok := last.Value.(*StoreLocal); ok {
-		identifier := c.function.IdentifierOf(store.LValue)
+		identifier := reactiveContext.function.IdentifierOf(store.LValue)
 		if identifier != nil && identifier.Name == "" {
 			place = store.LValue
 			value = &ReactiveInstructionValue{Value: &LoadLocal{Place: store.Value}}
@@ -1048,7 +1048,7 @@ func (c *reactiveContext) extractValueBlockResult(block *BasicBlock) (reactiveVa
 
 	if len(block.Instructions) > 1 {
 		value = &ReactiveSequenceValue{
-			Instructions: c.reactiveInstructions(block.Instructions[:len(block.Instructions)-1]),
+			Instructions: reactiveContext.reactiveInstructions(block.Instructions[:len(block.Instructions)-1]),
 			Order:        last.Order,
 			Value:        value,
 		}
@@ -1058,10 +1058,10 @@ func (c *reactiveContext) extractValueBlockResult(block *BasicBlock) (reactiveVa
 	}, true
 }
 
-func (c *reactiveContext) reactiveInstructions(ids []InstructionId) []*ReactiveInstruction {
+func (reactiveContext *reactiveContext) reactiveInstructions(ids []InstructionId) []*ReactiveInstruction {
 	instructions := make([]*ReactiveInstruction, 0, len(ids))
 	for _, id := range ids {
-		instruction := c.function.Instructions[id]
+		instruction := reactiveContext.function.Instructions[id]
 		if instruction == nil {
 			continue
 		}
@@ -1079,20 +1079,20 @@ func (c *reactiveContext) reactiveInstructions(ids []InstructionId) []*ReactiveI
 //
 // Returns the block to visit as a sibling afterwards, and whether this call is the one that claimed
 // it. A fallthrough already scheduled by an enclosing construct is that construct's to emit.
-func (c *reactiveContext) scheduleFallthrough(block static_single_assignment.BlockId, kind controlFlowKind,
+func (reactiveContext *reactiveContext) scheduleFallthrough(block static_single_assignment.BlockId, kind controlFlowKind,
 	ids *[]int) (static_single_assignment.BlockId, bool) {
-	if c.isScheduled(block) {
+	if reactiveContext.isScheduled(block) {
 		return 0, false
 	}
-	*ids = append(*ids, c.schedule(block, kind))
+	*ids = append(*ids, reactiveContext.schedule(block, kind))
 	return block, true
 }
 
 // scheduleLoopTargets claims a loop's fallthrough and its continue block together.
-func (c *reactiveContext) scheduleLoopTargets(fallthrough_, continueBlock static_single_assignment.BlockId,
+func (reactiveContext *reactiveContext) scheduleLoopTargets(fallthrough_, continueBlock static_single_assignment.BlockId,
 	ids *[]int) static_single_assignment.BlockId {
-	owns := !c.isScheduled(fallthrough_)
-	*ids = append(*ids, c.scheduleLoop(fallthrough_, continueBlock))
+	owns := !reactiveContext.isScheduled(fallthrough_)
+	*ids = append(*ids, reactiveContext.scheduleLoop(fallthrough_, continueBlock))
 	if !owns {
 		return 0
 	}
@@ -1103,18 +1103,18 @@ func (c *reactiveContext) scheduleLoopTargets(fallthrough_, continueBlock static
 //
 // This is what keeps the tree flat where the source was flat: statements after an `if` are siblings
 // of it, not children. A zero id means the fallthrough belongs to an enclosing construct.
-func (c *reactiveContext) visitFallthrough(block static_single_assignment.BlockId, into *ReactiveBlock) {
+func (reactiveContext *reactiveContext) visitFallthrough(block static_single_assignment.BlockId, into *ReactiveBlock) {
 	if block == 0 {
 		return
 	}
-	c.visitBlock(c.block(block), into)
+	reactiveContext.visitBlock(reactiveContext.block(block), into)
 }
 
 // labelFor produces the break-target label upstream emits for every terminal with a fallthrough.
 //
 // Upstream emits these naively and prunes them later; see `ReactiveFunctionGapUnprunedLabels`. The
 // `Implicit` flag is upstream's and records that control would reach the target anyway.
-func (c *reactiveContext) labelFor(block static_single_assignment.BlockId, owned bool) *ReactiveLabel {
+func (reactiveContext *reactiveContext) labelFor(block static_single_assignment.BlockId, owned bool) *ReactiveLabel {
 	if !owned {
 		return nil
 	}
@@ -1127,11 +1127,11 @@ func (c *reactiveContext) labelFor(block static_single_assignment.BlockId, owned
 // where control transfers implicitly, so upstream emits a terminal marked implicit rather than
 // omitting it -- keeping the statement lets a later pass decide, and dropping it here would lose the
 // information irrecoverably.
-func (c *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
+func (reactiveContext *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 	if terminal.Variant == GotoVariantContinue {
-		kind, matched := c.continueTarget(terminal.Block)
+		kind, matched := reactiveContext.continueTarget(terminal.Block)
 		if !matched {
-			c.unmatchedGotos++
+			reactiveContext.unmatchedGotos++
 		}
 		*into = append(*into, &ReactiveTerminalStatement{
 			Terminal: &ReactiveContinue{
@@ -1140,17 +1140,17 @@ func (c *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 		})
 		return
 	}
-	if !c.isScheduled(terminal.Block) {
+	if !reactiveContext.isScheduled(terminal.Block) {
 		// Not a break at all: the target has not been claimed by any enclosing construct, so control
 		// simply continues into it and it is emitted inline.
-		c.visitBlock(c.block(terminal.Block), into)
+		reactiveContext.visitBlock(reactiveContext.block(terminal.Block), into)
 		return
 	}
-	kind, matched := c.breakTarget(terminal.Block)
+	kind, matched := reactiveContext.breakTarget(terminal.Block)
 	if !matched {
-		c.unmatchedGotos++
+		reactiveContext.unmatchedGotos++
 	}
-	if c.scopeFallthroughs[terminal.Block] {
+	if reactiveContext.scopeFallthroughs[terminal.Block] {
 		// Upstream's `visitBreak` returns nothing here, and asserts the target is implicit while
 		// doing so. A reactive scope falls through to its continuation with no `break` in the
 		// source, so emitting one invents a jump and names a target no enclosing construct claims.
@@ -1158,9 +1158,9 @@ func (c *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 		// The assert is kept as a measurement rather than a panic, which is this package's standing
 		// treatment of upstream invariants: a linter reports where a compiler aborts.
 		if kind != ReactiveTargetImplicit {
-			c.nonImplicitScopeBreaks++
+			reactiveContext.nonImplicitScopeBreaks++
 		}
-		c.elidedScopeBreaks++
+		reactiveContext.elidedScopeBreaks++
 		return
 	}
 	*into = append(*into, &ReactiveTerminalStatement{
@@ -1172,9 +1172,9 @@ func (c *reactiveContext) emitGoto(terminal *Goto, into *ReactiveBlock) {
 // structured extractor does not understand. It preserves the test and both arms as a statement
 // subtree, then emits the continuation as a sibling. The source-expression form is lost, but no
 // graph instructions are guessed away.
-func (c *reactiveContext) emitValueTerminal(fallthrough_ static_single_assignment.BlockId, into *ReactiveBlock,
+func (reactiveContext *reactiveContext) emitValueTerminal(fallthrough_ static_single_assignment.BlockId, into *ReactiveBlock,
 	ids *[]int, test static_single_assignment.BlockId) {
-	blockId, _ := c.scheduleFallthrough(fallthrough_, controlFlowIf, ids)
+	blockId, _ := reactiveContext.scheduleFallthrough(fallthrough_, controlFlowIf, ids)
 	// The test block, walked while the fallthrough is SCHEDULED.
 	//
 	// That block ends in a `Branch`, which already nests both arms under a `ReactiveIf` and
@@ -1186,17 +1186,17 @@ func (c *reactiveContext) emitValueTerminal(fallthrough_ static_single_assignmen
 	// blocks reached the tree through nothing and their instructions were lost. Measured over the
 	// corpus as `lostWithValueTerminal`, and now visible per fixture because the lowering gives the
 	// short-circuiting arm a block of its own rather than letting it fall through writeless.
-	if test != 0 && test != fallthrough_ && !c.emitted[test] {
-		*into = append(*into, c.traverse(test)...)
+	if test != 0 && test != fallthrough_ && !reactiveContext.emitted[test] {
+		*into = append(*into, reactiveContext.traverse(test)...)
 	}
-	c.unscheduleAll(*ids)
-	c.visitFallthrough(blockId, into)
+	reactiveContext.unscheduleAll(*ids)
+	reactiveContext.visitFallthrough(blockId, into)
 }
 
 // traverse builds a fresh block from one entry point.
-func (c *reactiveContext) traverse(block static_single_assignment.BlockId) ReactiveBlock {
+func (reactiveContext *reactiveContext) traverse(block static_single_assignment.BlockId) ReactiveBlock {
 	var built ReactiveBlock
-	c.visitBlock(c.block(block), &built)
+	reactiveContext.visitBlock(reactiveContext.block(block), &built)
 	return built
 }
 
@@ -1222,20 +1222,20 @@ func (c *reactiveContext) traverse(block static_single_assignment.BlockId) React
 //
 // The block is marked emitted so the ordinary walk does not visit it again as a statement block --
 // a value block belongs to its terminal, not to the enclosing statement list.
-func (c *reactiveContext) valueOf(block static_single_assignment.BlockId) ReactiveValue {
-	basic := c.block(block)
+func (reactiveContext *reactiveContext) valueOf(block static_single_assignment.BlockId) ReactiveValue {
+	basic := reactiveContext.block(block)
 	if basic == nil || len(basic.Instructions) == 0 {
 		return nil
 	}
-	if c.emitted[basic.Id] {
-		c.doubleEmit++
+	if reactiveContext.emitted[basic.Id] {
+		reactiveContext.doubleEmit++
 		return nil
 	}
-	c.emitted[basic.Id] = true
+	reactiveContext.emitted[basic.Id] = true
 
 	instructions := make([]*ReactiveInstruction, 0, len(basic.Instructions))
 	for _, instructionId := range basic.Instructions {
-		instruction := c.function.Instructions[instructionId]
+		instruction := reactiveContext.function.Instructions[instructionId]
 		if instruction == nil {
 			continue
 		}

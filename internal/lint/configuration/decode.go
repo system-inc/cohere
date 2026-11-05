@@ -85,8 +85,8 @@ type OptionsRegistry map[string]RuleOptions
 // {"enforceForRenamedProperties": true}]` loaded clean, ran, and reported 0 on source the second
 // element exists to flag, while the one-object spelling reported 1. A refusal costs one edit to the
 // config; a silent drop costs an afternoon of somebody wondering why their option does nothing.
-func (o OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (any, error) {
-	declared, hasDeclared := o[ruleName]
+func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessage) (any, error) {
+	declared, hasDeclared := registry[ruleName]
 	if !hasDeclared || (declared.Decode == nil && declared.DecodeList == nil) {
 		if len(elements) > 0 {
 			return nil, fmt.Errorf(

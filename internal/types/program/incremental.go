@@ -40,11 +40,11 @@ type IncrementalSession struct {
 // support one, which is a reason to run the full pass rather than an error: no compiler host,
 // no config, or a tsconfig without `incremental` all mean the caller should use
 // AllDiagnostics.
-func (g *Graph) NewIncrementalSession() *IncrementalSession {
-	if g.CompilerHost == nil || g.Config == nil {
+func (graph *Graph) NewIncrementalSession() *IncrementalSession {
+	if graph.CompilerHost == nil || graph.Config == nil {
 		return nil
 	}
-	if !g.Config.CompilerOptions().IsIncremental() {
+	if !graph.Config.CompilerOptions().IsIncremental() {
 		return nil
 	}
 
@@ -52,18 +52,18 @@ func (g *Graph) NewIncrementalSession() *IncrementalSession {
 	// relative to it, so a fresh host with a different current directory resolves them
 	// elsewhere and reports every file as changed. Silently, and in the direction that looks
 	// like a cold cache rather than like a bug.
-	host := incremental.CreateHost(g.CompilerHost)
+	host := incremental.CreateHost(graph.CompilerHost)
 
 	// A nil previous program is a cold start, not a failure: no build info on disk, a version
 	// mismatch, or a non-incremental one all return nil and all mean check everything.
-	reader := incremental.NewBuildInfoReader(g.CompilerHost)
-	previous := incremental.ReadBuildInfoProgram(g.Config, reader, g.CompilerHost)
+	reader := incremental.NewBuildInfoReader(graph.CompilerHost)
+	previous := incremental.ReadBuildInfoProgram(graph.Config, reader, graph.CompilerHost)
 
-	incrementalProgram := incremental.NewProgram(g.Program, previous, host)
+	incrementalProgram := incremental.NewProgram(graph.Program, previous, host)
 	if incrementalProgram == nil {
 		return nil
 	}
-	return &IncrementalSession{graph: g, program: incrementalProgram}
+	return &IncrementalSession{graph: graph, program: incrementalProgram}
 }
 
 // Diagnostics returns the same findings AllDiagnostics returns, re-checking only the files
@@ -75,19 +75,19 @@ func (g *Graph) NewIncrementalSession() *IncrementalSession {
 //
 // The program is still built either way. A build info can skip checking the graph, never
 // constructing it, so the caller has already paid the graph phase before calling this.
-func (s *IncrementalSession) Diagnostics(ctx context.Context) []*ast.Diagnostic {
-	return s.DiagnosticParts(ctx).All()
+func (session *IncrementalSession) Diagnostics(ctx context.Context) []*ast.Diagnostic {
+	return session.DiagnosticParts(ctx).All()
 }
 
 // DiagnosticParts is Diagnostics with its parts kept apart. See TypeDiagnosticParts.
-func (s *IncrementalSession) DiagnosticParts(ctx context.Context) TypeDiagnosticParts {
+func (session *IncrementalSession) DiagnosticParts(ctx context.Context) TypeDiagnosticParts {
 	// Syntactic first, and bail on failure, for the same reason AllDiagnostics does: a file
 	// that does not parse produces cascading nonsense from the later phases.
-	syntactic := s.graph.Program.GetSyntacticDiagnostics(ctx, nil)
+	syntactic := session.graph.Program.GetSyntacticDiagnostics(ctx, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-	return TypeDiagnosticParts{Bind: s.graph.Program.GetBindDiagnostics(ctx, nil), Semantic: s.program.GetSemanticDiagnostics(ctx, nil)}
+	return TypeDiagnosticParts{Bind: session.graph.Program.GetBindDiagnostics(ctx, nil), Semantic: session.program.GetSemanticDiagnostics(ctx, nil)}
 }
 
 // Write persists what the next run needs to tell changed files from unchanged ones.
@@ -124,8 +124,8 @@ func (s *IncrementalSession) DiagnosticParts(ctx context.Context) TypeDiagnostic
 // Returns any diagnostics from the write itself. A failed write must not pass silently: the
 // next run would be cold while this one reported success, and the symptom is a saving that
 // never appears rather than an error anyone can see.
-func (s *IncrementalSession) Write(ctx context.Context) []*ast.Diagnostic {
-	result := incremental.EmitBuildInfo(ctx, s.program)
+func (session *IncrementalSession) Write(ctx context.Context) []*ast.Diagnostic {
+	result := incremental.EmitBuildInfo(ctx, session.program)
 	if result == nil {
 		return nil
 	}
@@ -138,10 +138,10 @@ func (s *IncrementalSession) Write(ctx context.Context) []*ast.Diagnostic {
 // Prefer this at a call site that just wants the findings. Use NewIncrementalSession directly
 // when the caller needs to decide whether to write, for example when it is about to report a
 // failure and would rather not persist state from a run it is discarding.
-func (g *Graph) IncrementalDiagnostics(ctx context.Context) []*ast.Diagnostic {
-	session := g.NewIncrementalSession()
+func (graph *Graph) IncrementalDiagnostics(ctx context.Context) []*ast.Diagnostic {
+	session := graph.NewIncrementalSession()
 	if session == nil {
-		return g.AllDiagnostics(ctx)
+		return graph.AllDiagnostics(ctx)
 	}
 	diagnostics := session.Diagnostics(ctx)
 	session.Write(ctx)

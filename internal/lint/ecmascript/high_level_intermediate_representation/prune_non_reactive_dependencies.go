@@ -83,11 +83,11 @@ type nonReactivePruner struct {
 //
 // Innermost-first because the propagation runs outward: an inner scope's outputs become reactive
 // before an enclosing scope asks whether its own dependencies are.
-func (p *nonReactivePruner) walk(block ReactiveBlock) {
+func (pruner *nonReactivePruner) walk(block ReactiveBlock) {
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveScopeBlock:
-			p.walk(shape.Instructions)
+			pruner.walk(shape.Instructions)
 			// A pruned scope is walked and nothing more. Upstream's visitor overrides `visitScope`
 			// only, and the base `visitPrunedScope` visits the body, so a pruned scope neither drops
 			// its dependencies nor makes its declarations reactive. Propagating through one marked
@@ -96,60 +96,60 @@ func (p *nonReactivePruner) walk(block ReactiveBlock) {
 			if shape.Pruned {
 				continue
 			}
-			p.visitScope(shape)
+			pruner.visitScope(shape)
 		case *ReactiveTerminalStatement:
-			p.walkTerminal(shape)
+			pruner.walkTerminal(shape)
 		}
 	}
 }
 
 // visitScope drops a scope's non-reactive dependencies, then propagates outward if any survived.
-func (p *nonReactivePruner) visitScope(scope *ReactiveScopeBlock) {
-	removed := p.dependencies.PruneNonReactiveDependenciesOf(scope.Scope, p.reactive)
-	p.pruned += removed
+func (pruner *nonReactivePruner) visitScope(scope *ReactiveScopeBlock) {
+	removed := pruner.dependencies.PruneNonReactiveDependenciesOf(scope.Scope, pruner.reactive)
+	pruner.pruned += removed
 
-	if len(p.dependencies.DependenciesOf(scope.Scope)) == 0 {
+	if len(pruner.dependencies.DependenciesOf(scope.Scope)) == 0 {
 		return
 	}
 	// Upstream's comment: if any dependency is reactive then every output re-evaluates whenever
 	// that dependency changes, so the outputs are reactive in practice even when the values
 	// themselves would not be.
-	for _, declared := range p.dependencies.DeclarationsOf(scope.Scope) {
-		p.reactive[declared] = true
+	for _, declared := range pruner.dependencies.DeclarationsOf(scope.Scope) {
+		pruner.reactive[declared] = true
 	}
-	for _, reassigned := range p.dependencies.ReassignmentsOf(scope.Scope) {
-		p.reactive[reassigned] = true
+	for _, reassigned := range pruner.dependencies.ReassignmentsOf(scope.Scope) {
+		pruner.reactive[reassigned] = true
 	}
 }
 
 // walkTerminal descends into every block a terminal contains.
-func (p *nonReactivePruner) walkTerminal(statement *ReactiveTerminalStatement) {
+func (pruner *nonReactivePruner) walkTerminal(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveIf:
-		p.walk(shape.Consequent)
+		pruner.walk(shape.Consequent)
 		if shape.Alternate != nil {
-			p.walk(*shape.Alternate)
+			pruner.walk(*shape.Alternate)
 		}
 	case *ReactiveSwitch:
 		for index := range shape.Cases {
 			if shape.Cases[index].Block != nil {
-				p.walk(*shape.Cases[index].Block)
+				pruner.walk(*shape.Cases[index].Block)
 			}
 		}
 	case *ReactiveFor:
-		p.walk(shape.Loop)
+		pruner.walk(shape.Loop)
 	case *ReactiveForOf:
-		p.walk(shape.Loop)
+		pruner.walk(shape.Loop)
 	case *ReactiveForIn:
-		p.walk(shape.Loop)
+		pruner.walk(shape.Loop)
 	case *ReactiveWhile:
-		p.walk(shape.Loop)
+		pruner.walk(shape.Loop)
 	case *ReactiveDoWhile:
-		p.walk(shape.Loop)
+		pruner.walk(shape.Loop)
 	case *ReactiveLabelTerminal:
-		p.walk(shape.Block)
+		pruner.walk(shape.Block)
 	case *ReactiveTry:
-		p.walk(shape.Block)
-		p.walk(shape.Handler)
+		pruner.walk(shape.Block)
+		pruner.walk(shape.Handler)
 	}
 }

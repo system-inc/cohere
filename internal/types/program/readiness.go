@@ -25,18 +25,18 @@ type Readiness struct {
 }
 
 // Measures is whether ruleName is one of the set's.
-func (r *Readiness) Measures(ruleName string) bool {
-	if r == nil {
+func (readiness *Readiness) Measures(ruleName string) bool {
+	if readiness == nil {
 		return false
 	}
-	_, measured := r.Options[ruleName]
+	_, measured := readiness.Options[ruleName]
 	return measured
 }
 
 // Findings is the record's total. AdamicRecord itself is the findings cache's, in lint_cache.go.
-func (r *AdamicRecord) Findings() int {
+func (record *AdamicRecord) Findings() int {
 	total := 0
-	for _, count := range r.Counts {
+	for _, count := range record.Counts {
 		total += int(count.Findings)
 	}
 	return total
@@ -45,8 +45,8 @@ func (r *AdamicRecord) Findings() int {
 // Measured is whether the record can say ready or not: a file has one, and no set rule skipped it. A file
 // with none was replayed from an entry its run never measured, which the findings cache refuses to a run that
 // measures (FindingsReuse.MeasureReadiness), so it reads unmeasured rather than as clean.
-func (r *AdamicRecord) Measured() bool {
-	return r != nil && len(r.Skipped) == 0
+func (record *AdamicRecord) Measured() bool {
+	return record != nil && len(record.Skipped) == 0
 }
 
 // fileReadiness accumulates one file's record while the dispatcher walks it.
@@ -71,42 +71,42 @@ func newFileReadiness(readiness *Readiness, rules []rule.Rule, measureOnly map[s
 }
 
 // count adds a finding of ruleName, when it is a set rule.
-func (f *fileReadiness) count(ruleName string) {
-	if f == nil {
+func (readiness *fileReadiness) count(ruleName string) {
+	if readiness == nil {
 		return
 	}
-	if current, measured := f.counts[ruleName]; measured {
-		f.counts[ruleName] = current + 1
+	if current, measured := readiness.counts[ruleName]; measured {
+		readiness.counts[ruleName] = current + 1
 	}
 }
 
 // hidden is whether ruleName's findings and notes stay out of the run: a rule running measure-only.
-func (f *fileReadiness) hidden(ruleName string) bool {
-	return f != nil && f.measureOnly[ruleName]
+func (readiness *fileReadiness) hidden(ruleName string) bool {
+	return readiness != nil && readiness.measureOnly[ruleName]
 }
 
 // note keeps a set rule's skip. A skip covered by another check that ran leaves nothing unchecked, so it
 // is no gap here either.
-func (f *fileReadiness) note(ruleName string, key string) {
-	if f == nil {
+func (readiness *fileReadiness) note(ruleName string, key string) {
+	if readiness == nil {
 		return
 	}
-	if _, measured := f.counts[ruleName]; measured && strings.HasPrefix(key, rule.SkippedNotePrefix) {
-		f.skipped = append(f.skipped, ruleName)
+	if _, measured := readiness.counts[ruleName]; measured && strings.HasPrefix(key, rule.SkippedNotePrefix) {
+		readiness.skipped = append(readiness.skipped, ruleName)
 	}
 }
 
 // record is the file's measurement, sorted, with a pair for every set rule that ran, zeros included.
-func (f *fileReadiness) record() *AdamicRecord {
-	if f == nil {
+func (readiness *fileReadiness) record() *AdamicRecord {
+	if readiness == nil {
 		return nil
 	}
-	record := &AdamicRecord{Counts: make([]AdamicCount, 0, len(f.counts))}
-	for name, findings := range f.counts {
+	record := &AdamicRecord{Counts: make([]AdamicCount, 0, len(readiness.counts))}
+	for name, findings := range readiness.counts {
 		record.Counts = append(record.Counts, AdamicCount{Rule: name, Findings: findings})
 	}
 	sort.Slice(record.Counts, func(left, right int) bool { return record.Counts[left].Rule < record.Counts[right].Rule })
-	record.Skipped = sortedUnique(f.skipped)
+	record.Skipped = sortedUnique(readiness.skipped)
 	return record
 }
 

@@ -76,7 +76,7 @@ type Explanation struct {
 // A separate path from Walk rather than a flag on it. Walk is the hot path across thousands of
 // files and must stay free of per-rule bookkeeping; this runs once, on one file, where the overhead
 // is irrelevant and completeness matters more than speed.
-func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules []rule.Rule) (*Explanation, error) {
+func (graph *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules []rule.Rule) (*Explanation, error) {
 	if sourceFile == nil {
 		return nil, fmt.Errorf("no file to explain")
 	}
@@ -87,8 +87,8 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 	explanation := &Explanation{FileName: sourceFile.FileName().AsString()}
 
 	var resolution configuration.Resolved
-	if g.LintConfig != nil {
-		resolution = g.LintConfig.Resolve(sourceFile.FileName().AsString())
+	if graph.LintConfig != nil {
+		resolution = graph.LintConfig.Resolve(sourceFile.FileName().AsString())
 		if resolution.Ignored {
 			explanation.FileIgnored = true
 			explanation.IgnoredBy = resolution.IgnoredBy
@@ -98,7 +98,7 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 
 	directives := suppression.Build(sourceFile.Text())
 
-	fileChecker, release := g.CheckerForFile(ctx, sourceFile)
+	fileChecker, release := graph.CheckerForFile(ctx, sourceFile)
 	defer release()
 
 	fileCache := rule.NewFileCache()
@@ -106,7 +106,7 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 	for _, subject := range rules {
 		account := RuleAccount{Name: subject.Name}
 
-		if g.LintConfig != nil {
+		if graph.LintConfig != nil {
 			status, _ := resolution.StatusOf(subject.Name)
 			if reason := declineReason(status); reason != "" {
 				account.DeclinedBecause = reason
@@ -115,7 +115,7 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 			}
 		}
 
-		options, decodeError := g.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
+		options, decodeError := graph.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
 		if decodeError != nil {
 			account.DeclinedBecause = fmt.Sprintf("its options could not be read: %v", decodeError)
 			explanation.Accounts = append(explanation.Accounts, account)
@@ -145,7 +145,7 @@ func (g *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules [
 		start := time.Now()
 		listeners := subject.Run(rule.Context{
 			SourceFile:  sourceFile,
-			Program:     rule.ViewProgram(g.Program, sourceFile, subject),
+			Program:     rule.ViewProgram(graph.Program, sourceFile, subject),
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
 			Report:      report,

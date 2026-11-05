@@ -288,7 +288,7 @@ type noInvalidThisWalker struct {
 	thisIsValid []bool
 }
 
-func (w *noInvalidThisWalker) walk(node *ast.Node) {
+func (walker *noInvalidThisWalker) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -300,8 +300,8 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 	popped := false
 	switch node.Kind {
 	case ast.KindThisKeyword:
-		if !w.currentlyValid() {
-			w.ctx.ReportNode(node, messageNoInvalidThisUnexpectedThis)
+		if !walker.currentlyValid() {
+			walker.ctx.ReportNode(node, messageNoInvalidThisUnexpectedThis)
 		}
 
 	case ast.KindComputedPropertyName:
@@ -314,27 +314,27 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 		// `class C { static { class D { [this.x]; } } }` is a passing corpus case: popping D's
 		// member exposes the static block's binding underneath, which is valid. Forcing a report
 		// here instead reported it, and forcing one is what an earlier draft did.
-		if len(w.thisIsValid) > 0 {
-			w.thisIsValid = w.thisIsValid[:len(w.thisIsValid)-1]
+		if len(walker.thisIsValid) > 0 {
+			walker.thisIsValid = walker.thisIsValid[:len(walker.thisIsValid)-1]
 			popped = true
 		}
 
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
-		w.thisIsValid = append(w.thisIsValid, !thisIsDefaultBoundIn(w.ctx, node, w.settings))
+		walker.thisIsValid = append(walker.thisIsValid, !thisIsDefaultBoundIn(walker.ctx, node, walker.settings))
 		pushed = true
 
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
 		ast.KindConstructor, ast.KindClassStaticBlockDeclaration:
 		// A method's `this` is the receiver and a static block's is the class. Core reaches these
 		// through the same default-binding test, which answers false for all of them.
-		w.thisIsValid = append(w.thisIsValid, true)
+		walker.thisIsValid = append(walker.thisIsValid, true)
 		pushed = true
 
 	case ast.KindPropertyDeclaration:
 		// A field initializer is an implicit function whose `this` is the instance. `accessor` is a
 		// modifier here rather than a separate node, so upstream's PropertyDefinition and
 		// AccessorProperty both arrive as this kind.
-		w.thisIsValid = append(w.thisIsValid, true)
+		walker.thisIsValid = append(walker.thisIsValid, true)
 		pushed = true
 
 	case ast.KindArrowFunction:
@@ -343,15 +343,15 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		w.walk(child)
+		walker.walk(child)
 		return false
 	})
 
 	if pushed {
-		w.thisIsValid = w.thisIsValid[:len(w.thisIsValid)-1]
+		walker.thisIsValid = walker.thisIsValid[:len(walker.thisIsValid)-1]
 	}
 	if popped {
-		w.thisIsValid = append(w.thisIsValid, true)
+		walker.thisIsValid = append(walker.thisIsValid, true)
 	}
 }
 
@@ -360,11 +360,11 @@ func (w *noInvalidThisWalker) walk(node *ast.Node) {
 // An empty stack is top level. Every file cohere lints is a TypeScript module, where top-level
 // `this` is `undefined`, so the answer there is false. Core reaches the same answer through
 // `node.sourceType === "module"`.
-func (w *noInvalidThisWalker) currentlyValid() bool {
-	if len(w.thisIsValid) == 0 {
+func (walker *noInvalidThisWalker) currentlyValid() bool {
+	if len(walker.thisIsValid) == 0 {
 		return false
 	}
-	return w.thisIsValid[len(w.thisIsValid)-1]
+	return walker.thisIsValid[len(walker.thisIsValid)-1]
 }
 
 // thisIsDefaultBoundIn is ESLint's `astUtils.isDefaultThisBinding`, which is where the judgment lives.

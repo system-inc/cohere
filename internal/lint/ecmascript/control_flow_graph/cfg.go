@@ -254,13 +254,13 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 
 // parameter models a parameter binding: its default value is skipped when an
 // argument was passed.
-func (b *Builder[E]) parameter(node *ast.Node) {
+func (builder *Builder[E]) parameter(node *ast.Node) {
 	parameter := node.AsParameterDeclaration()
 	if parameter == nil {
 		return
 	}
-	b.expr(parameter.Type)
-	b.bindWithDefault(parameter.Name(), parameter.Initializer)
+	builder.expr(parameter.Type)
+	builder.bindWithDefault(parameter.Name(), parameter.Initializer)
 }
 
 // ---------------------------------------------------------------------------
@@ -269,64 +269,64 @@ func (b *Builder[E]) parameter(node *ast.Node) {
 
 // Current returns the block being filled. Its Reachable field says whether the
 // position control is at is one control can arrive at.
-func (b *Builder[E]) Current() *Block[E] {
-	return b.cur
+func (builder *Builder[E]) Current() *Block[E] {
+	return builder.cur
 }
 
 // Emit records one event in the current block and returns where it landed, so a
 // consumer can refer back to it.
-func (b *Builder[E]) Emit(e E) (*Block[E], int) {
-	index := len(b.cur.Events)
-	b.cur.Events = append(b.cur.Events, e)
-	return b.cur, index
+func (builder *Builder[E]) Emit(e E) (*Block[E], int) {
+	index := len(builder.cur.Events)
+	builder.cur.Events = append(builder.cur.Events, e)
+	return builder.cur, index
 }
 
-func (b *Builder[E]) newBlock() *Block[E] {
-	index := len(b.blocks)
+func (builder *Builder[E]) newBlock() *Block[E] {
+	index := len(builder.blocks)
 	chunkIndex := index / blockChunkSize
-	if chunkIndex == len(b.blockChunks) {
-		b.blockChunks = append(b.blockChunks, new(blockChunk[E]))
+	if chunkIndex == len(builder.blockChunks) {
+		builder.blockChunks = append(builder.blockChunks, new(blockChunk[E]))
 	}
-	blk := &b.blockChunks[chunkIndex][index%blockChunkSize]
+	blk := &builder.blockChunks[chunkIndex][index%blockChunkSize]
 	blk.index = int32(index)
-	b.blocks = append(b.blocks, blk)
+	builder.blocks = append(builder.blocks, blk)
 	return blk
 }
 
-func (b *Builder[E]) markFinal(blk *Block[E]) {
+func (builder *Builder[E]) markFinal(blk *Block[E]) {
 	if blk == nil || !blk.Reachable || blk.final {
 		return
 	}
 	blk.final = true
-	b.finals = append(b.finals, blk)
+	builder.finals = append(builder.finals, blk)
 }
 
-func (b *Builder[E]) markThrown(blk *Block[E]) {
+func (builder *Builder[E]) markThrown(blk *Block[E]) {
 	if blk == nil || !blk.Reachable || blk.thrown {
 		return
 	}
 	blk.thrown = true
-	b.thrown = append(b.thrown, blk)
+	builder.thrown = append(builder.thrown, blk)
 }
 
-func (b *Builder[E]) link(from, to *Block[E]) {
-	b.linkWithCycleBarrier(from, to, false)
+func (builder *Builder[E]) link(from, to *Block[E]) {
+	builder.linkWithCycleBarrier(from, to, false)
 }
 
-func (b *Builder[E]) linkWithCycleBarrier(from, to *Block[E], barrier bool) int {
+func (builder *Builder[E]) linkWithCycleBarrier(from, to *Block[E], barrier bool) int {
 	if from == nil || to == nil {
 		return -1
 	}
 	index := len(from.Successors)
-	b.appendSuccessor(from, to)
-	b.setCycleBarrier(from, index, barrier)
+	builder.appendSuccessor(from, to)
+	builder.setCycleBarrier(from, index, barrier)
 	if from.Reachable {
 		to.hasIncoming = true
 	}
 	return index
 }
 
-func (b *Builder[E]) appendSuccessor(from, to *Block[E]) {
+func (builder *Builder[E]) appendSuccessor(from, to *Block[E]) {
 	index := len(from.Successors)
 	if index < len(from.successors) {
 		from.successors[index] = to
@@ -336,7 +336,7 @@ func (b *Builder[E]) appendSuccessor(from, to *Block[E]) {
 	from.Successors = append(from.Successors, to)
 }
 
-func (b *Builder[E]) setCycleBarrier(from *Block[E], index int, barrier bool) {
+func (builder *Builder[E]) setCycleBarrier(from *Block[E], index int, barrier bool) {
 	if from == nil || index < 0 {
 		return
 	}
@@ -355,9 +355,9 @@ func (b *Builder[E]) setCycleBarrier(from *Block[E], index int, barrier bool) {
 
 // enter makes blk the current block and settles its reachability, so every edge
 // that could make it reachable has to be linked before it is entered.
-func (b *Builder[E]) enter(blk *Block[E]) {
+func (builder *Builder[E]) enter(blk *Block[E]) {
 	blk.Reachable = blk.hasIncoming
-	b.cur = blk
+	builder.cur = blk
 }
 
 // makeUnreachable ends the path at the current block and carries the walk on in
@@ -365,45 +365,45 @@ func (b *Builder[E]) enter(blk *Block[E]) {
 // every other edge — it does not make its target something control arrives at,
 // which is what leaving through it meant in the first place. That is why the
 // block is never entered: its reachability is settled here, as false.
-func (b *Builder[E]) makeUnreachable() {
-	next := b.newBlock()
-	b.appendSuccessor(b.cur, next)
-	if b.cur.cycleBarrier != nil {
-		b.cur.cycleBarrier = append(b.cur.cycleBarrier, false)
+func (builder *Builder[E]) makeUnreachable() {
+	next := builder.newBlock()
+	builder.appendSuccessor(builder.cur, next)
+	if builder.cur.cycleBarrier != nil {
+		builder.cur.cycleBarrier = append(builder.cur.cycleBarrier, false)
 	}
-	b.cur = next
+	builder.cur = next
 }
 
 // enterDisconnected makes blk current when the position the walk stands at is
 // one control arrives at, rather than when an edge into blk already is. It is
 // how a block whose only edge in is laid out later still gets laid out here,
 // which is the order ESLint traverses one in.
-func (b *Builder[E]) enterDisconnected(blk *Block[E]) {
-	blk.hasIncoming = blk.hasIncoming || b.cur.Reachable
-	b.enter(blk)
+func (builder *Builder[E]) enterDisconnected(blk *Block[E]) {
+	blk.hasIncoming = blk.hasIncoming || builder.cur.Reachable
+	builder.enter(blk)
 }
 
-func (b *Builder[E]) read(node *ast.Node) {
-	if b.hooks.Read != nil {
-		b.hooks.Read(b, node)
+func (builder *Builder[E]) read(node *ast.Node) {
+	if builder.hooks.Read != nil {
+		builder.hooks.Read(builder, node)
 	}
 }
 
-func (b *Builder[E]) write(node *ast.Node) {
-	if b.hooks.Write != nil {
-		b.hooks.Write(b, node)
+func (builder *Builder[E]) write(node *ast.Node) {
+	if builder.hooks.Write != nil {
+		builder.hooks.Write(builder, node)
 	}
 }
 
-func (b *Builder[E]) reachedStatement(node *ast.Node) {
-	if b.hooks.Statement != nil {
-		b.hooks.Statement(b, node)
+func (builder *Builder[E]) reachedStatement(node *ast.Node) {
+	if builder.hooks.Statement != nil {
+		builder.hooks.Statement(builder, node)
 	}
 }
 
-func (b *Builder[E]) loop(node *ast.Node) {
-	if b.hooks.Loop != nil && node != nil {
-		b.hooks.Loop(b, node)
+func (builder *Builder[E]) loop(node *ast.Node) {
+	if builder.hooks.Loop != nil && node != nil {
+		builder.hooks.Loop(builder, node)
 	}
 }
 
@@ -413,9 +413,9 @@ func (b *Builder[E]) loop(node *ast.Node) {
 
 // throwFrame returns the innermost `try` frame an exception raised at the
 // current position lands in, or -1 when it leaves the code path entirely.
-func (b *Builder[E]) throwFrame() int {
-	for i := len(b.tryStack) - 1; i >= 0; i-- {
-		f := b.tryStack[i]
+func (builder *Builder[E]) throwFrame() int {
+	for i := len(builder.tryStack) - 1; i >= 0; i-- {
+		f := builder.tryStack[i]
 		if f.position == posTry || (f.hasFinally && f.position == posCatch) {
 			return i
 		}
@@ -432,9 +432,9 @@ func throwTarget[E any](f *tryFrame[E]) *Block[E] {
 
 // returnFrame returns the innermost `try` frame whose `finally` block runs
 // before a `return` leaves the code path, or -1 when none does.
-func (b *Builder[E]) returnFrame() int {
-	for i := len(b.tryStack) - 1; i >= 0; i-- {
-		if b.tryStack[i].hasFinally {
+func (builder *Builder[E]) returnFrame() int {
+	for i := len(builder.tryStack) - 1; i >= 0; i-- {
+		if builder.tryStack[i].hasFinally {
 			return i
 		}
 	}
@@ -445,40 +445,40 @@ func (b *Builder[E]) returnFrame() int {
 // could throw is completed inside a `try` block (or inside the `catch` block of
 // a `try` that has a `finally`). Later throwable nodes in the same block reuse
 // that first fork, matching ESLint's approximation.
-func (b *Builder[E]) firstThrowableFork() {
-	if !b.cur.Reachable {
+func (builder *Builder[E]) firstThrowableFork() {
+	if !builder.cur.Reachable {
 		return
 	}
-	i := b.throwFrame()
+	i := builder.throwFrame()
 	if i < 0 {
 		return
 	}
-	f := b.tryStack[i]
+	f := builder.tryStack[i]
 	if f.thrownForked {
 		return
 	}
 	f.thrownForked = true
 	f.thrownAny = true
-	b.link(b.cur, throwTarget(f))
-	next := b.newBlock()
-	b.link(b.cur, next)
-	b.enter(next)
+	builder.link(builder.cur, throwTarget(f))
+	next := builder.newBlock()
+	builder.link(builder.cur, next)
+	builder.enter(next)
 }
 
 // snapshotForks records the "already forked" state of every enclosing `try` so
 // the second copy of a `finally` block forks at the same place the first did.
-func (b *Builder[E]) snapshotForks() []bool {
-	snapshot := make([]bool, len(b.tryStack))
-	for i, f := range b.tryStack {
+func (builder *Builder[E]) snapshotForks() []bool {
+	snapshot := make([]bool, len(builder.tryStack))
+	for i, f := range builder.tryStack {
 		snapshot[i] = f.thrownForked
 	}
 	return snapshot
 }
 
-func (b *Builder[E]) restoreForks(snapshot []bool) {
+func (builder *Builder[E]) restoreForks(snapshot []bool) {
 	for i, forked := range snapshot {
-		if i < len(b.tryStack) {
-			b.tryStack[i].thrownForked = forked
+		if i < len(builder.tryStack) {
+			builder.tryStack[i].thrownForked = forked
 		}
 	}
 }

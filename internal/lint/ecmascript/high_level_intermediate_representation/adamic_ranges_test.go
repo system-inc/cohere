@@ -118,12 +118,12 @@ type recordingRangeGraph struct {
 	answers map[closureKey][]closureAnswer
 }
 
-func (g recordingRangeGraph) Closure(function *Function, block *BasicBlock, index int, into static_single_assignment.IdentifierId,
+func (graph recordingRangeGraph) Closure(function *Function, block *BasicBlock, index int, into static_single_assignment.IdentifierId,
 	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) ([]Place, bool) {
-	captures, frozen := g.rangeGraph.Closure(function, block, index, into, kinds)
+	captures, frozen := graph.rangeGraph.Closure(function, block, index, into, kinds)
 	if captures != nil {
 		key := closureKey{block: block.Id, index: index}
-		g.answers[key] = append(g.answers[key], closureAnswer{into: into, captures: captures, frozen: frozen})
+		graph.answers[key] = append(graph.answers[key], closureAnswer{into: into, captures: captures, frozen: frozen})
 	}
 	return captures, frozen
 }

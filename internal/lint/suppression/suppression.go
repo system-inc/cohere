@@ -47,8 +47,8 @@ const (
 )
 
 // String names a kind for a failure message, so a fixture that fails says which form it got.
-func (k Kind) String() string {
-	switch k {
+func (kind Kind) String() string {
+	switch kind {
 	case KindNextLine:
 		return "next-line"
 	case KindSameLine:
@@ -90,8 +90,8 @@ type Directive struct {
 }
 
 // HasReason is whether the author said why.
-func (d *Directive) HasReason() bool {
-	return d.Reason != ""
+func (directive *Directive) HasReason() bool {
+	return directive.Reason != ""
 }
 
 // Covers is whether this directive applies to ruleName on a zero-based line.
@@ -101,14 +101,14 @@ func (d *Directive) HasReason() bool {
 // `consistency-no-enum` a rule registers under. The corpus writes the plugin prefix and cohere's
 // registry does not, and reconciling that here is cheaper than making every rule carry a prefix it
 // has no other use for.
-func (d *Directive) Covers(ruleName string, line int) bool {
-	if line < d.StartLine || line > d.EndLine {
+func (directive *Directive) Covers(ruleName string, line int) bool {
+	if line < directive.StartLine || line > directive.EndLine {
 		return false
 	}
-	if len(d.Rules) == 0 {
+	if len(directive.Rules) == 0 {
 		return true
 	}
-	for _, named := range d.Rules {
+	for _, named := range directive.Rules {
 		if matchesRuleName(named, ruleName) {
 			return true
 		}
@@ -117,11 +117,11 @@ func (d *Directive) Covers(ruleName string, line int) bool {
 }
 
 // Names is whether this directive could silence ruleName on some line: it names that rule, or names none.
-func (d *Directive) Names(ruleName string) bool {
-	if len(d.Rules) == 0 {
+func (directive *Directive) Names(ruleName string) bool {
+	if len(directive.Rules) == 0 {
 		return true
 	}
-	for _, named := range d.Rules {
+	for _, named := range directive.Rules {
 		if matchesRuleName(named, ruleName) {
 			return true
 		}
@@ -314,8 +314,8 @@ func (i *Index) MarkApplied(index int, ruleName string) bool {
 
 // AppliedTo reports whether this directive withheld a finding for the named rule, resolving
 // its spelling just as Covers does. A live name must survive removal of a dead sibling name.
-func (d *Directive) AppliedTo(named string) bool {
-	for registered := range d.appliedRules {
+func (directive *Directive) AppliedTo(named string) bool {
+	for registered := range directive.appliedRules {
 		if matchesRuleName(named, registered) {
 			return true
 		}

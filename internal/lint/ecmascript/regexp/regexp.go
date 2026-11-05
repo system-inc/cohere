@@ -172,11 +172,11 @@ func MustCompile(source string, flags string) *RegExp {
 // A match that overruns MatchTimeout counts as no match: the alternative is
 // making every caller handle an error that only ever means "this pattern is
 // pathological", and a lint rule has nothing better to do with that than skip.
-func (r *RegExp) Test(s string) bool {
-	if r == nil || r.re == nil {
+func (exp *RegExp) Test(s string) bool {
+	if exp == nil || exp.re == nil {
 		return false
 	}
-	matched, matchStringError := r.re.MatchString(s)
+	matched, matchStringError := exp.re.MatchString(s)
 	return matchStringError == nil && matched
 }
 
@@ -185,37 +185,37 @@ func (r *RegExp) Test(s string) bool {
 // match. Reading a bound match as no match would turn a skipped report into a
 // false positive there, so a match that overruns MatchTimeout counts as a
 // match and the report is skipped.
-func (r *RegExp) TestOrTimeout(s string) bool {
-	matched, testOrError := r.TestOrError(s)
+func (exp *RegExp) TestOrTimeout(s string) bool {
+	matched, testOrError := exp.TestOrError(s)
 	return matched || testOrError != nil
 }
 
 // TestOrError is Test for a caller that has to tell "no match" apart from "the
 // match ran into MatchTimeout", and that has somewhere other than a match to
 // send the second answer.
-func (r *RegExp) TestOrError(s string) (bool, error) {
-	if r == nil || r.re == nil {
+func (exp *RegExp) TestOrError(s string) (bool, error) {
+	if exp == nil || exp.re == nil {
 		return false, nil
 	}
-	return r.re.MatchString(s)
+	return exp.re.MatchString(s)
 }
 
 // Source returns the pattern as it was written, the way `RegExp.prototype
 // .source` does — not the rewritten form handed to regexp2.
-func (r *RegExp) Source() string { return r.source }
+func (exp *RegExp) Source() string { return exp.source }
 
 // Flags returns the flags as they were written.
-func (r *RegExp) Flags() string { return r.flags }
+func (exp *RegExp) Flags() string { return exp.flags }
 
 // String renders the regexp the way JavaScript writes a regexp literal.
-func (r *RegExp) String() string { return "/" + r.source + "/" + r.flags }
+func (exp *RegExp) String() string { return "/" + exp.source + "/" + exp.flags }
 
 // Unwrap returns the compiled regexp2 pattern, for a caller that needs
 // capture groups or replacement. The pattern it holds is the rewritten one, so
 // its own String does not match Source.
-func (r *RegExp) Unwrap() *regexp2.Regexp {
-	if r == nil {
+func (exp *RegExp) Unwrap() *regexp2.Regexp {
+	if exp == nil {
 		return nil
 	}
-	return r.re
+	return exp.re
 }

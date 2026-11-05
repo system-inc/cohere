@@ -81,8 +81,8 @@ type Fixture struct {
 // 325, so 290 need no Flow parser. Restricting the search to the first line instead reports 20,
 // which is wrong in the direction that matters: it would hand 15 unparseable fixtures to a
 // TypeScript parser and read their parse failures as rule failures.
-func (f Fixture) RequiresFlow() bool {
-	return strings.Contains(f.Source, "@flow")
+func (fixture Fixture) RequiresFlow() bool {
+	return strings.Contains(fixture.Source, "@flow")
 }
 
 // Expectation is the parsed `## Error` block.

@@ -79,17 +79,17 @@ func containsName(names []string, name string) bool {
 // errMemoryFSReadOnly is every write's answer.
 var errMemoryFSReadOnly = errors.New("program: the memory filesystem is read-only")
 
-func (m *MemoryFS) CaseSensitivity() tspath.CaseSensitivity { return tspath.CaseSensitive }
+func (memoryFS *MemoryFS) CaseSensitivity() tspath.CaseSensitivity { return tspath.CaseSensitive }
 
-func (m *MemoryFS) FileExists(fileName tspath.RootedFilePath) bool {
-	_, exists := m.files[path.Clean(fileName.AsString())]
+func (memoryFS *MemoryFS) FileExists(fileName tspath.RootedFilePath) bool {
+	_, exists := memoryFS.files[path.Clean(fileName.AsString())]
 	return exists
 }
 
 // ReadFile answers as the disk does: a file's bytes decoded the way the real filesystem decodes them, so a
 // fixture's byte order mark or UTF-16 reaches the compiler as it would from a file.
-func (m *MemoryFS) ReadFile(fileName tspath.RootedFilePath) (string, bool) {
-	contents, exists := m.files[path.Clean(fileName.AsString())]
+func (memoryFS *MemoryFS) ReadFile(fileName tspath.RootedFilePath) (string, bool) {
+	contents, exists := memoryFS.files[path.Clean(fileName.AsString())]
 	if !exists {
 		return "", false
 	}
@@ -125,32 +125,34 @@ func decodeUtf16LikeDisk(s string, order binary.ByteOrder) string {
 	return string(utf16.Decode(ints))
 }
 
-func (m *MemoryFS) WriteFile(tspath.RootedFilePath, string) error         { return errMemoryFSReadOnly }
-func (m *MemoryFS) AppendFile(tspath.RootedFilePath, string) error        { return errMemoryFSReadOnly }
-func (m *MemoryFS) Remove(tspath.RootedPath) error                        { return errMemoryFSReadOnly }
-func (m *MemoryFS) Chtimes(tspath.RootedPath, time.Time, time.Time) error { return errMemoryFSReadOnly }
-func (m *MemoryFS) Realpath(fileName tspath.RootedPath) tspath.RootedPath {
+func (memoryFS *MemoryFS) WriteFile(tspath.RootedFilePath, string) error  { return errMemoryFSReadOnly }
+func (memoryFS *MemoryFS) AppendFile(tspath.RootedFilePath, string) error { return errMemoryFSReadOnly }
+func (memoryFS *MemoryFS) Remove(tspath.RootedPath) error                 { return errMemoryFSReadOnly }
+func (memoryFS *MemoryFS) Chtimes(tspath.RootedPath, time.Time, time.Time) error {
+	return errMemoryFSReadOnly
+}
+func (memoryFS *MemoryFS) Realpath(fileName tspath.RootedPath) tspath.RootedPath {
 	return tspath.RootedPath(path.Clean(fileName.AsString()))
 }
 
-func (m *MemoryFS) DirectoryExists(directory tspath.RootedDirectoryPath) bool {
-	_, exists := m.directories[path.Clean(directory.AsString())]
+func (memoryFS *MemoryFS) DirectoryExists(directory tspath.RootedDirectoryPath) bool {
+	_, exists := memoryFS.directories[path.Clean(directory.AsString())]
 	return exists
 }
 
-func (m *MemoryFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
-	if entries, exists := m.directories[path.Clean(directory.AsString())]; exists {
+func (memoryFS *MemoryFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+	if entries, exists := memoryFS.directories[path.Clean(directory.AsString())]; exists {
 		return *entries
 	}
 	return vfs.Entries{}
 }
 
-func (m *MemoryFS) Stat(rooted tspath.RootedPath) vfs.FileInfo {
+func (memoryFS *MemoryFS) Stat(rooted tspath.RootedPath) vfs.FileInfo {
 	name := path.Clean(rooted.AsString())
-	if contents, exists := m.files[name]; exists {
+	if contents, exists := memoryFS.files[name]; exists {
 		return memoryFileInfo{name: path.Base(name), size: int64(len(contents))}
 	}
-	if _, exists := m.directories[name]; exists {
+	if _, exists := memoryFS.directories[name]; exists {
 		return memoryFileInfo{name: path.Base(name), directory: true}
 	}
 	return nil
@@ -164,14 +166,14 @@ type memoryFileInfo struct {
 	directory bool
 }
 
-func (i memoryFileInfo) Name() string       { return i.name }
-func (i memoryFileInfo) Size() int64        { return i.size }
-func (i memoryFileInfo) ModTime() time.Time { return time.Time{} }
-func (i memoryFileInfo) IsDir() bool        { return i.directory }
-func (i memoryFileInfo) Sys() any           { return nil }
+func (info memoryFileInfo) Name() string       { return info.name }
+func (info memoryFileInfo) Size() int64        { return info.size }
+func (info memoryFileInfo) ModTime() time.Time { return time.Time{} }
+func (info memoryFileInfo) IsDir() bool        { return info.directory }
+func (info memoryFileInfo) Sys() any           { return nil }
 
-func (i memoryFileInfo) Mode() fs.FileMode {
-	if i.directory {
+func (info memoryFileInfo) Mode() fs.FileMode {
+	if info.directory {
 		return fs.ModeDir | 0o555
 	}
 	return 0o444

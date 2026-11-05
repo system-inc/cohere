@@ -14,131 +14,131 @@ import (
 )
 
 // lowerExpressionToPlace lowers an expression and returns the value it produces.
-func (b *builder) lowerExpressionToPlace(node *ast.Node) Place {
+func (builder *builder) lowerExpressionToPlace(node *ast.Node) Place {
 	if node == nil {
-		return b.emit(&Primitive{Value: nil}, nil)
+		return builder.emit(&Primitive{Value: nil}, nil)
 	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return b.lowerIdentifier(node)
+		return builder.lowerIdentifier(node)
 
 	case ast.KindNumericLiteral:
-		return b.emit(&Primitive{Value: node.Text()}, node)
+		return builder.emit(&Primitive{Value: node.Text()}, node)
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return b.emit(&Primitive{Value: node.Text()}, node)
+		return builder.emit(&Primitive{Value: node.Text()}, node)
 	case ast.KindTrueKeyword:
-		return b.emit(&Primitive{Value: true}, node)
+		return builder.emit(&Primitive{Value: true}, node)
 	case ast.KindFalseKeyword:
-		return b.emit(&Primitive{Value: false}, node)
+		return builder.emit(&Primitive{Value: false}, node)
 	case ast.KindNullKeyword:
-		return b.emit(&Primitive{Value: nil}, node)
+		return builder.emit(&Primitive{Value: nil}, node)
 	case ast.KindBigIntLiteral:
-		return b.emit(&Primitive{Value: node.Text()}, node)
+		return builder.emit(&Primitive{Value: node.Text()}, node)
 
 	case ast.KindRegularExpressionLiteral:
 		pattern, flags := splitRegExp(node.Text())
-		return b.emit(&RegExpLiteral{Pattern: pattern, Flags: flags}, node)
+		return builder.emit(&RegExpLiteral{Pattern: pattern, Flags: flags}, node)
 
 	case ast.KindThisKeyword:
-		return b.emit(&LoadGlobal{Name: "this", BindingKind: GlobalBindingKindGlobal}, node)
+		return builder.emit(&LoadGlobal{Name: "this", BindingKind: GlobalBindingKindGlobal}, node)
 
 	case ast.KindParenthesizedExpression:
-		return b.lowerExpressionToPlace(node.AsParenthesizedExpression().Expression)
+		return builder.lowerExpressionToPlace(node.AsParenthesizedExpression().Expression)
 
 	case ast.KindAsExpression:
 		expression := node.AsAsExpression()
-		value := b.lowerExpressionToPlace(expression.Expression)
-		return b.emit(&TypeCastExpression{Value: value, Node: expression.Type}, node)
+		value := builder.lowerExpressionToPlace(expression.Expression)
+		return builder.emit(&TypeCastExpression{Value: value, Node: expression.Type}, node)
 
 	case ast.KindSatisfiesExpression:
 		expression := node.AsSatisfiesExpression()
-		value := b.lowerExpressionToPlace(expression.Expression)
-		return b.emit(&TypeCastExpression{Value: value, Node: expression.Type}, node)
+		value := builder.lowerExpressionToPlace(expression.Expression)
+		return builder.emit(&TypeCastExpression{Value: value, Node: expression.Type}, node)
 
 	case ast.KindNonNullExpression:
-		return b.lowerExpressionToPlace(node.AsNonNullExpression().Expression)
+		return builder.lowerExpressionToPlace(node.AsNonNullExpression().Expression)
 
 	case ast.KindTypeAssertionExpression:
 		expression := node.AsTypeAssertion()
-		value := b.lowerExpressionToPlace(expression.Expression)
-		return b.emit(&TypeCastExpression{Value: value, Node: expression.Type}, node)
+		value := builder.lowerExpressionToPlace(expression.Expression)
+		return builder.emit(&TypeCastExpression{Value: value, Node: expression.Type}, node)
 
 	case ast.KindPropertyAccessExpression:
-		return b.lowerPropertyAccess(node)
+		return builder.lowerPropertyAccess(node)
 
 	case ast.KindElementAccessExpression:
-		return b.lowerElementAccess(node)
+		return builder.lowerElementAccess(node)
 
 	case ast.KindCallExpression:
-		return b.lowerCallExpression(node)
+		return builder.lowerCallExpression(node)
 
 	case ast.KindNewExpression:
-		return b.lowerNewExpression(node)
+		return builder.lowerNewExpression(node)
 
 	case ast.KindBinaryExpression:
-		return b.lowerBinaryExpression(node)
+		return builder.lowerBinaryExpression(node)
 
 	case ast.KindPrefixUnaryExpression:
-		return b.lowerPrefixUnary(node)
+		return builder.lowerPrefixUnary(node)
 
 	case ast.KindPostfixUnaryExpression:
-		return b.lowerPostfixUnary(node)
+		return builder.lowerPostfixUnary(node)
 
 	case ast.KindTypeOfExpression:
-		value := b.lowerExpressionToPlace(node.AsTypeOfExpression().Expression)
-		return b.emit(&UnaryExpression{Operator: "typeof", Value: value}, node)
+		value := builder.lowerExpressionToPlace(node.AsTypeOfExpression().Expression)
+		return builder.emit(&UnaryExpression{Operator: "typeof", Value: value}, node)
 
 	case ast.KindVoidExpression:
-		value := b.lowerExpressionToPlace(node.AsVoidExpression().Expression)
-		return b.emit(&UnaryExpression{Operator: "void", Value: value}, node)
+		value := builder.lowerExpressionToPlace(node.AsVoidExpression().Expression)
+		return builder.emit(&UnaryExpression{Operator: "void", Value: value}, node)
 
 	case ast.KindDeleteExpression:
-		return b.lowerDeleteExpression(node)
+		return builder.lowerDeleteExpression(node)
 
 	case ast.KindAwaitExpression:
-		value := b.lowerExpressionToPlace(node.AsAwaitExpression().Expression)
-		return b.emit(&Await{Value: value}, node)
+		value := builder.lowerExpressionToPlace(node.AsAwaitExpression().Expression)
+		return builder.emit(&Await{Value: value}, node)
 
 	case ast.KindConditionalExpression:
-		return b.lowerConditionalExpression(node)
+		return builder.lowerConditionalExpression(node)
 
 	case ast.KindObjectLiteralExpression:
-		return b.lowerObjectLiteral(node)
+		return builder.lowerObjectLiteral(node)
 
 	case ast.KindArrayLiteralExpression:
-		return b.lowerArrayLiteral(node)
+		return builder.lowerArrayLiteral(node)
 
 	case ast.KindTemplateExpression:
-		return b.lowerTemplateExpression(node)
+		return builder.lowerTemplateExpression(node)
 
 	case ast.KindTaggedTemplateExpression:
-		return b.lowerTaggedTemplate(node)
+		return builder.lowerTaggedTemplate(node)
 
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
-		return b.lowerFunctionExpression(node)
+		return builder.lowerFunctionExpression(node)
 
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
-		return b.lowerJsxElement(node)
+		return builder.lowerJsxElement(node)
 
 	case ast.KindJsxFragment:
-		return b.lowerJsxFragment(node)
+		return builder.lowerJsxFragment(node)
 
 	case ast.KindJsxExpression:
 		inner := node.AsJsxExpression().Expression
 		if inner == nil {
-			return b.emit(&Primitive{Value: nil}, node)
+			return builder.emit(&Primitive{Value: nil}, node)
 		}
-		return b.lowerExpressionToPlace(inner)
+		return builder.lowerExpressionToPlace(inner)
 
 	case ast.KindSpreadElement:
-		return b.lowerExpressionToPlace(node.AsSpreadElement().Expression)
+		return builder.lowerExpressionToPlace(node.AsSpreadElement().Expression)
 
 	case ast.KindMetaProperty:
-		return b.emit(&MetaProperty{Meta: "import", Property: "meta"}, node)
+		return builder.emit(&MetaProperty{Meta: "import", Property: "meta"}, node)
 
 	default:
-		return b.emit(&UnsupportedNode{Node: node, Reason: node.Kind.String()}, node)
+		return builder.emit(&UnsupportedNode{Node: node, Reason: node.Kind.String()}, node)
 	}
 }
 
@@ -154,58 +154,58 @@ func (b *builder) lowerExpressionToPlace(node *ast.Node) Place {
 // This resolves nothing when `builder.typeChecker` is nil, and the failure produces a well-formed
 // graph rather than an error: every reference takes the `LoadGlobal` path below. Nothing downstream
 // can tell that apart from a program made entirely of globals. See `Lower` for the measurement.
-func (b *builder) lowerIdentifier(node *ast.Node) Place {
+func (builder *builder) lowerIdentifier(node *ast.Node) Place {
 	name := node.Text()
 	if name == "undefined" {
-		return b.emit(&Primitive{Value: nil}, node)
+		return builder.emit(&Primitive{Value: nil}, node)
 	}
 
-	symbol := b.symbolOf(node)
+	symbol := builder.symbolOf(node)
 	if symbol != nil {
-		if identifier, ok := b.identifiers[symbol]; ok {
+		if identifier, ok := builder.identifiers[symbol]; ok {
 			place := Place{Identifier: identifier, Range: rangeOf(node)}
-			return b.emit(&LoadLocal{Place: place}, node)
+			return builder.emit(&LoadLocal{Place: place}, node)
 		}
 		// Not declared here, but declared by an enclosing function: a capture. This is the case
 		// that used to fall through to LoadGlobal, making a closed-over variable indistinguishable
 		// from a true global and stopping every analysis at the function boundary.
-		if place, ok := b.captureOf(symbol); ok {
+		if place, ok := builder.captureOf(symbol); ok {
 			place.Range = rangeOf(node)
-			return b.emit(&LoadContext{Place: place}, node)
+			return builder.emit(&LoadContext{Place: place}, node)
 		}
 	}
 
 	// Unknown to every enclosing function: a true global, an import, or a module-scope binding.
 	// Retain the checker's declaration provenance rather than conflating those three cases.
-	return b.emit(moduleGlobalLoad(node, symbol), node)
+	return builder.emit(moduleGlobalLoad(node, symbol), node)
 }
 
-func (b *builder) lowerPropertyAccess(node *ast.Node) Place {
+func (builder *builder) lowerPropertyAccess(node *ast.Node) Place {
 	if isOptionalChainLink(node) {
-		return b.lowerOptionalChain(node, nil)
+		return builder.lowerOptionalChain(node, nil)
 	}
 	expression := node.AsPropertyAccessExpression()
-	object := b.lowerExpressionToPlace(expression.Expression)
+	object := builder.lowerExpressionToPlace(expression.Expression)
 	optional := expression.QuestionDotToken != nil
 	name := ""
 	if expression.Name() != nil {
 		name = expression.Name().Text()
 	}
-	return b.emit(&PropertyLoad{Object: object, Property: name, Optional: optional}, node)
+	return builder.emit(&PropertyLoad{Object: object, Property: name, Optional: optional}, node)
 }
 
-func (b *builder) lowerElementAccess(node *ast.Node) Place {
+func (builder *builder) lowerElementAccess(node *ast.Node) Place {
 	expression := node.AsElementAccessExpression()
-	object := b.lowerExpressionToPlace(expression.Expression)
-	property := b.lowerExpressionToPlace(expression.ArgumentExpression)
+	object := builder.lowerExpressionToPlace(expression.Expression)
+	property := builder.lowerExpressionToPlace(expression.ArgumentExpression)
 	optional := expression.QuestionDotToken != nil
-	return b.emit(&ComputedLoad{Object: object, Property: property, Optional: optional}, node)
+	return builder.emit(&ComputedLoad{Object: object, Property: property, Optional: optional}, node)
 }
 
 // calleeModuleOrigin names the React export a callee is, through imports and re-exports in other files,
 // which rule.ExportNameIn reads within its imports' shapes.
-func (b *builder) calleeModuleOrigin(expression *ast.Node) ModuleExportOrigin {
-	if export := rule.ExportNameIn(b.typeChecker, expression, "react"); export != "" {
+func (builder *builder) calleeModuleOrigin(expression *ast.Node) ModuleExportOrigin {
+	if export := rule.ExportNameIn(builder.typeChecker, expression, "react"); export != "" {
 		return ModuleExportOrigin{Module: "react", Export: export}
 	}
 	return ModuleExportOrigin{}
@@ -216,22 +216,22 @@ func (b *builder) calleeModuleOrigin(expression *ast.Node) ModuleExportOrigin {
 // A call whose callee is a member access becomes a MethodCall, keeping the receiver, so an effect
 // pass can attribute mutation to the object. Lowering it as a property load plus a plain call would
 // lose the relationship between the loaded function and the object it came from.
-func (b *builder) lowerCallExpression(node *ast.Node) Place {
+func (builder *builder) lowerCallExpression(node *ast.Node) Place {
 	expression := node.AsCallExpression()
 	optional := expression.QuestionDotToken != nil
 
 	callee := expression.Expression
-	origin := b.calleeModuleOrigin(callee)
+	origin := builder.calleeModuleOrigin(callee)
 	if callee != nil && callee.Kind == ast.KindPropertyAccessExpression {
 		access := callee.AsPropertyAccessExpression()
-		receiver := b.lowerExpressionToPlace(access.Expression)
+		receiver := builder.lowerExpressionToPlace(access.Expression)
 		name := ""
 		if access.Name() != nil {
 			name = access.Name().Text()
 		}
-		property := b.emit(&Primitive{Value: name}, access.Name())
-		args := b.lowerArguments(expression.Arguments)
-		return b.emit(&MethodCall{
+		property := builder.emit(&Primitive{Value: name}, access.Name())
+		args := builder.lowerArguments(expression.Arguments)
+		return builder.emit(&MethodCall{
 			CalleeOrigin: origin,
 			Receiver:     receiver,
 			Property:     property,
@@ -241,10 +241,10 @@ func (b *builder) lowerCallExpression(node *ast.Node) Place {
 	}
 	if callee != nil && callee.Kind == ast.KindElementAccessExpression {
 		access := callee.AsElementAccessExpression()
-		receiver := b.lowerExpressionToPlace(access.Expression)
-		property := b.lowerExpressionToPlace(access.ArgumentExpression)
-		args := b.lowerArguments(expression.Arguments)
-		return b.emit(&MethodCall{
+		receiver := builder.lowerExpressionToPlace(access.Expression)
+		property := builder.lowerExpressionToPlace(access.ArgumentExpression)
+		args := builder.lowerArguments(expression.Arguments)
+		return builder.emit(&MethodCall{
 			CalleeOrigin: origin,
 			Receiver:     receiver,
 			Property:     property,
@@ -253,30 +253,30 @@ func (b *builder) lowerCallExpression(node *ast.Node) Place {
 		}, node)
 	}
 
-	calleePlace := b.lowerExpressionToPlace(callee)
-	args := b.lowerArguments(expression.Arguments)
-	return b.emit(&CallExpression{Callee: calleePlace, Args: args, Optional: optional, CalleeOrigin: origin}, node)
+	calleePlace := builder.lowerExpressionToPlace(callee)
+	args := builder.lowerArguments(expression.Arguments)
+	return builder.emit(&CallExpression{Callee: calleePlace, Args: args, Optional: optional, CalleeOrigin: origin}, node)
 }
 
-func (b *builder) lowerNewExpression(node *ast.Node) Place {
+func (builder *builder) lowerNewExpression(node *ast.Node) Place {
 	expression := node.AsNewExpression()
-	callee := b.lowerExpressionToPlace(expression.Expression)
-	args := b.lowerArguments(expression.Arguments)
-	return b.emit(&NewExpression{Callee: callee, Args: args}, node)
+	callee := builder.lowerExpressionToPlace(expression.Expression)
+	args := builder.lowerArguments(expression.Arguments)
+	return builder.emit(&NewExpression{Callee: callee, Args: args}, node)
 }
 
-func (b *builder) lowerArguments(list *ast.NodeList) []Argument {
+func (builder *builder) lowerArguments(list *ast.NodeList) []Argument {
 	if list == nil {
 		return nil
 	}
 	args := make([]Argument, 0, len(list.Nodes))
 	for _, argument := range list.Nodes {
 		if argument.Kind == ast.KindSpreadElement {
-			value := b.lowerExpressionToPlace(argument.AsSpreadElement().Expression)
+			value := builder.lowerExpressionToPlace(argument.AsSpreadElement().Expression)
 			args = append(args, Argument{Place: value, Spread: true})
 			continue
 		}
-		args = append(args, Argument{Place: b.lowerExpressionToPlace(argument)})
+		args = append(args, Argument{Place: builder.lowerExpressionToPlace(argument)})
 	}
 	return args
 }
@@ -285,30 +285,30 @@ func (b *builder) lowerArguments(list *ast.NodeList) []Argument {
 //
 // The three are one AST node in TypeScript and three different things here: `&&` is control flow,
 // `=` is a store, and `+` is an instruction.
-func (b *builder) lowerBinaryExpression(node *ast.Node) Place {
+func (builder *builder) lowerBinaryExpression(node *ast.Node) Place {
 	expression := node.AsBinaryExpression()
 	operator := expression.OperatorToken.Kind
 
 	switch operator {
 	case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-		return b.lowerLogicalExpression(node)
+		return builder.lowerLogicalExpression(node)
 
 	case ast.KindEqualsToken:
-		value := b.lowerExpressionToPlace(expression.Right)
-		return b.lowerAssignmentTarget(expression.Left, value, InstructionKindReassign)
+		value := builder.lowerExpressionToPlace(expression.Right)
+		return builder.lowerAssignmentTarget(expression.Left, value, InstructionKindReassign)
 
 	case ast.KindCommaToken:
-		b.lowerExpressionToPlace(expression.Left)
-		return b.lowerExpressionToPlace(expression.Right)
+		builder.lowerExpressionToPlace(expression.Left)
+		return builder.lowerExpressionToPlace(expression.Right)
 	}
 
 	if isCompoundAssignment(operator) {
-		return b.lowerCompoundAssignment(node)
+		return builder.lowerCompoundAssignment(node)
 	}
 
-	left := b.lowerExpressionToPlace(expression.Left)
-	right := b.lowerExpressionToPlace(expression.Right)
-	return b.emit(&BinaryExpression{
+	left := builder.lowerExpressionToPlace(expression.Left)
+	right := builder.lowerExpressionToPlace(expression.Right)
+	return builder.emit(&BinaryExpression{
 		Left:     left,
 		Operator: operatorText(operator),
 		Right:    right,
@@ -320,14 +320,14 @@ func (b *builder) lowerBinaryExpression(node *ast.Node) Place {
 // These short-circuit, so the right operand is not evaluated on every path. That is control flow,
 // and it lowers to a Logical terminal with the two operands in separate blocks. The value is the
 // result temporary, stored to on both paths.
-func (b *builder) lowerLogicalExpression(node *ast.Node) Place {
+func (builder *builder) lowerLogicalExpression(node *ast.Node) Place {
 	expression := node.AsBinaryExpression()
-	result := b.newTemporary(node)
+	result := builder.newTemporary(node)
 
-	testBlock := b.reserve(BlockKindValue)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	testBlock := builder.reserve(BlockKindValue)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
-	b.terminateAndEnter(&Logical{
+	builder.terminateAndEnter(&Logical{
 		Operator:    operatorText(expression.OperatorToken.Kind),
 		Test:        testBlock.Id,
 		Fallthrough: fallthroughBlock.Id,
@@ -335,9 +335,9 @@ func (b *builder) lowerLogicalExpression(node *ast.Node) Place {
 
 	// The arms write DISTINCT identifiers under the result's declaration, so construction sees two
 	// definitions of one binding and merges them. See `newTemporaryUnder`.
-	shared := b.function.Identifiers[result.Identifier].Declaration
+	shared := builder.function.Identifiers[result.Identifier].Declaration
 
-	left := b.lowerExpressionToPlace(expression.Left)
+	left := builder.lowerExpressionToPlace(expression.Left)
 
 	// Both arms get a value block, including the short-circuiting one.
 	//
@@ -349,87 +349,87 @@ func (b *builder) lowerLogicalExpression(node *ast.Node) Place {
 	// Upstream gives both a block: on `const x = a ?? []` its graph is a `branch` value block plus
 	// two `goto` value blocks feeding a join carrying one phi. This reproduces that for every
 	// operator.
-	shortCircuitBlock := b.reserve(BlockKindValue)
-	rightBlock := b.reserve(BlockKindValue)
+	shortCircuitBlock := builder.reserve(BlockKindValue)
+	rightBlock := builder.reserve(BlockKindValue)
 	consequent, alternate := rightBlock, shortCircuitBlock
 	if expression.OperatorToken.Kind == ast.KindBarBarToken ||
 		expression.OperatorToken.Kind == ast.KindQuestionQuestionToken {
 		// `a || b` and `a ?? b` evaluate the right operand when the test is falsy or nullish.
 		consequent, alternate = shortCircuitBlock, rightBlock
 	}
-	b.terminateWith(&Branch{
+	builder.terminateWith(&Branch{
 		Test:        left,
 		Consequent:  consequent.Id,
 		Alternate:   alternate.Id,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.enter(shortCircuitBlock)
-	b.emitTo(b.newTemporaryUnder(expression.Left, shared), &LoadLocal{Place: left},
+	builder.enter(shortCircuitBlock)
+	builder.emitTo(builder.newTemporaryUnder(expression.Left, shared), &LoadLocal{Place: left},
 		expression.Left)
-	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+	builder.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 
-	b.enter(rightBlock)
-	right := b.lowerExpressionToPlace(expression.Right)
-	b.emitTo(b.newTemporaryUnder(expression.Right, shared), &LoadLocal{Place: right},
+	builder.enter(rightBlock)
+	right := builder.lowerExpressionToPlace(expression.Right)
+	builder.emitTo(builder.newTemporaryUnder(expression.Right, shared), &LoadLocal{Place: right},
 		expression.Right)
-	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+	builder.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 	return result
 }
 
 // lowerConditionalExpression lowers `a ? b : c`.
-func (b *builder) lowerConditionalExpression(node *ast.Node) Place {
+func (builder *builder) lowerConditionalExpression(node *ast.Node) Place {
 	expression := node.AsConditionalExpression()
-	result := b.newTemporary(node)
+	result := builder.newTemporary(node)
 
-	testBlock := b.reserve(BlockKindValue)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	testBlock := builder.reserve(BlockKindValue)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
-	b.terminateAndEnter(&Ternary{
+	builder.terminateAndEnter(&Ternary{
 		Test:        testBlock.Id,
 		Fallthrough: fallthroughBlock.Id,
 	}, testBlock)
 
-	test := b.lowerExpressionToPlace(expression.Condition)
+	test := builder.lowerExpressionToPlace(expression.Condition)
 
-	consequent := b.reserve(BlockKindValue)
-	alternate := b.reserve(BlockKindValue)
-	b.terminateWith(&Branch{
+	consequent := builder.reserve(BlockKindValue)
+	alternate := builder.reserve(BlockKindValue)
+	builder.terminateWith(&Branch{
 		Test:        test,
 		Consequent:  consequent.Id,
 		Alternate:   alternate.Id,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.enter(consequent)
-	whenTrue := b.lowerExpressionToPlace(expression.WhenTrue)
-	b.emitTo(result, &LoadLocal{Place: whenTrue}, expression.WhenTrue)
-	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+	builder.enter(consequent)
+	whenTrue := builder.lowerExpressionToPlace(expression.WhenTrue)
+	builder.emitTo(result, &LoadLocal{Place: whenTrue}, expression.WhenTrue)
+	builder.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 
-	b.enter(alternate)
-	whenFalse := b.lowerExpressionToPlace(expression.WhenFalse)
-	b.emitTo(result, &LoadLocal{Place: whenFalse}, expression.WhenFalse)
-	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+	builder.enter(alternate)
+	whenFalse := builder.lowerExpressionToPlace(expression.WhenFalse)
+	builder.emitTo(result, &LoadLocal{Place: whenFalse}, expression.WhenFalse)
+	builder.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 	return result
 }
 
 // lowerAssignmentTarget stores a value into an assignment target and returns the value.
 //
 // Assignment is an expression: `a = (b = 1)` needs the inner assignment to produce a value.
-func (b *builder) lowerAssignmentTarget(target *ast.Node, value Place, kind InstructionKind) Place {
+func (builder *builder) lowerAssignmentTarget(target *ast.Node, value Place, kind InstructionKind) Place {
 	if target == nil {
 		return value
 	}
 	switch target.Kind {
 	case ast.KindIdentifier:
-		symbol := b.symbolOf(target)
+		symbol := builder.symbolOf(target)
 		if symbol != nil {
-			if _, known := b.identifiers[symbol]; known {
-				place := b.bind(target.Text(), symbol, target)
+			if _, known := builder.identifiers[symbol]; known {
+				place := builder.bind(target.Text(), symbol, target)
 				// A binding this function declared is still a CONTEXT binding when a closure inside
 				// it reads the value and something reassigns it, which is upstream's second rule at
 				// `FindContextIdentifiers.ts:108`. The write is in the outer function either way, so
@@ -439,130 +439,130 @@ func (b *builder) lowerAssignmentTarget(target *ast.Node, value Place, kind Inst
 				// `Mutate` on the binding, widening its mutable range past the memo call that
 				// captured it, and without that widening the scope closes before the marker and the
 				// rule stays silent where upstream reports a dependency that may be mutated later.
-				if b.contextual[symbol] {
-					if b.function.ContextDeclarations == nil {
-						b.function.ContextDeclarations = map[static_single_assignment.DeclarationId]bool{}
+				if builder.contextual[symbol] {
+					if builder.function.ContextDeclarations == nil {
+						builder.function.ContextDeclarations = map[static_single_assignment.DeclarationId]bool{}
 					}
-					if identifier := b.function.Identifiers[place.Identifier]; identifier != nil {
-						b.function.ContextDeclarations[identifier.Declaration] = true
+					if identifier := builder.function.Identifiers[place.Identifier]; identifier != nil {
+						builder.function.ContextDeclarations[identifier.Declaration] = true
 					}
-					b.emit(&StoreContext{LValue: place, Value: value, Kind: kind}, target)
+					builder.emit(&StoreContext{LValue: place, Value: value, Kind: kind}, target)
 					return value
 				}
-				b.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, target)
+				builder.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, target)
 				return value
 			}
 			// A write to a binding an enclosing function declared. Emitting StoreGlobal here was a
 			// real over-report: `let n = 0; const f = () => { n = 1; };` claimed a global write.
-			if place, ok := b.captureOf(symbol); ok {
+			if place, ok := builder.captureOf(symbol); ok {
 				place.Range = rangeOf(target)
-				b.emit(&StoreContext{LValue: place, Value: value, Kind: kind}, target)
+				builder.emit(&StoreContext{LValue: place, Value: value, Kind: kind}, target)
 				return value
 			}
 		}
 		// Not a binding this function declared and unknown to every enclosing one: a global.
-		b.emit(&StoreGlobal{Name: target.Text(), Value: value}, target)
+		builder.emit(&StoreGlobal{Name: target.Text(), Value: value}, target)
 		return value
 
 	case ast.KindPropertyAccessExpression:
 		expression := target.AsPropertyAccessExpression()
-		object := b.lowerExpressionToPlace(expression.Expression)
+		object := builder.lowerExpressionToPlace(expression.Expression)
 		name := ""
 		if expression.Name() != nil {
 			name = expression.Name().Text()
 		}
-		b.emit(&PropertyStore{Object: object, Property: name, Value: value}, target)
+		builder.emit(&PropertyStore{Object: object, Property: name, Value: value}, target)
 		return value
 
 	case ast.KindElementAccessExpression:
 		expression := target.AsElementAccessExpression()
-		object := b.lowerExpressionToPlace(expression.Expression)
-		property := b.lowerExpressionToPlace(expression.ArgumentExpression)
-		b.emit(&ComputedStore{Object: object, Property: property, Value: value}, target)
+		object := builder.lowerExpressionToPlace(expression.Expression)
+		property := builder.lowerExpressionToPlace(expression.ArgumentExpression)
+		builder.emit(&ComputedStore{Object: object, Property: property, Value: value}, target)
 		return value
 
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
 		// Destructuring assignment: `({a} = o)` and `[a] = xs`.
-		pattern := b.lowerPattern(target)
-		b.emit(&Destructure{LValue: pattern, Value: value, Kind: kind, Pattern: pattern}, target)
+		pattern := builder.lowerPattern(target)
+		builder.emit(&Destructure{LValue: pattern, Value: value, Kind: kind, Pattern: pattern}, target)
 		return value
 
 	case ast.KindParenthesizedExpression:
-		return b.lowerAssignmentTarget(target.AsParenthesizedExpression().Expression, value, kind)
+		return builder.lowerAssignmentTarget(target.AsParenthesizedExpression().Expression, value, kind)
 	}
 
-	b.emit(&UnsupportedNode{Node: target, Reason: "assignment target"}, target)
+	builder.emit(&UnsupportedNode{Node: target, Reason: "assignment target"}, target)
 	return value
 }
 
-func (b *builder) lowerCompoundAssignment(node *ast.Node) Place {
+func (builder *builder) lowerCompoundAssignment(node *ast.Node) Place {
 	expression := node.AsBinaryExpression()
-	current := b.lowerExpressionToPlace(expression.Left)
-	right := b.lowerExpressionToPlace(expression.Right)
-	updated := b.emit(&BinaryExpression{
+	current := builder.lowerExpressionToPlace(expression.Left)
+	right := builder.lowerExpressionToPlace(expression.Right)
+	updated := builder.emit(&BinaryExpression{
 		Left:     current,
 		Operator: compoundOperatorText(expression.OperatorToken.Kind),
 		Right:    right,
 	}, node)
-	return b.lowerAssignmentTarget(expression.Left, updated, InstructionKindReassign)
+	return builder.lowerAssignmentTarget(expression.Left, updated, InstructionKindReassign)
 }
 
-func (b *builder) lowerPrefixUnary(node *ast.Node) Place {
+func (builder *builder) lowerPrefixUnary(node *ast.Node) Place {
 	expression := node.AsPrefixUnaryExpression()
 	operator := expression.Operator
 
 	if operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken {
-		current := b.lowerExpressionToPlace(expression.Operand)
-		result := b.emit(&PrefixUpdate{
+		current := builder.lowerExpressionToPlace(expression.Operand)
+		result := builder.emit(&PrefixUpdate{
 			LValue:    current,
 			Operation: operatorText(operator),
 			Value:     current,
 		}, node)
-		b.lowerAssignmentTarget(expression.Operand, result, InstructionKindReassign)
+		builder.lowerAssignmentTarget(expression.Operand, result, InstructionKindReassign)
 		return result
 	}
 
-	value := b.lowerExpressionToPlace(expression.Operand)
-	return b.emit(&UnaryExpression{Operator: operatorText(operator), Value: value}, node)
+	value := builder.lowerExpressionToPlace(expression.Operand)
+	return builder.emit(&UnaryExpression{Operator: operatorText(operator), Value: value}, node)
 }
 
-func (b *builder) lowerPostfixUnary(node *ast.Node) Place {
+func (builder *builder) lowerPostfixUnary(node *ast.Node) Place {
 	expression := node.AsPostfixUnaryExpression()
-	current := b.lowerExpressionToPlace(expression.Operand)
-	result := b.emit(&PostfixUpdate{
+	current := builder.lowerExpressionToPlace(expression.Operand)
+	result := builder.emit(&PostfixUpdate{
 		LValue:    current,
 		Operation: operatorText(expression.Operator),
 		Value:     current,
 	}, node)
-	b.lowerAssignmentTarget(expression.Operand, result, InstructionKindReassign)
+	builder.lowerAssignmentTarget(expression.Operand, result, InstructionKindReassign)
 	return result
 }
 
-func (b *builder) lowerDeleteExpression(node *ast.Node) Place {
+func (builder *builder) lowerDeleteExpression(node *ast.Node) Place {
 	target := node.AsDeleteExpression().Expression
 	if target == nil {
-		return b.emit(&Primitive{Value: true}, node)
+		return builder.emit(&Primitive{Value: true}, node)
 	}
 	switch target.Kind {
 	case ast.KindPropertyAccessExpression:
 		expression := target.AsPropertyAccessExpression()
-		object := b.lowerExpressionToPlace(expression.Expression)
+		object := builder.lowerExpressionToPlace(expression.Expression)
 		name := ""
 		if expression.Name() != nil {
 			name = expression.Name().Text()
 		}
-		return b.emit(&PropertyDelete{Object: object, Property: name}, node)
+		return builder.emit(&PropertyDelete{Object: object, Property: name}, node)
 	case ast.KindElementAccessExpression:
 		expression := target.AsElementAccessExpression()
-		object := b.lowerExpressionToPlace(expression.Expression)
-		property := b.lowerExpressionToPlace(expression.ArgumentExpression)
-		return b.emit(&ComputedDelete{Object: object, Property: property}, node)
+		object := builder.lowerExpressionToPlace(expression.Expression)
+		property := builder.lowerExpressionToPlace(expression.ArgumentExpression)
+		return builder.emit(&ComputedDelete{Object: object, Property: property}, node)
 	}
-	b.lowerExpressionToPlace(target)
-	return b.emit(&Primitive{Value: true}, node)
+	builder.lowerExpressionToPlace(target)
+	return builder.emit(&Primitive{Value: true}, node)
 }
 
-func (b *builder) lowerObjectLiteral(node *ast.Node) Place {
+func (builder *builder) lowerObjectLiteral(node *ast.Node) Place {
 	expression := node.AsObjectLiteralExpression()
 	properties := make([]ObjectProperty, 0, len(expression.Properties.Nodes))
 
@@ -570,17 +570,17 @@ func (b *builder) lowerObjectLiteral(node *ast.Node) Place {
 		switch property.Kind {
 		case ast.KindPropertyAssignment:
 			assignment := property.AsPropertyAssignment()
-			value := b.lowerExpressionToPlace(assignment.Initializer)
-			properties = append(properties, b.objectPropertyKey(assignment.Name(), value))
+			value := builder.lowerExpressionToPlace(assignment.Initializer)
+			properties = append(properties, builder.objectPropertyKey(assignment.Name(), value))
 
 		case ast.KindShorthandPropertyAssignment:
 			assignment := property.AsShorthandPropertyAssignment()
 			name := assignment.Name()
-			value := b.lowerExpressionToPlace(name)
+			value := builder.lowerExpressionToPlace(name)
 			properties = append(properties, ObjectProperty{Key: name.Text(), Value: value})
 
 		case ast.KindSpreadAssignment:
-			value := b.lowerExpressionToPlace(property.AsSpreadAssignment().Expression)
+			value := builder.lowerExpressionToPlace(property.AsSpreadAssignment().Expression)
 			properties = append(properties, ObjectProperty{Value: value, Spread: true})
 
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
@@ -588,12 +588,12 @@ func (b *builder) lowerObjectLiteral(node *ast.Node) Place {
 			// function. `ObjectMethod` carries no Captures field, so the pairing is not recorded
 			// here, but the nested function's own `Context` is populated by the lowering and its
 			// body reads captured names as LoadContext rather than LoadGlobal.
-			nested, _ := b.lowerNestedFunction(property)
+			nested, _ := builder.lowerNestedFunction(property)
 			if nested == nil {
 				continue
 			}
-			id := FunctionId(len(b.function.Functions))
-			b.function.Functions = append(b.function.Functions, nested)
+			id := FunctionId(len(builder.function.Functions))
+			builder.function.Functions = append(builder.function.Functions, nested)
 			// A method's name can be computed, `async *[Symbol.asyncIterator]() {}`, and a computed
 			// name has no text: reading it as text panicked every rule that lowers the function, on
 			// TanStack Query's own tests (#zx5xvtg). The key goes through objectPropertyKey as a
@@ -603,30 +603,30 @@ func (b *builder) lowerObjectLiteral(node *ast.Node) Place {
 			if name := property.Name(); name != nil && name.Kind != ast.KindComputedPropertyName {
 				key = name.Text()
 			}
-			value := b.emit(&ObjectMethod{Key: key, Function: id}, property)
-			properties = append(properties, b.objectPropertyKey(property.Name(), value))
+			value := builder.emit(&ObjectMethod{Key: key, Function: id}, property)
+			properties = append(properties, builder.objectPropertyKey(property.Name(), value))
 
 		default:
-			value := b.emit(&UnsupportedNode{Node: property, Reason: "object member"}, property)
+			value := builder.emit(&UnsupportedNode{Node: property, Reason: "object member"}, property)
 			properties = append(properties, ObjectProperty{Value: value})
 		}
 	}
 
-	return b.emit(&ObjectExpression{Properties: properties}, node)
+	return builder.emit(&ObjectExpression{Properties: properties}, node)
 }
 
-func (b *builder) objectPropertyKey(name *ast.Node, value Place) ObjectProperty {
+func (builder *builder) objectPropertyKey(name *ast.Node, value Place) ObjectProperty {
 	if name == nil {
 		return ObjectProperty{Value: value}
 	}
 	if name.Kind == ast.KindComputedPropertyName {
-		key := b.lowerExpressionToPlace(name.AsComputedPropertyName().Expression)
+		key := builder.lowerExpressionToPlace(name.AsComputedPropertyName().Expression)
 		return ObjectProperty{ComputedKey: &key, Value: value}
 	}
 	return ObjectProperty{Key: name.Text(), Value: value}
 }
 
-func (b *builder) lowerArrayLiteral(node *ast.Node) Place {
+func (builder *builder) lowerArrayLiteral(node *ast.Node) Place {
 	expression := node.AsArrayLiteralExpression()
 	elements := make([]ArrayElement, 0, len(expression.Elements.Nodes))
 
@@ -635,17 +635,17 @@ func (b *builder) lowerArrayLiteral(node *ast.Node) Place {
 		case ast.KindOmittedExpression:
 			elements = append(elements, ArrayElement{Hole: true})
 		case ast.KindSpreadElement:
-			value := b.lowerExpressionToPlace(element.AsSpreadElement().Expression)
+			value := builder.lowerExpressionToPlace(element.AsSpreadElement().Expression)
 			elements = append(elements, ArrayElement{Place: value, Spread: true})
 		default:
-			elements = append(elements, ArrayElement{Place: b.lowerExpressionToPlace(element)})
+			elements = append(elements, ArrayElement{Place: builder.lowerExpressionToPlace(element)})
 		}
 	}
 
-	return b.emit(&ArrayExpression{Elements: elements}, node)
+	return builder.emit(&ArrayExpression{Elements: elements}, node)
 }
 
-func (b *builder) lowerTemplateExpression(node *ast.Node) Place {
+func (builder *builder) lowerTemplateExpression(node *ast.Node) Place {
 	expression := node.AsTemplateExpression()
 	quasis := []string{}
 	if expression.Head != nil {
@@ -654,17 +654,17 @@ func (b *builder) lowerTemplateExpression(node *ast.Node) Place {
 	subexprs := make([]Place, 0, len(expression.TemplateSpans.Nodes))
 	for _, span := range expression.TemplateSpans.Nodes {
 		templateSpan := span.AsTemplateSpan()
-		subexprs = append(subexprs, b.lowerExpressionToPlace(templateSpan.Expression))
+		subexprs = append(subexprs, builder.lowerExpressionToPlace(templateSpan.Expression))
 		if templateSpan.Literal != nil {
 			quasis = append(quasis, templateSpan.Literal.Text())
 		}
 	}
-	return b.emit(&TemplateLiteral{Quasis: quasis, Subexprs: subexprs}, node)
+	return builder.emit(&TemplateLiteral{Quasis: quasis, Subexprs: subexprs}, node)
 }
 
-func (b *builder) lowerTaggedTemplate(node *ast.Node) Place {
+func (builder *builder) lowerTaggedTemplate(node *ast.Node) Place {
 	expression := node.AsTaggedTemplateExpression()
-	tag := b.lowerExpressionToPlace(expression.Tag)
+	tag := builder.lowerExpressionToPlace(expression.Tag)
 
 	quasis := []string{}
 	var subexprs []Place
@@ -676,7 +676,7 @@ func (b *builder) lowerTaggedTemplate(node *ast.Node) Place {
 			}
 			for _, span := range template.TemplateSpans.Nodes {
 				templateSpan := span.AsTemplateSpan()
-				subexprs = append(subexprs, b.lowerExpressionToPlace(templateSpan.Expression))
+				subexprs = append(subexprs, builder.lowerExpressionToPlace(templateSpan.Expression))
 				if templateSpan.Literal != nil {
 					quasis = append(quasis, templateSpan.Literal.Text())
 				}
@@ -686,25 +686,25 @@ func (b *builder) lowerTaggedTemplate(node *ast.Node) Place {
 		}
 	}
 
-	return b.emit(&TaggedTemplateExpression{Tag: tag, Quasis: quasis, Subexprs: subexprs}, node)
+	return builder.emit(&TaggedTemplateExpression{Tag: tag, Quasis: quasis, Subexprs: subexprs}, node)
 }
 
 // lowerFunctionExpression lowers a nested function and records what it captures.
-func (b *builder) lowerFunctionExpression(node *ast.Node) Place {
-	nested, captures := b.lowerNestedFunction(node)
+func (builder *builder) lowerFunctionExpression(node *ast.Node) Place {
+	nested, captures := builder.lowerNestedFunction(node)
 	if nested == nil {
-		return b.emit(&UnsupportedNode{Node: node, Reason: "function expression"}, node)
+		return builder.emit(&UnsupportedNode{Node: node, Reason: "function expression"}, node)
 	}
-	id := FunctionId(len(b.function.Functions))
-	b.function.Functions = append(b.function.Functions, nested)
-	return b.emit(&FunctionExpression{Function: id, Captures: captures}, node)
+	id := FunctionId(len(builder.function.Functions))
+	builder.function.Functions = append(builder.function.Functions, nested)
+	return builder.emit(&FunctionExpression{Function: id, Captures: captures}, node)
 }
 
 // ---------------------------------------------------------------------------
 // JSX
 // ---------------------------------------------------------------------------
 
-func (b *builder) lowerJsxElement(node *ast.Node) Place {
+func (builder *builder) lowerJsxElement(node *ast.Node) Place {
 	var opening *ast.Node
 	var children []*ast.Node
 
@@ -719,27 +719,27 @@ func (b *builder) lowerJsxElement(node *ast.Node) Place {
 	}
 
 	tagName, attributes := jsxOpeningParts(opening)
-	tag := b.lowerJsxTag(tagName)
-	props := b.lowerJsxAttributes(attributes)
-	childPlaces := b.lowerJsxChildren(children)
+	tag := builder.lowerJsxTag(tagName)
+	props := builder.lowerJsxAttributes(attributes)
+	childPlaces := builder.lowerJsxChildren(children)
 
-	return b.emit(&JsxExpression{Tag: tag, Props: props, Children: childPlaces}, node)
+	return builder.emit(&JsxExpression{Tag: tag, Props: props, Children: childPlaces}, node)
 }
 
-func (b *builder) lowerJsxFragment(node *ast.Node) Place {
+func (builder *builder) lowerJsxFragment(node *ast.Node) Place {
 	fragment := node.AsJsxFragment()
 	var children []*ast.Node
 	if fragment.Children != nil {
 		children = fragment.Children.Nodes
 	}
-	return b.emit(&JsxFragment{Children: b.lowerJsxChildren(children)}, node)
+	return builder.emit(&JsxFragment{Children: builder.lowerJsxChildren(children)}, node)
 }
 
 // lowerJsxTag resolves an element name.
 //
 // A lowercase name is a host element and stays a string; anything else is a value reference, which
 // is what makes `<Foo />` a use of `Foo`.
-func (b *builder) lowerJsxTag(name *ast.Node) JsxTag {
+func (builder *builder) lowerJsxTag(name *ast.Node) JsxTag {
 	if name == nil {
 		return JsxTag{Name: "unknown"}
 	}
@@ -749,16 +749,16 @@ func (b *builder) lowerJsxTag(name *ast.Node) JsxTag {
 		if text != "" && text[0] >= 'a' && text[0] <= 'z' {
 			return JsxTag{Name: text}
 		}
-		place := b.lowerIdentifier(name)
+		place := builder.lowerIdentifier(name)
 		return JsxTag{Place: &place}
 	case ast.KindPropertyAccessExpression:
-		place := b.lowerPropertyAccess(name)
+		place := builder.lowerPropertyAccess(name)
 		return JsxTag{Place: &place}
 	}
 	return JsxTag{Name: "unknown"}
 }
 
-func (b *builder) lowerJsxAttributes(attributes *ast.Node) []JsxAttribute {
+func (builder *builder) lowerJsxAttributes(attributes *ast.Node) []JsxAttribute {
 	if attributes == nil {
 		return nil
 	}
@@ -778,24 +778,24 @@ func (b *builder) lowerJsxAttributes(attributes *ast.Node) []JsxAttribute {
 			}
 			if attribute.Initializer == nil {
 				// A bare attribute is `true`.
-				value := b.emit(&Primitive{Value: true}, property)
+				value := builder.emit(&Primitive{Value: true}, property)
 				props = append(props, JsxAttribute{Name: name, Value: value})
 				continue
 			}
 			props = append(props, JsxAttribute{
 				Name:  name,
-				Value: b.lowerExpressionToPlace(attribute.Initializer),
+				Value: builder.lowerExpressionToPlace(attribute.Initializer),
 			})
 
 		case ast.KindJsxSpreadAttribute:
-			value := b.lowerExpressionToPlace(property.AsJsxSpreadAttribute().Expression)
+			value := builder.lowerExpressionToPlace(property.AsJsxSpreadAttribute().Expression)
 			props = append(props, JsxAttribute{Value: value, Spread: true})
 		}
 	}
 	return props
 }
 
-func (b *builder) lowerJsxChildren(children []*ast.Node) []Place {
+func (builder *builder) lowerJsxChildren(children []*ast.Node) []Place {
 	var places []Place
 	for _, child := range children {
 		switch child.Kind {
@@ -808,15 +808,15 @@ func (b *builder) lowerJsxChildren(children []*ast.Node) []Place {
 			if text.ContainsOnlyTriviaWhiteSpaces {
 				continue
 			}
-			places = append(places, b.emit(&JsxText{Value: text.Text}, child))
+			places = append(places, builder.emit(&JsxText{Value: text.Text}, child))
 		case ast.KindJsxExpression:
 			inner := child.AsJsxExpression().Expression
 			if inner == nil {
 				continue
 			}
-			places = append(places, b.lowerExpressionToPlace(inner))
+			places = append(places, builder.lowerExpressionToPlace(inner))
 		default:
-			places = append(places, b.lowerExpressionToPlace(child))
+			places = append(places, builder.lowerExpressionToPlace(child))
 		}
 	}
 	return places
@@ -845,36 +845,36 @@ func jsxOpeningParts(opening *ast.Node) (*ast.Node, *ast.Node) {
 //
 // TypeScript represents `const {a} = o` and `({a} = o)` with different node kinds - a binding
 // pattern and an object literal - so both are handled here and produce the same structure.
-func (b *builder) lowerPattern(node *ast.Node) Pattern {
+func (builder *builder) lowerPattern(node *ast.Node) Pattern {
 	if node == nil {
-		return &PlacePattern{Place: b.newTemporary(nil)}
+		return &PlacePattern{Place: builder.newTemporary(nil)}
 	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return &PlacePattern{Place: b.bind(node.Text(), b.symbolOf(node), node)}
+		return &PlacePattern{Place: builder.bind(node.Text(), builder.symbolOf(node), node)}
 
 	case ast.KindObjectBindingPattern:
-		return b.lowerObjectBindingPattern(node)
+		return builder.lowerObjectBindingPattern(node)
 
 	case ast.KindArrayBindingPattern:
-		return b.lowerArrayBindingPattern(node)
+		return builder.lowerArrayBindingPattern(node)
 
 	case ast.KindObjectLiteralExpression:
-		return b.lowerObjectAssignmentPattern(node)
+		return builder.lowerObjectAssignmentPattern(node)
 
 	case ast.KindArrayLiteralExpression:
-		return b.lowerArrayAssignmentPattern(node)
+		return builder.lowerArrayAssignmentPattern(node)
 
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 		// `({a: o.x} = v)` targets a property rather than a binding.
-		return &PlacePattern{Place: b.lowerExpressionToPlace(node)}
+		return &PlacePattern{Place: builder.lowerExpressionToPlace(node)}
 	}
 
-	return &PlacePattern{Place: b.newTemporary(node)}
+	return &PlacePattern{Place: builder.newTemporary(node)}
 }
 
-func (b *builder) lowerObjectBindingPattern(node *ast.Node) Pattern {
+func (builder *builder) lowerObjectBindingPattern(node *ast.Node) Pattern {
 	pattern := node.AsBindingPattern()
 	result := &ObjectPattern{}
 
@@ -883,7 +883,7 @@ func (b *builder) lowerObjectBindingPattern(node *ast.Node) Pattern {
 		if binding.DotDotDotToken != nil {
 			name := binding.Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), b.symbolOf(name), name)
+				place := builder.bind(name.Text(), builder.symbolOf(name), name)
 				result.Rest = &place
 			}
 			continue
@@ -892,7 +892,7 @@ func (b *builder) lowerObjectBindingPattern(node *ast.Node) Pattern {
 		property := ObjectPatternProperty{}
 		if binding.PropertyName != nil {
 			if binding.PropertyName.Kind == ast.KindComputedPropertyName {
-				key := b.lowerExpressionToPlace(binding.PropertyName.AsComputedPropertyName().Expression)
+				key := builder.lowerExpressionToPlace(binding.PropertyName.AsComputedPropertyName().Expression)
 				property.ComputedKey = &key
 			} else {
 				property.Key = binding.PropertyName.Text()
@@ -902,17 +902,17 @@ func (b *builder) lowerObjectBindingPattern(node *ast.Node) Pattern {
 		}
 
 		if binding.Initializer != nil {
-			value := b.lowerExpressionToPlace(binding.Initializer)
+			value := builder.lowerExpressionToPlace(binding.Initializer)
 			property.Default = &value
 		}
-		property.Value = b.lowerPattern(binding.Name())
+		property.Value = builder.lowerPattern(binding.Name())
 		result.Properties = append(result.Properties, property)
 	}
 
 	return result
 }
 
-func (b *builder) lowerArrayBindingPattern(node *ast.Node) Pattern {
+func (builder *builder) lowerArrayBindingPattern(node *ast.Node) Pattern {
 	pattern := node.AsBindingPattern()
 	result := &ArrayPattern{}
 
@@ -935,24 +935,24 @@ func (b *builder) lowerArrayBindingPattern(node *ast.Node) Pattern {
 		if binding.DotDotDotToken != nil {
 			name := binding.Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), b.symbolOf(name), name)
+				place := builder.bind(name.Text(), builder.symbolOf(name), name)
 				result.Rest = &place
 			}
 			continue
 		}
 		item := ArrayPatternElement{}
 		if binding.Initializer != nil {
-			value := b.lowerExpressionToPlace(binding.Initializer)
+			value := builder.lowerExpressionToPlace(binding.Initializer)
 			item.Default = &value
 		}
-		item.Value = b.lowerPattern(binding.Name())
+		item.Value = builder.lowerPattern(binding.Name())
 		result.Elements = append(result.Elements, item)
 	}
 
 	return result
 }
 
-func (b *builder) lowerObjectAssignmentPattern(node *ast.Node) Pattern {
+func (builder *builder) lowerObjectAssignmentPattern(node *ast.Node) Pattern {
 	expression := node.AsObjectLiteralExpression()
 	result := &ObjectPattern{}
 
@@ -960,10 +960,10 @@ func (b *builder) lowerObjectAssignmentPattern(node *ast.Node) Pattern {
 		switch property.Kind {
 		case ast.KindPropertyAssignment:
 			assignment := property.AsPropertyAssignment()
-			item := ObjectPatternProperty{Value: b.lowerPattern(assignment.Initializer)}
+			item := ObjectPatternProperty{Value: builder.lowerPattern(assignment.Initializer)}
 			if name := assignment.Name(); name != nil {
 				if name.Kind == ast.KindComputedPropertyName {
-					key := b.lowerExpressionToPlace(name.AsComputedPropertyName().Expression)
+					key := builder.lowerExpressionToPlace(name.AsComputedPropertyName().Expression)
 					item.ComputedKey = &key
 				} else {
 					item.Key = name.Text()
@@ -974,9 +974,9 @@ func (b *builder) lowerObjectAssignmentPattern(node *ast.Node) Pattern {
 		case ast.KindShorthandPropertyAssignment:
 			assignment := property.AsShorthandPropertyAssignment()
 			name := assignment.Name()
-			item := ObjectPatternProperty{Key: name.Text(), Value: b.lowerPattern(name)}
+			item := ObjectPatternProperty{Key: name.Text(), Value: builder.lowerPattern(name)}
 			if assignment.ObjectAssignmentInitializer != nil {
-				value := b.lowerExpressionToPlace(assignment.ObjectAssignmentInitializer)
+				value := builder.lowerExpressionToPlace(assignment.ObjectAssignmentInitializer)
 				item.Default = &value
 			}
 			result.Properties = append(result.Properties, item)
@@ -984,7 +984,7 @@ func (b *builder) lowerObjectAssignmentPattern(node *ast.Node) Pattern {
 		case ast.KindSpreadAssignment:
 			target := property.AsSpreadAssignment().Expression
 			if target != nil && target.Kind == ast.KindIdentifier {
-				place := b.bind(target.Text(), b.symbolOf(target), target)
+				place := builder.bind(target.Text(), builder.symbolOf(target), target)
 				result.Rest = &place
 			}
 		}
@@ -993,7 +993,7 @@ func (b *builder) lowerObjectAssignmentPattern(node *ast.Node) Pattern {
 	return result
 }
 
-func (b *builder) lowerArrayAssignmentPattern(node *ast.Node) Pattern {
+func (builder *builder) lowerArrayAssignmentPattern(node *ast.Node) Pattern {
 	expression := node.AsArrayLiteralExpression()
 	result := &ArrayPattern{}
 
@@ -1004,18 +1004,18 @@ func (b *builder) lowerArrayAssignmentPattern(node *ast.Node) Pattern {
 		case ast.KindSpreadElement:
 			target := element.AsSpreadElement().Expression
 			if target != nil && target.Kind == ast.KindIdentifier {
-				place := b.bind(target.Text(), b.symbolOf(target), target)
+				place := builder.bind(target.Text(), builder.symbolOf(target), target)
 				result.Rest = &place
 			}
 		case ast.KindBinaryExpression:
 			// `[a = 1] = xs`.
 			binary := element.AsBinaryExpression()
-			item := ArrayPatternElement{Value: b.lowerPattern(binary.Left)}
-			value := b.lowerExpressionToPlace(binary.Right)
+			item := ArrayPatternElement{Value: builder.lowerPattern(binary.Left)}
+			value := builder.lowerExpressionToPlace(binary.Right)
 			item.Default = &value
 			result.Elements = append(result.Elements, item)
 		default:
-			result.Elements = append(result.Elements, ArrayPatternElement{Value: b.lowerPattern(element)})
+			result.Elements = append(result.Elements, ArrayPatternElement{Value: builder.lowerPattern(element)})
 		}
 	}
 

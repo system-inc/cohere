@@ -48,20 +48,20 @@ func newTestFunction() *testFunction {
 	return &testFunction{table: map[ssa.BlockId]*testBlock{}, next: 1}
 }
 
-func (f *testFunction) block() *testBlock {
-	block := &testBlock{id: f.next}
-	f.next++
-	f.blocks = append(f.blocks, block)
-	f.table[block.id] = block
-	if f.entry == 0 {
-		f.entry = block.id
+func (function *testFunction) block() *testBlock {
+	block := &testBlock{id: function.next}
+	function.next++
+	function.blocks = append(function.blocks, block)
+	function.table[block.id] = block
+	if function.entry == 0 {
+		function.entry = block.id
 	}
 	return block
 }
 
 // add appends an instruction to a block.
-func (b *testBlock) add(instruction *testInstruction) *testInstruction {
-	b.instructions = append(b.instructions, instruction)
+func (block *testBlock) add(instruction *testInstruction) *testInstruction {
+	block.instructions = append(block.instructions, instruction)
 	return instruction
 }
 

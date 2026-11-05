@@ -89,10 +89,10 @@ type liveIdentifiers struct {
 }
 
 // reference marks a value as read.
-func (l *liveIdentifiers) reference(function *Function, id static_single_assignment.IdentifierId) {
-	l.identifiers[id] = true
+func (identifiers *liveIdentifiers) reference(function *Function, id static_single_assignment.IdentifierId) {
+	identifiers.identifiers[id] = true
 	if identifier := function.Identifiers[id]; identifier != nil && identifier.Name != "" {
-		l.named[identifier.Name] = true
+		identifiers.named[identifier.Name] = true
 	}
 }
 
@@ -109,17 +109,17 @@ func (l *liveIdentifiers) reference(function *Function, id static_single_assignm
 // version whose name is read later leaves that read resolving to nothing, which is a miscompile
 // rather than a lost optimisation. The verdict EXPIRES the moment this runs anywhere later in the
 // pipeline, where named reassignments are live across versions.
-func (l *liveIdentifiers) usedByIdOrName(function *Function, id static_single_assignment.IdentifierId) bool {
-	if l.identifiers[id] {
+func (identifiers *liveIdentifiers) usedByIdOrName(function *Function, id static_single_assignment.IdentifierId) bool {
+	if identifiers.identifiers[id] {
 		return true
 	}
 	identifier := function.Identifiers[id]
-	return identifier != nil && identifier.Name != "" && l.named[identifier.Name]
+	return identifier != nil && identifier.Name != "" && identifiers.named[identifier.Name]
 }
 
 // usedById reports whether this exact value is read, ignoring its name.
-func (l *liveIdentifiers) usedById(id static_single_assignment.IdentifierId) bool {
-	return l.identifiers[id]
+func (identifiers *liveIdentifiers) usedById(id static_single_assignment.IdentifierId) bool {
+	return identifiers.identifiers[id]
 }
 
 // findReferencedIdentifiers marks every value some surviving instruction reads.

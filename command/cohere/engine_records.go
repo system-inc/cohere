@@ -280,7 +280,7 @@ func newEngineRun(
 }
 
 // accept renders one line of the engine's stdout.
-func (r *engineRun) accept(line []byte) error {
+func (run *engineRun) accept(line []byte) error {
 	var envelope struct {
 		Kind string `json:"kind"`
 	}
@@ -288,38 +288,38 @@ func (r *engineRun) accept(line []byte) error {
 		return fmt.Errorf("a line that is not a record: %q (%w)", truncateForError(line), decodeError)
 	}
 
-	if r.summary != nil {
+	if run.summary != nil {
 		return fmt.Errorf("a %q record after the summary, which is always last", envelope.Kind)
 	}
-	if r.provenance == nil && envelope.Kind != "provenance" {
+	if run.provenance == nil && envelope.Kind != "provenance" {
 		return fmt.Errorf("the first record was %q, and provenance is always first", envelope.Kind)
 	}
 
 	switch envelope.Kind {
 	case "provenance":
-		return decodeRecord(line, &engineProvenanceRecord{}, r.acceptProvenance)
+		return decodeRecord(line, &engineProvenanceRecord{}, run.acceptProvenance)
 	case "project":
-		return decodeRecord(line, &engineProjectRecord{}, r.acceptProject)
+		return decodeRecord(line, &engineProjectRecord{}, run.acceptProject)
 	case "unreadable":
-		return decodeRecord(line, &engineUnreadableRecord{}, r.acceptUnreadable)
+		return decodeRecord(line, &engineUnreadableRecord{}, run.acceptUnreadable)
 	case "finding":
-		return decodeRecord(line, &engineFindingRecord{}, r.acceptFinding)
+		return decodeRecord(line, &engineFindingRecord{}, run.acceptFinding)
 	case "fix":
-		return decodeRecord(line, &engineFixRecord{}, r.acceptFix)
+		return decodeRecord(line, &engineFixRecord{}, run.acceptFix)
 	case "types":
-		return decodeRecord(line, &engineTypesRecord{}, r.acceptTypes)
+		return decodeRecord(line, &engineTypesRecord{}, run.acceptTypes)
 	case "lint":
-		return decodeRecord(line, &engineLintRecord{}, r.acceptLint)
+		return decodeRecord(line, &engineLintRecord{}, run.acceptLint)
 	case "phase":
-		return decodeRecord(line, &enginePhaseRecord{}, r.acceptPhase)
+		return decodeRecord(line, &enginePhaseRecord{}, run.acceptPhase)
 	case "rule":
-		return decodeRecord(line, &engineRuleRecord{}, r.acceptRule)
+		return decodeRecord(line, &engineRuleRecord{}, run.acceptRule)
 	case "unused":
-		return decodeRecord(line, &engineUnusedRecord{}, r.acceptUnused)
+		return decodeRecord(line, &engineUnusedRecord{}, run.acceptUnused)
 	case "unusedCoverage":
-		return decodeRecord(line, &engineUnusedCoverageRecord{}, r.acceptUnusedCoverage)
+		return decodeRecord(line, &engineUnusedCoverageRecord{}, run.acceptUnusedCoverage)
 	case "summary":
-		return decodeRecord(line, &engineSummaryRecord{}, r.acceptSummary)
+		return decodeRecord(line, &engineSummaryRecord{}, run.acceptSummary)
 	default:
 		// An unknown kind is refused rather than ignored: it is a record this front door cannot render,
 		// so whatever it carried would reach nobody.
@@ -335,8 +335,8 @@ func decodeRecord[Record any](line []byte, record *Record, accept func(*Record) 
 	return accept(record)
 }
 
-func (r *engineRun) acceptProvenance(record *engineProvenanceRecord) error {
-	if r.provenance != nil {
+func (run *engineRun) acceptProvenance(record *engineProvenanceRecord) error {
+	if run.provenance != nil {
 		return fmt.Errorf("a second provenance record")
 	}
 	// Checked here as well as by the engine against `--contract`, because the flag and the record are
@@ -348,67 +348,67 @@ func (r *engineRun) acceptProvenance(record *engineProvenanceRecord) error {
 		}
 		return fmt.Errorf("the engine speaks contract %s and this front door speaks contract %d", spoken, engineContractVersion)
 	}
-	r.provenance = record
-	r.report.engineSourceTreeModified = record.SourceTreeModified
+	run.provenance = record
+	run.report.engineSourceTreeModified = record.SourceTreeModified
 	return nil
 }
 
-func (r *engineRun) acceptProject(record *engineProjectRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("a project record in a %s run", r.mode)
+func (run *engineRun) acceptProject(record *engineProjectRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a project record in a %s run", run.mode)
 	}
-	if r.project != nil {
+	if run.project != nil {
 		return fmt.Errorf("a second project record")
 	}
-	r.project = record
+	run.project = record
 
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
 	line := fmt.Sprintf("%s described in %s: %d %s in the %s, %d of them ours",
-		r.language.Container, round(elapsed), record.FilesInPackage, r.language.FileNoun, r.language.Container,
+		run.language.Container, round(elapsed), record.FilesInPackage, run.language.FileNoun, run.language.Container,
 		record.FilesOurs)
 	if record.FilesInScope != record.FilesOurs || record.ScopeDescription != "" {
 		line += fmt.Sprintf(", %d in scope (%s)", record.FilesInScope, record.ScopeDescription)
 	}
-	fmt.Fprintln(accountOutput(r.out), line)
-	streams.Show(r.out)
+	fmt.Fprintln(accountOutput(run.out), line)
+	streams.Show(run.out)
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, record.FilesInScope
 	activeSummary.Gaps.NothingToCheck = record.FilesInScope == 0
 
-	r.report.graph = elapsed
-	r.report.filesInScope = record.FilesInScope
-	r.report.filesInProgram = record.FilesOurs
+	run.report.graph = elapsed
+	run.report.filesInScope = record.FilesInScope
+	run.report.filesInProgram = record.FilesOurs
 	return nil
 }
 
 // acceptUnreadable holds a file nothing checked, to be named with the excluded files and counted as a
 // gap. Its place is fixed, after the project and before the first phase, so the files a run could not
 // read are all known before any phase reports on the files it could.
-func (r *engineRun) acceptUnreadable(record *engineUnreadableRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("an unreadable record in a %s run", r.mode)
+func (run *engineRun) acceptUnreadable(record *engineUnreadableRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("an unreadable record in a %s run", run.mode)
 	}
-	if r.project == nil {
+	if run.project == nil {
 		return fmt.Errorf("an unreadable record before the project record")
 	}
-	if r.nextPhase > 0 {
-		return fmt.Errorf("an unreadable record after phase %s, and contract 2 places them before the first phase", phaseOrder[r.nextPhase-1])
+	if run.nextPhase > 0 {
+		return fmt.Errorf("an unreadable record after phase %s, and contract 2 places them before the first phase", phaseOrder[run.nextPhase-1])
 	}
 	if record.File == "" {
 		return fmt.Errorf("an unreadable record with no file")
 	}
-	r.unreadable = append(r.unreadable, *record)
+	run.unreadable = append(run.unreadable, *record)
 	return nil
 }
 
-func (r *engineRun) acceptFinding(record *engineFindingRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("a finding record in a %s run", r.mode)
+func (run *engineRun) acceptFinding(record *engineFindingRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a finding record in a %s run", run.mode)
 	}
 	if record.File == "" || record.Line < 1 || record.Column < 1 {
 		return fmt.Errorf("a finding with no position (file %q, line %d, column %d)", record.File, record.Line, record.Column)
 	}
-	r.findings++
-	r.findingsInPhase++
+	run.findings++
+	run.findingsInPhase++
 	// A compiler finding is a type error, as the TypeScript run counts its own; the rest are findings.
 	// The contract spells the severities error and warning; the view spells a warning warn, as the settings do.
 	severity := "error"
@@ -421,12 +421,12 @@ func (r *engineRun) acceptFinding(record *engineFindingRecord) error {
 		if rule != "" {
 			rule = "#" + rule
 		} else {
-			rule = r.language.CompilerLabel
+			rule = run.language.CompilerLabel
 		}
 	} else {
 		activeSummary.Findings++
 	}
-	printFinding(r.out,
+	printFinding(run.out,
 		runFinding{Path: record.File, Line: record.Line, Column: record.Column, Severity: severity, Rule: rule, MessageID: messageID, Message: singleLineDescription(record.Message)},
 		engineFindingLine(record)+"\n")
 	return nil
@@ -453,57 +453,57 @@ func engineFindingLine(record *engineFindingRecord) string {
 
 // unusedPlace refuses an --unused report record anywhere but between the lint phase record and the
 // unused one, where the contract puts the report.
-func (r *engineRun) unusedPlace(kind string) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("an %s record in a %s run", kind, r.mode)
+func (run *engineRun) unusedPlace(kind string) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("an %s record in a %s run", kind, run.mode)
 	}
-	if r.nextPhase >= len(phaseOrder) || phaseOrder[r.nextPhase] != phaseUnused {
+	if run.nextPhase >= len(phaseOrder) || phaseOrder[run.nextPhase] != phaseUnused {
 		return fmt.Errorf("an %s record outside the unused phase, which comes after lint", kind)
 	}
 	return nil
 }
 
-func (r *engineRun) acceptUnused(record *engineUnusedRecord) error {
-	if unusedPlaceError := r.unusedPlace("unused"); unusedPlaceError != nil {
+func (run *engineRun) acceptUnused(record *engineUnusedRecord) error {
+	if unusedPlaceError := run.unusedPlace("unused"); unusedPlaceError != nil {
 		return unusedPlaceError
 	}
 	if record.File == "" || record.Line < 1 || record.Column < 1 || record.Rule == "" || record.Subject == "" {
 		return fmt.Errorf("an unused record missing its file, position, rule or subject (file %q, line %d, column %d, rule %q)",
 			record.File, record.Line, record.Column, record.Rule)
 	}
-	r.unusedPending = append(r.unusedPending, *record)
+	run.unusedPending = append(run.unusedPending, *record)
 	return nil
 }
 
 // acceptUnusedCoverage prints one rule's section of the report: its items, counted and sorted, then what
 // it looked at and what it could not.
-func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) error {
-	if unusedPlaceError := r.unusedPlace("unusedCoverage"); unusedPlaceError != nil {
+func (run *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) error {
+	if unusedPlaceError := run.unusedPlace("unusedCoverage"); unusedPlaceError != nil {
 		return unusedPlaceError
 	}
 	if record.Rule == "" || record.Found == nil {
 		return fmt.Errorf("an unusedCoverage record missing its rule or found count")
 	}
 	items := []engineUnusedRecord{}
-	for _, pending := range r.unusedPending {
+	for _, pending := range run.unusedPending {
 		if pending.Rule == record.Rule {
 			items = append(items, pending)
 		}
 	}
-	if len(items) != len(r.unusedPending) {
+	if len(items) != len(run.unusedPending) {
 		return fmt.Errorf("unused records of another rule arrived before the coverage record for %s", record.Rule)
 	}
 	if *record.Found != len(items) {
 		return fmt.Errorf("the unusedCoverage record for %s counts %d found and %d unused records came with it", record.Rule, *record.Found, len(items))
 	}
-	r.unusedPending = nil
-	r.unusedCoverage++
+	run.unusedPending = nil
+	run.unusedCoverage++
 
 	// The dashes here and in the items below are escaped, not changed: the report is in the TypeScript unused
 	// report's shape (internal/unused_exports/report.go, swift/Contract.md), so the two print the same bytes.
-	if !r.unusedHeadingPrinted {
-		r.unusedHeadingPrinted = true
-		fmt.Fprintf(r.out, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")
+	if !run.unusedHeadingPrinted {
+		run.unusedHeadingPrinted = true
+		fmt.Fprintf(run.out, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")
 	}
 	// File, line, then column, so two items on one line print in the same order on every run.
 	sort.SliceStable(items, func(first, second int) bool {
@@ -516,17 +516,17 @@ func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) err
 		return items[first].Column < items[second].Column
 	})
 	if len(items) > 0 {
-		fmt.Fprintf(r.out, "\n  %s \u2014 %d\n", swiftUnusedSection(record.Rule), len(items))
+		fmt.Fprintf(run.out, "\n  %s \u2014 %d\n", swiftUnusedSection(record.Rule), len(items))
 		for _, item := range items {
-			fmt.Fprintf(r.out, "    %s:%d:%d \u2014 %s\n", item.File, item.Line, item.Column, item.Subject)
+			fmt.Fprintf(run.out, "    %s:%d:%d \u2014 %s\n", item.File, item.Line, item.Column, item.Subject)
 		}
 	}
-	fmt.Fprintf(r.out, "  looked at %d files and %d %s (%s)\n", record.FilesChecked, record.Checked, swiftUnusedNoun(record.Rule), record.Rule)
+	fmt.Fprintf(run.out, "  looked at %d files and %d %s (%s)\n", record.FilesChecked, record.Checked, swiftUnusedNoun(record.Rule), record.Rule)
 	for _, reason := range sortedKeys(record.FilesNotChecked) {
-		fmt.Fprintf(r.out, "  not checked for unused %s: %d files (%s)\n", swiftUnusedNoun(record.Rule), record.FilesNotChecked[reason], reason)
+		fmt.Fprintf(run.out, "  not checked for unused %s: %d files (%s)\n", swiftUnusedNoun(record.Rule), record.FilesNotChecked[reason], reason)
 	}
 	for _, reason := range sortedKeys(record.Skipped) {
-		fmt.Fprintf(r.out, "  never reported: %d %s (%s)\n", record.Skipped[reason], swiftUnusedNoun(record.Rule), reason)
+		fmt.Fprintf(run.out, "  never reported: %d %s (%s)\n", record.Skipped[reason], swiftUnusedNoun(record.Rule), reason)
 	}
 	return nil
 }
@@ -564,9 +564,9 @@ func sortedKeys(counts map[string]int) []string {
 	return keys
 }
 
-func (r *engineRun) acceptFix(record *engineFixRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("a fix record in a %s run", r.mode)
+func (run *engineRun) acceptFix(record *engineFixRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a fix record in a %s run", run.mode)
 	}
 	// The engine's numbers fed to the summary the TypeScript run prints, so the line and its rules
 	// (the refusal breakdown beside the refusal count, formatting counted apart from fixes) are the
@@ -581,35 +581,35 @@ func (r *engineRun) acceptFix(record *engineFixRecord) error {
 		FilesTransformSkipped: record.FilesNotFormatted,
 		TransformSkipReasons:  record.NotFormattedReasons,
 	}
-	fmt.Fprintln(accountOutput(r.out), summary.String())
-	fmt.Fprintf(accountOutput(r.out), "format scope: %s\n", record.FormatScope)
+	fmt.Fprintln(accountOutput(run.out), summary.String())
+	fmt.Fprintf(accountOutput(run.out), "format scope: %s\n", record.FormatScope)
 
 	// An engine from before the list sends none, and the run then states the counts alone: the footer
 	// leaves out a cohered count it was not given, rather than print a zero it does not know.
 	if record.ChangedFiles == nil {
-		streams.Show(r.out)
+		streams.Show(run.out)
 		return nil
 	}
-	changed, changedFilesError := r.changedFiles(*record.ChangedFiles, record.FilesRewritten)
+	changed, changedFilesError := run.changedFiles(*record.ChangedFiles, record.FilesRewritten)
 	if changedFilesError != nil {
 		return changedFilesError
 	}
 	activeSummary.Changed = changed
-	printChangedFiles(r.out, changed)
-	streams.Show(r.out)
+	printChangedFiles(run.out, changed)
+	streams.Show(run.out)
 	return nil
 }
 
 // changedFiles turns the fix record's list into the summary's, each path relative to the project root as a
 // TypeScript run's are. It refuses a list whose length differs from the count the record states, a file
 // named twice, and a file that neither a fix nor the formatter changed, since "N cohered" must be the list.
-func (r *engineRun) changedFiles(files []engineChangedFile, rewritten int) ([]changedFile, error) {
+func (run *engineRun) changedFiles(files []engineChangedFile, rewritten int) ([]changedFile, error) {
 	if len(files) != rewritten {
 		return nil, fmt.Errorf("the fix record counts %d files rewritten and lists %d", rewritten, len(files))
 	}
 	root := ""
-	if r.project != nil {
-		root = r.project.Root
+	if run.project != nil {
+		root = run.project.Root
 	}
 	seen := map[string]bool{}
 	changed := make([]changedFile, 0, len(files))
@@ -635,36 +635,36 @@ func (r *engineRun) changedFiles(files []engineChangedFile, rewritten int) ([]ch
 	return changed, nil
 }
 
-func (r *engineRun) acceptTypes(record *engineTypesRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("a types record in a %s run", r.mode)
+func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a types record in a %s run", run.mode)
 	}
-	if record.Diagnostics != r.findingsInPhase {
-		return fmt.Errorf("the types record counts %d diagnostics and %d finding records came with it", record.Diagnostics, r.findingsInPhase)
+	if record.Diagnostics != run.findingsInPhase {
+		return fmt.Errorf("the types record counts %d diagnostics and %d finding records came with it", record.Diagnostics, run.findingsInPhase)
 	}
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
-	fmt.Fprintf(accountOutput(r.out), "types: %d diagnostics over %d files in %s\n", record.Diagnostics, record.Files, round(elapsed))
+	fmt.Fprintf(accountOutput(run.out), "types: %d diagnostics over %d files in %s\n", record.Diagnostics, record.Files, round(elapsed))
 
 	// The compiler checks the whole module whatever the scope, so a scoped run's types line covers more
 	// than the scope does. Said, so the larger number does not read as a scope that leaked.
-	if r.project != nil && record.Files != r.project.FilesInScope {
-		fmt.Fprintf(accountOutput(r.out), "  types: covered the whole %s, not only the %d files in scope\n",
-			r.language.Container, r.project.FilesInScope)
+	if run.project != nil && record.Files != run.project.FilesInScope {
+		fmt.Fprintf(accountOutput(run.out), "  types: covered the whole %s, not only the %d files in scope\n",
+			run.language.Container, run.project.FilesInScope)
 	}
 	for _, file := range record.FilesWithoutRecord {
-		fmt.Fprintf(accountOutput(r.out), "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
+		fmt.Fprintf(accountOutput(run.out), "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
 	}
-	r.filesWithoutRecord += len(record.FilesWithoutRecord)
-	streams.Show(r.out)
+	run.filesWithoutRecord += len(record.FilesWithoutRecord)
+	streams.Show(run.out)
 	return nil
 }
 
-func (r *engineRun) acceptLint(record *engineLintRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("a lint record in a %s run", r.mode)
+func (run *engineRun) acceptLint(record *engineLintRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a lint record in a %s run", run.mode)
 	}
-	if record.Findings != r.findingsInPhase {
-		return fmt.Errorf("the lint record counts %d findings and %d finding records came with it", record.Findings, r.findingsInPhase)
+	if record.Findings != run.findingsInPhase {
+		return fmt.Errorf("the lint record counts %d findings and %d finding records came with it", record.Findings, run.findingsInPhase)
 	}
 
 	walkCost := fmt.Sprintf("in %s", round(time.Duration(record.ElapsedMilliseconds)*time.Millisecond))
@@ -673,7 +673,7 @@ func (r *engineRun) acceptLint(record *engineLintRecord) error {
 	}
 	// The dash is escaped, not changed: it is the TypeScript run's lint line, which internal/differential finds
 	// by it. See writeLintReport.
-	fmt.Fprintf(accountOutput(r.out), "lint: %d findings \u2014 %d rules over %d files, %d nodes visited, %s\n",
+	fmt.Fprintf(accountOutput(run.out), "lint: %d findings \u2014 %d rules over %d files, %d nodes visited, %s\n",
 		record.Findings, record.RulesRun, record.FilesWalked, record.NodesVisited, walkCost)
 	activeSummary.Rules = record.RulesRun
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked
@@ -687,14 +687,14 @@ func (r *engineRun) acceptLint(record *engineLintRecord) error {
 	if classifyEngineCoverageError != nil {
 		return classifyEngineCoverageError
 	}
-	writeCoverage(accountOutput(r.out), summary, r.details)
-	r.crashes += len(record.Crashes)
+	writeCoverage(accountOutput(run.out), summary, run.details)
+	run.crashes += len(record.Crashes)
 
 	if record.ConfigNote != "" {
-		fmt.Fprintf(accountOutput(r.out), "  %s\n", record.ConfigNote)
+		fmt.Fprintf(accountOutput(run.out), "  %s\n", record.ConfigNote)
 	}
-	r.writeExcluded()
-	streams.Show(r.out)
+	run.writeExcluded()
+	streams.Show(run.out)
 	return nil
 }
 
@@ -777,11 +777,11 @@ const excludedNamedLimit = 5
 // `vendored under Vendor/` between the lint line and the verdict, which buries the two lines a reader
 // must act on under a hundred that say one thing. A few files are named, because one file left out
 // for a surprising reason is the case worth seeing; a hundred for the same reason are one fact.
-func (r *engineRun) writeExcluded() {
-	if r.excludedPrinted || r.project == nil {
+func (run *engineRun) writeExcluded() {
+	if run.excludedPrinted || run.project == nil {
 		return
 	}
-	r.excludedPrinted = true
+	run.excludedPrinted = true
 
 	filesByReason := map[string][]string{}
 	reasons := []string{}
@@ -791,35 +791,35 @@ func (r *engineRun) writeExcluded() {
 		}
 		filesByReason[reason] = append(filesByReason[reason], file)
 	}
-	for _, excluded := range r.project.Excluded {
+	for _, excluded := range run.project.Excluded {
 		add(excluded.File, excluded.Reason)
 	}
 	// A file the engine could not read is printed the way an excluded file is, because to a reader it is
 	// the same fact: a file nothing checked, and why.
-	for _, unreadable := range r.unreadable {
+	for _, unreadable := range run.unreadable {
 		add(unreadable.File, "could not be read: "+unreadable.Error)
 	}
 	sort.Strings(reasons)
 	for _, reason := range reasons {
 		files := filesByReason[reason]
 		if len(files) > excludedNamedLimit {
-			fmt.Fprintf(accountOutput(r.out), "  not checked: %d files (%s)\n", len(files), reason)
+			fmt.Fprintf(accountOutput(run.out), "  not checked: %d files (%s)\n", len(files), reason)
 			continue
 		}
 		for _, file := range files {
-			fmt.Fprintf(accountOutput(r.out), "  not checked: %s (%s)\n", file, reason)
+			fmt.Fprintf(accountOutput(run.out), "  not checked: %s (%s)\n", file, reason)
 		}
 	}
 }
 
-func (r *engineRun) acceptPhase(record *enginePhaseRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("a phase record in a %s run", r.mode)
+func (run *engineRun) acceptPhase(record *enginePhaseRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a phase record in a %s run", run.mode)
 	}
-	if r.nextPhase >= len(phaseOrder) || string(phaseOrder[r.nextPhase]) != record.Name {
+	if run.nextPhase >= len(phaseOrder) || string(phaseOrder[run.nextPhase]) != record.Name {
 		expected := "nothing more"
-		if r.nextPhase < len(phaseOrder) {
-			expected = string(phaseOrder[r.nextPhase])
+		if run.nextPhase < len(phaseOrder) {
+			expected = string(phaseOrder[run.nextPhase])
 		}
 		return fmt.Errorf("a phase record for %q where the pipeline order expects %s", record.Name, expected)
 	}
@@ -827,21 +827,21 @@ func (r *engineRun) acceptPhase(record *enginePhaseRecord) error {
 	if !known {
 		return fmt.Errorf("phase %s has outcome %q, which is not one of ran, skipped, notReached, reused", record.Name, record.Outcome)
 	}
-	if phaseOrder[r.nextPhase] == phaseUnused {
-		if len(r.unusedPending) > 0 {
-			return fmt.Errorf("%d unused records arrived with no unusedCoverage record to count them", len(r.unusedPending))
+	if phaseOrder[run.nextPhase] == phaseUnused {
+		if len(run.unusedPending) > 0 {
+			return fmt.Errorf("%d unused records arrived with no unusedCoverage record to count them", len(run.unusedPending))
 		}
-		if record.Outcome == "ran" && r.unusedCoverage == 0 {
+		if record.Outcome == "ran" && run.unusedCoverage == 0 {
 			return fmt.Errorf("the unused phase ran and no unusedCoverage record said what it looked at")
 		}
 	}
-	name := phaseOrder[r.nextPhase]
-	if r.requested[name] && skippedAsNotRequested(phaseRecord{Outcome: outcome, Detail: record.Detail}) {
+	name := phaseOrder[run.nextPhase]
+	if run.requested[name] && skippedAsNotRequested(phaseRecord{Outcome: outcome, Detail: record.Detail}) {
 		return fmt.Errorf("the %s phase was asked for, and the engine skipped it as %q", name, record.Detail)
 	}
-	r.nextPhase++
-	r.findingsInPhase = 0
-	r.report.record(name, outcome, time.Duration(record.ElapsedMilliseconds)*time.Millisecond, record.Detail)
+	run.nextPhase++
+	run.findingsInPhase = 0
+	run.report.record(name, outcome, time.Duration(record.ElapsedMilliseconds)*time.Millisecond, record.Detail)
 	return nil
 }
 
@@ -864,67 +864,67 @@ func engineRequestedPhases(given map[string]bool, value func(string) string) map
 	}
 }
 
-func (r *engineRun) acceptRule(record *engineRuleRecord) error {
-	if r.mode != engineModeRules && r.mode != engineModeRulesEnabled {
-		return fmt.Errorf("a rule record in a %s run", r.mode)
+func (run *engineRun) acceptRule(record *engineRuleRecord) error {
+	if run.mode != engineModeRules && run.mode != engineModeRulesEnabled {
+		return fmt.Errorf("a rule record in a %s run", run.mode)
 	}
-	r.rules = append(r.rules, *record)
+	run.rules = append(run.rules, *record)
 	return nil
 }
 
-func (r *engineRun) acceptSummary(record *engineSummaryRecord) error {
-	if r.mode != engineModeCheck {
-		return fmt.Errorf("a summary record in a %s run", r.mode)
+func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("a summary record in a %s run", run.mode)
 	}
 	if record.Findings == nil || record.Complete == nil || record.ExitCode == nil {
 		return fmt.Errorf("a summary missing findings, complete or exitCode")
 	}
-	if r.nextPhase != len(phaseOrder) {
+	if run.nextPhase != len(phaseOrder) {
 		// The reason markRemainingNotReached exists: a phase absent from the report reads the same as
 		// one the reporter forgot.
-		return fmt.Errorf("a summary with no record for phase %s", phaseOrder[r.nextPhase])
+		return fmt.Errorf("a summary with no record for phase %s", phaseOrder[run.nextPhase])
 	}
-	if *record.Findings != r.findings {
-		return fmt.Errorf("the summary counts %d findings and %d finding records arrived", *record.Findings, r.findings)
+	if *record.Findings != run.findings {
+		return fmt.Errorf("the summary counts %d findings and %d finding records arrived", *record.Findings, run.findings)
 	}
 
 	// The two views of completeness are compared in one direction only. Where the records show a gap
 	// and the summary claims none, the engine is printing green over work it did not do, which is the
 	// failure this tool exists to stop, and the run is refused. The other direction is allowed: an engine
 	// that says it fell short is believed, even where no record shows the gap.
-	namedGaps := r.filesWithoutRecord > 0 || r.crashes > 0 || len(r.unreadable) > 0
+	namedGaps := run.filesWithoutRecord > 0 || run.crashes > 0 || len(run.unreadable) > 0
 	// Judged by the phases the caller asked for: `complete` means every requested phase ran, so `--lint`
 	// with fix and types skipped as not requested is complete. Any other skip is still a gap.
-	gapInRecords := !r.report.checkedEveryRequestedPhase() || namedGaps
+	gapInRecords := !run.report.checkedEveryRequestedPhase() || namedGaps
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
-	if !*record.Complete && r.report.checkedEveryRequestedPhase() {
+	if !*record.Complete && run.report.checkedEveryRequestedPhase() {
 		if namedGaps {
-			r.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
-			activeSummary.Gaps.Unread = engineUncheckedFiles(r.filesWithoutRecord, len(r.unreadable))
+			run.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
+			activeSummary.Gaps.Unread = engineUncheckedFiles(run.filesWithoutRecord, len(run.unreadable))
 		} else {
-			r.report.incompleteBeyondPhases = r.language.theEngine() +
+			run.report.incompleteBeyondPhases = run.language.theEngine() +
 				" reported that it fell short without a record saying where"
-			activeSummary.Gaps.Unread = r.language.theEngine() + " fell short without saying where"
+			activeSummary.Gaps.Unread = run.language.theEngine() + " fell short without saying where"
 		}
 	}
 
 	expectedExit := 0
-	if r.findings > 0 || !*record.Complete {
+	if run.findings > 0 || !*record.Complete {
 		expectedExit = 1
 	}
 	if *record.ExitCode != expectedExit {
 		return fmt.Errorf("the summary says exit %d, and %d findings in a run complete=%t means exit %d",
-			*record.ExitCode, r.findings, *record.Complete, expectedExit)
+			*record.ExitCode, run.findings, *record.Complete, expectedExit)
 	}
 
-	r.summary = record
-	r.writeExcluded()
-	if r.project == nil {
-		r.report.graphNotBuilt = true
+	run.summary = record
+	run.writeExcluded()
+	if run.project == nil {
+		run.report.graphNotBuilt = true
 	}
-	writeRunEnd(r.report, r.out)
+	writeRunEnd(run.report, run.out)
 	return nil
 }
 
@@ -933,62 +933,62 @@ func (r *engineRun) acceptSummary(record *engineSummaryRecord) error {
 // Every path that is not a validated summary, or a listing mode's expected ending, is a failure that
 // says nothing was checked. There is no path through here where a run that did not finish prints
 // green.
-func (r *engineRun) finish(engineExit int, ended string) (int, error) {
+func (run *engineRun) finish(engineExit int, ended string) (int, error) {
 	if engineExit == 2 {
 		// The engine's own sentence is already on stderr, passed through untouched.
-		return 1, fmt.Errorf("%s did not run, so nothing was checked", r.language.theEngine())
+		return 1, fmt.Errorf("%s did not run, so nothing was checked", run.language.theEngine())
 	}
 
-	switch r.mode {
+	switch run.mode {
 	case engineModeVersion:
-		if engineExit != 0 || r.provenance == nil {
-			return 1, fmt.Errorf("%s %s without stating its version", r.language.theEngine(), ended)
+		if engineExit != 0 || run.provenance == nil {
+			return 1, fmt.Errorf("%s %s without stating its version", run.language.theEngine(), ended)
 		}
-		fmt.Fprintln(r.out, versionReport())
-		for _, line := range r.language.VersionLines(r.provenance, r.engineSourceCommit) {
-			fmt.Fprintln(r.out, line)
+		fmt.Fprintln(run.out, versionReport())
+		for _, line := range run.language.VersionLines(run.provenance, run.engineSourceCommit) {
+			fmt.Fprintln(run.out, line)
 		}
 		return 0, nil
 
 	case engineModeRules, engineModeRulesEnabled:
-		if engineExit != 0 || r.provenance == nil {
-			return 1, fmt.Errorf("%s %s before listing its rules", r.language.theEngine(), ended)
+		if engineExit != 0 || run.provenance == nil {
+			return 1, fmt.Errorf("%s %s before listing its rules", run.language.theEngine(), ended)
 		}
-		sort.Slice(r.rules, func(first, second int) bool { return r.rules[first].Name < r.rules[second].Name })
-		for _, listed := range r.rules {
-			if r.mode == engineModeRulesEnabled {
-				fmt.Fprintf(r.out, "%s\t%s\n", listed.Name, listed.Severity)
+		sort.Slice(run.rules, func(first, second int) bool { return run.rules[first].Name < run.rules[second].Name })
+		for _, listed := range run.rules {
+			if run.mode == engineModeRulesEnabled {
+				fmt.Fprintf(run.out, "%s\t%s\n", listed.Name, listed.Severity)
 			} else {
-				fmt.Fprintln(r.out, listed.Name)
+				fmt.Fprintln(run.out, listed.Name)
 			}
 		}
 		return 0, nil
 	}
 
-	if r.summary == nil {
-		r.writeUnfinished(fmt.Sprintf("%s %s before finishing", r.language.theEngine(), ended))
-		return 1, fmt.Errorf("%s %s without a summary, so nothing was checked", r.language.theEngine(), ended)
+	if run.summary == nil {
+		run.writeUnfinished(fmt.Sprintf("%s %s before finishing", run.language.theEngine(), ended))
+		return 1, fmt.Errorf("%s %s without a summary, so nothing was checked", run.language.theEngine(), ended)
 	}
-	if engineExit != *r.summary.ExitCode {
+	if engineExit != *run.summary.ExitCode {
 		return 1, fmt.Errorf("%s %s, and its summary said it would exit %d",
-			r.language.theEngine(), ended, *r.summary.ExitCode)
+			run.language.theEngine(), ended, *run.summary.ExitCode)
 	}
-	return *r.summary.ExitCode, nil
+	return *run.summary.ExitCode, nil
 }
 
 // writeUnfinished prints the phase line for a run that stopped early, every phase the engine never
 // recorded marked not reached, so the last line a reader sees is never a clean bill of health.
-func (r *engineRun) writeUnfinished(reason string) {
-	if r.mode != engineModeCheck || r.summary != nil {
+func (run *engineRun) writeUnfinished(reason string) {
+	if run.mode != engineModeCheck || run.summary != nil {
 		return
 	}
-	for ; r.nextPhase < len(phaseOrder); r.nextPhase++ {
-		r.report.record(phaseOrder[r.nextPhase], outcomeNotReached, 0, reason)
+	for ; run.nextPhase < len(phaseOrder); run.nextPhase++ {
+		run.report.record(phaseOrder[run.nextPhase], outcomeNotReached, 0, reason)
 	}
-	if r.project == nil {
-		r.report.graphNotBuilt = true
+	if run.project == nil {
+		run.report.graphNotBuilt = true
 	}
-	writeRunEnd(r.report, r.out)
+	writeRunEnd(run.report, run.out)
 }
 
 // truncateForError keeps a refused line short enough to read in an error.

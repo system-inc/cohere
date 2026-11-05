@@ -207,48 +207,48 @@ type AlignedScopes struct {
 }
 
 // RangeOf returns a scope's aligned range, or the unset range for a scope that does not exist.
-func (a *AlignedScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
-	if a == nil || a.ranges == nil {
+func (scopes *AlignedScopes) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
+	if scopes == nil || scopes.ranges == nil {
 		return mutation_aliasing.MutableRange{}
 	}
-	return a.ranges[scope]
+	return scopes.ranges[scope]
 }
 
 // MembersOf returns the values belonging to a scope, sorted, or nil for a scope that does not exist.
 //
 // The slice is the table's own and must not be modified by a caller.
-func (a *AlignedScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
-	if a == nil || a.members == nil {
+func (scopes *AlignedScopes) MembersOf(scope ScopeId) []static_single_assignment.IdentifierId {
+	if scopes == nil || scopes.members == nil {
 		return nil
 	}
-	return a.members[scope]
+	return scopes.members[scope]
 }
 
 // Ids returns every scope this pass saw, in the input table's own order.
-func (a *AlignedScopes) Ids() []ScopeId {
-	if a == nil {
+func (scopes *AlignedScopes) Ids() []ScopeId {
+	if scopes == nil {
 		return nil
 	}
-	return a.order
+	return scopes.order
 }
 
 // Len reports how many scopes exist, for measurement.
-func (a *AlignedScopes) Len() int {
-	if a == nil {
+func (scopes *AlignedScopes) Len() int {
+	if scopes == nil {
 		return 0
 	}
-	return len(a.order)
+	return len(scopes.order)
 }
 
 // Widened reports how many scopes had at least one endpoint moved, for measurement.
 //
 // Exposed directly because it is the two-sided key this pass is measured on: a zero here beside a
 // closed assertion would mean the assertion was already closed and this pass did nothing.
-func (a *AlignedScopes) Widened() int {
-	if a == nil {
+func (scopes *AlignedScopes) Widened() int {
+	if scopes == nil {
 		return 0
 	}
-	return a.widened
+	return scopes.widened
 }
 
 // MemberRanges returns every scoped value's range after alignment, as a table.
@@ -256,14 +256,14 @@ func (a *AlignedScopes) Widened() int {
 // This is upstream's aliasing made explicit: every member of a scope reports that scope's WIDENED
 // range. See the doc comment on `AlignedScopes` for why this cannot be taken from
 // `ReactiveScopes.MemberRanges()` once this pass has run.
-func (a *AlignedScopes) MemberRanges() *mutation_aliasing.MutableRanges {
+func (scopes *AlignedScopes) MemberRanges() *mutation_aliasing.MutableRanges {
 	result := &mutation_aliasing.MutableRanges{}
-	if a == nil {
+	if scopes == nil {
 		return result
 	}
-	for _, scope := range a.order {
-		widened := a.ranges[scope]
-		for _, id := range a.members[scope] {
+	for _, scope := range scopes.order {
+		widened := scopes.ranges[scope]
+		for _, id := range scopes.members[scope] {
 			result.Set(id, widened)
 		}
 	}
@@ -412,41 +412,41 @@ func startingIdOf(function *Function, block *BasicBlock) static_single_assignmen
 }
 
 // visitBlock is one iteration of upstream's `for (const [, block] of fn.body.blocks)`.
-func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_assignment.BlockId]*BasicBlock,
+func (state *alignSweepState) visitBlock(function *Function, byId map[static_single_assignment.BlockId]*BasicBlock,
 	block *BasicBlock) {
-	s.visits++
+	state.visits++
 	startingId := startingIdOf(function, block)
 
 	// Upstream's `retainWhere_Set(activeScopes, scope => scope.range.end > startingId)`: a scope
 	// whose end has passed is no longer active and must not be widened by a construct it has left.
-	kept := s.activeScopes[:0]
-	for _, id := range s.activeScopes {
-		if s.ranges[id].End > startingId {
+	kept := state.activeScopes[:0]
+	for _, id := range state.activeScopes {
+		if state.ranges[id].End > startingId {
 			kept = append(kept, id)
 		} else {
-			delete(s.activeSet, id)
+			delete(state.activeSet, id)
 		}
 	}
-	s.activeScopes = kept
+	state.activeScopes = kept
 
 	// MECHANISM ONE, the fallthrough POP. Entering the block that closes the innermost open construct
 	// pulls every still-active scope's START back to that construct's terminal id, so a scope that
 	// began inside the construct now contains it rather than crossing its boundary.
-	if len(s.activeFallthroughs) > 0 {
-		top := s.activeFallthroughs[len(s.activeFallthroughs)-1]
+	if len(state.activeFallthroughs) > 0 {
+		top := state.activeFallthroughs[len(state.activeFallthroughs)-1]
 		if top.fallthrough_ == block.Id {
-			s.activeFallthroughs = s.activeFallthroughs[:len(s.activeFallthroughs)-1]
-			for _, id := range s.activeScopes {
-				current := s.ranges[id]
+			state.activeFallthroughs = state.activeFallthroughs[:len(state.activeFallthroughs)-1]
+			for _, id := range state.activeScopes {
+				current := state.ranges[id]
 				if top.start < current.Start {
 					current.Start = top.start
-					s.ranges[id] = current
+					state.ranges[id] = current
 				}
 			}
 		}
 	}
 
-	node := s.valueBlockNodes[block.Id]
+	node := state.valueBlockNodes[block.Id]
 
 	for _, instructionId := range block.Instructions {
 		instruction := function.Instructions[instructionId]
@@ -454,12 +454,12 @@ func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_
 			continue
 		}
 		EachInstructionPlace(instruction, func(place Place, role PlaceRole) {
-			s.recordPlace(instruction.Order, place, node)
+			state.recordPlace(instruction.Order, place, node)
 		})
 	}
 	terminalOrder := TerminalOrder(block.Terminal)
 	EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) {
-		s.recordPlace(terminalOrder, place, node)
+		state.recordPlace(terminalOrder, place, node)
 	})
 
 	fallthroughId, hasFallthrough := Fallthrough(block.Terminal)
@@ -479,15 +479,15 @@ func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_
 		// The `scope.range.end > terminal.id` test is upstream's and it is a FILTER rather than a
 		// cost optimisation: a scope whose end has already passed this terminal would otherwise be
 		// dragged forward across a construct it never entered.
-		for _, id := range s.activeScopes {
-			current := s.ranges[id]
+		for _, id := range state.activeScopes {
+			current := state.ranges[id]
 			if current.End > terminalOrder && nextId > current.End {
 				current.End = nextId
-				s.ranges[id] = current
+				state.ranges[id] = current
 			}
 		}
 
-		s.activeFallthroughs = append(s.activeFallthroughs, fallthroughRange{
+		state.activeFallthroughs = append(state.activeFallthroughs, fallthroughRange{
 			fallthrough_: fallthroughId,
 			start:        terminalOrder,
 			end:          nextId,
@@ -498,8 +498,8 @@ func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_
 		// linter that stops on a graph it dislikes is worse than one that declines. Measured over 400
 		// corpus files, 0 non-branch terminals reuse a fallthrough, so this never fires today.
 		if node != nil {
-			if _, taken := s.valueBlockNodes[fallthroughId]; !taken {
-				s.valueBlockNodes[fallthroughId] = node
+			if _, taken := state.valueBlockNodes[fallthroughId]; !taken {
+				state.valueBlockNodes[fallthroughId] = node
 			}
 		}
 	} else if gotoTerminal, ok := block.Terminal.(*Goto); ok {
@@ -510,18 +510,18 @@ func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_
 		// The `start !== activeBlockFallthroughRanges.at(-1)` test is upstream's: when the target IS
 		// the innermost open construct, the pop above will handle it on the next block.
 		index := -1
-		for i, candidate := range s.activeFallthroughs {
+		for i, candidate := range state.activeFallthroughs {
 			if candidate.fallthrough_ == gotoTerminal.Block {
 				index = i
 				break
 			}
 		}
-		if index != -1 && index != len(s.activeFallthroughs)-1 {
-			outer := s.activeFallthroughs[index]
+		if index != -1 && index != len(state.activeFallthroughs)-1 {
+			outer := state.activeFallthroughs[index]
 			fallthroughBlock := byId[outer.fallthrough_]
 			firstId := startingIdOf(function, fallthroughBlock)
-			for _, id := range s.activeScopes {
-				current := s.ranges[id]
+			for _, id := range state.activeScopes {
+				current := state.ranges[id]
 				if current.End <= terminalOrder {
 					continue
 				}
@@ -531,12 +531,12 @@ func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_
 				if firstId > current.End {
 					current.End = firstId
 				}
-				s.ranges[id] = current
+				state.ranges[id] = current
 			}
 		}
 	}
 
-	s.assignValueBlockNodes(function, byId, block, node, fallthroughId, hasFallthrough)
+	state.assignValueBlockNodes(function, byId, block, node, fallthroughId, hasFallthrough)
 }
 
 // recordPlace is upstream's `recordPlace`, minus the `placeScopes` map it writes and never reads.
@@ -544,30 +544,30 @@ func (s *alignSweepState) visitBlock(function *Function, byId map[static_single_
 // MECHANISM FOUR, the value-block RANGE: the FIRST time a scope is seen, if it is seen inside a value
 // block, the scope is widened to that whole value block's span. `seen` is what makes this fire once
 // per scope rather than once per place, and it is upstream's.
-func (s *alignSweepState) recordPlace(id static_single_assignment.EvaluationOrder, place Place, node *valueBlockNode) {
-	scope := s.activeScopeOf(id, place)
+func (state *alignSweepState) recordPlace(id static_single_assignment.EvaluationOrder, place Place, node *valueBlockNode) {
+	scope := state.activeScopeOf(id, place)
 	if scope == 0 {
 		return
 	}
-	if !s.activeSet[scope] {
-		s.activeSet[scope] = true
-		s.activeScopes = append(s.activeScopes, scope)
+	if !state.activeSet[scope] {
+		state.activeSet[scope] = true
+		state.activeScopes = append(state.activeScopes, scope)
 	}
-	if s.seen[scope] {
+	if state.seen[scope] {
 		return
 	}
-	s.seen[scope] = true
+	state.seen[scope] = true
 	if node == nil {
 		return
 	}
-	current := s.ranges[scope]
+	current := state.ranges[scope]
 	if node.start < current.Start {
 		current.Start = node.start
 	}
 	if node.end > current.End {
 		current.End = node.end
 	}
-	s.ranges[scope] = current
+	state.ranges[scope] = current
 }
 
 // activeScopeOf is upstream's `getPlaceScope`: the place's scope, but only while it is open.
@@ -580,12 +580,12 @@ func (s *alignSweepState) recordPlace(id static_single_assignment.EvaluationOrde
 // `TestAlignDeclinesAPlaceReadOutsideItsScope` is that case.
 //
 // Half-open, so the start is inside and the end is not, matching `MutableRange.Contains`.
-func (s *alignSweepState) activeScopeOf(id static_single_assignment.EvaluationOrder, place Place) ScopeId {
-	scope := s.scopes.ScopeOf(place.Identifier)
+func (state *alignSweepState) activeScopeOf(id static_single_assignment.EvaluationOrder, place Place) ScopeId {
+	scope := state.scopes.ScopeOf(place.Identifier)
 	if scope == 0 {
 		return 0
 	}
-	if !s.ranges[scope].Contains(id) {
+	if !state.ranges[scope].Contains(id) {
 		return 0
 	}
 	return scope
@@ -596,14 +596,14 @@ func (s *alignSweepState) activeScopeOf(id static_single_assignment.EvaluationOr
 //
 // Upstream returns each successor unchanged, so the call is a WALK rather than a rewrite despite the
 // name. Reproduced as a walk.
-func (s *alignSweepState) assignValueBlockNodes(function *Function, byId map[static_single_assignment.BlockId]*BasicBlock,
+func (state *alignSweepState) assignValueBlockNodes(function *Function, byId map[static_single_assignment.BlockId]*BasicBlock,
 	block *BasicBlock, node *valueBlockNode, fallthroughId static_single_assignment.BlockId, hasFallthrough bool) {
 	_, isTernary := block.Terminal.(*Ternary)
 	_, isLogical := block.Terminal.(*Logical)
 	_, isOptional := block.Terminal.(*Optional)
 
 	EachSuccessor(block.Terminal, func(successor static_single_assignment.BlockId) {
-		if _, taken := s.valueBlockNodes[successor]; taken {
+		if _, taken := state.valueBlockNodes[successor]; taken {
 			return
 		}
 		successorBlock := byId[successor]
@@ -631,9 +631,9 @@ func (s *alignSweepState) assignValueBlockNodes(function *Function, byId map[sta
 				span = *node
 			}
 			child := span
-			s.valueBlockNodes[successor] = &child
+			state.valueBlockNodes[successor] = &child
 			return
 		}
-		s.valueBlockNodes[successor] = node
+		state.valueBlockNodes[successor] = node
 	})
 }

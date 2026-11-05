@@ -98,13 +98,13 @@ var reactImportPattern = regexp.MustCompile(`(?m)(?:^|\n)\s*import\b[^\n;]*?['"]
 var hookCallPattern = regexp.MustCompile(`\buse[A-Z]\w*\s*\(`)
 
 // ResolvesReactTypes reports whether a fixture could resolve `@types/react`.
-func (f Fixture) ResolvesReactTypes() bool {
-	return reactImportPattern.MatchString(f.Source)
+func (fixture Fixture) ResolvesReactTypes() bool {
+	return reactImportPattern.MatchString(fixture.Source)
 }
 
 // CallsHook reports whether a fixture calls anything named like a hook.
-func (f Fixture) CallsHook() bool {
-	return hookCallPattern.MatchString(f.Source)
+func (fixture Fixture) CallsHook() bool {
+	return hookCallPattern.MatchString(fixture.Source)
 }
 
 // StatedDivergence names a fixture cohere deliberately does not reproduce, with where the boundary

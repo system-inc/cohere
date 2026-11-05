@@ -34,17 +34,17 @@ func NewDirectoryListings() *DirectoryListings {
 }
 
 // Add keeps one directory's listing, by its absolute path.
-func (l *DirectoryListings) Add(directory string, entries []os.DirEntry) {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	l.entries[filepath.ToSlash(filepath.Clean(directory))] = entries
+func (listings *DirectoryListings) Add(directory string, entries []os.DirEntry) {
+	listings.mutex.Lock()
+	defer listings.mutex.Unlock()
+	listings.entries[filepath.ToSlash(filepath.Clean(directory))] = entries
 }
 
 // Len is how many directories are held.
-func (l *DirectoryListings) Len() int {
-	l.mutex.RLock()
-	defer l.mutex.RUnlock()
-	return len(l.entries)
+func (listings *DirectoryListings) Len() int {
+	listings.mutex.RLock()
+	defer listings.mutex.RUnlock()
+	return len(listings.entries)
 }
 
 // Listing is a directory's entries as os.ReadDir returned them, sorted by name, and whether it was listed.
@@ -52,10 +52,10 @@ func (l *DirectoryListings) Len() int {
 // symbolic link's target; entry.Info() stats again. A directory that was not listed is not empty: read it
 // from disk. The format walk reads discovery's listings through this (#g3046x5), as the build does through
 // listingFS.
-func (l *DirectoryListings) Listing(directory string) ([]os.DirEntry, bool) {
-	l.mutex.RLock()
-	defer l.mutex.RUnlock()
-	entries, listed := l.entries[path.Clean(filepath.ToSlash(directory))]
+func (listings *DirectoryListings) Listing(directory string) ([]os.DirEntry, bool) {
+	listings.mutex.RLock()
+	defer listings.mutex.RUnlock()
+	entries, listed := listings.entries[path.Clean(filepath.ToSlash(directory))]
 	return entries, listed
 }
 
@@ -65,10 +65,10 @@ type listingFS struct {
 	listings *DirectoryListings
 }
 
-func (l *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
-	entries, listed := l.listings.Listing(directory.AsString())
+func (listingFS *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+	entries, listed := listingFS.listings.Listing(directory.AsString())
 	if !listed {
-		return l.FS.GetAccessibleEntries(directory)
+		return listingFS.FS.GetAccessibleEntries(directory)
 	}
 	// What the real disk returns for the same entries (vfs/internal Common.GetAccessibleEntries).
 	result := vfs.Entries{Symlinks: map[string]struct{}{}}
@@ -91,7 +91,7 @@ func (l *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) v
 			continue
 		}
 		if entry.Type()&fs.ModeSymlink != 0 {
-			if information := l.FS.Stat(tspath.RootedPath(directory.AsString() + "/" + entry.Name())); information != nil {
+			if information := listingFS.FS.Stat(tspath.RootedPath(directory.AsString() + "/" + entry.Name())); information != nil {
 				add(entry.Name(), information.Mode(), true)
 			}
 		}

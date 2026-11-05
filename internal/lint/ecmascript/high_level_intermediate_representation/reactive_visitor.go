@@ -98,112 +98,112 @@ type reactiveWalker struct {
 	visitor ReactiveVisitor
 }
 
-func (w *reactiveWalker) visitBlock(block ReactiveBlock) {
-	if w.visitor.Block != nil {
-		w.visitor.Block(block, func() { w.traverseBlock(block) })
+func (walker *reactiveWalker) visitBlock(block ReactiveBlock) {
+	if walker.visitor.Block != nil {
+		walker.visitor.Block(block, func() { walker.traverseBlock(block) })
 		return
 	}
-	w.traverseBlock(block)
+	walker.traverseBlock(block)
 }
 
-func (w *reactiveWalker) traverseBlock(block ReactiveBlock) {
+func (walker *reactiveWalker) traverseBlock(block ReactiveBlock) {
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveInstructionStatement:
-			w.visitInstruction(shape.Instruction)
+			walker.visitInstruction(shape.Instruction)
 		case *ReactiveScopeBlock:
-			w.visitScope(shape)
+			walker.visitScope(shape)
 		case *ReactiveTerminalStatement:
-			w.visitTerminal(shape)
+			walker.visitTerminal(shape)
 		}
 	}
 }
 
-func (w *reactiveWalker) visitScope(scope *ReactiveScopeBlock) {
-	if w.visitor.Scope != nil {
-		w.visitor.Scope(scope, func() { w.visitBlock(scope.Instructions) })
+func (walker *reactiveWalker) visitScope(scope *ReactiveScopeBlock) {
+	if walker.visitor.Scope != nil {
+		walker.visitor.Scope(scope, func() { walker.visitBlock(scope.Instructions) })
 		return
 	}
-	w.visitBlock(scope.Instructions)
+	walker.visitBlock(scope.Instructions)
 }
 
-func (w *reactiveWalker) visitInstruction(instruction *ReactiveInstruction) {
+func (walker *reactiveWalker) visitInstruction(instruction *ReactiveInstruction) {
 	if instruction == nil {
 		return
 	}
-	if w.visitor.Instruction != nil {
-		w.visitor.Instruction(instruction, func() { w.traverseInstruction(instruction) })
+	if walker.visitor.Instruction != nil {
+		walker.visitor.Instruction(instruction, func() { walker.traverseInstruction(instruction) })
 		return
 	}
-	w.traverseInstruction(instruction)
+	walker.traverseInstruction(instruction)
 }
 
-func (w *reactiveWalker) traverseInstruction(instruction *ReactiveInstruction) {
+func (walker *reactiveWalker) traverseInstruction(instruction *ReactiveInstruction) {
 	// The lvalue first, matching upstream's order: `traverseInstruction` visits lvalues before the
 	// value. A pass building a definition table reads it before the uses that may shadow it.
 	if instruction.LValue != nil {
-		w.visitPlace(instruction.Order, *instruction.LValue, PlaceRoleDefine)
+		walker.visitPlace(instruction.Order, *instruction.LValue, PlaceRoleDefine)
 	}
-	w.visitValue(instruction.Order, instruction.Value)
+	walker.visitValue(instruction.Order, instruction.Value)
 }
 
-func (w *reactiveWalker) visitValue(order static_single_assignment.EvaluationOrder, value ReactiveValue) {
+func (walker *reactiveWalker) visitValue(order static_single_assignment.EvaluationOrder, value ReactiveValue) {
 	if value == nil {
 		return
 	}
-	if w.visitor.Value != nil {
-		w.visitor.Value(order, value, func() { w.traverseValue(order, value) })
+	if walker.visitor.Value != nil {
+		walker.visitor.Value(order, value, func() { walker.traverseValue(order, value) })
 		return
 	}
-	w.traverseValue(order, value)
+	walker.traverseValue(order, value)
 }
 
-func (w *reactiveWalker) traverseValue(order static_single_assignment.EvaluationOrder, value ReactiveValue) {
+func (walker *reactiveWalker) traverseValue(order static_single_assignment.EvaluationOrder, value ReactiveValue) {
 	switch shape := value.(type) {
 	case *ReactiveInstructionValue:
 		// The leaf. A plain instruction value's places are read through this package's own
 		// `EachPlace`, which is why this walk carries a role and upstream's does not.
 		if shape.Value != nil {
 			EachPlace(shape.Value, func(place Place, role PlaceRole) {
-				w.visitPlace(order, place, role)
+				walker.visitPlace(order, place, role)
 			})
 		}
 	case *ReactiveLogicalValue:
-		w.visitValue(order, shape.Left)
-		w.visitValue(order, shape.Right)
+		walker.visitValue(order, shape.Left)
+		walker.visitValue(order, shape.Right)
 	case *ReactiveTernaryValue:
-		w.visitValue(order, shape.Test)
-		w.visitValue(order, shape.Consequent)
-		w.visitValue(order, shape.Alternate)
+		walker.visitValue(order, shape.Test)
+		walker.visitValue(order, shape.Consequent)
+		walker.visitValue(order, shape.Alternate)
 	case *ReactiveSequenceValue:
 		// The instructions run for effect and the value is the result. Upstream visits the
 		// instructions as INSTRUCTIONS rather than as values, which matters: a pass counting
 		// instructions sees the ones nested inside a sequence, and a pass that only walked values
 		// would miss them. That is the same omission that cost this package 27 functions once.
 		for _, nested := range shape.Instructions {
-			w.visitInstruction(nested)
+			walker.visitInstruction(nested)
 		}
-		w.visitValue(shape.Order, shape.Value)
+		walker.visitValue(shape.Order, shape.Value)
 	case *ReactiveOptionalValue:
-		w.visitValue(shape.Order, shape.Value)
+		walker.visitValue(shape.Order, shape.Value)
 	}
 }
 
-func (w *reactiveWalker) visitPlace(order static_single_assignment.EvaluationOrder, place Place, role PlaceRole) {
-	if w.visitor.Place != nil {
-		w.visitor.Place(order, place, role)
+func (walker *reactiveWalker) visitPlace(order static_single_assignment.EvaluationOrder, place Place, role PlaceRole) {
+	if walker.visitor.Place != nil {
+		walker.visitor.Place(order, place, role)
 	}
 }
 
-func (w *reactiveWalker) visitTerminal(statement *ReactiveTerminalStatement) {
+func (walker *reactiveWalker) visitTerminal(statement *ReactiveTerminalStatement) {
 	if statement == nil {
 		return
 	}
-	if w.visitor.Terminal != nil {
-		w.visitor.Terminal(statement, func() { w.traverseTerminal(statement) })
+	if walker.visitor.Terminal != nil {
+		walker.visitor.Terminal(statement, func() { walker.traverseTerminal(statement) })
 		return
 	}
-	w.traverseTerminal(statement)
+	walker.traverseTerminal(statement)
 }
 
 // traverseTerminal descends into a terminal's operands and blocks, in upstream's order.
@@ -212,71 +212,71 @@ func (w *reactiveWalker) visitTerminal(statement *ReactiveTerminalStatement) {
 // which is evaluation order and not field order; a `do-while` visits its body BEFORE its test for
 // the same reason. A pass building a def-use table over this walk reads a wrong answer if either is
 // reordered, and nothing about the resulting tree would look wrong.
-func (w *reactiveWalker) traverseTerminal(statement *ReactiveTerminalStatement) {
+func (walker *reactiveWalker) traverseTerminal(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveBreak, *ReactiveContinue:
 		// No operands and no blocks.
 
 	case *ReactiveReturn:
-		w.visitPlace(shape.Order, shape.Value, PlaceRoleUse)
+		walker.visitPlace(shape.Order, shape.Value, PlaceRoleUse)
 
 	case *ReactiveThrow:
-		w.visitPlace(shape.Order, shape.Value, PlaceRoleUse)
+		walker.visitPlace(shape.Order, shape.Value, PlaceRoleUse)
 
 	case *ReactiveIf:
-		w.visitPlace(shape.Order, shape.Test, PlaceRoleUse)
-		w.visitBlock(shape.Consequent)
+		walker.visitPlace(shape.Order, shape.Test, PlaceRoleUse)
+		walker.visitBlock(shape.Consequent)
 		if shape.Alternate != nil {
-			w.visitBlock(*shape.Alternate)
+			walker.visitBlock(*shape.Alternate)
 		}
 
 	case *ReactiveSwitch:
-		w.visitPlace(shape.Order, shape.Test, PlaceRoleUse)
+		walker.visitPlace(shape.Order, shape.Test, PlaceRoleUse)
 		for _, arm := range shape.Cases {
 			// A nil Test is the default arm and a nil Block is a fallthrough arm sharing the next
 			// one's statements. Both nils are meaningful and distinct; see ReactiveSwitchCase.
 			if arm.Test != nil {
-				w.visitPlace(shape.Order, *arm.Test, PlaceRoleUse)
+				walker.visitPlace(shape.Order, *arm.Test, PlaceRoleUse)
 			}
 			if arm.Block != nil {
-				w.visitBlock(*arm.Block)
+				walker.visitBlock(*arm.Block)
 			}
 		}
 
 	case *ReactiveFor:
-		w.visitValue(shape.Order, shape.Init)
-		w.visitValue(shape.Order, shape.Test)
-		w.visitBlock(shape.Loop)
+		walker.visitValue(shape.Order, shape.Init)
+		walker.visitValue(shape.Order, shape.Test)
+		walker.visitBlock(shape.Loop)
 		if shape.Update != nil {
-			w.visitValue(shape.Order, shape.Update)
+			walker.visitValue(shape.Order, shape.Update)
 		}
 
 	case *ReactiveForOf:
-		w.visitValue(shape.Order, shape.Init)
-		w.visitValue(shape.Order, shape.Test)
-		w.visitBlock(shape.Loop)
+		walker.visitValue(shape.Order, shape.Init)
+		walker.visitValue(shape.Order, shape.Test)
+		walker.visitBlock(shape.Loop)
 
 	case *ReactiveForIn:
-		w.visitValue(shape.Order, shape.Init)
-		w.visitBlock(shape.Loop)
+		walker.visitValue(shape.Order, shape.Init)
+		walker.visitBlock(shape.Loop)
 
 	case *ReactiveWhile:
-		w.visitValue(shape.Order, shape.Test)
-		w.visitBlock(shape.Loop)
+		walker.visitValue(shape.Order, shape.Test)
+		walker.visitBlock(shape.Loop)
 
 	case *ReactiveDoWhile:
 		// Body before test: a do-while runs its body first, and this walk is in evaluation order.
-		w.visitBlock(shape.Loop)
-		w.visitValue(shape.Order, shape.Test)
+		walker.visitBlock(shape.Loop)
+		walker.visitValue(shape.Order, shape.Test)
 
 	case *ReactiveLabelTerminal:
-		w.visitBlock(shape.Block)
+		walker.visitBlock(shape.Block)
 
 	case *ReactiveTry:
-		w.visitBlock(shape.Block)
+		walker.visitBlock(shape.Block)
 		if shape.HandlerBinding != nil {
-			w.visitPlace(shape.Order, *shape.HandlerBinding, PlaceRoleDefine)
+			walker.visitPlace(shape.Order, *shape.HandlerBinding, PlaceRoleDefine)
 		}
-		w.visitBlock(shape.Handler)
+		walker.visitBlock(shape.Handler)
 	}
 }

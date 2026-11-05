@@ -465,10 +465,10 @@ type preferPromiseRejectErrorsRawSpecifier struct {
 // rather than erroring, matching how the sibling rules treat the same field: the specifier then
 // matches nothing instead of failing the run, and dropping it says nothing rather than silently
 // meaning `file`, which is the zero value.
-func (s *preferPromiseRejectErrorsRawSpecifier) UnmarshalJSON(raw []byte) error {
+func (specifier *preferPromiseRejectErrorsRawSpecifier) UnmarshalJSON(raw []byte) error {
 	var asString string
 	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
-		*s = preferPromiseRejectErrorsRawSpecifier{inline: asString}
+		*specifier = preferPromiseRejectErrorsRawSpecifier{inline: asString}
 		return nil
 	}
 
@@ -482,18 +482,18 @@ func (s *preferPromiseRejectErrorsRawSpecifier) UnmarshalJSON(raw []byte) error 
 		return unmarshalOptionsError
 	}
 
-	*s = preferPromiseRejectErrorsRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
+	*specifier = preferPromiseRejectErrorsRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
 
 	var names []string
 	if decodeError := json.Unmarshal(object.Name, &names); decodeError == nil {
-		s.Name = names
+		specifier.Name = names
 		return nil
 	}
 	var name string
 	if decodeError := json.Unmarshal(object.Name, &name); decodeError != nil {
 		return decodeError
 	}
-	s.Name = []string{name}
+	specifier.Name = []string{name}
 	return nil
 }
 

@@ -191,9 +191,9 @@ type compiler struct {
 	pending   []*node
 }
 
-func (c *compiler) compile(value any, pointer string) (*node, error) {
+func (compiler *compiler) compile(value any, pointer string) (*node, error) {
 	compiled := &node{pointer: pointer}
-	c.byPointer[pointer] = compiled
+	compiler.byPointer[pointer] = compiled
 	switch typed := value.(type) {
 	case bool:
 		compiled.always, compiled.never = typed, !typed
@@ -209,7 +209,7 @@ func (c *compiler) compile(value any, pointer string) (*node, error) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			if keywordError := c.keyword(compiled, key, typed[key], pointer); keywordError != nil {
+			if keywordError := compiler.keyword(compiled, key, typed[key], pointer); keywordError != nil {
 				return nil, fmt.Errorf("%s/%s: %w", pointer, key, keywordError)
 			}
 		}
@@ -217,7 +217,7 @@ func (c *compiler) compile(value any, pointer string) (*node, error) {
 		for _, definitions := range []string{"$defs", "definitions"} {
 			if entries, isObject := typed[definitions].(map[string]any); isObject {
 				for name, entry := range entries {
-					if _, compileError := c.compile(entry, pointer+"/"+definitions+"/"+escapePointer(name)); compileError != nil {
+					if _, compileError := compiler.compile(entry, pointer+"/"+definitions+"/"+escapePointer(name)); compileError != nil {
 						return nil, compileError
 					}
 				}
@@ -232,9 +232,9 @@ func (c *compiler) compile(value any, pointer string) (*node, error) {
 // keyword compiles one keyword of a schema object into the node that object compiles to.
 //
 // Mutates: compiled each keyword fills its own fields of the node compile is building, one call per key
-func (c *compiler) keyword(compiled *node, key string, value any, pointer string) error {
+func (compiler *compiler) keyword(compiled *node, key string, value any, pointer string) error {
 	child := func(name string, value any) (*node, error) {
-		return c.compile(value, pointer+"/"+name)
+		return compiler.compile(value, pointer+"/"+name)
 	}
 	children := func(name string, value any) ([]*node, error) {
 		list, isList := value.([]any)
@@ -243,7 +243,7 @@ func (c *compiler) keyword(compiled *node, key string, value any, pointer string
 		}
 		nodes := make([]*node, len(list))
 		for index, item := range list {
-			compiledItem, compileError := c.compile(item, pointer+"/"+name+"/"+strconv.Itoa(index))
+			compiledItem, compileError := compiler.compile(item, pointer+"/"+name+"/"+strconv.Itoa(index))
 			if compileError != nil {
 				return nil, compileError
 			}
@@ -290,7 +290,7 @@ func (c *compiler) keyword(compiled *node, key string, value any, pointer string
 		}
 		compiled.properties = make(map[string]*node, len(entries))
 		for name, entry := range entries {
-			if compiled.properties[name], err = c.compile(entry, pointer+"/properties/"+escapePointer(name)); err != nil {
+			if compiled.properties[name], err = compiler.compile(entry, pointer+"/properties/"+escapePointer(name)); err != nil {
 				return err
 			}
 		}
@@ -309,7 +309,7 @@ func (c *compiler) keyword(compiled *node, key string, value any, pointer string
 			if compileErr != nil {
 				return compileErr
 			}
-			schema, compileErr := c.compile(entries[source], pointer+"/patternProperties/"+escapePointer(source))
+			schema, compileErr := compiler.compile(entries[source], pointer+"/patternProperties/"+escapePointer(source))
 			if compileErr != nil {
 				return compileErr
 			}
@@ -385,7 +385,7 @@ func (c *compiler) keyword(compiled *node, key string, value any, pointer string
 			return fmt.Errorf("$ref must be a string")
 		}
 		compiled.reference = reference
-		c.pending = append(c.pending, compiled)
+		compiler.pending = append(compiler.pending, compiled)
 	default:
 		if unimplemented[key] {
 			return fmt.Errorf("keyword %q is outside the subset this package implements", key)
@@ -396,20 +396,20 @@ func (c *compiler) keyword(compiled *node, key string, value any, pointer string
 
 // resolveReferences checks that every $ref lands on a schema in the same document. A $ref is followed at
 // validation time, so a schema that refers to itself does not recurse while compiling.
-func (c *compiler) resolveReferences() error {
-	for _, referring := range c.pending {
-		if _, found := c.byPointer[referring.reference]; !found {
-			target, pointerTargetError := pointerTarget(c.document, referring.reference)
+func (compiler *compiler) resolveReferences() error {
+	for _, referring := range compiler.pending {
+		if _, found := compiler.byPointer[referring.reference]; !found {
+			target, pointerTargetError := pointerTarget(compiler.document, referring.reference)
 			if pointerTargetError != nil {
 				return pointerTargetError
 			}
-			if _, compileError := c.compile(target, referring.reference); compileError != nil {
+			if _, compileError := compiler.compile(target, referring.reference); compileError != nil {
 				return compileError
 			}
 		}
 	}
-	for _, referring := range c.pending {
-		referring.referenceTarget = c.byPointer[referring.reference]
+	for _, referring := range compiler.pending {
+		referring.referenceTarget = compiler.byPointer[referring.reference]
 	}
 	return nil
 }

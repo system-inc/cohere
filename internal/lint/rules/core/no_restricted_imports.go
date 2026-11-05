@@ -488,7 +488,7 @@ type noRestrictedImportsBinding struct {
 }
 
 // checkImportDeclaration handles `import ... from '...'` in all its forms.
-func (c *noRestrictedImportsChecker) checkImportDeclaration(node *ast.Node) {
+func (checker *noRestrictedImportsChecker) checkImportDeclaration(node *ast.Node) {
 	declaration := node.AsImportDeclaration()
 	if declaration == nil || declaration.ModuleSpecifier == nil {
 		return
@@ -508,31 +508,31 @@ func (c *noRestrictedImportsChecker) checkImportDeclaration(node *ast.Node) {
 	if declared.Default != nil {
 		bindings = append(bindings, noRestrictedImportsBinding{
 			name:        "default",
-			reportRange: rule.TokenRange(c.ctx.SourceFile, declared.Default),
+			reportRange: rule.TokenRange(checker.ctx.SourceFile, declared.Default),
 		})
 	}
 	if declared.Namespace != nil {
 		bindings = append(bindings, noRestrictedImportsBinding{
 			name:        "*",
-			reportRange: rule.TokenRange(c.ctx.SourceFile, declared.Namespace),
+			reportRange: rule.TokenRange(checker.ctx.SourceFile, declared.Namespace),
 		})
 	}
 	for _, specifier := range declared.Named {
 		bindings = append(bindings, noRestrictedImportsBinding{
 			name:        noRestrictedImportsImportedName(specifier),
-			reportRange: rule.TokenRange(c.ctx.SourceFile, specifier),
+			reportRange: rule.TokenRange(checker.ctx.SourceFile, specifier),
 			typeOnly:    specifier.AsImportSpecifier().IsTypeOnly,
 		})
 	}
 
-	c.check(node, source, bindings, noRestrictedImportsDeclarationIsTypeOnly(node))
+	checker.check(node, source, bindings, noRestrictedImportsDeclarationIsTypeOnly(node))
 }
 
 // checkExportDeclaration handles a re-export, which names a module exactly as an import does.
 //
 // An export with no module specifier (`export { a };`) names nothing and is skipped, which is
 // upstream's `if (node.source)` guard.
-func (c *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node) {
+func (checker *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node) {
 	declaration := node.AsExportDeclaration()
 	if declaration == nil || declaration.ModuleSpecifier == nil {
 		return
@@ -547,14 +547,14 @@ func (c *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node) {
 	case declaration.ExportClause == nil:
 		// `export * from 'm'`. Upstream reports at `sourceCode.getFirstToken(node, 1)`, the token
 		// after `export`, which is the `*`.
-		if star := noRestrictedImportsStarToken(c.ctx, node); star != nil {
+		if star := noRestrictedImportsStarToken(checker.ctx, node); star != nil {
 			bindings = append(bindings, noRestrictedImportsBinding{name: "*", reportRange: *star})
 		}
 
 	case declaration.ExportClause.Kind == ast.KindNamespaceExport:
 		// `export * as ns from 'm'`. Upstream's ExportAllDeclaration arm reaches this with the same
 		// `*` token, because it reads the token rather than the clause.
-		if star := noRestrictedImportsStarToken(c.ctx, node); star != nil {
+		if star := noRestrictedImportsStarToken(checker.ctx, node); star != nil {
 			bindings = append(bindings, noRestrictedImportsBinding{name: "*", reportRange: *star})
 		}
 
@@ -563,14 +563,14 @@ func (c *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node) {
 			for _, specifier := range elements.Nodes {
 				bindings = append(bindings, noRestrictedImportsBinding{
 					name:        noRestrictedImportsExportedLocalName(specifier),
-					reportRange: rule.TokenRange(c.ctx.SourceFile, specifier),
+					reportRange: rule.TokenRange(checker.ctx.SourceFile, specifier),
 					typeOnly:    specifier.AsExportSpecifier().IsTypeOnly,
 				})
 			}
 		}
 	}
 
-	c.check(node, source, bindings, noRestrictedImportsExportIsTypeOnly(node))
+	checker.check(node, source, bindings, noRestrictedImportsExportIsTypeOnly(node))
 }
 
 // checkImportEquals handles `import foo = require('bar')`.
@@ -578,7 +578,7 @@ func (c *noRestrictedImportsChecker) checkExportDeclaration(node *ast.Node) {
 // Upstream passes an empty import-name map for this form, so only a whole-module restriction can
 // report on it and an `importNames` entry never does. Ported from upstream's source rather than
 // from a measured verdict: its corpus has no case for this arm.
-func (c *noRestrictedImportsChecker) checkImportEquals(node *ast.Node) {
+func (checker *noRestrictedImportsChecker) checkImportEquals(node *ast.Node) {
 	declaration := node.AsImportEqualsDeclaration()
 	if declaration == nil || declaration.ModuleReference == nil {
 		return
@@ -591,11 +591,11 @@ func (c *noRestrictedImportsChecker) checkImportEquals(node *ast.Node) {
 	if !ok {
 		return
 	}
-	c.check(node, source, nil, declaration.IsTypeOnly)
+	checker.check(node, source, nil, declaration.IsTypeOnly)
 }
 
 // check is upstream's `checkNode`: the path list first, then every matching pattern group.
-func (c *noRestrictedImportsChecker) check(
+func (checker *noRestrictedImportsChecker) check(
 	node *ast.Node,
 	source string,
 	bindings []noRestrictedImportsBinding,
@@ -605,18 +605,18 @@ func (c *noRestrictedImportsChecker) check(
 	// `fs`. The trim applies to both the path list and the pattern list.
 	trimmedSource := text.TrimWhitespace(source)
 
-	c.checkPaths(node, trimmedSource, bindings, declarationIsTypeOnly)
+	checker.checkPaths(node, trimmedSource, bindings, declarationIsTypeOnly)
 
-	for _, pattern := range c.patterns {
-		if !c.patternMatches(pattern, trimmedSource) {
+	for _, pattern := range checker.patterns {
+		if !checker.patternMatches(pattern, trimmedSource) {
 			continue
 		}
-		c.reportForPattern(node, pattern, trimmedSource, bindings, declarationIsTypeOnly)
+		checker.reportForPattern(node, pattern, trimmedSource, bindings, declarationIsTypeOnly)
 	}
 }
 
 // patternMatches answers upstream's `isRestrictedPattern`.
-func (c *noRestrictedImportsChecker) patternMatches(
+func (checker *noRestrictedImportsChecker) patternMatches(
 	pattern noRestrictedImportsCompiledPattern,
 	source string,
 ) bool {
@@ -627,13 +627,13 @@ func (c *noRestrictedImportsChecker) patternMatches(
 }
 
 // checkPaths is upstream's `checkRestrictedPathAndReport`.
-func (c *noRestrictedImportsChecker) checkPaths(
+func (checker *noRestrictedImportsChecker) checkPaths(
 	node *ast.Node,
 	source string,
 	bindings []noRestrictedImportsBinding,
 	declarationIsTypeOnly bool,
 ) {
-	entries, restricted := c.paths[source]
+	entries, restricted := checker.paths[source]
 	if !restricted {
 		return
 	}
@@ -646,17 +646,17 @@ func (c *noRestrictedImportsChecker) checkPaths(
 		if len(entry.ImportNames) == 0 && len(entry.AllowImportNames) == 0 {
 			// The whole module is banned, so the finding is on the statement rather than on any
 			// one binding.
-			c.report(node, noRestrictedImportsPathMessage(source, entry.Message))
+			checker.report(node, noRestrictedImportsPathMessage(source, entry.Message))
 			continue
 		}
 
 		for _, binding := range bindings {
 			if binding.name == "*" {
 				if len(entry.ImportNames) > 0 {
-					c.reportRange(binding.reportRange, noRestrictedImportsEverythingMessage(
+					checker.reportRange(binding.reportRange, noRestrictedImportsEverythingMessage(
 						source, entry.ImportNames, entry.Message))
 				} else if len(entry.AllowImportNames) > 0 {
-					c.reportRange(binding.reportRange,
+					checker.reportRange(binding.reportRange,
 						noRestrictedImportsEverythingWithAllowMessage(
 							source, entry.AllowImportNames, entry.Message))
 				}
@@ -668,12 +668,12 @@ func (c *noRestrictedImportsChecker) checkPaths(
 			}
 
 			if noRestrictedImportsContains(entry.ImportNames, binding.name) {
-				c.reportRange(binding.reportRange,
+				checker.reportRange(binding.reportRange,
 					noRestrictedImportsImportNameMessage(source, binding.name, entry.Message))
 			}
 			if len(entry.AllowImportNames) > 0 &&
 				!noRestrictedImportsContains(entry.AllowImportNames, binding.name) {
-				c.reportRange(binding.reportRange, noRestrictedImportsAllowedImportNameMessage(
+				checker.reportRange(binding.reportRange, noRestrictedImportsAllowedImportNameMessage(
 					source, binding.name, entry.AllowImportNames, entry.Message))
 			}
 		}
@@ -685,7 +685,7 @@ func (c *noRestrictedImportsChecker) checkPaths(
 // The four name-restriction fields are mutually exclusive, which the decoder enforces, so the arms
 // below never both apply. Their order still matters for the namespace case, where upstream picks
 // among four messages by which field is set.
-func (c *noRestrictedImportsChecker) reportForPattern(
+func (checker *noRestrictedImportsChecker) reportForPattern(
 	node *ast.Node,
 	pattern noRestrictedImportsCompiledPattern,
 	source string,
@@ -700,7 +700,7 @@ func (c *noRestrictedImportsChecker) reportForPattern(
 	restrictsNames := len(entry.ImportNames) > 0 || pattern.importNamePattern != nil
 	allowsNames := len(entry.AllowImportNames) > 0 || pattern.allowedNamePattern != nil
 	if !restrictsNames && !allowsNames {
-		c.report(node, noRestrictedImportsPatternMessage(source, entry.Message))
+		checker.report(node, noRestrictedImportsPatternMessage(source, entry.Message))
 		return
 	}
 
@@ -708,18 +708,18 @@ func (c *noRestrictedImportsChecker) reportForPattern(
 		if binding.name == "*" {
 			switch {
 			case len(entry.ImportNames) > 0:
-				c.reportRange(binding.reportRange, noRestrictedImportsPatternEverythingMessage(
+				checker.reportRange(binding.reportRange, noRestrictedImportsPatternEverythingMessage(
 					source, entry.ImportNames, entry.Message))
 			case len(entry.AllowImportNames) > 0:
-				c.reportRange(binding.reportRange,
+				checker.reportRange(binding.reportRange,
 					noRestrictedImportsEverythingWithAllowMessage(
 						source, entry.AllowImportNames, entry.Message))
 			case pattern.allowedNamePattern != nil:
-				c.reportRange(binding.reportRange,
+				checker.reportRange(binding.reportRange,
 					noRestrictedImportsEverythingWithAllowedPatternMessage(
 						source, entry.AllowImportNamePattern, entry.Message))
 			default:
-				c.reportRange(binding.reportRange,
+				checker.reportRange(binding.reportRange,
 					noRestrictedImportsPatternEverythingWithRegexMessage(
 						source, entry.ImportNamePattern, entry.Message))
 			}
@@ -732,7 +732,7 @@ func (c *noRestrictedImportsChecker) reportForPattern(
 
 		if noRestrictedImportsContains(entry.ImportNames, binding.name) ||
 			(pattern.importNamePattern != nil && pattern.importNamePattern.Test(binding.name)) {
-			c.reportRange(binding.reportRange, noRestrictedImportsPatternAndImportNameMessage(
+			checker.reportRange(binding.reportRange, noRestrictedImportsPatternAndImportNameMessage(
 				source, binding.name, entry.Message))
 		}
 
@@ -740,25 +740,25 @@ func (c *noRestrictedImportsChecker) reportForPattern(
 		// reported once, under whichever list was configured.
 		if len(entry.AllowImportNames) > 0 &&
 			!noRestrictedImportsContains(entry.AllowImportNames, binding.name) {
-			c.reportRange(binding.reportRange, noRestrictedImportsAllowedImportNameMessage(
+			checker.reportRange(binding.reportRange, noRestrictedImportsAllowedImportNameMessage(
 				source, binding.name, entry.AllowImportNames, entry.Message))
 		} else if pattern.allowedNamePattern != nil &&
 			!pattern.allowedNamePattern.Test(binding.name) {
-			c.reportRange(binding.reportRange, noRestrictedImportsAllowedNamePatternMessage(
+			checker.reportRange(binding.reportRange, noRestrictedImportsAllowedNamePatternMessage(
 				source, binding.name, entry.AllowImportNamePattern, entry.Message))
 		}
 	}
 }
 
 // report anchors a finding on a whole statement.
-func (c *noRestrictedImportsChecker) report(node *ast.Node, message rule.Message) {
-	c.ctx.ReportNode(node, message)
+func (checker *noRestrictedImportsChecker) report(node *ast.Node, message rule.Message) {
+	checker.ctx.ReportNode(node, message)
 }
 
 // reportRange anchors a finding on a span, which a namespace re-export needs because it has no
 // specifier node.
-func (c *noRestrictedImportsChecker) reportRange(span core.TextRange, message rule.Message) {
-	c.ctx.ReportRange(span, message)
+func (checker *noRestrictedImportsChecker) reportRange(span core.TextRange, message rule.Message) {
+	checker.ctx.ReportRange(span, message)
 }
 
 // noRestrictedImportsContains answers whether a name is in a list.

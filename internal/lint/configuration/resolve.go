@@ -37,11 +37,11 @@ type resolutionIdentity struct {
 // so a caller can derive what depends only on the resolution once per resolution rather than once per
 // file: which rules apply, and their decoded options. Nil for a resolution with no identity, an ignored
 // file or one built by hand, which a caller treats as unique.
-func (r Resolved) Identity() any {
-	if r.identity == nil {
+func (resolved Resolved) Identity() any {
+	if resolved.identity == nil {
 		return nil
 	}
-	return r.identity
+	return resolved.identity
 }
 
 // resolutionMemo is a Config's resolutions, by which of its overrides a path matched.
@@ -99,8 +99,8 @@ func (c *Config) resolutions() *resolutionMemo {
 }
 
 // Enabled reports whether a rule runs on this file.
-func (r Resolved) Enabled(ruleName string) bool {
-	status, _ := r.StatusOf(ruleName)
+func (resolved Resolved) Enabled(ruleName string) bool {
+	status, _ := resolved.StatusOf(ruleName)
 	return status == StatusEnabled
 }
 
@@ -128,11 +128,11 @@ const (
 )
 
 // StatusOf reports why a rule runs or does not, and its setting when it has one.
-func (r Resolved) StatusOf(ruleName string) (Status, RuleSetting) {
-	if r.Ignored {
+func (resolved Resolved) StatusOf(ruleName string) (Status, RuleSetting) {
+	if resolved.Ignored {
 		return StatusFileIgnored, RuleSetting{}
 	}
-	setting, configured := r.settingFor(ruleName)
+	setting, configured := resolved.settingFor(ruleName)
 	if !configured {
 		// A rule the config never mentions does not run. Defaulting the other way would mean adding
 		// a rule to the registry silently turns it on across the whole tree, which is a decision
@@ -158,8 +158,8 @@ func (r Resolved) StatusOf(ruleName string) (Status, RuleSetting) {
 // become. The registry pairs each rule with a decoder; this returns the bytes that decoder reads.
 // Handing a rule this JSON directly would fail its type assertion and make it decline every file,
 // which is the inert-rule defect wearing a different hat.
-func (r Resolved) RawOptionsFor(ruleName string) []json.RawMessage {
-	setting, configured := r.settingFor(ruleName)
+func (resolved Resolved) RawOptionsFor(ruleName string) []json.RawMessage {
+	setting, configured := resolved.settingFor(ruleName)
 	if !configured {
 		return nil
 	}
@@ -179,17 +179,17 @@ func (r Resolved) RawOptionsFor(ruleName string) []json.RawMessage {
 //
 // The suffix must fall on a `/` boundary. Plain suffix matching would let a config entry for
 // `no-enum` silence `consistency-no-enum`, which is a rule nobody named.
-func (r Resolved) settingFor(ruleName string) (RuleSetting, bool) {
-	key, configured := r.keyFor(ruleName)
+func (resolved Resolved) settingFor(ruleName string) (RuleSetting, bool) {
+	key, configured := resolved.keyFor(ruleName)
 	if !configured {
 		return RuleSetting{}, false
 	}
-	return r.Rules[key], true
+	return resolved.Rules[key], true
 }
 
 // keyFor identifies the configuration key selected by the resolver for one registered name.
-func (r Resolved) keyFor(ruleName string) (string, bool) {
-	if _, configured := r.Rules[ruleName]; configured {
+func (resolved Resolved) keyFor(ruleName string) (string, bool) {
+	if _, configured := resolved.Rules[ruleName]; configured {
 		return ruleName, true
 	}
 
@@ -208,7 +208,7 @@ func (r Resolved) keyFor(ruleName string) (string, bool) {
 	var matched string
 	found := false
 	ambiguous := false
-	for configuredName := range r.Rules {
+	for configuredName := range resolved.Rules {
 		if configuredName == ruleName || !KeyReachesRule(configuredName, ruleName) {
 			continue
 		}
@@ -232,10 +232,10 @@ func (r Resolved) keyFor(ruleName string) (string, bool) {
 // RuleAliases maps the non-exact keys this file resolves through to their registered names.
 // Inherited and matching override keys are already in Rules. Exact keys and ambiguous fallbacks
 // follow keyFor, so this does not invent aliases for unconfigured spellings or inactive overrides.
-func (r Resolved) RuleAliases(registeredNames []string) map[string]string {
+func (resolved Resolved) RuleAliases(registeredNames []string) map[string]string {
 	aliases := map[string]string{}
 	for _, name := range registeredNames {
-		key, configured := r.keyFor(name)
+		key, configured := resolved.keyFor(name)
 		if !configured || key == name {
 			continue
 		}
@@ -349,12 +349,12 @@ func (c *Config) resolveMatch(match []byte) Resolved {
 
 // MatchedOverrideIndices returns the blocks applied to this resolution in precedence order.
 // The indices name Config.Overrides; the memoized match is the resolver's source of truth.
-func (r Resolved) MatchedOverrideIndices() []int {
+func (resolved Resolved) MatchedOverrideIndices() []int {
 	indices := []int{}
-	if r.identity == nil {
+	if resolved.identity == nil {
 		return indices
 	}
-	for remaining := []byte(r.identity.match); len(remaining) > 0; {
+	for remaining := []byte(resolved.identity.match); len(remaining) > 0; {
 		index, width := binary.Uvarint(remaining)
 		remaining = remaining[width:]
 		indices = append(indices, int(index))
@@ -386,8 +386,8 @@ const UnusedDisable = "unused-disable"
 // UnusedDisableSeverity honors file overrides and defaults to error, so a dead directive fails the run
 // the way a finding does (#9137dhp, Kirk's call). warn, which reports without failing, and off stay
 // settable; ESLint's own default is warn, so a project that wants its parity sets it.
-func (r Resolved) UnusedDisableSeverity() Severity {
-	if setting, configured := r.Rules[UnusedDisable]; configured {
+func (resolved Resolved) UnusedDisableSeverity() Severity {
+	if setting, configured := resolved.Rules[UnusedDisable]; configured {
 		return setting.Severity
 	}
 	return SeverityError

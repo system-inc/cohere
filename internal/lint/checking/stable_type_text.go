@@ -66,37 +66,37 @@ type stableTypePrinter struct {
 	stack []*checker.Type
 }
 
-func (p *stableTypePrinter) print(t *checker.Type, depth int) string {
+func (printer *stableTypePrinter) print(t *checker.Type, depth int) string {
 	if t == nil {
 		return "unknown"
 	}
 	if alias := t.Alias(); alias != nil && alias.Symbol() != nil {
-		return p.named(alias.Symbol().Name, alias.TypeArguments(), depth)
+		return printer.named(alias.Symbol().Name, alias.TypeArguments(), depth)
 	}
 	switch {
 	case t.Flags()&checker.TypeFlagsUnion != 0:
-		return p.union(t, depth)
+		return printer.union(t, depth)
 	case t.Flags()&checker.TypeFlagsIntersection != 0:
-		return p.joined(t.Types(), " & ", depth)
+		return printer.joined(t.Types(), " & ", depth)
 	case t.Flags()&checker.TypeFlagsObject == 0:
 		// Primitives, literals, enums, type parameters and the rest print a name of their own, which no other
 		// type's order reaches.
-		return p.typeChecker.TypeToString(t)
+		return printer.typeChecker.TypeToString(t)
 	}
-	if slices.Contains(p.stack, t) || depth > p.maximumDepth {
+	if slices.Contains(printer.stack, t) || depth > printer.maximumDepth {
 		if symbol := t.Symbol(); symbol != nil && t.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 {
 			return symbol.Name
 		}
 		return "..."
 	}
-	p.stack = append(p.stack, t)
-	defer func() { p.stack = p.stack[:len(p.stack)-1] }()
+	printer.stack = append(printer.stack, t)
+	defer func() { printer.stack = printer.stack[:len(printer.stack)-1] }()
 
-	if checker.Checker_isArrayType(p.typeChecker, t) {
-		arguments := p.typeChecker.GetTypeArguments(t)
+	if checker.Checker_isArrayType(printer.typeChecker, t) {
+		arguments := printer.typeChecker.GetTypeArguments(t)
 		element := "unknown"
 		if len(arguments) > 0 {
-			element = p.operand(arguments[0], depth+1)
+			element = printer.operand(arguments[0], depth+1)
 		}
 		if t.Target() != nil && t.Target().Symbol() != nil && t.Target().Symbol().Name == "ReadonlyArray" {
 			return "readonly " + element + "[]"
@@ -104,37 +104,37 @@ func (p *stableTypePrinter) print(t *checker.Type, depth int) string {
 		return element + "[]"
 	}
 	if checker.IsTupleType(t) {
-		return p.tuple(t, depth)
+		return printer.tuple(t, depth)
 	}
 	if t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil && t.Target().Symbol() != nil {
-		arguments := p.typeChecker.GetTypeArguments(t)
+		arguments := printer.typeChecker.GetTypeArguments(t)
 		if target := t.Target().TargetInterfaceType(); target != nil && len(target.TypeParameters()) <= len(arguments) {
 			arguments = arguments[:len(target.TypeParameters())]
 		}
-		return p.named(t.Target().Symbol().Name, arguments, depth)
+		return printer.named(t.Target().Symbol().Name, arguments, depth)
 	}
 	if t.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 && t.Symbol() != nil {
-		return p.typeChecker.TypeToString(t)
+		return printer.typeChecker.TypeToString(t)
 	}
-	return p.anonymous(t, depth)
+	return printer.anonymous(t, depth)
 }
 
 // named prints a name with its type arguments, each by these rules.
-func (p *stableTypePrinter) named(name string, arguments []*checker.Type, depth int) string {
+func (printer *stableTypePrinter) named(name string, arguments []*checker.Type, depth int) string {
 	if len(arguments) == 0 {
 		return name
 	}
 	printed := make([]string, len(arguments))
 	for index, argument := range arguments {
-		printed[index] = p.print(argument, depth+1)
+		printed[index] = printer.print(argument, depth+1)
 	}
 	return name + "<" + strings.Join(printed, ", ") + ">"
 }
 
 // operand is a type printed where an operator follows it, `T[]`: a union, an intersection or a function is
 // parenthesized, as TypeScript prints it.
-func (p *stableTypePrinter) operand(t *checker.Type, depth int) string {
-	text := p.print(t, depth)
+func (printer *stableTypePrinter) operand(t *checker.Type, depth int) string {
+	text := printer.print(t, depth)
 	if t.Alias() == nil && (t.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 || strings.Contains(text, "=>")) {
 		return "(" + text + ")"
 	}
@@ -142,7 +142,7 @@ func (p *stableTypePrinter) operand(t *checker.Type, depth int) string {
 }
 
 // union prints a union's members in their stable order. `true | false` is `boolean`, as TypeScript prints it.
-func (p *stableTypePrinter) union(t *checker.Type, depth int) string {
+func (printer *stableTypePrinter) union(t *checker.Type, depth int) string {
 	var printed []string
 	var booleans []*checker.Type
 	for _, member := range t.Types() {
@@ -150,33 +150,33 @@ func (p *stableTypePrinter) union(t *checker.Type, depth int) string {
 			booleans = append(booleans, member)
 			continue
 		}
-		printed = append(printed, p.print(member, depth+1))
+		printed = append(printed, printer.print(member, depth+1))
 	}
 	switch len(booleans) {
 	case 2:
 		printed = append(printed, "boolean")
 	case 1:
-		printed = append(printed, p.typeChecker.TypeToString(booleans[0]))
+		printed = append(printed, printer.typeChecker.TypeToString(booleans[0]))
 	}
-	return p.sortedJoin(printed, " | ")
+	return printer.sortedJoin(printed, " | ")
 }
 
 // joined prints members each by these rules and joins them in their stable order.
-func (p *stableTypePrinter) joined(members []*checker.Type, separator string, depth int) string {
+func (printer *stableTypePrinter) joined(members []*checker.Type, separator string, depth int) string {
 	printed := make([]string, len(members))
 	for index, member := range members {
 		if separator == " & " {
-			printed[index] = p.operand(member, depth+1)
+			printed[index] = printer.operand(member, depth+1)
 		} else {
-			printed[index] = p.print(member, depth+1)
+			printed[index] = printer.print(member, depth+1)
 		}
 	}
-	return p.sortedJoin(printed, separator)
+	return printer.sortedJoin(printed, separator)
 }
 
 // sortedJoin orders printed members by their text, with null and undefined last, and keeps the first
 // maximumMembers of them.
-func (p *stableTypePrinter) sortedJoin(printed []string, separator string) string {
+func (printer *stableTypePrinter) sortedJoin(printed []string, separator string) string {
 	rank := func(text string) int {
 		switch text {
 		case "null":
@@ -192,16 +192,16 @@ func (p *stableTypePrinter) sortedJoin(printed []string, separator string) strin
 		}
 		return strings.Compare(a, b)
 	})
-	if len(printed) > p.maximumMembers {
-		more := len(printed) - p.maximumMembers + 1
-		printed = append(printed[:p.maximumMembers-1], "... "+strconv.Itoa(more)+" more ...")
+	if len(printed) > printer.maximumMembers {
+		more := len(printed) - printer.maximumMembers + 1
+		printed = append(printed[:printer.maximumMembers-1], "... "+strconv.Itoa(more)+" more ...")
 	}
 	return strings.Join(printed, separator)
 }
 
 // tuple prints a tuple's elements in their positions, which no checker reorders.
-func (p *stableTypePrinter) tuple(t *checker.Type, depth int) string {
-	arguments := p.typeChecker.GetTypeArguments(t)
+func (printer *stableTypePrinter) tuple(t *checker.Type, depth int) string {
+	arguments := printer.typeChecker.GetTypeArguments(t)
 	tuple := t.TargetTupleType()
 	flags := tuple.ElementFlags()
 	printed := make([]string, 0, len(flags))
@@ -209,10 +209,10 @@ func (p *stableTypePrinter) tuple(t *checker.Type, depth int) string {
 		if index >= len(arguments) {
 			break
 		}
-		element := p.print(arguments[index], depth+1)
+		element := printer.print(arguments[index], depth+1)
 		switch {
 		case flags[index]&checker.ElementFlagsOptional != 0:
-			element = p.operand(arguments[index], depth+1) + "?"
+			element = printer.operand(arguments[index], depth+1) + "?"
 		case flags[index]&checker.ElementFlagsVariable != 0:
 			element = "..." + element
 		}
@@ -227,40 +227,40 @@ func (p *stableTypePrinter) tuple(t *checker.Type, depth int) string {
 
 // anonymous prints an object type that has no name: a function as `(p: T) => R`, and anything else as its
 // signatures, index signatures and members in braces.
-func (p *stableTypePrinter) anonymous(t *checker.Type, depth int) string {
-	calls := p.typeChecker.GetSignaturesOfType(t, checker.SignatureKindCall)
-	constructs := p.typeChecker.GetSignaturesOfType(t, checker.SignatureKindConstruct)
-	indexes := p.typeChecker.GetIndexInfosOfType(t)
-	properties := p.members(t)
+func (printer *stableTypePrinter) anonymous(t *checker.Type, depth int) string {
+	calls := printer.typeChecker.GetSignaturesOfType(t, checker.SignatureKindCall)
+	constructs := printer.typeChecker.GetSignaturesOfType(t, checker.SignatureKindConstruct)
+	indexes := printer.typeChecker.GetIndexInfosOfType(t)
+	properties := printer.members(t)
 	if len(calls) == 1 && len(constructs) == 0 && len(indexes) == 0 && len(properties) == 0 {
-		return p.signature(calls[0], " => ", depth)
+		return printer.signature(calls[0], " => ", depth)
 	}
 	if len(constructs) == 1 && len(calls) == 0 && len(indexes) == 0 && len(properties) == 0 {
-		return "new " + p.signature(constructs[0], " => ", depth)
+		return "new " + printer.signature(constructs[0], " => ", depth)
 	}
 	var parts []string
 	for _, call := range calls {
-		parts = append(parts, p.signature(call, ": ", depth))
+		parts = append(parts, printer.signature(call, ": ", depth))
 	}
 	for _, construct := range constructs {
-		parts = append(parts, "new "+p.signature(construct, ": ", depth))
+		parts = append(parts, "new "+printer.signature(construct, ": ", depth))
 	}
 	for _, index := range indexes {
-		part := "[key: " + p.print(index.KeyType(), depth+1) + "]: " + p.print(index.ValueType(), depth+1)
+		part := "[key: " + printer.print(index.KeyType(), depth+1) + "]: " + printer.print(index.ValueType(), depth+1)
 		if index.IsReadonly() {
 			part = "readonly " + part
 		}
 		parts = append(parts, part)
 	}
 	for _, property := range properties {
-		parts = append(parts, p.member(property, depth))
+		parts = append(parts, printer.member(property, depth))
 	}
 	if len(parts) == 0 {
 		return "{}"
 	}
-	if len(parts) > p.maximumMembers {
-		more := len(parts) - p.maximumMembers + 1
-		parts = append(parts[:p.maximumMembers-1], "... "+strconv.Itoa(more)+" more ...")
+	if len(parts) > printer.maximumMembers {
+		more := len(parts) - printer.maximumMembers + 1
+		parts = append(parts[:printer.maximumMembers-1], "... "+strconv.Itoa(more)+" more ...")
 	}
 	return "{ " + strings.Join(parts, "; ") + "; }"
 }
@@ -273,8 +273,8 @@ func (p *stableTypePrinter) anonymous(t *checker.Type, depth int) string {
 // nested inside this one, inside its range but not among its members, and then whether it read as own was the
 // checker's history again, as a spread of a nested literal's member was on www-phi-health. memberHome is exact for
 // every container measured there: object literals, type literals, a class's static side, namespaces and files.
-func (p *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
-	properties := slices.Clone(p.typeChecker.GetPropertiesOfType(t))
+func (printer *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
+	properties := slices.Clone(printer.typeChecker.GetPropertiesOfType(t))
 	var container *ast.Node
 	if symbol := t.Symbol(); symbol != nil && len(symbol.Declarations) > 0 {
 		container = symbol.Declarations[0]
@@ -318,31 +318,31 @@ func memberHome(declaration *ast.Node) *ast.Node {
 // written `y?: number | undefined` keeps its undefined, and a synthesized `y?:` member prints `never`, as TypeToString
 // prints it. Without the option the marker is undefined itself, `y?: number` and `y?: number | undefined` are one
 // type, and it prints `| undefined`: TypeToString drops it only where it reuses a written annotation.
-func (p *stableTypePrinter) member(property *ast.Symbol, depth int) string {
+func (printer *stableTypePrinter) member(property *ast.Symbol, depth int) string {
 	name := StablePropertyName(property.Name)
 	if property.Flags&ast.SymbolFlagsOptional != 0 {
 		name += "?"
 	}
-	propertyType := checker.Checker_getNonMissingTypeOfSymbol(p.typeChecker, property)
+	propertyType := checker.Checker_getNonMissingTypeOfSymbol(printer.typeChecker, property)
 	if property.Flags&ast.SymbolFlagsMethod != 0 {
-		if signatures := p.typeChecker.GetSignaturesOfType(propertyType, checker.SignatureKindCall); len(signatures) == 1 {
-			return name + p.signature(signatures[0], ": ", depth)
+		if signatures := printer.typeChecker.GetSignaturesOfType(propertyType, checker.SignatureKindCall); len(signatures) == 1 {
+			return name + printer.signature(signatures[0], ": ", depth)
 		}
 	}
-	text := name + ": " + p.print(propertyType, depth+1)
-	if checker.Checker_isReadonlySymbol(p.typeChecker, property) {
+	text := name + ": " + printer.print(propertyType, depth+1)
+	if checker.Checker_isReadonlySymbol(printer.typeChecker, property) {
 		text = "readonly " + text
 	}
 	return text
 }
 
 // signature prints `<T>(a: A, b?: B, ...rest: C[])` followed by the arrow or colon and the return type.
-func (p *stableTypePrinter) signature(signature *checker.Signature, arrow string, depth int) string {
+func (printer *stableTypePrinter) signature(signature *checker.Signature, arrow string, depth int) string {
 	var text strings.Builder
 	if typeParameters := signature.TypeParameters(); len(typeParameters) > 0 {
 		names := make([]string, len(typeParameters))
 		for index, typeParameter := range typeParameters {
-			names[index] = p.typeChecker.TypeToString(typeParameter)
+			names[index] = printer.typeChecker.TypeToString(typeParameter)
 		}
 		text.WriteString("<" + strings.Join(names, ", ") + ">")
 	}
@@ -356,10 +356,10 @@ func (p *stableTypePrinter) signature(signature *checker.Signature, arrow string
 		case index >= signature.MinArgumentCount():
 			suffix = "?"
 		}
-		printed[index] = prefix + parameter.Name + suffix + ": " + p.print(p.typeChecker.GetTypeOfSymbol(parameter), depth+1)
+		printed[index] = prefix + parameter.Name + suffix + ": " + printer.print(printer.typeChecker.GetTypeOfSymbol(parameter), depth+1)
 	}
 	text.WriteString("(" + strings.Join(printed, ", ") + ")")
-	text.WriteString(arrow + p.print(p.typeChecker.GetReturnTypeOfSignature(signature), depth+1))
+	text.WriteString(arrow + printer.print(printer.typeChecker.GetReturnTypeOfSignature(signature), depth+1))
 	return text.String()
 }
 

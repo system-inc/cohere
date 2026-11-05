@@ -174,8 +174,8 @@ type comparison struct {
 	differences []string
 }
 
-func (c *comparison) differ(path string, format string, arguments ...any) {
-	c.differences = append(c.differences, path+": "+fmt.Sprintf(format, arguments...))
+func (comparison *comparison) differ(path string, format string, arguments ...any) {
+	comparison.differences = append(comparison.differences, path+": "+fmt.Sprintf(format, arguments...))
 }
 
 // jsonString is the port's string as the oracle's arrives: JSON.stringify escapes a lone surrogate,
@@ -198,75 +198,75 @@ func jsonString(text string) string {
 	return builder.String()
 }
 
-func (c *comparison) point(path string, name string, mine Point, theirs jsonPoint) {
-	expected := Point{Line: theirs.Line, Column: theirs.Column, Offset: c.offsets.byteOffset(theirs.Offset)}
+func (comparison *comparison) point(path string, name string, mine Point, theirs jsonPoint) {
+	expected := Point{Line: theirs.Line, Column: theirs.Column, Offset: comparison.offsets.byteOffset(theirs.Offset)}
 	if mine != expected {
-		c.differ(path, "%s is %+v, upstream's %+v (unit offset %d)", name, mine, expected, theirs.Offset)
+		comparison.differ(path, "%s is %+v, upstream's %+v (unit offset %d)", name, mine, expected, theirs.Offset)
 	}
 }
 
-func (c *comparison) list(path string, name string, mine []*Node, theirs []*jsonNode, present bool) {
+func (comparison *comparison) list(path string, name string, mine []*Node, theirs []*jsonNode, present bool) {
 	if !present {
 		if mine != nil {
-			c.differ(path, "%s is %d nodes where upstream has no such field", name, len(mine))
+			comparison.differ(path, "%s is %d nodes where upstream has no such field", name, len(mine))
 		}
 		return
 	}
 	if mine == nil || theirs == nil {
 		// encoding/json decodes null as a nil slice and [] as an empty one.
 		if (mine == nil) != (theirs == nil) {
-			c.differ(path, "%s: one side is null, the other an array (the port's is nil: %v)", name, mine == nil)
+			comparison.differ(path, "%s: one side is null, the other an array (the port's is nil: %v)", name, mine == nil)
 		}
 		return
 	}
 	if len(mine) != len(theirs) {
-		c.differ(path, "%s has %d nodes, upstream's %d", name, len(mine), len(theirs))
+		comparison.differ(path, "%s has %d nodes, upstream's %d", name, len(mine), len(theirs))
 		return
 	}
 	for index := range mine {
-		c.node(fmt.Sprintf("%s.%s[%d]", path, name, index), mine[index], theirs[index])
+		comparison.node(fmt.Sprintf("%s.%s[%d]", path, name, index), mine[index], theirs[index])
 	}
 }
 
-func (c *comparison) node(path string, mine *Node, theirs *jsonNode) {
+func (comparison *comparison) node(path string, mine *Node, theirs *jsonNode) {
 	if theirs == nil || theirs.Undefined {
 		if mine != nil {
-			c.differ(path, "is a %s where upstream's is null", mine.NodeType)
+			comparison.differ(path, "is a %s where upstream's is null", mine.NodeType)
 		}
 		return
 	}
 	if mine == nil {
-		c.differ(path, "is nil where upstream's is a %s", theirs.Type)
+		comparison.differ(path, "is nil where upstream's is a %s", theirs.Type)
 		return
 	}
 	path = path + "<" + theirs.Type + ">"
 
 	// Identity: one object upstream is one node here, and the other way round.
-	if known, seen := c.byID[theirs.ID]; seen {
+	if known, seen := comparison.byID[theirs.ID]; seen {
 		if known != mine {
-			c.differ(path, "upstream reaches its object #%d again, the port a different node", theirs.ID)
+			comparison.differ(path, "upstream reaches its object #%d again, the port a different node", theirs.ID)
 		}
 	} else {
-		c.byID[theirs.ID] = mine
+		comparison.byID[theirs.ID] = mine
 	}
-	if known, seen := c.idOf[mine]; seen {
+	if known, seen := comparison.idOf[mine]; seen {
 		if known != theirs.ID {
-			c.differ(path, "the port reaches one node as upstream's objects #%d and #%d", known, theirs.ID)
+			comparison.differ(path, "the port reaches one node as upstream's objects #%d and #%d", known, theirs.ID)
 		}
 	} else {
-		c.idOf[mine] = theirs.ID
+		comparison.idOf[mine] = theirs.ID
 	}
-	c.parents[mine] = theirs.Parent
+	comparison.parents[mine] = theirs.Parent
 
 	has := func(key string) bool { return slices.Contains(theirs.Keys, key) }
 	if mine.NodeType != theirs.Type {
-		c.differ(path, "type is %q", mine.NodeType)
+		comparison.differ(path, "type is %q", mine.NodeType)
 	}
-	c.point(path, "start", mine.Position.Start, theirs.Position.Start)
-	c.point(path, "end", mine.Position.End, theirs.Position.End)
+	comparison.point(path, "start", mine.Position.Start, theirs.Position.Start)
+	comparison.point(path, "end", mine.Position.End, theirs.Position.End)
 	if hasLeadingCommentsField(mine.NodeType) != has("leadingComments") || hasTrailingCommentField(mine.NodeType) != has("trailingComment") ||
 		hasChildrenField(mine.NodeType) != has("children") {
-		c.differ(path, "the port's field predicates disagree with upstream's keys %v", theirs.Keys)
+		comparison.differ(path, "the port's field predicates disagree with upstream's keys %v", theirs.Keys)
 	}
 
 	stringField := func(name string, mineValue string, theirsValue *string) {
@@ -275,35 +275,35 @@ func (c *comparison) node(path string, mine *Node, theirs *jsonNode) {
 			expected = *theirsValue
 		}
 		if jsonString(mineValue) != expected {
-			c.differ(path, "%s is %q, upstream's %q", name, mineValue, expected)
+			comparison.differ(path, "%s is %q, upstream's %q", name, mineValue, expected)
 		}
 	}
 	stringField("value", mine.Value, theirs.Value)
 	stringField("chomping", mine.Chomping, theirs.Chomping)
 	stringField("name", mine.Name, theirs.Name)
 	if (mine.Indent == nil) != (theirs.Indent == nil) || mine.Indent != nil && *mine.Indent != *theirs.Indent {
-		c.differ(path, "indent differs")
+		comparison.differ(path, "indent differs")
 	}
 	boolField := func(name string, mineValue bool, theirsValue *bool) {
 		if mineValue != (theirsValue != nil && *theirsValue) {
-			c.differ(path, "%s is %v", name, mineValue)
+			comparison.differ(path, "%s is %v", name, mineValue)
 		}
 	}
 	boolField("directivesEndMarker", mine.DirectivesEndMarker, theirs.DirectivesEndMarker)
 	boolField("documentEndMarker", mine.DocumentEndMarker, theirs.DocumentEndMarker)
 	if has("parameters") != (mine.Parameters != nil) || !slices.Equal(mine.Parameters, theirs.Parameters) {
-		c.differ(path, "parameters are %q, upstream's %q", mine.Parameters, theirs.Parameters)
+		comparison.differ(path, "parameters are %q, upstream's %q", mine.Parameters, theirs.Parameters)
 	}
 
-	c.list(path, "children", mine.Children, theirs.Children, has("children"))
-	c.node(path+".tag", mine.Tag, theirs.Tag)
-	c.node(path+".anchor", mine.Anchor, theirs.Anchor)
-	c.list(path, "middleComments", mine.MiddleComments, theirs.MiddleComments, has("middleComments"))
-	c.list(path, "leadingComments", mine.LeadingComments, theirs.LeadingComments, has("leadingComments"))
-	c.node(path+".indicatorComment", mine.IndicatorComment, theirs.IndicatorComment)
-	c.node(path+".trailingComment", mine.TrailingComment, theirs.TrailingComment)
-	c.list(path, "endComments", mine.EndComments, theirs.EndComments, has("endComments"))
-	c.list(path, "comments", mine.Comments, theirs.Comments, has("comments"))
+	comparison.list(path, "children", mine.Children, theirs.Children, has("children"))
+	comparison.node(path+".tag", mine.Tag, theirs.Tag)
+	comparison.node(path+".anchor", mine.Anchor, theirs.Anchor)
+	comparison.list(path, "middleComments", mine.MiddleComments, theirs.MiddleComments, has("middleComments"))
+	comparison.list(path, "leadingComments", mine.LeadingComments, theirs.LeadingComments, has("leadingComments"))
+	comparison.node(path+".indicatorComment", mine.IndicatorComment, theirs.IndicatorComment)
+	comparison.node(path+".trailingComment", mine.TrailingComment, theirs.TrailingComment)
+	comparison.list(path, "endComments", mine.EndComments, theirs.EndComments, has("endComments"))
+	comparison.list(path, "comments", mine.Comments, theirs.Comments, has("comments"))
 }
 
 // compareParse compares Parse's result for the text with the oracle's and returns the differences.

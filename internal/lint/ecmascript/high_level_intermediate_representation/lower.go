@@ -250,8 +250,8 @@ type jumpTarget struct {
 // ---------------------------------------------------------------------------
 
 // reserve allocates a block that will be filled later.
-func (b *builder) reserve(kind BlockKind) *BasicBlock {
-	return b.function.NewBlock(kind)
+func (builder *builder) reserve(kind BlockKind) *BasicBlock {
+	return builder.function.NewBlock(kind)
 }
 
 // terminateWith closes the current block with a terminal.
@@ -259,39 +259,39 @@ func (b *builder) reserve(kind BlockKind) *BasicBlock {
 // The block that follows is left unset; the caller must call `enter` before lowering anything else.
 // A caller that forgets gets a nil-pointer panic at the next append rather than silent misplacement,
 // which is the failure mode worth having.
-func (b *builder) terminateWith(terminal Terminal) {
-	if b.currentBlock == nil {
+func (builder *builder) terminateWith(terminal Terminal) {
+	if builder.currentBlock == nil {
 		return
 	}
-	b.currentBlock.Terminal = terminal
-	b.currentBlock = nil
+	builder.currentBlock.Terminal = terminal
+	builder.currentBlock = nil
 }
 
 // enter makes a reserved block current.
-func (b *builder) enter(block *BasicBlock) {
-	b.currentBlock = block
+func (builder *builder) enter(block *BasicBlock) {
+	builder.currentBlock = block
 }
 
 // terminateAndEnter closes the current block and makes next current.
-func (b *builder) terminateAndEnter(terminal Terminal, next *BasicBlock) {
-	b.terminateWith(terminal)
-	b.enter(next)
+func (builder *builder) terminateAndEnter(terminal Terminal, next *BasicBlock) {
+	builder.terminateWith(terminal)
+	builder.enter(next)
 }
 
 // gotoBlock closes the current block with an unconditional jump.
-func (b *builder) gotoBlock(target static_single_assignment.BlockId, variant GotoVariant) {
-	b.terminateWith(&Goto{Block: target, Variant: variant})
+func (builder *builder) gotoBlock(target static_single_assignment.BlockId, variant GotoVariant) {
+	builder.terminateWith(&Goto{Block: target, Variant: variant})
 }
 
 // ensureBlock guarantees there is a current block to append to.
 //
 // Code after an abrupt exit is lowered into a block nothing reaches rather than dropped, matching
 // what `controlflow` does. ReversePostorder removes it afterwards.
-func (b *builder) ensureBlock() *BasicBlock {
-	if b.currentBlock == nil {
-		b.currentBlock = b.reserve(BlockKindBlock)
+func (builder *builder) ensureBlock() *BasicBlock {
+	if builder.currentBlock == nil {
+		builder.currentBlock = builder.reserve(BlockKindBlock)
 	}
-	return b.currentBlock
+	return builder.currentBlock
 }
 
 // ---------------------------------------------------------------------------
@@ -299,8 +299,8 @@ func (b *builder) ensureBlock() *BasicBlock {
 // ---------------------------------------------------------------------------
 
 // newTemporary mints an unnamed value.
-func (b *builder) newTemporary(node *ast.Node) Place {
-	identifier := b.function.NewIdentifier("", node, 0)
+func (builder *builder) newTemporary(node *ast.Node) Place {
+	identifier := builder.function.NewIdentifier("", node, 0)
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
 }
 
@@ -314,8 +314,8 @@ func (b *builder) newTemporary(node *ast.Node) Place {
 //
 // Upstream gets this structurally: its `LogicalExpression` case stores into a single `place` in both
 // arms and construction versions that one binding.
-func (b *builder) newTemporaryUnder(node *ast.Node, shared static_single_assignment.DeclarationId) Place {
-	identifier := b.function.NewIdentifier("", node, shared)
+func (builder *builder) newTemporaryUnder(node *ast.Node, shared static_single_assignment.DeclarationId) Place {
+	identifier := builder.function.NewIdentifier("", node, shared)
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
 }
 
@@ -333,11 +333,11 @@ func (b *builder) newTemporaryUnder(node *ast.Node, shared static_single_assignm
 // so whichever value reached a declaration first claimed it and the real binding was dropped with
 // the losing scope stack. A binding whose store sat inside a scope then registered no declaration
 // for it, and `PruneUnusedScopes` removed the scope for declaring nothing.
-func (b *builder) declarationOf(symbol *ast.Symbol) static_single_assignment.DeclarationId {
+func (builder *builder) declarationOf(symbol *ast.Symbol) static_single_assignment.DeclarationId {
 	if symbol == nil {
 		return 0
 	}
-	if declaration, ok := b.declarations[symbol]; ok {
+	if declaration, ok := builder.declarations[symbol]; ok {
 		return declaration
 	}
 	return 0
@@ -356,14 +356,14 @@ func (b *builder) declarationOf(symbol *ast.Symbol) static_single_assignment.Dec
 // functions up produces a capture in the middle function too, and the middle function's own
 // `Context` grows to match. Without that the pairing would name an identifier that does not exist
 // in this function's table.
-func (b *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place) {
-	nested := lowerNested(node, b.typeChecker, b)
+func (builder *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place) {
+	nested := lowerNested(node, builder.typeChecker, builder)
 	if nested == nil {
 		return nil, nil
 	}
 
-	nestedBuilder := b.lastNested
-	b.lastNested = nil
+	nestedBuilder := builder.lastNested
+	builder.lastNested = nil
 	if nestedBuilder == nil {
 		return nested, nil
 	}
@@ -377,11 +377,11 @@ func (b *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place) {
 		}
 		// The value THIS function names the binding by: a local if this function declared it, or a
 		// capture of its own if an enclosing one did.
-		if identifier, ok := b.identifiers[symbol]; ok {
+		if identifier, ok := builder.identifiers[symbol]; ok {
 			captures = append(captures, Place{Identifier: identifier})
 			continue
 		}
-		if place, ok := b.captureOf(symbol); ok {
+		if place, ok := builder.captureOf(symbol); ok {
 			captures = append(captures, place)
 			continue
 		}
@@ -419,18 +419,18 @@ func (b *builder) lowerNestedFunction(node *ast.Node) (*Function, []Place) {
 // answer the `globals` rule already depends on. The walk goes outward through every enclosing
 // builder, so a binding captured through two function boundaries is found at the depth that
 // declared it.
-func (b *builder) captureOf(symbol *ast.Symbol) (Place, bool) {
-	if symbol == nil || b.enclosing == nil {
+func (builder *builder) captureOf(symbol *ast.Symbol) (Place, bool) {
+	if symbol == nil || builder.enclosing == nil {
 		return Place{}, false
 	}
-	if identifier, ok := b.captured[symbol]; ok {
+	if identifier, ok := builder.captured[symbol]; ok {
 		return Place{Identifier: identifier}, true
 	}
 
 	// Find the enclosing function that declared this binding. Nothing about the value it holds
 	// there is copied: only the fact that it is a local of some enclosing function.
 	declaredOutside := false
-	for scope := b.enclosing; scope != nil; scope = scope.enclosing {
+	for scope := builder.enclosing; scope != nil; scope = scope.enclosing {
 		if _, ok := scope.identifiers[symbol]; ok {
 			declaredOutside = true
 			break
@@ -448,9 +448,9 @@ func (b *builder) captureOf(symbol *ast.Symbol) (Place, bool) {
 	if symbol.Name != "" {
 		name = symbol.Name
 	}
-	identifier := b.function.NewIdentifier(name, nil, 0)
-	b.captured[symbol] = identifier.Id
-	b.function.Context = append(b.function.Context, Place{Identifier: identifier.Id})
+	identifier := builder.function.NewIdentifier(name, nil, 0)
+	builder.captured[symbol] = identifier.Id
+	builder.function.Context = append(builder.function.Context, Place{Identifier: identifier.Id})
 	return Place{Identifier: identifier.Id}, true
 }
 
@@ -460,10 +460,10 @@ func (b *builder) captureOf(symbol *ast.Symbol) (Place, bool) {
 // order and the two must correspond index for index: `FunctionExpression.Captures[i]` is the
 // enclosing function's value for `nested.Context[i]`. A Go map cannot supply that, which is the
 // same reason `BasicBlock.Predecessors` is a slice.
-func (b *builder) capturedSymbolsInOrder() []*ast.Symbol {
-	ordered := make([]*ast.Symbol, len(b.function.Context))
-	for symbol, identifier := range b.captured {
-		for index, place := range b.function.Context {
+func (builder *builder) capturedSymbolsInOrder() []*ast.Symbol {
+	ordered := make([]*ast.Symbol, len(builder.function.Context))
+	for symbol, identifier := range builder.captured {
+		for index, place := range builder.function.Context {
 			if place.Identifier == identifier {
 				ordered[index] = symbol
 				break
@@ -474,31 +474,31 @@ func (b *builder) capturedSymbolsInOrder() []*ast.Symbol {
 }
 
 // bind creates a new value for a named binding and records it as that binding's current value.
-func (b *builder) bind(name string, symbol *ast.Symbol, node *ast.Node) Place {
-	declaration := b.declarationOf(symbol)
-	identifier := b.function.NewIdentifier(name, node, declaration)
+func (builder *builder) bind(name string, symbol *ast.Symbol, node *ast.Node) Place {
+	declaration := builder.declarationOf(symbol)
+	identifier := builder.function.NewIdentifier(name, node, declaration)
 	if symbol != nil {
 		// The first value a symbol takes names the binding for every value after it, which is what
 		// makes `let x = 1; x = 2` one declaration across two identifiers.
 		if declaration == 0 {
-			b.declarations[symbol] = identifier.Declaration
+			builder.declarations[symbol] = identifier.Declaration
 		}
-		b.identifiers[symbol] = identifier.Id
+		builder.identifiers[symbol] = identifier.Id
 	}
 	return Place{Identifier: identifier.Id, Range: rangeOf(node)}
 }
 
 // emit appends an instruction storing into a fresh temporary, and returns that temporary.
-func (b *builder) emit(value InstructionValue, node *ast.Node) Place {
-	lvalue := b.newTemporary(node)
-	b.emitTo(lvalue, value, node)
+func (builder *builder) emit(value InstructionValue, node *ast.Node) Place {
+	lvalue := builder.newTemporary(node)
+	builder.emitTo(lvalue, value, node)
 	return lvalue
 }
 
 // emitTo appends an instruction storing into a given place.
-func (b *builder) emitTo(lvalue Place, value InstructionValue, node *ast.Node) {
-	block := b.ensureBlock()
-	b.function.AddInstruction(block, &Instruction{
+func (builder *builder) emitTo(lvalue Place, value InstructionValue, node *ast.Node) {
+	block := builder.ensureBlock()
+	builder.function.AddInstruction(block, &Instruction{
 		LValue: lvalue,
 		Value:  value,
 		Node:   node,
@@ -510,7 +510,7 @@ func (b *builder) emitTo(lvalue Place, value InstructionValue, node *ast.Node) {
 // Parameters
 // ---------------------------------------------------------------------------
 
-func (b *builder) lowerParams(node *ast.Node) {
+func (builder *builder) lowerParams(node *ast.Node) {
 	parameters := functionParameters(node)
 	if parameters == nil {
 		return
@@ -524,14 +524,14 @@ func (b *builder) lowerParams(node *ast.Node) {
 		// A destructured parameter becomes a temporary plus a Destructure in the entry block, so
 		// Function.Params stays flat and a pass reading it never walks a pattern.
 		if name.Kind == ast.KindIdentifier {
-			place := b.bind(name.Text(), b.symbolOf(name), name)
-			b.function.Params = append(b.function.Params, place)
+			place := builder.bind(name.Text(), builder.symbolOf(name), name)
+			builder.function.Params = append(builder.function.Params, place)
 			continue
 		}
-		temporary := b.newTemporary(name)
-		b.function.Params = append(b.function.Params, temporary)
-		pattern := b.lowerPattern(name)
-		b.emit(&Destructure{LValue: pattern, Value: temporary, Kind: InstructionKindLet, Pattern: pattern}, name)
+		temporary := builder.newTemporary(name)
+		builder.function.Params = append(builder.function.Params, temporary)
+		pattern := builder.lowerPattern(name)
+		builder.emit(&Destructure{LValue: pattern, Value: temporary, Kind: InstructionKindLet, Pattern: pattern}, name)
 	}
 }
 
@@ -539,12 +539,12 @@ func (b *builder) lowerParams(node *ast.Node) {
 // Statements
 // ---------------------------------------------------------------------------
 
-func (b *builder) lowerStatements(statements *ast.NodeList) {
+func (builder *builder) lowerStatements(statements *ast.NodeList) {
 	if statements == nil {
 		return
 	}
 	for _, statement := range statements.Nodes {
-		b.lowerStatement(statement, "")
+		builder.lowerStatement(statement, "")
 	}
 }
 
@@ -553,91 +553,91 @@ func (b *builder) lowerStatements(statements *ast.NodeList) {
 // label is the label attached to this statement by an enclosing LabeledStatement, empty otherwise.
 // It is threaded rather than looked up because a labeled loop must push its jump target with the
 // label attached, and the loop is what knows its own continue block.
-func (b *builder) lowerStatement(node *ast.Node, label string) {
+func (builder *builder) lowerStatement(node *ast.Node, label string) {
 	if node == nil {
 		return
 	}
 	switch node.Kind {
 	case ast.KindBlock:
-		b.lowerStatements(node.AsBlock().Statements)
+		builder.lowerStatements(node.AsBlock().Statements)
 
 	case ast.KindEmptyStatement:
 		// Nothing.
 
 	case ast.KindDebuggerStatement:
-		b.emit(&Debugger{}, node)
+		builder.emit(&Debugger{}, node)
 
 	case ast.KindExpressionStatement:
-		b.lowerExpressionToPlace(node.AsExpressionStatement().Expression)
+		builder.lowerExpressionToPlace(node.AsExpressionStatement().Expression)
 
 	case ast.KindVariableStatement:
-		b.lowerVariableDeclarationList(node.AsVariableStatement().DeclarationList)
+		builder.lowerVariableDeclarationList(node.AsVariableStatement().DeclarationList)
 
 	case ast.KindIfStatement:
-		b.lowerIfStatement(node)
+		builder.lowerIfStatement(node)
 
 	case ast.KindReturnStatement:
-		b.lowerReturnStatement(node)
+		builder.lowerReturnStatement(node)
 
 	case ast.KindThrowStatement:
-		value := b.lowerExpressionToPlace(node.AsThrowStatement().Expression)
-		b.terminateWith(&Throw{Value: value})
+		value := builder.lowerExpressionToPlace(node.AsThrowStatement().Expression)
+		builder.terminateWith(&Throw{Value: value})
 
 	case ast.KindWhileStatement:
-		b.lowerWhileStatement(node, label)
+		builder.lowerWhileStatement(node, label)
 
 	case ast.KindDoStatement:
-		b.lowerDoStatement(node, label)
+		builder.lowerDoStatement(node, label)
 
 	case ast.KindForStatement:
-		b.lowerForStatement(node, label)
+		builder.lowerForStatement(node, label)
 
 	case ast.KindForOfStatement:
-		b.lowerForOfStatement(node, label)
+		builder.lowerForOfStatement(node, label)
 
 	case ast.KindForInStatement:
-		b.lowerForInStatement(node, label)
+		builder.lowerForInStatement(node, label)
 
 	case ast.KindSwitchStatement:
-		b.lowerSwitchStatement(node, label)
+		builder.lowerSwitchStatement(node, label)
 
 	case ast.KindTryStatement:
-		b.lowerTryStatement(node)
+		builder.lowerTryStatement(node)
 
 	case ast.KindBreakStatement:
-		b.lowerBreakStatement(node)
+		builder.lowerBreakStatement(node)
 
 	case ast.KindContinueStatement:
-		b.lowerContinueStatement(node)
+		builder.lowerContinueStatement(node)
 
 	case ast.KindLabeledStatement:
-		b.lowerLabeledStatement(node)
+		builder.lowerLabeledStatement(node)
 
 	case ast.KindFunctionDeclaration:
-		b.lowerFunctionDeclaration(node)
+		builder.lowerFunctionDeclaration(node)
 
 	case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
 		// Types are erased. Nothing runs.
 
 	default:
-		b.emit(&UnsupportedNode{Node: node, Reason: node.Kind.String()}, node)
+		builder.emit(&UnsupportedNode{Node: node, Reason: node.Kind.String()}, node)
 	}
 }
 
-func (b *builder) lowerReturnStatement(node *ast.Node) {
+func (builder *builder) lowerReturnStatement(node *ast.Node) {
 	statement := node.AsReturnStatement()
-	value := b.function.Returns
+	value := builder.function.Returns
 	if statement.Expression != nil {
-		result := b.lowerExpressionToPlace(statement.Expression)
-		b.emitTo(b.function.Returns, &LoadLocal{Place: result}, node)
-		value = b.function.Returns
+		result := builder.lowerExpressionToPlace(statement.Expression)
+		builder.emitTo(builder.function.Returns, &LoadLocal{Place: result}, node)
+		value = builder.function.Returns
 	} else {
-		b.emitTo(b.function.Returns, &Primitive{Value: nil}, node)
+		builder.emitTo(builder.function.Returns, &Primitive{Value: nil}, node)
 	}
-	b.terminateWith(&Return{Value: value})
+	builder.terminateWith(&Return{Value: value})
 }
 
-func (b *builder) lowerVariableDeclarationList(node *ast.Node) {
+func (builder *builder) lowerVariableDeclarationList(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -647,11 +647,11 @@ func (b *builder) lowerVariableDeclarationList(node *ast.Node) {
 		kind = InstructionKindConst
 	}
 	for _, declaration := range list.Declarations.Nodes {
-		b.lowerVariableDeclaration(declaration, kind)
+		builder.lowerVariableDeclaration(declaration, kind)
 	}
 }
 
-func (b *builder) lowerVariableDeclaration(node *ast.Node, kind InstructionKind) {
+func (builder *builder) lowerVariableDeclaration(node *ast.Node, kind InstructionKind) {
 	declaration := node.AsVariableDeclaration()
 	name := declaration.Name()
 	if name == nil {
@@ -660,133 +660,133 @@ func (b *builder) lowerVariableDeclaration(node *ast.Node, kind InstructionKind)
 
 	if declaration.Initializer == nil {
 		if name.Kind == ast.KindIdentifier {
-			place := b.bind(name.Text(), b.symbolOf(name), name)
-			b.emit(&DeclareLocal{LValue: place, Kind: kind}, node)
+			place := builder.bind(name.Text(), builder.symbolOf(name), name)
+			builder.emit(&DeclareLocal{LValue: place, Kind: kind}, node)
 		}
 		return
 	}
 
-	value := b.lowerExpressionToPlace(declaration.Initializer)
+	value := builder.lowerExpressionToPlace(declaration.Initializer)
 	if name.Kind == ast.KindIdentifier {
-		place := b.bind(name.Text(), b.symbolOf(name), name)
-		b.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, node)
+		place := builder.bind(name.Text(), builder.symbolOf(name), name)
+		builder.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, node)
 		return
 	}
-	pattern := b.lowerPattern(name)
-	b.emit(&Destructure{LValue: pattern, Value: value, Kind: kind, Pattern: pattern}, node)
+	pattern := builder.lowerPattern(name)
+	builder.emit(&Destructure{LValue: pattern, Value: value, Kind: kind, Pattern: pattern}, node)
 }
 
-func (b *builder) lowerIfStatement(node *ast.Node) {
+func (builder *builder) lowerIfStatement(node *ast.Node) {
 	statement := node.AsIfStatement()
-	test := b.lowerExpressionToPlace(statement.Expression)
+	test := builder.lowerExpressionToPlace(statement.Expression)
 
-	consequent := b.reserve(BlockKindBlock)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	consequent := builder.reserve(BlockKindBlock)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 	alternate := fallthroughBlock
 	if statement.ElseStatement != nil {
-		alternate = b.reserve(BlockKindBlock)
+		alternate = builder.reserve(BlockKindBlock)
 	}
 
-	b.terminateWith(&If{
+	builder.terminateWith(&If{
 		Test:        test,
 		Consequent:  consequent.Id,
 		Alternate:   alternate.Id,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.enter(consequent)
-	b.lowerStatement(statement.ThenStatement, "")
-	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+	builder.enter(consequent)
+	builder.lowerStatement(statement.ThenStatement, "")
+	builder.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 
 	if statement.ElseStatement != nil {
-		b.enter(alternate)
-		b.lowerStatement(statement.ElseStatement, "")
-		b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+		builder.enter(alternate)
+		builder.lowerStatement(statement.ElseStatement, "")
+		builder.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 	}
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
 // ---------------------------------------------------------------------------
 // Loops
 // ---------------------------------------------------------------------------
 
-func (b *builder) lowerWhileStatement(node *ast.Node, label string) {
+func (builder *builder) lowerWhileStatement(node *ast.Node, label string) {
 	statement := node.AsWhileStatement()
 
-	test := b.reserve(BlockKindBlock)
-	loop := b.reserve(BlockKindLoop)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	test := builder.reserve(BlockKindBlock)
+	loop := builder.reserve(BlockKindLoop)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
-	b.terminateAndEnter(&While{
+	builder.terminateAndEnter(&While{
 		Test:        test.Id,
 		Loop:        loop.Id,
 		Fallthrough: fallthroughBlock.Id,
 	}, test)
 
-	testValue := b.lowerExpressionToPlace(statement.Expression)
-	b.terminateWith(&Branch{
+	testValue := builder.lowerExpressionToPlace(statement.Expression)
+	builder.terminateWith(&Branch{
 		Test:        testValue,
 		Consequent:  loop.Id,
 		Alternate:   fallthroughBlock.Id,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.enter(loop)
-	b.pushJump(label, fallthroughBlock.Id, test.Id)
-	b.lowerStatement(statement.Statement, "")
-	b.popJump()
-	b.gotoBlock(test.Id, GotoVariantContinue)
+	builder.enter(loop)
+	builder.pushJump(label, fallthroughBlock.Id, test.Id)
+	builder.lowerStatement(statement.Statement, "")
+	builder.popJump()
+	builder.gotoBlock(test.Id, GotoVariantContinue)
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
-func (b *builder) lowerDoStatement(node *ast.Node, label string) {
+func (builder *builder) lowerDoStatement(node *ast.Node, label string) {
 	statement := node.AsDoStatement()
 
-	loop := b.reserve(BlockKindLoop)
-	test := b.reserve(BlockKindBlock)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	loop := builder.reserve(BlockKindLoop)
+	test := builder.reserve(BlockKindBlock)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
-	b.terminateAndEnter(&DoWhile{
+	builder.terminateAndEnter(&DoWhile{
 		Loop:        loop.Id,
 		Test:        test.Id,
 		Fallthrough: fallthroughBlock.Id,
 	}, loop)
 
 	// A `continue` in a do-while restarts at the test, not at the body.
-	b.pushJump(label, fallthroughBlock.Id, test.Id)
-	b.lowerStatement(statement.Statement, "")
-	b.popJump()
-	b.gotoBlock(test.Id, GotoVariantContinue)
+	builder.pushJump(label, fallthroughBlock.Id, test.Id)
+	builder.lowerStatement(statement.Statement, "")
+	builder.popJump()
+	builder.gotoBlock(test.Id, GotoVariantContinue)
 
-	b.enter(test)
-	testValue := b.lowerExpressionToPlace(statement.Expression)
-	b.terminateWith(&Branch{
+	builder.enter(test)
+	testValue := builder.lowerExpressionToPlace(statement.Expression)
+	builder.terminateWith(&Branch{
 		Test:        testValue,
 		Consequent:  loop.Id,
 		Alternate:   fallthroughBlock.Id,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
-func (b *builder) lowerForStatement(node *ast.Node, label string) {
+func (builder *builder) lowerForStatement(node *ast.Node, label string) {
 	statement := node.AsForStatement()
 
-	init := b.reserve(BlockKindBlock)
-	test := b.reserve(BlockKindBlock)
-	loop := b.reserve(BlockKindLoop)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	init := builder.reserve(BlockKindBlock)
+	test := builder.reserve(BlockKindBlock)
+	loop := builder.reserve(BlockKindLoop)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 	update := InvalidBlock
 	var updateBlock *BasicBlock
 	if statement.Incrementor != nil {
-		updateBlock = b.reserve(BlockKindBlock)
+		updateBlock = builder.reserve(BlockKindBlock)
 		update = updateBlock.Id
 	}
 
-	b.terminateAndEnter(&For{
+	builder.terminateAndEnter(&For{
 		Init:        init.Id,
 		Test:        test.Id,
 		Update:      update,
@@ -796,17 +796,17 @@ func (b *builder) lowerForStatement(node *ast.Node, label string) {
 
 	if statement.Initializer != nil {
 		if statement.Initializer.Kind == ast.KindVariableDeclarationList {
-			b.lowerVariableDeclarationList(statement.Initializer)
+			builder.lowerVariableDeclarationList(statement.Initializer)
 		} else {
-			b.lowerExpressionToPlace(statement.Initializer)
+			builder.lowerExpressionToPlace(statement.Initializer)
 		}
 	}
-	b.gotoBlock(test.Id, GotoVariantBreak)
+	builder.gotoBlock(test.Id, GotoVariantBreak)
 
-	b.enter(test)
+	builder.enter(test)
 	if statement.Condition != nil {
-		testValue := b.lowerExpressionToPlace(statement.Condition)
-		b.terminateWith(&Branch{
+		testValue := builder.lowerExpressionToPlace(statement.Condition)
+		builder.terminateWith(&Branch{
 			Test:        testValue,
 			Consequent:  loop.Id,
 			Alternate:   fallthroughBlock.Id,
@@ -814,37 +814,37 @@ func (b *builder) lowerForStatement(node *ast.Node, label string) {
 		})
 	} else {
 		// `for (;;)` never leaves through the test.
-		b.gotoBlock(loop.Id, GotoVariantBreak)
+		builder.gotoBlock(loop.Id, GotoVariantBreak)
 	}
 
-	b.enter(loop)
+	builder.enter(loop)
 	continueTarget := test.Id
 	if updateBlock != nil {
 		continueTarget = updateBlock.Id
 	}
-	b.pushJump(label, fallthroughBlock.Id, continueTarget)
-	b.lowerStatement(statement.Statement, "")
-	b.popJump()
-	b.gotoBlock(continueTarget, GotoVariantContinue)
+	builder.pushJump(label, fallthroughBlock.Id, continueTarget)
+	builder.lowerStatement(statement.Statement, "")
+	builder.popJump()
+	builder.gotoBlock(continueTarget, GotoVariantContinue)
 
 	if updateBlock != nil {
-		b.enter(updateBlock)
-		b.lowerExpressionToPlace(statement.Incrementor)
-		b.gotoBlock(test.Id, GotoVariantBreak)
+		builder.enter(updateBlock)
+		builder.lowerExpressionToPlace(statement.Incrementor)
+		builder.gotoBlock(test.Id, GotoVariantBreak)
 	}
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
-func (b *builder) lowerForOfStatement(node *ast.Node, label string) {
+func (builder *builder) lowerForOfStatement(node *ast.Node, label string) {
 	statement := node.AsForInOrOfStatement()
 
-	init := b.reserve(BlockKindLoop)
-	test := b.reserve(BlockKindLoop)
-	loop := b.reserve(BlockKindLoop)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	init := builder.reserve(BlockKindLoop)
+	test := builder.reserve(BlockKindLoop)
+	loop := builder.reserve(BlockKindLoop)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
-	b.terminateAndEnter(&ForOf{
+	builder.terminateAndEnter(&ForOf{
 		Init:        init.Id,
 		Test:        test.Id,
 		Loop:        loop.Id,
@@ -853,63 +853,63 @@ func (b *builder) lowerForOfStatement(node *ast.Node, label string) {
 
 	// The iterator protocol is instructions, not terminal payload, so an effect pass can see that
 	// iterating mutates the iterator.
-	collection := b.lowerExpressionToPlace(statement.Expression)
-	iterator := b.emit(&GetIterator{Value: collection}, statement.Expression)
-	b.gotoBlock(test.Id, GotoVariantBreak)
+	collection := builder.lowerExpressionToPlace(statement.Expression)
+	iterator := builder.emit(&GetIterator{Value: collection}, statement.Expression)
+	builder.gotoBlock(test.Id, GotoVariantBreak)
 
-	b.enter(test)
-	next := b.emit(&IteratorNext{Iterator: iterator, Collection: collection}, node)
-	b.terminateWith(&Branch{
+	builder.enter(test)
+	next := builder.emit(&IteratorNext{Iterator: iterator, Collection: collection}, node)
+	builder.terminateWith(&Branch{
 		Test:        next,
 		Consequent:  loop.Id,
 		Alternate:   fallthroughBlock.Id,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.enter(loop)
-	b.lowerForBinding(statement.Initializer, next)
-	b.pushJump(label, fallthroughBlock.Id, test.Id)
-	b.lowerStatement(statement.Statement, "")
-	b.popJump()
-	b.gotoBlock(test.Id, GotoVariantContinue)
+	builder.enter(loop)
+	builder.lowerForBinding(statement.Initializer, next)
+	builder.pushJump(label, fallthroughBlock.Id, test.Id)
+	builder.lowerStatement(statement.Statement, "")
+	builder.popJump()
+	builder.gotoBlock(test.Id, GotoVariantContinue)
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
-func (b *builder) lowerForInStatement(node *ast.Node, label string) {
+func (builder *builder) lowerForInStatement(node *ast.Node, label string) {
 	statement := node.AsForInOrOfStatement()
 
-	init := b.reserve(BlockKindBlock)
-	loop := b.reserve(BlockKindLoop)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	init := builder.reserve(BlockKindBlock)
+	loop := builder.reserve(BlockKindLoop)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
-	b.terminateAndEnter(&ForIn{
+	builder.terminateAndEnter(&ForIn{
 		Init:        init.Id,
 		Loop:        loop.Id,
 		Fallthrough: fallthroughBlock.Id,
 	}, init)
 
-	object := b.lowerExpressionToPlace(statement.Expression)
-	key := b.emit(&NextPropertyOf{Value: object}, node)
-	b.terminateWith(&Branch{
+	object := builder.lowerExpressionToPlace(statement.Expression)
+	key := builder.emit(&NextPropertyOf{Value: object}, node)
+	builder.terminateWith(&Branch{
 		Test:        key,
 		Consequent:  loop.Id,
 		Alternate:   fallthroughBlock.Id,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.enter(loop)
-	b.lowerForBinding(statement.Initializer, key)
-	b.pushJump(label, fallthroughBlock.Id, init.Id)
-	b.lowerStatement(statement.Statement, "")
-	b.popJump()
-	b.gotoBlock(init.Id, GotoVariantContinue)
+	builder.enter(loop)
+	builder.lowerForBinding(statement.Initializer, key)
+	builder.pushJump(label, fallthroughBlock.Id, init.Id)
+	builder.lowerStatement(statement.Statement, "")
+	builder.popJump()
+	builder.gotoBlock(init.Id, GotoVariantContinue)
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
 // lowerForBinding binds the loop variable of a for-of or for-in to the value produced per iteration.
-func (b *builder) lowerForBinding(initializer *ast.Node, value Place) {
+func (builder *builder) lowerForBinding(initializer *ast.Node, value Place) {
 	if initializer == nil {
 		return
 	}
@@ -925,17 +925,17 @@ func (b *builder) lowerForBinding(initializer *ast.Node, value Place) {
 				continue
 			}
 			if name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), b.symbolOf(name), name)
-				b.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, name)
+				place := builder.bind(name.Text(), builder.symbolOf(name), name)
+				builder.emit(&StoreLocal{LValue: place, Value: value, Kind: kind}, name)
 				continue
 			}
-			pattern := b.lowerPattern(name)
-			b.emit(&Destructure{LValue: pattern, Value: value, Kind: kind, Pattern: pattern}, name)
+			pattern := builder.lowerPattern(name)
+			builder.emit(&Destructure{LValue: pattern, Value: value, Kind: kind, Pattern: pattern}, name)
 		}
 		return
 	}
 	// `for (x of xs)` with an existing binding.
-	b.lowerAssignmentTarget(initializer, value, InstructionKindReassign)
+	builder.lowerAssignmentTarget(initializer, value, InstructionKindReassign)
 }
 
 // ---------------------------------------------------------------------------
@@ -947,16 +947,16 @@ func (b *builder) lowerForBinding(initializer *ast.Node, value Place) {
 // Fallthrough between cases is represented by each case block's own terminal: a case that runs off
 // its end jumps to the next case block, and one that breaks jumps to the switch's fallthrough. That
 // is why the case blocks are all reserved before any is filled.
-func (b *builder) lowerSwitchStatement(node *ast.Node, label string) {
+func (builder *builder) lowerSwitchStatement(node *ast.Node, label string) {
 	statement := node.AsSwitchStatement()
-	test := b.lowerExpressionToPlace(statement.Expression)
+	test := builder.lowerExpressionToPlace(statement.Expression)
 
 	clauses := statement.CaseBlock.AsCaseBlock().Clauses.Nodes
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
 	blocks := make([]*BasicBlock, len(clauses))
 	for index := range clauses {
-		blocks[index] = b.reserve(BlockKindBlock)
+		blocks[index] = builder.reserve(BlockKindBlock)
 	}
 
 	cases := make([]SwitchCase, 0, len(clauses))
@@ -967,31 +967,31 @@ func (b *builder) lowerSwitchStatement(node *ast.Node, label string) {
 		}
 		// A case test is an expression evaluated at dispatch. It is lowered into the block holding
 		// the switch terminal, which is where it evaluates.
-		caseTest := b.lowerExpressionToPlace(clause.AsCaseOrDefaultClause().Expression)
+		caseTest := builder.lowerExpressionToPlace(clause.AsCaseOrDefaultClause().Expression)
 		cases = append(cases, SwitchCase{Test: &caseTest, Block: blocks[index].Id})
 	}
 
-	b.terminateWith(&Switch{
+	builder.terminateWith(&Switch{
 		Test:        test,
 		Cases:       cases,
 		Fallthrough: fallthroughBlock.Id,
 	})
 
-	b.pushJump(label, fallthroughBlock.Id, InvalidBlock)
+	builder.pushJump(label, fallthroughBlock.Id, InvalidBlock)
 	for index, clause := range clauses {
-		b.enter(blocks[index])
-		b.lowerStatements(clause.AsCaseOrDefaultClause().Statements)
+		builder.enter(blocks[index])
+		builder.lowerStatements(clause.AsCaseOrDefaultClause().Statements)
 
 		// Running off the end of a case falls into the next one, or past the switch.
 		next := fallthroughBlock.Id
 		if index+1 < len(blocks) {
 			next = blocks[index+1].Id
 		}
-		b.gotoBlock(next, GotoVariantBreak)
+		builder.gotoBlock(next, GotoVariantBreak)
 	}
-	b.popJump()
+	builder.popJump()
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
 // ---------------------------------------------------------------------------
@@ -1019,18 +1019,18 @@ func (b *builder) lowerSwitchStatement(node *ast.Node, label string) {
 // rethrows. That differs from `controlflow`, which gives a body that cannot throw no edge to its
 // catch at all. The reason is that "cannot throw" is a judgement a later, more precise pass may
 // revise, and a graph whose shape depends on it must be rebuilt when it changes.
-func (b *builder) lowerTryStatement(node *ast.Node) {
+func (builder *builder) lowerTryStatement(node *ast.Node) {
 	statement := node.AsTryStatement()
 
-	tryBlock := b.reserve(BlockKindBlock)
-	fallthroughBlock := b.reserve(BlockKindBlock)
+	tryBlock := builder.reserve(BlockKindBlock)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
 
 	hasCatch := statement.CatchClause != nil
 	hasFinally := statement.FinallyBlock != nil
 
 	var finallyBlock *BasicBlock
 	if hasFinally {
-		finallyBlock = b.reserve(BlockKindBlock)
+		finallyBlock = builder.reserve(BlockKindBlock)
 	}
 
 	// Where the body's normal completion goes: the finally if there is one, else past the statement.
@@ -1039,41 +1039,41 @@ func (b *builder) lowerTryStatement(node *ast.Node) {
 		normalExit = finallyBlock
 	}
 
-	handler := b.reserve(BlockKindCatch)
+	handler := builder.reserve(BlockKindCatch)
 	var handlerBinding *Place
 	if hasCatch {
 		catchClause := statement.CatchClause.AsCatchClause()
 		if catchClause.VariableDeclaration != nil {
 			name := catchClause.VariableDeclaration.AsVariableDeclaration().Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
-				place := b.bind(name.Text(), b.symbolOf(name), name)
+				place := builder.bind(name.Text(), builder.symbolOf(name), name)
 				handlerBinding = &place
 			}
 		}
 	}
 
-	b.terminateWith(&Try{
+	builder.terminateWith(&Try{
 		Block:          tryBlock.Id,
 		HandlerBinding: handlerBinding,
 		Handler:        handler.Id,
 		Fallthrough:    fallthroughBlock.Id,
 	})
 
-	b.enter(tryBlock)
-	b.handlers = append(b.handlers, handler.Id)
-	b.lowerStatement(statement.TryBlock, "")
-	b.handlers = b.handlers[:len(b.handlers)-1]
-	b.gotoBlock(normalExit.Id, GotoVariantTry)
+	builder.enter(tryBlock)
+	builder.handlers = append(builder.handlers, handler.Id)
+	builder.lowerStatement(statement.TryBlock, "")
+	builder.handlers = builder.handlers[:len(builder.handlers)-1]
+	builder.gotoBlock(normalExit.Id, GotoVariantTry)
 
-	b.enter(handler)
+	builder.enter(handler)
 	if hasCatch {
 		catchClause := statement.CatchClause.AsCatchClause()
 		if catchClause.VariableDeclaration != nil {
 			name := catchClause.VariableDeclaration.AsVariableDeclaration().Name()
 			if name != nil && name.Kind != ast.KindIdentifier && handlerBinding == nil {
-				temporary := b.newTemporary(name)
-				pattern := b.lowerPattern(name)
-				b.emit(&Destructure{
+				temporary := builder.newTemporary(name)
+				pattern := builder.lowerPattern(name)
+				builder.emit(&Destructure{
 					LValue:  pattern,
 					Value:   temporary,
 					Kind:    InstructionKindCatch,
@@ -1081,47 +1081,47 @@ func (b *builder) lowerTryStatement(node *ast.Node) {
 				}, name)
 			}
 		}
-		b.lowerStatement(catchClause.Block, "")
-		b.gotoBlock(normalExit.Id, GotoVariantTry)
+		builder.lowerStatement(catchClause.Block, "")
+		builder.gotoBlock(normalExit.Id, GotoVariantTry)
 	} else {
 		// try/finally with no catch: run the finally, then let the exception continue outward.
 		if hasFinally {
-			b.gotoBlock(finallyBlock.Id, GotoVariantTry)
+			builder.gotoBlock(finallyBlock.Id, GotoVariantTry)
 		} else {
-			b.terminateWith(&Unreachable{})
+			builder.terminateWith(&Unreachable{})
 		}
 	}
 
 	if hasFinally {
-		b.enter(finallyBlock)
-		b.lowerStatement(statement.FinallyBlock, "")
-		b.gotoBlock(fallthroughBlock.Id, GotoVariantTry)
+		builder.enter(finallyBlock)
+		builder.lowerStatement(statement.FinallyBlock, "")
+		builder.gotoBlock(fallthroughBlock.Id, GotoVariantTry)
 	}
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
 // ---------------------------------------------------------------------------
 // Labels and jumps
 // ---------------------------------------------------------------------------
 
-func (b *builder) pushJump(label string, breakBlock, continueBlock static_single_assignment.BlockId) {
-	b.jumps = append(b.jumps, jumpTarget{
+func (builder *builder) pushJump(label string, breakBlock, continueBlock static_single_assignment.BlockId) {
+	builder.jumps = append(builder.jumps, jumpTarget{
 		label:         label,
 		breakBlock:    breakBlock,
 		continueBlock: continueBlock,
 	})
 }
 
-func (b *builder) popJump() {
-	if len(b.jumps) > 0 {
-		b.jumps = b.jumps[:len(b.jumps)-1]
+func (builder *builder) popJump() {
+	if len(builder.jumps) > 0 {
+		builder.jumps = builder.jumps[:len(builder.jumps)-1]
 	}
 }
 
-func (b *builder) lookupBreak(label string) static_single_assignment.BlockId {
-	for index := len(b.jumps) - 1; index >= 0; index-- {
-		jump := b.jumps[index]
+func (builder *builder) lookupBreak(label string) static_single_assignment.BlockId {
+	for index := len(builder.jumps) - 1; index >= 0; index-- {
+		jump := builder.jumps[index]
 		if label == "" || jump.label == label {
 			return jump.breakBlock
 		}
@@ -1129,9 +1129,9 @@ func (b *builder) lookupBreak(label string) static_single_assignment.BlockId {
 	return InvalidBlock
 }
 
-func (b *builder) lookupContinue(label string) static_single_assignment.BlockId {
-	for index := len(b.jumps) - 1; index >= 0; index-- {
-		jump := b.jumps[index]
+func (builder *builder) lookupContinue(label string) static_single_assignment.BlockId {
+	for index := len(builder.jumps) - 1; index >= 0; index-- {
+		jump := builder.jumps[index]
 		if !HasBlock(jump.continueBlock) {
 			// A switch or labeled block cannot be continued; keep looking outward.
 			if label != "" && jump.label == label {
@@ -1146,30 +1146,30 @@ func (b *builder) lookupContinue(label string) static_single_assignment.BlockId 
 	return InvalidBlock
 }
 
-func (b *builder) lowerBreakStatement(node *ast.Node) {
+func (builder *builder) lowerBreakStatement(node *ast.Node) {
 	label := ""
 	if name := node.AsBreakStatement().Label; name != nil {
 		label = name.Text()
 	}
-	target := b.lookupBreak(label)
+	target := builder.lookupBreak(label)
 	if !HasBlock(target) {
-		b.terminateWith(&Unsupported{})
+		builder.terminateWith(&Unsupported{})
 		return
 	}
-	b.gotoBlock(target, GotoVariantBreak)
+	builder.gotoBlock(target, GotoVariantBreak)
 }
 
-func (b *builder) lowerContinueStatement(node *ast.Node) {
+func (builder *builder) lowerContinueStatement(node *ast.Node) {
 	label := ""
 	if name := node.AsContinueStatement().Label; name != nil {
 		label = name.Text()
 	}
-	target := b.lookupContinue(label)
+	target := builder.lookupContinue(label)
 	if !HasBlock(target) {
-		b.terminateWith(&Unsupported{})
+		builder.terminateWith(&Unsupported{})
 		return
 	}
-	b.gotoBlock(target, GotoVariantContinue)
+	builder.gotoBlock(target, GotoVariantContinue)
 }
 
 // lowerLabeledStatement lowers `label: statement`.
@@ -1177,25 +1177,25 @@ func (b *builder) lowerContinueStatement(node *ast.Node) {
 // A label on a loop is threaded into the loop, which pushes its own jump target carrying the label,
 // so `continue label` finds the loop's continue block. A label on anything else gets a Label
 // terminal, which only `break label` can target.
-func (b *builder) lowerLabeledStatement(node *ast.Node) {
+func (builder *builder) lowerLabeledStatement(node *ast.Node) {
 	statement := node.AsLabeledStatement()
 	label := statement.Label.Text()
 
 	if isLoopStatement(statement.Statement) {
-		b.lowerStatement(statement.Statement, label)
+		builder.lowerStatement(statement.Statement, label)
 		return
 	}
 
-	block := b.reserve(BlockKindBlock)
-	fallthroughBlock := b.reserve(BlockKindBlock)
-	b.terminateAndEnter(&Label{Block: block.Id, Fallthrough: fallthroughBlock.Id}, block)
+	block := builder.reserve(BlockKindBlock)
+	fallthroughBlock := builder.reserve(BlockKindBlock)
+	builder.terminateAndEnter(&Label{Block: block.Id, Fallthrough: fallthroughBlock.Id}, block)
 
-	b.pushJump(label, fallthroughBlock.Id, InvalidBlock)
-	b.lowerStatement(statement.Statement, "")
-	b.popJump()
-	b.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
+	builder.pushJump(label, fallthroughBlock.Id, InvalidBlock)
+	builder.lowerStatement(statement.Statement, "")
+	builder.popJump()
+	builder.gotoBlock(fallthroughBlock.Id, GotoVariantBreak)
 
-	b.enter(fallthroughBlock)
+	builder.enter(fallthroughBlock)
 }
 
 func isLoopStatement(node *ast.Node) bool {
@@ -1210,23 +1210,23 @@ func isLoopStatement(node *ast.Node) bool {
 	return false
 }
 
-func (b *builder) lowerFunctionDeclaration(node *ast.Node) {
-	nested, captures := b.lowerNestedFunction(node)
+func (builder *builder) lowerFunctionDeclaration(node *ast.Node) {
+	nested, captures := builder.lowerNestedFunction(node)
 	if nested == nil {
 		return
 	}
-	id := FunctionId(len(b.function.Functions))
-	b.function.Functions = append(b.function.Functions, nested)
+	id := FunctionId(len(builder.function.Functions))
+	builder.function.Functions = append(builder.function.Functions, nested)
 
 	name := functionName(node)
-	value := b.emit(&FunctionExpression{Function: id, Captures: captures}, node)
+	value := builder.emit(&FunctionExpression{Function: id, Captures: captures}, node)
 	if name != "" {
 		var symbol *ast.Symbol
 		if nameNode := node.Name(); nameNode != nil {
-			symbol = b.symbolOf(nameNode)
+			symbol = builder.symbolOf(nameNode)
 		}
-		place := b.bind(name, symbol, node)
-		b.emit(&StoreLocal{LValue: place, Value: value, Kind: InstructionKindHoistedFunction}, node)
+		place := builder.bind(name, symbol, node)
+		builder.emit(&StoreLocal{LValue: place, Value: value, Kind: InstructionKindHoistedFunction}, node)
 	}
 }
 
@@ -1256,21 +1256,21 @@ func rangeOf(node *ast.Node) core.TextRange {
 // pointer for a binding and every reference to it, which is the identity `declarationOf` groups on.
 // It distinguishes shadowed bindings of one name, verified rather than assumed: in
 // `let y = 2; { let y = 99; }` it returns two distinct symbols, four occurrences against two.
-func (b *builder) symbolOf(node *ast.Node) *ast.Symbol {
+func (builder *builder) symbolOf(node *ast.Node) *ast.Symbol {
 	if node == nil {
 		return nil
 	}
-	if b.typeChecker != nil {
+	if builder.typeChecker != nil {
 		// At the identifier in `{value}`, the generic accessor returns the symbol for the
 		// object's `value` PROPERTY. The lowering is reading the expression side, whose symbol is
 		// the local binding. TypeScript exposes that binding through a dedicated accessor.
 		if parent := node.Parent; parent != nil &&
 			parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == node {
-			if symbol := b.typeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+			if symbol := builder.typeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
 				return symbol
 			}
 		}
-		if symbol := b.typeChecker.GetSymbolAtLocation(node); symbol != nil {
+		if symbol := builder.typeChecker.GetSymbolAtLocation(node); symbol != nil {
 			return symbol
 		}
 	}

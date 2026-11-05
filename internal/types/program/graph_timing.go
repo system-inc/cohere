@@ -104,14 +104,14 @@ type diskCounters struct {
 	durations [diskCallKinds]atomic.Int64
 }
 
-func (c *diskCounters) add(kind int, started time.Time) {
-	c.counts[kind].Add(1)
-	c.durations[kind].Add(int64(time.Since(started)))
+func (counters *diskCounters) add(kind int, started time.Time) {
+	counters.counts[kind].Add(1)
+	counters.durations[kind].Add(int64(time.Since(started)))
 }
 
-func (c *diskCounters) snapshot() DiskTiming {
+func (counters *diskCounters) snapshot() DiskTiming {
 	calls := func(kind int) DiskCalls {
-		return DiskCalls{Count: c.counts[kind].Load(), Summed: time.Duration(c.durations[kind].Load())}
+		return DiskCalls{Count: counters.counts[kind].Load(), Summed: time.Duration(counters.durations[kind].Load())}
 	}
 	return DiskTiming{
 		Reads:     calls(diskRead),
@@ -143,48 +143,48 @@ type timingFS struct {
 	current atomic.Pointer[diskCounters]
 }
 
-func (f *timingFS) start() (*diskCounters, time.Time) {
-	return f.current.Load(), time.Now()
+func (timingFS *timingFS) start() (*diskCounters, time.Time) {
+	return timingFS.current.Load(), time.Now()
 }
 
-func (f *timingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	counters, started := f.start()
-	contents, ok := f.FS.ReadFile(path)
+func (timingFS *timingFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
+	counters, started := timingFS.start()
+	contents, ok := timingFS.FS.ReadFile(path)
 	counters.add(diskRead, started)
 	return contents, ok
 }
 
-func (f *timingFS) FileExists(path tspath.RootedFilePath) bool {
-	counters, started := f.start()
-	exists := f.FS.FileExists(path)
+func (timingFS *timingFS) FileExists(path tspath.RootedFilePath) bool {
+	counters, started := timingFS.start()
+	exists := timingFS.FS.FileExists(path)
 	counters.add(diskExistence, started)
 	return exists
 }
 
-func (f *timingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
-	counters, started := f.start()
-	exists := f.FS.DirectoryExists(path)
+func (timingFS *timingFS) DirectoryExists(path tspath.RootedDirectoryPath) bool {
+	counters, started := timingFS.start()
+	exists := timingFS.FS.DirectoryExists(path)
 	counters.add(diskExistence, started)
 	return exists
 }
 
-func (f *timingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
-	counters, started := f.start()
-	information := f.FS.Stat(path)
+func (timingFS *timingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
+	counters, started := timingFS.start()
+	information := timingFS.FS.Stat(path)
 	counters.add(diskStat, started)
 	return information
 }
 
-func (f *timingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
-	counters, started := f.start()
-	entries := f.FS.GetAccessibleEntries(path)
+func (timingFS *timingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
+	counters, started := timingFS.start()
+	entries := timingFS.FS.GetAccessibleEntries(path)
 	counters.add(diskListing, started)
 	return entries
 }
 
-func (f *timingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
-	counters, started := f.start()
-	resolved := f.FS.Realpath(path)
+func (timingFS *timingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
+	counters, started := timingFS.start()
+	resolved := timingFS.FS.Realpath(path)
 	counters.add(diskRealpath, started)
 	return resolved
 }
@@ -197,10 +197,10 @@ type timingHost struct {
 	summed atomic.Int64
 }
 
-func (h *timingHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
+func (host *timingHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
 	started := time.Now()
-	sourceFile := h.CompilerHost.GetSourceFile(options)
-	h.loads.Add(1)
-	h.summed.Add(int64(time.Since(started)))
+	sourceFile := host.CompilerHost.GetSourceFile(options)
+	host.loads.Add(1)
+	host.summed.Add(int64(time.Since(started)))
 	return sourceFile
 }

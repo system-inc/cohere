@@ -113,10 +113,10 @@ type reactiveTransformWalker struct {
 }
 
 // transformBlock returns the rewritten block, reallocating only if something was not kept.
-func (w *reactiveTransformWalker) transformBlock(block ReactiveBlock) ReactiveBlock {
+func (walker *reactiveTransformWalker) transformBlock(block ReactiveBlock) ReactiveBlock {
 	var rebuilt ReactiveBlock
 	for index, statement := range block {
-		transformed := w.transformStatement(statement)
+		transformed := walker.transformStatement(statement)
 
 		switch transformed.Kind {
 		case ReactiveTransformKeep:
@@ -150,28 +150,28 @@ func (w *reactiveTransformWalker) transformBlock(block ReactiveBlock) ReactiveBl
 	return rebuilt
 }
 
-func (w *reactiveTransformWalker) transformStatement(statement ReactiveStatement) ReactiveTransformed {
+func (walker *reactiveTransformWalker) transformStatement(statement ReactiveStatement) ReactiveTransformed {
 	switch shape := statement.(type) {
 	case *ReactiveInstructionStatement:
-		if w.transformer.Instruction != nil {
-			return w.transformer.Instruction(shape, func() {})
+		if walker.transformer.Instruction != nil {
+			return walker.transformer.Instruction(shape, func() {})
 		}
 		return KeepStatement()
 
 	case *ReactiveScopeBlock:
-		if w.transformer.Scope != nil {
-			return w.transformer.Scope(shape, func() {
-				shape.Instructions = w.transformBlock(shape.Instructions)
+		if walker.transformer.Scope != nil {
+			return walker.transformer.Scope(shape, func() {
+				shape.Instructions = walker.transformBlock(shape.Instructions)
 			})
 		}
-		shape.Instructions = w.transformBlock(shape.Instructions)
+		shape.Instructions = walker.transformBlock(shape.Instructions)
 		return KeepStatement()
 
 	case *ReactiveTerminalStatement:
-		if w.transformer.Terminal != nil {
-			return w.transformer.Terminal(shape, func() { w.transformTerminalBlocks(shape) })
+		if walker.transformer.Terminal != nil {
+			return walker.transformer.Terminal(shape, func() { walker.transformTerminalBlocks(shape) })
 		}
-		w.transformTerminalBlocks(shape)
+		walker.transformTerminalBlocks(shape)
 		return KeepStatement()
 	}
 	return KeepStatement()
@@ -183,35 +183,35 @@ func (w *reactiveTransformWalker) transformStatement(statement ReactiveStatement
 // transform and a visitor: `transformBlock` returns a possibly-new slice and a terminal holding the
 // old one would silently keep the unrewritten body. A missing assignment here is invisible to any
 // test that only counts what the walk reaches, so each arm is written out rather than generated.
-func (w *reactiveTransformWalker) transformTerminalBlocks(statement *ReactiveTerminalStatement) {
+func (walker *reactiveTransformWalker) transformTerminalBlocks(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveIf:
-		shape.Consequent = w.transformBlock(shape.Consequent)
+		shape.Consequent = walker.transformBlock(shape.Consequent)
 		if shape.Alternate != nil {
-			rewritten := w.transformBlock(*shape.Alternate)
+			rewritten := walker.transformBlock(*shape.Alternate)
 			shape.Alternate = &rewritten
 		}
 	case *ReactiveSwitch:
 		for index := range shape.Cases {
 			if shape.Cases[index].Block != nil {
-				rewritten := w.transformBlock(*shape.Cases[index].Block)
+				rewritten := walker.transformBlock(*shape.Cases[index].Block)
 				shape.Cases[index].Block = &rewritten
 			}
 		}
 	case *ReactiveFor:
-		shape.Loop = w.transformBlock(shape.Loop)
+		shape.Loop = walker.transformBlock(shape.Loop)
 	case *ReactiveForOf:
-		shape.Loop = w.transformBlock(shape.Loop)
+		shape.Loop = walker.transformBlock(shape.Loop)
 	case *ReactiveForIn:
-		shape.Loop = w.transformBlock(shape.Loop)
+		shape.Loop = walker.transformBlock(shape.Loop)
 	case *ReactiveWhile:
-		shape.Loop = w.transformBlock(shape.Loop)
+		shape.Loop = walker.transformBlock(shape.Loop)
 	case *ReactiveDoWhile:
-		shape.Loop = w.transformBlock(shape.Loop)
+		shape.Loop = walker.transformBlock(shape.Loop)
 	case *ReactiveLabelTerminal:
-		shape.Block = w.transformBlock(shape.Block)
+		shape.Block = walker.transformBlock(shape.Block)
 	case *ReactiveTry:
-		shape.Block = w.transformBlock(shape.Block)
-		shape.Handler = w.transformBlock(shape.Handler)
+		shape.Block = walker.transformBlock(shape.Block)
+		shape.Handler = walker.transformBlock(shape.Handler)
 	}
 }

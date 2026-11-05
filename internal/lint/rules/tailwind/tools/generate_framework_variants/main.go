@@ -106,10 +106,10 @@ type enumeration struct {
 // pathList collects a repeatable flag.
 type pathList []string
 
-func (p *pathList) String() string { return strings.Join(*p, ", ") }
+func (list *pathList) String() string { return strings.Join(*list, ", ") }
 
-func (p *pathList) Set(value string) error {
-	*p = append(*p, value)
+func (list *pathList) Set(value string) error {
+	*list = append(*list, value)
 	return nil
 }
 

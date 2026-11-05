@@ -47,20 +47,20 @@ type LastUsage struct {
 // The second return is not decoration. Upstream indexes its map with a non-null assertion and would
 // throw on a miss; a linter cannot, and the two callers treat a miss differently -- one skips the
 // declaration, the other declines the merge.
-func (l *LastUsage) LastUsedAt(declaration static_single_assignment.DeclarationId) (static_single_assignment.EvaluationOrder, bool) {
-	if l == nil || l.byDeclaration == nil {
+func (usage *LastUsage) LastUsedAt(declaration static_single_assignment.DeclarationId) (static_single_assignment.EvaluationOrder, bool) {
+	if usage == nil || usage.byDeclaration == nil {
 		return 0, false
 	}
-	order, found := l.byDeclaration[declaration]
+	order, found := usage.byDeclaration[declaration]
 	return order, found
 }
 
 // Len reports how many declarations were seen, for measurement.
-func (l *LastUsage) Len() int {
-	if l == nil {
+func (usage *LastUsage) Len() int {
+	if usage == nil {
 		return 0
 	}
-	return len(l.byDeclaration)
+	return len(usage.byDeclaration)
 }
 
 // FindLastUsage records, for every declaration, the highest evaluation order at which it is read.
@@ -393,27 +393,27 @@ type mergeCandidate struct {
 	lvalues []static_single_assignment.DeclarationId
 }
 
-func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
+func (merger *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 	// Nested blocks first, so an inner merge is settled before the outer scan reads the statement
 	// holding it.
 	rebuilt := make(ReactiveBlock, 0, len(block))
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveScopeBlock:
-			parent := m.parentScope
+			parent := merger.parentScope
 			if !shape.Pruned {
 				scope := shape.Scope
-				m.parentScope = &scope
+				merger.parentScope = &scope
 			}
-			shape.Instructions = m.mergeBlock(shape.Instructions)
-			m.parentScope = parent
-			if !shape.Pruned && parent != nil && AreEqualDependencies(m.dependencies.DependenciesOf(*parent), m.dependencies.DependenciesOf(shape.Scope)) {
-				m.nestedScopesRemoved++
+			shape.Instructions = merger.mergeBlock(shape.Instructions)
+			merger.parentScope = parent
+			if !shape.Pruned && parent != nil && AreEqualDependencies(merger.dependencies.DependenciesOf(*parent), merger.dependencies.DependenciesOf(shape.Scope)) {
+				merger.nestedScopesRemoved++
 				rebuilt = append(rebuilt, shape.Instructions...)
 				continue
 			}
 		case *ReactiveTerminalStatement:
-			m.mergeTerminalBlocks(shape)
+			merger.mergeTerminalBlocks(shape)
 		}
 		rebuilt = append(rebuilt, statement)
 	}
@@ -452,12 +452,12 @@ func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 				}
 				// Upstream allows a StoreLocal only while tracking it, recording the alias so a
 				// later dependency on the stored name still resolves to the earlier scope's output.
-				target := declarationOf(m.function, store.LValue.Identifier)
-				source := declarationOf(m.function, store.Value.Identifier)
-				if aliased, found := m.temporaries[source]; found {
+				target := declarationOf(merger.function, store.LValue.Identifier)
+				source := declarationOf(merger.function, store.Value.Identifier)
+				if aliased, found := merger.temporaries[source]; found {
 					source = aliased
 				}
-				m.temporaries[target] = source
+				merger.temporaries[target] = source
 				candidate.lvalues = append(candidate.lvalues, target)
 				continue
 			}
@@ -467,7 +467,7 @@ func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 			}
 			if candidate != nil && shape.Instruction.LValue != nil {
 				candidate.lvalues = append(candidate.lvalues,
-					declarationOf(m.function, shape.Instruction.LValue.Identifier))
+					declarationOf(merger.function, shape.Instruction.LValue.Identifier))
 			}
 
 		case *ReactiveScopeBlock:
@@ -477,9 +477,9 @@ func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 				continue
 			}
 			if candidate != nil &&
-				CanMergeScopes(m.function, candidate.scope.Scope, shape.Scope, m.dependencies,
-					m.temporaries, m.typeChecker) &&
-				AreLValuesLastUsedByScope(shape.Range.End, candidate.lvalues, m.usage) {
+				CanMergeScopes(merger.function, candidate.scope.Scope, shape.Scope, merger.dependencies,
+					merger.temporaries, merger.typeChecker) &&
+				AreLValuesLastUsedByScope(shape.Range.End, candidate.lvalues, merger.usage) {
 				// Widen the survivor to cover the scope it absorbs, matching upstream's range
 				// update, and reopen the lvalue set: everything named before this point is now
 				// inside the merged scope.
@@ -496,17 +496,17 @@ func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 				// declaration set is conservative. That holds only where declarations are read to
 				// permit; `pruneAlwaysInvalidatingScopes` reads them to propagate, which prunes
 				// further scopes downstream, so the debt came due when that pass was written.
-				m.declarationPruneCalls++
-				m.declarationsPruned += m.dependencies.PruneDeclarationsLastUsedBefore(
-					candidate.scope.Scope, candidate.scope.Range.End, m.usage, m.function)
-				if !ScopeIsEligibleForMerging(m.function, shape.Scope, m.dependencies,
-					m.typeChecker) {
+				merger.declarationPruneCalls++
+				merger.declarationsPruned += merger.dependencies.PruneDeclarationsLastUsedBefore(
+					candidate.scope.Scope, candidate.scope.Range.End, merger.usage, merger.function)
+				if !ScopeIsEligibleForMerging(merger.function, shape.Scope, merger.dependencies,
+					merger.typeChecker) {
 					commit()
 				}
 				continue
 			}
 			commit()
-			if ScopeIsEligibleForMerging(m.function, shape.Scope, m.dependencies, m.typeChecker) {
+			if ScopeIsEligibleForMerging(merger.function, shape.Scope, merger.dependencies, merger.typeChecker) {
 				candidate = &mergeCandidate{scope: shape, from: index, to: index + 1}
 			}
 		}
@@ -516,11 +516,11 @@ func (m *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 	if len(committed) == 0 {
 		return block
 	}
-	return m.rewrite(block, committed)
+	return merger.rewrite(block, committed)
 }
 
 // rewrite splices each committed candidate's statements into its surviving scope.
-func (m *scopeMerger) rewrite(block ReactiveBlock, committed []mergeCandidate) ReactiveBlock {
+func (merger *scopeMerger) rewrite(block ReactiveBlock, committed []mergeCandidate) ReactiveBlock {
 	rebuilt := make(ReactiveBlock, 0, len(block))
 	index := 0
 	for _, entry := range committed {
@@ -541,7 +541,7 @@ func (m *scopeMerger) rewrite(block ReactiveBlock, committed []mergeCandidate) R
 			case *ReactiveScopeBlock:
 				survivor.Instructions = append(survivor.Instructions, shape.Instructions...)
 				survivor.Merged = append(survivor.Merged, shape.Scope)
-				m.merges++
+				merger.merges++
 			default:
 				// Never taken on the corpus: 132 scopes fold and zero non-scope statements come
 				// with them, so a mutation deleting this line changes no answer. It is kept because
@@ -562,35 +562,35 @@ func (m *scopeMerger) rewrite(block ReactiveBlock, committed []mergeCandidate) R
 // Each arm assigns the result back, for the reason `transformTerminalBlocks` records: a missing
 // assignment leaves the terminal holding the pre-merge slice, and that is invisible to any test
 // counting what the walk reached.
-func (m *scopeMerger) mergeTerminalBlocks(statement *ReactiveTerminalStatement) {
+func (merger *scopeMerger) mergeTerminalBlocks(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveIf:
-		shape.Consequent = m.mergeBlock(shape.Consequent)
+		shape.Consequent = merger.mergeBlock(shape.Consequent)
 		if shape.Alternate != nil {
-			rewritten := m.mergeBlock(*shape.Alternate)
+			rewritten := merger.mergeBlock(*shape.Alternate)
 			shape.Alternate = &rewritten
 		}
 	case *ReactiveSwitch:
 		for index := range shape.Cases {
 			if shape.Cases[index].Block != nil {
-				rewritten := m.mergeBlock(*shape.Cases[index].Block)
+				rewritten := merger.mergeBlock(*shape.Cases[index].Block)
 				shape.Cases[index].Block = &rewritten
 			}
 		}
 	case *ReactiveFor:
-		shape.Loop = m.mergeBlock(shape.Loop)
+		shape.Loop = merger.mergeBlock(shape.Loop)
 	case *ReactiveForOf:
-		shape.Loop = m.mergeBlock(shape.Loop)
+		shape.Loop = merger.mergeBlock(shape.Loop)
 	case *ReactiveForIn:
-		shape.Loop = m.mergeBlock(shape.Loop)
+		shape.Loop = merger.mergeBlock(shape.Loop)
 	case *ReactiveWhile:
-		shape.Loop = m.mergeBlock(shape.Loop)
+		shape.Loop = merger.mergeBlock(shape.Loop)
 	case *ReactiveDoWhile:
-		shape.Loop = m.mergeBlock(shape.Loop)
+		shape.Loop = merger.mergeBlock(shape.Loop)
 	case *ReactiveLabelTerminal:
-		shape.Block = m.mergeBlock(shape.Block)
+		shape.Block = merger.mergeBlock(shape.Block)
 	case *ReactiveTry:
-		shape.Block = m.mergeBlock(shape.Block)
-		shape.Handler = m.mergeBlock(shape.Handler)
+		shape.Block = merger.mergeBlock(shape.Block)
+		shape.Handler = merger.mergeBlock(shape.Handler)
 	}
 }

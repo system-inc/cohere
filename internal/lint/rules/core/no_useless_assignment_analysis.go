@@ -421,7 +421,7 @@ func (deadStoreLiveness) Bottom() liveSymbols { return nil }
 
 func (deadStoreLiveness) Entry() liveSymbols { return nil }
 
-func (l deadStoreLiveness) Meet(left, right liveSymbols) liveSymbols {
+func (liveness deadStoreLiveness) Meet(left, right liveSymbols) liveSymbols {
 	// Neither argument is written: `Solve` holds one of them as a settled boundary value and
 	// compares against it to decide whether anything moved. One that already holds the other is
 	// returned as it is, which is most meets, since Solve folds every block's neighbours from
@@ -433,14 +433,14 @@ func (l deadStoreLiveness) Meet(left, right liveSymbols) liveSymbols {
 	if right.covers(left) {
 		return right
 	}
-	merged := left.withWords(l.words)
+	merged := left.withWords(liveness.words)
 	for index, bits := range right {
 		merged[index] |= bits
 	}
 	return merged
 }
 
-func (l deadStoreLiveness) Transfer(
+func (liveness deadStoreLiveness) Transfer(
 	block *control_flow_graph.Block[deadStoreEvent],
 	incoming liveSymbols,
 ) liveSymbols {
@@ -449,10 +449,10 @@ func (l deadStoreLiveness) Transfer(
 	if len(block.Events) == 0 {
 		return incoming
 	}
-	outgoing := incoming.withWords(l.words)
+	outgoing := incoming.withWords(liveness.words)
 	// nil observer: the fixed-point rounds must report nothing, because a block is transferred many
 	// times before the sets settle. Reporting happens once afterwards, in a separate walk.
-	applyBlockTransfer(block, outgoing, l.reachable, nil)
+	applyBlockTransfer(block, outgoing, liveness.reachable, nil)
 	return outgoing
 }
 

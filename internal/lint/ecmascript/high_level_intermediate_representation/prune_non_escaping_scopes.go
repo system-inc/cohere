@@ -148,21 +148,21 @@ type memoizationCollector struct {
 }
 
 // resolve follows a `LoadLocal` indirection to the binding a value really names.
-func (c *memoizationCollector) resolve(declaration static_single_assignment.DeclarationId) static_single_assignment.DeclarationId {
-	if target, found := c.definitions[declaration]; found {
+func (collector *memoizationCollector) resolve(declaration static_single_assignment.DeclarationId) static_single_assignment.DeclarationId {
+	if target, found := collector.definitions[declaration]; found {
 		return target
 	}
 	return declaration
 }
 
-func (c *memoizationCollector) walk(block ReactiveBlock) {
+func (collector *memoizationCollector) walk(block ReactiveBlock) {
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveInstructionStatement:
-			c.visitInstruction(shape.Instruction)
+			collector.visitInstruction(shape.Instruction)
 
 		case *ReactiveScopeBlock:
-			c.scopeStack = append(c.scopeStack, shape.Scope)
+			collector.scopeStack = append(collector.scopeStack, shape.Scope)
 			// A variable reassigned inside a scope takes the whole chain of enclosing scopes as
 			// scopes of its own, this one included.
 			//
@@ -179,21 +179,21 @@ func (c *memoizationCollector) walk(block ReactiveBlock) {
 			// up still and is not this pass's to fix. Filed as its own question rather than worked
 			// around here, because making this arm fire by loosening a gate it does not own would
 			// be fixture-shaped development.
-			for _, reassigned := range c.dependencies.ReassignmentsOf(shape.Scope) {
-				declaration := c.resolve(declarationOf(c.function, reassigned))
-				c.associateChain(declaration)
+			for _, reassigned := range collector.dependencies.ReassignmentsOf(shape.Scope) {
+				declaration := collector.resolve(declarationOf(collector.function, reassigned))
+				collector.associateChain(declaration)
 			}
-			c.walk(shape.Instructions)
-			c.scopeStack = c.scopeStack[:len(c.scopeStack)-1]
+			collector.walk(shape.Instructions)
+			collector.scopeStack = collector.scopeStack[:len(collector.scopeStack)-1]
 
 		case *ReactiveTerminalStatement:
-			c.visitTerminal(shape)
+			collector.visitTerminal(shape)
 		}
 	}
 }
 
 // visitInstruction records one instruction's lvalue, its level, and its operands as dependencies.
-func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction) {
+func (collector *memoizationCollector) visitInstruction(instruction *ReactiveInstruction) {
 	if instruction == nil || instruction.Value == nil {
 		return
 	}
@@ -205,18 +205,18 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 	// was stored into it, and the propagation then walks away from the value it is looking for.
 	var operands []static_single_assignment.DeclarationId
 	var defines []Place
-	c.eachMemoizationOperand(instruction.Value, func(place Place, role PlaceRole) {
+	collector.eachMemoizationOperand(instruction.Value, func(place Place, role PlaceRole) {
 		if role == PlaceRoleDefine {
 			defines = append(defines, place)
 			return
 		}
-		operands = append(operands, c.resolve(declarationOf(c.function, place.Identifier)))
+		operands = append(operands, collector.resolve(declarationOf(collector.function, place.Identifier)))
 	})
 
 	if instruction.LValue != nil {
-		lvalue := c.resolve(declarationOf(c.function, instruction.LValue.Identifier))
-		c.graph.Record(lvalue, level, operands)
-		c.associate(lvalue)
+		lvalue := collector.resolve(declarationOf(collector.function, instruction.LValue.Identifier))
+		collector.graph.Record(lvalue, level, operands)
+		collector.associate(lvalue)
 	}
 
 	// The assignment targets a value carries in addition to the instruction's own lvalue.
@@ -226,14 +226,14 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 	// `PostfixUpdate`, and every place bound by a `Destructure` pattern. Each carries its own level,
 	// which is not the level of the instruction that produced it.
 	for _, place := range defines {
-		declaration := c.resolve(declarationOf(c.function, place.Identifier))
-		c.graph.Record(declaration, memoizationLevelOfDefine(instruction.Value, place), operands)
-		c.associate(declaration)
+		declaration := collector.resolve(declarationOf(collector.function, place.Identifier))
+		collector.graph.Record(declaration, memoizationLevelOfDefine(instruction.Value, place), operands)
+		collector.associate(declaration)
 	}
 
 	for _, operand := range operands {
-		c.graph.Declare(operand)
-		c.associate(operand)
+		collector.graph.Declare(operand)
+		collector.associate(operand)
 	}
 
 	// The `LoadLocal` indirection, recorded after the operands so this instruction still reads
@@ -243,8 +243,8 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 		return
 	}
 	if load, isLoad := plain.Value.(*LoadLocal); isLoad {
-		c.definitions[declarationOf(c.function, instruction.LValue.Identifier)] =
-			c.resolve(declarationOf(c.function, load.Place.Identifier))
+		collector.definitions[declarationOf(collector.function, instruction.LValue.Identifier)] =
+			collector.resolve(declarationOf(collector.function, load.Place.Identifier))
 		return
 	}
 
@@ -254,26 +254,26 @@ func (c *memoizationCollector) visitInstruction(instruction *ReactiveInstruction
 	// The gap direction is conservative -- more values held, never fewer.
 	switch call := plain.Value.(type) {
 	case *CallExpression:
-		if IsHookCallee(c.function, call.Callee.Identifier) {
+		if IsHookCallee(collector.function, call.Callee.Identifier) {
 			for _, argument := range call.Args {
-				c.graph.MarkEscaping(c.resolve(declarationOf(c.function, argument.Place.Identifier)))
+				collector.graph.MarkEscaping(collector.resolve(declarationOf(collector.function, argument.Place.Identifier)))
 			}
 		}
 	case *MethodCall:
-		if IsHookCallee(c.function, call.Property.Identifier) {
+		if IsHookCallee(collector.function, call.Property.Identifier) {
 			for _, argument := range call.Args {
-				c.graph.MarkEscaping(c.resolve(declarationOf(c.function, argument.Place.Identifier)))
+				collector.graph.MarkEscaping(collector.resolve(declarationOf(collector.function, argument.Place.Identifier)))
 			}
 		}
 	}
 }
 
 // associate records that a declaration belongs to the innermost scope currently open.
-func (c *memoizationCollector) associate(declaration static_single_assignment.DeclarationId) {
-	if len(c.scopeStack) == 0 || c.dependencies == nil {
+func (collector *memoizationCollector) associate(declaration static_single_assignment.DeclarationId) {
+	if len(collector.scopeStack) == 0 || collector.dependencies == nil {
 		return
 	}
-	c.associateScope(declaration, c.scopeStack[len(c.scopeStack)-1])
+	collector.associateScope(declaration, collector.scopeStack[len(collector.scopeStack)-1])
 }
 
 // associateChain records that a declaration belongs to every scope currently open.
@@ -282,62 +282,62 @@ func (c *memoizationCollector) associate(declaration static_single_assignment.De
 // ordinary value belongs to the scope it was computed in. A value that escapes from inside a nest of
 // scopes -- returned, or reassigned -- depends on all of them having been evaluated, so forcing it
 // has to force the whole chain or the outer scopes' dependencies are never held.
-func (c *memoizationCollector) associateChain(declaration static_single_assignment.DeclarationId) {
-	if c.dependencies == nil {
+func (collector *memoizationCollector) associateChain(declaration static_single_assignment.DeclarationId) {
+	if collector.dependencies == nil {
 		return
 	}
-	for _, scope := range c.scopeStack {
-		c.associateScope(declaration, scope)
+	for _, scope := range collector.scopeStack {
+		collector.associateScope(declaration, scope)
 	}
 }
 
 // associateScope records that a declaration belongs to one named scope.
-func (c *memoizationCollector) associateScope(declaration static_single_assignment.DeclarationId, scope ScopeId) {
+func (collector *memoizationCollector) associateScope(declaration static_single_assignment.DeclarationId, scope ScopeId) {
 	var scopeDependencies []static_single_assignment.DeclarationId
-	for _, dependency := range c.dependencies.DependenciesOf(scope) {
+	for _, dependency := range collector.dependencies.DependenciesOf(scope) {
 		scopeDependencies = append(scopeDependencies,
-			c.resolve(declarationOf(c.function, dependency.Identifier)))
+			collector.resolve(declarationOf(collector.function, dependency.Identifier)))
 	}
-	c.graph.AssociateScope(declaration, scope, scopeDependencies)
+	collector.graph.AssociateScope(declaration, scope, scopeDependencies)
 }
 
 // visitTerminal descends, and records a returned value as escaping.
-func (c *memoizationCollector) visitTerminal(statement *ReactiveTerminalStatement) {
+func (collector *memoizationCollector) visitTerminal(statement *ReactiveTerminalStatement) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveReturn:
-		returned := c.resolve(declarationOf(c.function, shape.Value.Identifier))
-		c.graph.MarkEscaping(returned)
+		returned := collector.resolve(declarationOf(collector.function, shape.Value.Identifier))
+		collector.graph.MarkEscaping(returned)
 		// A return inside scopes makes those scopes dependencies of the returned value, because they
 		// have to be evaluated for the return to happen. Upstream's `CollectDependenciesVisitor`
 		// arm for `ReturnTerminal`; without it the enclosing scopes' own dependencies are never
 		// forced and a returned value can be held while what produced it is not.
-		c.associateChain(returned)
+		collector.associateChain(returned)
 	case *ReactiveIf:
-		c.walk(shape.Consequent)
+		collector.walk(shape.Consequent)
 		if shape.Alternate != nil {
-			c.walk(*shape.Alternate)
+			collector.walk(*shape.Alternate)
 		}
 	case *ReactiveSwitch:
 		for index := range shape.Cases {
 			if shape.Cases[index].Block != nil {
-				c.walk(*shape.Cases[index].Block)
+				collector.walk(*shape.Cases[index].Block)
 			}
 		}
 	case *ReactiveFor:
-		c.walk(shape.Loop)
+		collector.walk(shape.Loop)
 	case *ReactiveForOf:
-		c.walk(shape.Loop)
+		collector.walk(shape.Loop)
 	case *ReactiveForIn:
-		c.walk(shape.Loop)
+		collector.walk(shape.Loop)
 	case *ReactiveWhile:
-		c.walk(shape.Loop)
+		collector.walk(shape.Loop)
 	case *ReactiveDoWhile:
-		c.walk(shape.Loop)
+		collector.walk(shape.Loop)
 	case *ReactiveLabelTerminal:
-		c.walk(shape.Block)
+		collector.walk(shape.Block)
 	case *ReactiveTry:
-		c.walk(shape.Block)
-		c.walk(shape.Handler)
+		collector.walk(shape.Block)
+		collector.walk(shape.Handler)
 	}
 }
 
@@ -418,31 +418,31 @@ func isRestPlaceOfPattern(pattern Pattern, place Place) bool {
 // prefix instruction while recursively computing the enclosing value's inputs. Visiting sequences
 // only when they are the top-level instruction loses allocations and `LoadLocal` definition edges
 // in nested arms, so an escaping result can look non-escaping and its scope is pruned.
-func (c *memoizationCollector) eachMemoizationOperand(value ReactiveValue, visit func(Place, PlaceRole)) {
+func (collector *memoizationCollector) eachMemoizationOperand(value ReactiveValue, visit func(Place, PlaceRole)) {
 	switch shape := value.(type) {
 	case *ReactiveInstructionValue:
 		if shape.Value != nil {
 			EachPlace(shape.Value, visit)
 		}
 	case *ReactiveLogicalValue:
-		c.eachMemoizationOperand(shape.Left, visit)
-		c.eachMemoizationOperand(shape.Right, visit)
+		collector.eachMemoizationOperand(shape.Left, visit)
+		collector.eachMemoizationOperand(shape.Right, visit)
 	case *ReactiveTernaryValue:
 		// Keep the test in this port's conservative alias set. Upstream excludes it, but changing
 		// that policy is independent of reaching nested sequence instructions and needs its own
 		// corpus trade-off.
-		c.eachMemoizationOperand(shape.Test, visit)
-		c.eachMemoizationOperand(shape.Consequent, visit)
-		c.eachMemoizationOperand(shape.Alternate, visit)
+		collector.eachMemoizationOperand(shape.Test, visit)
+		collector.eachMemoizationOperand(shape.Consequent, visit)
+		collector.eachMemoizationOperand(shape.Alternate, visit)
 	case *ReactiveSequenceValue:
 		for _, nested := range shape.Instructions {
-			c.visitInstruction(nested)
+			collector.visitInstruction(nested)
 		}
 		// Prefix instructions are graph nodes of their own. Only the sequence's final value aliases
 		// the enclosing expression.
-		c.eachMemoizationOperand(shape.Value, visit)
+		collector.eachMemoizationOperand(shape.Value, visit)
 	case *ReactiveOptionalValue:
-		c.eachMemoizationOperand(shape.Value, visit)
+		collector.eachMemoizationOperand(shape.Value, visit)
 	}
 }
 

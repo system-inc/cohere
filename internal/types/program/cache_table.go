@@ -392,8 +392,8 @@ func orUnknown(value string) string {
 
 // wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
 // memory always means what this build means.
-func (c *LintCache) wire() *lintCacheWire {
-	wire := &lintCacheWire{Version: lintCacheVersion, Key: c.Key, KeyParts: c.KeyParts, DesignSystem: c.DesignSystem}
+func (cache *LintCache) wire() *lintCacheWire {
+	wire := &lintCacheWire{Version: lintCacheVersion, Key: cache.Key, KeyParts: cache.KeyParts, DesignSystem: cache.DesignSystem}
 	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
 	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
 	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
@@ -416,7 +416,7 @@ func (c *LintCache) wire() *lintCacheWire {
 		wire.Lists = append(wire.Lists, append([]string{}, list...))
 		return len(wire.Lists) - 1
 	}
-	for _, entry := range c.Entries {
+	for _, entry := range cache.Entries {
 		wire.Entries = append(wire.Entries, lintCacheWireEntry{
 			Path:            entry.Path,
 			ContentHash:     entry.ContentHash,

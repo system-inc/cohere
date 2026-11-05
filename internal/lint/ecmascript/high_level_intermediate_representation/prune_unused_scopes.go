@@ -51,19 +51,19 @@ type scopePruner struct {
 //
 // The return flag propagates outward: a `return` anywhere inside a scope keeps that scope, and a
 // scope's own walk must therefore see returns from every block nested within it.
-func (p *scopePruner) walk(block ReactiveBlock) bool {
+func (pruner *scopePruner) walk(block ReactiveBlock) bool {
 	sawReturn := false
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveScopeBlock:
 			// The nested walk's return flag decides this scope, and also propagates outward: a
 			// return inside a nested scope is still a return inside this block.
-			if p.visitScope(shape) {
+			if pruner.visitScope(shape) {
 				sawReturn = true
 			}
 
 		case *ReactiveTerminalStatement:
-			if p.walkTerminal(shape) {
+			if pruner.walkTerminal(shape) {
 				sawReturn = true
 			}
 			if _, isReturn := shape.Terminal.(*ReactiveReturn); isReturn {
@@ -75,22 +75,22 @@ func (p *scopePruner) walk(block ReactiveBlock) bool {
 }
 
 // visitScope prunes one scope if it qualifies, and reports whether it contained a return.
-func (p *scopePruner) visitScope(scope *ReactiveScopeBlock) bool {
-	sawReturn := p.walk(scope.Instructions)
+func (pruner *scopePruner) visitScope(scope *ReactiveScopeBlock) bool {
+	sawReturn := pruner.walk(scope.Instructions)
 	if scope.Pruned {
 		return sawReturn
 	}
 	if sawReturn {
 		return sawReturn
 	}
-	if len(p.dependencies.ReassignmentsOf(scope.Scope)) != 0 {
+	if len(pruner.dependencies.ReassignmentsOf(scope.Scope)) != 0 {
 		return sawReturn
 	}
-	if p.hasOwnDeclaration(scope) {
+	if pruner.hasOwnDeclaration(scope) {
 		return sawReturn
 	}
 	scope.Pruned = true
-	p.pruned++
+	pruner.pruned++
 	return sawReturn
 }
 
@@ -102,9 +102,9 @@ func (p *scopePruner) visitScope(scope *ReactiveScopeBlock) bool {
 //
 // A declaration with no recorded origin counts as the scope's own, which is the conservative
 // direction: an unknown origin keeps the scope rather than pruning it on missing information.
-func (p *scopePruner) hasOwnDeclaration(scope *ReactiveScopeBlock) bool {
-	for _, declared := range p.dependencies.DeclarationsOf(scope.Scope) {
-		origin, found := p.dependencies.OriginOf(declared)
+func (pruner *scopePruner) hasOwnDeclaration(scope *ReactiveScopeBlock) bool {
+	for _, declared := range pruner.dependencies.DeclarationsOf(scope.Scope) {
+		origin, found := pruner.dependencies.OriginOf(declared)
 		if !found || origin == scope.Scope {
 			return true
 		}
@@ -113,10 +113,10 @@ func (p *scopePruner) hasOwnDeclaration(scope *ReactiveScopeBlock) bool {
 }
 
 // walkTerminal descends into every block a terminal contains, reporting whether any held a return.
-func (p *scopePruner) walkTerminal(statement *ReactiveTerminalStatement) bool {
+func (pruner *scopePruner) walkTerminal(statement *ReactiveTerminalStatement) bool {
 	sawReturn := false
 	visit := func(block ReactiveBlock) {
-		if p.walk(block) {
+		if pruner.walk(block) {
 			sawReturn = true
 		}
 	}

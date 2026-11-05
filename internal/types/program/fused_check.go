@@ -55,10 +55,10 @@ func NewFusedCheck() *FusedCheck {
 // itself, or for a stolen file, a file of the thief's own group. The checker's lock is taken and released
 // inside the call, so it must not be held: the walk calls this before it takes a checker for the file's
 // rules, never while holding one.
-func (f *FusedCheck) checkFile(ctx context.Context, g *Graph, sourceFile *ast.SourceFile, checkerFile *ast.SourceFile) {
-	f.mutex.Lock()
-	_, done := f.checked[sourceFile]
-	f.mutex.Unlock()
+func (check *FusedCheck) checkFile(ctx context.Context, g *Graph, sourceFile *ast.SourceFile, checkerFile *ast.SourceFile) {
+	check.mutex.Lock()
+	_, done := check.checked[sourceFile]
+	check.mutex.Unlock()
 	if done {
 		return
 	}
@@ -68,9 +68,9 @@ func (f *FusedCheck) checkFile(ctx context.Context, g *Graph, sourceFile *ast.So
 	} else {
 		diagnostics = semanticDiagnosticsOn(ctx, g.Program, sourceFile, checkerFile)
 	}
-	f.mutex.Lock()
-	f.checked[sourceFile] = diagnostics
-	f.mutex.Unlock()
+	check.mutex.Lock()
+	check.checked[sourceFile] = diagnostics
+	check.mutex.Unlock()
 }
 
 // semanticDiagnosticsOn is GetSemanticDiagnostics with the checker that owns checkerFile instead of the one
@@ -86,16 +86,16 @@ func semanticDiagnosticsOn(ctx context.Context, program *compiler.Program, sourc
 }
 
 // Checked is how many files have been checked so far.
-func (f *FusedCheck) Checked() int {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-	return len(f.checked)
+func (check *FusedCheck) Checked() int {
+	check.mutex.Lock()
+	defer check.mutex.Unlock()
+	return len(check.checked)
 }
 
 // DiagnosticParts is the check's parts, as AllDiagnosticParts would have returned them. A program file the
 // walk did not check (a third-party declaration, a file the config ignores, any file when no walk ran) is
 // checked here, on its own checker, a goroutine per checker.
-func (f *FusedCheck) DiagnosticParts(ctx context.Context, g *Graph) TypeDiagnosticParts {
+func (check *FusedCheck) DiagnosticParts(ctx context.Context, g *Graph) TypeDiagnosticParts {
 	syntactic := g.Program.GetSyntacticDiagnostics(ctx, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
@@ -104,20 +104,20 @@ func (f *FusedCheck) DiagnosticParts(ctx context.Context, g *Graph) TypeDiagnost
 
 	programFiles := g.Program.GetSourceFiles()
 	var unchecked []*ast.SourceFile
-	f.mutex.Lock()
+	check.mutex.Lock()
 	for _, sourceFile := range programFiles {
-		if _, done := f.checked[sourceFile]; !done {
+		if _, done := check.checked[sourceFile]; !done {
 			unchecked = append(unchecked, sourceFile)
 		}
 	}
-	f.mutex.Unlock()
+	check.mutex.Unlock()
 	for index, diagnostics := range g.semanticDiagnosticsOf(ctx, unchecked) {
-		f.checked[unchecked[index]] = diagnostics
+		check.checked[unchecked[index]] = diagnostics
 	}
 
 	var semantic []*ast.Diagnostic
 	for _, sourceFile := range programFiles {
-		semantic = append(semantic, f.checked[sourceFile]...)
+		semantic = append(semantic, check.checked[sourceFile]...)
 	}
 	return TypeDiagnosticParts{Bind: bind, Semantic: compiler.SortAndDeduplicateDiagnostics(semantic)}
 }

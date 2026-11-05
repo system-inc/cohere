@@ -135,12 +135,12 @@ func preferDestructuringDecodeStrictly(element json.RawMessage, into any) error 
 // Upstream's `shouldCheck` is `normalizedOptions[nodeType][destructuringType]`, a plain truthiness
 // test, so an absent key is falsy and the arm is off. Only the wholly-default configuration turns
 // everything on, which the decoder builds explicitly.
-func (o PreferDestructuringKindOptions) enabled(array bool) bool {
+func (options PreferDestructuringKindOptions) enabled(array bool) bool {
 	switch {
 	case array:
-		return o.Array != nil && *o.Array
+		return options.Array != nil && *options.Array
 	default:
-		return o.Object != nil && *o.Object
+		return options.Object != nil && *options.Object
 	}
 }
 

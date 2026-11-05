@@ -53,9 +53,9 @@ func (reachingNames) Equal(left, right map[string]bool) bool {
 // LatticeOf doc warns reads backward.
 type mustReachNames struct{ universe map[string]bool }
 
-func (m mustReachNames) Bottom() map[string]bool {
-	all := make(map[string]bool, len(m.universe))
-	for name := range m.universe {
+func (names mustReachNames) Bottom() map[string]bool {
+	all := make(map[string]bool, len(names.universe))
+	for name := range names.universe {
 		all[name] = true
 	}
 	return all

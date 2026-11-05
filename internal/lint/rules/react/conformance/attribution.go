@@ -286,10 +286,10 @@ func HeadingForCategory(category string) (string, bool) {
 // The bool is not decoration. A fixture with an unattributed diagnostic must not be scored against
 // any rule, because the rule that owns it is exactly the unknown; scoring it would credit or blame
 // whichever rule happened to be running.
-func (f Fixture) Categories() (categories []string, complete bool) {
+func (fixture Fixture) Categories() (categories []string, complete bool) {
 	seen := map[string]bool{}
 	complete = true
-	for _, expectedError := range f.Expected.Errors {
+	for _, expectedError := range fixture.Expected.Errors {
 		category, found := CategoryForMessage(expectedError.Message)
 		if !found {
 			complete = false
@@ -304,8 +304,8 @@ func (f Fixture) Categories() (categories []string, complete bool) {
 }
 
 // Rules returns the upstream rule names a fixture's diagnostics belong to.
-func (f Fixture) Rules() (rules []string, complete bool) {
-	categories, complete := f.Categories()
+func (fixture Fixture) Rules() (rules []string, complete bool) {
+	categories, complete := fixture.Categories()
 	seen := map[string]bool{}
 	for _, category := range categories {
 		rule, found := RuleForCategory(category)

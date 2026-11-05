@@ -383,8 +383,8 @@ func newUnsafeArgumentSignature(ruleContext rule.Context, node *ast.Node) *unsaf
 }
 
 // consumeRemainingArguments marks every later argument as absorbed by the rest parameter.
-func (s *unsafeArgumentSignature) consumeRemainingArguments() {
-	s.hasConsumedArguments = true
+func (signature *unsafeArgumentSignature) consumeRemainingArguments() {
+	signature.hasConsumedArguments = true
 }
 
 // nextParameterType hands out the parameter the next argument lands on, or nil when the call has
@@ -393,31 +393,31 @@ func (s *unsafeArgumentSignature) consumeRemainingArguments() {
 // Nil is not an error and upstream skips rather than reports on it: too many arguments is already a
 // compiler error, and reporting a type mismatch against a parameter that does not exist would name
 // a type nobody wrote.
-func (s *unsafeArgumentSignature) nextParameterType() *checker.Type {
-	index := s.parameterTypeIndex
-	s.parameterTypeIndex++
+func (signature *unsafeArgumentSignature) nextParameterType() *checker.Type {
+	index := signature.parameterTypeIndex
+	signature.parameterTypeIndex++
 
-	if index < len(s.parameterTypes) && !s.hasConsumedArguments {
-		return s.parameterTypes[index]
+	if index < len(signature.parameterTypes) && !signature.hasConsumedArguments {
+		return signature.parameterTypes[index]
 	}
 
-	switch s.restKind {
+	switch signature.restKind {
 	case restKindTuple:
-		if len(s.restTypeArguments) == 0 {
+		if len(signature.restTypeArguments) == 0 {
 			return nil
 		}
-		last := s.restTypeArguments[len(s.restTypeArguments)-1]
-		if s.hasConsumedArguments {
+		last := signature.restTypeArguments[len(signature.restTypeArguments)-1]
+		if signature.hasConsumedArguments {
 			return last
 		}
-		typeIndex := index - s.restIndex
-		if typeIndex < 0 || typeIndex >= len(s.restTypeArguments) {
+		typeIndex := index - signature.restIndex
+		if typeIndex < 0 || typeIndex >= len(signature.restTypeArguments) {
 			return last
 		}
-		return s.restTypeArguments[typeIndex]
+		return signature.restTypeArguments[typeIndex]
 
 	case restKindArray, restKindOther:
-		return s.restType
+		return signature.restType
 	}
 	return nil
 }

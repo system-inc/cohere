@@ -55,9 +55,9 @@ type exportOriginResolver struct {
 }
 
 // requireShape panics unless node is in the home file or outside every function body of its own file.
-func (r *exportOriginResolver) requireShape(node *ast.Node) {
+func (resolver *exportOriginResolver) requireShape(node *ast.Node) {
 	sourceFile := ast.GetSourceFileOfNode(node)
-	if sourceFile == r.home {
+	if sourceFile == resolver.home {
 		return
 	}
 	for ancestor := node.Parent; ancestor != nil; ancestor = ancestor.Parent {
@@ -78,16 +78,16 @@ func (r *exportOriginResolver) requireShape(node *ast.Node) {
 	}
 }
 
-func (r *exportOriginResolver) expression(node *ast.Node) moduleExport {
+func (resolver *exportOriginResolver) expression(node *ast.Node) moduleExport {
 	if node == nil {
 		return moduleExport{}
 	}
-	r.requireShape(node)
+	resolver.requireShape(node)
 	switch node.Kind {
 	case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindNonNullExpression, ast.KindSatisfiesExpression:
-		return r.expression(node.Expression())
+		return resolver.expression(node.Expression())
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		receiver := r.expression(node.Expression())
+		receiver := resolver.expression(node.Expression())
 		var name string
 		if node.Kind == ast.KindPropertyAccessExpression && node.Name() != nil {
 			name = node.Name().Text()
@@ -98,22 +98,22 @@ func (r *exportOriginResolver) expression(node *ast.Node) moduleExport {
 			}
 		}
 		if receiver.module != nil && (receiver.name == "*" || receiver.name == "default") && name != "" {
-			return r.export(receiver.module, name)
+			return resolver.export(receiver.module, name)
 		}
 	case ast.KindIdentifier:
-		return r.symbol(r.checker.GetSymbolAtLocation(node))
+		return resolver.symbol(resolver.checker.GetSymbolAtLocation(node))
 	}
 	return moduleExport{}
 }
 
-func (r *exportOriginResolver) symbol(symbol *ast.Symbol) moduleExport {
-	if symbol == nil || r.symbols[symbol] {
+func (resolver *exportOriginResolver) symbol(symbol *ast.Symbol) moduleExport {
+	if symbol == nil || resolver.symbols[symbol] {
 		return moduleExport{}
 	}
-	r.symbols[symbol] = true
-	defer delete(r.symbols, symbol)
+	resolver.symbols[symbol] = true
+	defer delete(resolver.symbols, symbol)
 	for _, declaration := range symbol.Declarations {
-		r.requireShape(declaration)
+		resolver.requireShape(declaration)
 		switch declaration.Kind {
 		case ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindExportSpecifier:
 			var container *ast.Node
@@ -146,27 +146,27 @@ func (r *exportOriginResolver) symbol(symbol *ast.Symbol) moduleExport {
 					name = declaration.Name().Text()
 				}
 			}
-			if origin := r.export(module, name); origin.module != nil {
+			if origin := resolver.export(module, name); origin.module != nil {
 				return origin
 			}
 		case ast.KindVariableDeclaration:
 			if declaration.Parent != nil && declaration.Parent.Kind == ast.KindVariableDeclarationList && declaration.Parent.Flags&ast.NodeFlagsConst != 0 {
-				if origin := r.expression(declaration.AsVariableDeclaration().Initializer); origin.module != nil {
+				if origin := resolver.expression(declaration.AsVariableDeclaration().Initializer); origin.module != nil {
 					return origin
 				}
 			}
 		}
 	}
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		return r.symbol(checker.Checker_getImmediateAliasedSymbol(r.checker, symbol))
+		return resolver.symbol(checker.Checker_getImmediateAliasedSymbol(resolver.checker, symbol))
 	}
 	return moduleExport{}
 }
 
-func (r *exportOriginResolver) moduleSymbol(module *ast.Node) *ast.Symbol {
-	symbol := r.checker.GetSymbolAtLocation(module)
+func (resolver *exportOriginResolver) moduleSymbol(module *ast.Node) *ast.Symbol {
+	symbol := resolver.checker.GetSymbolAtLocation(module)
 	if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = checker.Checker_resolveAlias(r.checker, symbol)
+		symbol = checker.Checker_resolveAlias(resolver.checker, symbol)
 	}
 	if symbol == nil || symbol.Flags&ast.SymbolFlagsModule == 0 {
 		return nil
@@ -174,9 +174,9 @@ func (r *exportOriginResolver) moduleSymbol(module *ast.Node) *ast.Symbol {
 	return symbol
 }
 
-func (r *exportOriginResolver) exportedSymbol(module *ast.Symbol, name string) *ast.Symbol {
+func (resolver *exportOriginResolver) exportedSymbol(module *ast.Symbol, name string) *ast.Symbol {
 	if module != nil {
-		for _, symbol := range r.checker.GetExportsOfModule(module) {
+		for _, symbol := range resolver.checker.GetExportsOfModule(module) {
 			if symbol.Name == name {
 				return symbol
 			}
@@ -185,29 +185,29 @@ func (r *exportOriginResolver) exportedSymbol(module *ast.Symbol, name string) *
 	return nil
 }
 
-func (r *exportOriginResolver) resolvedSymbol(symbol *ast.Symbol) *ast.Symbol {
+func (resolver *exportOriginResolver) resolvedSymbol(symbol *ast.Symbol) *ast.Symbol {
 	if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		return checker.Checker_resolveAlias(r.checker, symbol)
+		return checker.Checker_resolveAlias(resolver.checker, symbol)
 	}
 	return symbol
 }
 
-func (r *exportOriginResolver) export(module *ast.Node, name string) moduleExport {
+func (resolver *exportOriginResolver) export(module *ast.Node, name string) moduleExport {
 	key := moduleExport{module: module, name: name}
-	if r.exports[key] {
+	if resolver.exports[key] {
 		return moduleExport{}
 	}
-	if module.Text() == r.module {
+	if module.Text() == resolver.module {
 		return key
 	}
-	r.exports[key] = true
-	defer delete(r.exports, key)
-	moduleSymbol := r.moduleSymbol(module)
-	exported := r.exportedSymbol(moduleSymbol, name)
+	resolver.exports[key] = true
+	defer delete(resolver.exports, key)
+	moduleSymbol := resolver.moduleSymbol(module)
+	exported := resolver.exportedSymbol(moduleSymbol, name)
 	if exported == nil {
 		return moduleExport{}
 	}
-	if origin := r.symbol(exported); origin.module != nil {
+	if origin := resolver.symbol(exported); origin.module != nil {
 		return origin
 	}
 	for _, declaration := range moduleSymbol.Declarations {
@@ -218,14 +218,14 @@ func (r *exportOriginResolver) export(module *ast.Node, name string) moduleExpor
 			if statement.Kind != ast.KindExportDeclaration {
 				continue
 			}
-			r.requireShape(statement)
+			resolver.requireShape(statement)
 			star := statement.AsExportDeclaration()
 			if star.ExportClause != nil || star.ModuleSpecifier == nil {
 				continue
 			}
-			candidate := r.exportedSymbol(r.moduleSymbol(star.ModuleSpecifier), name)
-			if candidate != nil && r.resolvedSymbol(candidate) == r.resolvedSymbol(exported) {
-				if origin := r.export(star.ModuleSpecifier, name); origin.module != nil {
+			candidate := resolver.exportedSymbol(resolver.moduleSymbol(star.ModuleSpecifier), name)
+			if candidate != nil && resolver.resolvedSymbol(candidate) == resolver.resolvedSymbol(exported) {
+				if origin := resolver.export(star.ModuleSpecifier, name); origin.module != nil {
 					return origin
 				}
 			}

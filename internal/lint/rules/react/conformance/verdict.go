@@ -129,18 +129,18 @@ type Report struct {
 //
 // Same guard as `Score.Check`, and for the same reason: the arithmetic is the only thing that
 // notices a fixture counted twice or not at all.
-func (r Report) Check() error {
+func (report Report) Check() error {
 	sum := 0
 	for _, verdict := range AllVerdicts {
-		sum += r.Counts[verdict]
+		sum += report.Counts[verdict]
 	}
-	if sum != r.Considered {
-		return fmt.Errorf("report does not partition the corpus: considered %d but categories sum to %d", r.Considered, sum)
+	if sum != report.Considered {
+		return fmt.Errorf("report does not partition the corpus: considered %d but categories sum to %d", report.Considered, sum)
 	}
-	if r.Considered != len(r.Fixtures) {
-		return fmt.Errorf("considered %d fixtures but recorded %d verdicts", r.Considered, len(r.Fixtures))
+	if report.Considered != len(report.Fixtures) {
+		return fmt.Errorf("considered %d fixtures but recorded %d verdicts", report.Considered, len(report.Fixtures))
 	}
-	for _, fixtureVerdict := range r.Fixtures {
+	for _, fixtureVerdict := range report.Fixtures {
 		if fixtureVerdict.Verdict != VerdictPassed && fixtureVerdict.Reason == "" {
 			return fmt.Errorf("%s: %s with no reason; an unreasoned category is somewhere to hide a failure", fixtureVerdict.Name, fixtureVerdict.Verdict)
 		}
@@ -152,19 +152,19 @@ func (r Report) Check() error {
 //
 // It leads with the number and its denominator and then names every category, because the headline
 // alone is the thing this whole file exists to stop anyone quoting.
-func (r Report) Summary() string {
+func (report Report) Summary() string {
 	var builder strings.Builder
-	fmt.Fprintf(&builder, "%d / %d passed against facebook/react@%s\n", r.Counts[VerdictPassed], r.Considered, UpstreamSha[:12])
+	fmt.Fprintf(&builder, "%d / %d passed against facebook/react@%s\n", report.Counts[VerdictPassed], report.Considered, UpstreamSha[:12])
 	for _, verdict := range AllVerdicts {
-		fmt.Fprintf(&builder, "  %-30s %4d\n", verdict, r.Counts[verdict])
+		fmt.Fprintf(&builder, "  %-30s %4d\n", verdict, report.Counts[verdict])
 	}
 	return builder.String()
 }
 
 // ByRule breaks the report down by the upstream rule each fixture belongs to.
-func (r Report) ByRule() map[string]map[Verdict]int {
+func (report Report) ByRule() map[string]map[Verdict]int {
 	breakdown := map[string]map[Verdict]int{}
-	for _, fixtureVerdict := range r.Fixtures {
+	for _, fixtureVerdict := range report.Fixtures {
 		for _, ruleName := range fixtureVerdict.Rules {
 			if breakdown[ruleName] == nil {
 				breakdown[ruleName] = map[Verdict]int{}
@@ -176,9 +176,9 @@ func (r Report) ByRule() map[string]map[Verdict]int {
 }
 
 // RuleNames returns the rules in the breakdown, sorted.
-func (r Report) RuleNames() []string {
+func (report Report) RuleNames() []string {
 	names := map[string]bool{}
-	for _, fixtureVerdict := range r.Fixtures {
+	for _, fixtureVerdict := range report.Fixtures {
 		for _, ruleName := range fixtureVerdict.Rules {
 			names[ruleName] = true
 		}

@@ -15,7 +15,7 @@ import (
 // wrong answer rather than an absent one.
 type engineImplementation struct{ t *testing.T }
 
-func (e engineImplementation) Analyze(fixture react_conformance.Fixture) (react_conformance.Result, error) {
+func (implementation engineImplementation) Analyze(fixture react_conformance.Fixture) (react_conformance.Result, error) {
 	rules, complete := fixture.Rules()
 	if !complete {
 		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "not every diagnostic could be attributed to an upstream rule"}
@@ -31,7 +31,7 @@ func (e engineImplementation) Analyze(fixture react_conformance.Fixture) (react_
 	if !wired {
 		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "no rule engine wired for upstream rule " + rules[0]}
 	}
-	return Analyze(subject, fixture, e.t.TempDir())
+	return Analyze(subject, fixture, implementation.t.TempDir())
 }
 
 // TestAggregateWithTheRuleEngineWired is the whole-corpus score with real rules running.

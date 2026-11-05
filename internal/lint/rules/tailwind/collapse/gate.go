@@ -205,18 +205,18 @@ const (
 // Two classes can only merge when this key matches. The key is derived from a real parse rather than
 // from string surgery on the class name, which is the difference between reporting `border-x` and
 // silently not.
-func (g *Gate) GroupKey(className string) string {
-	if cached, isCached := g.groupKeyByClassName[className]; isCached {
+func (gate *Gate) GroupKey(className string) string {
+	if cached, isCached := gate.groupKeyByClassName[className]; isCached {
 		return cached
 	}
 
-	key := g.computeGroupKey(className)
-	g.groupKeyByClassName[className] = key
+	key := gate.computeGroupKey(className)
+	gate.groupKeyByClassName[className] = key
 	return key
 }
 
-func (g *Gate) computeGroupKey(className string) string {
-	candidates := g.parser.ParseCandidates(className)
+func (gate *Gate) computeGroupKey(className string) string {
+	candidates := gate.parser.ParseCandidates(className)
 	if len(candidates) == 0 {
 		return unparsedKeyPrefix + className
 	}
@@ -232,7 +232,7 @@ func (g *Gate) computeGroupKey(className string) string {
 
 	case CandidateKindStatic:
 		// Statics bucket by what they declare, not by their name and not by their properties.
-		return staticKeyPrefix + g.declaredValuesKey(className)
+		return staticKeyPrefix + gate.declaredValuesKey(className)
 
 	default:
 		return variantsKey(candidate.Variants) + "|" + importanceKey(candidate.Important) + "|" + valueKey(candidate.Value)
@@ -244,8 +244,8 @@ func (g *Gate) computeGroupKey(className string) string {
 // A class that declares nothing gets a key carrying its own name rather than the empty string.
 // Without that, every class the compiler could not read would collide under one key and send each
 // other to the engine forever.
-func (g *Gate) declaredValuesKey(className string) string {
-	values := g.parser.DeclaredValues(className)
+func (gate *Gate) declaredValuesKey(className string) string {
+	values := gate.parser.DeclaredValues(className)
 	if len(values) == 0 {
 		return uncompiledPrefix + className
 	}
@@ -309,8 +309,8 @@ func valueKey(value Value) string {
 // Functional candidates with a named value (`px-4`, `rounded-md`, `text-sm`, the overwhelming
 // majority) never rewrite alone, because a named value is already the theme's own spelling. Those
 // are the ones worth never asking about.
-func (g *Gate) CouldRewriteAlone(className string) bool {
-	key := g.GroupKey(className)
+func (gate *Gate) CouldRewriteAlone(className string) bool {
+	key := gate.GroupKey(className)
 
 	if strings.HasPrefix(key, staticKeyPrefix) {
 		return true
@@ -326,9 +326,9 @@ func (g *Gate) CouldRewriteAlone(className string) bool {
 // The gate can see that `z-[1]` is worth asking about; only the engine can say that it is actually
 // `z-1`. Feeding the verdict back means a class is asked about once per process rather than once per
 // literal that contains it.
-func (g *Gate) RecordSingleRewrites(classNames []string) {
+func (gate *Gate) RecordSingleRewrites(classNames []string) {
 	for _, className := range classNames {
-		g.singlesThatRewrite[className] = true
+		gate.singlesThatRewrite[className] = true
 	}
 }
 
@@ -337,13 +337,13 @@ func (g *Gate) RecordSingleRewrites(classNames []string) {
 //
 // Returned rather than acted on, so the caller keeps its own record of what it has paid for and the
 // gate stays free of the boundary it exists to avoid.
-func (g *Gate) SingleClassesWorthChecking(classNames []string, alreadyChecked map[string]bool) []string {
+func (gate *Gate) SingleClassesWorthChecking(classNames []string, alreadyChecked map[string]bool) []string {
 	worthChecking := make([]string, 0, len(classNames))
 	for _, className := range classNames {
 		if alreadyChecked[className] {
 			continue
 		}
-		if g.CouldRewriteAlone(className) {
+		if gate.CouldRewriteAlone(className) {
 			worthChecking = append(worthChecking, className)
 		}
 	}
@@ -358,16 +358,16 @@ func (g *Gate) SingleClassesWorthChecking(classNames []string, alreadyChecked ma
 // The asymmetry is the whole design. A false here costs one engine call. A true here that should
 // have been false loses a finding on a tree that then looks clean, which is the failure this package
 // exists to prevent, so every doubtful case resolves to false.
-func (g *Gate) CannotCollapse(classNames []string) bool {
+func (gate *Gate) CannotCollapse(classNames []string) bool {
 	for _, className := range classNames {
-		if g.singlesThatRewrite[className] {
+		if gate.singlesThatRewrite[className] {
 			return false
 		}
 	}
 
 	seenGroups := make(map[string]bool, len(classNames))
 	for _, className := range classNames {
-		key := g.GroupKey(className)
+		key := gate.GroupKey(className)
 		if seenGroups[key] {
 			return false
 		}
@@ -384,7 +384,7 @@ func (g *Gate) CannotCollapse(classNames []string) bool {
 // two classes in a shared bucket and no rewritable single never pays that at all.
 //
 // alreadyChecked carries singles the caller has resolved in this process; pass nil on a first call.
-func (g *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) bool {
+func (gate *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) bool {
 	if alreadyChecked == nil {
 		alreadyChecked = map[string]bool{}
 	}
@@ -394,7 +394,7 @@ func (g *Gate) NeedsEngine(classNames []string, alreadyChecked map[string]bool) 
 		return false
 	}
 
-	if g.CannotCollapse(distinct) && len(g.SingleClassesWorthChecking(distinct, alreadyChecked)) == 0 {
+	if gate.CannotCollapse(distinct) && len(gate.SingleClassesWorthChecking(distinct, alreadyChecked)) == 0 {
 		return false
 	}
 	return true

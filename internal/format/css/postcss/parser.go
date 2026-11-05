@@ -83,27 +83,27 @@ func newParser(in *input) *parser {
 
 // construct is Parser's constructor, split from newParser so a subclass sets this first and its own
 // createTokenizer is the one the constructor calls.
-func (p *parser) construct(in *input) {
-	p.input = in
+func (parser *parser) construct(in *input) {
+	parser.input = in
 
-	p.root = newRoot()
-	p.current = p.root
-	p.spaces = ""
-	p.semicolon = false
+	parser.root = newRoot()
+	parser.current = parser.root
+	parser.spaces = ""
+	parser.semicolon = false
 
-	p.this.createTokenizer()
-	p.root.source = &source{start: &position{column: 1, line: 1, offset: 0}}
-	p.root.mark("source")
+	parser.this.createTokenizer()
+	parser.root.source = &source{start: &position{column: 1, line: 1, offset: 0}}
+	parser.root.mark("source")
 }
 
-func (p *parser) atrule(atToken token) {
+func (parser *parser) atrule(atToken token) {
 	node := newAtRule()
 	node.name = atToken.value[1:]
 	node.mark("name")
 	if node.name == "" {
-		p.unnamedAtrule(node, atToken)
+		parser.unnamedAtrule(node, atToken)
 	}
-	p.init(node, atToken.start)
+	parser.init(node, atToken.start)
 
 	var kind string
 	var prev *token
@@ -113,8 +113,8 @@ func (p *parser) atrule(atToken token) {
 	params := []token{}
 	brackets := []string{}
 
-	for !p.tokenizer.endOfFile() {
-		each, _ := p.tokenizer.nextToken()
+	for !parser.tokenizer.endOfFile() {
+		each, _ := parser.tokenizer.nextToken()
 		kind = each.kind
 
 		if kind == "(" || kind == "[" {
@@ -131,9 +131,9 @@ func (p *parser) atrule(atToken token) {
 
 		if len(brackets) == 0 {
 			if kind == ";" {
-				node.source.end = p.getPosition(each.start)
+				node.source.end = parser.getPosition(each.start)
 				node.source.end.offset++
-				p.semicolon = true
+				parser.semicolon = true
 				break
 			} else if kind == "{" {
 				open = true
@@ -151,11 +151,11 @@ func (p *parser) atrule(atToken token) {
 						}
 					}
 					if prev != nil {
-						node.source.end = p.getPosition(prev.endOrStart())
+						node.source.end = parser.getPosition(prev.endOrStart())
 						node.source.end.offset++
 					}
 				}
-				p.end(each)
+				parser.end(each)
 				break
 			} else {
 				params = append(params, each)
@@ -164,21 +164,21 @@ func (p *parser) atrule(atToken token) {
 			params = append(params, each)
 		}
 
-		if p.tokenizer.endOfFile() {
+		if parser.tokenizer.endOfFile() {
 			last = true
 			break
 		}
 	}
 
-	node.raws["between"] = p.spacesAndCommentsFromEnd(&params)
+	node.raws["between"] = parser.spacesAndCommentsFromEnd(&params)
 	if len(params) > 0 {
-		node.raws["afterName"] = p.spacesAndCommentsFromStart(&params)
-		p.this.raw(node, "params", params, false)
+		node.raws["afterName"] = parser.spacesAndCommentsFromStart(&params)
+		parser.this.raw(node, "params", params, false)
 		if last {
 			each := params[len(params)-1]
-			node.source.end = p.getPosition(each.endOrStart())
+			node.source.end = parser.getPosition(each.endOrStart())
 			node.source.end.offset++
-			p.spaces = node.rawString("between")
+			parser.spaces = node.rawString("between")
 			node.raws["between"] = ""
 		}
 	} else {
@@ -190,12 +190,12 @@ func (p *parser) atrule(atToken token) {
 	if open {
 		node.nodes = emptyNodes()
 		node.mark("nodes")
-		p.current = node
+		parser.current = node
 	}
 }
 
-func (p *parser) checkMissedSemicolon(tokens []token) {
-	colon := p.colon(tokens)
+func (parser *parser) checkMissedSemicolon(tokens []token) {
+	colon := parser.colon(tokens)
 	if colon < 0 {
 		return
 	}
@@ -219,11 +219,11 @@ func (p *parser) checkMissedSemicolon(tokens []token) {
 	if each.kind == "word" {
 		offset = each.end + 1
 	}
-	panic(p.input.errorAt("Missed semicolon", offset))
+	panic(parser.input.errorAt("Missed semicolon", offset))
 }
 
 // colon is the index of the first top-level ":", -1 where upstream returns false.
-func (p *parser) colon(tokens []token) int {
+func (parser *parser) colon(tokens []token) int {
 	brackets := 0
 	var prev *token
 	for index := range tokens {
@@ -238,7 +238,7 @@ func (p *parser) colon(tokens []token) int {
 		}
 		if brackets == 0 && kind == ":" {
 			if prev == nil {
-				p.doubleColon(*each)
+				parser.doubleColon(*each)
 			} else if prev.kind == "word" && prev.value == "progid" {
 				continue
 			} else {
@@ -251,10 +251,10 @@ func (p *parser) colon(tokens []token) int {
 	return -1
 }
 
-func (p *parser) comment(commentToken token) {
+func (parser *parser) comment(commentToken token) {
 	node := newComment()
-	p.init(node, commentToken.start)
-	node.source.end = p.getPosition(commentToken.endOrStart())
+	parser.init(node, commentToken.start)
+	node.source.end = parser.getPosition(commentToken.endOrStart())
 	node.source.end.offset++
 
 	text := commentToken.value[2 : len(commentToken.value)-2]
@@ -274,17 +274,17 @@ func (p *parser) comment(commentToken token) {
 	node.mark("text")
 }
 
-func (p *parser) createTokenizer() {
-	p.tokenizer = newTokenizer(p.input)
+func (parser *parser) createTokenizer() {
+	parser.tokenizer = newTokenizer(parser.input)
 }
 
-func (p *parser) decl(tokens []token, customProperty bool) {
+func (parser *parser) decl(tokens []token, customProperty bool) {
 	node := newDeclaration()
-	p.init(node, tokens[0].start)
+	parser.init(node, tokens[0].start)
 
 	last := tokens[len(tokens)-1]
 	if last.kind == ";" {
-		p.semicolon = true
+		parser.semicolon = true
 		tokens = tokens[:len(tokens)-1]
 	}
 
@@ -292,18 +292,18 @@ func (p *parser) decl(tokens []token, customProperty bool) {
 	if endOffset <= 0 {
 		endOffset = findLastWithPosition(tokens)
 	}
-	node.source.end = p.getPosition(endOffset)
+	node.source.end = parser.getPosition(endOffset)
 	node.source.end.offset++
 
 	start := 0
 	for tokens[start].kind != "word" {
 		if start == len(tokens)-1 {
-			p.unknownWord([]token{tokens[start]})
+			parser.unknownWord([]token{tokens[start]})
 		}
 		start++
 	}
 	node.raws["before"] = node.rawString("before") + tokensToString(tokens, 0, start)
-	node.source.start = p.getPosition(tokens[start].start)
+	node.source.start = parser.getPosition(tokens[start].start)
 
 	propStart := start
 	for start < len(tokens) {
@@ -325,7 +325,7 @@ func (p *parser) decl(tokens []token, customProperty bool) {
 			break
 		}
 		if each.kind == "word" && hasWordCharacter(each.value) {
-			p.unknownWord([]token{each})
+			parser.unknownWord([]token{each})
 		}
 	}
 	node.raws["between"] = tokensToString(tokens, betweenStart, start)
@@ -355,8 +355,8 @@ func (p *parser) decl(tokens []token, customProperty bool) {
 		if lowered == "!important" {
 			node.important = true
 			node.mark("important")
-			text := p.stringFrom(&tokens, index)
-			text = p.spacesFromEnd(&tokens) + text
+			text := parser.stringFrom(&tokens, index)
+			text = parser.spacesFromEnd(&tokens) + text
 			if text != " !important" {
 				node.raws["important"] = text
 			}
@@ -400,66 +400,66 @@ func (p *parser) decl(tokens []token, customProperty bool) {
 	valueTokens := make([]token, 0, len(firstSpaces)+len(tokens))
 	valueTokens = append(valueTokens, firstSpaces...)
 	valueTokens = append(valueTokens, tokens...)
-	p.this.raw(node, "value", valueTokens, customProperty)
+	parser.this.raw(node, "value", valueTokens, customProperty)
 
 	if strings.Contains(node.value, ":") && !customProperty {
-		p.checkMissedSemicolon(tokens)
+		parser.checkMissedSemicolon(tokens)
 	}
 }
 
-func (p *parser) doubleColon(each token) {
-	panic(p.input.errorBetween("Double colon", each.start, each.start+utf16Length(each.value)))
+func (parser *parser) doubleColon(each token) {
+	panic(parser.input.errorBetween("Double colon", each.start, each.start+utf16Length(each.value)))
 }
 
-func (p *parser) emptyRule(each token) {
+func (parser *parser) emptyRule(each token) {
 	node := newRule()
-	p.init(node, each.start)
+	parser.init(node, each.start)
 	node.selector = ""
 	node.mark("selector")
 	node.raws["between"] = ""
-	p.current = node
+	parser.current = node
 }
 
-func (p *parser) end(each token) {
-	if p.current.hasNodes() && len(p.current.nodes) > 0 {
-		p.current.raws["semicolon"] = p.semicolon
+func (parser *parser) end(each token) {
+	if parser.current.hasNodes() && len(parser.current.nodes) > 0 {
+		parser.current.raws["semicolon"] = parser.semicolon
 	}
-	p.semicolon = false
+	parser.semicolon = false
 
-	p.current.raws["after"] = p.current.rawString("after") + p.spaces
-	p.spaces = ""
+	parser.current.raws["after"] = parser.current.rawString("after") + parser.spaces
+	parser.spaces = ""
 
-	if p.current.parent != nil {
-		p.current.source.end = p.getPosition(each.start)
-		p.current.source.end.offset++
-		p.current = p.current.parent
+	if parser.current.parent != nil {
+		parser.current.source.end = parser.getPosition(each.start)
+		parser.current.source.end.offset++
+		parser.current = parser.current.parent
 	} else {
-		p.unexpectedClose(each)
+		parser.unexpectedClose(each)
 	}
 }
 
-func (p *parser) endFile() {
-	if p.current.parent != nil {
-		p.unclosedBlock()
+func (parser *parser) endFile() {
+	if parser.current.parent != nil {
+		parser.unclosedBlock()
 	}
-	if p.current.hasNodes() && len(p.current.nodes) > 0 {
-		p.current.raws["semicolon"] = p.semicolon
+	if parser.current.hasNodes() && len(parser.current.nodes) > 0 {
+		parser.current.raws["semicolon"] = parser.semicolon
 	}
-	p.current.raws["after"] = p.current.rawString("after") + p.spaces
-	p.root.source.end = p.getPosition(p.tokenizer.position())
+	parser.current.raws["after"] = parser.current.rawString("after") + parser.spaces
+	parser.root.source.end = parser.getPosition(parser.tokenizer.position())
 }
 
-func (p *parser) freeSemicolon(each token) {
-	p.spaces += each.value
-	if p.current.hasNodes() {
+func (parser *parser) freeSemicolon(each token) {
+	parser.spaces += each.value
+	if parser.current.hasNodes() {
 		var prev *node
-		if len(p.current.nodes) > 0 {
-			prev = p.current.nodes[len(p.current.nodes)-1]
+		if len(parser.current.nodes) > 0 {
+			prev = parser.current.nodes[len(parser.current.nodes)-1]
 		}
 		if prev != nil && prev.nodeType == "rule" && prev.rawString("ownSemicolon") == "" {
-			prev.raws["ownSemicolon"] = p.spaces
-			p.spaces = ""
-			prev.source.end = p.getPosition(each.start)
+			prev.raws["ownSemicolon"] = parser.spaces
+			parser.spaces = ""
+			prev.source.end = parser.getPosition(each.start)
 			prev.source.end.offset += utf16Length(prev.rawString("ownSemicolon"))
 		}
 	}
@@ -467,8 +467,8 @@ func (p *parser) freeSemicolon(each token) {
 
 // Helpers
 
-func (p *parser) getPosition(offset int) *position {
-	pos := p.input.fromOffset(offset)
+func (parser *parser) getPosition(offset int) *position {
+	pos := parser.input.fromOffset(offset)
 	return &position{
 		column: pos.column,
 		line:   pos.line,
@@ -476,18 +476,18 @@ func (p *parser) getPosition(offset int) *position {
 	}
 }
 
-func (p *parser) init(each *node, offset int) {
-	p.current.push(each)
-	each.source = &source{start: p.getPosition(offset)}
+func (parser *parser) init(each *node, offset int) {
+	parser.current.push(each)
+	each.source = &source{start: parser.getPosition(offset)}
 	each.mark("source")
-	each.raws["before"] = p.spaces
-	p.spaces = ""
+	each.raws["before"] = parser.spaces
+	parser.spaces = ""
 	if each.nodeType != "comment" {
-		p.semicolon = false
+		parser.semicolon = false
 	}
 }
 
-func (p *parser) other(start token) {
+func (parser *parser) other(start token) {
 	end := false
 	kind := ""
 	colon := false
@@ -521,16 +521,16 @@ func (p *parser) other(start token) {
 		} else if len(brackets) == 0 {
 			if kind == ";" {
 				if colon {
-					p.decl(tokens, customProperty)
+					parser.decl(tokens, customProperty)
 					return
 				} else {
 					break
 				}
 			} else if kind == "{" {
-				p.this.rule(tokens)
+				parser.this.rule(tokens)
 				return
 			} else if kind == "}" {
-				p.tokenizer.back(tokens[len(tokens)-1])
+				parser.tokenizer.back(tokens[len(tokens)-1])
 				tokens = tokens[:len(tokens)-1]
 				end = true
 				break
@@ -544,14 +544,14 @@ func (p *parser) other(start token) {
 			}
 		}
 
-		each, present = p.tokenizer.nextToken()
+		each, present = parser.tokenizer.nextToken()
 	}
 
-	if p.tokenizer.endOfFile() {
+	if parser.tokenizer.endOfFile() {
 		end = true
 	}
 	if len(brackets) > 0 {
-		p.unclosedBracket(*bracket)
+		parser.unclosedBracket(*bracket)
 	}
 
 	if end && colon {
@@ -561,47 +561,47 @@ func (p *parser) other(start token) {
 				if kind != "space" && kind != "comment" {
 					break
 				}
-				p.tokenizer.back(tokens[len(tokens)-1])
+				parser.tokenizer.back(tokens[len(tokens)-1])
 				tokens = tokens[:len(tokens)-1]
 			}
 		}
-		p.decl(tokens, customProperty)
+		parser.decl(tokens, customProperty)
 	} else {
-		p.unknownWord(tokens)
+		parser.unknownWord(tokens)
 	}
 }
 
-func (p *parser) parse() {
-	for !p.tokenizer.endOfFile() {
-		each, _ := p.tokenizer.nextToken()
+func (parser *parser) parse() {
+	for !parser.tokenizer.endOfFile() {
+		each, _ := parser.tokenizer.nextToken()
 
 		switch each.kind {
 		case "space":
-			p.spaces += each.value
+			parser.spaces += each.value
 
 		case ";":
-			p.freeSemicolon(each)
+			parser.freeSemicolon(each)
 
 		case "}":
-			p.end(each)
+			parser.end(each)
 
 		case "comment":
-			p.this.comment(each)
+			parser.this.comment(each)
 
 		case "at-word":
-			p.this.atrule(each)
+			parser.this.atrule(each)
 
 		case "{":
-			p.emptyRule(each)
+			parser.emptyRule(each)
 
 		default:
-			p.other(each)
+			parser.other(each)
 		}
 	}
-	p.endFile()
+	parser.endFile()
 }
 
-func (p *parser) raw(each *node, prop string, tokens []token, customProperty bool) {
+func (parser *parser) raw(each *node, prop string, tokens []token, customProperty bool) {
 	length := len(tokens)
 	var value strings.Builder
 	clean := true
@@ -640,18 +640,18 @@ func (p *parser) raw(each *node, prop string, tokens []token, customProperty boo
 	each.setField(prop, value.String())
 }
 
-func (p *parser) rule(tokens []token) {
+func (parser *parser) rule(tokens []token) {
 	tokens = tokens[:len(tokens)-1]
 
 	node := newRule()
-	p.init(node, tokens[0].start)
+	parser.init(node, tokens[0].start)
 
-	node.raws["between"] = p.spacesAndCommentsFromEnd(&tokens)
-	p.this.raw(node, "selector", tokens, false)
-	p.current = node
+	node.raws["between"] = parser.spacesAndCommentsFromEnd(&tokens)
+	parser.this.raw(node, "selector", tokens, false)
+	parser.current = node
 }
 
-func (p *parser) spacesAndCommentsFromEnd(tokens *[]token) string {
+func (parser *parser) spacesAndCommentsFromEnd(tokens *[]token) string {
 	spaces := ""
 	for len(*tokens) > 0 {
 		lastTokenType := (*tokens)[len(*tokens)-1].kind
@@ -666,7 +666,7 @@ func (p *parser) spacesAndCommentsFromEnd(tokens *[]token) string {
 
 // Errors
 
-func (p *parser) spacesAndCommentsFromStart(tokens *[]token) string {
+func (parser *parser) spacesAndCommentsFromStart(tokens *[]token) string {
 	spaces := ""
 	for len(*tokens) > 0 {
 		next := (*tokens)[0].kind
@@ -679,7 +679,7 @@ func (p *parser) spacesAndCommentsFromStart(tokens *[]token) string {
 	return spaces
 }
 
-func (p *parser) spacesFromEnd(tokens *[]token) string {
+func (parser *parser) spacesFromEnd(tokens *[]token) string {
 	spaces := ""
 	for len(*tokens) > 0 {
 		lastTokenType := (*tokens)[len(*tokens)-1].kind
@@ -692,31 +692,31 @@ func (p *parser) spacesFromEnd(tokens *[]token) string {
 	return spaces
 }
 
-func (p *parser) stringFrom(tokens *[]token, from int) string {
+func (parser *parser) stringFrom(tokens *[]token, from int) string {
 	result := tokensToString(*tokens, from, len(*tokens))
 	*tokens = (*tokens)[:from]
 	return result
 }
 
-func (p *parser) unclosedBlock() {
-	pos := p.current.source.start
-	panic(p.input.errorAtLineAndColumn("Unclosed block", pos.line, pos.column))
+func (parser *parser) unclosedBlock() {
+	pos := parser.current.source.start
+	panic(parser.input.errorAtLineAndColumn("Unclosed block", pos.line, pos.column))
 }
 
-func (p *parser) unclosedBracket(bracket token) {
-	panic(p.input.errorBetween("Unclosed bracket", bracket.start, bracket.start+1))
+func (parser *parser) unclosedBracket(bracket token) {
+	panic(parser.input.errorBetween("Unclosed bracket", bracket.start, bracket.start+1))
 }
 
-func (p *parser) unexpectedClose(each token) {
-	panic(p.input.errorBetween("Unexpected }", each.start, each.start+1))
+func (parser *parser) unexpectedClose(each token) {
+	panic(parser.input.errorBetween("Unexpected }", each.start, each.start+1))
 }
 
-func (p *parser) unknownWord(tokens []token) {
-	panic(p.input.errorBetween("Unknown word "+tokens[0].value, tokens[0].start, tokens[0].start+utf16Length(tokens[0].value)))
+func (parser *parser) unknownWord(tokens []token) {
+	panic(parser.input.errorBetween("Unknown word "+tokens[0].value, tokens[0].start, tokens[0].start+utf16Length(tokens[0].value)))
 }
 
-func (p *parser) unnamedAtrule(_ *node, each token) {
-	panic(p.input.errorBetween("At-rule without name", each.start, each.start+utf16Length(each.value)))
+func (parser *parser) unnamedAtrule(_ *node, each token) {
+	panic(parser.input.errorBetween("At-rule without name", each.start, each.start+utf16Length(each.value)))
 }
 
 // hasWordCharacter is /\w/.test(text): an ASCII letter, digit or underscore.

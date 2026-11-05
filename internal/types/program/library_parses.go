@@ -65,21 +65,21 @@ func NewLibraryParses() *LibraryParses {
 }
 
 // Len is how many distinct parses the cache holds.
-func (l *LibraryParses) Len() int {
-	l.mutex.Lock()
-	defer l.mutex.Unlock()
-	return len(l.entries)
+func (parses *LibraryParses) Len() int {
+	parses.mutex.Lock()
+	defer parses.mutex.Unlock()
+	return len(parses.entries)
 }
 
 // sourceFile answers a bundled file from the cache, parsing it on first use. It reports false for a file
 // that is not bundled or cannot be read, which the caller loads the ordinary way.
-func (l *LibraryParses) sourceFile(options ast.SourceFileParseOptions, read func(string) (string, bool)) (*ast.SourceFile, bool) {
+func (parses *LibraryParses) sourceFile(options ast.SourceFileParseOptions, read func(string) (string, bool)) (*ast.SourceFile, bool) {
 	if !bundled.IsBundled(options.FileName.AsString()) {
 		return nil, false
 	}
-	l.mutex.Lock()
-	hash, hashed := l.hashes[options.FileName.AsString()]
-	l.mutex.Unlock()
+	parses.mutex.Lock()
+	hash, hashed := parses.hashes[options.FileName.AsString()]
+	parses.mutex.Unlock()
 	var text string
 	if !hashed {
 		contents, ok := read(options.FileName.AsString())
@@ -87,19 +87,19 @@ func (l *LibraryParses) sourceFile(options ast.SourceFileParseOptions, read func
 			return nil, false
 		}
 		text, hash = contents, sha256.Sum256([]byte(contents))
-		l.mutex.Lock()
-		l.hashes[options.FileName.AsString()] = hash
-		l.mutex.Unlock()
+		parses.mutex.Lock()
+		parses.hashes[options.FileName.AsString()] = hash
+		parses.mutex.Unlock()
 	}
 
 	key := libraryParseKey{options: options, scriptKind: core.EnsureScriptKindFromFileName(options.FileName), hash: hash}
-	l.mutex.Lock()
-	entry, found := l.entries[key]
+	parses.mutex.Lock()
+	entry, found := parses.entries[key]
 	if !found {
 		entry = &libraryParse{}
-		l.entries[key] = entry
+		parses.entries[key] = entry
 	}
-	l.mutex.Unlock()
+	parses.mutex.Unlock()
 
 	entry.once.Do(func() {
 		if text == "" {
@@ -121,9 +121,9 @@ type libraryParsesHost struct {
 	parses *LibraryParses
 }
 
-func (h *libraryParsesHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
-	if file, shared := h.parses.sourceFile(options, func(path string) (string, bool) { return h.FS().ReadFile(tspath.RootedFilePath(path)) }); shared {
+func (host *libraryParsesHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
+	if file, shared := host.parses.sourceFile(options, func(path string) (string, bool) { return host.FS().ReadFile(tspath.RootedFilePath(path)) }); shared {
 		return file
 	}
-	return h.CompilerHost.GetSourceFile(options)
+	return host.CompilerHost.GetSourceFile(options)
 }

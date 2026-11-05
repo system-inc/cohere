@@ -70,8 +70,8 @@ const (
 	AliasingEffectApply
 )
 
-func (k AliasingEffectKind) String() string {
-	switch k {
+func (kind AliasingEffectKind) String() string {
+	switch kind {
 	case AliasingEffectCreate:
 		return "create"
 	case AliasingEffectCreateFrom:
@@ -109,8 +109,8 @@ func (k AliasingEffectKind) String() string {
 // `infer_mutation_aliasing_ranges.rs` where `mutations` is populated from effects matching
 // `Mutate | MutateConditionally | MutateTransitive | MutateTransitiveConditionally`. Exposed here
 // rather than restated there so the two passes cannot drift.
-func (k AliasingEffectKind) IsMutation() bool {
-	switch k {
+func (kind AliasingEffectKind) IsMutation() bool {
+	switch kind {
 	case AliasingEffectMutate, AliasingEffectMutateConditionally,
 		AliasingEffectMutateTransitive, AliasingEffectMutateTransitiveConditionally:
 		return true
@@ -124,8 +124,8 @@ func (k AliasingEffectKind) IsMutation() bool {
 // These are the five variants the ranges pass treats identically when projecting to a scalar
 // `Effect`: all five give From either Capture or Read depending on whether Into is still mutable,
 // and give Into Store. See cohere's `ProjectEffects`.
-func (k AliasingEffectKind) IsAliasing() bool {
-	switch k {
+func (kind AliasingEffectKind) IsAliasing() bool {
+	switch kind {
 	case AliasingEffectAssign, AliasingEffectAlias, AliasingEffectCapture,
 		AliasingEffectCreateFrom, AliasingEffectMaybeAlias:
 		return true
@@ -191,8 +191,8 @@ const (
 	EffectValueGlobal
 )
 
-func (k EffectValueKind) String() string {
-	switch k {
+func (kind EffectValueKind) String() string {
+	switch kind {
 	case EffectValuePrimitive:
 		return "primitive"
 	case EffectValueFrozen:

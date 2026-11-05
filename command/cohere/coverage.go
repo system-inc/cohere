@@ -177,9 +177,9 @@ type coverageSummary struct {
 }
 
 // count is how many rules a category holds, named or not.
-func (s coverageSummary) count(category coverageCategory) int {
-	total := s.Unnamed[category]
-	for _, entry := range s.Entries {
+func (summary coverageSummary) count(category coverageCategory) int {
+	total := summary.Unnamed[category]
+	for _, entry := range summary.Entries {
 		if entry.Category == category {
 			total++
 		}
@@ -189,9 +189,9 @@ func (s coverageSummary) count(category coverageCategory) int {
 
 // total is every rule the summary accounts for. It is the sum of the categories by construction, and
 // a test pins that the counted line says so.
-func (s coverageSummary) total() int {
-	total := len(s.Entries)
-	for _, count := range s.Unnamed {
+func (summary coverageSummary) total() int {
+	total := len(summary.Entries)
+	for _, count := range summary.Unnamed {
 		total += count
 	}
 	return total
@@ -331,30 +331,30 @@ func partOfTheTreeDetail(listening, offered, scopedOff, unconfigured int) string
 
 // sortEntries orders the entries by category, then by name, so the details read in the counted
 // line's order and two runs can be diffed.
-func (s *coverageSummary) sortEntries() {
+func (summary *coverageSummary) sortEntries() {
 	position := make(map[coverageCategory]int, len(coverageCategoryOrder))
 	for index, category := range coverageCategoryOrder {
 		position[category] = index
 	}
-	sort.SliceStable(s.Entries, func(first, second int) bool {
-		if s.Entries[first].Category != s.Entries[second].Category {
-			return position[s.Entries[first].Category] < position[s.Entries[second].Category]
+	sort.SliceStable(summary.Entries, func(first, second int) bool {
+		if summary.Entries[first].Category != summary.Entries[second].Category {
+			return position[summary.Entries[first].Category] < position[summary.Entries[second].Category]
 		}
-		return s.Entries[first].Name < s.Entries[second].Name
+		return summary.Entries[first].Name < summary.Entries[second].Name
 	})
 }
 
 // coverageCountedLine is the line whose terms add up to the rule total, said as arithmetic so a reader
 // can check it: `coverage: 459 rules = 370 ran and found nothing + 14 registered no listener + ...`.
 // A category holding no rule is left out, and the sum still holds.
-func (s coverageSummary) coverageCountedLine() string {
+func (summary coverageSummary) coverageCountedLine() string {
 	terms := []string{}
 	for _, category := range coverageCategoryOrder {
-		if count := s.count(category); count > 0 {
+		if count := summary.count(category); count > 0 {
 			terms = append(terms, fmt.Sprintf("%d %s", count, coverageCategoryTerms[category]))
 		}
 	}
-	line := fmt.Sprintf("coverage: %d rules", s.total())
+	line := fmt.Sprintf("coverage: %d rules", summary.total())
 	if len(terms) > 0 {
 		line += " = " + strings.Join(terms, " + ")
 	}
@@ -369,21 +369,21 @@ func (s coverageSummary) coverageCountedLine() string {
 // enforced: measured across the codebase cohere gates, 281 of 306 suppressions of our own rules stated
 // no reason, so requiring one would turn working code red for no defect, and printing it is what lets
 // the convention be tightened later from evidence rather than from a guess.
-func (s coverageSummary) coverageFilesLine(details bool) string {
-	terms := []string{fmt.Sprintf("%d files crashed", len(s.Crashes))}
-	if len(s.RuleCrashes) > 0 {
-		terms = append(terms, fmt.Sprintf("%d rule crashes, each costing one rule one file", len(s.RuleCrashes)))
+func (summary coverageSummary) coverageFilesLine(details bool) string {
+	terms := []string{fmt.Sprintf("%d files crashed", len(summary.Crashes))}
+	if len(summary.RuleCrashes) > 0 {
+		terms = append(terms, fmt.Sprintf("%d rule crashes, each costing one rule one file", len(summary.RuleCrashes)))
 	}
-	if s.FilesIgnored > 0 {
-		terms = append(terms, fmt.Sprintf("%d files excluded by ignorePatterns", s.FilesIgnored))
+	if summary.FilesIgnored > 0 {
+		terms = append(terms, fmt.Sprintf("%d files excluded by ignorePatterns", summary.FilesIgnored))
 	}
-	if s.Suppression != nil {
+	if summary.Suppression != nil {
 		terms = append(terms, fmt.Sprintf("%d findings suppressed, %d without a reason",
-			s.Suppression.Suppressed, s.Suppression.SuppressedWithoutReason))
+			summary.Suppression.Suppressed, summary.Suppression.SuppressedWithoutReason))
 		// Keep the coverage count beside the walk's fixable unused-disable findings. The walk only
 		// reports names whose rules ran, so a filtered run preserves unselected names.
-		if s.Suppression.Dead > 0 {
-			terms = append(terms, fmt.Sprintf("%d disable comments silenced nothing while their rule ran", s.Suppression.Dead))
+		if summary.Suppression.Dead > 0 {
+			terms = append(terms, fmt.Sprintf("%d disable comments silenced nothing while their rule ran", summary.Suppression.Dead))
 		}
 	}
 	if !details {
@@ -842,9 +842,9 @@ func writeOverrideReasons(out *bufio.Writer, lintConfig *configuration.Config) {
 }
 
 // offWithoutReasonCount is how many rules the settings turn off with no reason given.
-func (s coverageSummary) offWithoutReasonCount() int {
+func (summary coverageSummary) offWithoutReasonCount() int {
 	count := 0
-	for _, entry := range s.Entries {
+	for _, entry := range summary.Entries {
 		if entry.OffWithoutReason {
 			count++
 		}

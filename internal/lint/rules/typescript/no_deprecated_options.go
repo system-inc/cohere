@@ -44,10 +44,10 @@ type noDeprecatedRawSpecifier struct {
 // An unrecognized `from` is dropped rather than erroring, matching `only-throw-error` and
 // `no-floating-promises`: the specifier then matches nothing, whereas keeping it would silently mean
 // `file`, which is the zero value of the enum.
-func (s *noDeprecatedRawSpecifier) UnmarshalJSON(raw []byte) error {
+func (specifier *noDeprecatedRawSpecifier) UnmarshalJSON(raw []byte) error {
 	var asString string
 	if decodeError := json.Unmarshal(raw, &asString); decodeError == nil {
-		*s = noDeprecatedRawSpecifier{inline: asString}
+		*specifier = noDeprecatedRawSpecifier{inline: asString}
 		return nil
 	}
 
@@ -61,18 +61,18 @@ func (s *noDeprecatedRawSpecifier) UnmarshalJSON(raw []byte) error {
 		return unmarshalOptionsError
 	}
 
-	*s = noDeprecatedRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
+	*specifier = noDeprecatedRawSpecifier{From: object.From, Path: object.Path, Package: object.Package}
 
 	var names []string
 	if decodeError := json.Unmarshal(object.Name, &names); decodeError == nil {
-		s.Name = names
+		specifier.Name = names
 		return nil
 	}
 	var name string
 	if decodeError := json.Unmarshal(object.Name, &name); decodeError != nil {
 		return decodeError
 	}
-	s.Name = []string{name}
+	specifier.Name = []string{name}
 	return nil
 }
 

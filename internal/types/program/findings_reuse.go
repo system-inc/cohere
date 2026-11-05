@@ -60,9 +60,9 @@ type FindingsReuse struct {
 // MeasureReadiness says this run measures Adamic readiness, so an entry recorded by a run that did not is a
 // miss: its file was never measured, and replaying it would read as measured and clean. Called before any
 // worker runs.
-func (r *FindingsReuse) MeasureReadiness() {
-	if r != nil {
-		r.readiness = true
+func (reuse *FindingsReuse) MeasureReadiness() {
+	if reuse != nil {
+		reuse.readiness = true
 	}
 }
 
@@ -90,31 +90,31 @@ func NewFindingsReuse(key [sha256.Size]byte, previous *LintCache, anchor PathAnc
 
 // NoteDesignSystem records what this run's design system read, from rule.DesignSystemReads after a walk. A run
 // that walks more than once adds every walk's reads, and loaded is whether any walk loaded it at all.
-func (r *FindingsReuse) NoteDesignSystem(reads []rule.FileRead, loaded bool) {
-	if r == nil || !loaded {
+func (reuse *FindingsReuse) NoteDesignSystem(reads []rule.FileRead, loaded bool) {
+	if reuse == nil || !loaded {
 		return
 	}
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.designLoaded = true
-	r.designReads = append(r.designReads, reads...)
+	reuse.mutex.Lock()
+	defer reuse.mutex.Unlock()
+	reuse.designLoaded = true
+	reuse.designReads = append(reuse.designReads, reads...)
 }
 
 // Misses says why the files this run looked up and did not replay were not replayed, in words, empty when
 // every one was or none was looked up. A run whose whole findings section was missing or under another key
 // says so itself (the command does), since then no file was looked up in anything.
-func (r *FindingsReuse) Misses() string {
-	if r == nil {
+func (reuse *FindingsReuse) Misses() string {
+	if reuse == nil {
 		return ""
 	}
 	var reasons []string
-	if count := r.missingEntries.Load(); count > 0 {
+	if count := reuse.missingEntries.Load(); count > 0 {
 		reasons = append(reasons, fmt.Sprintf("%d with no entry", count))
 	}
-	if count := r.changedEntries.Load(); count > 0 {
+	if count := reuse.changedEntries.Load(); count > 0 {
 		reasons = append(reasons, fmt.Sprintf("%d whose bytes or rules changed", count))
 	}
-	if count := r.unmeasuredEntries.Load(); count > 0 {
+	if count := reuse.unmeasuredEntries.Load(); count > 0 {
 		reasons = append(reasons, fmt.Sprintf("%d taken without measuring readiness", count))
 	}
 	if len(reasons) == 0 {
@@ -124,11 +124,11 @@ func (r *FindingsReuse) Misses() string {
 }
 
 // Replayed is how many files this run served from cache.
-func (r *FindingsReuse) Replayed() int {
-	if r == nil {
+func (reuse *FindingsReuse) Replayed() int {
+	if reuse == nil {
 		return 0
 	}
-	return int(r.replayed.Load())
+	return int(reuse.replayed.Load())
 }
 
 // Recorded is what this run leaves for the next: every file it served or walked eligibly, under
@@ -138,12 +138,12 @@ func (r *FindingsReuse) Replayed() int {
 // carry a zero fingerprint until now; they take this run's. Entries that replayed theirs keep the previous one,
 // unless this run loaded a design system that differs from it, and then every entry's design-system findings
 // are dropped from replay, since which design system they saw can no longer be told.
-func (r *FindingsReuse) Recorded() *LintCache {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	design, keepReplayed := r.settleDesignSystem()
-	cache := &LintCache{Version: lintCacheVersion, Key: r.key, Entries: make([]LintCacheEntry, 0, len(r.next)), DesignSystem: design}
-	for _, entry := range r.next {
+func (reuse *FindingsReuse) Recorded() *LintCache {
+	reuse.mutex.Lock()
+	defer reuse.mutex.Unlock()
+	design, keepReplayed := reuse.settleDesignSystem()
+	cache := &LintCache{Version: lintCacheVersion, Key: reuse.key, Entries: make([]LintCacheEntry, 0, len(reuse.next)), DesignSystem: design}
+	for _, entry := range reuse.next {
 		switch {
 		case entry.DesignFingerprint == [sha256.Size]byte{} && design != nil:
 			entry.DesignFingerprint = design.Fingerprint
@@ -163,17 +163,17 @@ func (r *FindingsReuse) Recorded() *LintCache {
 // produced is replayable. A run that never loaded it produced design-system findings that read no stylesheet,
 // true under any; it carries the previous key when that still held, so the entries that replayed under it
 // stay valid, and otherwise records the empty key.
-func (r *FindingsReuse) settleDesignSystem() (key *DesignSystemKey, keepReplayed bool) {
+func (reuse *FindingsReuse) settleDesignSystem() (key *DesignSystemKey, keepReplayed bool) {
 	zero := [sha256.Size]byte{}
-	if r.designLoaded {
-		key, held := designSystemKeyFromReads(r.designReads, r.anchor)
+	if reuse.designLoaded {
+		key, held := designSystemKeyFromReads(reuse.designReads, reuse.anchor)
 		if !held {
 			return nil, false
 		}
-		return key, r.designFingerprint == zero || r.designFingerprint == key.Fingerprint
+		return key, reuse.designFingerprint == zero || reuse.designFingerprint == key.Fingerprint
 	}
-	if r.designFingerprint != zero {
-		return r.previous.DesignSystem, true
+	if reuse.designFingerprint != zero {
+		return reuse.previous.DesignSystem, true
 	}
 	return emptyDesignSystemKey(), true
 }
@@ -220,30 +220,30 @@ type cacheKeys struct {
 // range, one that cannot silence the rule it is said to have silenced, or a rule the entry did not run, is not
 // replayed: it is a miss, never repaired. text is the file's bytes, which a pure hit has already proven are the
 // entry's.
-func (r *FindingsReuse) lookup(path string, keys cacheKeys, text string) (entry LintCacheEntry, hits classHits) {
-	entry, pureHit := r.previous.Lookup(path, keys.contentHash, r.key, keys.pure)
+func (reuse *FindingsReuse) lookup(path string, keys cacheKeys, text string) (entry LintCacheEntry, hits classHits) {
+	entry, pureHit := reuse.previous.Lookup(path, keys.contentHash, reuse.key, keys.pure)
 	if pureHit && !withheldFits(entry, text) {
 		pureHit = false
 	}
 	switch {
-	case !pureHit && r.previous.holds(path):
-		r.changedEntries.Add(1)
+	case !pureHit && reuse.previous.holds(path):
+		reuse.changedEntries.Add(1)
 	case !pureHit:
-		r.missingEntries.Add(1)
-	case r.readiness && entry.Adamic == nil:
-		r.unmeasuredEntries.Add(1)
+		reuse.missingEntries.Add(1)
+	case reuse.readiness && entry.Adamic == nil:
+		reuse.unmeasuredEntries.Add(1)
 	}
-	if !pureHit || r.readiness && entry.Adamic == nil {
+	if !pureHit || reuse.readiness && entry.Adamic == nil {
 		return LintCacheEntry{}, classHits{}
 	}
-	r.replayed.Add(1)
-	r.keep(entry)
+	reuse.replayed.Add(1)
+	reuse.keep(entry)
 	return entry, classHits{
 		pure:   true,
 		typed:  equalStrings(entry.TypedRules, keys.typed) && entry.TypeFingerprint == keys.typeFingerprint,
 		shaped: equalStrings(entry.ShapedRules, keys.shaped) && entry.ShapeFingerprint == keys.shapeFingerprint,
 		design: equalStrings(entry.DesignRules, keys.design) && (len(keys.design) == 0 ||
-			r.designFingerprint != [sha256.Size]byte{} && entry.DesignFingerprint == r.designFingerprint),
+			reuse.designFingerprint != [sha256.Size]byte{} && entry.DesignFingerprint == reuse.designFingerprint),
 		derived: equalStrings(entry.DerivedRules, keys.derived) && (len(keys.derived) == 0 ||
 			keys.derivedFingerprint != [sha256.Size]byte{} && entry.DerivedFingerprint == keys.derivedFingerprint),
 	}
@@ -278,10 +278,10 @@ type classHits struct {
 	pure, typed, shaped, design, derived bool
 }
 
-func (r *FindingsReuse) keep(entry LintCacheEntry) {
-	r.mutex.Lock()
-	r.next[entry.Path] = entry
-	r.mutex.Unlock()
+func (reuse *FindingsReuse) keep(entry LintCacheEntry) {
+	reuse.mutex.Lock()
+	reuse.next[entry.Path] = entry
+	reuse.mutex.Unlock()
 }
 
 // ruleNames lists rules by name, in order.

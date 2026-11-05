@@ -125,16 +125,16 @@ func newAlias(source string) *Node {
 
 // newScalar, newPair and newCollection on a context take the node from the parse's arena when the
 // options carry one (Options.Nodes), and allocate it otherwise (#v6ksqg3).
-func (ctx *composeContext) newScalar(value any) *Node {
-	return ctx.options.Nodes.New(Node{Kind: KindScalar, Class: "Scalar", ScalarValue: value})
+func (composition *composeContext) newScalar(value any) *Node {
+	return composition.options.Nodes.New(Node{Kind: KindScalar, Class: "Scalar", ScalarValue: value})
 }
 
-func (ctx *composeContext) newPair(key *Node, value *Node) *Node {
-	return ctx.options.Nodes.New(Node{Kind: KindPair, Class: "Pair", Key: key, Value: value})
+func (composition *composeContext) newPair(key *Node, value *Node) *Node {
+	return composition.options.Nodes.New(Node{Kind: KindPair, Class: "Pair", Key: key, Value: value})
 }
 
-func (ctx *composeContext) newCollection(class string) *Node {
-	return ctx.options.Nodes.New(collectionNode(class))
+func (composition *composeContext) newCollection(class string) *Node {
+	return composition.options.Nodes.New(collectionNode(class))
 }
 
 // newPair is `new Pair(key, value)`.

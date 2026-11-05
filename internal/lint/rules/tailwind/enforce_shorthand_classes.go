@@ -266,8 +266,8 @@ type shorthandMatch struct {
 }
 
 // match reports whether this class matches one pattern, and what it captured.
-func (d shorthandDissection) match(pattern int) (string, bool) {
-	for _, candidate := range d.matches {
+func (dissection shorthandDissection) match(pattern int) (string, bool) {
+	for _, candidate := range dissection.matches {
 		if candidate.pattern == pattern {
 			return candidate.capture, true
 		}
@@ -278,13 +278,13 @@ func (d shorthandDissection) match(pattern int) (string, bool) {
 // shorthandPatternSet is a set of pattern indexes, one bit each.
 type shorthandPatternSet [2]uint64
 
-func (s *shorthandPatternSet) add(pattern int) {
-	s[pattern/64] |= 1 << (pattern % 64)
+func (set *shorthandPatternSet) add(pattern int) {
+	set[pattern/64] |= 1 << (pattern % 64)
 }
 
 // holds reports whether every pattern in needed is in this set.
-func (s shorthandPatternSet) holds(needed shorthandPatternSet) bool {
-	return s[0]&needed[0] == needed[0] && s[1]&needed[1] == needed[1]
+func (set shorthandPatternSet) holds(needed shorthandPatternSet) bool {
+	return set[0]&needed[0] == needed[0] && set[1]&needed[1] == needed[1]
 }
 
 // shorthandTablePattern is one longhand pattern of the table, read as the plain text it is.

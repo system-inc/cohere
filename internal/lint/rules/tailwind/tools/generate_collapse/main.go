@@ -109,21 +109,21 @@ type family struct {
 }
 
 // signature is one family as the invariance check and the difference report compare it.
-func (f family) signature() string {
+func (family family) signature() string {
 	logical := ""
-	if f.RequiresLogicalToPhysical {
+	if family.RequiresLogicalToPhysical {
 		logical = " (logical)"
 	}
-	return fmt.Sprintf("%s => %s @ %s%s", strings.Join(f.Inputs, " + "), f.Output, f.DiscoveredAtValue, logical)
+	return fmt.Sprintf("%s => %s @ %s%s", strings.Join(family.Inputs, " + "), family.Output, family.DiscoveredAtValue, logical)
 }
 
 // pathList collects a repeatable flag.
 type pathList []string
 
-func (p *pathList) String() string { return strings.Join(*p, ", ") }
+func (list *pathList) String() string { return strings.Join(*list, ", ") }
 
-func (p *pathList) Set(value string) error {
-	*p = append(*p, value)
+func (list *pathList) Set(value string) error {
+	*list = append(*list, value)
 	return nil
 }
 

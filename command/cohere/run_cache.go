@@ -171,17 +171,17 @@ type teeStream struct {
 // the recording reaches the real file and stays out of it.
 //
 // Mutates: target the caller's stream variable is what every write goes through, so it is pointed at the pipe
-func (t *teeStream) start(target **os.File, buffered *bufio.Writer) error {
+func (stream *teeStream) start(target **os.File, buffered *bufio.Writer) error {
 	reader, writer, pipeError := os.Pipe()
 	if pipeError != nil {
 		return pipeError
 	}
 	streams.Show(buffered)
-	t.real = *target
-	t.writer = writer
-	t.done = make(chan struct{})
+	stream.real = *target
+	stream.writer = writer
+	stream.done = make(chan struct{})
 	go func() {
-		defer close(t.done)
+		defer close(stream.done)
 		// Ignored: the read end, closed once everything written to the pipe has been read from it.
 		defer reader.Close()
 		// Line by line, so a line tagged as describing this invocation reaches the terminal untagged
@@ -192,14 +192,14 @@ func (t *teeStream) start(target **os.File, buffered *bufio.Writer) error {
 			line, readBytesError := lines.ReadBytes('\n')
 			if len(line) > 0 {
 				if rest, tagged := bytes.CutPrefix(line, invocationTag); tagged {
-					t.copyToReal(rest)
+					stream.copyToReal(rest)
 				} else if rest, tagged := bytes.CutPrefix(line, provenanceTag); tagged {
 					// Kept tagged in the recording, so a replay knows to say where the line came from.
-					t.copyToReal(rest)
-					t.buffer.Write(line)
+					stream.copyToReal(rest)
+					stream.buffer.Write(line)
 				} else {
-					t.copyToReal(line)
-					t.buffer.Write(line)
+					stream.copyToReal(line)
+					stream.buffer.Write(line)
 				}
 			}
 			if readBytesError != nil {
@@ -214,9 +214,9 @@ func (t *teeStream) start(target **os.File, buffered *bufio.Writer) error {
 // copyToReal copies one line to the real file. The copy runs on the tee's own goroutine, so a failure is
 // reported to package streams rather than returned, and the exit code counts it there: a run whose output never
 // reached the terminal must not exit as though it had.
-func (t *teeStream) copyToReal(line []byte) {
-	if _, writeError := t.real.Write(line); writeError != nil {
-		streams.Report(fmt.Errorf("copying the run's output to %s: %w", t.real.Name(), writeError))
+func (stream *teeStream) copyToReal(line []byte) {
+	if _, writeError := stream.real.Write(line); writeError != nil {
+		streams.Report(fmt.Errorf("copying the run's output to %s: %w", stream.real.Name(), writeError))
 	}
 }
 
@@ -224,17 +224,17 @@ func (t *teeStream) copyToReal(line []byte) {
 // the stream that writes to target, shown first, so what it held from during the recording is recorded.
 //
 // Mutates: target the caller's stream variable is pointed back at the real file start took it from
-func (t *teeStream) stop(target **os.File, buffered *bufio.Writer) {
-	if t.writer == nil {
+func (stream *teeStream) stop(target **os.File, buffered *bufio.Writer) {
+	if stream.writer == nil {
 		return
 	}
 	streams.Show(buffered)
-	*target = t.real
+	*target = stream.real
 	// Ignored: closing the write end only tells the copy it has everything. A pipe's writes are not buffered, so
 	// every one already reached the pipe, or failed and was kept by the stream that made it.
-	_ = t.writer.Close()
-	<-t.done
-	t.writer = nil
+	_ = stream.writer.Close()
+	<-stream.done
+	stream.writer = nil
 }
 
 // runCacheEligible reports whether this invocation may use the run cache at all.

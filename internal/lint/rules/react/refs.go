@@ -829,73 +829,73 @@ func newRefsEnvironment() *refsEnvironment {
 
 // nextRefId mints a fresh ref identity. Every call site of this is a place the convergence equality
 // must not look, which is why it is funnelled through one method.
-func (env *refsEnvironment) nextRefId() int {
-	env.refIdSeed++
-	return env.refIdSeed
+func (environment *refsEnvironment) nextRefId() int {
+	environment.refIdSeed++
+	return environment.refIdSeed
 }
 
 // operandId resolves an identifier through the temporaries side map.
-func (env *refsEnvironment) operandId(key static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
-	if resolved, found := env.temporaries[key]; found {
+func (environment *refsEnvironment) operandId(key static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
+	if resolved, found := environment.temporaries[key]; found {
 		return resolved
 	}
 	return key
 }
 
-func (env *refsEnvironment) define(key static_single_assignment.IdentifierId, value static_single_assignment.IdentifierId) {
-	resolved := env.operandId(value)
-	env.temporaries[key] = resolved
+func (environment *refsEnvironment) define(key static_single_assignment.IdentifierId, value static_single_assignment.IdentifierId) {
+	resolved := environment.operandId(value)
+	environment.temporaries[key] = resolved
 	// The access node travels with the value along an alias chain, so `const v = ref.current;`
 	// still underlines `ref.current` when the finding is raised at the read of `v`.
-	if node, ok := env.accessNodes[resolved]; ok {
-		env.accessNodes[key] = node
-	} else if node, ok := env.accessNodes[value]; ok {
-		env.accessNodes[key] = node
+	if node, ok := environment.accessNodes[resolved]; ok {
+		environment.accessNodes[key] = node
+	} else if node, ok := environment.accessNodes[value]; ok {
+		environment.accessNodes[key] = node
 	}
 }
 
 // carryAccessNode copies a recorded access node from one value to another.
-func (env *refsEnvironment) carryAccessNode(to static_single_assignment.IdentifierId, from static_single_assignment.IdentifierId) {
-	if node, ok := env.accessNodes[env.operandId(from)]; ok {
-		env.accessNodes[to] = node
+func (environment *refsEnvironment) carryAccessNode(to static_single_assignment.IdentifierId, from static_single_assignment.IdentifierId) {
+	if node, ok := environment.accessNodes[environment.operandId(from)]; ok {
+		environment.accessNodes[to] = node
 		return
 	}
-	if node, ok := env.accessNodes[from]; ok {
-		env.accessNodes[to] = node
+	if node, ok := environment.accessNodes[from]; ok {
+		environment.accessNodes[to] = node
 	}
 }
 
 // setName carries a source name onto a temporary, upstream's `set_name`.
-func (env *refsEnvironment) setName(function *high_level_intermediate_representation.Function, target static_single_assignment.IdentifierId, source static_single_assignment.IdentifierId) {
+func (environment *refsEnvironment) setName(function *high_level_intermediate_representation.Function, target static_single_assignment.IdentifierId, source static_single_assignment.IdentifierId) {
 	if name := refsIdentifierName(function, source); name != "" {
-		env.names[target] = name
+		environment.names[target] = name
 	}
 }
 
 // setName2 records a name directly onto a value, used for a global's own name.
-func (env *refsEnvironment) setName2(target static_single_assignment.IdentifierId, name string) {
+func (environment *refsEnvironment) setName2(target static_single_assignment.IdentifierId, name string) {
 	if name != "" {
-		env.names[target] = name
+		environment.names[target] = name
 	}
 }
 
 // setPropertyName records the property a load read, as the result's name in this position.
-func (env *refsEnvironment) setPropertyName(target static_single_assignment.IdentifierId, property string) {
+func (environment *refsEnvironment) setPropertyName(target static_single_assignment.IdentifierId, property string) {
 	if property != "" {
-		env.propertyNames[target] = property
+		environment.propertyNames[target] = property
 	}
 }
 
 // nameOf is the value's own binding name, or the one a LoadLocal carried onto it.
-func (env *refsEnvironment) nameOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) string {
+func (environment *refsEnvironment) nameOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) string {
 	if name := refsIdentifierName(function, id); name != "" {
 		return name
 	}
-	return env.names[id]
+	return environment.names[id]
 }
 
-func (env *refsEnvironment) get(key static_single_assignment.IdentifierId) *refsAccessType {
-	if found, ok := env.data[env.operandId(key)]; ok {
+func (environment *refsEnvironment) get(key static_single_assignment.IdentifierId) *refsAccessType {
+	if found, ok := environment.data[environment.operandId(key)]; ok {
 		return found
 	}
 	// Fall back to whatever the same source binding holds elsewhere in this function.
@@ -914,9 +914,9 @@ func (env *refsEnvironment) get(key static_single_assignment.IdentifierId) *refs
 	//
 	// This is a workaround for a representation defect rather than a transcription of upstream,
 	// which has no such gap. It belongs in lowering; see the report.
-	for _, candidate := range [2]static_single_assignment.IdentifierId{key, env.operandId(key)} {
-		if declaration, ok := env.declarations[candidate]; ok {
-			if found, ok := env.byDeclaration[declaration]; ok {
+	for _, candidate := range [2]static_single_assignment.IdentifierId{key, environment.operandId(key)} {
+		if declaration, ok := environment.declarations[candidate]; ok {
+			if found, ok := environment.byDeclaration[declaration]; ok {
 				return found
 			}
 		}
@@ -930,39 +930,39 @@ func (env *refsEnvironment) get(key static_single_assignment.IdentifierId) *refs
 // fixpoint's only termination signal. The comparison uses `refsTypeEqual`, which ignores minted ref
 // identity: reading that comparison as ordinary equality is the defect that would prevent
 // convergence.
-func (env *refsEnvironment) set(key static_single_assignment.IdentifierId, value *refsAccessType) {
-	operandId := env.operandId(key)
-	current, hadCurrent := env.data[operandId]
-	widened := refsJoin(value, current, env.nextRefId)
+func (environment *refsEnvironment) set(key static_single_assignment.IdentifierId, value *refsAccessType) {
+	operandId := environment.operandId(key)
+	current, hadCurrent := environment.data[operandId]
+	widened := refsJoin(value, current, environment.nextRefId)
 	if !hadCurrent && widened.Kind == refsNone {
-		env.data[operandId] = widened
+		environment.data[operandId] = widened
 		return
 	}
 	if !hadCurrent || !refsTypeEqual(current, widened) {
-		env.changed = true
+		environment.changed = true
 	}
-	env.data[operandId] = widened
+	environment.data[operandId] = widened
 	// Record against the original key's declaration as well as the resolved one: an alias chain
 	// resolves a named binding onto an unnamed temporary, so the declaration lives on the key that
 	// was asked about rather than on the value it resolved to.
 	if widened.Kind != refsNone {
-		if declaration, ok := env.declarations[key]; ok {
-			env.byDeclaration[declaration] = widened
+		if declaration, ok := environment.declarations[key]; ok {
+			environment.byDeclaration[declaration] = widened
 		}
-		if declaration, ok := env.declarations[operandId]; ok {
-			env.byDeclaration[declaration] = widened
+		if declaration, ok := environment.declarations[operandId]; ok {
+			environment.byDeclaration[declaration] = widened
 		}
 	}
 }
 
 // noteDeclaration records which source binding a value belongs to, so `get` can recover a value
 // whose single-assignment numbering did not unify with the one that was written.
-func (env *refsEnvironment) noteDeclaration(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) {
+func (environment *refsEnvironment) noteDeclaration(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return
 	}
 	if identifier := function.Identifiers[id]; identifier != nil && identifier.Name != "" {
-		env.declarations[id] = identifier.Declaration
+		environment.declarations[id] = identifier.Declaration
 	}
 }
 

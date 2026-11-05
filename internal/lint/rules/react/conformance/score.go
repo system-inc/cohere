@@ -25,7 +25,7 @@ type Implementation interface {
 // ErrUnsupported is what an Implementation returns for a fixture it cannot handle.
 type ErrUnsupported struct{ Reason string }
 
-func (e *ErrUnsupported) Error() string { return "unsupported: " + e.Reason }
+func (unsupported *ErrUnsupported) Error() string { return "unsupported: " + unsupported.Reason }
 
 // Outcome is what happened to one fixture.
 type Outcome string
@@ -86,16 +86,16 @@ type Score struct {
 // This is the guard on the guard. If a future outcome is added and its counter is not summed here,
 // the arithmetic stops adding up and says so, rather than quietly under-reporting the denominator
 // and making a partial run look like a complete one.
-func (s Score) Check() error {
-	sum := s.Passed + s.Failed + s.Declined + s.Excluded + s.Refused
-	if sum != s.Considered {
+func (score Score) Check() error {
+	sum := score.Passed + score.Failed + score.Declined + score.Excluded + score.Refused
+	if sum != score.Considered {
 		return fmt.Errorf(
 			"score does not partition the corpus: considered %d but outcomes sum to %d (passed %d, failed %d, declined %d, excluded %d, refused %d)",
-			s.Considered, sum, s.Passed, s.Failed, s.Declined, s.Excluded, s.Refused,
+			score.Considered, sum, score.Passed, score.Failed, score.Declined, score.Excluded, score.Refused,
 		)
 	}
-	if s.Considered != len(s.Fixtures) {
-		return fmt.Errorf("score considered %d fixtures but recorded %d verdicts", s.Considered, len(s.Fixtures))
+	if score.Considered != len(score.Fixtures) {
+		return fmt.Errorf("score considered %d fixtures but recorded %d verdicts", score.Considered, len(score.Fixtures))
 	}
 	return nil
 }
@@ -104,10 +104,10 @@ func (s Score) Check() error {
 //
 // It always states the denominator and always states what was not scored, because "0 / 325" and
 // "0 / 0" differ by exactly the fact this suite is built to keep visible.
-func (s Score) Summary() string {
+func (score Score) Summary() string {
 	return fmt.Sprintf(
 		"%d / %d passed (failed %d, declined %d, excluded %d, refused %d) against facebook/react@%s",
-		s.Passed, s.Considered, s.Failed, s.Declined, s.Excluded, s.Refused, UpstreamSha[:12],
+		score.Passed, score.Considered, score.Failed, score.Declined, score.Excluded, score.Refused, UpstreamSha[:12],
 	)
 }
 

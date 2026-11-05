@@ -87,8 +87,8 @@ type CSSSyntaxError struct {
 	Offset int
 }
 
-func (err *CSSSyntaxError) Error() string {
-	return fmt.Sprintf("%d: %s", err.Offset, err.Message)
+func (syntaxError *CSSSyntaxError) Error() string {
+	return fmt.Sprintf("%d: %s", syntaxError.Offset, syntaxError.Message)
 }
 
 // ParseCSS parses a stylesheet into the AST in ast.go.

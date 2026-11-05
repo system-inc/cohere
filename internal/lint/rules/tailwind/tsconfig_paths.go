@@ -149,9 +149,9 @@ func tsconfigPrefixLength(pattern string) int {
 // tsconfigFile is one tsconfig read as JSON, its top-level keys kept raw.
 type tsconfigFile map[string]json.RawMessage
 
-func (config tsconfigFile) compilerOptions() map[string]json.RawMessage {
+func (file tsconfigFile) compilerOptions() map[string]json.RawMessage {
 	options := map[string]json.RawMessage{}
-	_ = json.Unmarshal(config["compilerOptions"], &options)
+	_ = json.Unmarshal(file["compilerOptions"], &options)
 	return options
 }
 

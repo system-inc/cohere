@@ -211,23 +211,23 @@ type candidateParts struct {
 }
 
 // mergeKey is everything except the root. Two classes can only merge when this matches.
-func (c candidateParts) mergeKey() string {
+func (parts candidateParts) mergeKey() string {
 	importance := ""
-	if c.Important {
+	if parts.Important {
 		importance = "!"
 	}
-	return c.Prefix + "|" + importance + "|" + c.Value
+	return parts.Prefix + "|" + importance + "|" + parts.Value
 }
 
 // printedValue is the value to write into a rebuilt class name.
 //
 // SourceValue when the decoded form differs from what the author wrote, Value otherwise. See the
 // field comment: the decoded form is what decides equality and is not always writable.
-func (c candidateParts) printedValue() string {
-	if c.SourceValue != "" {
-		return c.SourceValue
+func (parts candidateParts) printedValue() string {
+	if parts.SourceValue != "" {
+		return parts.SourceValue
 	}
-	return c.Value
+	return parts.Value
 }
 
 // reportCollapses finds mergeable sets in one literal and reports the shorter spelling, returning the

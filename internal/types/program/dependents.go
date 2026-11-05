@@ -31,12 +31,12 @@ const DependentClosureLimit = 500
 // Demonstrated before this existed, by changing one function's return type to `any`: the whole tree
 // reported seven new findings, three in the edited file and four in a consumer two directories away,
 // and a run scoped to the edited file alone saw only the three.
-func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bool) {
+func (graph *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bool) {
 	if len(seeds) == 0 {
 		return nil, true
 	}
 
-	projectFiles := g.ProjectFiles()
+	projectFiles := graph.ProjectFiles()
 	byPath := make(map[tspath.PathKey]*ast.SourceFile, len(projectFiles))
 	for _, sourceFile := range projectFiles {
 		byPath[sourceFile.PathKey()] = sourceFile
@@ -50,7 +50,7 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 	// those differ in case alone. Comparing them raw produced a graph with almost no edges, which read
 	// as `every file reaches its whole closure in one hop` rather than as a broken map.
 	importers := make(map[tspath.PathKey][]tspath.PathKey, len(projectFiles))
-	for fromPath, resolutions := range g.Program.GetResolvedModules() {
+	for fromPath, resolutions := range graph.Program.GetResolvedModules() {
 		if _, ours := byPath[fromPath]; !ours {
 			continue
 		}
@@ -58,7 +58,7 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 			if resolution == nil || resolution.ResolvedFileName == "" {
 				continue
 			}
-			toward := g.pathFor(resolution.ResolvedFileName.AsString())
+			toward := graph.pathFor(resolution.ResolvedFileName.AsString())
 			if _, ours := byPath[toward]; !ours {
 				continue
 			}
@@ -105,6 +105,6 @@ func (g *Graph) DependentClosure(seeds []*ast.SourceFile) ([]*ast.SourceFile, bo
 }
 
 // pathFor normalises a file name the way the program keys its own maps.
-func (g *Graph) pathFor(fileName string) tspath.PathKey {
-	return toPath(fileName, g.Anchor.Root(), g.Config.CaseSensitivity())
+func (graph *Graph) pathFor(fileName string) tspath.PathKey {
+	return toPath(fileName, graph.Anchor.Root(), graph.Config.CaseSensitivity())
 }

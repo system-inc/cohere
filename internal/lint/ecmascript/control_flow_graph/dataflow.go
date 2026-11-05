@@ -228,22 +228,22 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 
 // In returns the value flowing into block in the analysis's direction: on entry for a Forward
 // analysis, on exit for a Backward one. The second result is false for an unreachable block.
-func (s *Solution[V, E]) In(block *Block[E]) (V, bool) {
+func (solution *Solution[V, E]) In(block *Block[E]) (V, bool) {
 	var zero V
-	if s == nil || block == nil || block.Index() >= len(s.entry) || !s.reachable[block.Index()] {
+	if solution == nil || block == nil || block.Index() >= len(solution.entry) || !solution.reachable[block.Index()] {
 		return zero, false
 	}
-	return s.entry[block.Index()], true
+	return solution.entry[block.Index()], true
 }
 
 // Out returns the value flowing out of block in the analysis's direction. The second result is
 // false for an unreachable block.
-func (s *Solution[V, E]) Out(block *Block[E]) (V, bool) {
+func (solution *Solution[V, E]) Out(block *Block[E]) (V, bool) {
 	var zero V
-	if s == nil || block == nil || block.Index() >= len(s.exit) || !s.reachable[block.Index()] {
+	if solution == nil || block == nil || block.Index() >= len(solution.exit) || !solution.reachable[block.Index()] {
 		return zero, false
 	}
-	return s.exit[block.Index()], true
+	return solution.exit[block.Index()], true
 }
 
 // Rounds reports how many times the solver swept every block before nothing moved.
@@ -252,9 +252,9 @@ func (s *Solution[V, E]) Out(block *Block[E]) (V, bool) {
 // job. A Forward analysis over an acyclic graph in reverse postorder settles in two rounds, one to
 // propagate and one to observe nothing moved; more than that means back edges, and a lot more than
 // that means the order is wrong or the lattice is taller than it looks.
-func (s *Solution[V, E]) Rounds() int {
-	if s == nil {
+func (solution *Solution[V, E]) Rounds() int {
+	if solution == nil {
 		return 0
 	}
-	return s.rounds
+	return solution.rounds
 }

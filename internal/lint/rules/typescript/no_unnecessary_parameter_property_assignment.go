@@ -188,7 +188,7 @@ type parameterPropertyAssignmentVisitor struct {
 	assignedBeforeConstructor map[string]bool
 }
 
-func (v *parameterPropertyAssignmentVisitor) visit(node *ast.Node) {
+func (visitor *parameterPropertyAssignmentVisitor) visit(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -216,7 +216,7 @@ func (v *parameterPropertyAssignmentVisitor) visit(node *ast.Node) {
 
 	case ast.KindBinaryExpression:
 		if ast.IsAssignmentOperator(node.AsBinaryExpression().OperatorToken.Kind) {
-			v.visitAssignment(node)
+			visitor.visitAssignment(node)
 			// Upstream's override returns on every path without calling the default walker, so an
 			// assignment is a dead end and neither side is descended into. This is what makes
 			// `this.bar = () => { this.foo = foo; }` clean, rather than any property of arrows.
@@ -225,12 +225,12 @@ func (v *parameterPropertyAssignmentVisitor) visit(node *ast.Node) {
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
-		v.visit(child)
+		visitor.visit(child)
 		return false
 	})
 }
 
-func (v *parameterPropertyAssignmentVisitor) visitAssignment(node *ast.Node) {
+func (visitor *parameterPropertyAssignmentVisitor) visitAssignment(node *ast.Node) {
 	assignment := node.AsBinaryExpression()
 
 	propertyName, ok := thisPropertyNameOfAssignmentTarget(assignment.Left)
@@ -241,7 +241,7 @@ func (v *parameterPropertyAssignmentVisitor) visitAssignment(node *ast.Node) {
 	if !isUnnecessaryAssignmentOperator(assignment.OperatorToken.Kind) {
 		// A compound arithmetic assignment reads the property, so the parameter property's value is
 		// now load-bearing and every later plain assignment to the same name is necessary.
-		v.assignedBeforeUnnecessary[propertyName] = true
+		visitor.assignedBeforeUnnecessary[propertyName] = true
 		return
 	}
 
@@ -252,7 +252,7 @@ func (v *parameterPropertyAssignmentVisitor) visitAssignment(node *ast.Node) {
 	if right.Text() != propertyName {
 		return
 	}
-	if !v.parameterProperties[propertyName] {
+	if !visitor.parameterProperties[propertyName] {
 		return
 	}
 
@@ -267,10 +267,10 @@ func (v *parameterPropertyAssignmentVisitor) visitAssignment(node *ast.Node) {
 		return
 	}
 
-	if v.assignedBeforeUnnecessary[propertyName] {
+	if visitor.assignedBeforeUnnecessary[propertyName] {
 		return
 	}
-	if v.assignedBeforeConstructor[propertyName] {
+	if visitor.assignedBeforeConstructor[propertyName] {
 		return
 	}
 
@@ -279,9 +279,9 @@ func (v *parameterPropertyAssignmentVisitor) visitAssignment(node *ast.Node) {
 	// as well as the assignment, and every one of upstream's 21 fix vectors keeps that indentation.
 	// `rule.TokenRange` is the same trivia-stripped span the diagnostic itself carries, which is
 	// also what makes the finding and its repair point at the same bytes.
-	reported := rule.TokenRange(v.context.SourceFile, node)
+	reported := rule.TokenRange(visitor.context.SourceFile, node)
 
-	v.context.ReportNodeWithSuggestions(node, messageNoUnnecessaryParameterPropertyAssignment,
+	visitor.context.ReportNodeWithSuggestions(node, messageNoUnnecessaryParameterPropertyAssignment,
 		rule.Suggestion{
 			Message: suggestionNoUnnecessaryParameterPropertyAssignment,
 			Fixes: []rule.Fix{{

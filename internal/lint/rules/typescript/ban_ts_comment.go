@@ -393,16 +393,16 @@ type BanTsCommentOptions struct {
 // The fallback is unreachable, because `findBanTsCommentDirective` returns only the four names the
 // switch covers, and a mutant flipping it to a ban survives for that reason. Go requires a return,
 // and the allowing setting is the one that cannot report on input this rule never produces.
-func (o BanTsCommentOptions) settingFor(directive string) BanTsCommentSetting {
+func (options BanTsCommentOptions) settingFor(directive string) BanTsCommentSetting {
 	switch directive {
 	case banTsCommentIgnore:
-		return o.TsIgnore
+		return options.TsIgnore
 	case banTsCommentCheck:
-		return o.TsCheck
+		return options.TsCheck
 	case banTsCommentNoCheck:
-		return o.TsNoCheck
+		return options.TsNoCheck
 	case banTsCommentExpectError:
-		return o.TsExpectError
+		return options.TsExpectError
 	}
 	return BanTsCommentSetting{Kind: BanTsCommentBoolean, Banned: false}
 }

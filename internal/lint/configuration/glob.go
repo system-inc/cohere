@@ -64,8 +64,8 @@ func compileGlob(pattern string) glob {
 }
 
 // matches reports whether a path, already split by splitPath, matches any alternative.
-func (g glob) matches(segments []string) bool {
-	for _, alternative := range g {
+func (glob glob) matches(segments []string) bool {
+	for _, alternative := range glob {
 		if matchSegments(alternative, segments) {
 			return true
 		}

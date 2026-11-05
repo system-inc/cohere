@@ -65,24 +65,24 @@ type alwaysInvalidatingPruner struct {
 // `withinScope` is upstream's traversal state: an allocation inside a scope is memoized by that
 // scope, so it is always-invalidating in principle but not unmemoized in fact. The distinction is
 // the whole pass -- without it every array literal anywhere would prune every scope reading it.
-func (p *alwaysInvalidatingPruner) walk(block ReactiveBlock, withinScope bool) {
+func (pruner *alwaysInvalidatingPruner) walk(block ReactiveBlock, withinScope bool) {
 	for _, statement := range block {
 		switch shape := statement.(type) {
 		case *ReactiveInstructionStatement:
-			p.visitInstruction(shape.Instruction, withinScope)
+			pruner.visitInstruction(shape.Instruction, withinScope)
 
 		case *ReactiveScopeBlock:
-			p.walk(shape.Instructions, true)
-			p.visitScope(shape)
+			pruner.walk(shape.Instructions, true)
+			pruner.visitScope(shape)
 
 		case *ReactiveTerminalStatement:
-			p.walkTerminal(shape, withinScope)
+			pruner.walkTerminal(shape, withinScope)
 		}
 	}
 }
 
 // visitInstruction seeds and propagates the two value sets.
-func (p *alwaysInvalidatingPruner) visitInstruction(instruction *ReactiveInstruction,
+func (pruner *alwaysInvalidatingPruner) visitInstruction(instruction *ReactiveInstruction,
 	withinScope bool) {
 	if instruction == nil {
 		return
@@ -96,43 +96,43 @@ func (p *alwaysInvalidatingPruner) visitInstruction(instruction *ReactiveInstruc
 	case *ArrayExpression, *ObjectExpression, *JsxExpression, *JsxFragment, *NewExpression:
 		// The seeding set, and `CallExpression` is deliberately not here; see the package comment.
 		if instruction.LValue != nil {
-			p.alwaysInvalidating[instruction.LValue.Identifier] = true
+			pruner.alwaysInvalidating[instruction.LValue.Identifier] = true
 			if !withinScope {
-				p.unmemoized[instruction.LValue.Identifier] = true
+				pruner.unmemoized[instruction.LValue.Identifier] = true
 			}
 		}
 
 	case *StoreLocal:
 		// Both sets flow through an assignment, separately: a value can be always-invalidating
 		// without being unmemoized, and copying it must preserve that difference.
-		if p.alwaysInvalidating[value.Value.Identifier] {
-			p.alwaysInvalidating[value.LValue.Identifier] = true
+		if pruner.alwaysInvalidating[value.Value.Identifier] {
+			pruner.alwaysInvalidating[value.LValue.Identifier] = true
 		}
-		if p.unmemoized[value.Value.Identifier] {
-			p.unmemoized[value.LValue.Identifier] = true
+		if pruner.unmemoized[value.Value.Identifier] {
+			pruner.unmemoized[value.LValue.Identifier] = true
 		}
 
 	case *LoadLocal:
 		if instruction.LValue == nil {
 			return
 		}
-		if p.alwaysInvalidating[value.Place.Identifier] {
-			p.alwaysInvalidating[instruction.LValue.Identifier] = true
+		if pruner.alwaysInvalidating[value.Place.Identifier] {
+			pruner.alwaysInvalidating[instruction.LValue.Identifier] = true
 		}
-		if p.unmemoized[value.Place.Identifier] {
-			p.unmemoized[instruction.LValue.Identifier] = true
+		if pruner.unmemoized[value.Place.Identifier] {
+			pruner.unmemoized[instruction.LValue.Identifier] = true
 		}
 	}
 }
 
 // visitScope prunes a scope depending on any unmemoized value, and propagates outward.
-func (p *alwaysInvalidatingPruner) visitScope(scope *ReactiveScopeBlock) {
+func (pruner *alwaysInvalidatingPruner) visitScope(scope *ReactiveScopeBlock) {
 	if scope.Pruned {
 		return
 	}
 	depends := false
-	for _, dependency := range p.dependencies.DependenciesOf(scope.Scope) {
-		if p.unmemoized[dependency.Identifier] {
+	for _, dependency := range pruner.dependencies.DependenciesOf(scope.Scope) {
+		if pruner.unmemoized[dependency.Identifier] {
 			depends = true
 			break
 		}
@@ -143,50 +143,50 @@ func (p *alwaysInvalidatingPruner) visitScope(scope *ReactiveScopeBlock) {
 
 	// The propagation channel. Every always-invalidating value this scope declares or reassigns
 	// becomes unmemoized, because the scope that was memoizing it is about to stop.
-	for _, declared := range p.dependencies.DeclarationsOf(scope.Scope) {
-		if p.alwaysInvalidating[declared] {
-			p.unmemoized[declared] = true
+	for _, declared := range pruner.dependencies.DeclarationsOf(scope.Scope) {
+		if pruner.alwaysInvalidating[declared] {
+			pruner.unmemoized[declared] = true
 		}
 	}
-	for _, reassigned := range p.dependencies.ReassignmentsOf(scope.Scope) {
-		if p.alwaysInvalidating[reassigned] {
-			p.unmemoized[reassigned] = true
+	for _, reassigned := range pruner.dependencies.ReassignmentsOf(scope.Scope) {
+		if pruner.alwaysInvalidating[reassigned] {
+			pruner.unmemoized[reassigned] = true
 		}
 	}
 
 	scope.Pruned = true
-	p.pruned++
+	pruner.pruned++
 }
 
 // walkTerminal descends into every block a terminal contains.
-func (p *alwaysInvalidatingPruner) walkTerminal(statement *ReactiveTerminalStatement,
+func (pruner *alwaysInvalidatingPruner) walkTerminal(statement *ReactiveTerminalStatement,
 	withinScope bool) {
 	switch shape := statement.Terminal.(type) {
 	case *ReactiveIf:
-		p.walk(shape.Consequent, withinScope)
+		pruner.walk(shape.Consequent, withinScope)
 		if shape.Alternate != nil {
-			p.walk(*shape.Alternate, withinScope)
+			pruner.walk(*shape.Alternate, withinScope)
 		}
 	case *ReactiveSwitch:
 		for index := range shape.Cases {
 			if shape.Cases[index].Block != nil {
-				p.walk(*shape.Cases[index].Block, withinScope)
+				pruner.walk(*shape.Cases[index].Block, withinScope)
 			}
 		}
 	case *ReactiveFor:
-		p.walk(shape.Loop, withinScope)
+		pruner.walk(shape.Loop, withinScope)
 	case *ReactiveForOf:
-		p.walk(shape.Loop, withinScope)
+		pruner.walk(shape.Loop, withinScope)
 	case *ReactiveForIn:
-		p.walk(shape.Loop, withinScope)
+		pruner.walk(shape.Loop, withinScope)
 	case *ReactiveWhile:
-		p.walk(shape.Loop, withinScope)
+		pruner.walk(shape.Loop, withinScope)
 	case *ReactiveDoWhile:
-		p.walk(shape.Loop, withinScope)
+		pruner.walk(shape.Loop, withinScope)
 	case *ReactiveLabelTerminal:
-		p.walk(shape.Block, withinScope)
+		pruner.walk(shape.Block, withinScope)
 	case *ReactiveTry:
-		p.walk(shape.Block, withinScope)
-		p.walk(shape.Handler, withinScope)
+		pruner.walk(shape.Block, withinScope)
+		pruner.walk(shape.Handler, withinScope)
 	}
 }

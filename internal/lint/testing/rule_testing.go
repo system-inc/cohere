@@ -36,9 +36,9 @@ type Result struct {
 }
 
 // MessageIds returns the ids of every finding, in the order they were reported.
-func (r Result) MessageIds() []string {
-	ids := make([]string, 0, len(r.Diagnostics))
-	for _, diagnostic := range r.Diagnostics {
+func (result Result) MessageIds() []string {
+	ids := make([]string, 0, len(result.Diagnostics))
+	for _, diagnostic := range result.Diagnostics {
 		ids = append(ids, diagnostic.Message.Id)
 	}
 	return ids

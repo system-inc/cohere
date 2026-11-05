@@ -36,13 +36,13 @@ package control_flow_graph
 // mirrors what every existing consumer already does — each one skips `!successor.Reachable` at its
 // own loop — and it is the definition dominance needs, since a block nothing arrives at cannot
 // dominate anything.
-func (d *DominatorAnalysis[E]) Predecessors(block *Block[E]) []*Block[E] {
-	if d == nil || block == nil || block.Index() >= len(d.predecessorStart)-1 {
+func (analysis *DominatorAnalysis[E]) Predecessors(block *Block[E]) []*Block[E] {
+	if analysis == nil || block == nil || block.Index() >= len(analysis.predecessorStart)-1 {
 		return nil
 	}
-	start := d.predecessorStart[block.Index()]
-	end := d.predecessorStart[block.Index()+1]
-	return d.predecessors[start:end]
+	start := analysis.predecessorStart[block.Index()]
+	end := analysis.predecessorStart[block.Index()+1]
+	return analysis.predecessors[start:end]
 }
 
 // DominatorAnalysis holds the dominator tree of one graph's reachable subgraph, plus the
@@ -224,11 +224,11 @@ func AnalyzeDominators[E any](graph *Graph[E]) *DominatorAnalysis[E] {
 //
 // Every other accessor answers false or nil for an unreachable block, and that answer is
 // indistinguishable from a real negative. This is how a caller tells the two apart.
-func (d *DominatorAnalysis[E]) IsReachable(block *Block[E]) bool {
-	if d == nil || block == nil || block.Index() >= len(d.immediate) {
+func (analysis *DominatorAnalysis[E]) IsReachable(block *Block[E]) bool {
+	if analysis == nil || block == nil || block.Index() >= len(analysis.immediate) {
 		return false
 	}
-	return d.immediate[block.Index()] != -1
+	return analysis.immediate[block.Index()] != -1
 }
 
 // ImmediateDominator returns the block that immediately dominates block: the last block every path
@@ -237,15 +237,15 @@ func (d *DominatorAnalysis[E]) IsReachable(block *Block[E]) bool {
 // The second result is false for an unreachable block and for the entry block, which has no
 // immediate dominator. Returning the entry as its own would make a caller walking the tree upward
 // loop forever, and callers do walk it upward.
-func (d *DominatorAnalysis[E]) ImmediateDominator(block *Block[E]) (*Block[E], bool) {
-	if !d.IsReachable(block) {
+func (analysis *DominatorAnalysis[E]) ImmediateDominator(block *Block[E]) (*Block[E], bool) {
+	if !analysis.IsReachable(block) {
 		return nil, false
 	}
 	index := block.Index()
 	if index == 0 {
 		return nil, false
 	}
-	return d.graph.Blocks[d.immediate[index]], true
+	return analysis.graph.Blocks[analysis.immediate[index]], true
 }
 
 // Dominates reports whether every path from the graph entry to block passes through dominator.
@@ -255,15 +255,15 @@ func (d *DominatorAnalysis[E]) ImmediateDominator(block *Block[E]) (*Block[E], b
 //
 // Both blocks must be reachable. An unreachable block is dominated by nothing and dominates
 // nothing, so either being unreachable answers false.
-func (d *DominatorAnalysis[E]) Dominates(dominator, block *Block[E]) bool {
-	if !d.IsReachable(dominator) || !d.IsReachable(block) {
+func (analysis *DominatorAnalysis[E]) Dominates(dominator, block *Block[E]) bool {
+	if !analysis.IsReachable(dominator) || !analysis.IsReachable(block) {
 		return false
 	}
 	target := dominator.Index()
 	// Walking the tree upward rather than comparing depth intervals. The chain is bounded by the
 	// tree's height and this is not on a hot path; a depth-interval encoding would need a second
 	// pass to build and would have to be kept honest against the tree.
-	for index := block.Index(); ; index = d.immediate[index] {
+	for index := block.Index(); ; index = analysis.immediate[index] {
 		if index == target {
 			return true
 		}
@@ -274,8 +274,8 @@ func (d *DominatorAnalysis[E]) Dominates(dominator, block *Block[E]) bool {
 }
 
 // StrictlyDominates reports whether dominator dominates block and is not block.
-func (d *DominatorAnalysis[E]) StrictlyDominates(dominator, block *Block[E]) bool {
-	return dominator != block && d.Dominates(dominator, block)
+func (analysis *DominatorAnalysis[E]) StrictlyDominates(dominator, block *Block[E]) bool {
+	return dominator != block && analysis.Dominates(dominator, block)
 }
 
 // ReversePostOrder returns the reachable blocks in reverse postorder, entry first.
@@ -287,9 +287,9 @@ func (d *DominatorAnalysis[E]) StrictlyDominates(dominator, block *Block[E]) boo
 //
 // A backward dataflow wants this reversed, which `Solve` does rather than making each caller
 // remember to.
-func (d *DominatorAnalysis[E]) ReversePostOrder() []*Block[E] {
-	if d == nil {
+func (analysis *DominatorAnalysis[E]) ReversePostOrder() []*Block[E] {
+	if analysis == nil {
 		return nil
 	}
-	return d.reversePostOrder
+	return analysis.reversePostOrder
 }

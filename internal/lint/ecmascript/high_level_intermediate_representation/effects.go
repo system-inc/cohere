@@ -183,19 +183,19 @@ type AliasingEffects struct {
 }
 
 // Get returns one instruction's effects, or nil when it has none.
-func (e *AliasingEffects) Get(id InstructionId) []AliasingEffect {
-	if e == nil {
+func (effects *AliasingEffects) Get(id InstructionId) []AliasingEffect {
+	if effects == nil {
 		return nil
 	}
-	return e.byInstruction[id]
+	return effects.byInstruction[id]
 }
 
 // Len is how many instructions carry at least one effect.
-func (e *AliasingEffects) Len() int {
-	if e == nil {
+func (effects *AliasingEffects) Len() int {
+	if effects == nil {
 		return 0
 	}
-	return len(e.byInstruction)
+	return len(effects.byInstruction)
 }
 
 // EffectGap names an effect-inference rule this pass cannot apply, for a caller that needs to know.
@@ -258,8 +258,8 @@ func EffectGaps() []EffectGap {
 	}
 }
 
-func (g EffectGap) String() string {
-	switch g {
+func (gap EffectGap) String() string {
+	switch gap {
 	case EffectGapInterproceduralParameters:
 		return "interprocedural-parameters"
 	case EffectGapSignatureTable:

@@ -75,27 +75,27 @@ func decideMemoryPolicy(lookupEnvironment func(string) (string, bool), available
 	return memoryPolicy{available: bytes, ceiling: uint64(float64(bytes) * memoryCeilingFraction)}
 }
 
-func (p memoryPolicy) apply() {
-	if p.ceiling == 0 {
+func (policy memoryPolicy) apply() {
+	if policy.ceiling == 0 {
 		return
 	}
 	// The limit first: with collection off and no limit, nothing would bound the heap for the instant
 	// between the two calls.
-	debug.SetMemoryLimit(int64(min(p.ceiling, math.MaxInt64)))
+	debug.SetMemoryLimit(int64(min(policy.ceiling, math.MaxInt64)))
 	debug.SetGCPercent(-1)
 }
 
 // line is the summary's account of the collector, so a run's memory use is never a surprise.
-func (p memoryPolicy) line() string {
+func (policy memoryPolicy) line() string {
 	switch {
-	case p.testBinary:
+	case policy.testBinary:
 		return "memory: the collector runs at Go's default, since this is a test binary"
-	case p.environment != "":
-		return "memory: the environment sets the collector (" + p.environment + ")"
-	case p.unreadable != nil:
-		return fmt.Sprintf("memory: the collector runs at Go's default, since available memory could not be read (%v)", p.unreadable)
+	case policy.environment != "":
+		return "memory: the environment sets the collector (" + policy.environment + ")"
+	case policy.unreadable != nil:
+		return fmt.Sprintf("memory: the collector runs at Go's default, since available memory could not be read (%v)", policy.unreadable)
 	}
-	return fmt.Sprintf("memory: collector off, ceiling %s (half of %s available)", gigabytes(p.ceiling), gigabytes(p.available))
+	return fmt.Sprintf("memory: collector off, ceiling %s (half of %s available)", gigabytes(policy.ceiling), gigabytes(policy.available))
 }
 
 // darwinAvailableMemory is free pages, plus file-backed pages (the cache the kernel drops before anything

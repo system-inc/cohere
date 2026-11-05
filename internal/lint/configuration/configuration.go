@@ -32,8 +32,8 @@ const (
 // Without this, fmt prints the underlying int as a control character, because Severity is an
 // iota and SeverityOff is 0. A diagnostic about a config key that rendered its severity as
 // '\x00' would be describing the exact problem it exists to report, illegibly.
-func (s Severity) String() string {
-	switch s {
+func (severity Severity) String() string {
+	switch severity {
 	case SeverityOff:
 		return "off"
 	case SeverityWarn:

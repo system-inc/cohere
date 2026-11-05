@@ -38,29 +38,29 @@ func (typeError *TypeError) Error() string {
 	return "TypeError: " + typeError.Message
 }
 
-func (s *scssParser) atrule(atToken token) {
+func (parser *scssParser) atrule(atToken token) {
 	name := atToken.value
 	prev := atToken
-	for !s.tokenizer.endOfFile() {
-		next, _ := s.tokenizer.nextToken()
+	for !parser.tokenizer.endOfFile() {
+		next, _ := parser.tokenizer.nextToken()
 		if next.kind == "word" && next.start == prev.end+1 {
 			name += next.value
 			prev = next
 		} else {
-			s.tokenizer.back(next)
+			parser.tokenizer.back(next)
 			break
 		}
 	}
 
-	s.parser.atrule(token{kind: "at-word", value: name, start: atToken.start, end: prev.end})
+	parser.parser.atrule(token{kind: "at-word", value: name, start: atToken.start, end: prev.end})
 }
 
-func (s *scssParser) comment(commentToken token) {
+func (parser *scssParser) comment(commentToken token) {
 	if commentToken.inline {
 		node := newComment()
-		s.init(node, commentToken.start)
+		parser.init(node, commentToken.start)
 		node.raws["inline"] = true
-		pos := s.input.fromOffset(commentToken.end)
+		pos := parser.input.fromOffset(commentToken.end)
 		node.source.end = &position{
 			column: pos.column,
 			line:   pos.line,
@@ -84,16 +84,16 @@ func (s *scssParser) comment(commentToken token) {
 		}
 		node.mark("text")
 	} else {
-		s.parser.comment(commentToken)
+		parser.parser.comment(commentToken)
 	}
 }
 
-func (s *scssParser) createTokenizer() {
-	s.tokenizer = newScssTokenizer(s.input)
+func (parser *scssParser) createTokenizer() {
+	parser.tokenizer = newScssTokenizer(parser.input)
 }
 
-func (s *scssParser) raw(each *node, prop string, tokens []token, customProperty bool) {
-	s.parser.raw(each, prop, tokens, customProperty)
+func (parser *scssParser) raw(each *node, prop string, tokens []token, customProperty bool) {
+	parser.parser.raw(each, prop, tokens, customProperty)
 	if raws, isRaw := each.raws[prop].(*rawValue); isRaw {
 		scss := raws.raw
 		var all strings.Builder
@@ -113,7 +113,7 @@ func (s *scssParser) raw(each *node, prop string, tokens []token, customProperty
 	}
 }
 
-func (s *scssParser) rule(tokens []token) {
+func (parser *scssParser) rule(tokens []token) {
 	withColon := false
 	brackets := 0
 	value := ""
@@ -134,11 +134,11 @@ func (s *scssParser) rule(tokens []token) {
 	}
 
 	if !withColon || strings.TrimFunc(value, ecmascripttext.IsWhitespace) == "" || startsLikeAProperty(value) {
-		s.parser.rule(tokens)
+		parser.parser.rule(tokens)
 	} else {
 		tokens = tokens[:len(tokens)-1]
 		node := newNestedDeclaration()
-		s.init(node, tokens[0].start)
+		parser.init(node, tokens[0].start)
 
 		// The last token that is not a space; there is one, the colon.
 		var last token
@@ -150,14 +150,14 @@ func (s *scssParser) rule(tokens []token) {
 		}
 		// `if (last[3])`: an end of 0, or none, falls to the start.
 		if last.end > 0 {
-			pos := s.input.fromOffset(last.end)
+			pos := parser.input.fromOffset(last.end)
 			node.source.end = &position{
 				column: pos.column,
 				line:   pos.line,
 				offset: last.end + 1,
 			}
 		} else {
-			pos := s.input.fromOffset(last.start)
+			pos := parser.input.fromOffset(last.start)
 			node.source.end = &position{
 				column: pos.column,
 				line:   pos.line,
@@ -179,7 +179,7 @@ func (s *scssParser) rule(tokens []token) {
 
 		// `if (tokens[0][2])`: a start of 0 keeps the one init set, which is the same offset.
 		if tokens[0].start > 0 {
-			pos := s.input.fromOffset(tokens[0].start)
+			pos := parser.input.fromOffset(tokens[0].start)
 			node.source.start = &position{
 				column: pos.column,
 				line:   pos.line,
@@ -217,7 +217,7 @@ func (s *scssParser) rule(tokens []token) {
 			node.raws["before"] = node.rawString("before") + node.prop[:1]
 			node.prop = node.prop[1:]
 		}
-		node.raws["between"] = node.rawString("between") + s.spacesAndCommentsFromStart(&tokens)
+		node.raws["between"] = node.rawString("between") + parser.spacesAndCommentsFromStart(&tokens)
 		// precheckMissedSemicolon is a hook for postcss-safe-parser; the base parser's does nothing.
 
 		for i := len(tokens) - 1; i > 0; i-- {
@@ -225,8 +225,8 @@ func (s *scssParser) rule(tokens []token) {
 			if each.value == "!important" {
 				node.important = true
 				node.mark("important")
-				text := s.stringFrom(&tokens, i)
-				text = s.spacesFromEnd(&tokens) + text
+				text := parser.stringFrom(&tokens, i)
+				text = parser.spacesFromEnd(&tokens) + text
 				if text != " !important" {
 					node.raws["important"] = text
 				}
@@ -255,13 +255,13 @@ func (s *scssParser) rule(tokens []token) {
 			}
 		}
 
-		s.raw(node, "value", tokens, false)
+		parser.raw(node, "value", tokens, false)
 
 		if strings.Contains(node.value, ":") {
-			s.checkMissedSemicolon(tokens)
+			parser.checkMissedSemicolon(tokens)
 		}
 
-		s.current = node
+		parser.current = node
 	}
 }
 

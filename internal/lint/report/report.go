@@ -28,15 +28,15 @@ type Coverage struct {
 }
 
 // String renders the coverage summary that follows every verdict.
-func (c Coverage) String() string {
+func (coverage Coverage) String() string {
 	graph := "graph cold"
-	if c.GraphWarm {
+	if coverage.GraphWarm {
 		graph = "graph warm"
 	}
 	return fmt.Sprintf("%s · %s · %s · %s",
-		formatDuration(c.Elapsed),
-		pluralize(c.FilesChecked, "file", "files"),
-		pluralize(c.RulesRun, "rule", "rules"),
+		formatDuration(coverage.Elapsed),
+		pluralize(coverage.FilesChecked, "file", "files"),
+		pluralize(coverage.RulesRun, "rule", "rules"),
 		graph,
 	)
 }

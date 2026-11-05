@@ -150,13 +150,13 @@ func optionalChainJoinBlocks(function *Function) map[static_single_assignment.Bl
 	return result
 }
 
-func (t *optionalTraversal) traverseFunction() {
-	for _, block := range t.function.Blocks {
+func (traversal *optionalTraversal) traverseFunction() {
+	for _, block := range traversal.function.Blocks {
 		if block == nil {
 			continue
 		}
-		if _, isOptional := block.Terminal.(*Optional); isOptional && !t.seen[block.Id] {
-			t.traverseOptionalBlock(block, nil)
+		if _, isOptional := block.Terminal.(*Optional); isOptional && !traversal.seen[block.Id] {
+			traversal.traverseOptionalBlock(block, nil)
 		}
 	}
 }
@@ -179,13 +179,13 @@ type optionalTestMatch struct {
 // Upstream raises invariants where this returns nil. The difference is deliberate and is this
 // tree's standing choice: a shape this pass cannot read is a chain it declines to collect, which
 // leaves the access to be collected un-chained rather than failing the compilation.
-func (t *optionalTraversal) matchOptionalTestBlock(branch *Branch) *optionalTestMatch {
-	consequent, found := t.function.Block(branch.Consequent)
+func (traversal *optionalTraversal) matchOptionalTestBlock(branch *Branch) *optionalTestMatch {
+	consequent, found := traversal.function.Block(branch.Consequent)
 	if !found || consequent == nil || len(consequent.Instructions) != 2 {
 		return nil
 	}
-	first := t.function.Instructions[consequent.Instructions[0]]
-	second := t.function.Instructions[consequent.Instructions[1]]
+	first := traversal.function.Instructions[consequent.Instructions[0]]
+	second := traversal.function.Instructions[consequent.Instructions[1]]
 	if first == nil || second == nil {
 		return nil
 	}
@@ -206,12 +206,12 @@ func (t *optionalTraversal) matchOptionalTestBlock(branch *Branch) *optionalTest
 	if !isGoto || goToNext.Variant != GotoVariantBreak {
 		return nil
 	}
-	alternate, foundAlternate := t.function.Block(branch.Alternate)
+	alternate, foundAlternate := traversal.function.Block(branch.Alternate)
 	if !foundAlternate || alternate == nil || len(alternate.Instructions) != 2 {
 		return nil
 	}
-	alternateFirst := t.function.Instructions[alternate.Instructions[0]]
-	alternateSecond := t.function.Instructions[alternate.Instructions[1]]
+	alternateFirst := traversal.function.Instructions[alternate.Instructions[0]]
+	alternateSecond := traversal.function.Instructions[alternate.Instructions[1]]
 	if alternateFirst == nil || alternateSecond == nil {
 		return nil
 	}
@@ -234,14 +234,14 @@ func (t *optionalTraversal) matchOptionalTestBlock(branch *Branch) *optionalTest
 //
 // Returns the identifier the chain's value was stored into, or zero when any part of it is not a
 // plain property-load chain. Upstream's `traverseOptionalBlock` (`:240`).
-func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
+func (traversal *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 	outerAlternate *static_single_assignment.BlockId) static_single_assignment.IdentifierId {
-	t.seen[block.Id] = true
+	traversal.seen[block.Id] = true
 	terminal, isOptional := block.Terminal.(*Optional)
 	if !isOptional {
 		return 0
 	}
-	maybeTest, found := t.function.Block(terminal.Test)
+	maybeTest, found := traversal.function.Block(terminal.Test)
 	if !found || maybeTest == nil {
 		return 0
 	}
@@ -260,7 +260,7 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		if len(maybeTest.Instructions) == 0 {
 			return 0
 		}
-		firstInstruction := t.function.Instructions[maybeTest.Instructions[0]]
+		firstInstruction := traversal.function.Instructions[maybeTest.Instructions[0]]
 		if firstInstruction == nil {
 			return 0
 		}
@@ -285,8 +285,8 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		}
 		path := make([]DependencyPathEntry, 0, len(maybeTest.Instructions)-1)
 		for index := 1; index < len(maybeTest.Instructions); index++ {
-			instruction := t.function.Instructions[maybeTest.Instructions[index]]
-			previous := t.function.Instructions[maybeTest.Instructions[index-1]]
+			instruction := traversal.function.Instructions[maybeTest.Instructions[index]]
+			previous := traversal.function.Instructions[maybeTest.Instructions[index-1]]
 			if instruction == nil || previous == nil {
 				return 0
 			}
@@ -308,7 +308,7 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		// A nested link. Its fallthrough is where the outer test lands, and upstream requires that
 		// block to terminate in a branch: "Fallthrough of the inner optional should be a block with
 		// no instructions, terminating with Test($<temporary written to from StoreLocal>)".
-		testBlock, foundTest := t.function.Block(testTerminal.Fallthrough)
+		testBlock, foundTest := traversal.function.Block(testTerminal.Fallthrough)
 		if !foundTest || testBlock == nil {
 			return 0
 		}
@@ -316,7 +316,7 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		if !isBranch {
 			return 0
 		}
-		inner := t.traverseOptionalBlock(maybeTest, &branch.Alternate)
+		inner := traversal.traverseOptionalBlock(maybeTest, &branch.Alternate)
 		if inner == 0 {
 			return 0
 		}
@@ -326,14 +326,14 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		if branch.Test.Identifier != inner {
 			return 0
 		}
-		innerDependency, hasInner := t.result.TemporariesReadInOptional[inner]
+		innerDependency, hasInner := traversal.result.TemporariesReadInOptional[inner]
 		if !hasInner {
 			return 0
 		}
 		if !terminal.Optional {
 			// A non-optional load riding an outer chain, the `.c` in `a?.b.c`. Loads from the inner
 			// value are hoistable, because the short circuit already guaranteed it is non-null.
-			t.result.HoistableObjects[block.Id] = innerDependency
+			traversal.result.HoistableObjects[block.Id] = innerDependency
 		}
 		baseObject = innerDependency
 		test = branch
@@ -350,7 +350,7 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		return 0
 	}
 
-	match := t.matchOptionalTestBlock(test)
+	match := traversal.matchOptionalTestBlock(test)
 	if match == nil {
 		// Not hoistable, e.g. `a?.[computed()]`.
 		return 0
@@ -365,9 +365,9 @@ func (t *optionalTraversal) traverseOptionalBlock(block *BasicBlock,
 		Path: append(append([]DependencyPathEntry{}, baseObject.Path...),
 			DependencyPathEntry{Property: match.property, Optional: terminal.Optional}),
 	}
-	t.result.ProcessedInstructions[match.storeLocalId] = true
-	t.result.ProcessedOptionalTests[testBlockId] = true
-	t.result.TemporariesReadInOptional[match.consequentId] = load
-	t.result.TemporariesReadInOptional[match.propertyId] = load
+	traversal.result.ProcessedInstructions[match.storeLocalId] = true
+	traversal.result.ProcessedOptionalTests[testBlockId] = true
+	traversal.result.TemporariesReadInOptional[match.consequentId] = load
+	traversal.result.TemporariesReadInOptional[match.propertyId] = load
 	return match.consequentId
 }

@@ -21,8 +21,8 @@ func RecordedRealSignatures(g *Graph) map[string]SignatureEntry {
 }
 
 // SignatureEmits is how many files Signatures has emitted declarations for on this graph.
-func (g *Graph) SignatureEmits() int {
-	return g.signatureEmits
+func (graph *Graph) SignatureEmits() int {
+	return graph.signatureEmits
 }
 
 // StaleStatSnapshotForTest is a snapshot that answers each of recorded's inputs as it was recorded rather than as

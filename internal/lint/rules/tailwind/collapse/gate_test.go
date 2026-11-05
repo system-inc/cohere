@@ -46,8 +46,8 @@ type engineCollapse struct {
 	Output string   `json:"output"`
 }
 
-func (f gateFixture) engineFoundCollapse() bool {
-	return len(f.EngineCollapses) > 0
+func (fixture gateFixture) engineFoundCollapse() bool {
+	return len(fixture.EngineCollapses) > 0
 }
 
 // recordedParser answers from what the real engine said, which is what makes this a test of the
@@ -61,12 +61,12 @@ type recordedParser struct {
 	declared   map[string][]string
 }
 
-func (p recordedParser) ParseCandidates(className string) []Candidate {
-	return p.candidates[className]
+func (parser recordedParser) ParseCandidates(className string) []Candidate {
+	return parser.candidates[className]
 }
 
-func (p recordedParser) DeclaredValues(className string) []string {
-	return p.declared[className]
+func (parser recordedParser) DeclaredValues(className string) []string {
+	return parser.declared[className]
 }
 
 func loadFixtures(test *testing.T) fixtureCorpus {

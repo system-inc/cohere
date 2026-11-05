@@ -397,28 +397,28 @@ func signatureOf(path string) (RunCacheInput, error) {
 // It returns the stored run only when the key matches and every input still has the signature it
 // was recorded with. The first mismatch is the answer; there is no partial hit, because a run's
 // verdict is a property of all its inputs together.
-func (c *RunCache) Check(key string) error {
-	return c.CheckNoting(key, nil)
+func (cache *RunCache) Check(key string) error {
+	return cache.CheckNoting(key, nil)
 }
 
 // CheckNoting is Check, noting in snapshot what it found at every path it statted, so the build and the content
 // pack can use stats this run already took rather than take each again (#kdee854). A nil snapshot notes nothing.
-func (c *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
-	if c == nil {
+func (cache *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
+	if cache == nil {
 		return fmt.Errorf("%w: no cache", ErrRunCacheMiss)
 	}
-	if c.Version != runCacheVersion {
-		return fmt.Errorf("%w: format version %d, this build reads %d", ErrRunCacheMiss, c.Version, runCacheVersion)
+	if cache.Version != runCacheVersion {
+		return fmt.Errorf("%w: format version %d, this build reads %d", ErrRunCacheMiss, cache.Version, runCacheVersion)
 	}
-	if c.Key != key {
+	if cache.Key != key {
 		return fmt.Errorf("%w: the binary, flags or directory changed", ErrRunCacheMiss)
 	}
-	if len(c.Inputs) == 0 {
+	if len(cache.Inputs) == 0 {
 		// A manifest with no inputs would match any tree. A run always depends on something, so
 		// an empty list is a manifest that was written wrong, not a run that read nothing.
 		return fmt.Errorf("%w: the manifest records no inputs", ErrRunCacheMiss)
 	}
-	return c.changedInput(snapshot)
+	return cache.changedInput(snapshot)
 }
 
 // ChangedInput reports the first recorded input whose signature no longer matches the disk, nil when every
@@ -427,16 +427,16 @@ func (c *RunCache) CheckNoting(key string, snapshot *StatSnapshot) error {
 //
 // The input named is the earliest recorded one that moved, whichever worker found it, so a run that misses
 // says the same thing every time rather than the first thing a worker happened to reach (#547dhjz).
-func (c *RunCache) ChangedInput() error {
-	return c.changedInput(nil)
+func (cache *RunCache) ChangedInput() error {
+	return cache.changedInput(nil)
 }
 
 // changedInput is ChangedInput, noting what each stat found in snapshot when it is not nil.
-func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
+func (cache *RunCache) changedInput(snapshot *StatSnapshot) error {
 	workers := min(runtime.NumCPU(), 8)
 	var mutex sync.Mutex
 	var mismatch error
-	earliest := len(c.Inputs)
+	earliest := len(cache.Inputs)
 	var waitGroup sync.WaitGroup
 	next := make(chan int, 256)
 
@@ -445,7 +445,7 @@ func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 		go func() {
 			defer waitGroup.Done()
 			for index := range next {
-				if stillMatchesError := c.Inputs[index].stillMatches(snapshot); stillMatchesError != nil {
+				if stillMatchesError := cache.Inputs[index].stillMatches(snapshot); stillMatchesError != nil {
 					mutex.Lock()
 					if index < earliest {
 						earliest, mismatch = index, stillMatchesError
@@ -455,7 +455,7 @@ func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 			}
 		}()
 	}
-	for index := range c.Inputs {
+	for index := range cache.Inputs {
 		next <- index
 	}
 	close(next)

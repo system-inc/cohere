@@ -32,46 +32,46 @@ func newPackFixture(test *testing.T) *packFixture {
 	return fixture
 }
 
-func (f *packFixture) path(name string) string { return filepath.Join(f.files, name) }
+func (fixture *packFixture) path(name string) string { return filepath.Join(fixture.files, name) }
 
-func (f *packFixture) write(name string, contents string) {
-	f.t.Helper()
-	if writeError := os.WriteFile(f.path(name), []byte(contents), 0o644); writeError != nil {
-		f.t.Fatal(writeError)
+func (fixture *packFixture) write(name string, contents string) {
+	fixture.t.Helper()
+	if writeError := os.WriteFile(fixture.path(name), []byte(contents), 0o644); writeError != nil {
+		fixture.t.Fatal(writeError)
 	}
 }
 
 // run opens the pack, reads every name through it, saves, and returns what it read and the pack's counts.
-func (f *packFixture) run(names ...string) (map[string]string, int, int, int) {
-	f.t.Helper()
-	pack, openContentPackError := OpenContentPack(f.cache)
+func (fixture *packFixture) run(names ...string) (map[string]string, int, int, int) {
+	fixture.t.Helper()
+	pack, openContentPackError := OpenContentPack(fixture.cache)
 	if openContentPackError != nil {
-		f.t.Logf("open: %v", openContentPackError)
+		fixture.t.Logf("open: %v", openContentPackError)
 	}
 	fileSystem := pack.wrap(osvfs.FS())
 	read := map[string]string{}
 	for _, name := range names {
-		contents, ok := fileSystem.ReadFile(tspath.RootedFilePath(f.path(name)))
+		contents, ok := fileSystem.ReadFile(tspath.RootedFilePath(fixture.path(name)))
 		if !ok {
-			f.t.Fatalf("%s could not be read", name)
+			fixture.t.Fatalf("%s could not be read", name)
 		}
 		read[name] = contents
 	}
 	if saveError := pack.Save(); saveError != nil {
-		f.t.Fatalf("saving the pack: %v", saveError)
+		fixture.t.Fatalf("saving the pack: %v", saveError)
 	}
 	hits, misses, damaged := pack.Counts()
 	return read, hits, misses, damaged
 }
 
-func (f *packFixture) dataFile() string {
-	f.t.Helper()
-	matches, globError := filepath.Glob(filepath.Join(f.cache, "contents-*.pack"))
+func (fixture *packFixture) dataFile() string {
+	fixture.t.Helper()
+	matches, globError := filepath.Glob(filepath.Join(fixture.cache, "contents-*.pack"))
 	if globError != nil {
-		f.t.Fatalf("listing the data files: %v", globError)
+		fixture.t.Fatalf("listing the data files: %v", globError)
 	}
 	if len(matches) != 1 {
-		f.t.Fatalf("want one data file, found %v", matches)
+		fixture.t.Fatalf("want one data file, found %v", matches)
 	}
 	return matches[0]
 }

@@ -38,14 +38,14 @@ type classAtom struct {
 
 // covers reports whether the atom already names r, which is what decides
 // whether widening the class has anything to add for it.
-func (a classAtom) covers(r rune) bool {
-	switch a.kind {
+func (atom classAtom) covers(r rune) bool {
+	switch atom.kind {
 	case classRune, classDash:
-		return r == a.lo
+		return r == atom.lo
 	case classRange:
-		return r >= a.lo && r <= a.hi
+		return r >= atom.lo && r <= atom.hi
 	case classSet:
-		_, ok := slices.BinarySearchFunc(a.ranges, r, func(span unicodeproperties.Range, r rune) int {
+		_, ok := slices.BinarySearchFunc(atom.ranges, r, func(span unicodeproperties.Range, r rune) int {
 			if span.Hi < r {
 				return -1
 			}
@@ -59,14 +59,14 @@ func (a classAtom) covers(r rune) bool {
 	return false
 }
 
-func (a classAtom) write() string {
-	switch a.kind {
+func (atom classAtom) write() string {
+	switch atom.kind {
 	case classSet:
-		return a.text
+		return atom.text
 	case classRange:
-		return literalRune(a.lo) + "-" + literalRune(a.hi)
+		return literalRune(atom.lo) + "-" + literalRune(atom.hi)
 	default:
-		return literalRune(a.lo)
+		return literalRune(atom.lo)
 	}
 }
 
