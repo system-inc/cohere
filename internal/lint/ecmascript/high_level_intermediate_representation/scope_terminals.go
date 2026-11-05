@@ -523,6 +523,8 @@ func queueScopeRewrites(function *Function, items []scopeItem) []scopeRewrite {
 // every rewrite landing at or before the current position is applied, carving off the instructions
 // seen so far into a new block terminated by the rewrite's terminal. Whatever remains becomes the
 // final block, which keeps the original block's own terminal.
+//
+// Mutates: function the splitting rebuilds the caller's graph in place, its block list among it
 func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTerminals {
 	result := ScopeTerminals{}
 	original := function.Blocks
@@ -540,6 +542,8 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 	// the block that now reaches whatever the original reached. Phi operands are rekeyed through it.
 	finalBlockOf := map[static_single_assignment.BlockId]static_single_assignment.BlockId{}
 
+	// The rewrites still to apply, popped from the end as the sweep passes each one's order.
+	pending := rewrites
 	for _, block := range original {
 		if block.Terminal == nil {
 			// A block minted for a scope body or fallthrough, not yet filled. Emitted by the sweep
@@ -558,9 +562,9 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 			} else {
 				order = TerminalOrder(block.Terminal)
 			}
-			for len(rewrites) > 0 && rewrites[len(rewrites)-1].order <= order {
-				rewrite := rewrites[len(rewrites)-1]
-				rewrites = rewrites[:len(rewrites)-1]
+			for len(pending) > 0 && pending[len(pending)-1].order <= order {
+				rewrite := pending[len(pending)-1]
+				pending = pending[:len(pending)-1]
 
 				var terminal Terminal
 				if rewrite.isStart {

@@ -34,7 +34,7 @@ func TestSSAOverRealCodebase(test *testing.T) {
 
 	root := corpusRoot(test)
 	var files []string
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -43,6 +43,9 @@ func TestSSAOverRealCodebase(test *testing.T) {
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
+	}
 	sort.Strings(files)
 	limit := 400
 	if len(files) > limit {
