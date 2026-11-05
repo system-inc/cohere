@@ -35,3 +35,34 @@ type Record struct {
 func describe() string {
 	return "a returned string past the limit, which cannot move to the next line, as return ends thereand so on and so on and"
 }
+
+// settingsNote is a constant past the limit in a block, after only its name and =, so nothing before it can wrap.
+const (
+	settingsNote = "a constant's string past the limit after only its name in a const block and so on and so on and so on"
+)
+
+// greeting is a var past the limit after only its keyword and name, which cannot leave each other.
+var greeting = "a var's string past the limit after only the keyword and its name and so on and so on and so on and so on"
+
+// keyed holds strings past the limit after only a key or a name and its operator, so nothing before them can wrap.
+func keyed(record *Record) []any {
+	name := "a string past the limit after only a name and :=, which nothing before can wrap and so on and so on and so on"
+	name = "a string past the limit after only a name and =, which nothing before can wrap and so on and so on and so on a"
+	record.Name = "a string past the limit after only a selector and =, which nothing before can wrap and so on and so on"
+	opening := `a raw string past the limit on its first line, after only a name and :=, and so on and so on and so on and
+its later lines are the raw string's own data, which may run past the limit as well and so on and so on and so on and so o
+and the line it closes on too, with only closing punctuation after it and so on and so on and so on and so on and so on an`
+	return []any{
+		name, opening, greeting, settingsNote,
+		Record{
+			Name: "a string past the limit after only a key, which gofmt keeps on the key's line and so on and so on and",
+		},
+		map[string]string{
+			"key": "a string past the limit after only a quoted key, which gofmt keeps on its line and so on and so on an",
+		},
+		use(Record{
+			Name: "a string past the limit after only a key, closed by a brace and a paren and so on and so on and so"}),
+		use(Record{
+			Name: `a raw string past the limit after only a key, closed by a brace and a paren and so on and so on and`}),
+	}
+}

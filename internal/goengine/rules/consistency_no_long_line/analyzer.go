@@ -2,9 +2,9 @@
 //
 // A line past the limit runs off the edge of a review pane or a split editor, and its end goes unread. gofmt never
 // wraps a line, so the limit is the writer's to keep. What cannot wrap is left alone: an import path, a //go:
-// directive, a raw string's body, a string literal alone on its line or after only a struct field's
-// names and type or a return, and a comment that overruns only on one token too long for a comment line of its own,
-// such as a URL.
+// directive, a raw string's body, a string literal alone on its line or after only a struct field's names and type, a
+// return, or a key or a name and its operator, and a comment that overruns only on one token too long for a comment
+// line of its own, such as a URL.
 package consistency_no_long_line
 
 import (
@@ -31,9 +31,9 @@ const Name = "cohere-go/consistency-no-long-line"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_long_line",
 	Doc: "Flags a line longer than 120 columns, a tab counted as 4 and every other rune as 1, at its 121st column. " +
-		"An import line, a //go: directive, a raw string's body, a string literal alone on its " +
-		"line or after only a struct field's names and type or a return, and a comment that overruns only on one " +
-		"token too long to wrap, such as a URL, are left alone.",
+		"An import line, a //go: directive, a raw string's body, a string literal alone on its line or after only a " +
+		"struct field's names and type, a return, or a key or a name and its operator, and a comment that overruns " +
+		"only on one token too long to wrap, such as a URL, are left alone.",
 	Run: run,
 }
 
@@ -65,8 +65,8 @@ type sourceFile struct {
 	comments       []*ast.Comment
 	// unwrappableOpenings maps the offset a line's code opens at to the string literal that line may overrun on,
 	// when nothing from that offset to the literal could move to a line of its own: the literal itself, a struct
-	// field's names and type before its tag, or the return keyword before a lone returned string, since a newline
-	// after return makes it a bare return.
+	// field's names and type before its tag, the return keyword before a lone returned string, since a newline
+	// after return makes it a bare return, or a key or a name before its operator and a lone string.
 	unwrappableOpenings map[int]*ast.BasicLit
 }
 
@@ -124,7 +124,11 @@ func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourc
 		case *ast.BasicLit:
 			if node.Kind == token.STRING {
 				source.stringLiterals = append(source.stringLiterals, node)
-				source.unwrappableOpenings[source.offsetOf(node.Pos())] = node
+				// Inspect visits a parent first, so a string key already maps to the value it opens a line for, which
+				// reaches further than the key alone and must not be lost to it.
+				if _, mapped := source.unwrappableOpenings[source.offsetOf(node.Pos())]; !mapped {
+					source.unwrappableOpenings[source.offsetOf(node.Pos())] = node
+				}
 			}
 		case *ast.Field:
 			// A field's names, type and tag are one declaration Go reads to the end of its line, and the tag is
@@ -134,8 +138,39 @@ func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourc
 			}
 		case *ast.ReturnStmt:
 			if len(node.Results) == 1 {
-				if literal, isLiteral := node.Results[0].(*ast.BasicLit); isLiteral && literal.Kind == token.STRING {
+				if literal, isLiteral := stringLiteralOf(node.Results[0]); isLiteral {
 					source.unwrappableOpenings[source.offsetOf(node.Pos())] = literal
+				}
+			}
+		case *ast.KeyValueExpr:
+			// gofmt prints a composite literal's key and its value on one line however they were written, and
+			// Prettier prints a TypeScript key and its string the same way, so a key that is only a name or a
+			// literal leaves nothing before its string that could wrap.
+			if literal, isLiteral := stringLiteralOf(node.Value); isLiteral && isUnwrappableKey(node.Key) {
+				source.unwrappableOpenings[source.offsetOf(node.Key.Pos())] = literal
+			}
+		case *ast.AssignStmt:
+			// One name given one string is the shape Prettier keeps on one line in TypeScript, and the house holds
+			// Go to the same parity. Two names, an index or a compound operator such as += are code, and wrap.
+			if (node.Tok == token.ASSIGN || node.Tok == token.DEFINE) && len(node.Lhs) == 1 && len(node.Rhs) == 1 &&
+				isName(node.Lhs[0]) {
+				if literal, isLiteral := stringLiteralOf(node.Rhs[0]); isLiteral {
+					source.unwrappableOpenings[source.offsetOf(node.Lhs[0].Pos())] = literal
+				}
+			}
+		case *ast.ValueSpec:
+			// A var or const spec in a block opens its line at its name, and gofmt rejoins the name and its value.
+			if literal, isLiteral := namedStringOf(node); isLiteral {
+				source.unwrappableOpenings[source.offsetOf(node.Pos())] = literal
+			}
+		case *ast.GenDecl:
+			// An ungrouped var or const opens its line at its keyword, which cannot leave its name, as return cannot
+			// leave its result.
+			if (node.Tok == token.VAR || node.Tok == token.CONST) && !node.Lparen.IsValid() && len(node.Specs) == 1 {
+				if spec, isValueSpec := node.Specs[0].(*ast.ValueSpec); isValueSpec {
+					if literal, isLiteral := namedStringOf(spec); isLiteral {
+						source.unwrappableOpenings[source.offsetOf(node.Pos())] = literal
+					}
 				}
 			}
 		}
@@ -189,14 +224,65 @@ func (source *sourceFile) isRawStringBody(line int, overflow int) bool {
 
 // isLoneStringLiteral is whether the line's code opens where nothing before a string literal could wrap, with only
 // closing punctuation after the literal and the overflow in the literal or that punctuation: the shape a formatter
-// prints for a long string, a long tag or a long returned string, which leaves nothing to break but the string. Code
-// before that, overflowing ahead of the literal, or more code after it, could move or be shortened, so is a finding.
+// prints for a long string, a long tag, a long returned string or a long string given to a key or a name, which leaves
+// nothing to break but the string. Code before that, a comment ahead of the literal, overflowing ahead of the literal,
+// or more code after it, could move or be shortened, so is a finding.
 func (source *sourceFile) isLoneStringLiteral(line int, overflow int) bool {
 	literal, found := source.unwrappableOpenings[source.codeStart(line)]
 	if !found || source.lineOf(literal.Pos()) != line || overflow < source.offsetOf(literal.Pos()) {
 		return false
 	}
+	// A comment ahead of the literal could sit on the line above instead.
+	if source.opensComment(source.codeStart(line), source.offsetOf(literal.Pos())) {
+		return false
+	}
 	return source.closesTheLine(literal, line)
+}
+
+// opensComment is whether a comment opens at an offset from start up to, not including, end.
+func (source *sourceFile) opensComment(start int, end int) bool {
+	index, _ := slices.BinarySearchFunc(source.comments, start, func(comment *ast.Comment, target int) int {
+		return cmp.Compare(source.offsetOf(comment.Pos()), target)
+	})
+	return index < len(source.comments) && source.offsetOf(source.comments[index].Pos()) < end
+}
+
+// stringLiteralOf is expression as a string literal, interpreted or raw, when it is one.
+func stringLiteralOf(expression ast.Expr) (*ast.BasicLit, bool) {
+	literal, isLiteral := expression.(*ast.BasicLit)
+	if !isLiteral || literal.Kind != token.STRING {
+		return nil, false
+	}
+	return literal, true
+}
+
+// namedStringOf is the string a var or const spec gives its one name, with no type between them, since a type is
+// more that could be long.
+func namedStringOf(spec *ast.ValueSpec) (*ast.BasicLit, bool) {
+	if len(spec.Names) != 1 || spec.Type != nil || len(spec.Values) != 1 {
+		return nil, false
+	}
+	return stringLiteralOf(spec.Values[0])
+}
+
+// isName is whether expression is a name or a chain of them, such as record.Name: nothing in it could wrap.
+func isName(expression ast.Expr) bool {
+	switch expression := expression.(type) {
+	case *ast.Ident:
+		return true
+	case *ast.SelectorExpr:
+		return isName(expression.X)
+	}
+	return false
+}
+
+// isUnwrappableKey is whether a composite literal's key is a name or a basic literal, such as a map's string key,
+// with nothing in it that could wrap. A key built by a call or an operation is code.
+func isUnwrappableKey(key ast.Expr) bool {
+	if _, isLiteral := key.(*ast.BasicLit); isLiteral {
+		return true
+	}
+	return isName(key)
 }
 
 // closesTheLine is whether nothing but closing punctuation follows literal on line, which holds as well for a raw
