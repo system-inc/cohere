@@ -203,7 +203,7 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		}
 		projectArguments := arguments
 		// TypeScript runs alone: the cache it turns off is cohere's table in the directory, which a Swift run
-		// never reads or writes, and the Swift engine refuses --no-cache by name.
+		// never reads or writes, so a Swift run in the same directory keeps its own cache.
 		if found.Ownership.SharedDirectory[label] && project.Engine == engineTypeScript {
 			projectArguments = append(slices.Clone(arguments), "--no-cache")
 		}

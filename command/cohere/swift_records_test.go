@@ -458,7 +458,8 @@ func TestSwiftEngineArguments(t *testing.T) {
 // A flag the engine does not read and the front door does not answer is refused by name, never dropped: a
 // dropped --format-only made a format gate type-check and lint the whole package (#nqb3mjv). A switch typed
 // as false asks for nothing and passes, and the flags the front door answers itself pass too. --format-only
-// and --no-format reach the engine, which reads them with TypeScript's meaning since c024df4b.
+// and --no-format reach the engine, which reads them with TypeScript's meaning since c024df4b, and
+// --no-cache since 9def2dc1.
 func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 	t.Parallel()
 	location := projectLocation{Root: "/work/macos", Engine: engineSwift, ArgumentBase: "/work/macos"}
@@ -471,7 +472,6 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 	}
 
 	for flag, says := range map[string]string{
-		"no-cache":       "--no-cache is not implemented for Swift yet",
 		"print-config":   "--print-config is not implemented for Swift yet",
 		"stdin-filepath": "--stdin-filepath is not implemented for Swift yet",
 		"cache-dump":     "--cache-dump is not implemented for Swift yet",
@@ -482,7 +482,7 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(t *testing.T) {
 		}
 	}
 
-	for _, flag := range []string{"format-only", "no-format"} {
+	for _, flag := range []string{"format-only", "no-format", "no-cache"} {
 		values[flag] = "true"
 		arguments, _, err := swiftEngineArguments(location, map[string]bool{"no-fix": true, flag: true}, value, nil)
 		if err != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix --"+flag {

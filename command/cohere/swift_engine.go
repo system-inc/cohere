@@ -22,10 +22,11 @@ import (
 
 // swiftPassThroughSwitches are the boolean flags the Swift engine reads with the meaning the contract
 // gives them, forwarded only when the caller typed them. The rest are refused by name, by the engine
-// or below, because a flag accepted and ignored reads as a run that did what was asked.
+// or below, because a flag accepted and ignored reads as a run that did what was asked. The engine reads
+// `--no-cache` since 9def2dc1: every phase from source, in a scratch of its own that it removes.
 var swiftPassThroughSwitches = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
+	"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing", "no-cache",
 }
 
 // swiftFrontDoorFlags are the flags the front door answers for a Swift run itself: where the package is,
