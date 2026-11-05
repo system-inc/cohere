@@ -21,10 +21,10 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 	}
 }
 
-// The flagged fixtures carry a // want on every test that has no way to fail, and analysistest fails on a finding
-// no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays
-// quiet on a test that fails through testing's methods, a panic, a helper or reporter it hands the test to, or a
-// skip before anything runs, and on functions that only look like tests.
+// The flagged fixtures carry a // want on every test that cannot fail on a wrong result, and analysistest fails on a
+// finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule
+// stays quiet on a test that fails through testing's methods, a panic, a helper or reporter it hands the test to, or
+// a skip before anything runs, and on functions that only look like tests.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(
