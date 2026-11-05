@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -31,8 +33,16 @@ func contractFixture(t *testing.T, name string) []string {
 // renderRecords feeds records through a fresh renderer and ends the run the way the engine would.
 func renderRecords(t *testing.T, mode swiftMode, lines []string, engineExit int) (string, int, error) {
 	t.Helper()
+	return renderRecordsYielding(t, mode, lines, engineExit, nil)
+}
+
+// renderRecordsYielding is renderRecords for a run that yields directories, resolved, to the Swift projects
+// below it, as runSwiftEngine hands them over.
+func renderRecordsYielding(t *testing.T, mode swiftMode, lines []string, engineExit int, yieldedDirectories []string) (string, int, error) {
+	t.Helper()
 	var out bytes.Buffer
 	run := newSwiftRun(&out, mode, "", time.Now())
+	run.yieldedDirectories = yieldedDirectories
 	for index, line := range lines {
 		if err := run.accept([]byte(line)); err != nil {
 			run.writeUnfinished("the Swift engine broke its contract")
@@ -352,6 +362,148 @@ func TestSwiftRunGroupsExcludedFiles(t *testing.T) {
 		"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
 	)
 	forbidLines(t, output, "/project/Vendor/Fa.swift")
+}
+
+// excludedFile is one file a project record lists as not checked, and why.
+type excludedFile struct {
+	file   string
+	reason string
+}
+
+// projectRecordAt is a contract fixture's project record moved to root, its excluded files replaced, so a
+// test can state which files the engine left out and why.
+func projectRecordAt(t *testing.T, record string, root string, excluded []excludedFile) string {
+	t.Helper()
+	var fields map[string]any
+	if err := json.Unmarshal([]byte(record), &fields); err != nil {
+		t.Fatal(err)
+	}
+	if fields["kind"] != "project" {
+		t.Fatalf("not a project record: %s", record)
+	}
+	entries := make([]map[string]string, 0, len(excluded))
+	for _, entry := range excluded {
+		entries = append(entries, map[string]string{"file": entry.file, "reason": entry.reason})
+	}
+	fields["root"], fields["excluded"] = root, entries
+	encoded, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(encoded)
+}
+
+// A Swift run that yields a directory to the Swift project below it, an Xcode project or a nested package
+// running on its own, leaves every excluded file under it out of its notes, whatever the reason, since that
+// project's run accounts for them; the engine spells the path as Foundation does, `/tmp` where this process
+// holds `/private/tmp`, so both sides are resolved. What remains is the gap, counted for the footer, unless its
+// reason is one the engine gives for files nobody expects checked; a reason it has never given before counts,
+// so a reworded sentence makes the gap louder. A file the engine could not read is this run's own and is never
+// left out. None of it moves the exit code (#ybspptb).
+// Not parallel: it renders check runs through swiftRun, whose record acceptors set the package-level
+// activeSummary, which it reads back
+func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(t *testing.T) {
+	resolvedRoot, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(resolvedRoot, alias); err != nil {
+		t.Fatal(err)
+	}
+	// The engine's spellings of the same directory: through a symbolic link on any platform, and on macOS,
+	// where the temporary directory is under /private, the spelling Foundation gives it without the prefix.
+	spellings := map[string]string{"through a symbolic link": alias}
+	if trimmed, isPrivate := strings.CutPrefix(resolvedRoot, "/private/"); isPrivate {
+		spellings["as /tmp is spelled for /private/tmp"] = "/" + trimmed
+	}
+	writeTree(t, resolvedRoot, map[string]string{
+		"CapturePhone/App/App.swift": "let app = 1\n",
+		"Tools/Sim/Package.swift":    discoveryPackage,
+		"Tools/Sim/Broken.swift":     "let broken = 1\n",
+	})
+	yielded := []string{filepath.Join(resolvedRoot, "CapturePhone"), filepath.Join(resolvedRoot, "Tools", "Sim")}
+
+	for name, engineRoot := range spellings {
+		excluded := []excludedFile{
+			{engineRoot + "/CapturePhone/App/App.swift", "no target of this package compiles it"},
+			{engineRoot + "/Tools/Sim/Package.swift", "a package manifest"},
+			{engineRoot + "/Scripts/build.swift", "no target of this package compiles it"},
+			{engineRoot + "/Scripts/odd.swift", "a reason no engine has given yet"},
+			{engineRoot + "/Package.swift", "a package manifest"},
+			{engineRoot + "/Vendor/Kit/Kit.swift", "vendored under Vendor/"},
+			{engineRoot + "/Scratch.swift", "ignored by git"},
+		}
+
+		// Not parallel: it renders a check run through swiftRun and reads back the package-level activeSummary
+		t.Run(name, func(t *testing.T) {
+			clean := contractFixture(t, "Clean.jsonl")
+			clean[1] = projectRecordAt(t, clean[1], engineRoot, excluded)
+
+			activeSummary = runSummary{}
+			output, exitCode, err := renderRecordsYielding(t, swiftModeCheck, clean, 0, yielded)
+			if err != nil || exitCode != 0 {
+				t.Fatalf("a clean run with a gap exited %d, err %v, want the 0 it exits without one:\n%s", exitCode, err, output)
+			}
+			forbidLines(t, output, "CapturePhone/App/App.swift", "Tools/Sim/Package.swift")
+			requireLines(t, output,
+				"  not checked: "+engineRoot+"/Scripts/build.swift (no target of this package compiles it)\n",
+				"  not checked: "+engineRoot+"/Scripts/odd.swift (a reason no engine has given yet)\n",
+				"  not checked: "+engineRoot+"/Package.swift (a package manifest)\n",
+				"  not checked: "+engineRoot+"/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
+				"  not checked: "+engineRoot+"/Scratch.swift (ignored by git)\n",
+			)
+			if activeSummary.Gaps.UncheckedSwift != 2 {
+				t.Errorf("counted %d Swift files not checked, want 2: build.swift and odd.swift, and none of the three expected reasons",
+					activeSummary.Gaps.UncheckedSwift)
+			}
+			if markers := uncheckedMarkers(activeSummary); !slices.Contains(markers, "⚠ 2 Swift files not checked") {
+				t.Errorf("the footer's markers are %q, want the gap among them", markers)
+			}
+
+			// The control: the same stream yielding nothing names every file, so what was left out above was
+			// the yield at work.
+			activeSummary = runSummary{}
+			output, _, err = renderRecordsYielding(t, swiftModeCheck, clean, 0, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			requireLines(t, output,
+				"  not checked: "+engineRoot+"/CapturePhone/App/App.swift (no target of this package compiles it)\n",
+				"  not checked: "+engineRoot+"/Tools/Sim/Package.swift (a package manifest)\n",
+			)
+			if activeSummary.Gaps.UncheckedSwift != 3 {
+				t.Errorf("yielding nothing counted %d Swift files not checked, want 3", activeSummary.Gaps.UncheckedSwift)
+			}
+
+			// A file the engine could not read under a yielded directory is still named, and the run is
+			// incomplete with the exit 1 it gives without the yield.
+			unreadable := contractFixture(t, "Unreadable.jsonl")
+			unreadable[1] = projectRecordAt(t, unreadable[1], engineRoot, excluded)
+			unreadable[2] = strings.Replace(unreadable[2], "/project/Sources/Example/Latin1.swift", engineRoot+"/Tools/Sim/Broken.swift", 1)
+			activeSummary = runSummary{}
+			output, exitCode, err = renderRecordsYielding(t, swiftModeCheck, unreadable, 1, yielded)
+			if err != nil || exitCode != 1 {
+				t.Fatalf("an unreadable file exited %d, err %v, want 1:\n%s", exitCode, err, output)
+			}
+			requireLines(t, output, "  not checked: "+engineRoot+"/Tools/Sim/Broken.swift (could not be read: ")
+			forbidLines(t, output, "CapturePhone/App/App.swift")
+		})
+	}
+}
+
+// The contract's own fixture lists one file for a reason the engine does not give today, `marked //
+// @generated`, and an unknown reason is a gap, so the clean fixture carries one; its exit is still 0.
+// Not parallel: it renders a check run through swiftRun and reads back the package-level activeSummary
+func TestSwiftRunCountsAnUnknownExclusionReasonAsAGap(t *testing.T) {
+	activeSummary = runSummary{}
+	output, exitCode, err := renderRecords(t, swiftModeCheck, contractFixture(t, "Clean.jsonl"), 0)
+	if err != nil || exitCode != 0 {
+		t.Fatalf("exit %d, err %v\n%s", exitCode, err, output)
+	}
+	if activeSummary.Gaps.UncheckedSwift != 1 {
+		t.Errorf("counted %d, want the one file marked // @generated", activeSummary.Gaps.UncheckedSwift)
+	}
 }
 
 // TestSwiftRunBelievesAnEngineThatFellShort holds the allowed direction of the completeness check: an

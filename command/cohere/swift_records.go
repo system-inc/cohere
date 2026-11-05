@@ -214,6 +214,11 @@ type swiftRun struct {
 	// that renders a stream with no command line, checks nothing.
 	requested map[phaseName]bool
 
+	// yieldedDirectories are the directories of the Swift projects below this one that run on their own,
+	// symbolic links resolved, when this run is one project of several. Their runs account for their files,
+	// so the excluded files under them are left out of this run's notes and its gap. Nil checks nothing.
+	yieldedDirectories []string
+
 	provenance *swiftProvenanceRecord
 	project    *swiftProjectRecord
 	summary    *swiftSummaryRecord
@@ -736,6 +741,16 @@ func classifySwiftCoverage(record *swiftLintRecord) (coverageSummary, error) {
 // excludedNamedLimit is how many excluded files of one reason are named before they are counted.
 const excludedNamedLimit = 5
 
+// expectedExclusionReasons are the reasons the engine gives for files nobody expects a run to check, in the
+// engine's words (swift/Sources/CohereSwift/Project/FileSet.swift): what git ignores, what is vendored, and
+// the manifests. Every other reason is a gap, `no target of this package compiles it` today and whatever
+// sentence comes next, so an engine that rewords one makes the gap louder and never hides it.
+var expectedExclusionReasons = map[string]bool{
+	"ignored by git":         true,
+	"vendored under Vendor/": true,
+	"a package manifest":     true,
+}
+
 // writeExcluded says which files the package description left out, once, under the lint line when
 // there is one and above the phase line when there is not: a file nobody checked is a coverage fact
 // whether or not lint got to run.
@@ -744,6 +759,11 @@ const excludedNamedLimit = 5
 // `vendored under Vendor/` between the lint line and the verdict, which buries the two lines a reader
 // must act on under a hundred that say one thing. A few files are named, because one file left out
 // for a surprising reason is the case worth seeing; a hundred for the same reason are one fact.
+//
+// A file under a directory this run yields is left out, whatever its reason: the run of the Swift project
+// there accounts for it, so on ahraos-presence the root's notes stop naming CapturePhone's and RigSimulator's
+// files as checked by nothing. What remains, for a reason other than the ones nobody expects checked, is the
+// run's gap, counted for the footer.
 func (r *swiftRun) writeExcluded() {
 	if r.excludedPrinted || r.project == nil {
 		return
@@ -758,9 +778,19 @@ func (r *swiftRun) writeExcluded() {
 		}
 		filesByReason[reason] = append(filesByReason[reason], file)
 	}
+	unexpected := 0
 	for _, excluded := range r.project.Excluded {
+		// Resolved, since the engine standardizes its paths as Foundation spells them, `/tmp` where this
+		// process may hold `/private/tmp`, and the yielded directories are resolved too.
+		if len(r.yieldedDirectories) > 0 && yieldsFile(r.yieldedDirectories, resolvedPath(excluded.File)) {
+			continue
+		}
 		add(excluded.File, excluded.Reason)
+		if !expectedExclusionReasons[excluded.Reason] {
+			unexpected++
+		}
 	}
+	activeSummary.Gaps.UncheckedSwift = unexpected
 	// A file the engine could not read is printed the way an excluded file is, because to a reader it is
 	// the same fact: a file nothing checked, and why.
 	for _, unreadable := range r.unreadable {

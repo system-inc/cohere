@@ -126,7 +126,8 @@
                                 }
                             },
                             "description": "Directories of .swift files beside the project that no Swift package holds, so nothing checked them, found by a run from the repository that discovered this one project. They fail nothing. Absent when there are none."
-                        }
+                        },
+                        "uncheckedSwift": { "type": "integer", "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them, less those under a Swift project below it that runs on its own. They fail nothing. Absent when there are none." }
                     }
                 },
                 "adamic": {

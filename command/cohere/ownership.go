@@ -47,7 +47,8 @@ type projectYield struct {
 
 	// Directories are directories the run's format walk leaves out, absolute, each formatted by the run
 	// of the project there. The project's own directory means the walk formats nothing: another tsconfig
-	// in the same directory formats it.
+	// in the same directory formats it. A Swift run's are the Swift projects below it, whose files its
+	// not-checked notes leave out (see discovery.swiftYield).
 	Directories []string `json:"directories"`
 }
 

@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -34,17 +33,24 @@ import (
 //
 // A marker the root's ignorePatterns match is refused rather than run, and named.
 //
-// The walk also notes every .swift file it passes that no discovered Swift package's directory holds, since
-// nothing checks it (#ybspptb). An app xcodegen generates has Swift sources and no Package.swift, and beside a
-// TypeScript program, a green run read clean over code nobody looked at. Such files are named by the top
-// directory holding them, in the notes and on the verdict line, and fail nothing: a run says what it covered
-// as well as what it found. Files the walk never enters, or that .gitignore or the root's ignorePatterns
-// match, are not counted, since nobody expects those checked.
+// The walk also notes every .swift file it passes, and each directory that could be an Xcode project's root:
+// one holding a project.yml, an xcodegen spec, or exactly one .xcodeproj, and no Package.swift (#ybspptb).
+// After the walk each directory of Swift files goes to the nearest Swift marker at or above it, a package's
+// directory or such a candidate. A candidate that claims any file is a Swift project, which the engine checks
+// as an Xcode root. One that claims none is not, since project.yml is a weak signal: other tools use the name.
+// So ahraos-presence's CapturePhone, inside the root package's directory, is a project of its own, because its
+// project.yml is nearer to its sources than the root's Package.swift is.
+//
+// Swift with no marker above it is checked by nothing, and beside a TypeScript program a green run read clean
+// over code nobody looked at. Such files are named by the top directory holding them, in the notes and on the
+// verdict line, and fail nothing: a run says what it covered as well as what it found. Files the walk never
+// enters, or that .gitignore or the root's ignorePatterns match, are not counted, since nobody expects those
+// checked.
 //
 // A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
-// directory claims it, and the engine knows which files it checks. ahraos-presence's CapturePhone sits inside
-// the root package's directory, so naming it there is the engine's not-checked list made a gap, which the
-// Xcode half of #ybspptb takes up.
+// directory claims it, and the engine knows which files it checks. Its run lists the file as not checked, and
+// that list, less what the runs of the Swift projects below it account for, is the run's own gap (see
+// swiftRun.writeExcluded).
 
 // neverDescended are the directory names discovery never enters, whatever any ignore file says.
 var neverDescended = map[string]bool{
@@ -96,8 +102,8 @@ type discovery struct {
 	// swift_coverage.go.
 	SwiftCoverage swiftCoverage
 
-	// UnclaimedSwift are the top directories holding .swift files no discovered Swift package holds, which
-	// no run checks, in path order.
+	// UnclaimedSwift are the top directories holding .swift files no discovered Swift package or Xcode
+	// project holds, which no run checks, in path order.
 	UnclaimedSwift []unclaimedSwiftDirectory
 
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
@@ -233,6 +239,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		firstError error
 		// swiftFiles counts the .swift files in each directory that holds any, by directory relative to root.
 		swiftFiles = map[string]int{}
+		// xcodeCandidates are the directories that could be an Xcode project's root, relative to root. The
+		// claim after the walk decides which are projects.
+		xcodeCandidates = map[string]bool{}
 	)
 	fail := func(err error) {
 		lock.Lock()
@@ -312,6 +321,14 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			}
 			found.Projects = append(found.Projects, discoveredProject{Directory: relative, Engine: marker.engine})
 		}
+		if marker := xcodeMarker(entries, names); marker != "" {
+			markerPath := path.Join(relative, marker)
+			if configuration.MatchAny(ignorePatterns, markerPath) {
+				found.Refused = append(found.Refused, markerPath)
+			} else {
+				xcodeCandidates[relative] = true
+			}
+		}
 		candidates := []string{}
 		for _, entry := range entries {
 			// A symbolic link is not followed: it is a way out of the repository, or a loop.
@@ -346,14 +363,45 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, firstError
 	}
 
+	xcodeProjects, unclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
+	found.Projects = append(found.Projects, xcodeProjects...)
+	found.UnclaimedSwift = unclaimed
 	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
-	found.UnclaimedSwift = unclaimedSwiftDirectories(swiftFiles, found.Projects)
 	return found, nil
 }
 
-// unclaimedSwiftDirectory is one top directory holding .swift files no discovered Swift package holds.
+// xcodeProjectSpecification is the xcodegen spec whose directory may be an Xcode project's root.
+const xcodeProjectSpecification = "project.yml"
+
+// xcodeMarker is the entry that makes a directory a candidate Xcode root, by the engine's own rule
+// (swift/Contract.md): its project.yml, or else its one .xcodeproj, or "" when it is no candidate. A
+// Package.swift wins beside either, and two .xcodeproj, or a workspace and no project, the engine refuses, so
+// none of those is a candidate. names are the listing's entries that are not directories, as the walk keeps
+// them for its other markers; a .xcodeproj is a bundle, a directory, and is counted whatever its type, as the
+// engine counts it.
+func xcodeMarker(entries []os.DirEntry, names map[string]bool) string {
+	if names[swiftProjectMarker] {
+		return ""
+	}
+	if names[xcodeProjectSpecification] {
+		return xcodeProjectSpecification
+	}
+	bundle := ""
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".xcodeproj") {
+			continue
+		}
+		if bundle != "" {
+			return ""
+		}
+		bundle = entry.Name()
+	}
+	return bundle
+}
+
+// unclaimedSwiftDirectory is one top directory holding .swift files no Swift package or Xcode project holds.
 type unclaimedSwiftDirectory struct {
 	// Directory is the shallowest directory under the root holding the files, relative to it and ending in
 	// a slash, such as "CapturePhone/", or "." for files directly in the root.
@@ -363,26 +411,33 @@ type unclaimedSwiftDirectory struct {
 	Files int `json:"files"`
 }
 
-// unclaimedSwiftDirectories is the .swift files no Swift package among projects holds, grouped by the top
-// directory holding them. A package claims every file under its directory, whether it runs or another
-// package's run covers it, since then the covering run checks its files. Every Swift package discovery found
-// is one or the other, so the claim is decided here, before coverage is asked.
+// claimSwiftFiles gives each directory of .swift files to the nearest Swift marker at or above it: a Swift
+// package among projects, or one of the Xcode candidates. It returns the candidates that claimed any file, as
+// projects, and the files nothing claimed, grouped by the top directory holding them.
 //
-// The top directory is a path's first segment: that directory is outside every package, or the files below
-// it would be claimed, so it is the shallowest one holding them. So CapturePhone/Sources/App and
+// A package claims by its directory, whether it runs or another package's run covers it, since then the
+// covering run checks its files. Every Swift package discovery found is one or the other, so the claim is
+// decided here, before coverage is asked. Nearest, so a candidate inside a package's directory claims the
+// files below it, which no target of that package compiles, and a package inside a candidate's directory
+// claims its own.
+//
+// The top directory of unclaimed files is a path's first segment: no marker is at or above them, so none is
+// at that directory, and it is the shallowest one holding them. So CapturePhone/Sources/App and
 // CapturePhone/Tests are both CapturePhone/.
-func unclaimedSwiftDirectories(swiftFiles map[string]int, projects []discoveredProject) []unclaimedSwiftDirectory {
-	var packages []string
+func claimSwiftFiles(swiftFiles map[string]int, projects []discoveredProject, xcodeCandidates map[string]bool) ([]discoveredProject, []unclaimedSwiftDirectory) {
+	packages := map[string]bool{}
 	for _, project := range projects {
 		if project.Engine == engineSwift {
-			packages = append(packages, project.Directory)
+			packages[project.Directory] = true
 		}
 	}
+	claiming := map[string]bool{}
 	byTop := map[string]int{}
 	for directory, count := range swiftFiles {
-		if slices.ContainsFunc(packages, func(packageDirectory string) bool {
-			return directory == packageDirectory || isBelow(directory, packageDirectory)
-		}) {
+		if marker, isCandidate, claimed := nearestSwiftMarker(directory, packages, xcodeCandidates); claimed {
+			if isCandidate {
+				claiming[marker] = true
+			}
 			continue
 		}
 		top := "."
@@ -400,7 +455,29 @@ func unclaimedSwiftDirectories(swiftFiles map[string]int, projects []discoveredP
 	sort.Slice(unclaimed, func(left, right int) bool {
 		return pathBefore(strings.TrimSuffix(unclaimed[left].Directory, "/"), strings.TrimSuffix(unclaimed[right].Directory, "/"))
 	})
-	return unclaimed
+	xcodeProjects := make([]discoveredProject, 0, len(claiming))
+	for directory := range claiming {
+		xcodeProjects = append(xcodeProjects, discoveredProject{Directory: directory, Engine: engineSwift})
+	}
+	return xcodeProjects, unclaimed
+}
+
+// nearestSwiftMarker is the nearest directory at or above a slash directory holding a Swift marker, whether it
+// is an Xcode candidate rather than a package, and whether there is one at all. No directory holds both, since
+// a Package.swift makes its directory no candidate.
+func nearestSwiftMarker(directory string, packages map[string]bool, xcodeCandidates map[string]bool) (string, bool, bool) {
+	for {
+		if packages[directory] {
+			return directory, false, true
+		}
+		if xcodeCandidates[directory] {
+			return directory, true, true
+		}
+		if directory == "." {
+			return "", false, false
+		}
+		directory = path.Dir(directory)
+	}
 }
 
 // sortProjects puts parents before children, TypeScript before Swift in one directory, and a directory's
