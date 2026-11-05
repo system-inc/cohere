@@ -8,30 +8,9 @@ import (
 	"github.com/system-inc/cohere/internal/format/yaml/cst"
 )
 
-// onErrorFunc is upstream's ComposeErrorHandler: source is an offset (int), a range ([]int, of which the
-// first two are read), a position ([2]int), or a CST token.
-type onErrorFunc func(source any, code string, message string, warning bool)
-
-// getErrorPos is upstream's: an offset is one character, a token is its source (or one character for a
-// token without one).
-func getErrorPos(source any) [2]int {
-	switch src := source.(type) {
-	case int:
-		return [2]int{src, src + 1}
-	case [2]int:
-		return src
-	case []int:
-		return [2]int{src[0], src[1]}
-	case *cst.Token:
-		if src.HasSource() {
-			return [2]int{src.Offset, src.Offset + len(src.Source)}
-		}
-		return [2]int{src.Offset, src.Offset + 1}
-	}
-	// Invariant: every onError call in this package passes an offset, a position, a range or a token,
-	// the four cases above, as upstream's ComposeErrorHandler is only ever handed those.
-	panic("compose: no error position for this source")
-}
+// onErrorFunc is upstream's ComposeErrorHandler: source places the error, as an offset, a position, a
+// range or a token (errorSource).
+type onErrorFunc func(source errorSource, code string, message string, warning bool)
 
 // parsePrelude collects the comments of the prelude: the comment and newline tokens, and the directive
 // lines, since the previous document.
@@ -100,8 +79,8 @@ func NewComposer(options Options) *Composer {
 	}
 }
 
-func (composer *Composer) onError(source any, code string, message string, warning bool) {
-	position := getErrorPos(source)
+func (composer *Composer) onError(source errorSource, code string, message string, warning bool) {
+	position := source.position()
 	if warning {
 		composer.warnings = append(composer.warnings, newYAMLWarning(position, code, message))
 	} else {
@@ -177,16 +156,21 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 	switch token.Type {
 	case "directive":
 		composer.directives.add(token.Source, func(offset int, message string, warning bool) {
-			position := getErrorPos(token)
+			position := errorToken{token: token}.position()
 			position[0] += offset
-			composer.onError(position, "BAD_DIRECTIVE", message, warning)
+			composer.onError(errorPosition(position), "BAD_DIRECTIVE", message, warning)
 		})
 		composer.prelude = append(composer.prelude, token.Source)
 		composer.atDirectives = true
 	case "document":
 		doc := composeDoc(composer.options, composer.directives, token, composer.onError)
 		if composer.atDirectives && !doc.Directives.DocStart {
-			composer.onError(token, "MISSING_CHAR", "Missing directives-end/doc-start indicator line", false)
+			composer.onError(
+				errorToken{token: token},
+				"MISSING_CHAR",
+				"Missing directives-end/doc-start indicator line",
+				false,
+			)
 		}
 		composer.decorate(doc, false)
 		if composer.doc != nil {
@@ -204,7 +188,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 		if len(token.Source) > 0 {
 			message = token.Message + ": " + jsonStringify(token.Source)
 		}
-		yamlError := newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message)
+		yamlError := newYAMLParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", message)
 		if composer.atDirectives || composer.doc == nil {
 			composer.errors = append(composer.errors, yamlError)
 		} else {
@@ -215,7 +199,7 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 			message := "Unexpected doc-end without preceding document"
 			composer.errors = append(
 				composer.errors,
-				newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message),
+				newYAMLParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", message),
 			)
 			break
 		}
@@ -232,8 +216,10 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 		}
 		composer.doc.Range[2] = end.offset
 	default:
-		composer.errors = append(composer.errors, newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN",
-			"Unsupported token "+token.Type))
+		composer.errors = append(
+			composer.errors,
+			newYAMLParseError(errorToken{token: token}.position(), "UNEXPECTED_TOKEN", "Unsupported token "+token.Type),
+		)
 	}
 	return true
 }
@@ -248,7 +234,7 @@ func (composer *Composer) end(forceDoc bool, endOffset int, yield func(*Document
 	} else if forceDoc {
 		doc := newDocument(composer.directives, composer.options)
 		if composer.atDirectives {
-			composer.onError(endOffset, "MISSING_CHAR", "Missing directives-end indicator line", false)
+			composer.onError(errorOffset(endOffset), "MISSING_CHAR", "Missing directives-end indicator line", false)
 		}
 		doc.Range = []int{0, endOffset, endOffset}
 		composer.decorate(doc, false)

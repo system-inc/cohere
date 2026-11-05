@@ -42,7 +42,7 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 		doc.Directives.DocStart = true
 		if value != nil && (value.Type == "block-map" || value.Type == "block-seq") && !properties.hasNewline {
 			onError(
-				properties.end,
+				errorOffset(properties.end),
 				"MISSING_CHAR",
 				"Block collection cannot start on same line with directives-end marker",
 				false,
@@ -72,7 +72,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 	case "alias":
 		node = composeAlias(composition, token, onError)
 		if anchor != nil || tag != nil {
-			onError(token, "ALIAS_PROPS", "An alias node must not specify any properties", false)
+			onError(errorToken{token: token}, "ALIAS_PROPS", "An alias node must not specify any properties", false)
 		}
 	case "scalar", "single-quoted-scalar", "double-quoted-scalar", "block-scalar":
 		node = composeScalar(composition, token, tag, onError)
@@ -86,7 +86,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 		if token.Type == "error" {
 			message = token.Message
 		}
-		onError(token, "UNEXPECTED_TOKEN", message, false)
+		onError(errorToken{token: token}, "UNEXPECTED_TOKEN", message, false)
 		isSourceToken = false
 	}
 	if node == nil {
@@ -94,7 +94,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 	}
 	// `node.anchor === ''`: an alias never gets the anchor, so its anchor is undefined, not ''.
 	if anchor != nil && node.HasAnchor() && node.Anchor == "" {
-		onError(anchor, "BAD_ALIAS", "Anchor cannot be an empty string", false)
+		onError(errorToken{token: anchor}, "BAD_ALIAS", "Anchor cannot be an empty string", false)
 	}
 	if atKey && composition.options.StringKeys && (!IsScalar(node) || !isString(node.ScalarValue) ||
 		node.Tag != "" && node.Tag != strTagName) {
@@ -103,7 +103,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 		if tag != nil {
 			source = tag
 		}
-		onError(source, "NON_STRING_KEY", message, false)
+		onError(errorToken{token: source}, "NON_STRING_KEY", message, false)
 	}
 	if spaceBefore {
 		node.SpaceBefore = true
@@ -138,7 +138,7 @@ func composeCollectionCatching(
 			if !isTypeError {
 				panic(recovered)
 			}
-			onError(token, "RESOURCE_EXHAUSTION", string(message), false)
+			onError(errorToken{token: token}, "RESOURCE_EXHAUSTION", string(message), false)
 			node = nil
 		}
 	}()
@@ -149,9 +149,9 @@ func composeCollectionCatching(
 	return node
 }
 
-func isString(value any) bool {
-	_, ok := value.(string)
-	return ok
+func isString(value ScalarValue) bool {
+	_, isText := value.(ScalarString)
+	return isText
 }
 
 // composeEmptyNode composes the empty scalar where a node is missing. before is nil for upstream's
@@ -173,7 +173,7 @@ func composeEmptyNode(
 	if properties.anchor != nil {
 		node.SetAnchor(unitsToString(substring(properties.anchor.Source, 1, len(properties.anchor.Source))))
 		if node.Anchor == "" {
-			onError(properties.anchor, "BAD_ALIAS", "Anchor cannot be an empty string", false)
+			onError(errorToken{token: properties.anchor}, "BAD_ALIAS", "Anchor cannot be an empty string", false)
 		}
 	}
 	if properties.spaceBefore {
@@ -190,10 +190,10 @@ func composeAlias(composition *composeContext, token *cst.Token, onError onError
 	offset, source, end := token.Offset, token.Source, token.End
 	alias := newAlias(unitsToString(substring(source, 1, len(source))))
 	if alias.Source == "" {
-		onError(offset, "BAD_ALIAS", "Alias cannot be an empty string", false)
+		onError(errorOffset(offset), "BAD_ALIAS", "Alias cannot be an empty string", false)
 	}
 	if characterAt(source, len(source)-1) == ':' && len(source) > 1 {
-		onError(offset+len(source)-1, "BAD_ALIAS", "Alias ending in : is ambiguous", true)
+		onError(errorOffset(offset+len(source)-1), "BAD_ALIAS", "Alias ending in : is ambiguous", true)
 	}
 	valueEnd := offset + len(source)
 	re := resolveEnd(end, valueEnd, composition.options.Strict, onError)

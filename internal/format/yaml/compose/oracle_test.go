@@ -318,16 +318,16 @@ func numberBits(value float64) string {
 	return `"` + strconv.FormatUint(math.Float64bits(value), 16) + `"`
 }
 
-func (writer *jsonWriter) value(value any) {
+func (writer *jsonWriter) value(value ScalarValue) {
 	switch typed := value.(type) {
 	case nil:
 		writer.raw("null")
-	case string:
-		writer.text(typed)
-	case bool:
-		writer.raw(strconv.FormatBool(typed))
-	case float64:
-		writer.raw(`{"number":` + numberBits(typed) + `}`)
+	case ScalarString:
+		writer.text(string(typed))
+	case ScalarBoolean:
+		writer.raw(strconv.FormatBool(bool(typed)))
+	case ScalarNumber:
+		writer.raw(`{"number":` + numberBits(float64(typed)) + `}`)
 	case *MergeKey:
 		writer.raw(`{"symbol":"<<"}`)
 	case Date:

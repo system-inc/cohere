@@ -10,7 +10,9 @@ func resolveFlowScalar(scalar *cst.Token, strict bool, onError onErrorFunc) scal
 	offset, tokenType, source, end := scalar.Offset, scalar.Type, scalar.Source, scalar.End
 	var scalarType string
 	var value []uint16
-	relativeError := func(rel int, code string, message string) { onError(offset+rel, code, message, false) }
+	relativeError := func(rel int, code string, message string) {
+		onError(errorOffset(offset+rel), code, message, false)
+	}
 	switch tokenType {
 	case "scalar":
 		scalarType = Plain
@@ -22,7 +24,12 @@ func resolveFlowScalar(scalar *cst.Token, strict bool, onError onErrorFunc) scal
 		scalarType = QuoteDouble
 		value = doubleQuotedValue(source, relativeError)
 	default:
-		onError(scalar, "UNEXPECTED_TOKEN", "Expected a flow scalar value, but found: "+tokenType, false)
+		onError(
+			errorToken{token: scalar},
+			"UNEXPECTED_TOKEN",
+			"Expected a flow scalar value, but found: "+tokenType,
+			false,
+		)
 		return scalarResolution{
 			value:      []uint16{},
 			valueRange: []int{offset, offset + len(source), offset + len(source)},
@@ -353,7 +360,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 		} else {
 			if len(indent) < trimIndent {
 				message := "Block scalars with more-indented leading empty lines must use an explicit indentation indicator"
-				onError(offset+len(indent), "MISSING_CHAR", message, false)
+				onError(errorOffset(offset+len(indent)), "MISSING_CHAR", message, false)
 			}
 			if header.indent == 0 {
 				trimIndent = len(indent)
@@ -361,7 +368,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 			contentStart = index
 			if trimIndent == 0 && !composition.atRoot {
 				message := "Block scalar values in collections must be indented"
-				onError(offset, "BAD_INDENT", message, false)
+				onError(errorOffset(offset), "BAD_INDENT", message, false)
 			}
 			break
 		}
@@ -398,7 +405,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 			if crlf {
 				rel = 2
 			}
-			onError(offset-len(content)-rel, "BAD_INDENT", message, false)
+			onError(errorOffset(offset-len(content)-rel), "BAD_INDENT", message, false)
 			indent = []uint16{}
 		}
 		trimmedIndent := slice(indent, trimIndent, len(indent))
@@ -453,14 +460,14 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 	offset, properties := scalar.Offset, scalar.Props
 	/* istanbul ignore if should not happen */
 	if properties[0].Type != "block-scalar-header" {
-		onError(properties[0], "IMPOSSIBLE", "Block scalar header not found", false)
+		onError(errorToken{token: properties[0]}, "IMPOSSIBLE", "Block scalar header not found", false)
 		return nil
 	}
 	source := properties[0].Source
 	mode := source[0]
 	indent := 0
 	var chomp uint16
-	errorOffset := -1
+	extraCharacterOffset := -1
 	for index := 1; index < len(source); index++ {
 		codeUnit := source[index]
 		if chomp == 0 && (codeUnit == '-' || codeUnit == '+') {
@@ -473,14 +480,14 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 			}
 			if indent == 0 && count != 0 {
 				indent = count
-			} else if errorOffset == -1 {
-				errorOffset = offset + index
+			} else if extraCharacterOffset == -1 {
+				extraCharacterOffset = offset + index
 			}
 		}
 	}
-	if errorOffset != -1 {
+	if extraCharacterOffset != -1 {
 		onError(
-			errorOffset,
+			errorOffset(extraCharacterOffset),
 			"UNEXPECTED_TOKEN",
 			"Block scalar header includes extra characters: "+unitsToString(source),
 			false,
@@ -500,17 +507,17 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 		case "comment":
 			if strict && !hasSpace {
 				message := "Comments must be separated from other tokens by white space characters"
-				onError(token, "MISSING_CHAR", message, false)
+				onError(errorToken{token: token}, "MISSING_CHAR", message, false)
 			}
 			length += len(token.Source)
 			comment = unitsToString(substring(token.Source, 1, len(token.Source)))
 		case "error":
-			onError(token, "UNEXPECTED_TOKEN", token.Message, false)
+			onError(errorToken{token: token}, "UNEXPECTED_TOKEN", token.Message, false)
 			length += len(token.Source)
 		/* istanbul ignore next should not happen */
 		default:
 			message := "Unexpected token in block scalar header: " + token.Type
-			onError(token, "UNEXPECTED_TOKEN", message, false)
+			onError(errorToken{token: token}, "UNEXPECTED_TOKEN", message, false)
 			if token.HasSource() && len(token.Source) > 0 {
 				length += len(token.Source)
 			}
