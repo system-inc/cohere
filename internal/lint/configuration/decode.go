@@ -150,9 +150,14 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 // that read their element with json.Unmarshal rather than rule.UnmarshalOptions.
 func refuseNulls(elements []json.RawMessage) error {
 	for index, element := range elements {
-		var value any
+		var value optionschema.JsonValue
 		if decodeError := json.Unmarshal(element, &value); decodeError != nil {
 			// Malformed JSON is the decoder's to report, in its own words.
+			continue
+		}
+		// An untyped decode read every number as a float64 and failed on one past its range, which left the
+		// whole element to the decoder, so such an element is still left to it.
+		if hasOverflowingNumber(value) {
 			continue
 		}
 		if path, found := nullPath(value, ""); found {
@@ -169,29 +174,51 @@ func refuseNulls(elements []json.RawMessage) error {
 
 // nullPath finds the first null in a decoded JSON value, walking object keys in sorted order so the
 // same config always names the same path, and returns its dotted path.
-func nullPath(value any, path string) (string, bool) {
-	switch typed := value.(type) {
-	case nil:
+func nullPath(value optionschema.JsonValue, path string) (string, bool) {
+	switch value.Kind {
+	case optionschema.JsonKindNull:
 		return path, true
-	case []any:
-		for index, member := range typed {
+	case optionschema.JsonKindArray:
+		for index, member := range value.Elements {
 			if found, isNull := nullPath(member, joinPath(path, strconv.Itoa(index))); isNull {
 				return found, true
 			}
 		}
-	case map[string]any:
-		keys := make([]string, 0, len(typed))
-		for key := range typed {
+	case optionschema.JsonKindObject:
+		keys := make([]string, 0, len(value.Members))
+		for key := range value.Members {
 			keys = append(keys, key)
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			if found, isNull := nullPath(typed[key], joinPath(path, key)); isNull {
+			if found, isNull := nullPath(value.Members[key], joinPath(path, key)); isNull {
 				return found, true
 			}
 		}
 	}
 	return "", false
+}
+
+// hasOverflowingNumber reports whether a decoded JSON value holds a number float64 cannot read, anywhere in it.
+func hasOverflowingNumber(value optionschema.JsonValue) bool {
+	switch value.Kind {
+	case optionschema.JsonKindNumber:
+		_, float64Error := value.Number.Float64()
+		return float64Error != nil
+	case optionschema.JsonKindArray:
+		for _, member := range value.Elements {
+			if hasOverflowingNumber(member) {
+				return true
+			}
+		}
+	case optionschema.JsonKindObject:
+		for _, member := range value.Members {
+			if hasOverflowingNumber(member) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func joinPath(path, key string) string {
