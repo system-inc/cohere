@@ -6,8 +6,11 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -485,6 +488,313 @@ func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(t *testing.T) {
 	output, exitCode := runWithEngine(t, binary, "", root, "--no-fix")
 	if exitCode != 0 || strings.Contains(output, "no package checks") {
 		t.Errorf("with the Swift gone the run still names it (exit %d):\n%s", exitCode, output)
+	}
+}
+
+// A directory holding a project.yml, or exactly one .xcodeproj, and no Package.swift is an Xcode candidate, and
+// it is a Swift project when it is the nearest Swift marker above some Swift file: inside a package's
+// directory, as ahraos-presence's CapturePhone is, or outside every package, where its files are then no gap.
+// A candidate claiming nothing is no project, Package.swift beside one is the package alone, two .xcodeproj or
+// a workspace alone is no candidate, and nested markers each claim their nearest files (#ybspptb).
+func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name           string
+		files          map[string]string
+		ignorePatterns []string
+		projects       []discoveredProject
+		unclaimed      []unclaimedSwiftDirectory
+		refused        []string
+	}{
+		{
+			name: "a candidate inside a package's directory with Swift beneath is a project",
+			files: map[string]string{
+				"Package.swift":              discoveryPackage,
+				"Sources/Toy/Toy.swift":      "let toy = 1\n",
+				"CapturePhone/project.yml":   "name: CapturePhone\n",
+				"CapturePhone/App/App.swift": "let app = 1\n",
+			},
+			projects: []discoveredProject{{Directory: ".", Engine: engineSwift}, {Directory: "CapturePhone", Engine: engineSwift}},
+		},
+		{
+			name: "a project.yml with no Swift beneath is not a project",
+			files: map[string]string{
+				"Package.swift":         discoveryPackage,
+				"Sources/Toy/Toy.swift": "let toy = 1\n",
+				"Docs/project.yml":      "name: Docs\n",
+				"Docs/README.md":        "not Swift\n",
+				"Alone/project.yml":     "name: Alone\n",
+			},
+			projects: []discoveredProject{{Directory: ".", Engine: engineSwift}},
+		},
+		{
+			name: "two .xcodeproj, or a workspace alone, is no candidate",
+			files: map[string]string{
+				"App/A.xcodeproj/project.pbxproj":           "// A\n",
+				"App/B.xcodeproj/project.pbxproj":           "// B\n",
+				"App/App.swift":                             "let app = 1\n",
+				"Work/App.xcworkspace/contents.xcworkspace": "<Workspace/>\n",
+				"Work/Work.swift":                           "let work = 1\n",
+			},
+			unclaimed: []unclaimedSwiftDirectory{{Directory: "App/", Files: 1}, {Directory: "Work/", Files: 1}},
+		},
+		{
+			name: "Package.swift beside project.yml is the package alone",
+			files: map[string]string{
+				"Lib/Package.swift":         discoveryPackage,
+				"Lib/project.yml":           "name: Lib\n",
+				"Lib/Single.xcodeproj/file": "// one\n",
+				"Lib/Sources/Lib/Lib.swift": "let lib = 1\n",
+			},
+			projects: []discoveredProject{{Directory: "Lib", Engine: engineSwift}},
+		},
+		{
+			// The engine reads a Package.swift first wherever it is, so one the root's ignorePatterns refuse
+			// leaves no Xcode project to run beside it, and its directory's Swift is claimed by nothing.
+			name: "Package.swift refused beside project.yml leaves no Xcode project",
+			files: map[string]string{
+				"Lib/Package.swift":         discoveryPackage,
+				"Lib/project.yml":           "name: Lib\n",
+				"Lib/Sources/Lib/Lib.swift": "let lib = 1\n",
+			},
+			ignorePatterns: []string{"Lib/Package.swift"},
+			unclaimed:      []unclaimedSwiftDirectory{{Directory: "Lib/", Files: 1}},
+			refused:        []string{"Lib/Package.swift"},
+		},
+		{
+			name: "a candidate outside any package is a project, and its files no gap",
+			files: map[string]string{
+				"App/project.yml":       "name: App\n",
+				"App/Sources/App.swift": "let app = 1\n",
+			},
+			projects: []discoveredProject{{Directory: "App", Engine: engineSwift}},
+		},
+		{
+			name: "nested markers each claim their nearest files",
+			files: map[string]string{
+				"Outer/project.yml":                           "name: Outer\n",
+				"Outer/Outer.swift":                           "let outer = 1\n",
+				"Outer/Inner/Inner.xcodeproj/project.pbxproj": "// Inner\n",
+				"Outer/Inner/Sources/Inner.swift":             "let inner = 1\n",
+				"Outer/Kit/Package.swift":                     discoveryPackage,
+				"Outer/Kit/Sources/Kit/Kit.swift":             "let kit = 1\n",
+			},
+			projects: []discoveredProject{
+				{Directory: "Outer", Engine: engineSwift},
+				{Directory: "Outer/Inner", Engine: engineSwift},
+				{Directory: "Outer/Kit", Engine: engineSwift},
+			},
+		},
+		{
+			name: "a candidate the root's ignorePatterns match is refused, and its Swift claimed by nothing",
+			files: map[string]string{
+				"Refused/project.yml": "name: Refused\n",
+				"Refused/App.swift":   "let app = 1\n",
+			},
+			ignorePatterns: []string{"Refused/project.yml"},
+			unclaimed:      []unclaimedSwiftDirectory{{Directory: "Refused/", Files: 1}},
+			refused:        []string{"Refused/project.yml"},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			root := newRepository(t, test.files)
+			found, err := discoverProjects(root, test.ignorePatterns)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(found.Projects) != len(test.projects) || len(found.Projects) > 0 && !reflect.DeepEqual(found.Projects, test.projects) {
+				t.Errorf("found the projects %+v, want %+v", found.Projects, test.projects)
+			}
+			if len(found.UnclaimedSwift) != len(test.unclaimed) || len(found.UnclaimedSwift) > 0 && !reflect.DeepEqual(found.UnclaimedSwift, test.unclaimed) {
+				t.Errorf("found the unclaimed Swift %+v, want %+v", found.UnclaimedSwift, test.unclaimed)
+			}
+			if len(found.Refused) != len(test.refused) || len(found.Refused) > 0 && !reflect.DeepEqual(found.Refused, test.refused) {
+				t.Errorf("refused %v, want %v", found.Refused, test.refused)
+			}
+		})
+	}
+}
+
+// xcodeRepository writes the shape of ahraos-presence beside a TypeScript program: a root package holding an
+// Xcode project, CapturePhone, that no target of it compiles; Tools/Sim, a nested package nothing depends on,
+// which runs on its own; and Libraries/Lib, a path dependency the root's run checks. The root's tsconfig.json
+// and web/'s make a TypeScript project in the root's directory that yields web/ (#ybspptb).
+func xcodeRepository(t *testing.T) string {
+	t.Helper()
+	root := mixedRepository(t, ".")
+	writeTree(t, root, map[string]string{
+		"web/tsconfig.json":                   incrementalFixtureConfig + "\n",
+		"web/CohereSettings.json":             "{ \"rules\": {} }\n",
+		"web/index.ts":                        "export const web = 1;\n",
+		"CapturePhone/project.yml":            "name: CapturePhone\n",
+		"CapturePhone/App/App.swift":          "let app = 1\n",
+		"Tools/Sim/Package.swift":             discoveryPackage,
+		"Tools/Sim/Sources/Toy/Toy.swift":     "let toy = 1\n",
+		"Libraries/Lib/Package.swift":         discoveryPackage,
+		"Libraries/Lib/Sources/Toy/Toy.swift": "let toy = 1\n",
+	})
+	return root
+}
+
+// xcodeSwiftEngine is a stand-in engine for xcodeRepository, with the root's check stream given. It answers
+// `--covered-packages` with each root checking itself and the root checking Libraries/Lib as well, and logs
+// each check run's root, resolved, and the yield its run was handed, to the file it returns.
+func xcodeSwiftEngine(t *testing.T, rootStream string) (string, string) {
+	t.Helper()
+	log := filepath.Join(t.TempDir(), "yields")
+	provenance := filepath.Join(contractDirectory(t), "Clean.jsonl")
+	clean := contractFixture(t, "Clean.jsonl")
+	clean[1] = projectRecordAt(t, clean[1], "/elsewhere", nil)
+	otherStream := filepath.Join(t.TempDir(), "other.jsonl")
+	if err := os.WriteFile(otherStream, []byte(strings.Join(clean, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	engine := fakeSwiftEngine(t, "root=''; covering=''; previous=''\n"+
+		"for argument in \"$@\"; do\n"+
+		"  if [ \"$previous\" = --root ]; then root=$argument; fi\n"+
+		"  if [ \"$argument\" = --covered-packages ]; then covering=1; fi\n"+
+		"  previous=$argument\n"+
+		"done\n"+
+		"if [ -n \"$covering\" ]; then\n"+
+		"  checked=\"\\\"$root\\\"\"\n"+
+		"  if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then checked=\"$checked,\\\"$root/Libraries/Lib\\\"\"; fi\n"+
+		"  head -1 '"+provenance+"'\n"+
+		"  echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\",\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
+		"  exit 0\n"+
+		"fi\n"+
+		"yield=''; if [ -n \"$COHERE_PROJECT_YIELD\" ]; then yield=$(cat \"$COHERE_PROJECT_YIELD\"); fi\n"+
+		"printf '%s\\t%s\\n' \"$(cd \"$root\" && pwd -P)\" \"$yield\" >> '"+log+"'\n"+
+		"if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then cat '"+rootStream+"'; else cat '"+otherStream+"'; fi")
+	return engine, log
+}
+
+// In ahraos-presence's shape, CapturePhone runs as its own Swift project and the root's run yields it and
+// Tools/Sim, the Swift projects running below it, and not Libraries/Lib, which it checks itself, nor web/,
+// which only the TypeScript project in the same directory yields. So the root's notes stop naming their files
+// as checked by nothing, though the engine spells them through a symbolic link; what remains for a reason
+// nobody expects is the root run's gap, on its footer and under --json; and the run is green (#ybspptb).
+func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	root := xcodeRepository(t)
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+	stream := contractFixture(t, "Clean.jsonl")
+	stream[1] = projectRecordAt(t, stream[1], alias, []excludedFile{
+		{alias + "/CapturePhone/App/App.swift", "no target of this package compiles it"},
+		{alias + "/Tools/Sim/Package.swift", "a package manifest"},
+		{alias + "/Tools/Sim/Sources/Toy/Toy.swift", "no target of this package compiles it"},
+		{alias + "/Scripts/build.swift", "no target of this package compiles it"},
+		{alias + "/Scripts/odd.swift", "a reason no engine has given yet"},
+		{alias + "/Package.swift", "a package manifest"},
+		{alias + "/Vendor/Kit/Kit.swift", "vendored under Vendor/"},
+		{alias + "/Scratch.swift", "ignored by git"},
+	})
+	rootStream := filepath.Join(t.TempDir(), "root.jsonl")
+	if err := os.WriteFile(rootStream, []byte(strings.Join(stream, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	engine, log := xcodeSwiftEngine(t, rootStream)
+
+	output, exitCode := runWithEngine(t, binary, engine, root, "--no-fix")
+	if exitCode != 0 {
+		t.Errorf("a clean repository with a gap exited %d, want 0:\n%s", exitCode, output)
+	}
+	for _, want := range []string{
+		"== CapturePhone (Swift) ==",
+		"== Tools/Sim (Swift) ==",
+		"Libraries/Lib not run: checked as part of .",
+		"  not checked: " + alias + "/Scripts/build.swift (no target of this package compiles it)\n",
+		"  not checked: " + alias + "/Scripts/odd.swift (a reason no engine has given yet)\n",
+		"  not checked: " + alias + "/Package.swift (a package manifest)\n",
+		"  not checked: " + alias + "/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
+		"  not checked: " + alias + "/Scratch.swift (ignored by git)\n",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("the report lacks %q:\n%s", want, output)
+		}
+	}
+	for _, unwanted := range []string{"CapturePhone/App/App.swift", "Tools/Sim/Package.swift", "Tools/Sim/Sources/Toy/Toy.swift", "no package checks"} {
+		if strings.Contains(output, unwanted) {
+			t.Errorf("the report names %q, which a run of its own accounts for:\n%s", unwanted, output)
+		}
+	}
+	// The TypeScript project in the root's directory shares its label, so the footers are kept by label in the
+	// order they print, and only the Swift one may carry the gap.
+	footers := map[string][]string{}
+	gapFooters := 0
+	for _, line := range strings.Split(output, "\n") {
+		if label, rest, isFooter := strings.Cut(line, "  ✓ 💎 "); isFooter {
+			footers[label] = append(footers[label], rest)
+			if strings.Contains(rest, "Swift files not checked") {
+				gapFooters++
+			}
+		}
+	}
+	if !slices.ContainsFunc(footers["."], func(footer string) bool {
+		return strings.HasSuffix(footer, " • ⚠ 2 Swift files not checked")
+	}) ||
+		gapFooters != 1 {
+		t.Errorf("the footers are %q, want the root's Swift one alone to end on the gap of build.swift and odd.swift", footers)
+	}
+	for _, label := range []string{"CapturePhone", "Tools/Sim"} {
+		if len(footers[label]) != 1 {
+			t.Errorf("%s printed the footers %q, want one, green", label, footers[label])
+		}
+	}
+
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logged, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yields := map[string][]string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
+		directory, encoded, _ := strings.Cut(line, "\t")
+		var yield projectYield
+		if encoded != "" {
+			if err := json.Unmarshal([]byte(encoded), &yield); err != nil {
+				t.Fatalf("the yield %q does not decode: %v", encoded, err)
+			}
+		}
+		var relatives []string
+		for _, yielded := range yield.Directories {
+			relative, _ := filepath.Rel(resolvedRoot, resolvedPath(yielded))
+			relatives = append(relatives, filepath.ToSlash(relative))
+		}
+		label, _ := filepath.Rel(resolvedRoot, directory)
+		yields[filepath.ToSlash(label)] = relatives
+	}
+	want := map[string][]string{".": {"CapturePhone", "Tools/Sim"}, "CapturePhone": nil, "Tools/Sim": nil}
+	if !reflect.DeepEqual(yields, want) {
+		t.Errorf("the Swift runs yielded %v, want %v:\n%s", yields, want, logged)
+	}
+
+	output, exitCode = runWithEngine(t, binary, engine, root, "--no-fix", "--json")
+	if exitCode != 0 {
+		t.Errorf("under --json the run exited %d, want 0:\n%s", exitCode, output)
+	}
+	gaps := map[string]float64{}
+	for _, line := range strings.Split(output, "\n") {
+		var summary struct {
+			Kind  string         `json:"kind"`
+			Label string         `json:"label"`
+			Gaps  map[string]any `json:"gaps"`
+		}
+		if json.Unmarshal([]byte(line), &summary) != nil || summary.Kind != "summary" {
+			continue
+		}
+		count, _ := summary.Gaps["uncheckedSwift"].(float64)
+		gaps[summary.Label] += count
+	}
+	if gaps["."] != 2 || gaps["CapturePhone"] != 0 || gaps["Tools/Sim"] != 0 {
+		t.Errorf("under --json the gaps are %v, want 2 for . and none for the others:\n%s", gaps, output)
 	}
 }
 

@@ -41,7 +41,8 @@ import (
 // One rule outranks the brevity. Anything the run did not check is in this line, green or not: a file a
 // rule crashed on, a rule that skipped every file it was offered, a phase that could not run, formatting
 // not checked, a run narrowed to some of the files, a project with nothing to check, a generated file the
-// program asks for that does not exist yet, Swift files beside the project that no package holds. The old
+// program asks for that does not exist yet, Swift files beside the project that no package holds, Swift
+// files inside a package's directory that no target compiles and no other project's run checks. The old
 // phase line existed so that a run which checked nothing could not print like one that checked everything,
 // and a one-line summary that dropped those cases would undo it in the line people actually read. So a gap
 // is never left to `--verbose`.
@@ -207,6 +208,9 @@ func uncheckedMarkers(summary runSummary) []string {
 	}
 	if len(gaps.UnclaimedSwift) > 0 {
 		markers = append(markers, unclaimedSwiftMarker(gaps.UnclaimedSwift))
+	}
+	if gaps.UncheckedSwift > 0 {
+		markers = append(markers, "⚠ "+counted(gaps.UncheckedSwift, "Swift file not checked", "Swift files not checked"))
 	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")

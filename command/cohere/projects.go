@@ -224,7 +224,13 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	running := make(chan struct{}, projectRunsAtOnce())
 	for index, project := range found.Projects {
 		label := projectLabel(project)
-		yieldFile, err := writeProjectYield(found.Ownership.Yields[label], yieldDirectory)
+		// A Swift project and a TypeScript project in one directory share a label, and what one yields is
+		// nothing to the other, so a Swift project's yield is its own.
+		yield := found.Ownership.Yields[label]
+		if project.Engine == engineSwift {
+			yield = found.swiftYield(project)
+		}
+		yieldFile, err := writeProjectYield(yield, yieldDirectory)
 		if err != nil {
 			runs[index] = projectRun{project: project, exitCode: 1, err: fmt.Errorf("writing what it yields: %w", err)}
 			continue
@@ -308,6 +314,22 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		return 128 + received
 	}
 	return worst
+}
+
+// swiftYield is what a Swift project's run leaves to others: the directories of the other running Swift
+// projects strictly below it, absolute, each checked by its own run. A nested package that runs on its own and
+// an Xcode project inside a package's directory are both there, and the run's not-checked notes leave their
+// files out, since those runs account for them. A package another run covers is not, since the covering run
+// checks its files itself, and found.Projects holds only the projects that run.
+func (found discovery) swiftYield(project discoveredProject) projectYield {
+	yield := projectYield{}
+	for _, other := range found.Projects {
+		if other.Engine == engineSwift && isBelow(other.Directory, project.Directory) {
+			yield.Directories = append(yield.Directories, filepath.Join(found.Root, filepath.FromSlash(other.Directory)))
+		}
+	}
+	sort.Strings(yield.Directories)
+	return yield
 }
 
 // overallFactsOf is what the overall verdict says of the projects' runs: how many of each engine, the ones
