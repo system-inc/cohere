@@ -209,7 +209,11 @@ func main() {
 	}
 
 	if *outputPath == "-" {
-		os.Stdout.Write(formatted)
+		if _, writeError := os.Stdout.Write(formatted); writeError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+			fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", writeError)
+			os.Exit(1)
+		}
 	} else if writeError := os.WriteFile(*outputPath, formatted, 0o644); writeError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", writeError)

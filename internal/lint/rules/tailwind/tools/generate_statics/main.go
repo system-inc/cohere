@@ -120,7 +120,9 @@ func main() {
 	}
 
 	if *output == "" {
-		os.Stdout.Write(source)
+		if _, writeError := os.Stdout.Write(source); writeError != nil {
+			fail("write stdout: %v", writeError)
+		}
 	} else if writeError := os.WriteFile(*output, source, 0o644); writeError != nil {
 		fail("write %s: %v", *output, writeError)
 	}
