@@ -254,9 +254,9 @@ func typeSwitchCases(test *testing.T, fileName, functionName string) map[string]
 // that does not exist and every test built on it failed on a machine that builds with -trimpath.
 func forEachPackageFile(test *testing.T, visit func(*ast.File)) {
 	test.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		test.Fatalf("cannot locate the package source: %v", err)
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatalf("cannot locate the package source: %v", workingDirectoryError)
 	}
 
 	// Every `.go` file in the directory, test files among them, as go/parser's deprecated ParseDir read it.
