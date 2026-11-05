@@ -30,7 +30,7 @@ type consistentIndexedObjectStyleFinding struct {
 	wantSuggestion string
 }
 
-func consistentIndexedObjectStyleOptionsFor(test *testing.T, optionsJson string) any {
+func consistentIndexedObjectStyleOptionsFor(test *testing.T, optionsJson string) ConsistentIndexedObjectStyleOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultConsistentIndexedObjectStyleSettings()
@@ -1190,8 +1190,8 @@ func TestConsistentIndexedObjectStyleFallsBackToTheDefaultOnNilOptions(test *tes
 
 	const record = "type T = Record<string, number>;"
 
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, ConsistentIndexedObjectStyle,
-		consistentIndexedObjectStyleFile, record, nil))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, ConsistentIndexedObjectStyle,
+		consistentIndexedObjectStyleFile, record))
 
 	// The control: the same input under the other mode must report, so the silence above is the
 	// default being applied rather than the rule being inert.

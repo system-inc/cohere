@@ -82,7 +82,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
 		"declare const a: any;\nexport const r = `${a?.b}`;\n",
 	}
 
-	rules := []rule.Rule{
+	rules := []rule.Rule[rule.NoOptions]{
 		NoExtraNonNullAssertion,
 		NoNonNullAssertedOptionalChain,
 		NoNonNullAssertion,

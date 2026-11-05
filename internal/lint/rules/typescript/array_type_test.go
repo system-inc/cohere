@@ -23,21 +23,21 @@ func arrayTypeCaseName(index int) string {
 // The decoder holds two defaults, neither of which is a Go zero value, and a fallback of `readonly`
 // onto the resolved value of `default`. A fixture constructing ArrayTypeOptions by hand would leave
 // both untested, and those are the two lines with no upstream counterpart. An empty configuration
-// is the bare `"error"` case, which the config layer turns into nil options, and it reaches the rule
+// is the bare `"error"` case, which the config layer turns into no options, and it reaches the rule
 // the same way here.
-func decodeArrayTypeOptions(test *testing.T, configuration string) any {
+func decodeArrayTypeOptions(test *testing.T, configuration string) rule.Given[ArrayTypeOptions] {
 	test.Helper()
 
 	if configuration == "" {
-		// A rule configured as a bare `"error"` is handed nil, not an empty struct. Passing nil
-		// here is what puts the rule's own fallback under test rather than the decoder's.
-		return nil
+		// A rule configured as a bare `"error"` is handed no options, not an empty struct. Handing
+		// it none here is what puts the rule's own fallback under test rather than the decoder's.
+		return rule.Given[ArrayTypeOptions]{}
 	}
 	options, decodeArrayTypeOptionsError := DecodeArrayTypeOptions([]byte(configuration))
 	if decodeArrayTypeOptionsError != nil {
 		test.Fatalf("could not decode %s: %v", configuration, decodeArrayTypeOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // TestArrayTypeStaysSilentOnUpstreamPassCases is the imported clean corpus, verbatim.
@@ -437,7 +437,7 @@ func TestArrayTypeStaysSilentOnUpstreamPassCases(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ArrayType,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, ArrayType,
 				arrayTypeFile, testCase.sourceText,
 				decodeArrayTypeOptions(test, testCase.configuration)))
 		})
@@ -1163,7 +1163,7 @@ func TestArrayTypeFiresOnUpstreamFailCases(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
@@ -1323,7 +1323,7 @@ func TestArrayTypeRendersTheMessageUpstreamRenders(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 
@@ -1370,7 +1370,7 @@ func TestArrayTypeDeclinesAHeritageClause(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
@@ -1407,7 +1407,7 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
@@ -1471,7 +1471,7 @@ func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
@@ -1543,7 +1543,7 @@ func TestArrayTypeJudgesSimplicityTheWayUpstreamDoes(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(testCase.wantIds) > 0 {
@@ -1609,7 +1609,7 @@ func TestArrayTypeReadsOnlyTheReadonlyOperator(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, testCase.configuration))
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
@@ -1798,7 +1798,7 @@ func TestArrayTypeDeclinesAShadowedName(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(arrayTypeCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
+			result := rule_testing.RunGiven(test, ArrayType, arrayTypeFile,
 				testCase.sourceText, decodeArrayTypeOptions(test, "{\"default\": \"array\"}"))
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
@@ -1857,10 +1857,10 @@ func TestArrayTypeNilOptionsFallsBackToUpstreamDefaults(test *testing.T) {
 	test.Parallel()
 
 	// `array` is the default, so the generic spelling reports and the suffix one does not.
-	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
-		"let x: Array<string>;", nil), "errorStringArray")
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile,
-		"let x: string[];", nil))
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, ArrayType, arrayTypeFile,
+		"let x: Array<string>;"), "errorStringArray")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, ArrayType, arrayTypeFile,
+		"let x: string[];"))
 }
 
 // TestArrayTypeSurvivesMalformedTypes is a crash fixture.
@@ -1889,7 +1889,7 @@ func TestArrayTypeSurvivesMalformedTypes(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.RunWithOptions(test, ArrayType, arrayTypeFile, sourceText,
+			rule_testing.RunGiven(test, ArrayType, arrayTypeFile, sourceText,
 				decodeArrayTypeOptions(test, "{\"default\": \"generic\"}"))
 		})
 	}

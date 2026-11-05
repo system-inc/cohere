@@ -27,7 +27,7 @@ func noExtraneousClassCaseName(index int) string {
 // still produce the right answer for an absent key and every fixture built from a struct would pass.
 // Going through the decoder is what puts the wire shape under test: cohere strips ESLint's
 // [severity, options] tuple, so what arrives is the bare object rather than a one-element array.
-func decodeNoExtraneousClassOptionsForTest(test *testing.T, raw string) any {
+func decodeNoExtraneousClassOptionsForTest(test *testing.T, raw string) NoExtraneousClassOptions {
 	test.Helper()
 	decoded, decodeNoExtraneousClassOptionsError := DecodeNoExtraneousClassOptions(json.RawMessage(raw))
 	if decodeNoExtraneousClassOptionsError != nil {
@@ -452,12 +452,8 @@ func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(tes
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
 			decoded := decodeNoExtraneousClassOptionsForTest(test, testCase.raw)
-			settings, isSettings := decoded.(NoExtraneousClassOptions)
-			if !isSettings {
-				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
-			}
-			if settings != testCase.want {
-				test.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
+			if decoded != testCase.want {
+				test.Errorf("decoded to %+v, wanted %+v", decoded, testCase.want)
 			}
 		})
 	}
@@ -472,8 +468,7 @@ func TestNoExtraneousClassDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFalse(tes
 func TestNoExtraneousClassFallsBackWhenHandedNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, NoExtraneousClass, noExtraneousClassFile,
-		"class Foo {}\n", nil)
+	result := rule_testing.Run(test, NoExtraneousClass, noExtraneousClassFile, "class Foo {}\n")
 	rule_testing.ExpectFindings(test, result, "empty")
 }
 
@@ -716,7 +711,7 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(
 				test,
-				rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil),
+				rule_testing.RunTyped(test, NoExtraneousClass, noExtraneousClassFile, testCase.source),
 			)
 		})
 	}
@@ -764,7 +759,7 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(
 				test,
-				rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil),
+				rule_testing.RunTyped(test, NoExtraneousClass, noExtraneousClassFile, testCase.source),
 				"empty",
 			)
 		})
