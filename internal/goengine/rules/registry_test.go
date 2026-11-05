@@ -124,7 +124,7 @@ var ruledStylecheck = []string{
 func staticcheckAnalyzers() []*analysis.Analyzer {
 	analyzers := []*analysis.Analyzer{}
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
-		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
 		analyzers = append(analyzers, wrapped.Analyzer)
@@ -278,6 +278,24 @@ func TestTypeAwareFollowsTheSyntaxOnlyTable(test *testing.T) {
 	for upstreamName := range syntaxOnly {
 		if _, found := registeredRuleNamed(rule.Namespace + upstreamName); !found {
 			test.Errorf("the syntax-only table names %q, which is not a registered rule", upstreamName)
+		}
+	}
+}
+
+// TestNoCheckDuplicatesAVetPass holds the registry to one rule per judgment: a staticcheck check that judges
+// what a vet pass judges is left out while that pass is registered. SA5009 is named, so the test cannot pass
+// by the table emptying.
+func TestNoCheckDuplicatesAVetPass(test *testing.T) {
+	test.Parallel()
+	if duplicatesOfVet["SA5009"] != "printf" {
+		test.Errorf("SA5009 is no longer recorded as printf's twin: %q", duplicatesOfVet)
+	}
+	for code, vetPass := range duplicatesOfVet {
+		if _, found := registeredRuleNamed(rule.Namespace + vetPass); !found {
+			test.Errorf("%s is left out as %s's twin, and %s is not registered", code, vetPass, vetPass)
+		}
+		if _, found := registeredRuleNamed(rule.Namespace + code); found {
+			test.Errorf("%s is registered beside %s, so one mistake would be two findings", code, vetPass)
 		}
 	}
 }

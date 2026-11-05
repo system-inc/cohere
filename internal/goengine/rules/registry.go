@@ -81,7 +81,17 @@ var stylecheckRuledOn = map[string]bool{
 // findings.
 //
 // An SA or S check staticcheck leaves off by default (its documentation's NonDefault) is left off here
-// too, until it is ruled on: at staticcheck v0.8.1 that is SA9003, an empty if or else branch.
+// too, until it is ruled on: at staticcheck v0.8.1 that is SA9003, an empty if or else branch. And a check
+// that makes the same judgment as a vet pass already registered is left out (duplicatesOfVet).
+// duplicatesOfVet names each staticcheck check that judges exactly what a registered vet pass judges, and
+// that pass. Both registered, one mistake is two findings, and turning the vet rule off in the settings, or
+// withholding it with //cohere:ignore, would leave its twin reporting the very thing the reader just
+// silenced. vet's pass is kept, since vet is what every Go programmer already runs.
+var duplicatesOfVet = map[string]string{
+	// Printf format verbs that do not match their arguments.
+	"SA5009": "printf",
+}
+
 func All() []rule.Rule {
 	registered := []rule.Rule{}
 	for _, analyzer := range vet.Suite {
@@ -90,7 +100,7 @@ func All() []rule.Rule {
 	registered = append(registered, portedRule(nilness.Analyzer, rule.OriginTools))
 	registered = append(registered, portedRule(unusedwrite.Analyzer, rule.OriginTools))
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
-		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
 		registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))

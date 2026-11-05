@@ -4,7 +4,7 @@
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"types","diagnostics":0,"files":3,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps -test, type-checked from source: N packages, 3 in the workspace"}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}
-{"kind":"lint","findings":0,"rulesRun":41,"filesWalked":3,"nodesVisited":30,"elapsedMilliseconds":0,"reusedFrom":"","rulesSilent":[],"rulesWatchedAndQuiet":41,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":"config: no CohereSettings.json beside go.work, so every house rule ran at error; put one at /project/CohereSettings.json to change that","withheldBySuppression":{},"withheldAsGenerated":{}}
+{"kind":"lint","findings":0,"rulesRun":184,"filesWalked":3,"nodesVisited":30,"elapsedMilliseconds":0,"reusedFrom":"","rulesSilent":[],"rulesWatchedAndQuiet":184,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":"config: no CohereSettings.json beside go.work, so every house rule ran at error; put one at /project/CohereSettings.json to change that","withheldBySuppression":{},"withheldAsGenerated":{}}
 {"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
 {"kind":"summary","findings":0,"complete":true,"exitCode":0}
