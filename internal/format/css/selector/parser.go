@@ -30,7 +30,11 @@ import (
 // thrownError is what a throw in upstream becomes: input.error's new Error(message), or a TypeError.
 type thrownError struct{ message string }
 
-func throwError(message string) { panic(thrownError{message}) }
+func throwError(message string) {
+	// Invariant: every throw happens under Parse, whose deferred recover turns a thrownError into the
+	// returned error, so this panic never leaves the package.
+	panic(thrownError{message})
+}
 
 // throwTypeError is V8's TypeError for reading key on undefined.
 func throwTypeError(key string) {
@@ -92,40 +96,46 @@ func (parser *parser) attribute() {
 		// end: {line: this.currToken[2], ...} when the brackets closed inside a string token.
 		throwTypeError("2")
 	}
-	attributeProperties := []any{
-		"operator", partAt(parts, 1),
-		"value", partAt(parts, 2),
+	// operator: parts[1], value: parts[2], undefined both when the text has no operator, where
+	// splitAttribute returns [text] alone.
+	attributeProperties := []any{"operator", nil, "value", nil}
+	if len(parts) > 2 {
+		attributeProperties = []any{"operator", parts[1], "value", parts[2]}
+	}
+	attributeProperties = append(attributeProperties,
 		"source", source(startingToken.at(2), startingToken.at(3), parser.currToken().at(2), parser.currToken().at(3)),
 		"sourceIndex", startingToken.at(4),
-	}
+	)
 	if len(namespace) > 1 {
-		var namespaceZero any = namespace[0]
-		if namespace[0] == "" {
-			namespaceZero = true
-		}
 		attributeProperties = append(attributeProperties, "attribute", parser.parseValue(namespace[2]))
-		attributeProperties = append(attributeProperties, "namespace", parser.parseNamespace(namespaceZero))
+		// namespace[0] || true: a bar with nothing before it is namespace true.
+		prefix := parser.parseNamespace(namespacePrefix{text: namespace[0], bare: namespace[0] == ""})
+		if prefix.bare {
+			attributeProperties = append(attributeProperties, "namespace", true)
+		} else {
+			attributeProperties = append(attributeProperties, "namespace", prefix.text)
+		}
 	} else {
 		attributeProperties = append(attributeProperties, "attribute", parser.parseValue(parts[0]))
 	}
 	attr := newSelectorNode(typeAttribute, attributeProperties...)
 
-	if partTwo, _ := partAt(parts, 2).(string); partTwo != "" {
-		insensitive := splitInsensitive(partTwo)
+	if len(parts) > 2 && parts[2] != "" {
+		insensitive := splitInsensitive(parts[2])
 		trimmedValue := jsTrim(insensitive[0])
 		attr.Set("value", insensitive[0])
 		if len(insensitive) > 1 && insensitive[1] != "" {
 			attr.Set("insensitive", true)
-			rawsOf(attr)["insensitive"] = insensitive[1]
+			setRaw(attr, "insensitive", insensitive[1])
 		}
 		attr.Set("quoted", strings.HasPrefix(trimmedValue, "'") || strings.HasPrefix(trimmedValue, "\""))
 		if attr.Bool("quoted") {
-			rawsOf(attr)["unquoted"] = jsSliceOneFromEach(trimmedValue)
+			setRaw(attr, "unquoted", jsSliceOneFromEach(trimmedValue))
 		} else {
-			rawsOf(attr)["unquoted"] = trimmedValue
+			setRaw(attr, "unquoted", trimmedValue)
 		}
 	}
-	parser.newNode(attr, nil)
+	parser.newNode(attr, namespacePrefix{})
 	parser.position++
 }
 
@@ -147,14 +157,14 @@ func (parser *parser) combinator() {
 		parser.currToken() != nil &&
 		(parser.currToken().kind == "space" || parser.currToken().kind == "combinator") {
 		if parser.nextToken() != nil && parser.nextToken().kind == "combinator" {
-			spacesOf(node)["before"] = parser.parseSpace(parser.currToken().value, "")
-			sourceEdgeOf(node, "start")["line"] = parser.nextToken().at(2)
-			sourceEdgeOf(node, "start")["column"] = parser.nextToken().at(3)
-			sourceEdgeOf(node, "end")["column"] = parser.nextToken().at(3)
-			sourceEdgeOf(node, "end")["line"] = parser.nextToken().at(2)
+			setSpace(node, "before", parser.parseSpace(parser.currToken().value, ""))
+			setSourceEdge(node, "start", "line", parser.nextToken().at(2))
+			setSourceEdge(node, "start", "column", parser.nextToken().at(3))
+			setSourceEdge(node, "end", "column", parser.nextToken().at(3))
+			setSourceEdge(node, "end", "line", parser.nextToken().at(2))
 			node.Set("sourceIndex", parser.nextToken().at(4))
 		} else if parser.prevToken() != nil && parser.prevToken().kind == "combinator" {
-			spacesOf(node)["after"] = parser.parseSpace(parser.currToken().value, "")
+			setSpace(node, "after", parser.parseSpace(parser.currToken().value, ""))
 		} else if parser.currToken().kind == "combinator" {
 			node.Set("value", parser.currToken().value)
 		} else if parser.currToken().kind == "space" {
@@ -162,7 +172,7 @@ func (parser *parser) combinator() {
 		}
 		parser.position++
 	}
-	parser.newNode(node, nil)
+	parser.newNode(node, namespacePrefix{})
 }
 
 func (parser *parser) comma() {
@@ -187,7 +197,7 @@ func (parser *parser) comment() {
 		"sourceIndex",
 		parser.currToken().at(6),
 	)
-	parser.newNode(node, nil)
+	parser.newNode(node, namespacePrefix{})
 	parser.position++
 }
 
@@ -209,9 +219,9 @@ func (parser *parser) missingSquareBracket() {
 
 func (parser *parser) namespace() {
 	// this.prevToken && this.prevToken[1] || true: a token's value is never empty.
-	var before any = true
+	before := namespacePrefix{bare: true}
 	if parser.prevToken() != nil && parser.prevToken().value != "" {
-		before = parser.prevToken().value
+		before = namespacePrefix{text: parser.prevToken().value}
 	}
 	if parser.nextToken() == nil {
 		throwTypeError("0")
@@ -226,6 +236,8 @@ func (parser *parser) namespace() {
 		return
 	}
 	// Upstream returns here without consuming the bar, and every caller comes straight back to it.
+	// Invariant: Parse's deferred recover turns loopsForever into ErrLoopsForever, so this panic never
+	// leaves the package.
 	panic(loopsForever{})
 }
 
@@ -238,7 +250,7 @@ func (parser *parser) nesting() {
 		source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(2), parser.currToken().at(3)),
 		"sourceIndex",
 		parser.currToken().at(4),
-	), nil)
+	), namespacePrefix{})
 	parser.position++
 }
 
@@ -261,9 +273,8 @@ func (parser *parser) parentheses() {
 			if balanced != 0 {
 				parser.parse(false)
 			} else {
-				end := sourceEdgeOf(parser.parents[selector], "end")
-				end["line"] = parser.currToken().at(2)
-				end["column"] = parser.currToken().at(3)
+				setSourceEdge(parser.parents[selector], "end", "line", parser.currToken().at(2))
+				setSourceEdge(parser.parents[selector], "end", "column", parser.currToken().at(3))
 				parser.position++
 			}
 		}
@@ -306,19 +317,19 @@ func (parser *parser) pseudo() {
 		return
 	}
 	if parser.currToken().kind == "word" {
-		parser.splitWord(nil, func(first string, length int) {
+		parser.splitWord(namespacePrefix{}, func(first string, length int) {
 			pseudoString += first
+			// currToken may be a space token here (see token.loose): its [4] is its pos, and its [5] is
+			// undefined.
+			endColumn, hasEndColumn := parser.currToken().loose(5)
+			pseudoSource := source(startingToken.at(2), startingToken.at(3), parser.currToken().at(4), endColumn)
+			pseudoSource.endColumnUndefined = !hasEndColumn
 			pseudo := newSelectorNode(typePseudo,
 				"value", pseudoString,
-				"source", source(
-					startingToken.at(2),
-					startingToken.at(3),
-					parser.currToken().loose(4),
-					parser.currToken().loose(5),
-				),
+				"source", pseudoSource,
 				"sourceIndex", startingToken.at(4),
 			)
-			parser.newNode(pseudo, nil)
+			parser.newNode(pseudo, namespacePrefix{})
 			if length > 1 && parser.nextToken() != nil && parser.nextToken().kind == "(" {
 				parser.error("Misplaced parenthesis.")
 			}
@@ -341,7 +352,7 @@ func (parser *parser) space() {
 		if last == nil {
 			throwTypeError("spaces")
 		}
-		spacesOf(last)["after"] = parser.parseSpace(token.value, "")
+		setSpace(last, "after", parser.parseSpace(token.value, ""))
 		parser.position++
 	} else {
 		parser.combinator()
@@ -354,11 +365,11 @@ func (parser *parser) string() {
 		"value", parser.currToken().value,
 		"source", source(token.at(2), token.at(3), token.at(4), token.at(5)),
 		"sourceIndex", token.at(6),
-	), nil)
+	), namespacePrefix{})
 	parser.position++
 }
 
-func (parser *parser) universal(namespace any) {
+func (parser *parser) universal(namespace namespacePrefix) {
 	nextToken := parser.nextToken()
 	if nextToken != nil && nextToken.value == "|" {
 		parser.position++
@@ -377,7 +388,7 @@ func (parser *parser) universal(namespace any) {
 	parser.position++
 }
 
-func (parser *parser) splitWord(namespace any, firstCallback func(first string, length int)) {
+func (parser *parser) splitWord(namespace namespacePrefix, firstCallback func(first string, length int)) {
 	nextToken := parser.nextToken()
 	word := parser.currToken().value
 	for nextToken != nil && nextToken.kind == "word" {
@@ -419,39 +430,40 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 			firstCallback(unitsToWTF8(value), len(indices))
 			continue
 		}
+		// currToken may be a space token here (see token.loose), which has a [2], [3] and [4] (its pos) and
+		// no [6]: undefined plus a number is NaN, which upstream stores as the sourceIndex like any number.
 		currToken := parser.currToken()
-		nodeSource := source(
-			currToken.loose(2),
-			jsAdd(currToken.loose(3), ind),
-			currToken.loose(4),
-			jsAdd(currToken.loose(3), index-1),
-		)
+		nodeSource := source(currToken.at(2), currToken.at(3)+ind, currToken.at(4), currToken.at(3)+index-1)
+		position, hasPosition := currToken.loose(6)
 		var node *estree.Node
 		if containsInt(hasClass, ind) {
 			node = newSelectorNode(typeClass,
 				"value", unitsToWTF8(value[1:]),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
+				"sourceIndex", position+indices[indexIndex],
 			)
 		} else if containsInt(hasID, ind) {
 			node = newSelectorNode(typeID,
 				"value", unitsToWTF8(value[1:]),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
+				"sourceIndex", position+indices[indexIndex],
 			)
 		} else {
 			node = newSelectorNode(typeTag,
 				"value", unitsToWTF8(value),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
+				"sourceIndex", position+indices[indexIndex],
 			)
+		}
+		if !hasPosition {
+			node.Set("sourceIndex", math.NaN())
 		}
 		parser.newNode(node, namespace)
 	}
 	parser.position++
 }
 
-func (parser *parser) word(namespace any) {
+func (parser *parser) word(namespace namespacePrefix) {
 	nextToken := parser.nextToken()
 	if nextToken != nil && nextToken.value == "|" {
 		parser.position++
@@ -485,7 +497,7 @@ func (parser *parser) parse(throwOnParenthesis bool) {
 	case "]":
 		parser.missingSquareBracket()
 	case "at-word", "word":
-		parser.word(nil)
+		parser.word(namespacePrefix{})
 	case ":":
 		parser.pseudo()
 	case ";":
@@ -493,7 +505,7 @@ func (parser *parser) parse(throwOnParenthesis bool) {
 	case ",":
 		parser.comma()
 	case "*":
-		parser.universal(nil)
+		parser.universal(namespacePrefix{})
 	case "&":
 		parser.nesting()
 	case "combinator":
@@ -507,8 +519,22 @@ func (parser *parser) parse(throwOnParenthesis bool) {
  * Helpers
  */
 
+// namespacePrefix is the namespace a word, universal or attribute carries, in upstream's
+// `this.prevToken && this.prevToken[1] || true`: the text before the bar, or bare (namespace true) for a
+// bar with nothing before it. The zero value is no namespace, undefined upstream.
+type namespacePrefix struct {
+	text string
+	bare bool
+}
+
+// present is upstream's `if (namespace)`: true and a non-empty text are truthy, and a namespace that is
+// not bare always has text.
+func (namespace namespacePrefix) present() bool {
+	return namespace.bare || namespace.text != ""
+}
+
 // parseNamespace returns namespace: its lossy trim never runs (see the file comment).
-func (parser *parser) parseNamespace(namespace any) any {
+func (parser *parser) parseNamespace(namespace namespacePrefix) namespacePrefix {
 	return namespace
 }
 
@@ -527,26 +553,20 @@ func (parser *parser) parseParenthesisToken(token *token) string {
 	return token.value
 }
 
-func (parser *parser) newNode(node *estree.Node, namespace any) *estree.Node {
-	if estree.IsTruthy(namespace) {
-		node.Set("namespace", parser.parseNamespace(namespace))
+func (parser *parser) newNode(node *estree.Node, namespace namespacePrefix) *estree.Node {
+	if namespace.present() {
+		prefix := parser.parseNamespace(namespace)
+		if prefix.bare {
+			node.Set("namespace", true)
+		} else {
+			node.Set("namespace", prefix.text)
+		}
 	}
 	if parser.spaces != "" {
-		spacesOf(node)["before"] = parser.spaces
+		setSpace(node, "before", parser.spaces)
 		parser.spaces = ""
 	}
 	return parser.append(parser.current, node)
-}
-
-// sourceEdgeOf is node.source.start or node.source.end, the {line, column} object the parser moves.
-func sourceEdgeOf(node *estree.Node, edge string) map[string]any {
-	position, isMap := sourceOf(node)[edge].(map[string]any)
-	if !isMap {
-		// Invariant: the parser moves an edge only on a combinator or pseudo it built with source(),
-		// which sets both edges to a map; Parse recovers the panic into an error.
-		panic("css selector parser: node.source." + edge + " is not a {line, column} object")
-	}
-	return position
 }
 
 // currToken, nextToken and prevToken are upstream's getters, nil past either end of the tokens.
@@ -611,14 +631,6 @@ func splitInsensitive(text string) []string {
 	return []string{text[:start], text[start:], ""}
 }
 
-// partAt is parts[index], nil where JavaScript reads undefined past the end.
-func partAt(parts []string, index int) any {
-	if index >= len(parts) {
-		return nil
-	}
-	return parts[index]
-}
-
 // jsIsWhitespace is JavaScript's \s and String.prototype.trim's set: WhiteSpace and LineTerminator.
 func jsIsWhitespace(character rune) bool {
 	switch character {
@@ -641,15 +653,6 @@ func jsSliceOneFromEach(text string) string {
 		return ""
 	}
 	return unitsToWTF8(units[1 : len(units)-1])
-}
-
-// jsAdd is `left + right` where left is a token field that may be undefined: undefined plus a number
-// is NaN, which upstream stores as a sourceIndex or column like any number.
-func jsAdd(left any, right int) any {
-	if value, isInt := left.(int); isInt {
-		return value + right
-	}
-	return math.NaN()
 }
 
 // jsStringOf is the string a value becomes in `value + '('`: an undefined value reads "undefined".
