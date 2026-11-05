@@ -33,9 +33,13 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // not preserve.
 //
 //	valid:   function Component(props) { const x = useMemo(() => [props.a], [props.a]); return <div>{x}</div>; }
-//	valid:   function Component(props) { const cb = useCallback(() => props.a, [props.a]); return <div onClick={cb} />; }
-//	invalid: function Foo(props) { let x = []; x.push(props); const cb = useCallback(() => [x], [x]); x = makeArray(); return cb; }
-//	invalid: function Component(props) { const data = useMemo(() => { const x = []; x.push(props?.items); return x; }, [props?.items, props.cond]); return <Validate output={data} />; }
+//	valid:   function Component(props) { const cb = useCallback(() => props.a, [props.a]);
+//	         return <div onClick={cb} />; }
+//	invalid: function Foo(props) { let x = []; x.push(props); const cb = useCallback(() => [x], [x]);
+//	         x = makeArray(); return cb; }
+//	invalid: function Component(props) { const data = useMemo(() => {
+//	         const x = []; x.push(props?.items); return x; }, [props?.items, props.cond]);
+//	         return <Validate output={data} />; }
 //
 // # This is a compiler validation pass, not an abstract syntax tree walk
 //

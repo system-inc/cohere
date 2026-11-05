@@ -246,7 +246,8 @@ var Purity = rule.Rule{
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
+					// Shared with the other rules that lower this same function; see
+					// high_level_intermediate_representation.ForFunction.
 					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
@@ -275,9 +276,9 @@ func purityAnalyzeSubject(ruleContext rule.Context, function *high_level_interme
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
-	purityReportImpureCalls(ruleContext, function, true)
+	purityReportImpureCalls(ruleContext, compilationUnit, true)
 }
 
 // purityValueKind is the small abstract domain described on the rule.
@@ -447,7 +448,7 @@ func (unit *purityUnit) step(
 	report func(purityFinding),
 ) {
 	values := unit.values
-	switch value := instruction.Value.(type) {
+	switch instructionValue := instruction.Value.(type) {
 	case *high_level_intermediate_representation.LoadGlobal:
 		// Only a genuine global can be one of these. An import or a module-scope binding of the same
 		// name is a different thing and upstream models neither, which is what makes
@@ -455,11 +456,14 @@ func (unit *purityUnit) step(
 		if !unit.namesATrueGlobal(instruction.Node) {
 			return
 		}
-		if _, isImpureContainer := purityImpureBuiltins[value.Name]; isImpureContainer {
-			values[instruction.LValue.Identifier] = purityValue{Kind: purityValueContainer, CanonicalName: value.Name}
+		if _, isImpureContainer := purityImpureBuiltins[instructionValue.Name]; isImpureContainer {
+			values[instruction.LValue.Identifier] = purityValue{
+				Kind:          purityValueContainer,
+				CanonicalName: instructionValue.Name,
+			}
 			return
 		}
-		if purityGlobalContainers[value.Name] {
+		if purityGlobalContainers[instructionValue.Name] {
 			// `globalThis` itself carries no name to print; it is transparent, and the property
 			// loaded off it is what names the container.
 			values[instruction.LValue.Identifier] = purityValue{Kind: purityValueContainer}
@@ -468,61 +472,81 @@ func (unit *purityUnit) step(
 		// Not a modelled global, so this may be a binding from an enclosing function that lowering
 		// could not give a local slot. `byName` is the only link between the two, because the
 		// identifier in the child function is not the identifier in the parent.
-		if known, ok := unit.byName[value.Name]; ok {
+		if known, ok := unit.byName[instructionValue.Name]; ok {
 			values[instruction.LValue.Identifier] = known
 		}
 
 	case *high_level_intermediate_representation.PropertyLoad:
-		purityLoadProperty(function, instruction, values, value.Object, value.Property)
+		purityLoadProperty(function, instruction, values, instructionValue.Object, instructionValue.Property)
 
 	case *high_level_intermediate_representation.Destructure:
 		// `const {random} = Math;` reports upstream, so destructuring has to carry the signature
 		// the same way a property load does. The pattern names the properties taken.
-		purityDestructure(function, instruction, values, value)
+		purityDestructure(function, instruction, values, instructionValue)
 
 	case *high_level_intermediate_representation.MethodCall:
-		purityMethodCall(function, instruction, values, value, report)
-		unit.callbackArguments(function, value.Args, purityCalleeName(function, value.Property), report)
+		purityMethodCall(function, instruction, values, instructionValue, report)
+		unit.callbackArguments(
+			function,
+			instructionValue.Args,
+			purityCalleeName(function, instructionValue.Property),
+			report,
+		)
 
 	case *high_level_intermediate_representation.CallExpression:
-		unit.callExpression(function, instruction, value, report)
-		unit.callbackArguments(function, value.Args, purityCalleeIdentifierName(function, value.Callee), report)
+		unit.callExpression(function, instruction, instructionValue, report)
+		unit.callbackArguments(
+			function,
+			instructionValue.Args,
+			purityCalleeIdentifierName(function, instructionValue.Callee),
+			report,
+		)
 
 	case *high_level_intermediate_representation.FunctionExpression:
 		// Recorded but not analysed here. Analysis happens on first call, which is what keeps an
 		// uncalled arrow silent.
-		if int(value.Function) < len(function.Functions) {
+		if int(instructionValue.Function) < len(function.Functions) {
 			values[instruction.LValue.Identifier] = purityValue{
 				Kind:     purityValueCallsImpure,
-				Function: function.Functions[value.Function],
+				Function: function.Functions[instructionValue.Function],
 			}
 		}
 
 	case *high_level_intermediate_representation.StoreLocal:
-		purityCopy(values, value.Value.Identifier, value.LValue.Identifier, instruction.LValue.Identifier)
-		unit.recordByName(function, value.LValue, value.Value)
+		purityCopy(
+			values,
+			instructionValue.Value.Identifier,
+			instructionValue.LValue.Identifier,
+			instruction.LValue.Identifier,
+		)
+		unit.recordByName(function, instructionValue.LValue, instructionValue.Value)
 
 	case *high_level_intermediate_representation.LoadLocal:
-		purityCopy(values, value.Place.Identifier, instruction.LValue.Identifier)
+		purityCopy(values, instructionValue.Place.Identifier, instruction.LValue.Identifier)
 
 	case *high_level_intermediate_representation.StoreContext:
-		purityCopy(values, value.Value.Identifier, value.LValue.Identifier, instruction.LValue.Identifier)
-		unit.recordByName(function, value.LValue, value.Value)
+		purityCopy(
+			values,
+			instructionValue.Value.Identifier,
+			instructionValue.LValue.Identifier,
+			instruction.LValue.Identifier,
+		)
+		unit.recordByName(function, instructionValue.LValue, instructionValue.Value)
 
 	case *high_level_intermediate_representation.LoadContext:
 		// A read of a binding captured from an enclosing function. The identifier is the enclosing
 		// function's, because `Context` places are the parent's values threaded in, so the ordinary
 		// copy already crosses the boundary when the parent recorded that value. The name-keyed
 		// fallback covers the case where it did not, which is a binding lowering gave no local slot.
-		if !purityCopy(values, value.Place.Identifier, instruction.LValue.Identifier) {
-			unit.loadByName(function, value.Place, instruction)
+		if !purityCopy(values, instructionValue.Place.Identifier, instruction.LValue.Identifier) {
+			unit.loadByName(function, instructionValue.Place, instruction)
 		}
 
 	case *high_level_intermediate_representation.StoreGlobal:
 		// A reassignment through a global binding, which is how `let r = Math.random; r = Date.now`
 		// lowers when the checker cannot give the binding a local identity. The value still has to
 		// travel, and this is the instruction carrying it.
-		purityCopy(values, value.Value.Identifier, instruction.LValue.Identifier)
+		purityCopy(values, instructionValue.Value.Identifier, instruction.LValue.Identifier)
 	}
 }
 
@@ -648,9 +672,9 @@ func purityDestructure(
 	function *high_level_intermediate_representation.Function,
 	instruction *high_level_intermediate_representation.Instruction,
 	values map[static_single_assignment.IdentifierId]purityValue,
-	value *high_level_intermediate_representation.Destructure,
+	destructure *high_level_intermediate_representation.Destructure,
 ) {
-	container, ok := values[value.Value.Identifier]
+	container, ok := values[destructure.Value.Identifier]
 	if !ok || container.Kind != purityValueContainer || container.CanonicalName == "" {
 		return
 	}
@@ -658,7 +682,7 @@ func purityDestructure(
 	if properties == nil {
 		return
 	}
-	object, isObject := value.Pattern.(*high_level_intermediate_representation.ObjectPattern)
+	object, isObject := destructure.Pattern.(*high_level_intermediate_representation.ObjectPattern)
 	if !isObject {
 		return
 	}

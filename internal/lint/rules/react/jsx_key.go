@@ -293,25 +293,25 @@ var JsxKey = rule.Rule{
 			// let `map(x => (<A key={x} />))` pass as an element and then read the paren's attributes,
 			// which are none: 103 keyed elements reported as missing a key across ahra and www
 			// (#ge8899e).
-			node = skipParenthesesSafely(node)
-			if node == nil {
+			unwrapped := skipParenthesesSafely(node)
+			if unwrapped == nil {
 				return
 			}
-			if isJsxElementNode(node) {
-				attributes := attributesOfJsxElement(node)
+			if isJsxElementNode(unwrapped) {
+				attributes := attributesOfJsxElement(unwrapped)
 				// Case-insensitive here, unlike the collection arm. See the rule's doc comment.
 				if !hasKeyAttributeIgnoringCase(attributes) {
-					ruleContext.ReportNode(node, messageJsxKeyMissingIterKey)
+					ruleContext.ReportNode(unwrapped, messageJsxKeyMissingIterKey)
 					return
 				}
 				if settings.CheckKeyMustBeforeSpread && isKeyAfterSpread(attributes) {
 					// The element here, where the collection arm reports the container. Measured.
-					ruleContext.ReportNode(node, messageJsxKeyBeforeSpread)
+					ruleContext.ReportNode(unwrapped, messageJsxKeyBeforeSpread)
 				}
 				return
 			}
-			if settings.CheckFragmentShorthand && node.Kind == ast.KindJsxFragment {
-				ruleContext.ReportNode(node, messageJsxKeyMissingIterKeyUsePragma)
+			if settings.CheckFragmentShorthand && unwrapped.Kind == ast.KindJsxFragment {
+				ruleContext.ReportNode(unwrapped, messageJsxKeyMissingIterKeyUsePragma)
 			}
 		}
 
@@ -323,12 +323,12 @@ var JsxKey = rule.Rule{
 			// reporting cases, `invalid-14` and `invalid-15`, which are the only two in the corpus
 			// that write a paren. Measured on the installed build: every parenthesized position
 			// this rule touches reports there, including doubled parens and a parenthesized callee.
-			callback = skipParenthesesSafely(callback)
-			if !isFunctionLikeExpressionForJsxKey(callback) {
+			unwrappedCallback := skipParenthesesSafely(callback)
+			if !isFunctionLikeExpressionForJsxKey(unwrappedCallback) {
 				return
 			}
-			checkArrowFunctionWithJsx(callback, checkIteratorElement)
-			checkFunctionsBlockStatement(callback, checkIteratorElement)
+			checkArrowFunctionWithJsx(unwrappedCallback, checkIteratorElement)
+			checkFunctionsBlockStatement(unwrappedCallback, checkIteratorElement)
 		}
 
 		return rule.Listeners{
@@ -687,10 +687,10 @@ func skipParenthesesSafely(node *ast.Node) *ast.Node {
 // spells as a `JSXElement`; ours is a distinct kind, so both are named here. Omitting the
 // self-closing kind would silence every arrow returning `<App />`, which is most of the corpus.
 func isJsxElementOrFragment(node *ast.Node) bool {
-	node = skipParenthesesSafely(node)
-	return node != nil && (node.Kind == ast.KindJsxElement ||
-		node.Kind == ast.KindJsxSelfClosingElement ||
-		node.Kind == ast.KindJsxFragment)
+	unwrapped := skipParenthesesSafely(node)
+	return unwrapped != nil && (unwrapped.Kind == ast.KindJsxElement ||
+		unwrapped.Kind == ast.KindJsxSelfClosingElement ||
+		unwrapped.Kind == ast.KindJsxFragment)
 }
 
 // isJsxElementNode is `node.type === 'JSXElement'`, which excludes a fragment.
@@ -698,9 +698,9 @@ func isJsxElementOrFragment(node *ast.Node) bool {
 // `checkIteratorElement` branches on element versus fragment and does different things for each, so
 // the two predicates are separate rather than one with a flag.
 func isJsxElementNode(node *ast.Node) bool {
-	node = skipParenthesesSafely(node)
-	return node != nil &&
-		(node.Kind == ast.KindJsxElement || node.Kind == ast.KindJsxSelfClosingElement)
+	unwrapped := skipParenthesesSafely(node)
+	return unwrapped != nil &&
+		(unwrapped.Kind == ast.KindJsxElement || unwrapped.Kind == ast.KindJsxSelfClosingElement)
 }
 
 // isLogicalExpression matches `&&`, `||` and `??`, which is what espree calls a LogicalExpression.

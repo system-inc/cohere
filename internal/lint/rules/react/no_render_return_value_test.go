@@ -250,7 +250,8 @@ func TestNoRenderReturnValueSpan(test *testing.T) {
 				test.Fatalf("got %d diagnostics, want 1", len(result.Diagnostics))
 			}
 			diagnostic := result.Diagnostics[0]
-			if reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != testCase.want {
+			if reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; reported !=
+				testCase.want {
 				test.Errorf("finding covers %q, want %q", reported, testCase.want)
 			}
 		})
