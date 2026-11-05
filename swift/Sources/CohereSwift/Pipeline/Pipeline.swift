@@ -157,8 +157,7 @@ public struct Pipeline {
         let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
 
         let describeStart = Date()
-        /* Variable because a fix to project.yml generates the project again, and the rest of the run reads that one. */
-        var (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
+        let (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
         let fileSet = try FileSet.build(package: package)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
         /*
@@ -184,23 +183,6 @@ public struct Pipeline {
                 elapsed: Self.milliseconds(since: describeStart),
             )
         )
-
-        /*
-         At an Xcode root, Xcode's own answer for each target's toolchain settings, asked for only when an enabled
-         toolchain rule will read it: lint judges it, and a plain run's fix writes what it lacks into project.yml.
-         */
-        let toolchainRulesEnabled = RuleRegistry.packageRules.contains { configuration.severity(of: $0.name) != .off }
-        if let loaded = xcodeProject, toolchainRulesEnabled,
-            options.runLint || (options.proposeFixes && package.projectKind == .xcodeGen)
-        {
-            package = toolchainSettingsRead(
-                into: package,
-                project: loaded,
-                fileSet: fileSet,
-                root: root,
-                toolchain: toolchain,
-            )
-        }
 
         var complete = true
 
@@ -343,54 +325,6 @@ public struct Pipeline {
                             targetName: file.targetName,
                             targetKind: file.targetKind,
                             packageRoot: file.packageRoot,
-                        )
-                    )
-                }
-            }
-            /*
-             At an xcodegen root, the build settings the toolchain rules find missing are written into project.yml, and
-             kept only when the project generated from it again reads them as on (`XcodeSpecificationFix`). The project
-             and model the rest of the run reads are the ones generated from the spec as it now stands.
-             */
-            if options.proposeFixes, let loaded = xcodeProject, let source = xcodeSource,
-                case let .xcodeGenSpecification(specification) = source, package.xcodeBuildSettings != nil
-            {
-                let fixFileSet = fileSet
-                let fix = XcodeSpecificationFix(
-                    specification: specification,
-                    rules: RuleRegistry.packageRules.compactMap { $0 as? any XcodeSettingRule }.filter {
-                        configuration.severity(of: $0.name) != .off
-                    },
-                    reload: {
-                        let reloaded = try XcodeProject.load(
-                            source: source,
-                            root: root,
-                            scratchPath: runScratch(for: root),
-                            runner: runner,
-                        )
-                        let model = toolchainSettingsRead(
-                            into: reloaded.model,
-                            project: reloaded,
-                            fileSet: fixFileSet,
-                            root: root,
-                            toolchain: toolchain,
-                        )
-                        var project = reloaded
-                        project.model = model
-                        return (project, model)
-                    },
-                )
-                let outcome = fix.run(project: loaded, package: package)
-                xcodeProject = outcome.project
-                package = outcome.package
-                fixesApplied += outcome.applied
-                refusals.merge(outcome.refusals, uniquingKeysWith: +)
-                if outcome.changed {
-                    changedFiles.append(
-                        FixRecord.ChangedFile(
-                            file: specification.path,
-                            fixedBy: outcome.appliedByRule,
-                            formatted: false,
                         )
                     )
                 }
@@ -552,8 +486,25 @@ public struct Pipeline {
                     "\($0), since the build this run made for the typed rules failed: \(lintBuildFailure)"
                 }
             }
+            /*
+             At an Xcode root, Xcode's own answer for each target's toolchain settings, which only the toolchain rules
+             read, so it is asked for here, when one of them is enabled. Its time is in the lint phase's elapsed. Asked
+             after the build, it finds the packages that build resolved, and a run whose types bailed never asks.
+             */
+            var judged = package
+            if let loaded = xcodeProject,
+                RuleRegistry.packageRules.contains(where: { configuration.severity(of: $0.name) != .off })
+            {
+                judged = toolchainSettingsRead(
+                    into: package,
+                    project: loaded,
+                    fileSet: fileSet,
+                    root: root,
+                    toolchain: toolchain,
+                )
+            }
             let lint = await linter.run(
-                package: package,
+                package: judged,
                 manifests: await manifests(of: package),
                 files: parsed.files,
                 reusable: reusableFindings,
@@ -629,7 +580,8 @@ public struct Pipeline {
     /*
      The model with Xcode's answer for each owned target's toolchain settings (`XcodeBuildSettings`), read through the
      invocation the types phase builds with, so it resolves and writes exactly where that build does, and findings
-     about a target point at its line in the project's definition.
+     about a target point at its line in the project's definition. At an xcodegen root the spec's text goes with it, for
+     the edit a finding suggests; a committed project file is never offered one.
      */
     private func toolchainSettingsRead(
         into package: PackageModel,
@@ -647,13 +599,19 @@ public struct Pipeline {
             toolchain: toolchain,
             runner: runner,
         )
-        let definitionText = (try? String(contentsOf: project.definition, encoding: .utf8)) ?? ""
+        let definitionText = try? String(contentsOf: project.definition, encoding: .utf8)
+        let isSpecification = package.projectKind == .xcodeGen
         let targetLines =
-            package.projectKind == .xcodeGen
-            ? XcodeGenSpecification(text: definitionText).targetLines
-            : XcodeBuildSettings.targetLines(inProjectFile: definitionText, targets: project.projectFile.targets)
-        return XcodeBuildSettings.read(phase: phase, definition: project.definition, targetLines: targetLines)
-            .applied(to: package)
+            isSpecification
+            ? XcodeGenSpecification(text: definitionText ?? "").targetLines
+            : XcodeBuildSettings.targetLines(inProjectFile: definitionText ?? "", targets: project.projectFile.targets)
+        return XcodeBuildSettings.read(
+            phase: phase,
+            definition: project.definition,
+            targetLines: targetLines,
+            specification: isSpecification ? definitionText : nil,
+        )
+        .applied(to: package)
     }
 
     /* The unused phase of a run cut off before it: not reached when it was asked for, not requested otherwise. */

@@ -23,9 +23,11 @@ import SwiftSyntax
  mean nothing to it.
 
  At an Xcode root a feature is on when every configuration turns it on, by its build setting or by
- `-enable-upcoming-feature` in `OTHER_SWIFT_FLAGS` (`XcodeBuildSettings`), and the advice is the build setting.
+ `-enable-upcoming-feature` in `OTHER_SWIFT_FLAGS` (`XcodeBuildSettings`), and the advice is the build setting,
+ with the edit to project.yml that sets it offered as a suggestion and never applied: turning it on is migration
+ work, and a fix would leave a build that may not compile.
  */
-public struct ToolchainRequireUpcomingFeatures: XcodeSettingRule {
+public struct ToolchainRequireUpcomingFeatures: PackageRule {
     public let name = "cohere-swift/toolchain-require-upcoming-features"
     public let origin = RuleOrigin.house
     public let upstreamName: String? = nil
@@ -49,6 +51,7 @@ public struct ToolchainRequireUpcomingFeatures: XcodeSettingRule {
         target.kind != "plugin" && target.kind != "macro" && !target.sources.isEmpty
     }
 
+    /* The build settings `target` lacks, as project.yml spells them; empty when it passes or is not this rule's to judge. */
     func xcodeSettingsMissing(for target: PackageModel.Target) -> [XcodeGenSpecification.Setting] {
         guard Self.judges(target) else { return [] }
         return Self.required.filter { !target.upcomingFeatures.contains($0.feature) }.compactMap { required in
@@ -75,7 +78,8 @@ public struct ToolchainRequireUpcomingFeatures: XcodeSettingRule {
                         "\(required.feature) in \(configurations.map(XcodeBuildSettings.listed) ?? "every configuration")"
                 }
                 let keys = xcodeSettingsMissing(for: target).map(\.key)
-                return settings.finding(rule: name, target: target.name) { lineFound in
+                return settings.finding(rule: name, target: target.name, missing: xcodeSettingsMissing(for: target)) {
+                    lineFound in
                     RuleMessages.ToolchainRequireUpcomingFeatures.upcomingFeatureMissingInXcode(
                         target: target.name,
                         features: features.joined(separator: " and "),

@@ -59,17 +59,24 @@ public struct XcodeBuildSettings: Equatable, Sendable {
     public var targets: [String: [String: Configuration]]
     /* Each target of ours whose settings could not be read, to why. */
     public var unchecked: [String: String]
+    /*
+     The spec's text at an xcodegen root, which a finding's suggestion edits (`XcodeGenSpecification`). Nil for a
+     committed project, whose project file is never offered an edit.
+     */
+    public var specification: String?
 
     public init(
         definition: URL,
         targetLines: [String: Int],
         targets: [String: [String: Configuration]],
         unchecked: [String: String],
+        specification: String? = nil,
     ) {
         self.definition = definition
         self.targetLines = targetLines
         self.targets = targets
         self.unchecked = unchecked
+        self.specification = specification
     }
 
     /* The upcoming features the rules judge, by the build setting Xcode turns each on with. */
@@ -167,14 +174,31 @@ public struct XcodeBuildSettings: Equatable, Sendable {
         definition.lastPathComponent
     }
 
-    /* A finding about `target` at its line in the definition, or at line 1 when that line was not found, which `message` is told so it can say so. */
+    /*
+     A finding about `target` at its line in the definition, or at line 1 when that line was not found, which `message`
+     is told so it can say so. At an xcodegen root it carries, as a suggestion and never a fix, the edit to project.yml
+     that writes `missing` into the target's base settings, when that edit is one `XcodeGenSpecification` can make.
+     */
     func finding(
         rule: String,
         target: String,
+        missing: [XcodeGenSpecification.Setting],
         message: (_ lineFound: Bool) -> RuleMessages.Message,
     ) -> FindingRecord {
         let line = targetLines[target]
         let said = message(line != nil)
+        var suggestions: [FindingRecord.Suggestion] = []
+        if let specification,
+            case let .success(edit) = XcodeGenSpecification(text: specification).suggestedEdit(missing, to: target)
+        {
+            let written = missing.map { "\($0.key): \($0.value)" }.joined(separator: ", ")
+            suggestions.append(
+                FindingRecord.Suggestion(
+                    message: "Write \(written) into \(target)'s base settings in project.yml",
+                    fixes: [edit],
+                )
+            )
+        }
         return FindingRecord(
             source: .rule,
             file: definition.path,
@@ -184,6 +208,7 @@ public struct XcodeBuildSettings: Equatable, Sendable {
             rule: rule,
             messageId: said.id,
             message: said.text,
+            suggestions: suggestions,
         )
     }
 
@@ -196,8 +221,7 @@ public struct XcodeBuildSettings: Equatable, Sendable {
     /*
      Each target's line in a committed project file: the line that opens its object, its identifier, then its name in
      a comment, then `= {`. The identifier also appears in every list that refers to the target, but only that line
-     opens it. A target
-     whose line is not found is absent, and its findings point at line 1 and say so.
+     opens it. A target whose line is not found is absent, and its findings point at line 1 and say so.
      */
     static func targetLines(inProjectFile text: String, targets: [XcodeProjectFile.Target]) -> [String: Int] {
         let identifiers = Dictionary(
@@ -229,12 +253,14 @@ public struct XcodeBuildSettings: Equatable, Sendable {
     /*
      Each owned target's settings, read through `phase`'s invocation, in every configuration the project file gives
      it, or the reason it is unchecked. A target the build plan does not build (no platform) is unchecked for the
-     reason the types record gives. `definition` and `targetLines` are where findings point (`Pipeline`).
+     reason the types record gives. `definition` and `targetLines` are where findings point, and `specification` is
+     the spec's text a suggestion edits (`Pipeline`).
      */
     static func read(
         phase: XcodeTypesPhase,
         definition: URL,
         targetLines: [String: Int],
+        specification: String?,
     ) -> XcodeBuildSettings {
         let plan = phase.buildPlan
         var unchecked = Dictionary(
@@ -246,6 +272,7 @@ public struct XcodeBuildSettings: Equatable, Sendable {
             targetLines: targetLines,
             targets: [:],
             unchecked: [:],
+            specification: specification,
         )
         var builds: [XcodeTypesPhase.Build] = []
         for build in plan.builds where !builds.contains(where: { $0.target == build.target }) {

@@ -1,23 +1,27 @@
 import Foundation
 
 /*
- The few lines of an xcodegen spec a toolchain finding points at and its fix writes: each target's line under the
- top-level `targets:`, and the target's `settings:` map, where a build setting is added.
+ The few lines of an xcodegen spec a toolchain finding points at and its suggestion edits: each target's line under
+ the top-level `targets:`, and the target's `settings:` map, where a build setting is added.
 
- Read from the text, line by line, rather than through a YAML parser, because the fix must leave every other byte
+ The edit is offered as a suggestion and never applied. Turning Swift 6, an upcoming feature or strict memory safety
+ on is migration work: on CapturePhone it left 20 type errors, and strict memory safety on presence's packages was
+ 2,103 sites. A fix that writes a build that no longer compiles is worse than none, which is also why the same rules
+ offer no fix in a Package.swift.
+
+ Read from the text, line by line, rather than through a YAML parser, because the edit must leave every other byte
  as it was, comments and order included, and a parser's printer would rewrite the file. So this reads only the
  plain block shape xcodegen's own examples are written in, and refuses the rest: a target or a settings map written
  as a flow map (`{ ... }`), an anchor or an alias (`&`, `*`), a merge key (`<<`), a `groups:` preset, a tab in the
- indentation, a carriage return. A refusal is never a guess; the finding stands with no fix.
+ indentation, a carriage return. A refusal is never a guess; the finding stands with no suggestion.
 
  How xcodegen reads a target's settings decides where a key goes (ProjectSpec.md, `Settings`): a map holding
  `base`, `configs` or `groups` is the structured form, whose `base` applies to every configuration, and any other
  map is itself the base. So a key is added under `base:` in the structured form, creating it when only `configs`
  is there, and straight into a plain map; a target with no `settings:` gets `settings:` and `base:`. A key already
- there has its value replaced, since YAML refuses a key written twice.
-
- Nothing here proves the edit did what it meant. The fix phase regenerates the project from the edited spec and asks
- Xcode again (`XcodeSpecificationFix`), and the spec is put back unless every setting it wrote reads as on.
+ there has its value replaced, since YAML refuses a key written twice. A key one of the target's own `configs:`
+ sets to another value is resolved after `base`, so writing it in `base` would change nothing there, and no edit is
+ offered; one that sets the same value already agrees.
  */
 struct XcodeGenSpecification {
     /* One build setting as the spec spells it: `SWIFT_VERSION` and `"6.0"`, or a feature's key and `YES`. */
@@ -26,22 +30,18 @@ struct XcodeGenSpecification {
         var value: String
     }
 
-    /* Why a target's settings were not written, in the words the fix record counts refusals by. */
-    struct Refusal: Error, Equatable {
-        var reason: String
-
-        static let targetNotFound = Refusal(
-            reason:
-                "the target was not found under targets: in project.yml (it may come from an included file), so its build settings were not written"
-        )
-        static let notPlain = Refusal(
-            reason:
-                "the target's settings in project.yml are not a plain map (a preset group, an anchor, an alias or a flow map), so its build settings were not written"
-        )
-        static let unreadable = Refusal(
-            reason:
-                "project.yml holds a tab in its indentation or a carriage return, which this fix does not rewrite, so no build setting was written"
-        )
+    /* Why no edit is offered for a target's settings. */
+    enum Refusal: Error, Equatable {
+        /* Not under this file's `targets:`, as a target from an included file is not. */
+        case targetNotFound
+        /* A preset group, an anchor, an alias, a merge key or a flow map. */
+        case notPlain
+        /* A tab in the indentation or a carriage return. */
+        case unreadable
+        /* One of the target's own configurations sets the key, which a key in `base` would not override. */
+        case overriddenByConfiguration
+        /* The base settings already hold every value, so something resolved after them turns it off. */
+        case alreadyWritten
     }
 
     /* One line of the spec, as read, with its indentation and, when it is a `key: value` line, its key, value and trailing comment. */
@@ -213,6 +213,26 @@ struct XcodeGenSpecification {
             return .failure(.notPlain)
         }
         let structured = settingsKeys.contains("base") || settingsKeys.contains("configs")
+        if let configsIndex = settingsBody.lines.first(where: { lines[$0].key == "configs" }) {
+            guard lines[configsIndex].value.isEmpty, let configs = children(of: configsIndex) else {
+                return .failure(.notPlain)
+            }
+            for configuration in configs.lines {
+                guard lines[configuration].value.isEmpty, let configured = children(of: configuration) else {
+                    return .failure(.notPlain)
+                }
+                /* A configuration that sets the same value already agrees; only another value would win over base. */
+                let unquoted = { (value: String) in value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'")) }
+                let overriding = settings.contains { setting in
+                    configured.lines.contains { line in
+                        lines[line].key == setting.key && unquoted(lines[line].value) != unquoted(setting.value)
+                    }
+                }
+                if overriding {
+                    return .failure(.overriddenByConfiguration)
+                }
+            }
+        }
         let mapIndex: Int
         let map: (indent: Int, lines: [Int], end: Int)
         if !structured {
@@ -249,6 +269,49 @@ struct XcodeGenSpecification {
         }
         edited.insert(contentsOf: inserted, at: mapIndex + 1)
         return .success(rejoined(edited))
+    }
+
+    /*
+     The edit a suggestion carries for `settings` in `target`: the smallest replacement, as UTF-8 byte offsets into
+     the spec as read, that turns it into the text `adding` writes, so applying it touches only the lines it adds or
+     changes.
+     */
+    func suggestedEdit(_ settings: [Setting], to target: String) -> Result<FindingRecord.Edit, Refusal> {
+        let edited: String
+        switch adding(settings, to: target) {
+            case let .success(written):
+                edited = written
+            case let .failure(refusal):
+                return .failure(refusal)
+        }
+        let before = Array(rejoined(lines.map(\.raw)).utf8)
+        let after = Array(edited.utf8)
+        guard before != after else { return .failure(.alreadyWritten) }
+        var prefix = 0
+        while prefix < before.count && prefix < after.count && before[prefix] == after[prefix] {
+            prefix += 1
+        }
+        var suffix = 0
+        while suffix < before.count - prefix && suffix < after.count - prefix
+            && before[before.count - 1 - suffix] == after[after.count - 1 - suffix]
+        {
+            suffix += 1
+        }
+        /* Back to whole characters, so neither end of the edit splits a multibyte one (a continuation byte is 10xxxxxx). */
+        let isContinuation = { (byte: UInt8) in byte & 0b1100_0000 == 0b1000_0000 }
+        while prefix > 0 && prefix < before.count && isContinuation(before[prefix]) {
+            prefix -= 1
+        }
+        while suffix > 0 && isContinuation(before[before.count - suffix]) {
+            suffix -= 1
+        }
+        return .success(
+            FindingRecord.Edit(
+                start: prefix,
+                end: before.count - suffix,
+                text: String(decoding: after[prefix..<(after.count - suffix)], as: UTF8.self),
+            )
+        )
     }
 
     /* The lines as text again, each untouched line exactly as it was read. */

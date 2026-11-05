@@ -1161,13 +1161,55 @@ struct XcodeProjectPipelineTests {
                 "App does not compile under strict memory safety in Release."
             )
         )
+        /* Debug sets the same values, so base is where Release gets them, and the edit is offered. */
+        #expect(Self.suggestion(of: run, "toolchain-require-upcoming-features") != nil)
+        #expect(Self.suggestion(of: run, "toolchain-require-strict-memory-safety") != nil)
     }
 
     /*
-     A plain run writes the missing settings into the target's base settings in project.yml, keeps them because the
-     project generated from it again reads them as on, and reports the fix; the next run finds nothing to say.
+     A plain run writes nothing to project.yml: turning these settings on is migration work that may leave the build
+     failing (CapturePhone's left 20 type errors), so each finding carries the edit as a suggestion, never a fix.
      */
-    @Test func aPlainRunFixesTheSpecAndTheNextRunIsClean() async throws {
+    @Test func aPlainRunLeavesTheSpecAsItIsAndEachFindingCarriesASuggestion() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixture(
+            counter: Self.cleanCounter,
+            specification: Self.specification(appSettings: Self.toolchainOff),
+        )
+        defer { Self.remove(fixture.repository) }
+        let spec = fixture.root.appendingPathComponent("project.yml")
+        let before = try Data(contentsOf: spec)
+
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-cache"])
+
+        #expect(try Data(contentsOf: spec) == before)
+        #expect(run.toolchainFindings.count == 3, "\(run.records)")
+        let changed = run.fixRecord["changedFiles"] as? [[String: Any]] ?? []
+        #expect(!changed.contains { ($0["file"] as? String ?? "").hasSuffix("/project.yml") })
+        for finding in run.toolchainFindingRecords {
+            #expect((finding["fixes"] as? [[String: Any]] ?? []).isEmpty, "a toolchain finding carries no fix")
+            let suggestions = finding["suggestions"] as? [[String: Any]] ?? []
+            #expect(suggestions.count == 1, "\(finding)")
+            #expect((suggestions.first?["message"] as? String ?? "").hasPrefix("Write "), "\(suggestions)")
+            #expect((suggestions.first?["fixes"] as? [[String: Any]] ?? []).count == 1)
+        }
+        #expect(
+            Self.suggestion(of: run, "toolchain-require-strict-memory-safety")?["message"] as? String
+                == "Write SWIFT_STRICT_MEMORY_SAFETY: YES into App's base settings in project.yml"
+        )
+    }
+
+    /* The one suggestion `rule`'s finding carries, its prefix off. */
+    static func suggestion(of run: Run, _ rule: String) -> [String: Any]? {
+        let finding = run.toolchainFindingRecords.first { $0["rule"] as? String == "cohere-swift/\(rule)" }
+        return (finding?["suggestions"] as? [[String: Any]])?.first
+    }
+
+    /*
+     The suggestions are right: each one, applied to project.yml by hand, one run after another, turns its setting on,
+     until a run finds nothing and every toolchain rule judged the target.
+     */
+    @Test func theSuggestedEditsTurnTheSettingsOn() async throws {
         try Self.requireXcodegen()
         let fixture = try Self.fixture(
             counter: Self.cleanCounter,
@@ -1176,59 +1218,59 @@ struct XcodeProjectPipelineTests {
         defer { Self.remove(fixture.repository) }
         let spec = fixture.root.appendingPathComponent("project.yml")
 
-        let fixed = try await Self.run(root: fixture.root, arguments: [])
+        var applied: [String] = []
+        var run = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
+        while let finding = run.toolchainFindingRecords.first, applied.count < 3 {
+            let suggestion = try #require((finding["suggestions"] as? [[String: Any]])?.first, "\(finding)")
+            let edits = try (suggestion["fixes"] as? [[String: Any]] ?? []).map { edit in
+                FindingRecord.Edit(
+                    start: try #require(edit["start"] as? Int),
+                    end: try #require(edit["end"] as? Int),
+                    text: try #require(edit["text"] as? String),
+                )
+            }
+            let text = try String(contentsOf: spec, encoding: .utf8)
+            let edited = FixApplier.apply(edits.map { FixApplier.Proposal(rule: "by hand", edit: $0) }, to: text)
+            #expect(edited.applied == edits.count)
+            try edited.text.write(to: spec, atomically: true, encoding: .utf8)
+            applied.append(finding["rule"] as? String ?? "")
+            run = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
+        }
 
-        #expect(fixed.toolchainFindings.isEmpty, "\(fixed.toolchainFindingRecords) \(fixed.fixRecord)")
-        let changed = fixed.fixRecord["changedFiles"] as? [[String: Any]] ?? []
-        let specChange = changed.first { ($0["file"] as? String ?? "").hasSuffix("/project.yml") }
-        #expect(
-            specChange?["fixedBy"] as? [String: Int]
-                == Dictionary(uniqueKeysWithValues: Self.toolchainRules.map { ($0, 1) }),
-            "\(fixed.fixRecord)",
-        )
+        #expect(applied == Self.toolchainRules, "each rule's suggestion, applied, cleared that rule")
+        #expect(run.toolchainFindings.isEmpty, "\(run.toolchainFindingRecords)")
+        #expect(Set(run.rulesSilent).isDisjoint(with: Self.toolchainRules), "\(run.rulesSilent)")
         #expect(
             try String(contentsOf: spec, encoding: .utf8)
                 == Self.specification(
                     appSettings: """
                               base:
+                                SWIFT_STRICT_MEMORY_SAFETY: YES
                                 SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
                                 SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
-                                SWIFT_STRICT_MEMORY_SAFETY: YES
                                 SWIFT_VERSION: "6.0"
 
                         """
                 )
         )
-
-        let next = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
-        #expect(next.toolchainFindings.isEmpty, "\(next.toolchainFindingRecords)")
-        #expect(Set(next.rulesSilent).isDisjoint(with: Self.toolchainRules))
-        #expect(next.complete == true, "\(next.records)")
     }
 
     /*
-     A fix that would not take: Release turns strict memory safety off in its own settings, which a key in base cannot
-     override. The project generated from the edited spec still reads it as off, so project.yml is put back byte for
-     byte, the refusal is counted, and the finding stands.
+     Release turns strict memory safety off in its own settings, which a key in base cannot override, so the finding
+     offers no edit rather than one that would change nothing.
      */
-    @Test func aFixThatWouldNotTakeIsPutBack() async throws {
+    @Test func noSuggestionIsOfferedWhereAConfigurationWouldOverrideIt() async throws {
         try Self.requireXcodegen()
         let fixture = try Self.fixture(
             counter: Self.cleanCounter,
             specification: Self.specification(appSettings: Self.strictMemorySafetyOffInRelease),
         )
         defer { Self.remove(fixture.repository) }
-        let spec = fixture.root.appendingPathComponent("project.yml")
-        let before = try Data(contentsOf: spec)
 
-        let run = try await Self.run(root: fixture.root, arguments: [])
+        let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
 
-        #expect(try Data(contentsOf: spec) == before)
         #expect(run.toolchainFindings == ["toolchain-require-strict-memory-safety@project.yml:5"], "\(run.records)")
-        let refusals = run.fixRecord["refusalsByReason"] as? [String: Int] ?? [:]
-        #expect(refusals[XcodeSpecificationFix.notRegenerated] == 1, "\(run.fixRecord)")
-        let changed = run.fixRecord["changedFiles"] as? [[String: Any]] ?? []
-        #expect(!changed.contains { ($0["file"] as? String ?? "").hasSuffix("/project.yml") })
+        #expect(Self.suggestion(of: run, "toolchain-require-strict-memory-safety") == nil)
     }
 
     /*
@@ -1264,6 +1306,10 @@ struct XcodeProjectPipelineTests {
             "\(checked.records)",
         )
         #expect(!checked.toolchainMessage("toolchain-require-swift-6-language-mode").contains("first line"))
+        #expect(
+            checked.toolchainFindingRecords.allSatisfy { ($0["suggestions"] as? [[String: Any]] ?? []).isEmpty },
+            "a committed project file is never offered an edit",
+        )
 
         let plain = try await Self.run(root: fixture.root, arguments: ["--no-cache"])
         #expect(try Data(contentsOf: projectFile) == before)

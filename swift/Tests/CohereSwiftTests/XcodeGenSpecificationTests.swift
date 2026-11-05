@@ -169,4 +169,44 @@ struct XcodeGenSpecificationTests {
         )
         #expect(both.components(separatedBy: "SWIFT_STRICT_MEMORY_SAFETY").count == 3)
     }
+
+    /* The suggestion's edit, applied to the spec as read, is exactly the text `adding` writes, and touches only the line it adds. */
+    @Test(arguments: [
+        "    platform: iOS",
+        "    settings:\n      base:\n        SWIFT_VERSION: \"5.0\" # the old mode\n        PRODUCT_NAME: Capture",
+        "    settings:\n      PRODUCT_NAME: Capture",
+        "    name: \"Café\"",
+    ])
+    func theSuggestedEditIsTheWrittenText(body: String) throws {
+        let text = Self.spec(target: body)
+        let settings = Self.strict + [XcodeGenSpecification.Setting(key: "SWIFT_VERSION", value: "\"6.0\"")]
+        let written = try #require(Self.added(settings, to: text))
+        let edit = try XcodeGenSpecification(text: text).suggestedEdit(settings, to: "App").get()
+        let applied = FixApplier.apply([FixApplier.Proposal(rule: "suggestion", edit: edit)], to: text)
+        #expect(applied.applied == 1)
+        #expect(applied.text == written)
+        #expect(edit.end - edit.start < 60, "the edit replaces the lines it changes, not the file: \(edit)")
+    }
+
+    /*
+     A key one of the target's own configurations sets to another value is resolved after base, so a key written in
+     base would change nothing there. One that sets the same value already agrees, and base is where the rest goes.
+     */
+    @Test func aKeyAConfigurationSetsOtherwiseIsRefused() {
+        let configured =
+            "    settings:\n      base:\n        A: B\n      configs:\n        Release:\n          SWIFT_STRICT_MEMORY_SAFETY: "
+        #expect(Self.refusal(Self.spec(target: configured + "NO")) == .overriddenByConfiguration)
+        #expect(Self.refusal(Self.spec(target: configured + "YES")) == nil)
+    }
+
+    /* Base already holds the value, so something resolved after it turns it off, and there is nothing to write. */
+    @Test func aValueBaseAlreadyHoldsIsNoEdit() {
+        let text = Self.spec(target: "    settings:\n      base:\n        SWIFT_STRICT_MEMORY_SAFETY: YES")
+        guard case let .failure(refusal) = XcodeGenSpecification(text: text).suggestedEdit(Self.strict, to: "App")
+        else {
+            Issue.record("an edit that changes nothing was offered")
+            return
+        }
+        #expect(refusal == .alreadyWritten)
+    }
 }

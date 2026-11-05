@@ -16,15 +16,18 @@ import SwiftSyntax
  and macro targets, and targets with no Swift sources, are skipped for that rule's reasons.
 
  At an Xcode root it is on when every configuration turns it on, by `SWIFT_STRICT_MEMORY_SAFETY` or by
- `-strict-memory-safety` in `OTHER_SWIFT_FLAGS` (`XcodeBuildSettings`), and the advice is the build setting.
+ `-strict-memory-safety` in `OTHER_SWIFT_FLAGS` (`XcodeBuildSettings`), and the advice is the build setting, with
+ the edit to project.yml that sets it offered as a suggestion and never applied: turning it on is migration work,
+ and a fix would leave a build that may not compile.
  */
-public struct ToolchainRequireStrictMemorySafety: XcodeSettingRule {
+public struct ToolchainRequireStrictMemorySafety: PackageRule {
     public let name = "cohere-swift/toolchain-require-strict-memory-safety"
     public let origin = RuleOrigin.house
     public let upstreamName: String? = nil
 
     public init() {}
 
+    /* The build settings `target` lacks, as project.yml spells them; empty when it passes or is not this rule's to judge. */
     func xcodeSettingsMissing(for target: PackageModel.Target) -> [XcodeGenSpecification.Setting] {
         guard ToolchainRequireUpcomingFeatures.judges(target), !target.strictMemorySafety else { return [] }
         return [XcodeGenSpecification.Setting(key: "SWIFT_STRICT_MEMORY_SAFETY", value: "YES")]
@@ -34,7 +37,8 @@ public struct ToolchainRequireStrictMemorySafety: XcodeSettingRule {
         if let settings = package.xcodeBuildSettings {
             return package.toolchainTargets.filter { !xcodeSettingsMissing(for: $0).isEmpty }.map { target in
                 let off = settings.configurations(of: target.name, where: { !$0.strictMemorySafety })
-                return settings.finding(rule: name, target: target.name) { lineFound in
+                return settings.finding(rule: name, target: target.name, missing: xcodeSettingsMissing(for: target)) {
+                    lineFound in
                     RuleMessages.ToolchainRequireStrictMemorySafety.strictMemorySafetyMissingInXcode(
                         target: target.name,
                         configurations: off.map { .some(configurations: XcodeBuildSettings.listed($0)) } ?? .every,
