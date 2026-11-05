@@ -47,7 +47,12 @@ var allowedRuleImports = map[string]bool{
 	// The SQL reading nexus/security-no-interpolated-sql-string and its Go engine twin share: which holes in SQL
 	// text sit inside a quoted value or bare after a comparison. It moved out of package nexus so the Go rule reads
 	// SQL as the TypeScript one does without linking the TypeScript checker, the move internal/shouting made. It
-	// imports only `strings`, so it is a leaf by its imports, and it changes only when the shared reading does.
+	// imports only `strings`, and `go list -deps` names nothing past the standard library, so it is a leaf by its
+	// imports, and it changes only when the shared reading does. Measured on 2026-11-05, three warm rounds each of
+	// `go build ./internal/lint/registry` after a one-comment edit, under a load average of about 19 to 20 (31 over
+	// fifteen minutes): editing internal/sqltext rebuilds in 0.12 to 0.13s, and `go build -v` shows it is the only
+	// package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule that imports it,
+	// 2.57 to 2.76s.
 	"github.com/system-inc/cohere/internal/sqltext": true,
 }
 
