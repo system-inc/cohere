@@ -46,10 +46,11 @@ func removeUnderscores(text []uint16) []uint16 {
 // yaml11IntResolve is int.js's intResolve. intAsBigInt is never set on this path.
 func yaml11IntResolve(value []uint16, offset int, radix int) float64 {
 	sign := characterAt(value, 0)
+	digitsOffset := offset
 	if sign == '-' || sign == '+' {
-		offset++
+		digitsOffset++
 	}
-	digits := removeUnderscores(substring(value, offset, len(value)))
+	digits := removeUnderscores(substring(value, digitsOffset, len(value)))
 	number := parseInt(digits, radix)
 	if sign == '-' {
 		return -1 * number
@@ -207,48 +208,52 @@ func nodeBase64Decode(text []uint16) Binary {
 // base64DecodeGroupSlow is nbytes' Base64DecodeGroupSlow: one group of four alphabet characters,
 // skipping others, writing as many bytes as fit. It returns false to stop decoding.
 func base64DecodeGroupSlow(destination []byte, destinationLength int, text []uint16, index int) ([]byte, int, bool) {
-	var hi, lo byte
+	var hi byte
+	var lo byte
+	// readIndex walks the text forward from index, and decoded grows from destination.
+	readIndex := index
+	decoded := destination
 	// next is the V macro's loop: the next alphabet character, false at = or the end.
 	next := func() bool {
 		for {
-			character := byte(text[index])
-			lo = unbase64(text[index])
-			index++
+			character := byte(text[readIndex])
+			lo = unbase64(text[readIndex])
+			readIndex++
 			if lo < 64 {
 				return true
 			}
-			if character == '=' || index >= len(text) {
+			if character == '=' || readIndex >= len(text) {
 				return false
 			}
 		}
 	}
 	// after is the V macro's tail: false at the end of the input or of the buffer.
 	after := func() bool {
-		if index >= len(text) || len(destination) >= destinationLength {
+		if readIndex >= len(text) || len(decoded) >= destinationLength {
 			return false
 		}
 		hi = lo
 		return true
 	}
 	if !next() || !after() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
 	if !next() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x3F)<<2|(lo&0x30)>>4)
+	decoded = append(decoded, (hi&0x3F)<<2|(lo&0x30)>>4)
 	if !after() || !next() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x0F)<<4|(lo&0x3C)>>2)
+	decoded = append(decoded, (hi&0x0F)<<4|(lo&0x3C)>>2)
 	if !after() || !next() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x03)<<6|lo&0x3F)
+	decoded = append(decoded, (hi&0x03)<<6|lo&0x3F)
 	if !after() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	return destination, index, true
+	return decoded, readIndex, true
 }
 
 // unbase64 is nbytes' table lookup on a code unit's low byte: 0 to 63 for the standard and URL-safe
@@ -432,6 +437,13 @@ var floatTimeTag = &Tag{
 	},
 }
 
+var timestampRegexp = regexp.MustCompile(`^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})` + // YYYY-Mm-Dd
+	`(?:` + // time is optional
+	`(?:t|T|[ \t]+)` + // t | T | whitespace
+	`([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2}(\.[0-9]+)?)` + // Hh:Mm:Ss(.ss)?
+	`(?:[ \t]*(Z|[-+][012]?[0-9](?::[0-9]{2})?))?` + // Z | +5 | -03:30
+	`)?$`)
+
 var timestampTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:timestamp",
@@ -443,13 +455,6 @@ var timestampTag = &Tag{
 		return timestampResolve(value)
 	},
 }
-
-var timestampRegexp = regexp.MustCompile(`^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})` + // YYYY-Mm-Dd
-	`(?:` + // time is optional
-	`(?:t|T|[ \t]+)` + // t | T | whitespace
-	`([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2}(\.[0-9]+)?)` + // Hh:Mm:Ss(.ss)?
-	`(?:[ \t]*(Z|[-+][012]?[0-9](?::[0-9]{2})?))?` + // Z | +5 | -03:30
-	`)?$`)
 
 func timestampResolve(value []uint16) (any, error) {
 	match := timestampRegexp.FindStringSubmatch(asciiView(value))
@@ -501,11 +506,12 @@ func dateUTC(year, month, day, hour, minute, second, millisecond float64) float6
 		}
 	}
 	yearInteger := math.Trunc(year)
+	fullYear := year
 	if yearInteger >= 0 && yearInteger <= 99 {
-		year = 1900 + yearInteger
+		fullYear = 1900 + yearInteger
 	}
 	// MakeDay.
-	y, m, dt := math.Trunc(year), math.Trunc(month), math.Trunc(day)
+	y, m, dt := math.Trunc(fullYear), math.Trunc(month), math.Trunc(day)
 	ym := y + math.Floor(m/12)
 	mn := math.Mod(m, 12)
 	if mn < 0 {
@@ -519,15 +525,17 @@ func dateUTC(year, month, day, hour, minute, second, millisecond float64) float6
 
 // daysFromCivil is the number of days from 1970-01-01 to the proleptic Gregorian date.
 func daysFromCivil(year int64, month int64, day int64) float64 {
+	// civilYear counts years from March, as the algorithm does, so January and February fall in the year before.
+	civilYear := year
 	if month <= 2 {
-		year--
+		civilYear--
 	}
-	era := year
+	era := civilYear
 	if era < 0 {
 		era -= 399
 	}
 	era /= 400
-	yearOfEra := year - era*400
+	yearOfEra := civilYear - era*400
 	shifted := month + 9
 	if month > 2 {
 		shifted = month - 3

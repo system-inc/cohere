@@ -175,7 +175,7 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 		tag = composition.schema.scalarTag()
 	}
 	// `tagToken ?? token`
-	var errorSource any = token
+	errorSource := token
 	if tagToken != nil {
 		errorSource = tagToken
 	}
@@ -215,6 +215,11 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 	return scalar
 }
 
+// findScalarTagByName is upstream's: the scalar tag tagName names, the first of the schema's own tags or
+// else a known tag, and the string tag when none resolves.
+//
+// Mutates: schema a known tag it reaches is appended to schema.Tags without a test or a default, as
+// upstream pushes it, so it is there for stringifying and found by name again
 func findScalarTagByName(
 	schema *Schema,
 	value []uint16,

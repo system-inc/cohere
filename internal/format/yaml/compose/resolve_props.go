@@ -39,7 +39,12 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 	commentSep := ""
 	hasNewline := false
 	requiresSpace := false
-	var tab, anchor, tag, newlineAfterProperty, comma, found *cst.Token
+	var tab *cst.Token
+	var anchor *cst.Token
+	var tag *cst.Token
+	var newlineAfterProperty *cst.Token
+	var comma *cst.Token
+	var found *cst.Token
 	start, startSet := 0, false
 	for _, token := range tokens {
 		if requiresSpace {
@@ -202,6 +207,7 @@ type resolvedEnd struct {
 // is nil for upstream's undefined.
 func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErrorFunc) resolvedEnd {
 	comment := ""
+	endOffset := offset
 	if end != nil {
 		hasSpace := false
 		sep := ""
@@ -236,8 +242,8 @@ func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErro
 			}
 			// `offset += source.length`: a token without a source (a collection) would make this NaN
 			// upstream; the parser never ends a node with one.
-			offset += len(source)
+			endOffset += len(source)
 		}
 	}
-	return resolvedEnd{comment: comment, offset: offset}
+	return resolvedEnd{comment: comment, offset: endOffset}
 }

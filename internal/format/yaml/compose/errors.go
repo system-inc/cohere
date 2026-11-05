@@ -71,6 +71,9 @@ func javaScriptString(value any) string {
 	case string:
 		return typed
 	}
+	// Invariant: the one caller, omapTag, converts a key's value only once containsSameValueZero has
+	// found it among the earlier keys, and a MergeKey, Date or Binary is a fresh object for every scalar,
+	// found by no other, so only the four primitives above get here.
 	panic("compose: no string conversion for this value")
 }
 
@@ -88,14 +91,17 @@ func numberToString(value float64) string {
 		return "-Infinity"
 	}
 	sign := ""
+	magnitude := value
 	if value < 0 {
 		sign = "-"
-		value = -value
+		magnitude = -value
 	}
 	// d.dddde±x: the digits without the dot, and n, the decimal point's position after the first.
-	formatted := strconv.FormatFloat(value, 'e', -1, 64)
+	formatted := strconv.FormatFloat(magnitude, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(formatted, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
+	// Ignored: exponentText is the exponent strconv.FormatFloat just wrote in its 'e' format, a sign
+	// and decimal digits, which Atoi always reads.
 	exponent, _ := strconv.Atoi(exponentText)
 	n := exponent + 1
 	k := len(digits)

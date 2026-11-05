@@ -56,6 +56,8 @@ func parseInt(text []uint16, radix int) float64 {
 	}
 	var magnitude float64
 	if radix == 10 {
+		// Ignored: digits is a nonempty run of decimal digits, so the only error is the range error,
+		// whose value, +Inf, is the Infinity parseInt gives for a number that long.
 		magnitude, _ = strconv.ParseFloat(digits, 64)
 	} else {
 		integer, _ := new(big.Int).SetString(digits, radix)
@@ -110,8 +112,9 @@ func parseFloat(text []uint16) float64 {
 			end = index
 		}
 	}
-	// A huge exponent overflows to ±Infinity and a tiny one underflows to ±0, as upstream's does;
-	// strconv's range error is the same value.
+	// Ignored: the text is the decimal literal the loops above measured, so the only error is the range
+	// error, whose value is upstream's: a huge exponent overflows to ±Infinity and a tiny one underflows
+	// to ±0.
 	value, _ := strconv.ParseFloat(asciiView(text[start:end]), 64)
 	return value
 }

@@ -99,7 +99,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 	if atKey && composition.options.StringKeys && (!IsScalar(node) || !isString(node.ScalarValue) ||
 		node.Tag != "" && node.Tag != strTagName) {
 		message := "With stringKeys, all keys must be strings"
-		var source any = token
+		source := token
 		if tag != nil {
 			source = tag
 		}
@@ -207,24 +207,25 @@ func composeAlias(composition *composeContext, token *cst.Token, onError onError
 // emptyScalarPosition is upstream's with pos null: the offset after the last non-empty token before,
 // moved forward past any spaces that follow it.
 func emptyScalarPosition(offset int, before []*cst.Token) int {
+	scalarOffset := offset
 	if before != nil {
 		position := len(before)
 		for index := position - 1; index >= 0; index-- {
 			st := before[index]
 			switch st.Type {
 			case "space", "comment", "newline":
-				offset -= len(st.Source)
+				scalarOffset -= len(st.Source)
 				continue
 			}
 			// Technically, an empty scalar is immediately after the last non-empty
 			// node, but it's more useful to place it after any whitespace.
 			index++
 			for index < len(before) && before[index].Type == "space" {
-				offset += len(before[index].Source)
+				scalarOffset += len(before[index].Source)
 				index++
 			}
 			break
 		}
 	}
-	return offset
+	return scalarOffset
 }

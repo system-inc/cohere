@@ -161,6 +161,8 @@ func collectionNode(class string) Node {
 	case "YAMLOMap":
 		return Node{Kind: KindSeq, Class: class, Items: []*Node{}, Tag: omapTagName}
 	}
+	// Invariant: class is a literal in this package or a tag's NodeClass, and the four tags that set
+	// one (map, seq, omap and set) name exactly the four classes above.
 	panic("compose: unknown collection class " + class)
 }
 

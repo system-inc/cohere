@@ -34,7 +34,8 @@ import (
 // A number is written as its IEEE 754 bits, so -0, the infinities and every last bit compare exactly.
 
 // forkRoot is the Prettier fork whose node_modules the oracle imports from (internal/corpus): a skip naming
-// COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks node_modules/yaml/dist/compose/composer.js.
+// COHERE_PRETTIER_FORK when it is unset, and a failure when it is set but lacks
+// node_modules/yaml/dist/compose/composer.js.
 func forkRoot(test *testing.T) string {
 	test.Helper()
 	corpus.Resolve(test, "prettier-fork:node_modules/yaml/dist/compose/composer.js")
@@ -218,7 +219,10 @@ func portOutput(text string) (output string) {
 		}
 	}()
 	tokens, documents := composeText(text)
-	writer := &jsonWriter{ids: map[any]int{}}
+	writer := &jsonWriter{
+		tokenIdentifiers: map[*cst.Token]int{},
+		itemIdentifiers:  map[*cst.CollectionItem]int{},
+	}
 	for _, token := range tokens {
 		writer.number(token)
 	}
@@ -233,9 +237,17 @@ func portOutput(text string) (output string) {
 	return writer.builder.String()
 }
 
+// jsonWriter numbers tokens and collection items in one sequence, as the oracle's one Map does: each one's
+// number is the count of both maps before it.
 type jsonWriter struct {
-	builder strings.Builder
-	ids     map[any]int
+	builder          strings.Builder
+	tokenIdentifiers map[*cst.Token]int
+	itemIdentifiers  map[*cst.CollectionItem]int
+}
+
+// nextIdentifier is the oracle's `ids.size`.
+func (writer *jsonWriter) nextIdentifier() int {
+	return len(writer.tokenIdentifiers) + len(writer.itemIdentifiers)
 }
 
 // number numbers a token and its descendants in the oracle's order: start, value, items (each item,
@@ -244,14 +256,14 @@ func (writer *jsonWriter) number(token *cst.Token) {
 	if token == nil {
 		return
 	}
-	writer.ids[token] = len(writer.ids)
+	writer.tokenIdentifiers[token] = writer.nextIdentifier()
 	for _, each := range token.Start {
 		writer.number(each)
 	}
 	writer.number(token.FlowStart)
 	writer.number(token.Value)
 	for _, item := range token.Items {
-		writer.ids[item] = len(writer.ids)
+		writer.itemIdentifiers[item] = writer.nextIdentifier()
 		for _, each := range item.Start {
 			writer.number(each)
 		}
@@ -271,6 +283,9 @@ func (writer *jsonWriter) number(token *cst.Token) {
 
 func (writer *jsonWriter) raw(text string) { writer.builder.WriteString(text) }
 
+// key writes a field's name, with the comma every field but an object's first is preceded by.
+//
+// Mutates: first the object's own flag, cleared at its first key so every later key writes its comma
 func (writer *jsonWriter) key(first *bool, name string) {
 	if !*first {
 		writer.builder.WriteByte(',')
@@ -325,7 +340,7 @@ func (writer *jsonWriter) value(value any) {
 }
 
 func (writer *jsonWriter) srcToken(token *cst.Token) {
-	id, found := writer.ids[token]
+	id, found := writer.tokenIdentifiers[token]
 	if !found {
 		writer.text(fmt.Sprintf("foreign %s@%d", token.Type, token.Offset))
 		return
@@ -353,7 +368,7 @@ func (writer *jsonWriter) node(node *Node) {
 		writer.srcToken(node.SrcToken)
 	} else if node.SrcItem != nil {
 		writer.key(&first, "srcToken")
-		if id, found := writer.ids[node.SrcItem]; found {
+		if id, found := writer.itemIdentifiers[node.SrcItem]; found {
 			writer.text(fmt.Sprintf("#%d item", id))
 		} else {
 			writer.text("foreign item")
@@ -635,7 +650,8 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 	if root == "" {
 		test.Skip("set COHERE_YAML_CORPUS to a directory to compare every .yaml and .yml file under it")
 	}
-	var paths, texts []string
+	var paths []string
+	var texts []string
 	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
 		if pathError != nil {
 			return pathError

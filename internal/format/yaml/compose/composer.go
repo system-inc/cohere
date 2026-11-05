@@ -28,6 +28,8 @@ func getErrorPos(source any) [2]int {
 		}
 		return [2]int{src.Offset, src.Offset + 1}
 	}
+	// Invariant: every onError call in this package passes an offset, a position, a range or a token,
+	// the four cases above, as upstream's ComposeErrorHandler is only ever handed those.
 	panic("compose: no error position for this source")
 }
 
@@ -107,6 +109,10 @@ func (composer *Composer) onError(source any, code string, message string, warni
 	}
 }
 
+// decorate is upstream's: the prelude's comments go onto doc, its first item or its contents, and the
+// errors and warnings collected since the previous document go to doc.
+//
+// Mutates: doc the document being finished, completed in place as upstream's decorate completes it
 func (composer *Composer) decorate(doc *Document, afterDoc bool) {
 	comment, afterEmptyLine := parsePrelude(composer.prelude)
 	if comment != "" {

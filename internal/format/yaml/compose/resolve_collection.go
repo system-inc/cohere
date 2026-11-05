@@ -20,6 +20,10 @@ func nodeClass(tag *Tag, fallback string) string {
 
 const startColMsg = "All mapping items must start at the same column"
 
+// resolveBlockMap is upstream's: a block map token's items composed into a map of pairs.
+//
+// Mutates: composition the shared context, whose atRoot and atKey the map switches as composing descends
+// into its keys and values, as upstream switches its ComposeContext
 func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	yamlMap := composition.newCollection(nodeClass(tag, "YAMLMap"))
 	if composition.atRoot {
@@ -66,7 +70,7 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 			}
 			if keyProperties.newlineAfterProp != nil || containsNewline(key) {
 				// `key ?? start[start.length - 1]`
-				var source any = key
+				source := key
 				if key == nil {
 					source = start[len(start)-1]
 				}
@@ -179,6 +183,10 @@ func sepOrEmpty(sep []*cst.Token) []*cst.Token {
 	return sep
 }
 
+// resolveBlockSeq is upstream's: a block sequence token's items composed into a sequence.
+//
+// Mutates: composition the shared context, whose atRoot and atKey the sequence clears before composing
+// its items, as upstream clears its ComposeContext's
 func resolveBlockSeq(composition *composeContext, bs *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	seq := composition.newCollection(nodeClass(tag, "YAMLSeq"))
 	if composition.atRoot {
@@ -241,6 +249,11 @@ func isBlock(token *cst.Token) bool {
 // where upstream's try/catch around composeCollection does.
 type typeError string
 
+// resolveFlowCollection is upstream's: a flow collection token's items composed into a flow map, or a
+// flow sequence of values and single-pair maps.
+//
+// Mutates: composition the shared context, whose atRoot and atKey the collection switches as composing
+// descends into its keys and values, as upstream switches its ComposeContext
 func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError onErrorFunc, tag *Tag) *Node {
 	isMap := equalsASCII(fc.FlowStart.Source, "{")
 	fcName := "flow sequence"
@@ -302,21 +315,13 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 				onError(properties.start, "MISSING_CHAR", "Missing , between "+fcName+" items", false)
 			}
 			if properties.comment != "" {
-				previousItemComment := []uint16{}
-			loop:
-				for _, st := range start {
-					switch st.Type {
-					case "comma", "space":
-					case "comment":
-						previousItemComment = substring(st.Source, 1, len(st.Source))
-						break loop
-					default:
-						break loop
-					}
-				}
+				previousItemComment := leadingComment(start)
 				if len(previousItemComment) > 0 {
 					if len(coll.Items) == 0 {
 						// `coll.items[coll.items.length - 1]` is undefined.
+						// Invariant: this is upstream's TypeError, which input can raise and which stops no
+						// process: resolveFlowCollection runs only under composeCollectionCatching, which
+						// recovers a typeError and reports it as upstream's catch does.
 						panic(typeError("Cannot read properties of undefined (reading 'comment')"))
 					}
 					previous := coll.Items[len(coll.Items)-1]
@@ -497,6 +502,21 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		coll.Range = []int{fc.Offset, cePosition, cePosition}
 	}
 	return coll
+}
+
+// leadingComment is the comment among an item's leading tokens, `prevItemComment`: the first comment's
+// text without its #, read past commas and spaces and stopping at anything else, empty when there is none.
+func leadingComment(start []*cst.Token) []uint16 {
+	for _, st := range start {
+		switch st.Type {
+		case "comma", "space":
+		case "comment":
+			return substring(st.Source, 1, len(st.Source))
+		default:
+			return []uint16{}
+		}
+	}
+	return []uint16{}
 }
 
 // containsNewline is upstream's, with its null for no key as false: every caller tests it for

@@ -56,10 +56,6 @@ type Schema struct {
 	Tags []*Tag
 }
 
-// Upstream's `schema[MAP]`, `schema[SCALAR]` and `schema[SEQ]` are the common map, string and seq tags,
-// whatever the schema.
-func (schema *Schema) scalarTag() *Tag { return stringTag }
-
 // schemaOptions is the part of upstream's Schema constructor options composing sets.
 type schemaOptions struct {
 	merge            bool
@@ -92,18 +88,6 @@ func coreKnownTags() map[string]*Tag {
 		"tag:yaml.org,2002:set":       setTag,
 		"tag:yaml.org,2002:timestamp": timestampTag,
 	}
-}
-
-// schemaTags is tags.js's schemas map, for the two schemas a Document picks: core for YAML 1.2 and
-// yaml-1.1 for YAML 1.1.
-func schemaTags(name string) []*Tag {
-	switch name {
-	case "core":
-		return coreSchema
-	case "yaml-1.1":
-		return yaml11Schema
-	}
-	panic("compose: unknown schema " + name)
 }
 
 // getTags is upstream's for no customTags: a fresh copy of the schema's list, with the merge tag
@@ -177,6 +161,10 @@ var stringTag = &Tag{
 		return unitsToString(value), nil
 	},
 }
+
+// Upstream's `schema[MAP]`, `schema[SCALAR]` and `schema[SEQ]` are the common map, string and seq tags,
+// whatever the schema.
+func (schema *Schema) scalarTag() *Tag { return stringTag }
 
 var nullTag = &Tag{
 	Default: defaultTrue,
@@ -310,4 +298,18 @@ var coreSchema = []*Tag{
 	coreFloatNaNTag,
 	coreFloatExpTag,
 	coreFloatTag,
+}
+
+// schemaTags is tags.js's schemas map, for the two schemas a Document picks: core for YAML 1.2 and
+// yaml-1.1 for YAML 1.1.
+func schemaTags(name string) []*Tag {
+	switch name {
+	case "core":
+		return coreSchema
+	case "yaml-1.1":
+		return yaml11Schema
+	}
+	// Invariant: setSchema names only "core" or "yaml-1.1", and newSchema reads an unnamed schema as
+	// "core", so getTags never asks for another.
+	panic("compose: unknown schema " + name)
 }

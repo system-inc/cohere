@@ -143,6 +143,27 @@ func foldLines(source []uint16) []uint16 {
 	return concatUnits(result, sep, source[start:])
 }
 
+var escapeCodes = map[int]uint16{
+	'0':  0x00,   // null character
+	'a':  0x07,   // bell character
+	'b':  '\b',   // backspace
+	'e':  0x1b,   // escape character
+	'f':  '\f',   // form feed
+	'n':  '\n',   // line feed
+	'r':  '\r',   // carriage return
+	't':  '\t',   // horizontal tab
+	'v':  '\v',   // vertical tab
+	'N':  0x85,   // Unicode next line
+	'_':  0xA0,   // Unicode non-breaking space
+	'L':  0x2028, // Unicode line separator
+	'P':  0x2029, // Unicode paragraph separator
+	' ':  ' ',
+	'"':  '"',
+	'/':  '/',
+	'\\': '\\',
+	'\t': '\t',
+}
+
 func doubleQuotedValue(source []uint16, onError func(rel int, code string, message string)) []uint16 {
 	result := []uint16{}
 	for index := 1; index < len(source)-1; index++ {
@@ -217,42 +238,22 @@ func doubleQuotedValue(source []uint16, onError func(rel int, code string, messa
 // `source[offset] === '\n'`.
 func foldNewline(source []uint16, offset int) ([]uint16, int) {
 	fold := []uint16{}
-	character := characterAt(source, offset+1)
+	foldedOffset := offset
+	character := characterAt(source, foldedOffset+1)
 	for character == ' ' || character == '\t' || character == '\n' || character == '\r' {
-		if character == '\r' && characterAt(source, offset+2) != '\n' {
+		if character == '\r' && characterAt(source, foldedOffset+2) != '\n' {
 			break
 		}
 		if character == '\n' {
 			fold = append(fold, '\n')
 		}
-		offset += 1
-		character = characterAt(source, offset+1)
+		foldedOffset += 1
+		character = characterAt(source, foldedOffset+1)
 	}
 	if len(fold) == 0 {
 		fold = []uint16{' '}
 	}
-	return fold, offset
-}
-
-var escapeCodes = map[int]uint16{
-	'0':  0x00,   // null character
-	'a':  0x07,   // bell character
-	'b':  '\b',   // backspace
-	'e':  0x1b,   // escape character
-	'f':  '\f',   // form feed
-	'n':  '\n',   // line feed
-	'r':  '\r',   // carriage return
-	't':  '\t',   // horizontal tab
-	'v':  '\v',   // vertical tab
-	'N':  0x85,   // Unicode next line
-	'_':  0xA0,   // Unicode non-breaking space
-	'L':  0x2028, // Unicode line separator
-	'P':  0x2029, // Unicode paragraph separator
-	' ':  ' ',
-	'"':  '"',
-	'/':  '/',
-	'\\': '\\',
-	'\t': '\t',
+	return fold, foldedOffset
 }
 
 func parseCharCode(
