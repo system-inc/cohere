@@ -76,7 +76,7 @@ var NoTitleInDocumentHead = rule.Rule{
 	Name:             "@next/next/no-title-in-document-head",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The specifier nodes this file watches, at most one per `next/document` declaration.
 		var watched []*ast.Node
 
@@ -155,7 +155,7 @@ var NoTitleInDocumentHead = rule.Rule{
 				// `jsx_opening_element.name.span()`, not at the `<title>` that eslint blames and not
 				// at the whole opening element. Asserted by a span fixture, which is how the first
 				// version of this line was caught pointing at the title.
-				ctx.ReportNode(headTagName, messageNoTitleInDocumentHead)
+				ruleContext.ReportNode(headTagName, messageNoTitleInDocumentHead)
 			}
 		}
 
@@ -188,7 +188,7 @@ var NoTitleInDocumentHead = rule.Rule{
 				if tagName == nil || tagName.Kind != ast.KindIdentifier {
 					return
 				}
-				if !resolvesToWatchedSpecifier(ctx, tagName, watched) {
+				if !resolvesToWatchedSpecifier(ruleContext, tagName, watched) {
 					return
 				}
 				reportTitleChildren(node.Parent, tagName)
@@ -203,11 +203,11 @@ var NoTitleInDocumentHead = rule.Rule{
 // Identity is the whole point. Comparing the declaration's KIND instead would answer true for any
 // import specifier in the file, and comparing the identifier's text would answer true for a local
 // component shadowing the import. Both pass every fixture upstream ships.
-func resolvesToWatchedSpecifier(ctx rule.Context, tagName *ast.Node, watched []*ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func resolvesToWatchedSpecifier(ruleContext rule.Context, tagName *ast.Node, watched []*ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(tagName)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(tagName)
 	for _, specifier := range watched {
 		if rule.HasDeclaration(symbol, specifier) {
 			return true

@@ -112,14 +112,14 @@ var NoEval = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		allowIndirect := false
 		if typed, ok := rule.OptionsAs[NoEvalOptions](options); ok {
 			allowIndirect = typed.AllowIndirect
 		}
 
 		report := func(node *ast.Node) {
-			ctx.ReportNode(node, messageNoEval)
+			ruleContext.ReportNode(node, messageNoEval)
 		}
 
 		listeners := rule.Listeners{
@@ -162,7 +162,7 @@ var NoEval = rule.Rule{
 			if !isValueReference(node) {
 				return
 			}
-			if !resolvesToAGlobal(ctx, node) {
+			if !resolvesToAGlobal(ruleContext, node) {
 				return
 			}
 			report(node)

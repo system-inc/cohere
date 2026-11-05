@@ -18,13 +18,13 @@ import (
 //
 // A run with no program, which is the syntax-only test harness, reads the default options, where an
 // unset `strict` is on. So the harness and a repository with an empty tsconfig agree.
-func CompilerImpliesStrict(ctx rule.Context, source *ast.SourceFile) bool {
+func CompilerImpliesStrict(ruleContext rule.Context, source *ast.SourceFile) bool {
 	if ast.IsSourceFileJS(source) {
 		return false
 	}
 	options := &core.CompilerOptions{}
-	if ctx.Program != nil {
-		options = ctx.Program.Options()
+	if ruleContext.Program != nil {
+		options = ruleContext.Program.Options()
 	}
 	return IsStrictCompilerOptionEnabled(options, options.AlwaysStrict)
 }

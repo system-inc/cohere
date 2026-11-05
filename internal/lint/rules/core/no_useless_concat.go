@@ -86,7 +86,7 @@ var messageUnexpectedConcat = rule.Message{
 // substitution, and the line break the author chose is often what makes a long string readable.
 var NoUselessConcat = rule.Rule{
 	Name: "no-useless-concat",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				expression := node.AsBinaryExpression()
@@ -100,16 +100,16 @@ var NoUselessConcat = rule.Rule{
 					return
 				}
 
-				leftRange := rule.TokenRange(ctx.SourceFile, left)
-				rightRange := rule.TokenRange(ctx.SourceFile, right)
-				if !noUselessConcatOnSameLine(ctx.SourceFile.Text(), leftRange.End(), rightRange.Pos()) {
+				leftRange := rule.TokenRange(ruleContext.SourceFile, left)
+				rightRange := rule.TokenRange(ruleContext.SourceFile, right)
+				if !noUselessConcatOnSameLine(ruleContext.SourceFile.Text(), leftRange.End(), rightRange.Pos()) {
 					return
 				}
 
 				// The operator token rather than the expression, which is upstream's own location
 				// override. `TokenRange` strips the leading trivia the raw token position carries,
 				// so this is the single `+` character and matches upstream's one-column span.
-				ctx.ReportRange(rule.TokenRange(ctx.SourceFile, expression.OperatorToken),
+				ruleContext.ReportRange(rule.TokenRange(ruleContext.SourceFile, expression.OperatorToken),
 					messageUnexpectedConcat)
 			},
 		}

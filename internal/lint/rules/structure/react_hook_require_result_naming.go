@@ -64,8 +64,8 @@ var emptySuffixes = []string{"Result", "Data", "Value", "State", "Hook"}
 var ReactHookRequireResultNaming = rule.Rule{
 	Name:       "structure/react-hook-require-result-naming",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if !FileContextFor(ctx.SourceFile.FileName().AsString()).IsReactFile {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}
 
@@ -75,7 +75,7 @@ var ReactHookRequireResultNaming = rule.Rule{
 		invocationCounts := map[string]int{}
 		var results []hookResultBinding
 
-		sourceFile := ctx.SourceFile.AsNode()
+		sourceFile := ruleContext.SourceFile.AsNode()
 		countHookInvocations(sourceFile, invocationCounts, &results)
 
 		for _, result := range results {
@@ -85,7 +85,7 @@ var ReactHookRequireResultNaming = rule.Rule{
 			if isRelatedHookResultName(result.variableName, result.hookName) {
 				continue
 			}
-			ctx.ReportNode(result.node, hookResultNamingMessage(result.variableName))
+			ruleContext.ReportNode(result.node, hookResultNamingMessage(result.variableName))
 		}
 
 		return nil

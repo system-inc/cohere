@@ -50,20 +50,20 @@ func messageOutsideInternal() rule.Message {
 // Resolving against the importing file has no such dependence.
 var BoundaryNoInternalImport = rule.Rule{
 	Name: "nexus/boundary-no-internal-import",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
-		importingFile := imports.NormalizedFileName(ctx.SourceFile)
+		importingFile := imports.NormalizedFileName(ruleContext.SourceFile)
 
 		return imports.SourceVisitors(func(source string, node *ast.Node) {
-			checkInternalImport(ctx, node, importingFile, source)
+			checkInternalImport(ruleContext, node, importingFile, source)
 		})
 	},
 }
 
 // checkInternalImport decides one specifier against one importing file.
-func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string, source string) {
+func checkInternalImport(ruleContext rule.Context, node *ast.Node, importingFile string, source string) {
 	if !strings.Contains(source, "internal") {
 		return
 	}
@@ -73,7 +73,7 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 	// that can prove it belongs.
 	if !strings.HasPrefix(source, ".") {
 		if imports.HasPathSegment(source, "internal") {
-			ctx.ReportNode(imports.SpecifierNode(node), messageAliasedInternal())
+			ruleContext.ReportNode(imports.SpecifierNode(node), messageAliasedInternal())
 		}
 		return
 	}
@@ -95,6 +95,6 @@ func checkInternalImport(ctx rule.Context, node *ast.Node, importingFile string,
 
 	owningFolder := strings.Join(segments[:internalIndex], "/")
 	if !strings.HasPrefix(importingFile, owningFolder+"/") {
-		ctx.ReportNode(imports.SpecifierNode(node), messageOutsideInternal())
+		ruleContext.ReportNode(imports.SpecifierNode(node), messageOutsideInternal())
 	}
 }

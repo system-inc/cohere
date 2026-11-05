@@ -150,7 +150,7 @@ var RequireRenderReturn = rule.Rule{
 	// strips the namespace on a `/` boundary, so `react-require-render-return` would match no
 	// inventory entry and lint no files while passing every fixture in this package.
 	Name: "react/require-render-return",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The judgment needs the whole file before it can be made: a return anywhere marks the
 		// component that encloses it, and only at the end is it known which components were never
 		// marked. There is no `rule.OnExit`, and the walk is pre-order, so `KindSourceFile` fires
@@ -166,7 +166,7 @@ var RequireRenderReturn = rule.Rule{
 					if component.renderProperty == nil {
 						continue
 					}
-					ctx.ReportNode(component.renderProperty, messageNoRenderReturn)
+					ruleContext.ReportNode(component.renderProperty, messageNoRenderReturn)
 				}
 			},
 		}

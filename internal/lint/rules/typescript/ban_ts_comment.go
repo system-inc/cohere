@@ -141,12 +141,12 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 // and only the last is read, so a directive above the closing line is invisible.
 var BanTsComment = rule.Rule{
 	Name: "@typescript-eslint/ban-ts-comment",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// See "A JavaScript file is still declined" above.
-		if !isTypeScriptSourceFile(ctx.SourceFile.FileName().AsString()) {
+		if !isTypeScriptSourceFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -162,23 +162,23 @@ var BanTsComment = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				reportBanTsComments(ctx, parsed)
+				reportBanTsComments(ruleContext, parsed)
 			},
 		}
 	},
 }
 
 // reportBanTsComments is upstream's `Program` listener.
-func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
+func reportBanTsComments(ruleContext rule.Context, options BanTsCommentOptions) {
 	// Upstream compares the line the first statement's first token is on with the comment's own,
 	// so a `@ts-nocheck` sharing the first statement's line is as late as one below it.
 	firstStatementLine := -1
-	if statements := ctx.SourceFile.Statements.Nodes; len(statements) > 0 {
-		start := scanner.GetTokenPosOfNode(statements[0], ctx.SourceFile, false)
-		firstStatementLine, _ = scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, start)
+	if statements := ruleContext.SourceFile.Statements.Nodes; len(statements) > 0 {
+		start := scanner.GetTokenPosOfNode(statements[0], ruleContext.SourceFile, false)
+		firstStatementLine, _ = scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, start)
 	}
 
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		value, readable := banTsCommentValue(comment)
 		if !readable {
 			continue
@@ -189,7 +189,7 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 		}
 
 		if directive == banTsCommentNoCheck && firstStatementLine >= 0 {
-			commentLine, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, comment.Range.Pos())
+			commentLine, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, comment.Range.Pos())
 			if firstStatementLine <= commentLine {
 				continue
 			}
@@ -207,14 +207,14 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 				if comment.IsBlock {
 					repaired = "/*" + replaced + "*/"
 				}
-				ctx.ReportRangeWithSuggestions(comment.Range, messageBanTsCommentPreferExpectError(),
+				ruleContext.ReportRangeWithSuggestions(comment.Range, messageBanTsCommentPreferExpectError(),
 					rule.Suggestion{
 						Message: messageBanTsCommentReplaceIgnore(),
 						Fixes:   []rule.Fix{{Range: comment.Range, Text: repaired}},
 					})
 				continue
 			}
-			ctx.ReportRange(comment.Range, messageBanTsCommentBanned(directive))
+			ruleContext.ReportRange(comment.Range, messageBanTsCommentBanned(directive))
 
 		case BanTsCommentRequireDescription, BanTsCommentDescriptionFormat:
 			// An object setting is only a description setting when its format is set and non-empty:
@@ -225,7 +225,7 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 			}
 			if banTsCommentLength(strings.TrimFunc(description, type_checking.IsStrWhiteSpace)) <
 				options.MinimumDescriptionLength {
-				ctx.ReportRange(comment.Range, messageBanTsCommentRequiresDescription(
+				ruleContext.ReportRange(comment.Range, messageBanTsCommentRequiresDescription(
 					directive, options.MinimumDescriptionLength))
 				continue
 			}
@@ -234,7 +234,7 @@ func reportBanTsComments(ctx rule.Context, options BanTsCommentOptions) {
 			// esregexp's time bound counts as a match, so a pathological pattern is silent rather
 			// than reporting every description.
 			if setting.DescriptionFormat != nil && !setting.DescriptionFormat.TestOrTimeout(description) {
-				ctx.ReportRange(comment.Range, messageBanTsCommentDescriptionFormat(
+				ruleContext.ReportRange(comment.Range, messageBanTsCommentDescriptionFormat(
 					directive, setting.DescriptionFormat.Source()))
 			}
 		}

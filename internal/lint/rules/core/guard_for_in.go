@@ -67,7 +67,7 @@ var messageGuardForIn = rule.Message{
 // the loop does.
 var GuardForIn = rule.Rule{
 	Name: "guard-for-in",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// `for-of` is deliberately absent. It iterates values through the iteration protocol
 			// and never walks the prototype chain, so it has nothing to guard. The two share
@@ -77,7 +77,7 @@ var GuardForIn = rule.Rule{
 				if bodyGuardsForIn(node.AsForInOrOfStatement().Statement) {
 					return
 				}
-				ctx.ReportNode(node, messageGuardForIn)
+				ruleContext.ReportNode(node, messageGuardForIn)
 			},
 		}
 	},

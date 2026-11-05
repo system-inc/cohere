@@ -297,17 +297,17 @@ func loweredParentAndNested(test *testing.T, source string) (*Function, *Functio
 	probe := rule.Rule{
 		Name:             "inline-remap-fixture",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
 						if parent != nil {
 							return
 						}
-						lowered := Lower(functionNode, ctx.TypeChecker)
+						lowered := Lower(functionNode, ruleContext.TypeChecker)
 						if lowered == nil {
 							return
 						}

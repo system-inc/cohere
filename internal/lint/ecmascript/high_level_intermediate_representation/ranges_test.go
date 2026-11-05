@@ -24,10 +24,10 @@ func rangesFor(test *testing.T, source string) (*Function, *mutation_aliasing.Mu
 	probe := rule.Rule{
 		Name:             "ranges-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker, so every " +
 							"assertion below would pass vacuously")
 					}
@@ -35,7 +35,7 @@ func rangesFor(test *testing.T, source string) (*Function, *mutation_aliasing.Mu
 						if outermost != nil {
 							return
 						}
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}

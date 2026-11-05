@@ -59,7 +59,7 @@ type deferredAtomicEvent struct {
 // is what the operand-with-no-events case needs, and the second is what moves a suspension past the
 // reads inside its own operand.
 func placeDeferredEvents(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	graph *control_flow_graph.Graph[atomicEvent],
 	escapes map[*ast.Symbol]bool,
 	root *ast.Node,
@@ -100,7 +100,7 @@ func placeDeferredEvents(
 				}
 				// The property arm asks the escape question with isMemberAccess true, which is what
 				// makes a parameter report here and stay clean on the variable side.
-				if !escapesEnclosingFunction(ctx, event.symbol, root, true, escapes) {
+				if !escapesEnclosingFunction(ruleContext, event.symbol, root, true, escapes) {
 					continue
 				}
 				propertyStores = append(propertyStores, deferredAtomicEvent{
@@ -277,7 +277,7 @@ func propertyAssignmentHeadedBy(identifier *ast.Node) (*ast.Node, bool) {
 // Both are computed from `control_flow_graph.RootOf`, which is the same boundary the graph itself uses, so
 // the answer cannot disagree with the graph about what "this function" means.
 func escapesEnclosingFunction(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	symbol *ast.Symbol,
 	root *ast.Node,
 	isMemberAccess bool,
@@ -303,7 +303,7 @@ func escapesEnclosingFunction(
 	if cached, seen := memo[symbol]; seen {
 		return cached
 	}
-	escaped := computeEscape(ctx, symbol, root)
+	escaped := computeEscape(ruleContext, symbol, root)
 	memo[symbol] = escaped
 	return escaped
 }
@@ -324,7 +324,7 @@ func symbolIsParameter(symbol *ast.Symbol) bool {
 }
 
 // computeEscape answers the declaration-side and capture-side halves of the escape question.
-func computeEscape(ctx rule.Context, symbol *ast.Symbol, root *ast.Node) bool {
+func computeEscape(ruleContext rule.Context, symbol *ast.Symbol, root *ast.Node) bool {
 	// The declaration side. A binding declared outside this root is shared with whatever else lives
 	// in that scope, so it escapes.
 	declaredInside := false
@@ -343,7 +343,7 @@ func computeEscape(ctx rule.Context, symbol *ast.Symbol, root *ast.Node) bool {
 
 	// The capture side. A binding declared here still escapes if a nested function names it, because
 	// that function can run during the suspension.
-	return symbolIsReadFromNestedRoot(ctx, symbol, root)
+	return symbolIsReadFromNestedRoot(ruleContext, symbol, root)
 }
 
 // symbolIsReadFromNestedRoot reports whether any occurrence of a binding lives in a code path root
@@ -361,7 +361,7 @@ func computeEscape(ctx rule.Context, symbol *ast.Symbol, root *ast.Node) bool {
 // The second is the control. A closure exists in both, and only the one that names the binding
 // changes the verdict, which is what proves this is testing capture rather than the presence of a
 // nested function.
-func symbolIsReadFromNestedRoot(ctx rule.Context, symbol *ast.Symbol, root *ast.Node) bool {
+func symbolIsReadFromNestedRoot(ruleContext rule.Context, symbol *ast.Symbol, root *ast.Node) bool {
 	name := symbol.Name
 	if name == "" {
 		return false
@@ -375,7 +375,7 @@ func symbolIsReadFromNestedRoot(ctx rule.Context, symbol *ast.Symbol, root *ast.
 		}
 		if node.Kind == ast.KindIdentifier && node.Text() == name {
 			if !isNonReferenceIdentifier(node) && control_flow_graph.RootOf(node) != root {
-				if resolveOccurrence(ctx, node) == symbol {
+				if resolveOccurrence(ruleContext, node) == symbol {
 					captured = true
 					return true
 				}

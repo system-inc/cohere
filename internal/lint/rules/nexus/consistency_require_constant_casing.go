@@ -121,7 +121,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 	// and whether it is a root, so the index and the roots are the fingerprint (#f96cnry). See
 	// constantCasingFingerprint.
 	ProgramFingerprint: constantCasingFingerprint,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		frameworkConstantNames := map[string]bool{}
 		if settings, hasSettings := rule.OptionsAs[ConsistencyRequireConstantCasingOptions](options); hasSettings {
 			for _, name := range settings.FrameworkConstantNames {
@@ -200,12 +200,12 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 					return
 				}
 
-				usage := usageIndexFor(ctx)
+				usage := usageIndexFor(ruleContext)
 
 				// Exported means a name crosses files, by the modifier or by a local export clause
 				// naming this binding. `export default X` does not count: the importer picks its own
 				// name, so the local spelling reaches no one.
-				exportedNames := exportedNamesOf(ctx, statement, name)
+				exportedNames := exportedNamesOf(ruleContext, statement, name)
 				exported := len(exportedNames) > 0
 
 				// Next.js reads this export off the route file by name, so its spelling and its
@@ -214,7 +214,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				// `POST`, or dropping the export from a `metadata` nothing imports. Checked before
 				// the clauses rather than beside the consumer's list, because that list is optional
 				// and this floor is not.
-				if exported && nextjs.IsRouteContractExport(imports.NormalizedFileName(ctx.SourceFile), declaredName) {
+				if exported && nextjs.IsRouteContractExport(imports.NormalizedFileName(ruleContext.SourceFile), declaredName) {
 					return
 				}
 
@@ -244,7 +244,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 					if shadowsCamelCaseSource(declaration) {
 						return
 					}
-					reportCamelCase(ctx, exported, name, messageRequireCamelCaseFunction(
+					reportCamelCase(ruleContext, exported, name, messageRequireCamelCaseFunction(
 						declaredName, constantNameToCamelCase(declaredName),
 					))
 					return
@@ -256,7 +256,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				// elsewhere, and Base's Verify* decorators and GraphQlQuery are callables from imported
 				// factories that stay PascalCase because every use is `@VerifyEmail`. Requiring it
 				// flagged 36 valid constants there. See holdsAFunctionType.
-				if isCamelCase(declaredName) && holdsAFunctionType(ctx, name) {
+				if isCamelCase(declaredName) && holdsAFunctionType(ruleContext, name) {
 					return
 				}
 
@@ -268,11 +268,11 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				// An instance takes camelCase whatever its reach, so it is judged here rather than
 				// falling through to the exported/local split below. This is the clause where kind
 				// outranks scope: PascalCase would read as the class rather than the object.
-				if isClassInstance(ctx, initializer, usage) || hasClassTypeAnnotation(declaration) {
+				if isClassInstance(ruleContext, initializer, usage) || hasClassTypeAnnotation(declaration) {
 					if isCamelCase(declaredName) {
 						return
 					}
-					reportCamelCase(ctx, exported, name, messageRequireCamelCaseInstance(
+					reportCamelCase(ruleContext, exported, name, messageRequireCamelCaseInstance(
 						declaredName, constantNameToCamelCase(declaredName),
 					))
 					return
@@ -283,13 +283,13 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 						return
 					}
 					if isCamelCase(declaredName) &&
-						importerIndexFor(ctx.Program).provablyUnimported(ctx.SourceFile, exportedNames...) {
-						ctx.ReportNode(name, messageDropUnimportedExport(
+						importerIndexFor(ruleContext.Program).provablyUnimported(ruleContext.SourceFile, exportedNames...) {
+						ruleContext.ReportNode(name, messageDropUnimportedExport(
 							declaredName, constantNameToPascalCase(declaredName),
 						))
 						return
 					}
-					ctx.ReportNode(name, messageRequirePascalCaseExported(
+					ruleContext.ReportNode(name, messageRequirePascalCaseExported(
 						declaredName, constantNameToPascalCase(declaredName),
 					))
 					return
@@ -306,7 +306,7 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				if shadowsCamelCaseSource(declaration) {
 					return
 				}
-				reportCamelCase(ctx, exported, name, messageRequireCamelCaseLocal(
+				reportCamelCase(ruleContext, exported, name, messageRequireCamelCaseLocal(
 					declaredName, constantNameToCamelCase(declaredName),
 				))
 			},
@@ -319,14 +319,14 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 //
 // The suggestion inside the message is the rename the fix performs, so the two cannot disagree:
 // both come from `constantNameToCamelCase`.
-func reportCamelCase(ctx rule.Context, exported bool, name *ast.Node, message rule.Message) {
+func reportCamelCase(ruleContext rule.Context, exported bool, name *ast.Node, message rule.Message) {
 	if !exported {
-		if fix, isSafe := fileLocalRenameFix(ctx, name, constantNameToCamelCase(name.Text())); isSafe {
-			ctx.ReportNodeWithFixes(name, message, fix)
+		if fix, isSafe := fileLocalRenameFix(ruleContext, name, constantNameToCamelCase(name.Text())); isSafe {
+			ruleContext.ReportNodeWithFixes(name, message, fix)
 			return
 		}
 	}
-	ctx.ReportNode(name, message)
+	ruleContext.ReportNode(name, message)
 }
 
 // hasDeclareModifier reports whether a statement carries the declare keyword.
@@ -406,7 +406,7 @@ func isFactoryProducedFunction(initializer *ast.Node) bool {
 //
 // Parity with the gate cohere replaces is the acceptance criterion, and 95 findings on a clean
 // baseline is the shape a false-positive family takes.
-func isClassInstance(ctx rule.Context, initializer *ast.Node, usage *fileUsageIndex) bool {
+func isClassInstance(ruleContext rule.Context, initializer *ast.Node, usage *fileUsageIndex) bool {
 	expression := initializer
 	if expression == nil {
 		return false
@@ -427,7 +427,7 @@ func isClassInstance(ctx rule.Context, initializer *ast.Node, usage *fileUsageIn
 			binary.OperatorToken.Kind != ast.KindBarBarToken {
 			return false
 		}
-		return isClassInstance(ctx, binary.Left, usage) || isClassInstance(ctx, binary.Right, usage)
+		return isClassInstance(ruleContext, binary.Left, usage) || isClassInstance(ruleContext, binary.Right, usage)
 	}
 
 	// The direct form: new NetworkService().
@@ -436,7 +436,7 @@ func isClassInstance(ctx rule.Context, initializer *ast.Node, usage *fileUsageIn
 		if callee == nil || callee.Kind != ast.KindIdentifier {
 			return false
 		}
-		return !dataStructureConstructors[callee.Text()] && !constructsAContainer(ctx, callee)
+		return !dataStructureConstructors[callee.Text()] && !constructsAContainer(ruleContext, callee)
 	}
 
 	// The resolver form, read from the local factory's declared return type.
@@ -563,24 +563,24 @@ func shadowsCamelCaseSource(declaration *ast.VariableDeclaration) bool {
 // evidence beside this answers for them, as it did before the checker was asked.
 //
 // Without a checker (a syntax-only run) this answers false, and that evidence is all there is.
-func holdsAFunctionType(ctx rule.Context, name *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func holdsAFunctionType(ruleContext rule.Context, name *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	valueType := ctx.TypeChecker.GetTypeAtLocation(name)
+	valueType := ruleContext.TypeChecker.GetTypeAtLocation(name)
 	if valueType == nil {
 		return false
 	}
-	for part := range type_checking.UnionTypePartsSeq(ctx.TypeChecker.GetNonNullableType(valueType)) {
-		callSignatures := ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall)
+	for part := range type_checking.UnionTypePartsSeq(ruleContext.TypeChecker.GetNonNullableType(valueType)) {
+		callSignatures := ruleContext.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall)
 		if len(callSignatures) == 0 {
 			return false
 		}
-		if len(ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindConstruct)) > 0 {
+		if len(ruleContext.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindConstruct)) > 0 {
 			return false
 		}
 		for _, signature := range callSignatures {
-			if mayReturnAnElement(ctx.TypeChecker, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)) {
+			if mayReturnAnElement(ruleContext.TypeChecker, checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)) {
 				return false
 			}
 		}
@@ -636,8 +636,8 @@ func mayReturnAnElement(typeChecker *checker.Checker, returnType *checker.Type) 
 // The class is found through the checker, so an imported one counts, and without a checker through
 // the class this file declares under that name. A class that cannot be found is not exempt, which is a
 // missed exemption and never an invented finding.
-func constructsAContainer(ctx rule.Context, callee *ast.Node) bool {
-	class := constantCasingClassOf(ctx, callee)
+func constructsAContainer(ruleContext rule.Context, callee *ast.Node) bool {
+	class := constantCasingClassOf(ruleContext, callee)
 	for depth := 0; class != nil && depth < 16; depth++ {
 		base := ast.GetClassExtendsHeritageElement(class)
 		if base == nil {
@@ -650,17 +650,17 @@ func constructsAContainer(ctx rule.Context, callee *ast.Node) bool {
 		if dataStructureConstructors[baseName.Text()] {
 			return true
 		}
-		class = constantCasingClassOf(ctx, baseName)
+		class = constantCasingClassOf(ruleContext, baseName)
 	}
 	return false
 }
 
 // constantCasingClassOf returns the class declaration an identifier names, or nil.
-func constantCasingClassOf(ctx rule.Context, name *ast.Node) *ast.Node {
-	if ctx.TypeChecker != nil {
-		symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+func constantCasingClassOf(ruleContext rule.Context, name *ast.Node) *ast.Node {
+	if ruleContext.TypeChecker != nil {
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 		if symbol != nil {
-			symbol = checker.SkipAlias(symbol, ctx.TypeChecker)
+			symbol = checker.SkipAlias(symbol, ruleContext.TypeChecker)
 			for _, declaration := range symbol.Declarations {
 				if declaration.Kind == ast.KindClassDeclaration || declaration.Kind == ast.KindClassExpression {
 					return declaration
@@ -670,7 +670,7 @@ func constantCasingClassOf(ctx rule.Context, name *ast.Node) *ast.Node {
 		return nil
 	}
 	var found *ast.Node
-	ctx.SourceFile.AsNode().ForEachChild(func(statement *ast.Node) bool {
+	ruleContext.SourceFile.AsNode().ForEachChild(func(statement *ast.Node) bool {
 		if statement.Kind == ast.KindClassDeclaration && statement.Name() != nil && statement.Name().Text() == name.Text() {
 			found = statement
 			return true

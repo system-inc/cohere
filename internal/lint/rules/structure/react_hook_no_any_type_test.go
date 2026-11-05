@@ -455,10 +455,10 @@ var reactHookNoAnyTypeStandInBlindedRule = rule.Rule{
 	Name:                    "react-hook-any-type-stand-in-blinded",
 	NeedsTypeChecker:        true,
 	ResolvesReactValueTypes: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Never registered with the real catalog and never offered a file; this body exists only so
 		// the struct is a rule rather than a shape.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{ast.KindCallExpression: func(node *ast.Node) {}}
@@ -675,18 +675,18 @@ func TestReactHookAnyTypeFlagReadAgreesWithTheCheckersOwnName(test *testing.T) {
 			probe := rule.Rule{
 				Name:             "react-hook-any-type-shim-probe",
 				NeedsTypeChecker: true,
-				Run: func(ctx rule.Context, options any) rule.Listeners {
-					if ctx.TypeChecker == nil {
+				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+					if ruleContext.TypeChecker == nil {
 						return nil
 					}
 					return rule.Listeners{
 						ast.KindCallExpression: func(node *ast.Node) {
-							resultType := ctx.TypeChecker.GetTypeAtLocation(node)
+							resultType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 							if resultType == nil {
 								return
 							}
 							visited++
-							gotName = ctx.TypeChecker.TypeToString(resultType)
+							gotName = ruleContext.TypeChecker.TypeToString(resultType)
 							gotAny = shimchecker.Type_flags(resultType)&shimchecker.TypeFlagsAny != 0
 						},
 					}

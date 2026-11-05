@@ -23,12 +23,12 @@ import (
 //
 // The returned slice is the index's own storage, capped at its length, so appending to it copies
 // rather than writing over the next name's identifiers.
-func IdentifiersNamed(ctx rule.Context, name string) []*ast.Node {
-	if ctx.SourceFile == nil {
+func IdentifiersNamed(ruleContext rule.Context, name string) []*ast.Node {
+	if ruleContext.SourceFile == nil {
 		return nil
 	}
-	index := rule.Cached(ctx.FileCache, "reference.identifiersByName", func() *identifierIndex {
-		return buildIdentifierIndex(ctx.SourceFile)
+	index := rule.Cached(ruleContext.FileCache, "reference.identifiersByName", func() *identifierIndex {
+		return buildIdentifierIndex(ruleContext.SourceFile)
 	})
 	position, found := index.positions[name]
 	if !found {

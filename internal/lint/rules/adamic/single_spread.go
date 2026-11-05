@@ -43,7 +43,7 @@ var singleSpreadText = policy.MessageOf("adamic/single-spread", "laterSpread")
 var SingleSpread = rule.Rule{
 	Name: "adamic/single-spread",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
 				// `({ x, ...rest } = point)` is a pattern: its rest collects, it copies over nothing.
@@ -65,7 +65,7 @@ var SingleSpread = rule.Rule{
 						continue
 					}
 					if before != "" {
-						ctx.ReportNode(member, rule.Message{
+						ruleContext.ReportNode(member, rule.Message{
 							Id:          "laterSpread",
 							Description: singleSpreadText.Render(map[string]string{"what": before}),
 						})

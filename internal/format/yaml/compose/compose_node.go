@@ -18,7 +18,7 @@ type composeContext struct {
 func composeDoc(options Options, directives *Directives, token *cst.Token, onError onErrorFunc) *Document {
 	offset, start, value, end := token.Offset, token.Start, token.Value, token.End
 	doc := newDocument(directives, options)
-	ctx := &composeContext{
+	composition := &composeContext{
 		atKey:      false,
 		atRoot:     true,
 		directives: doc.Directives,
@@ -45,9 +45,9 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 		}
 	}
 	if value != nil {
-		doc.Contents = composeNode(ctx, value, props, onError)
+		doc.Contents = composeNode(composition, value, props, onError)
 	} else {
-		doc.Contents = composeEmptyNode(ctx, props.end, start, props, onError)
+		doc.Contents = composeEmptyNode(composition, props.end, start, props, onError)
 	}
 	contentEnd := doc.Contents.Range[2]
 	re := resolveEnd(end, contentEnd, false, onError)
@@ -58,24 +58,24 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	return doc
 }
 
-func composeNode(ctx *composeContext, token *cst.Token, props props, onError onErrorFunc) *Node {
-	atKey := ctx.atKey
+func composeNode(composition *composeContext, token *cst.Token, props props, onError onErrorFunc) *Node {
+	atKey := composition.atKey
 	spaceBefore, comment, anchor, tag := props.spaceBefore, props.comment, props.anchor, props.tag
 	var node *Node
 	isSrcToken := true
 	switch token.Type {
 	case "alias":
-		node = composeAlias(ctx, token, onError)
+		node = composeAlias(composition, token, onError)
 		if anchor != nil || tag != nil {
 			onError(token, "ALIAS_PROPS", "An alias node must not specify any properties", false)
 		}
 	case "scalar", "single-quoted-scalar", "double-quoted-scalar", "block-scalar":
-		node = composeScalar(ctx, token, tag, onError)
+		node = composeScalar(composition, token, tag, onError)
 		if anchor != nil {
 			node.SetAnchor(unitsToString(substring(anchor.Source, 1, len(anchor.Source))))
 		}
 	case "block-map", "block-seq", "flow-collection":
-		node = composeCollectionCatching(ctx, token, props, onError)
+		node = composeCollectionCatching(composition, token, props, onError)
 	default:
 		message := "Unsupported token (type: " + token.Type + ")"
 		if token.Type == "error" {
@@ -85,13 +85,13 @@ func composeNode(ctx *composeContext, token *cst.Token, props props, onError onE
 		isSrcToken = false
 	}
 	if node == nil {
-		node = composeEmptyNode(ctx, token.Offset, nil, props, onError)
+		node = composeEmptyNode(composition, token.Offset, nil, props, onError)
 	}
 	// `node.anchor === ''`: an alias never gets the anchor, so its anchor is undefined, not ''.
 	if anchor != nil && node.HasAnchor() && node.Anchor == "" {
 		onError(anchor, "BAD_ALIAS", "Anchor cannot be an empty string", false)
 	}
-	if atKey && ctx.options.StringKeys && (!IsScalar(node) || !isString(node.ScalarValue) ||
+	if atKey && composition.options.StringKeys && (!IsScalar(node) || !isString(node.ScalarValue) ||
 		node.Tag != "" && node.Tag != strTagName) {
 		msg := "With stringKeys, all keys must be strings"
 		var source any = token
@@ -110,7 +110,7 @@ func composeNode(ctx *composeContext, token *cst.Token, props props, onError onE
 			node.CommentBefore = comment
 		}
 	}
-	if ctx.options.KeepSourceTokens && isSrcToken {
+	if composition.options.KeepSourceTokens && isSrcToken {
 		node.SrcToken = token
 	}
 	return node
@@ -121,7 +121,7 @@ func composeNode(ctx *composeContext, token *cst.Token, props props, onError onE
 // Go's stack grows instead of overflowing at V8's depth, so the port composes what upstream would have
 // given up on. The one exception the port does raise is the TypeError resolveFlowCollection meets on a
 // comment that belongs to a previous item that was never composed.
-func composeCollectionCatching(ctx *composeContext, token *cst.Token, props props, onError onErrorFunc) (node *Node) {
+func composeCollectionCatching(composition *composeContext, token *cst.Token, props props, onError onErrorFunc) (node *Node) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			message, isTypeError := recovered.(typeError)
@@ -132,7 +132,7 @@ func composeCollectionCatching(ctx *composeContext, token *cst.Token, props prop
 			node = nil
 		}
 	}()
-	node = composeCollection(ctx, token, props, onError)
+	node = composeCollection(composition, token, props, onError)
 	if props.anchor != nil {
 		node.SetAnchor(unitsToString(substring(props.anchor.Source, 1, len(props.anchor.Source))))
 	}
@@ -146,14 +146,14 @@ func isString(value any) bool {
 
 // composeEmptyNode composes the empty scalar where a node is missing. before is nil for upstream's
 // undefined; upstream's pos argument is always null, so it is left out.
-func composeEmptyNode(ctx *composeContext, offset int, before []*cst.Token, props props, onError onErrorFunc) *Node {
+func composeEmptyNode(composition *composeContext, offset int, before []*cst.Token, props props, onError onErrorFunc) *Node {
 	token := &cst.Token{
 		Type:   "scalar",
 		Offset: emptyScalarPosition(offset, before),
 		Indent: -1,
 		Source: []uint16{},
 	}
-	node := composeScalar(ctx, token, props.tag, onError)
+	node := composeScalar(composition, token, props.tag, onError)
 	if props.anchor != nil {
 		node.SetAnchor(unitsToString(substring(props.anchor.Source, 1, len(props.anchor.Source))))
 		if node.Anchor == "" {
@@ -170,7 +170,7 @@ func composeEmptyNode(ctx *composeContext, offset int, before []*cst.Token, prop
 	return node
 }
 
-func composeAlias(ctx *composeContext, token *cst.Token, onError onErrorFunc) *Node {
+func composeAlias(composition *composeContext, token *cst.Token, onError onErrorFunc) *Node {
 	offset, source, end := token.Offset, token.Source, token.End
 	alias := newAlias(unitsToString(substring(source, 1, len(source))))
 	if alias.Source == "" {
@@ -180,7 +180,7 @@ func composeAlias(ctx *composeContext, token *cst.Token, onError onErrorFunc) *N
 		onError(offset+len(source)-1, "BAD_ALIAS", "Alias ending in : is ambiguous", true)
 	}
 	valueEnd := offset + len(source)
-	re := resolveEnd(end, valueEnd, ctx.options.Strict, onError)
+	re := resolveEnd(end, valueEnd, composition.options.Strict, onError)
 	alias.Range = []int{offset, valueEnd, re.offset}
 	if re.comment != "" {
 		alias.Comment = re.comment

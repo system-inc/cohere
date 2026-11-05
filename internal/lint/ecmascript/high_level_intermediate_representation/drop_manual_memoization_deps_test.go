@@ -188,10 +188,10 @@ func memoDepsFor(test *testing.T, source string) ([]ManualMemoDependency, bool, 
 	probe := rule.Rule{
 		Name:             "memo-deps",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker; without one " +
 							"no memo call is recognised and every assertion below is vacuous")
 					}
@@ -199,12 +199,12 @@ func memoDepsFor(test *testing.T, source string) ([]ManualMemoDependency, bool, 
 						if result.Recognised > 0 {
 							return
 						}
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						result = DropManualMemoization(function)
 						for _, block := range function.Blocks {
 							if block == nil {

@@ -39,8 +39,8 @@ type useBeforeDefineCycles struct {
 	graphs map[*ast.Node]map[*ast.Node]map[*ast.Node]bool
 }
 
-func newUseBeforeDefineCycles(ctx rule.Context) *useBeforeDefineCycles {
-	return &useBeforeDefineCycles{ctx: ctx, graphs: map[*ast.Node]map[*ast.Node]map[*ast.Node]bool{}}
+func newUseBeforeDefineCycles(ruleContext rule.Context) *useBeforeDefineCycles {
+	return &useBeforeDefineCycles{ctx: ruleContext, graphs: map[*ast.Node]map[*ast.Node]map[*ast.Node]bool{}}
 }
 
 // exempts reports whether a forward reference from identifier to declaration is one no ordering can

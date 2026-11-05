@@ -38,13 +38,13 @@ func TestCustomHookEffectsFollowModuleBindings(test *testing.T) {
 			}
 			source := testCase.prefix + " function Component(" + testCase.parameters + ") {" + alias + "return " + testCase.callee + "({value: 0});}"
 			visited := 0
-			probe := rule.Rule{Name: "custom-hook-effects", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+			probe := rule.Rule{Name: "custom-hook-effects", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(node *ast.Node) {
 						if node.Name() == nil || node.Name().Text() != "Component" {
 							return
 						}
-						function := Lower(node, ctx.TypeChecker)
+						function := Lower(node, ruleContext.TypeChecker)
 						Construct(function)
 						effects := InferAliasingEffects(function)
 						for _, instruction := range function.Instructions {
@@ -117,13 +117,13 @@ func TestCalleeProducersAreBuiltOncePerFunction(test *testing.T) {
 	test.Parallel()
 	calls := 0
 	var builds []int
-	probe := rule.Rule{Name: "callee-producers", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+	probe := rule.Rule{Name: "callee-producers", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 			forEachFunctionLike(node, func(node *ast.Node) {
 				if node.Name() == nil || node.Name().Text() != "Component" {
 					return
 				}
-				function := Lower(node, ctx.TypeChecker)
+				function := Lower(node, ruleContext.TypeChecker)
 				Construct(function)
 				producers := newCalleeProducers(function)
 				inferAliasingEffects(function, producers)

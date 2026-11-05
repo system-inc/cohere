@@ -98,7 +98,7 @@ var NoLocationAssignRelativeDestination = rule.Rule{
 	// and the matcher strips the namespace on a `/` boundary, so a prefixed name here matches
 	// nothing and the rule runs on no files while every fixture passes.
 	Name: "@next/next/no-location-assign-relative-destination",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
@@ -119,7 +119,7 @@ var NoLocationAssignRelativeDestination = rule.Rule{
 				if first.Kind == ast.KindSpreadElement {
 					return
 				}
-				reportIfRelative(ctx, node, first)
+				reportIfRelative(ruleContext, node, first)
 			},
 
 			// Assignment is a binary expression in this tree rather than its own node kind, so the
@@ -136,7 +136,7 @@ var NoLocationAssignRelativeDestination = rule.Rule{
 				if !readsGlobalLocation(memberReceiver(target)) {
 					return
 				}
-				reportIfRelative(ctx, node, binary.Right)
+				reportIfRelative(ruleContext, node, binary.Right)
 			},
 		}
 	},
@@ -164,12 +164,12 @@ var assignmentOperators = map[ast.Kind]bool{
 }
 
 // reportIfRelative reports against reported when value resolves to an internal destination.
-func reportIfRelative(ctx rule.Context, reported *ast.Node, value *ast.Node) {
+func reportIfRelative(ruleContext rule.Context, reported *ast.Node, value *ast.Node) {
 	text, ok := staticStringPrefix(value, map[*ast.Node]bool{})
 	if !ok || absoluteDestination.MatchString(text) {
 		return
 	}
-	ctx.ReportNode(reported, messageNoLocationAssign)
+	ruleContext.ReportNode(reported, messageNoLocationAssign)
 }
 
 // accessesNamedProperty reports whether node reads the property `name` off something.

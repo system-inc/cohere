@@ -82,23 +82,23 @@ var PreferIncludes = rule.Rule{
 	Name:             "@typescript-eslint/prefer-includes",
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportPreferIncludesComparison(ctx, node)
+				reportPreferIncludesComparison(ruleContext, node)
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportPreferIncludesRegexTest(ctx, node)
+				reportPreferIncludesRegexTest(ruleContext, node)
 			},
 		}
 	},
@@ -109,13 +109,13 @@ var PreferIncludes = rule.Rule{
 // Upstream anchors on the member access through two selectors that name the comparison as an
 // ancestor; anchoring on the comparison instead reaches the same set and makes the optional-chain
 // distinction a property of the node in hand rather than of which selector fired.
-func reportPreferIncludesComparison(ctx rule.Context, node *ast.Node) {
+func reportPreferIncludesComparison(ruleContext rule.Context, node *ast.Node) {
 	comparison := node.AsBinaryExpression()
 	if comparison.OperatorToken == nil {
 		return
 	}
 
-	negative, positive := preferIncludesCheckDirection(ctx, comparison)
+	negative, positive := preferIncludesCheckDirection(ruleContext, comparison)
 	if !negative && !positive {
 		return
 	}
@@ -137,7 +137,7 @@ func reportPreferIncludesComparison(ctx rule.Context, node *ast.Node) {
 		return
 	}
 
-	if !preferIncludesTypeHasMatchingIncludes(ctx, propertyName) {
+	if !preferIncludesTypeHasMatchingIncludes(ruleContext, propertyName) {
 		return
 	}
 
@@ -146,7 +146,7 @@ func reportPreferIncludesComparison(ctx rule.Context, node *ast.Node) {
 	fixable := access.QuestionDotToken == nil && callNode.AsCallExpression().QuestionDotToken == nil
 
 	if !fixable {
-		ctx.ReportNode(node, messagePreferIncludes())
+		ruleContext.ReportNode(node, messagePreferIncludes())
 		return
 	}
 
@@ -157,9 +157,9 @@ func reportPreferIncludesComparison(ctx rule.Context, node *ast.Node) {
 	// sentinel together. Nothing type-bearing lives inside it: the left operand ends at the call and
 	// the right operand is the numeric sentinel this rule already evaluated, so the span holds only
 	// the comparison itself.
-	callRange := rule.TokenRange(ctx.SourceFile, callNode)
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	propertyRange := rule.TokenRange(ctx.SourceFile, propertyName)
+	callRange := rule.TokenRange(ruleContext.SourceFile, callNode)
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	propertyRange := rule.TokenRange(ruleContext.SourceFile, propertyName)
 
 	fixes := make([]rule.Fix, 0, 3)
 	if negative {
@@ -170,14 +170,14 @@ func reportPreferIncludesComparison(ctx rule.Context, node *ast.Node) {
 		rule.ReplaceRange(propertyRange, "includes"),
 		rule.RemoveRange(shimcore.NewTextRange(callRange.End(), nodeRange.End())))
 
-	ctx.ReportNodeWithFixes(node, messagePreferIncludes(), fixes...)
+	ruleContext.ReportNodeWithFixes(node, messagePreferIncludes(), fixes...)
 }
 
 // preferIncludesCheckDirection is upstream's `isNegativeCheck` and `isPositiveCheck` together.
 //
 // Returning both answers from one function because the caller needs the direction and upstream's
 // two predicates partition the same switch.
-func preferIncludesCheckDirection(ctx rule.Context, comparison *ast.BinaryExpression) (negative bool, positive bool) {
+func preferIncludesCheckDirection(ruleContext rule.Context, comparison *ast.BinaryExpression) (negative bool, positive bool) {
 	right := comparison.Right
 	if right == nil {
 		return false, false
@@ -186,14 +186,14 @@ func preferIncludesCheckDirection(ctx rule.Context, comparison *ast.BinaryExpres
 	switch comparison.OperatorToken.Kind {
 	case ast.KindExclamationEqualsEqualsToken, ast.KindExclamationEqualsToken,
 		ast.KindGreaterThanToken:
-		return false, preferIncludesEvaluatesTo(ctx, right, -1)
+		return false, preferIncludesEvaluatesTo(ruleContext, right, -1)
 	case ast.KindGreaterThanEqualsToken:
-		return false, preferIncludesEvaluatesTo(ctx, right, 0)
+		return false, preferIncludesEvaluatesTo(ruleContext, right, 0)
 	case ast.KindEqualsEqualsEqualsToken, ast.KindEqualsEqualsToken,
 		ast.KindLessThanEqualsToken:
-		return preferIncludesEvaluatesTo(ctx, right, -1), false
+		return preferIncludesEvaluatesTo(ruleContext, right, -1), false
 	case ast.KindLessThanToken:
-		return preferIncludesEvaluatesTo(ctx, right, 0), false
+		return preferIncludesEvaluatesTo(ruleContext, right, 0), false
 	}
 	return false, false
 }
@@ -212,7 +212,7 @@ func preferIncludesCheckDirection(ctx rule.Context, comparison *ast.BinaryExpres
 // comparisons in total and none of them names a constant, so the narrowing has no exposure here.
 // Closing it means a constant evaluator with scope, which is substrate rather than a line in this
 // rule, and the same gap is recorded on `class-literal-property-style`.
-func preferIncludesEvaluatesTo(ctx rule.Context, node *ast.Node, want int) bool {
+func preferIncludesEvaluatesTo(ruleContext rule.Context, node *ast.Node, want int) bool {
 	if node == nil {
 		return false
 	}
@@ -261,8 +261,8 @@ func preferIncludesNumericLiteralIs(node *ast.Node, want int) bool {
 // parameter text matches some `indexOf` overload. A single declaration failing the test declines the
 // whole finding, which is why this returns on the first failure rather than accepting on the first
 // success.
-func preferIncludesTypeHasMatchingIncludes(ctx rule.Context, propertyName *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(propertyName)
+func preferIncludesTypeHasMatchingIncludes(ruleContext rule.Context, propertyName *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(propertyName)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -272,18 +272,18 @@ func preferIncludesTypeHasMatchingIncludes(ctx rule.Context, propertyName *ast.N
 		if parent == nil {
 			return false
 		}
-		declaringType := ctx.TypeChecker.GetTypeAtLocation(parent)
+		declaringType := ruleContext.TypeChecker.GetTypeAtLocation(parent)
 		if declaringType == nil {
 			return false
 		}
-		includes := shimchecker.Checker_getPropertyOfType(ctx.TypeChecker, declaringType, "includes")
+		includes := shimchecker.Checker_getPropertyOfType(ruleContext.TypeChecker, declaringType, "includes")
 		if includes == nil || len(includes.Declarations) == 0 {
 			return false
 		}
 
 		matched := false
 		for _, includesDeclaration := range includes.Declarations {
-			if preferIncludesHasSameParameters(ctx, includesDeclaration, indexOfDeclaration) {
+			if preferIncludesHasSameParameters(ruleContext, includesDeclaration, indexOfDeclaration) {
 				matched = true
 				break
 			}
@@ -301,7 +301,7 @@ func preferIncludesTypeHasMatchingIncludes(ctx rule.Context, propertyName *ast.N
 // SOURCE TEXT must match. Comparing text rather than type is upstream's own shortcut and is
 // reproduced: it is what makes a `includes: boolean` property decline, since a property declaration
 // is not function-like and has no parameters to compare.
-func preferIncludesHasSameParameters(ctx rule.Context, first *ast.Node, second *ast.Node) bool {
+func preferIncludesHasSameParameters(ruleContext rule.Context, first *ast.Node, second *ast.Node) bool {
 	firstParameters, firstIsFunction := preferIncludesParametersOf(first)
 	secondParameters, secondIsFunction := preferIncludesParametersOf(second)
 	if !firstIsFunction || !secondIsFunction {
@@ -312,8 +312,8 @@ func preferIncludesHasSameParameters(ctx rule.Context, first *ast.Node, second *
 	}
 
 	for index := range firstParameters {
-		firstText, firstReadable := preferIncludesNodeText(ctx, firstParameters[index])
-		secondText, secondReadable := preferIncludesNodeText(ctx, secondParameters[index])
+		firstText, firstReadable := preferIncludesNodeText(ruleContext, firstParameters[index])
+		secondText, secondReadable := preferIncludesNodeText(ruleContext, secondParameters[index])
 		if !firstReadable || !secondReadable || firstText != secondText {
 			return false
 		}
@@ -342,7 +342,7 @@ func preferIncludesParametersOf(declaration *ast.Node) ([]*ast.Node, bool) {
 }
 
 // reportPreferIncludesRegexTest is upstream's `/lit/.test(x)` listener.
-func reportPreferIncludesRegexTest(ctx rule.Context, node *ast.Node) {
+func reportPreferIncludesRegexTest(ruleContext rule.Context, node *ast.Node) {
 	call := node.AsCallExpression()
 	if call.Arguments == nil || len(call.Arguments.Nodes) != 1 {
 		return
@@ -360,24 +360,24 @@ func reportPreferIncludesRegexTest(ctx rule.Context, node *ast.Node) {
 	// business. A property access is the non-computed form in this parser, so the kind test above
 	// already carries it, and an element access reaches a different node kind entirely.
 
-	text, simple := preferIncludesPatternTextOf(ctx, access.Expression)
+	text, simple := preferIncludesPatternTextOf(ruleContext, access.Expression)
 	if !simple {
 		return
 	}
 
 	argument := call.Arguments.Nodes[0]
-	if !preferIncludesArgumentHasIncludes(ctx, argument) {
+	if !preferIncludesArgumentHasIncludes(ruleContext, argument) {
 		return
 	}
 
-	replacement, buildable := preferIncludesRegexReplacement(ctx, node, access, argument, text)
+	replacement, buildable := preferIncludesRegexReplacement(ruleContext, node, access, argument, text)
 	if !buildable {
-		ctx.ReportNode(node, messagePreferStringIncludes())
+		ruleContext.ReportNode(node, messagePreferStringIncludes())
 		return
 	}
 
-	ctx.ReportNodeWithFixes(node, messagePreferStringIncludes(),
-		rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, node), replacement))
+	ruleContext.ReportNodeWithFixes(node, messagePreferStringIncludes(),
+		rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement))
 }
 
 // preferIncludesRegexReplacement builds the whole rewritten call.
@@ -393,7 +393,7 @@ func reportPreferIncludesRegexTest(ctx rule.Context, node *ast.Node) {
 // parenthesis. The argument is carried through as its own source text rather than re-rendered, so a
 // type assertion or a generic call inside it survives.
 func preferIncludesRegexReplacement(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	access *ast.PropertyAccessExpression,
 	argument *ast.Node,
@@ -420,7 +420,7 @@ func preferIncludesRegexReplacement(
 		argument = inner
 	}
 
-	argumentText, readable := preferIncludesNodeText(ctx, argument)
+	argumentText, readable := preferIncludesNodeText(ruleContext, argument)
 	if !readable {
 		return "", false
 	}
@@ -459,16 +459,16 @@ func preferIncludesRegexReplacement(
 //
 // This is what makes `/bar/.test(a)` clean when `a` is untyped and reporting when it is a string.
 // Upstream reads the CONSTRAINED type, so a type parameter is judged by its constraint.
-func preferIncludesArgumentHasIncludes(ctx rule.Context, argument *ast.Node) bool {
-	argumentType := ctx.TypeChecker.GetTypeAtLocation(argument)
+func preferIncludesArgumentHasIncludes(ruleContext rule.Context, argument *ast.Node) bool {
+	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 	if argumentType == nil {
 		return false
 	}
-	constrained := shimchecker.Checker_getBaseConstraintOfType(ctx.TypeChecker, argumentType)
+	constrained := shimchecker.Checker_getBaseConstraintOfType(ruleContext.TypeChecker, argumentType)
 	if constrained != nil {
 		argumentType = constrained
 	}
-	includes := shimchecker.Checker_getPropertyOfType(ctx.TypeChecker, argumentType, "includes")
+	includes := shimchecker.Checker_getPropertyOfType(ruleContext.TypeChecker, argumentType, "includes")
 	return includes != nil && len(includes.Declarations) > 0
 }
 
@@ -477,7 +477,7 @@ func preferIncludesArgumentHasIncludes(ctx rule.Context, argument *ast.Node) boo
 // Two receivers reach here, both of which upstream resolves through `getStaticValue`: a regex
 // literal written in place, and an identifier bound to one. The identifier arm covers upstream's
 // `const pattern = /bar/` and `const pattern = new RegExp('bar')` cases.
-func preferIncludesPatternTextOf(ctx rule.Context, receiver *ast.Node) (string, bool) {
+func preferIncludesPatternTextOf(ruleContext rule.Context, receiver *ast.Node) (string, bool) {
 	if receiver == nil {
 		return "", false
 	}
@@ -486,7 +486,7 @@ func preferIncludesPatternTextOf(ctx rule.Context, receiver *ast.Node) (string, 
 	case ast.KindRegularExpressionLiteral:
 		return preferIncludesSimplePatternFromLiteral(receiver.Text())
 	case ast.KindIdentifier:
-		return preferIncludesResolveRegexVariable(ctx, receiver.Text())
+		return preferIncludesResolveRegexVariable(ruleContext, receiver.Text())
 	}
 	return "", false
 }
@@ -499,10 +499,10 @@ func preferIncludesPatternTextOf(ctx rule.Context, receiver *ast.Node) (string, 
 //
 // The LAST matching declaration wins, matching how a second declaration of the same name shadows the
 // first at the point the call is written.
-func preferIncludesResolveRegexVariable(ctx rule.Context, name string) (string, bool) {
+func preferIncludesResolveRegexVariable(ruleContext rule.Context, name string) (string, bool) {
 	text := ""
 	found := false
-	for _, statement := range ctx.SourceFile.AsNode().Statements() {
+	for _, statement := range ruleContext.SourceFile.AsNode().Statements() {
 		if statement.Kind != ast.KindVariableStatement {
 			continue
 		}
@@ -734,7 +734,7 @@ func preferIncludesEscapeString(text string) string {
 }
 
 // preferIncludesNodeText slices a node's own source text, trivia excluded.
-func preferIncludesNodeText(ctx rule.Context, node *ast.Node) (string, bool) {
+func preferIncludesNodeText(ruleContext rule.Context, node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
 	}

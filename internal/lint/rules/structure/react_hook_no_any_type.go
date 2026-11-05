@@ -119,10 +119,10 @@ var ReactHookNoAnyType = rule.Rule{
 	Name:             "structure/react-hook-no-any-type",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The typed-rule guard. A rule that reads a nil checker here would decline every file
 		// vacuously, which is precisely the silence this rule exists to make loud.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -147,7 +147,7 @@ var ReactHookNoAnyType = rule.Rule{
 
 				// The CALL's type, not the callee's. See the rule comment: an ambient shim
 				// declaring `useState<T>(initial: T): any` gives a perfectly typed callee.
-				resultType := ctx.TypeChecker.GetTypeAtLocation(node)
+				resultType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 
 				// Crash protection rather than a behavioural filter, and it is a SURVIVING mutant
 				// recorded as such rather than argued into equivalence. `shimchecker.Type_flags`
@@ -169,7 +169,7 @@ var ReactHookNoAnyType = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id:          reactHookNoAnyTypeMessageId,
 					Description: reactHookNoAnyTypeDescription(reactHookNoAnyTypeCalleeName(call.Expression)),
 				})

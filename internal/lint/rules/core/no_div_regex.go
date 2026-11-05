@@ -62,10 +62,10 @@ var messageDivRegex = rule.Message{
 // upstream's rather than an omission.
 var NoDivRegex = rule.Rule{
 	Name: "no-div-regex",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
 				// Sliced from the range rather than read off the node, though for this kind the
 				// two are the same string. A mutation swapping in `node.Text()` survived the whole
 				// fixture set, and probing eight shapes including ones with leading block and line
@@ -73,7 +73,7 @@ var NoDivRegex = rule.Rule{
 				// than a blind spot. The range form is kept because the fix offset below has to
 				// come from the range in any case, and reading both from one place means an
 				// offset and the text it indexes cannot drift apart.
-				text := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				text := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 
 				// Index 1 is the character after the opening slash.
 				//
@@ -93,7 +93,7 @@ var NoDivRegex = rule.Rule{
 				// still points at the whole literal, matching upstream.
 				equalsRange := core.NewTextRange(literalRange.Pos()+1, literalRange.Pos()+2)
 
-				ctx.ReportNodeWithFixes(node, messageDivRegex,
+				ruleContext.ReportNodeWithFixes(node, messageDivRegex,
 					rule.ReplaceRange(equalsRange, "[=]"))
 			},
 		}

@@ -30,9 +30,9 @@ func TestTheFixPathsReLintComputesEachDerivationOncePerText(test *testing.T) {
 	test.Parallel()
 	computed := 0
 	asking := func(name string) rule.Rule {
-		return rule.Rule{Name: name, Run: func(ctx rule.Context, options any) rule.Listeners {
+		return rule.Rule{Name: name, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindIdentifier: func(node *ast.Node) {
-				rule.Cached(ctx.FileCache, "fix-file-cache-probe", func() int {
+				rule.Cached(ruleContext.FileCache, "fix-file-cache-probe", func() int {
 					computed++
 					return computed
 				})

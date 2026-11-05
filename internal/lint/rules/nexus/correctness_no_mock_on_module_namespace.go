@@ -101,13 +101,13 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 	// it resolves the argument to is declared in the file itself.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.Program == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			// Telling node:test's MockTracker from any other `method`, and a namespace import from a
 			// value of the same type, are questions for the checker.
 			return nil
 		}
-		if !correctnessNoMockOnModuleNamespaceRunsAsModule(ctx.SourceFile.FileName().AsString(), ctx.Program.Options()) {
+		if !correctnessNoMockOnModuleNamespaceRunsAsModule(ruleContext.SourceFile.FileName().AsString(), ruleContext.Program.Options()) {
 			return nil
 		}
 		return rule.Listeners{
@@ -125,13 +125,13 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 					return
 				}
 				target := correctnessNoMockOnModuleNamespaceUnwrap(call.Arguments.Nodes[0])
-				if target.Kind != ast.KindIdentifier || !correctnessNoMockOnModuleNamespaceIsNamespace(ctx, target) {
+				if target.Kind != ast.KindIdentifier || !correctnessNoMockOnModuleNamespaceIsNamespace(ruleContext, target) {
 					return
 				}
-				if !correctnessNoMockOnModuleNamespaceIsMockTracker(ctx, node) {
+				if !correctnessNoMockOnModuleNamespaceIsMockTracker(ruleContext, node) {
 					return
 				}
-				ctx.ReportNode(node, correctnessNoMockOnModuleNamespaceMessage())
+				ruleContext.ReportNode(node, correctnessNoMockOnModuleNamespaceMessage())
 			},
 		}
 	},
@@ -175,12 +175,12 @@ func correctnessNoMockOnModuleNamespaceUnwrap(expression *ast.Node) *ast.Node {
 
 // correctnessNoMockOnModuleNamespaceIsNamespace says whether an identifier names the binding of an
 // `import * as` declaration in this file that is not type-only.
-func correctnessNoMockOnModuleNamespaceIsNamespace(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func correctnessNoMockOnModuleNamespaceIsNamespace(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil || symbol.Flags&ast.SymbolFlagsAlias == 0 {
 		return false
 	}
-	declarations := rule.DeclarationsIn(ctx.SourceFile, symbol)
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, symbol)
 	if len(declarations) != 1 {
 		return false
 	}
@@ -190,8 +190,8 @@ func correctnessNoMockOnModuleNamespaceIsNamespace(ctx rule.Context, identifier 
 
 // correctnessNoMockOnModuleNamespaceIsMockTracker says whether a call resolves to a method declared on
 // `MockTracker` in `declare module "node:test"` (or `"test"`), at any depth of namespaces inside it.
-func correctnessNoMockOnModuleNamespaceIsMockTracker(ctx rule.Context, call *ast.Node) bool {
-	signature := ctx.TypeChecker.GetResolvedSignature(call)
+func correctnessNoMockOnModuleNamespaceIsMockTracker(ruleContext rule.Context, call *ast.Node) bool {
+	signature := ruleContext.TypeChecker.GetResolvedSignature(call)
 	if signature == nil {
 		return false
 	}

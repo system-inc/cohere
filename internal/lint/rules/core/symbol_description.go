@@ -59,7 +59,7 @@ var SymbolDescription = rule.Rule{
 	Name:             "symbol-description",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				// Without this the rule goes completely silent under the plain harness rather than
@@ -73,7 +73,7 @@ var SymbolDescription = rule.Rule{
 				// verdict names the callers that exist right now and expires the moment a second
 				// checker call is added here, and because a typed rule that reads the checker
 				// without guarding is the shape three shipped rules got wrong.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 
@@ -92,11 +92,11 @@ var SymbolDescription = rule.Rule{
 				if !ast.IsIdentifier(callee) || callee.Text() != "Symbol" {
 					return
 				}
-				if !resolvesToAGlobal(ctx, callee) {
+				if !resolvesToAGlobal(ruleContext, callee) {
 					return
 				}
 
-				ctx.ReportNode(node, messageSymbolDescription)
+				ruleContext.ReportNode(node, messageSymbolDescription)
 			},
 		}
 	},

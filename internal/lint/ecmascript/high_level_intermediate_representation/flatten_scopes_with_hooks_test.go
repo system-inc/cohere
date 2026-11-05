@@ -24,16 +24,16 @@ func flattenHooksIn(test *testing.T, source string) hookFlattening {
 	test.Helper()
 	var result hookFlattening
 	visited := 0
-	probe := rule.Rule{Name: "hook-flatten", NeedsTypeChecker: true, Run: func(ctx rule.Context, options any) rule.Listeners {
+	probe := rule.Rule{Name: "hook-flatten", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 			forEachFunctionLike(node, func(node *ast.Node) {
-				function := Lower(node, ctx.TypeChecker)
+				function := Lower(node, ruleContext.TypeChecker)
 				if function == nil {
 					return
 				}
 				Construct(function)
 				OutlineFunctions(function)
-				InferReactive(function, ctx.TypeChecker)
+				InferReactive(function, ruleContext.TypeChecker)
 				DropManualMemoization(function)
 				if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
 					MergeConsecutiveBlocks(function)

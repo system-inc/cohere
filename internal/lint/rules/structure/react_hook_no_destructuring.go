@@ -36,7 +36,7 @@ func messageNoDestructuringInHook() rule.Message {
 // might.
 var ReactHookNoDestructuring = rule.Rule{
 	Name: "structure/react-hook-no-destructuring",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				declaration := node.AsVariableDeclaration()
@@ -65,7 +65,7 @@ var ReactHookNoDestructuring = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(name, messageNoDestructuringInHook())
+				ruleContext.ReportNode(name, messageNoDestructuringInHook())
 			},
 		}
 	},

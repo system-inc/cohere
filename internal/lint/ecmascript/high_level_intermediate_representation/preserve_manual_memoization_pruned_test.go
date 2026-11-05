@@ -54,19 +54,19 @@ func TestPrunedScopesAreRecordedRatherThanCompared(test *testing.T) {
 	probe := rule.Rule{
 		Name:             "pruned-scope-split",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						live, pruned, sharedDependencies = prunedScopeShape(function, ctx.TypeChecker)
+						live, pruned, sharedDependencies = prunedScopeShape(function, ruleContext.TypeChecker)
 					})
 				},
 			}

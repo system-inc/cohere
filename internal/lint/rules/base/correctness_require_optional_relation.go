@@ -68,10 +68,10 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				// The shelf's HasDecoratorInSet, which was measured to agree with the source's
@@ -91,7 +91,7 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 					return
 				}
 
-				propertyType := ctx.TypeChecker.GetTypeAtLocation(name)
+				propertyType := ruleContext.TypeChecker.GetTypeAtLocation(name)
 				if propertyType == nil {
 					return
 				}
@@ -99,11 +99,11 @@ var CorrectnessRequireOptionalRelation = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(name, rule.Message{
+				ruleContext.ReportNode(name, rule.Message{
 					Id: correctnessRequireOptionalRelationText.Id,
 					Description: correctnessRequireOptionalRelationText.Render(map[string]string{
 						"propertyName": name.AsIdentifier().Text,
-						"propertyType": ctx.TypeChecker.TypeToString(propertyType),
+						"propertyType": ruleContext.TypeChecker.TypeToString(propertyType),
 					}),
 				})
 			},

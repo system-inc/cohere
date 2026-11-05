@@ -49,12 +49,12 @@ var NoOptionalWidening = rule.Rule{
 	Name:             "adamic/no-optional-widening",
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
-		typeChecker := ctx.TypeChecker
-		walker := flow.WalkerFor(ctx)
+		typeChecker := ruleContext.TypeChecker
+		walker := flow.WalkerFor(ruleContext)
 		// The judge, what it reads and what it reports are made once per file and set at each site, not a
 		// closure per site (#m6tyg79).
 		var exactAtTop bool
@@ -103,10 +103,10 @@ var NoOptionalWidening = rule.Rule{
 			if !wrong {
 				return
 			}
-			ctx.ReportNode(site.Node, rule.Message{
+			ruleContext.ReportNode(site.Node, rule.Message{
 				Id: "optionalWidening",
 				Description: noOptionalWideningText.Render(map[string]string{
-					"slot":         slotText(ctx.SourceFile, site.Node, found.Path),
+					"slot":         slotText(ruleContext.SourceFile, site.Node, found.Path),
 					"source":       type_checking.StableTypeText(typeChecker, found.Source),
 					"target":       type_checking.StableTypeText(typeChecker, found.Target),
 					"property":     type_checking.StablePropertyName(missing.Name),

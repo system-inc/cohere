@@ -55,10 +55,10 @@ var forwardRefTypeNames = map[string]bool{
 // the aliased import (`import { forwardRef as fr }`) that the import arm exists to catch anyway.
 var ReactComponentNoForwardRef = rule.Rule{
 	Name: "structure/react-component-no-forward-ref",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
-				reportForwardRefImport(ctx, node)
+				reportForwardRefImport(ruleContext, node)
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -70,11 +70,11 @@ var ReactComponentNoForwardRef = rule.Rule{
 				switch callee.Kind {
 				case ast.KindIdentifier:
 					if callee.Text() == "forwardRef" {
-						ctx.ReportNode(callee, messageNoForwardRefCall())
+						ruleContext.ReportNode(callee, messageNoForwardRefCall())
 					}
 				case ast.KindPropertyAccessExpression:
 					if react.IsNamespacedMember(callee, func(name string) bool { return name == "forwardRef" }) {
-						ctx.ReportNode(callee, messageNoForwardRefCall())
+						ruleContext.ReportNode(callee, messageNoForwardRefCall())
 					}
 				}
 			},
@@ -88,7 +88,7 @@ var ReactComponentNoForwardRef = rule.Rule{
 				}
 				if left.Kind == ast.KindIdentifier && left.Text() == "React" &&
 					right.Kind == ast.KindIdentifier && forwardRefTypeNames[right.Text()] {
-					ctx.ReportNode(node, messageNoForwardRefCall())
+					ruleContext.ReportNode(node, messageNoForwardRefCall())
 				}
 			},
 		}
@@ -101,7 +101,7 @@ var ReactComponentNoForwardRef = rule.Rule{
 // function under another name, so the imported name is what decides and the local name is what the
 // call arm would have to have resolved. Reporting the specifier rather than the whole statement
 // keeps the finding on the one name at fault when several are imported together.
-func reportForwardRefImport(ctx rule.Context, node *ast.Node) {
+func reportForwardRefImport(ruleContext rule.Context, node *ast.Node) {
 	declaration := node.AsImportDeclaration()
 	if declaration.ModuleSpecifier == nil || !ast.IsStringLiteralLike(declaration.ModuleSpecifier) {
 		return
@@ -120,7 +120,7 @@ func reportForwardRefImport(ctx rule.Context, node *ast.Node) {
 		if imports.ImportedNameOf(element) == "forwardRef" {
 			// The specifier node rather than the local name, so an aliased import blames the whole
 			// `forwardRef as forward` rather than just the alias.
-			ctx.ReportNode(element, messageNoForwardRefImport())
+			ruleContext.ReportNode(element, messageNoForwardRefImport())
 		}
 	}
 }

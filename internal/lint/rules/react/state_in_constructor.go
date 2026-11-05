@@ -207,7 +207,7 @@ var StateInConstructor = rule.Rule{
 	// No namespace prefix beyond the plugin's own. The config writes `react/state-in-constructor`
 	// and the parity guard strips the namespace on a `/` boundary.
 	Name: "react/state-in-constructor",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[StateInConstructorOptions](options)
 		if !ok {
 			// A rule configured as bare `"error"` reaches here with nil options, which type-asserts
@@ -227,7 +227,7 @@ var StateInConstructor = rule.Rule{
 						return
 					}
 					if stateInConstructorIsComponentClass(enclosingClassOf(node)) {
-						ctx.ReportNode(node, messageStateInConstructorInConstructor)
+						ruleContext.ReportNode(node, messageStateInConstructorInConstructor)
 					}
 				},
 			}
@@ -250,7 +250,7 @@ var StateInConstructor = rule.Rule{
 					return
 				}
 				if stateInConstructorIsComponentClass(enclosingClassOf(node)) {
-					ctx.ReportNode(node, messageStateInConstructorClassProperty)
+					ruleContext.ReportNode(node, messageStateInConstructorClassProperty)
 				}
 			},
 		}

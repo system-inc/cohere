@@ -68,12 +68,12 @@ var NoSetterReturn = rule.Rule{
 	// Whether the `Object` or `Reflect` of a descriptor call is the global
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		isGlobal := func(identifier *ast.Node) bool {
-			return ctx.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+			return ruleContext.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}
 		report := func(node *ast.Node) {
-			ctx.ReportNode(node, rule.Message{
+			ruleContext.ReportNode(node, rule.Message{
 				Id: "noSetterReturn",
 				Description: "This returns a value from a setter, and the language discards " +
 					"it: an assignment evaluates to the value assigned, never to what the " +

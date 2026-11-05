@@ -97,13 +97,13 @@ var StrictVoidReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[StrictVoidReturnOptions](options)
 		if !isSettings {
 			settings = DefaultStrictVoidReturnSettings()
 		}
 
-		state := &strictVoidReturnState{ctx: ctx, settings: settings}
+		state := &strictVoidReturnState{ctx: ruleContext, settings: settings}
 
 		return rule.Listeners{
 			ast.KindCallExpression: state.checkCall,
@@ -682,15 +682,15 @@ func strictVoidReturnBody(node *ast.Node) *ast.Node {
 // The reported span for an async or generator function literal is its HEAD rather than the whole
 // function, so a multi-line callback underlines its first line instead of its body. The head runs
 // from the function's first token through the closing parenthesis of its parameter list.
-func strictVoidReturnHeadRange(ctx rule.Context, node *ast.Node) core.TextRange {
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
+func strictVoidReturnHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 	body := strictVoidReturnBody(node)
 	if body == nil {
 		return nodeRange
 	}
 	// Everything up to the body, with trailing trivia and any arrow trimmed off.
-	end := rule.TokenRange(ctx.SourceFile, body).Pos()
-	text := ctx.SourceFile.Text()
+	end := rule.TokenRange(ruleContext.SourceFile, body).Pos()
+	text := ruleContext.SourceFile.Text()
 	for end > nodeRange.Pos() {
 		trimmed := end - 1
 		switch text[trimmed] {

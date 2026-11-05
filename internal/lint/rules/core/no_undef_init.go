@@ -79,10 +79,10 @@ var NoUndefInit = rule.Rule{
 	Name:             "no-undef-init",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				declaration := node.AsVariableDeclaration()
@@ -105,7 +105,7 @@ var NoUndefInit = rule.Rule{
 					return
 				}
 
-				if undefinedIsShadowed(ctx, initializer) {
+				if undefinedIsShadowed(ruleContext, initializer) {
 					return
 				}
 
@@ -114,12 +114,12 @@ var NoUndefInit = rule.Rule{
 					return
 				}
 
-				message := buildNoUndefInitMessage(ctx.SourceFile.Text()[rule.TokenRange(ctx.SourceFile, name).Pos():name.End()])
-				if fix, offered := noUndefInitFix(ctx, node, name); offered {
-					ctx.ReportNodeWithFixes(node, message, fix)
+				message := buildNoUndefInitMessage(ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, name).Pos():name.End()])
+				if fix, offered := noUndefInitFix(ruleContext, node, name); offered {
+					ruleContext.ReportNodeWithFixes(node, message, fix)
 					return
 				}
-				ctx.ReportNode(node, message)
+				ruleContext.ReportNode(node, message)
 			},
 		}
 	},
@@ -131,8 +131,8 @@ var NoUndefInit = rule.Rule{
 // The shared form exists because `no-alert` asks the identical question of three different names,
 // and two spellings of one decision is how the four-implementation census in
 // `internal/utilities/ecmascript/reference` started.
-func undefinedIsShadowed(ctx rule.Context, identifier *ast.Node) bool {
-	return identifierIsShadowed(ctx, identifier)
+func undefinedIsShadowed(ruleContext rule.Context, identifier *ast.Node) bool {
+	return identifierIsShadowed(ruleContext, identifier)
 }
 
 // identifierIsShadowed reports whether an identifier names a binding written in source rather than
@@ -157,11 +157,11 @@ func undefinedIsShadowed(ctx rule.Context, identifier *ast.Node) bool {
 // A symbol we cannot resolve answers false, which reports. That is the conservative direction for
 // these callers: an unresolvable `alert` or `undefined` is overwhelmingly the global in a file the
 // checker could not fully type, and declining there would silence the rule on every such file.
-func identifierIsShadowed(ctx rule.Context, identifier *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func identifierIsShadowed(ruleContext rule.Context, identifier *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	return rule.IsDeclaredInANonDeclarationFile(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+	return rule.IsDeclaredInANonDeclarationFile(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // noUndefInitFix builds the removal upstream would build, or declines the way upstream declines.
@@ -173,7 +173,7 @@ func identifierIsShadowed(ctx rule.Context, identifier *ast.Node) bool {
 // Three declines, all of them upstream's, all of them asserted by an `output: null` in the corpus:
 // a `var` declaration, a destructuring target, and a comment sitting inside the range about to be
 // removed.
-func noUndefInitFix(ctx rule.Context, node *ast.Node, name *ast.Node) (rule.Fix, bool) {
+func noUndefInitFix(ruleContext rule.Context, node *ast.Node, name *ast.Node) (rule.Fix, bool) {
 	// `var a = undefined` and `var a` are not the same program. A `var` re-reached in a loop keeps
 	// whatever it last held when there is no initializer, and is reset to `undefined` when there is
 	// one, so the edit changes behaviour rather than spelling.
@@ -203,7 +203,7 @@ func noUndefInitFix(ctx rule.Context, node *ast.Node, name *ast.Node) (rule.Fix,
 	}
 
 	removal := core.NewTextRange(removalStart, node.End())
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		// Upstream asks `commentsExistBetween(node.id, lastToken)`, which is this half-open range.
 		// A comment after the initializer but before the terminator sits outside it and is kept,
 		// which is why `let a = undefined/* comment */;` fixes and `let a /**/ = undefined;` does

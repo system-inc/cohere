@@ -66,7 +66,7 @@ var messageNoAsyncPromiseExecutor = rule.Message{
 // there.
 var NoAsyncPromiseExecutor = rule.Rule{
 	Name: "no-async-promise-executor",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				newExpression := node.AsNewExpression()
@@ -91,7 +91,7 @@ var NoAsyncPromiseExecutor = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(asyncKeyword, messageNoAsyncPromiseExecutor)
+				ruleContext.ReportNode(asyncKeyword, messageNoAsyncPromiseExecutor)
 			},
 		}
 	},

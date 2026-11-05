@@ -107,8 +107,8 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return rule.Listeners{}
 		}
 
@@ -120,7 +120,7 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 			if len(declared) == 0 {
 				return
 			}
-			markPrivateKeywordUses(ctx, classNode, declared)
+			markPrivateKeywordUses(ruleContext, classNode, declared)
 
 			// Reported in declaration order, which is source order, so a class with several dead
 			// members reads top to bottom.
@@ -134,11 +134,11 @@ var NoUnusedPrivateClassMembers = rule.Rule{
 						"' is defined but never used.",
 				}
 				if member.spanEnd == 0 {
-					ctx.ReportNode(member.nameNode, message)
+					ruleContext.ReportNode(member.nameNode, message)
 					continue
 				}
-				ctx.ReportRange(core.NewTextRange(
-					rule.TokenRange(ctx.SourceFile, member.nameNode).Pos(), member.spanEnd), message)
+				ruleContext.ReportRange(core.NewTextRange(
+					rule.TokenRange(ruleContext.SourceFile, member.nameNode).Pos(), member.spanEnd), message)
 			}
 		}
 
@@ -269,7 +269,7 @@ func hasPrivateKeyword(node *ast.Node) bool {
 // The walk is bounded to the class node, which is what makes a reference from outside not count:
 // such a reference is illegal TypeScript and the compiler rejects it, so it cannot keep a member
 // alive. Upstream reaches the same verdict through its scope structure and carries two cases for it.
-func markPrivateKeywordUses(ctx rule.Context, classNode *ast.Node, declared []*privateKeywordMember) {
+func markPrivateKeywordUses(ruleContext rule.Context, classNode *ast.Node, declared []*privateKeywordMember) {
 	byName := map[string][]*privateKeywordMember{}
 	for _, member := range declared {
 		byName[member.name] = append(byName[member.name], member)
@@ -291,7 +291,7 @@ func markPrivateKeywordUses(ctx rule.Context, classNode *ast.Node, declared []*p
 				// read (#yfkhkvy). The checker's resolution is the bound that matters: `this.secret`
 				// inside the nested class names the nested class's own member or nothing, never the
 				// outer declaration, so no bound on nesting is needed to keep it from crediting one.
-				markPrivateKeywordAccess(ctx, node, name, byName)
+				markPrivateKeywordAccess(ruleContext, node, name, byName)
 			case name.Kind == ast.KindPrivateIdentifier:
 				// A `#name` reaches its declaring class from any depth, so this arm is not bounded
 				// by nesting the way the keyword arm is: `other.#foo` inside the class reaches the
@@ -308,7 +308,7 @@ func markPrivateKeywordUses(ctx rule.Context, classNode *ast.Node, declared []*p
 			// as a binding element. Two of upstream's passing cases are this shape and both report
 			// without this arm.
 			if !insideNestedClass {
-				markShorthandAssignmentUse(ctx, node, byName)
+				markShorthandAssignmentUse(ruleContext, node, byName)
 			}
 
 		case ast.KindBindingElement:
@@ -316,7 +316,7 @@ func markPrivateKeywordUses(ctx rule.Context, classNode *ast.Node, declared []*p
 			// property-access arm above never sees it. Seven of upstream's passing cases are this
 			// shape and every one of them reports without this arm.
 			if !insideNestedClass {
-				markDestructuredUse(ctx, node, byName)
+				markDestructuredUse(ruleContext, node, byName)
 			}
 
 		case ast.KindPrivateIdentifier:
@@ -351,7 +351,7 @@ func markPrivateKeywordUses(ctx rule.Context, classNode *ast.Node, declared []*p
 // Attribution is by DECLARATION IDENTITY rather than by name. Two classes in one file can each
 // declare `private prop`, and a name comparison would let a use in one keep the other alive.
 func markPrivateKeywordAccess(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	access *ast.Node,
 	name *ast.Node,
 	byName map[string][]*privateKeywordMember,
@@ -370,7 +370,7 @@ func markPrivateKeywordAccess(
 		return
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return
 	}
@@ -569,11 +569,11 @@ func shadowedByNestedClass(node *ast.Node, name string, outermost *ast.Node) boo
 //
 // Both are reads by construction. A destructuring pattern loads; there is no write-only form of it,
 // which is why nothing here consults the write enumeration.
-func markDestructuredUse(ctx rule.Context, element *ast.Node, byName map[string][]*privateKeywordMember) {
+func markDestructuredUse(ruleContext rule.Context, element *ast.Node, byName map[string][]*privateKeywordMember) {
 	binding := element.AsBindingElement()
 	if binding.PropertyName != nil {
 		if binding.PropertyName.Kind == ast.KindIdentifier {
-			markResolvedUse(ctx, binding.PropertyName, byName)
+			markResolvedUse(ruleContext, binding.PropertyName, byName)
 		}
 		return
 	}
@@ -590,11 +590,11 @@ func markDestructuredUse(ctx rule.Context, element *ast.Node, byName map[string]
 	if source == nil {
 		return
 	}
-	sourceType := ctx.TypeChecker.GetTypeAtLocation(source)
+	sourceType := ruleContext.TypeChecker.GetTypeAtLocation(source)
 	if sourceType == nil {
 		return
 	}
-	property := ctx.TypeChecker.GetPropertyOfType(sourceType, name.Text())
+	property := ruleContext.TypeChecker.GetPropertyOfType(sourceType, name.Text())
 	if property == nil {
 		return
 	}
@@ -632,12 +632,12 @@ func destructuringSource(element *ast.Node) *ast.Node {
 }
 
 // markResolvedUse marks whichever declared member a name resolves to.
-func markResolvedUse(ctx rule.Context, name *ast.Node, byName map[string][]*privateKeywordMember) {
+func markResolvedUse(ruleContext rule.Context, name *ast.Node, byName map[string][]*privateKeywordMember) {
 	candidates, named := byName[name.Text()]
 	if !named {
 		return
 	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil {
 		return
 	}
@@ -654,7 +654,7 @@ func markResolvedUse(ctx rule.Context, name *ast.Node, byName map[string][]*priv
 // read. The name resolves to the shorthand assignment itself rather than to the property, the same
 // way a shorthand binding does, so the member is found on the source object's type instead.
 func markShorthandAssignmentUse(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	shorthand *ast.Node,
 	byName map[string][]*privateKeywordMember,
 ) {
@@ -670,11 +670,11 @@ func markShorthandAssignmentUse(
 	if source == nil {
 		return
 	}
-	sourceType := ctx.TypeChecker.GetTypeAtLocation(source)
+	sourceType := ruleContext.TypeChecker.GetTypeAtLocation(source)
 	if sourceType == nil {
 		return
 	}
-	property := ctx.TypeChecker.GetPropertyOfType(sourceType, name.Text())
+	property := ruleContext.TypeChecker.GetPropertyOfType(sourceType, name.Text())
 	if property == nil {
 		return
 	}

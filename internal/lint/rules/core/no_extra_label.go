@@ -90,7 +90,7 @@ var messageExtraLabel = rule.Message{
 // one source-file listener, which fires before its children and lets this rule own its own descent.
 var NoExtraLabel = rule.Rule{
 	Name: "no-extra-label",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// The enclosing scope stack, innermost last. Built during the descent and read at
@@ -137,10 +137,10 @@ var NoExtraLabel = rule.Rule{
 						}
 
 					case current.Kind == ast.KindBreakStatement:
-						reportIfLabelIsRedundant(ctx, current, current.AsBreakStatement().Label, scopes)
+						reportIfLabelIsRedundant(ruleContext, current, current.AsBreakStatement().Label, scopes)
 
 					case current.Kind == ast.KindContinueStatement:
-						reportIfLabelIsRedundant(ctx, current, current.AsContinueStatement().Label, scopes)
+						reportIfLabelIsRedundant(ruleContext, current, current.AsContinueStatement().Label, scopes)
 					}
 
 					current.ForEachChild(visit)
@@ -190,7 +190,7 @@ func isBreakableStatement(node *ast.Node) bool {
 // frame is both, which is exactly upstream's condition and the reason a plain outward name search
 // is wrong: in `A: while (a) { while (b) { break A; } }` the inner loop is the first breakable frame
 // and it carries no label, so the search stops there having reported nothing.
-func reportIfLabelIsRedundant(ctx rule.Context, jump *ast.Node, label *ast.Node, scopes []labelScope) {
+func reportIfLabelIsRedundant(ruleContext rule.Context, jump *ast.Node, label *ast.Node, scopes []labelScope) {
 	if label == nil {
 		return
 	}
@@ -203,10 +203,10 @@ func reportIfLabelIsRedundant(ctx rule.Context, jump *ast.Node, label *ast.Node,
 			continue
 		}
 		if scope.breakable && namesThisScope {
-			if removal, ok := extraLabelRemovalFix(ctx, jump, label); ok {
-				ctx.ReportNodeWithFixes(label, messageExtraLabel, removal)
+			if removal, ok := extraLabelRemovalFix(ruleContext, jump, label); ok {
+				ruleContext.ReportNodeWithFixes(label, messageExtraLabel, removal)
 			} else {
-				ctx.ReportNode(label, messageExtraLabel)
+				ruleContext.ReportNode(label, messageExtraLabel)
 			}
 		}
 		// Either way this frame is where the jump lands, so nothing above it can matter.
@@ -223,8 +223,8 @@ func reportIfLabelIsRedundant(ctx rule.Context, jump *ast.Node, label *ast.Node,
 // It declines when a comment sits inside that span, because the removal would delete it with no
 // warning and the engine applies a fix unattended. A comment outside the span is untouched and the
 // repair is still offered, which is why `/*comment*/break A;` fixes and `break/**/ A;` does not.
-func extraLabelRemovalFix(ctx rule.Context, jump *ast.Node, label *ast.Node) (rule.Fix, bool) {
-	keywordStart := scanner.GetTokenPosOfNode(jump, ctx.SourceFile, false)
+func extraLabelRemovalFix(ruleContext rule.Context, jump *ast.Node, label *ast.Node) (rule.Fix, bool) {
+	keywordStart := scanner.GetTokenPosOfNode(jump, ruleContext.SourceFile, false)
 	keywordEnd := keywordStart + len(jumpKeywordText(jump))
 	labelEnd := label.End()
 
@@ -243,7 +243,7 @@ func extraLabelRemovalFix(ctx rule.Context, jump *ast.Node, label *ast.Node) (ru
 	if keywordEnd >= labelEnd {
 		return rule.Fix{}, false
 	}
-	for _, comment := range comments.ForFile(ctx) {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() < labelEnd && comment.Range.End() > keywordEnd {
 			return rule.Fix{}, false
 		}

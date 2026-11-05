@@ -104,7 +104,7 @@ var NoFindDOMNode = rule.Rule{
 	// the namespace on a `/` boundary, so `react-no-find-dom-node` would match no inventory entry,
 	// lint no files, and still pass every fixture in this package.
 	Name: "react/no-find-dom-node",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				name := findDOMNodeCalleeName(node.AsCallExpression().Expression)
@@ -115,7 +115,7 @@ var NoFindDOMNode = rule.Rule{
 				// rather than the whole call. For a subscript this is the string or template
 				// literal node, so the quotes are included, which is upstream's span and not a
 				// slip.
-				ctx.ReportNode(name, messageNoFindDOMNode)
+				ruleContext.ReportNode(name, messageNoFindDOMNode)
 			},
 		}
 	},

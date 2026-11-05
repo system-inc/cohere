@@ -51,7 +51,7 @@ var NoAssignModuleVariable = rule.Rule{
 	// own tests pass. That is not hypothetical: this rule shipped that way and was inert until a
 	// planted violation failed to fire.
 	Name: "@next/next/no-assign-module-variable",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableStatement: func(node *ast.Node) {
 				statement := node.AsVariableStatement()
@@ -76,7 +76,7 @@ var NoAssignModuleVariable = rule.Rule{
 						continue
 					}
 
-					ctx.ReportNode(node, messageNoAssignModuleVariable)
+					ruleContext.ReportNode(node, messageNoAssignModuleVariable)
 					return
 				}
 			},

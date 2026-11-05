@@ -30,14 +30,14 @@ func budgetThreadCPU() time.Duration {
 func TestRuleBudgetRejectsCPUWorkAndDoesNotBillWaiting(test *testing.T) {
 	test.Parallel()
 	graph := buildBudgetGraph(test, map[string]string{"file.ts": "export const value = 1;\n"})
-	sleeper := rule.Rule{Name: "planted-waiter", Run: func(ctx rule.Context, options any) rule.Listeners {
+	sleeper := rule.Rule{Name: "planted-waiter", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { time.Sleep(350 * time.Millisecond) }}
 	}}
 	rows, err := checkRuleBudget(test, graph, []rule.Rule{sleeper}, 250*time.Millisecond)
 	if err != nil || len(rows) != 1 || rows[0].NodesOffered != 1 || rows[0].TotalCPU() > 25*time.Millisecond {
 		test.Fatalf("waiter was billed CPU or not run: %v %+v", err, rows)
 	}
-	spinner := rule.Rule{Name: "planted-spinner", Run: func(ctx rule.Context, options any) rule.Listeners {
+	spinner := rule.Rule{Name: "planted-spinner", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 			start := budgetThreadCPU()
 			for budgetThreadCPU()-start < 350*time.Millisecond {
@@ -58,7 +58,7 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 	const helper = "COHERE_BUDGET_DEADLINE_CONTROL"
 	if os.Getenv(helper) == "1" {
 		graph := buildBudgetGraph(test, map[string]string{"file.ts": "export const value = 1;\n"})
-		stuck := rule.Rule{Name: "planted-nonreturning", Run: func(ctx rule.Context, options any) rule.Listeners {
+		stuck := rule.Rule{Name: "planted-nonreturning", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { select {} }}
 		}}
 		_, checkRuleBudgetError := checkRuleBudget(test, graph, []rule.Rule{stuck}, 20*time.Millisecond)

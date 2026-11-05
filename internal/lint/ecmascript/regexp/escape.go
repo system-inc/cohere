@@ -74,7 +74,7 @@ const syntaxCharacters = `^$\.*+?()[]{}|`
 // decodeEscape reads the escape whose backslash ends at i, returning what it
 // names. An escape JavaScript itself rejects comes back as an error rather than
 // as text for regexp2 to judge, which reads a different syntax.
-func decodeEscape(source string, i int, ctx escapeContext) (decodedEscape, error) {
+func decodeEscape(source string, i int, escaping escapeContext) (decodedEscape, error) {
 	if i >= len(source) {
 		return decodedEscape{}, fmt.Errorf(`%w: \ at the end of the pattern`, ErrUnsupportedSyntax)
 	}
@@ -82,9 +82,9 @@ func decodeEscape(source string, i int, ctx escapeContext) (decodedEscape, error
 
 	switch r {
 	case 'u':
-		return decodeUnicodeEscape(source, i, size, ctx)
+		return decodeUnicodeEscape(source, i, size, escaping)
 	case 'x':
-		return decodeFixedHex(source, i, size, 2, ctx)
+		return decodeFixedHex(source, i, size, 2, escaping)
 	case 'n':
 		return decodedEscape{r: '\n', width: size}, nil
 	case 'r':
@@ -96,7 +96,7 @@ func decodeEscape(source string, i int, ctx escapeContext) (decodedEscape, error
 	case 'v':
 		return decodedEscape{r: '\v', width: size}, nil
 	case 'c':
-		return decodeControlEscape(source, i, size, ctx)
+		return decodeControlEscape(source, i, size, escaping)
 	case 'd', 'D', 's', 'S':
 		return decodedEscape{kind: escapeSet, width: size}, nil
 	case 'w':
@@ -104,17 +104,17 @@ func decodeEscape(source string, i int, ctx escapeContext) (decodedEscape, error
 	case 'W':
 		return decodedEscape{kind: escapeSet, set: setNonWord, width: size}, nil
 	case 'p', 'P':
-		return decodePropertyEscape(source, i, size, ctx)
+		return decodePropertyEscape(source, i, size, escaping)
 	case 'b':
-		if ctx.inClass {
+		if escaping.inClass {
 			// Inside a class a `\b` is a backspace, which is the one place the
 			// two readings of the escape part ways.
 			return decodedEscape{r: '\b', width: size}, nil
 		}
 		return decodedEscape{kind: escapeAssertion, width: size}, nil
 	case 'B':
-		if ctx.inClass {
-			return identityEscape(r, size, ctx)
+		if escaping.inClass {
+			return identityEscape(r, size, escaping)
 		}
 		return decodedEscape{kind: escapeAssertion, width: size, negated: true}, nil
 	case 'k':
@@ -122,21 +122,21 @@ func decodeEscape(source string, i int, ctx escapeContext) (decodedEscape, error
 		// nothing, which Annex B reads as the letter — but only in a pattern
 		// that opens no named group, since one that does makes the reference
 		// mandatory.
-		if ctx.named {
+		if escaping.named {
 			return decodedEscape{}, fmt.Errorf(`%w: \k naming no group`, ErrUnsupportedSyntax)
 		}
-		return identityEscape(r, size, ctx)
+		return identityEscape(r, size, escaping)
 	}
 
 	if r >= '0' && r <= '9' {
-		return decodeNumericEscape(source, i, ctx)
+		return decodeNumericEscape(source, i, escaping)
 	}
-	return identityEscape(r, size, ctx)
+	return identityEscape(r, size, escaping)
 }
 
 // decodeUnicodeEscape reads `\uXXXX`, or `\u{X…}` where the `u` flag spells it.
-func decodeUnicodeEscape(source string, i int, size int, ctx escapeContext) (decodedEscape, error) {
-	if ctx.unicode && strings.HasPrefix(source[i+size:], "{") {
+func decodeUnicodeEscape(source string, i int, size int, escaping escapeContext) (decodedEscape, error) {
+	if escaping.unicode && strings.HasPrefix(source[i+size:], "{") {
 		end := strings.IndexByte(source[i+size:], '}')
 		if end < 0 {
 			return decodedEscape{}, fmt.Errorf(`%w: \u{ that no } closes`, ErrUnsupportedSyntax)
@@ -147,20 +147,20 @@ func decodeUnicodeEscape(source string, i int, size int, ctx escapeContext) (dec
 		}
 		return decodedEscape{r: rune(value), width: size + end + 1}, nil
 	}
-	return decodeFixedHex(source, i, size, 4, ctx)
+	return decodeFixedHex(source, i, size, 4, escaping)
 }
 
 // decodeFixedHex reads the fixed-width hexadecimal escapes, `\xXX` and
 // `\uXXXX`. Without `u`, one that no hex digits complete is not an error but an
 // identity escape, so `/\x/` matches an `x` — and under `i` an `X` as well.
-func decodeFixedHex(source string, i int, size int, digits int, ctx escapeContext) (decodedEscape, error) {
+func decodeFixedHex(source string, i int, size int, digits int, escaping escapeContext) (decodedEscape, error) {
 	start := i + size
 	if start+digits <= len(source) {
 		if value, parseError := strconv.ParseUint(source[start:start+digits], 16, 32); parseError == nil {
 			return decodedEscape{r: rune(value), width: size + digits}, nil
 		}
 	}
-	if ctx.unicode {
+	if escaping.unicode {
 		return decodedEscape{}, fmt.Errorf(`%w: \%.1s naming no character`, ErrUnsupportedSyntax, source[i:])
 	}
 	r, _ := utf8.DecodeRuneInString(source[i:])
@@ -168,17 +168,17 @@ func decodeFixedHex(source string, i int, size int, digits int, ctx escapeContex
 }
 
 // decodeControlEscape reads `\cX`, the control character an ASCII letter names.
-func decodeControlEscape(source string, i int, size int, ctx escapeContext) (decodedEscape, error) {
+func decodeControlEscape(source string, i int, size int, escaping escapeContext) (decodedEscape, error) {
 	if letter := i + size; letter < len(source) {
 		c := source[letter]
 		// Annex B widens the letter a character class takes to a digit or an
 		// underscore, which is the one place the two productions differ.
 		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' ||
-			!ctx.unicode && ctx.inClass && (c >= '0' && c <= '9' || c == '_') {
+			!escaping.unicode && escaping.inClass && (c >= '0' && c <= '9' || c == '_') {
 			return decodedEscape{r: rune(c % 32), width: size + 1}, nil
 		}
 	}
-	if ctx.unicode {
+	if escaping.unicode {
 		return decodedEscape{}, fmt.Errorf(`%w: \c naming no control character`, ErrUnsupportedSyntax)
 	}
 	// Annex B: with no control letter after it the backslash is not an escape
@@ -189,9 +189,9 @@ func decodeControlEscape(source string, i int, size int, ctx escapeContext) (dec
 // decodePropertyEscape reads `\p{…}` and `\P{…}`, which name a set out of
 // Unicode's tables. Only the `u` flag spells them; without it .NET would still
 // read a property where JavaScript reads the letter.
-func decodePropertyEscape(source string, i int, size int, ctx escapeContext) (decodedEscape, error) {
-	if !ctx.unicode {
-		return identityEscape(rune(source[i]), size, ctx)
+func decodePropertyEscape(source string, i int, size int, escaping escapeContext) (decodedEscape, error) {
+	if !escaping.unicode {
+		return identityEscape(rune(source[i]), size, escaping)
 	}
 	if !strings.HasPrefix(source[i+size:], "{") {
 		return decodedEscape{}, fmt.Errorf(`%w: \%.1s naming no property`, ErrUnsupportedSyntax, source[i:])
@@ -212,19 +212,19 @@ func decodePropertyEscape(source string, i int, size int, ctx escapeContext) (de
 // decodeNumericEscape reads an escape a digit opens, which is a backreference,
 // a NUL, or one of Annex B's legacy octal escapes depending on the digits, on
 // where it sits, and on how many groups the pattern opens.
-func decodeNumericEscape(source string, i int, ctx escapeContext) (decodedEscape, error) {
+func decodeNumericEscape(source string, i int, escaping escapeContext) (decodedEscape, error) {
 	if source[i] == '0' && !isDecimalDigit(source, i+1) {
 		return decodedEscape{r: 0, width: 1}, nil
 	}
 	// A number no group answers to is not a backreference at all, and Annex B
 	// reads the same text as an escaped character instead. Inside a class there
 	// is no backreference to read in the first place.
-	if source[i] != '0' && !ctx.inClass {
-		if value, width := decimalEscape(source, i); value <= ctx.groups {
+	if source[i] != '0' && !escaping.inClass {
+		if value, width := decimalEscape(source, i); value <= escaping.groups {
 			return decodedEscape{kind: escapeBackreference, width: width}, nil
 		}
 	}
-	if ctx.unicode {
+	if escaping.unicode {
 		return decodedEscape{}, fmt.Errorf(`%w: \%.1s`, ErrUnsupportedSyntax, source[i:])
 	}
 	if r, width := decodeLegacyOctal(source, i); width > 0 {
@@ -269,8 +269,8 @@ func decodeLegacyOctal(source string, i int) (rune, int) {
 // identityEscape reads a backslash standing before a character that carries no
 // escape of its own. Annex B lets it stand before nearly anything; `u` narrows
 // it to the characters a pattern would otherwise read as syntax.
-func identityEscape(r rune, size int, ctx escapeContext) (decodedEscape, error) {
-	if ctx.unicode && !strings.ContainsRune(syntaxCharacters, r) && r != '/' && (!ctx.inClass || r != '-') {
+func identityEscape(r rune, size int, escaping escapeContext) (decodedEscape, error) {
+	if escaping.unicode && !strings.ContainsRune(syntaxCharacters, r) && r != '/' && (!escaping.inClass || r != '-') {
 		return decodedEscape{}, fmt.Errorf(`%w: \%c`, ErrUnsupportedSyntax, r)
 	}
 	return decodedEscape{r: r, width: size}, nil

@@ -167,7 +167,7 @@ var NoDirectMutationState = rule.Rule{
 	// strips the namespace on a `/` boundary, so `react-no-direct-mutation-state` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-direct-mutation-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// No file gate. oxc gated this on `source_type().is_jsx()` and that gate came along with the
 		// port from oxc, but the authority here is eslint-plugin-react, which does not gate on the
 		// file name at all. React code in a `.ts` file is ordinary and legal, and the gate made this
@@ -198,7 +198,7 @@ var NoDirectMutationState = rule.Rule{
 
 				// The left side alone, not the whole assignment. Upstream underlines
 				// `this.state.foo` and stops before the `=`.
-				ctx.ReportNode(target, messageNoDirectMutationState)
+				ruleContext.ReportNode(target, messageNoDirectMutationState)
 			},
 
 			ast.KindPostfixUnaryExpression: func(node *ast.Node) {
@@ -206,7 +206,7 @@ var NoDirectMutationState = rule.Rule{
 				// oxc's `UpdateExpression` is `++` and `--` and nothing else, and a postfix node in
 				// our tree is only ever one of those two, so no operator check is needed on this
 				// arm. The prefix arm below does need one.
-				reportUpdate(ctx, node, operand.Operand)
+				reportUpdate(ruleContext, node, operand.Operand)
 			},
 
 			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
@@ -216,7 +216,7 @@ var NoDirectMutationState = rule.Rule{
 				// silent at both tools; see the rule doc.
 				switch operand.Operator {
 				case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-					reportUpdate(ctx, node, operand.Operand)
+					reportUpdate(ruleContext, node, operand.Operand)
 				}
 			},
 		}
@@ -230,14 +230,14 @@ var NoDirectMutationState = rule.Rule{
 // snapshot underlines `this.state.foo++` including the operator, and `(this.state.foo)++` including
 // the parentheses, which is the visible consequence of the operand being paren-skipped for the
 // match while the reported node is the expression around it.
-func reportUpdate(ctx rule.Context, updateExpression *ast.Node, operand *ast.Node) {
+func reportUpdate(ruleContext rule.Context, updateExpression *ast.Node, operand *ast.Node) {
 	if !isStateRootedMemberChain(ast.SkipParentheses(operand)) {
 		return
 	}
 	if shouldIgnoreComponent(updateExpression) {
 		return
 	}
-	ctx.ReportNode(updateExpression, messageNoDirectMutationState)
+	ruleContext.ReportNode(updateExpression, messageNoDirectMutationState)
 }
 
 // isStateRootedMemberChain reports whether a write target's member chain is rooted at `this.state`.

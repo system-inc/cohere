@@ -179,7 +179,7 @@ func noInnerDeclarationsApplyFirst(
 // source rather than by configuring the harness, which cannot vary either.
 var NoInnerDeclarations = rule.Rule{
 	Name: "no-inner-declarations",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[NoInnerDeclarationsOptions](options)
 		if !isSettings {
 			settings = DefaultNoInnerDeclarationsSettings()
@@ -193,7 +193,7 @@ var NoInnerDeclarations = rule.Rule{
 			if noInnerDeclarationsIsAtARoot(node) {
 				return
 			}
-			ctx.ReportNode(node, noInnerDeclarationsMessage(declarationType,
+			ruleContext.ReportNode(node, noInnerDeclarationsMessage(declarationType,
 				noInnerDeclarationsAllowedBodyDescription(node)))
 		}
 
@@ -201,7 +201,7 @@ var NoInnerDeclarations = rule.Rule{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				// The language gives a block scoped function declaration well defined semantics in
 				// strict code, so upstream's default declines to report it there.
-				if allowBlockScopedFunctions && noInnerDeclarationsIsInStrictCode(ctx, node) {
+				if allowBlockScopedFunctions && noInnerDeclarationsIsInStrictCode(ruleContext, node) {
 					return
 				}
 				check(node, "function")
@@ -290,9 +290,9 @@ func noInnerDeclarationsAllowedBodyDescription(node *ast.Node) string {
 //
 // Upstream asks its scope analysis, which has already computed this. Recomputed here from the three
 // things the language says make code strict, in the order that decides fastest.
-func noInnerDeclarationsIsInStrictCode(ctx rule.Context, node *ast.Node) bool {
+func noInnerDeclarationsIsInStrictCode(ruleContext rule.Context, node *ast.Node) bool {
 	// Every module is strict, whatever is written inside it.
-	if ast.IsExternalModule(ctx.SourceFile) {
+	if ast.IsExternalModule(ruleContext.SourceFile) {
 		return true
 	}
 
@@ -313,7 +313,7 @@ func noInnerDeclarationsIsInStrictCode(ctx rule.Context, node *ast.Node) bool {
 		}
 	}
 
-	return noInnerDeclarationsHasUseStrictPrologue(ctx.SourceFile.Statements)
+	return noInnerDeclarationsHasUseStrictPrologue(ruleContext.SourceFile.Statements)
 }
 
 // noInnerDeclarationsHasUseStrictPrologue answers whether a statement list opens with a `'use

@@ -87,16 +87,16 @@ var messageNoOctal = rule.Message{
 // message about what to write instead rather than a grammar error.
 var NoOctal = rule.Rule{
 	Name: "no-octal",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// `KindNumericLiteral` alone is upstream's `typeof node.value === "number"`. A string
 			// holding the same digits is a different kind and a comment is not a node, so both are
 			// declined by the listener rather than by a check inside it.
 			ast.KindNumericLiteral: func(node *ast.Node) {
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				raw := ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				raw := ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]
 				if rawNumericLiteralIsLegacyOctal(raw) {
-					ctx.ReportNode(node, messageNoOctal)
+					ruleContext.ReportNode(node, messageNoOctal)
 				}
 			},
 		}

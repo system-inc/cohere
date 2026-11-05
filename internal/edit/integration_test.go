@@ -243,18 +243,18 @@ func TestAFindingWithNoFixChangesNothing(test *testing.T) {
 // is what that sentence actually means in practice.
 var breakingRule = rule.Rule{
 	Name: "probe-break-syntax",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				body := node.AsFunctionDeclaration().Body
 				if body == nil {
 					return
 				}
-				ctx.Report(rule.Diagnostic{
+				ruleContext.Report(rule.Diagnostic{
 					Range:      node.Loc,
 					Message:    rule.Message{Id: "break"},
-					SourceFile: ctx.SourceFile,
-					Fixes:      []rule.Fix{ctx.ReplaceNode(body, "{ return (1; }")},
+					SourceFile: ruleContext.SourceFile,
+					Fixes:      []rule.Fix{ruleContext.ReplaceNode(body, "{ return (1; }")},
 				})
 			},
 		}
@@ -309,7 +309,7 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 // file full of nested braces.
 var nonSilencingRule = rule.Rule{
 	Name: "probe-never-silences",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCaseBlock: func(node *ast.Node) {
 				caseBlock := node.AsCaseBlock()
@@ -325,13 +325,13 @@ var nonSilencingRule = rule.Rule{
 					if len(statements) == 0 {
 						continue
 					}
-					ctx.Report(rule.Diagnostic{
+					ruleContext.Report(rule.Diagnostic{
 						Range:      clauseNode.Loc,
 						Message:    rule.Message{Id: "wrap"},
-						SourceFile: ctx.SourceFile,
+						SourceFile: ruleContext.SourceFile,
 						Fixes: []rule.Fix{
-							ctx.InsertBefore(statements[0], "{ "),
-							ctx.InsertAfter(statements[len(statements)-1], " }"),
+							ruleContext.InsertBefore(statements[0], "{ "),
+							ruleContext.InsertAfter(statements[len(statements)-1], " }"),
 						},
 					})
 				}
@@ -427,17 +427,17 @@ func TestNonConvergenceNamesTheRule(test *testing.T) {
 // watched happen, and a property stated by code and never observed is a claim, not a guarantee.
 var siblingOverlapRule = rule.Rule{
 	Name: "probe-sibling-overlap",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				start, end := node.Loc.Pos(), node.Loc.End()
-				ctx.Report(rule.Diagnostic{
+				ruleContext.Report(rule.Diagnostic{
 					Range:      node.Loc,
 					Message:    rule.Message{Id: "sib"},
-					SourceFile: ctx.SourceFile,
+					SourceFile: ruleContext.SourceFile,
 					Fixes: []rule.Fix{
-						rule.ReplaceRange(ctx.SourceFile.Loc.WithPos(start).WithEnd(end), `"A"`),
-						rule.ReplaceRange(ctx.SourceFile.Loc.WithPos(start+1).WithEnd(end), `B"`),
+						rule.ReplaceRange(ruleContext.SourceFile.Loc.WithPos(start).WithEnd(end), `"A"`),
+						rule.ReplaceRange(ruleContext.SourceFile.Loc.WithPos(start+1).WithEnd(end), `B"`),
 					},
 				})
 			},

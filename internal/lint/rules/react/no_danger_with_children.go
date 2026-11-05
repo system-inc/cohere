@@ -98,7 +98,7 @@ var NoDangerWithChildren = rule.Rule{
 	// would match no inventory entry and lint no files while passing every fixture in this file.
 	Name:             "react/no-danger-with-children",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			// JsxElement rather than the opening element, because the finding spans the whole
 			// element and because the children are on this node. A self-closing element parses to
@@ -107,21 +107,21 @@ var NoDangerWithChildren = rule.Rule{
 			ast.KindJsxElement: func(node *ast.Node) {
 				element := node.AsJsxElement()
 				attributes := element.OpeningElement.AsJsxOpeningElement().Attributes
-				if !hasElementChildren(ctx, attributes, element.Children) {
+				if !hasElementChildren(ruleContext, attributes, element.Children) {
 					return
 				}
-				if hasJsxProperty(ctx, attributes, dangerPropertyName) {
-					ctx.ReportNode(node, messageNoDangerWithChildren)
+				if hasJsxProperty(ruleContext, attributes, dangerPropertyName) {
+					ruleContext.ReportNode(node, messageNoDangerWithChildren)
 				}
 			},
 
 			ast.KindJsxSelfClosingElement: func(node *ast.Node) {
 				attributes := node.AsJsxSelfClosingElement().Attributes
-				if !hasElementChildren(ctx, attributes, nil) {
+				if !hasElementChildren(ruleContext, attributes, nil) {
 					return
 				}
-				if hasJsxProperty(ctx, attributes, dangerPropertyName) {
-					ctx.ReportNode(node, messageNoDangerWithChildren)
+				if hasJsxProperty(ruleContext, attributes, dangerPropertyName) {
+					ruleContext.ReportNode(node, messageNoDangerWithChildren)
 				}
 			},
 
@@ -143,13 +143,13 @@ var NoDangerWithChildren = rule.Rule{
 				// there are children without having to read the props object at all. Exactly two
 				// means children can only be inside the props.
 				hasChildren := len(arguments.Nodes) > 2 ||
-					objectExpressionHasProperty(ctx, properties, childrenPropertyName)
+					objectExpressionHasProperty(ruleContext, properties, childrenPropertyName)
 				if !hasChildren {
 					return
 				}
 
-				if objectExpressionHasProperty(ctx, properties, dangerPropertyName) {
-					ctx.ReportNode(node, messageNoDangerWithChildren)
+				if objectExpressionHasProperty(ruleContext, properties, dangerPropertyName) {
+					ruleContext.ReportNode(node, messageNoDangerWithChildren)
 				}
 			},
 		}
@@ -161,8 +161,8 @@ var NoDangerWithChildren = rule.Rule{
 // Either as a `children` prop, written out or reached through a spread, or as content nested
 // between the tags. The two are one question because upstream asks them as one: an element is
 // only clean when it passes children neither way.
-func hasElementChildren(ctx rule.Context, attributes *ast.Node, children *ast.NodeList) bool {
-	if hasJsxProperty(ctx, attributes, childrenPropertyName) {
+func hasElementChildren(ruleContext rule.Context, attributes *ast.Node, children *ast.NodeList) bool {
+	if hasJsxProperty(ruleContext, attributes, childrenPropertyName) {
 		return true
 	}
 	if children == nil || len(children.Nodes) == 0 {
@@ -181,7 +181,7 @@ func hasElementChildren(ctx rule.Context, attributes *ast.Node, children *ast.No
 // anything other than a plain identifier, such as `{...{children: 1}}`, is declined here exactly as
 // upstream declines it through `get_identifier_reference`, so an object literal spread inline is
 // invisible to both tools rather than exempted by either.
-func hasJsxProperty(ctx rule.Context, attributes *ast.Node, propertyName string) bool {
+func hasJsxProperty(ruleContext rule.Context, attributes *ast.Node, propertyName string) bool {
 	if attributes == nil || attributes.Kind != ast.KindJsxAttributes {
 		return false
 	}
@@ -215,7 +215,7 @@ func hasJsxProperty(ctx rule.Context, attributes *ast.Node, propertyName string)
 			if expression == nil || expression.Kind != ast.KindIdentifier {
 				continue
 			}
-			if variableHasProperty(ctx, expression, propertyName, nil) {
+			if variableHasProperty(ruleContext, expression, propertyName, nil) {
 				return true
 			}
 		}
@@ -231,7 +231,7 @@ func hasJsxProperty(ctx rule.Context, attributes *ast.Node, propertyName string)
 // it names and read there. A call, a member expression, or `undefined` all fall through to false,
 // and `React.createElement("Hello", undefined, "Children")` is a passing corpus case that lands
 // here.
-func objectExpressionHasProperty(ctx rule.Context, expression *ast.Node, propertyName string) bool {
+func objectExpressionHasProperty(ruleContext rule.Context, expression *ast.Node, propertyName string) bool {
 	if expression == nil {
 		return false
 	}
@@ -244,7 +244,7 @@ func objectExpressionHasProperty(ctx rule.Context, expression *ast.Node, propert
 		return objectLiteralHasOwnProperty(expression, propertyName)
 
 	case ast.KindIdentifier:
-		return variableHasProperty(ctx, expression, propertyName, nil)
+		return variableHasProperty(ruleContext, expression, propertyName, nil)
 	}
 	return false
 }
@@ -263,12 +263,12 @@ func objectExpressionHasProperty(ctx rule.Context, expression *ast.Node, propert
 // costs the same and terminates on a mutual cycle too, which is a divergence in the direction of
 // not hanging rather than in the direction of a different verdict.
 func variableHasProperty(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	identifier *ast.Node,
 	propertyName string,
 	seen map[*ast.Node]bool,
 ) bool {
-	declaration := resolvedDeclaration(ctx, identifier)
+	declaration := resolvedDeclaration(ruleContext, identifier)
 	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
 		return false
 	}
@@ -293,7 +293,7 @@ func variableHasProperty(
 			if spread == nil || spread.Kind != ast.KindIdentifier {
 				continue
 			}
-			if variableHasProperty(ctx, spread, propertyName, seen) {
+			if variableHasProperty(ruleContext, spread, propertyName, seen) {
 				return true
 			}
 
@@ -359,8 +359,8 @@ func staticPropertyName(property *ast.Node) (string, bool) {
 // question is asked of it. An identifier the checker cannot resolve, and a symbol carrying no
 // declarations, both answer nil: `{...undefined}` is the corpus case that lands there and it is a
 // passing case, so answering nil is the behavior rather than a fallback.
-func resolvedDeclaration(ctx rule.Context, identifier *ast.Node) *ast.Node {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func resolvedDeclaration(ruleContext rule.Context, identifier *ast.Node) *ast.Node {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return nil
 	}

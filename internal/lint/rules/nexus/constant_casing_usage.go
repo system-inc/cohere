@@ -58,8 +58,8 @@ type fileUsageIndex struct {
 //
 // The cache is the shared per-file store, so a second rule wanting the same scan would not pay for
 // it twice. Without it this rule would walk the file once per constant declaration in it.
-func usageIndexFor(ctx rule.Context) *fileUsageIndex {
-	return rule.Cached(ctx.FileCache, "nexus.constantCasingUsage", func() *fileUsageIndex {
+func usageIndexFor(ruleContext rule.Context) *fileUsageIndex {
+	return rule.Cached(ruleContext.FileCache, "nexus.constantCasingUsage", func() *fileUsageIndex {
 		index := &fileUsageIndex{
 			usedAsJsxElementName:        map[string]bool{},
 			calledLikeAFunction:         map[string]bool{},
@@ -68,8 +68,8 @@ func usageIndexFor(ctx rule.Context) *fileUsageIndex {
 			functionsReturningAFunction: map[string]bool{},
 			functionsReturningAClass:    map[string]bool{},
 		}
-		if ctx.SourceFile != nil {
-			index.collect(ctx.SourceFile.AsNode())
+		if ruleContext.SourceFile != nil {
+			index.collect(ruleContext.SourceFile.AsNode())
 		}
 		return index
 	})

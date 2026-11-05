@@ -86,9 +86,9 @@ var NoNewFunc = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		reportIfFunctionConstructor := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
@@ -115,8 +115,8 @@ var NoNewFunc = rule.Rule{
 
 			// The direct forms: `Function(...)` and `new Function(...)`.
 			if callee.Kind == ast.KindIdentifier {
-				if callee.Text() == "Function" && resolvesToAGlobal(ctx, callee) {
-					ctx.ReportNode(node, messageNoFunctionConstructor)
+				if callee.Text() == "Function" && resolvesToAGlobal(ruleContext, callee) {
+					ruleContext.ReportNode(node, messageNoFunctionConstructor)
 				}
 				return
 			}
@@ -134,10 +134,10 @@ var NoNewFunc = rule.Rule{
 			}
 			object = ast.SkipParentheses(object)
 			if object == nil || object.Kind != ast.KindIdentifier ||
-				object.Text() != "Function" || !resolvesToAGlobal(ctx, object) {
+				object.Text() != "Function" || !resolvesToAGlobal(ruleContext, object) {
 				return
 			}
-			ctx.ReportNode(node, messageNoFunctionConstructor)
+			ruleContext.ReportNode(node, messageNoFunctionConstructor)
 		}
 
 		return rule.Listeners{

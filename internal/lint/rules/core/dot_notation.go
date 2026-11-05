@@ -81,7 +81,7 @@ type DotNotationOptions struct {
 // branches against each other.
 var DotNotation = rule.Rule{
 	Name: "dot-notation",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := dotnotation.Settings{AllowKeywords: true}
 		if resolved, isDotNotationOptions := rule.OptionsAs[DotNotationOptions](options); isDotNotationOptions {
 			if resolved.AllowKeywords != nil {
@@ -89,7 +89,7 @@ var DotNotation = rule.Rule{
 			}
 			settings.AllowPattern = dotnotation.CompileAllowPattern(resolved.AllowPattern)
 		}
-		return dotnotation.Listeners(ctx, settings)
+		return dotnotation.Listeners(ruleContext, settings)
 	},
 }
 

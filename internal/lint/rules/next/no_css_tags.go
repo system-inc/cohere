@@ -38,7 +38,7 @@ var NoCssTags = rule.Rule{
 	// No family prefix. The config writes `nextjs/no-css-tags` and matching strips the namespace on
 	// a `/` boundary, so a prefixed name matches nothing and runs on no files while its tests pass.
 	Name: "@next/next/no-css-tags",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			if !jsx.IsIntrinsicElementNamed(tagName, "link") {
@@ -58,7 +58,7 @@ var NoCssTags = rule.Rule{
 				return
 			}
 
-			ctx.ReportNode(node, messageNoCssTags)
+			ruleContext.ReportNode(node, messageNoCssTags)
 		}
 
 		return rule.Listeners{

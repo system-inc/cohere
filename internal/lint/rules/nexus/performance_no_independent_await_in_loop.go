@@ -135,17 +135,17 @@ var PerformanceNoIndependentAwaitInLoop = rule.Rule{
 	// an iteration, and the binder that answers that runs only with the program.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
 		check := func(node *ast.Node) {
-			analysis := newIndependentAwaitLoopAnalysis(ctx, node)
+			analysis := newIndependentAwaitLoopAnalysis(ruleContext, node)
 			if analysis == nil || !analysis.isIndependent() {
 				return
 			}
-			ctx.ReportRange(independentAwaitLoopHeaderRange(ctx.SourceFile, node, analysis.body), messagePerformanceNoIndependentAwaitInLoop())
+			ruleContext.ReportRange(independentAwaitLoopHeaderRange(ruleContext.SourceFile, node, analysis.body), messagePerformanceNoIndependentAwaitInLoop())
 		}
 
 		return rule.Listeners{
@@ -180,9 +180,9 @@ type independentAwaitLoopPath struct {
 	root     *ast.Node
 }
 
-func newIndependentAwaitLoopAnalysis(ctx rule.Context, loop *ast.Node) *independentAwaitLoopAnalysis {
+func newIndependentAwaitLoopAnalysis(ruleContext rule.Context, loop *ast.Node) *independentAwaitLoopAnalysis {
 	analysis := &independentAwaitLoopAnalysis{
-		ctx:            ctx,
+		ctx:            ruleContext,
 		loop:           loop,
 		taintedSymbols: map[*ast.Symbol]bool{},
 		orderedBodies:  map[*ast.Node]bool{},
@@ -205,7 +205,7 @@ func newIndependentAwaitLoopAnalysis(ctx rule.Context, loop *ast.Node) *independ
 		if indexName == nil {
 			return nil
 		}
-		analysis.indexSymbol = ctx.TypeChecker.GetSymbolAtLocation(indexName)
+		analysis.indexSymbol = ruleContext.TypeChecker.GetSymbolAtLocation(indexName)
 		if analysis.indexSymbol == nil {
 			return nil
 		}

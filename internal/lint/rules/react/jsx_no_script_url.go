@@ -285,7 +285,7 @@ func jsxNoScriptUrlLinkComponents(options JsxNoScriptUrlOptions) map[string][]st
 var JsxNoScriptUrl = rule.Rule{
 	Name: "react/jsx-no-script-url",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, _ := rule.OptionsAs[JsxNoScriptUrlOptions](options)
 		components := jsxNoScriptUrlLinkComponents(settings)
 
@@ -354,7 +354,7 @@ var JsxNoScriptUrl = rule.Rule{
 				// Upstream reports on the whole attribute, so the span covers the name and the
 				// value together rather than just one. Measured: an attribute at column 4 reports
 				// through the closing quote of its value.
-				ctx.ReportNode(node, jsxNoScriptUrlMessage)
+				ruleContext.ReportNode(node, jsxNoScriptUrlMessage)
 			},
 		}
 	},

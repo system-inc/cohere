@@ -49,8 +49,8 @@ func TestExportGraphsForAdamic(test *testing.T) {
 
 	fixtures, functions := 0, 0
 	for _, fixture := range reactCompilerFixtures(test) {
-		lowered := lowerReactCompilerFixture(test, fixture.source, func(ctx rule.Context, node *ast.Node) *Function {
-			return Lower(node, ctx.TypeChecker)
+		lowered := lowerReactCompilerFixture(test, fixture.source, func(ruleContext rule.Context, node *ast.Node) *Function {
+			return Lower(node, ruleContext.TypeChecker)
 		})
 		name := fixture.name
 
@@ -134,14 +134,14 @@ func lowerReactCompilerFixture(test *testing.T, source string, lower func(rule.C
 	probe := rule.Rule{
 		Name:             "adamic-graphs-export",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the harness produced no type checker, so every reference would lower as a global")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
-						if fn := lower(ctx, function); fn != nil {
+						if fn := lower(ruleContext, function); fn != nil {
 							lowered = append(lowered, fn)
 						}
 					})

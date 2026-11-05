@@ -75,7 +75,7 @@ func messageNoTypeReferenceWithoutPrefix() rule.Message {
 // rather than adding one it does not have.
 var ImportRequireReactNamespace = rule.Rule{
 	Name: "structure/import-require-react-namespace",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Local names brought in by a named import from react, which is what a later bare use has
 		// to be checked against.
 		importedFromReact := map[string]bool{}
@@ -123,13 +123,13 @@ var ImportRequireReactNamespace = rule.Rule{
 					}
 
 					namedCount++
-					ctx.ReportNode(element, messageNoNamedImport())
+					ruleContext.ReportNode(element, messageNoNamedImport())
 				}
 
 				// A namespace import (`import * as React from 'react'`) provides the namespace and
 				// destructures nothing, so it is left alone.
 				if namedCount > 0 && !hasReactDefault {
-					ctx.ReportNode(node, messageNoDestructuringFromReact())
+					ruleContext.ReportNode(node, messageNoDestructuringFromReact())
 				}
 			},
 
@@ -144,7 +144,7 @@ var ImportRequireReactNamespace = rule.Rule{
 				// calls, so testing every imported name here would report on nothing real while
 				// risking a finding on an unrelated call.
 				if importedFromReact[name] && react.IsHookName(name) {
-					ctx.ReportNode(node, messageNoCallWithoutPrefix())
+					ruleContext.ReportNode(node, messageNoCallWithoutPrefix())
 				}
 			},
 
@@ -159,7 +159,7 @@ var ImportRequireReactNamespace = rule.Rule{
 				// The "use" prefix rather than react.IsHookName, matching the original. See the rule
 				// comment: the two arms deliberately spell the hook test differently.
 				if importedFromReact[name] && !strings.HasPrefix(name, "use") {
-					ctx.ReportNode(node, messageNoTypeReferenceWithoutPrefix())
+					ruleContext.ReportNode(node, messageNoTypeReferenceWithoutPrefix())
 				}
 			},
 		}

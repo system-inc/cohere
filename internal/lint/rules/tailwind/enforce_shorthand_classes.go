@@ -187,8 +187,8 @@ var EnforceShorthandClasses = rule.Rule{
 	Name: "better-tailwindcss/enforce-shorthand-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -196,8 +196,8 @@ var EnforceShorthandClasses = rule.Rule{
 
 		// nil when there is no design system to ask, and classExistsIn answers true for nil.
 		var system *tailwindengine.LoadedDesignSystem
-		if ctx.Program != nil {
-			if designSystem := DesignSystemForProgramAt(ctx.Program, configured.Location()); designSystem.Err == nil {
+		if ruleContext.Program != nil {
+			if designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location()); designSystem.Err == nil {
 				system = designSystem.System
 			}
 		}
@@ -207,7 +207,7 @@ var EnforceShorthandClasses = rule.Rule{
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
-		reader := surfaces.ReaderFor(ctx.FileCache)
+		reader := surfaces.ReaderFor(ruleContext.FileCache)
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
@@ -215,7 +215,7 @@ var EnforceShorthandClasses = rule.Rule{
 					if !shorthandsExistIn(collapse.shorthands, system) {
 						continue
 					}
-					ctx.ReportRange(literal.Range, messageShorthandClasses(
+					ruleContext.ReportRange(literal.Range, messageShorthandClasses(
 						strings.Join(collapse.longhands, " "),
 						strings.Join(collapse.shorthands, " "),
 					))

@@ -166,7 +166,7 @@ var NoLoopFunc = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Recorded across the file, because a skipped immediately-invoked function has to stay
 		// transparent to the loop search of every function nested inside it. Upstream keeps the
 		// same set for the same reason.
@@ -179,7 +179,7 @@ var NoLoopFunc = rule.Rule{
 		var referencesByDeclaration map[*ast.Node][]*ast.Node
 
 		check := func(node *ast.Node) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			loopNode := loopFuncContainingLoop(node, skippedImmediatelyInvoked)
@@ -187,9 +187,9 @@ var NoLoopFunc = rule.Rule{
 				return
 			}
 			if referencesByDeclaration == nil {
-				referencesByDeclaration = loopFuncReferenceIndex(ctx)
+				referencesByDeclaration = loopFuncReferenceIndex(ruleContext)
 			}
-			checkLoopFunc(ctx, node, loopNode, skippedImmediatelyInvoked, referencesByDeclaration)
+			checkLoopFunc(ruleContext, node, loopNode, skippedImmediatelyInvoked, referencesByDeclaration)
 		}
 
 		// Every kind whose ESTree counterpart is a FunctionExpression, which is what upstream's
@@ -208,13 +208,13 @@ var NoLoopFunc = rule.Rule{
 
 // checkLoopFunc judges one function, which sits in loopNode.
 func checkLoopFunc(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	loopNode *ast.Node,
 	skippedImmediatelyInvoked map[*ast.Node]bool,
 	referencesByDeclaration map[*ast.Node][]*ast.Node,
 ) {
-	escaping := loopFuncEscapingReferences(ctx, node)
+	escaping := loopFuncEscapingReferences(ruleContext, node)
 
 	// A function invoked where it is created cannot outlive the iteration. Upstream applies this
 	// only to a function that is neither async nor a generator, so an async immediately-invoked
@@ -231,7 +231,7 @@ func checkLoopFunc(
 	unsafeNames := []string{}
 	seen := map[string]bool{}
 	for _, identifier := range escaping {
-		declaration := loopFuncDeclarationFor(ctx, identifier)
+		declaration := loopFuncDeclarationFor(ruleContext, identifier)
 		if declaration == nil {
 			// Upstream requires `r.resolved`: an undeclared name is no-undef's business, not this
 			// rule's, and six corpus cases turn on it.
@@ -249,7 +249,7 @@ func checkLoopFunc(
 			// this one.
 			continue
 		}
-		if loopFuncReferenceIsSafe(ctx, loopNode, declaration, referencesByDeclaration, skippedImmediatelyInvoked) {
+		if loopFuncReferenceIsSafe(ruleContext, loopNode, declaration, referencesByDeclaration, skippedImmediatelyInvoked) {
 			continue
 		}
 		name := identifier.Text()
@@ -264,7 +264,7 @@ func checkLoopFunc(
 		return
 	}
 
-	ctx.ReportNode(node, rule.Message{
+	ruleContext.ReportNode(node, rule.Message{
 		Id: messageNoLoopFunc.Id,
 		Description: fmt.Sprintf("%s The unsafe reference is to '%s'.",
 			messageNoLoopFunc.Description, strings.Join(unsafeNames, "', '")),
@@ -328,7 +328,7 @@ func loopFuncTopLoop(loopNode *ast.Node, excluded *ast.Node, skippedImmediatelyI
 
 // loopFuncReferenceIsSafe answers upstream's `isSafe` for one resolved binding.
 func loopFuncReferenceIsSafe(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	loopNode *ast.Node,
 	declaration *ast.Node,
 	referencesByDeclaration map[*ast.Node][]*ast.Node,
@@ -579,7 +579,7 @@ func loopFuncVariableScope(node *ast.Node) *ast.Node {
 // `(function a(){ i; a; })()`: both `i` and `a` are there. Five corpus cases depend on it, because
 // the immediately-invoked skip is declined exactly when the name is reachable, and without this the
 // name is never seen and every one of them goes silent.
-func loopFuncEscapingReferences(ctx rule.Context, node *ast.Node) []*ast.Node {
+func loopFuncEscapingReferences(ruleContext rule.Context, node *ast.Node) []*ast.Node {
 	escaping := []*ast.Node{}
 	body := node.Body()
 	if body == nil {
@@ -593,7 +593,7 @@ func loopFuncEscapingReferences(ctx rule.Context, node *ast.Node) []*ast.Node {
 		}
 		if current.Kind == ast.KindIdentifier {
 			if loopFuncIsReadableReference(current) {
-				declaration := loopFuncDeclarationFor(ctx, current)
+				declaration := loopFuncDeclarationFor(ruleContext, current)
 				if declaration == nil || !loopFuncIsUnder(declaration, node) ||
 					declaration == node {
 					escaping = append(escaping, current)
@@ -676,13 +676,13 @@ func loopFuncIsUnder(node *ast.Node, ancestor *ast.Node) bool {
 //
 // `LocalSymbol` is the fallback an exported declaration needs: the checker hands an exported
 // declaration its own truncated symbol while the merged list lives there instead.
-func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
-	if ctx.TypeChecker == nil {
+func loopFuncDeclarationFor(ruleContext rule.Context, identifier *ast.Node) *ast.Node {
+	if ruleContext.TypeChecker == nil {
 		return nil
 	}
 	// This file's declarations only: a position is compared below, and positions in two files do not
 	// compare.
-	declarations := rule.DeclarationsIn(ctx.SourceFile, ctx.TypeChecker.GetSymbolAtLocation(identifier))
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 	if len(declarations) == 0 {
 		return nil
 	}
@@ -724,14 +724,14 @@ func loopFuncDeclarationFor(ctx rule.Context, identifier *ast.Node) *ast.Node {
 // shared through the file cache with no-unmodified-loop-condition, which reads the same index. Two
 // rules each building it cost 29 MB in 394K objects on a cold ahra run (#942rdnn). Neither rule
 // writes to it.
-func loopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
-	return rule.Cached(ctx.FileCache, "core.loopFuncReferenceIndex", func() map[*ast.Node][]*ast.Node {
-		return buildLoopFuncReferenceIndex(ctx)
+func loopFuncReferenceIndex(ruleContext rule.Context) map[*ast.Node][]*ast.Node {
+	return rule.Cached(ruleContext.FileCache, "core.loopFuncReferenceIndex", func() map[*ast.Node][]*ast.Node {
+		return buildLoopFuncReferenceIndex(ruleContext)
 	})
 }
 
 // buildLoopFuncReferenceIndex is loopFuncReferenceIndex's fill.
-func buildLoopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
+func buildLoopFuncReferenceIndex(ruleContext rule.Context) map[*ast.Node][]*ast.Node {
 	index := map[*ast.Node][]*ast.Node{}
 	var walk func(node *ast.Node)
 	walk = func(node *ast.Node) {
@@ -740,7 +740,7 @@ func buildLoopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
 		}
 		if node.Kind == ast.KindIdentifier {
 			if loopFuncIsReadableReference(node) {
-				if declaration := loopFuncDeclarationFor(ctx, node); declaration != nil {
+				if declaration := loopFuncDeclarationFor(ruleContext, node); declaration != nil {
 					index[declaration] = append(index[declaration], node)
 				}
 			}
@@ -751,7 +751,7 @@ func buildLoopFuncReferenceIndex(ctx rule.Context) map[*ast.Node][]*ast.Node {
 			return false
 		})
 	}
-	walk(ctx.SourceFile.AsNode())
+	walk(ruleContext.SourceFile.AsNode())
 	return index
 }
 

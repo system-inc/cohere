@@ -92,18 +92,18 @@ var NoUnsafeCall = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// checkCall is upstream's single body, shared by all three anchors.
 		//
 		// `subject` is the thing being called and `reportOn` is where the finding points. They are
 		// the same node for a call and for a tagged template, and they differ for `new`, where
 		// upstream reports the whole NewExpression while typing its callee.
 		checkCall := func(subject *ast.Node, reportOn *ast.Node, unsafeId string, errorId string) {
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 
-			subjectType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, subject)
+			subjectType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, subject)
 			if subjectType == nil {
 				return
 			}
@@ -113,7 +113,7 @@ var NoUnsafeCall = rule.Rule{
 				// correct and unreachable through this package's fixtures, because the harness
 				// pins the option above the rule.
 				if !type_checking.IsStrictCompilerOptionEnabled(
-					ctx.Program.Options(), ctx.Program.Options().NoImplicitThis) {
+					ruleContext.Program.Options(), ruleContext.Program.Options().NoImplicitThis) {
 					// A mutation replacing this call with `subject` SURVIVES the whole fixture set,
 					// and it is not a blind spot: the enclosing gate is false under this harness's
 					// tsconfig, so nothing reaches the line at all. Scored both ways to be sure of
@@ -123,7 +123,7 @@ var NoUnsafeCall = rule.Rule{
 					// A single-site sweep structurally cannot see this.
 					thisExpression := type_checking.GetThisExpression(subject)
 					if thisExpression != nil {
-						thisType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
+						thisType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, thisExpression)
 						if thisType != nil && type_checking.IsTypeAnyType(thisType) {
 							unsafeId = "unsafeCallThis"
 							errorId = "errorCallThis"
@@ -135,28 +135,28 @@ var NoUnsafeCall = rule.Rule{
 				// intrinsic name does. Getting this backwards renames every unresolved-type finding
 				// into one claiming an `any` the reader never wrote.
 				if type_checking.IsIntrinsicErrorType(subjectType) {
-					ctx.ReportNode(reportOn, unsafeCallMessageFor(errorId, ""))
+					ruleContext.ReportNode(reportOn, unsafeCallMessageFor(errorId, ""))
 					return
 				}
-				ctx.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "an `any`"))
+				ruleContext.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "an `any`"))
 				return
 			}
 
-			if !type_checking.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, subjectType, "Function") {
+			if !type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, subjectType, "Function") {
 				return
 			}
 
 			// The asymmetry, reproduced from upstream including its own admission that the reason
 			// is unclear. A construct signature makes every use safe; otherwise calling and tagging
 			// want any call signature at all, while constructing wants one that returns something.
-			if len(type_checking.GetConstructSignatures(ctx.TypeChecker, subjectType)) > 0 {
+			if len(type_checking.GetConstructSignatures(ruleContext.TypeChecker, subjectType)) > 0 {
 				return
 			}
 
-			callSignatures := type_checking.GetCallSignatures(ctx.TypeChecker, subjectType)
+			callSignatures := type_checking.GetCallSignatures(ruleContext.TypeChecker, subjectType)
 			if unsafeId == "unsafeNew" {
 				for _, signature := range callSignatures {
-					returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+					returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 					if returnType != nil && !type_checking.IsIntrinsicVoidType(returnType) {
 						return
 					}
@@ -168,7 +168,7 @@ var NoUnsafeCall = rule.Rule{
 			// Note the id: the `Function` branch reports the UNSAFE message even for a type the
 			// checker resolved perfectly well, because the type is known and the problem is what it
 			// permits. There is no error-type path here at all.
-			ctx.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "a `Function`"))
+			ruleContext.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "a `Function`"))
 		}
 
 		return rule.Listeners{

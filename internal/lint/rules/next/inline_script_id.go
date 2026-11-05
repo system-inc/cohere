@@ -120,8 +120,8 @@ var InlineScriptId = rule.Rule{
 	// files while every fixture in this package stayed green.
 	Name: "@next/next/inline-script-id",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		scriptNames := defaultImportNamesOf(ctx.SourceFile, "next/script")
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		scriptNames := defaultImportNamesOf(ruleContext.SourceFile, "next/script")
 		if len(scriptNames) == 0 {
 			// Nothing in this file binds the framework's script component, so no element can
 			// report. Upstream reaches the same conclusion by finding no import specifier to
@@ -155,14 +155,14 @@ var InlineScriptId = rule.Rule{
 					childCount = len(element.Children.Nodes)
 				}
 				reportInlineScriptWithoutId(
-					ctx, scriptNames, opening.TagName, opening.Attributes, childCount > 0,
+					ruleContext, scriptNames, opening.TagName, opening.Attributes, childCount > 0,
 				)
 			},
 
 			ast.KindJsxSelfClosingElement: func(node *ast.Node) {
 				element := node.AsJsxSelfClosingElement()
 				reportInlineScriptWithoutId(
-					ctx, scriptNames, element.TagName, element.Attributes, false,
+					ruleContext, scriptNames, element.TagName, element.Attributes, false,
 				)
 			},
 		}
@@ -177,7 +177,7 @@ var InlineScriptId = rule.Rule{
 // observable, but it would also stop reading like the original, which is the thing a later reader
 // checks this against.
 func reportInlineScriptWithoutId(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	scriptNames map[string]bool,
 	tagName *ast.Node,
 	attributes *ast.Node,
@@ -203,7 +203,7 @@ func reportInlineScriptWithoutId(
 	if !hasChildren && !attributeNames["dangerouslySetInnerHTML"] {
 		return
 	}
-	ctx.ReportNode(tagName, messageInlineScriptId)
+	ruleContext.ReportNode(tagName, messageInlineScriptId)
 }
 
 // attributeNamesIncludingObjectSpreads returns the attribute names an element writes, reading the

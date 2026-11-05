@@ -128,8 +128,8 @@ var noArrayIndexKeyIteratorPositions = map[string]int{
 var NoArrayIndexKey = rule.Rule{
 	Name:             "react/no-array-index-key",
 	NeedsTypeChecker: true,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -138,7 +138,7 @@ var NoArrayIndexKey = rule.Rule{
 			// hook to pop it with. `KindSourceFile` fires before its children, so the walk below is
 			// the rule's own rather than the harness's.
 			ast.KindSourceFile: func(node *ast.Node) {
-				walker := &noArrayIndexKeyWalker{ctx: ctx}
+				walker := &noArrayIndexKeyWalker{ctx: ruleContext}
 				walker.walk(node)
 			},
 		}

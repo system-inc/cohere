@@ -29,7 +29,7 @@ var messageUnexpectedEmptyStaticBlock = rule.Message{
 // where someone parks work they are about to write, and this rule cannot tell which case it found.
 var NoEmptyStaticBlock = rule.Rule{
 	Name: "no-empty-static-block",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindClassStaticBlockDeclaration: func(node *ast.Node) {
 				body := node.AsClassStaticBlockDeclaration().Body
@@ -44,10 +44,10 @@ var NoEmptyStaticBlock = rule.Rule{
 				// than writing a second one: it reads the parser's own trivia, so it is immune to
 				// a comment marker living inside a string earlier in the node, and two helpers
 				// that almost agree would drift.
-				if blockContainsComment(ctx.SourceFile, body) {
+				if blockContainsComment(ruleContext.SourceFile, body) {
 					return
 				}
-				ctx.ReportNode(node, messageUnexpectedEmptyStaticBlock)
+				ruleContext.ReportNode(node, messageUnexpectedEmptyStaticBlock)
 			},
 		}
 	},

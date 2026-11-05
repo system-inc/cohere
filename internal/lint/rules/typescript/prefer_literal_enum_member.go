@@ -130,7 +130,7 @@ func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
 var PreferLiteralEnumMember = rule.Rule{
 	Name: "@typescript-eslint/prefer-literal-enum-member",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, isSettings := rule.OptionsAs[PreferLiteralEnumMemberOptions](options)
 		if !isSettings {
 			settings = DefaultPreferLiteralEnumMemberSettings()
@@ -158,7 +158,7 @@ var PreferLiteralEnumMember = rule.Rule{
 				if settings.AllowBitwiseExpressions {
 					message = preferLiteralEnumMemberNotLiteralOrBitwiseMessage
 				}
-				ctx.ReportNode(member.Name(), message)
+				ruleContext.ReportNode(member.Name(), message)
 			},
 		}
 	},

@@ -237,7 +237,7 @@ var NoRedeclare = rule.Rule{
 	// builtinGlobals asks whether a global's declarations live in a lib file.
 	ProgramReads: rule.ReadsDefaultLibrary,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[NoRedeclareOptions](options)
 		if !ok {
 			// A rule configured as a bare "error" is handed nil, and `options.(T)` on nil yields the
@@ -253,10 +253,10 @@ var NoRedeclare = rule.Rule{
 				// The engine hands every rule a nil checker when the program could not be built.
 				// This rule reads the binder's scope tables, which only exist on a bound program,
 				// so without one there is nothing to group and the honest answer is silence.
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				reportRedeclarationsIn(ctx, node, settings)
+				reportRedeclarationsIn(ruleContext, node, settings)
 			},
 		}
 	},
@@ -274,7 +274,7 @@ type declarationGroup struct {
 // listeners and asks each for its scope, which is the shape ESLint's API forces; we have the whole
 // tree in hand, so the same partition falls out of a single walk that asks each declaration which
 // scope owns it. Fidelity is to which inputs report, not to how upstream obtained its scopes.
-func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoRedeclareOptions) {
+func reportRedeclarationsIn(ruleContext rule.Context, sourceFile *ast.Node, settings NoRedeclareOptions) {
 	// Keyed by the scope-owning node and the name, so two scopes holding the same name never meet.
 	groups := map[scopedName]*declarationGroup{}
 	var order []scopedName
@@ -307,7 +307,7 @@ func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoR
 
 	// Only a script's top level is the global scope, so only its groups can meet a builtin.
 	file := sourceFile.AsSourceFile()
-	checksBuiltins := settings.BuiltinGlobals && !ast.IsExternalModule(file) && ctx.Program != nil
+	checksBuiltins := settings.BuiltinGlobals && !ast.IsExternalModule(file) && ruleContext.Program != nil
 
 	// Iterate the recorded order rather than the map. Go randomises map iteration, so reporting
 	// straight from it would emit findings in a different order on every run, and the harness
@@ -318,7 +318,7 @@ func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoR
 		}
 		declarations := survivingDeclarations(groups[key].declarations, settings)
 		message := messageNoRedeclare
-		if checksBuiltins && key.container == sourceFile && len(declarations) > 0 && isBuiltinGlobal(ctx.TypeChecker, ctx.Program, key.name) {
+		if checksBuiltins && key.container == sourceFile && len(declarations) > 0 && isBuiltinGlobal(ruleContext.TypeChecker, ruleContext.Program, key.name) {
 			// The builtin is the first declaration, so every one in the file redeclares it.
 			message = messageNoRedeclareAsBuiltin
 		} else if len(declarations) < 2 {
@@ -332,7 +332,7 @@ func reportRedeclarationsIn(ctx rule.Context, sourceFile *ast.Node, settings NoR
 			if name == nil {
 				continue
 			}
-			ctx.ReportNode(name, message)
+			ruleContext.ReportNode(name, message)
 		}
 	}
 }

@@ -145,7 +145,7 @@ var PreserveManualMemoization = rule.Rule{
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declined once per file rather than once per node. `NeedsTypeChecker` governs the
 		// REGISTRATION path and says nothing about the harness path, where a context is built by
 		// hand with no checker at all, so the declaration is not the guard.
@@ -162,12 +162,12 @@ var PreserveManualMemoization = rule.Rule{
 		// rather than a contract: every pass below consults the checker, and one of them growing a
 		// dereference would turn this from wasted work into the panic that costs every rule on the
 		// file its verdict.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				text := ctx.SourceFile.Text()
+				text := ruleContext.SourceFile.Text()
 				if !hir.SpellsManualMemoization(text) && strings.IndexByte(text, '\\') < 0 {
 					return
 				}
@@ -192,11 +192,11 @@ var PreserveManualMemoization = rule.Rule{
 					// rewrites the graph it is handed, so it cannot read the shared one, and a copy
 					// skips the control-flow build and single-assignment construction the other react
 					// rules have already paid for on this function (#rwsffzm).
-					function := hir.CloneFunction(hir.ForFunction(ctx, functionNode))
+					function := hir.CloneFunction(hir.ForFunction(ruleContext, functionNode))
 					if function == nil {
 						return
 					}
-					for _, finding := range hir.AnalyzePreservedManualMemoization(function, ctx.TypeChecker) {
+					for _, finding := range hir.AnalyzePreservedManualMemoization(function, ruleContext.TypeChecker) {
 						identifier := function.Identifier(finding.Identifier)
 						if identifier == nil || identifier.Node == nil {
 							// Crash protection rather than a filter, which is worth stating because
@@ -218,7 +218,7 @@ var PreserveManualMemoization = rule.Rule{
 							// construction. The corpus never routes one into a finding today.
 							continue
 						}
-						ctx.ReportNode(identifier.Node, messageFor(finding.Kind))
+						ruleContext.ReportNode(identifier.Node, messageFor(finding.Kind))
 					}
 				})
 			},

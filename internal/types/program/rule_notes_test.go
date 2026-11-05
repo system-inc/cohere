@@ -22,9 +22,9 @@ func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 	notingEachDeclaration := func(name string, key func(declaration *ast.Node) string) rule.Rule {
 		return rule.Rule{
 			Name: name,
-			Run: func(ctx rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
 				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-					ctx.Note(key(node))
+					ruleContext.Note(key(node))
 				}}
 			},
 		}

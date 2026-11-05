@@ -90,7 +90,7 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	var sleptTotal, spunTotal atomic.Int64
 	sleeper := rule.Rule{
 		Name: "planted-sleeper",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				start := time.Now()
 				time.Sleep(sleepPerFile)
@@ -100,7 +100,7 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	}
 	spinner := rule.Rule{
 		Name: "planted-spinner",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				start := threadCPU()
 				spin(iterations)

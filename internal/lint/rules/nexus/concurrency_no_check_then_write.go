@@ -127,14 +127,14 @@ var ConcurrencyNoCheckThenWrite = rule.Rule{
 	// Where this file's `sharp` import resolves.
 	ProgramReads: rule.ReadsModuleResolution,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			// Every callee is identified through the checker. Without it the rule could only match
 			// names, so it declines the file.
 			return nil
 		}
 		check := func(node *ast.Node) {
-			concurrencyNoCheckThenWriteCheckLoop(ctx, node)
+			concurrencyNoCheckThenWriteCheckLoop(ruleContext, node)
 		}
 		return rule.Listeners{
 			ast.KindWhileStatement: check,
@@ -215,8 +215,8 @@ type concurrencyNoCheckThenWriteComparison struct {
 
 // concurrencyNoCheckThenWriteCheckLoop reports a loop that finds a free name and a later write that
 // creates it without exclusive create.
-func concurrencyNoCheckThenWriteCheckLoop(ctx rule.Context, loop *ast.Node) {
-	analysis := &concurrencyNoCheckThenWriteLoop{ctx: ctx, loop: loop, function: scope.EnclosingFunctionLike(loop)}
+func concurrencyNoCheckThenWriteCheckLoop(ruleContext rule.Context, loop *ast.Node) {
+	analysis := &concurrencyNoCheckThenWriteLoop{ctx: ruleContext, loop: loop, function: scope.EnclosingFunctionLike(loop)}
 	if !analysis.findCheck() {
 		return
 	}
@@ -228,7 +228,7 @@ func concurrencyNoCheckThenWriteCheckLoop(ctx rule.Context, loop *ast.Node) {
 	for _, statement := range analysis.followingStatements() {
 		write, destination := analysis.findWrite(statement, checkedPath)
 		if write != nil {
-			ctx.ReportNode(analysis.check, concurrencyNoCheckThenWriteMessage(destination))
+			ruleContext.ReportNode(analysis.check, concurrencyNoCheckThenWriteMessage(destination))
 			return
 		}
 	}

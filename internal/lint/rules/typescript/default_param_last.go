@@ -132,7 +132,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // half of a grammar-versus-parser distinction. Four fixtures pin it now.
 var DefaultParamLast = rule.Rule{
 	Name: "@typescript-eslint/default-param-last",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		check := func(node *ast.Node) {
 			// A bodyless construct declares a shape rather than an implementation, and upstream
 			// gives every such construct a node type outside its three listeners. See the doc
@@ -175,7 +175,7 @@ var DefaultParamLast = rule.Rule{
 				// The parameter's own token range already begins at its first modifier, which is
 				// what makes a parameter property span its `public` or `readonly` keyword the way
 				// upstream's outer TSParameterProperty node does.
-				ctx.ReportNode(parameter, messageDefaultParamLastShouldBeLast)
+				ruleContext.ReportNode(parameter, messageDefaultParamLastShouldBeLast)
 			}
 		}
 

@@ -533,15 +533,15 @@ var Dependencies = rule.Rule{
 	Name: "boundaries/dependencies",
 	// The project root, and where this file's imports resolve.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsModuleResolution,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || ctx.Program == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil || ruleContext.Program == nil {
 			return nil
 		}
 		settings, configured := rule.OptionsAs[DependenciesOptions](options)
 		if !configured || len(settings.Elements) == 0 {
 			// The decoder refuses an empty element list, so this is a hand-built Context's case, and a
 			// skip rather than a silence if it is ever reached in a run (#pa7k7zv).
-			ctx.Skip("no elements are configured")
+			ruleContext.Skip("no elements are configured")
 			return nil
 		}
 
@@ -550,7 +550,7 @@ var Dependencies = rule.Rule{
 			// A test hands the struct straight in, with no config to anchor it. The program's
 			// directory is where its tsconfig sits, which is upstream's rootPath for every project
 			// this runs on.
-			root = ctx.Program.GetCurrentDirectory()
+			root = ruleContext.Program.GetCurrentDirectory()
 		}
 		// The resolver returns a package's file by its real path and a project file by the path it was
 		// reached through, so under a root that is itself reached through a link the two disagree:
@@ -574,7 +574,7 @@ var Dependencies = rule.Rule{
 			return "", false
 		}
 
-		fromPath, inside := relative(ctx.SourceFile.FileName().AsString())
+		fromPath, inside := relative(ruleContext.SourceFile.FileName().AsString())
 		if !inside {
 			return nil
 		}
@@ -587,7 +587,7 @@ var Dependencies = rule.Rule{
 			if specifier == nil || specifier.Kind != ast.KindStringLiteral {
 				return
 			}
-			resolved := ctx.Program.ResolveModule(ctx.SourceFile, specifier)
+			resolved := ruleContext.Program.ResolveModule(ruleContext.SourceFile, specifier)
 			if !resolved.IsResolved() || resolved.IsExternalLibraryImport {
 				return
 			}
@@ -600,7 +600,7 @@ var Dependencies = rule.Rule{
 				return
 			}
 			if refused, policyIndex := settings.decide(from, to); refused {
-				ctx.ReportNode(specifier, settings.messageFor(policyIndex, from, to))
+				ruleContext.ReportNode(specifier, settings.messageFor(policyIndex, from, to))
 			}
 		}
 

@@ -71,11 +71,11 @@ func messageNoHandBuiltDeclaredError() rule.Message {
 var ConsistencyNoHandBuiltDeclaredError = rule.Rule{
 	Name: "base/consistency-no-hand-built-declared-error",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
-		if isNoHandBuiltDeclaredErrorExemptFile(ctx.SourceFile.FileName().AsString()) {
+		if isNoHandBuiltDeclaredErrorExemptFile(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}
 
@@ -106,7 +106,7 @@ var ConsistencyNoHandBuiltDeclaredError = rule.Rule{
 
 				// The finding points at the whole `new` expression, which is the original's
 				// `node`, rather than at the option that triggered it.
-				ctx.ReportNode(node, messageNoHandBuiltDeclaredError())
+				ruleContext.ReportNode(node, messageNoHandBuiltDeclaredError())
 			},
 		}
 	},

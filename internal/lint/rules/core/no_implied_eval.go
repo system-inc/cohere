@@ -99,7 +99,7 @@ var NoImpliedEval = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declared as well as needed. NeedsTypeChecker governs the registration path, so a
 		// Context built by hand still arrives with a nil checker, and every listener below reads
 		// it. Declining the file once here rather than per node.
@@ -115,7 +115,7 @@ var NoImpliedEval = rule.Rule{
 		// They are kept apart because they do different jobs. This one declines the file once
 		// instead of once per call expression. The inner one is what actually prevents the
 		// dereference, and it is the one that has to survive somebody moving this line.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -126,7 +126,7 @@ var NoImpliedEval = rule.Rule{
 					return
 				}
 
-				name, isGlobalCall := impliedEvalCalleeName(ctx, callee)
+				name, isGlobalCall := impliedEvalCalleeName(ruleContext, callee)
 				if !isGlobalCall || !impliedEvalFunctionNames[name] {
 					return
 				}
@@ -138,7 +138,7 @@ var NoImpliedEval = rule.Rule{
 				// alone, so `execScript` gets its own sentence in both the bare and the member
 				// forms. The distinction is upstream's and it is reproduced rather than collapsed.
 				if name == "execScript" {
-					ctx.ReportNode(node, rule.Message{
+					ruleContext.ReportNode(node, rule.Message{
 						Id: "execScript",
 						Description: "This calls `execScript` with a string, which compiles and runs that " +
 							"text as code. It is `eval` under another name, and it is not standard. " +
@@ -147,7 +147,7 @@ var NoImpliedEval = rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(node, rule.Message{
+				ruleContext.ReportNode(node, rule.Message{
 					Id: "impliedEval",
 					Description: "This passes a string where a function belongs, so the string is compiled " +
 						"and run when the timer fires. That is `eval` with a delay: the code loses the " +
@@ -173,7 +173,7 @@ var NoImpliedEval = rule.Rule{
 // and `global.global['execScript']` both report and both are in the corpus. The loop terminates
 // because each turn moves strictly outward through `Parent`, but it is written over the receiver
 // chain instead, which shrinks on every turn.
-func impliedEvalCalleeName(ctx rule.Context, callee *ast.Node) (string, bool) {
+func impliedEvalCalleeName(ruleContext rule.Context, callee *ast.Node) (string, bool) {
 	// A parenthesized callee is a node our parser keeps and upstream's deletes, so `(setTimeout)('s')`
 	// arrives here wrapped where upstream sees the identifier directly. Unwrapped in a loop because
 	// `((setTimeout))('s')` nests, and with the nil check written out rather than delegated to
@@ -187,7 +187,7 @@ func impliedEvalCalleeName(ctx rule.Context, callee *ast.Node) (string, bool) {
 
 	// The bare form. `setTimeout('s')` reports only when that name is the global one.
 	if callee.Kind == ast.KindIdentifier {
-		return callee.Text(), impliedEvalResolvesToAGlobal(ctx, callee)
+		return callee.Text(), impliedEvalResolvesToAGlobal(ruleContext, callee)
 	}
 
 	// The member forms. Read the property being called, then walk the receiver.
@@ -211,7 +211,7 @@ func impliedEvalCalleeName(ctx rule.Context, callee *ast.Node) (string, bool) {
 			if !impliedEvalGlobalObjectNames[receiver.Text()] {
 				return "", false
 			}
-			return functionName, impliedEvalResolvesToAGlobal(ctx, receiver)
+			return functionName, impliedEvalResolvesToAGlobal(ruleContext, receiver)
 		}
 
 		// A longer chain is only walked through while each link names the global object again.
@@ -316,12 +316,12 @@ func impliedEvalAccessReceiver(access *ast.Node) *ast.Node {
 // unresolvable name answers "global" here, where the neighbour answers "not global". That is
 // upstream's behaviour: `execScript` resolves to nothing in any TypeScript program and upstream
 // reports it in twenty-one corpus cases, so declining an unresolved name would lose all of them.
-func impliedEvalResolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func impliedEvalResolvesToAGlobal(ruleContext rule.Context, identifier *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		// Nothing declares this name at all, and upstream declines it.
 		//

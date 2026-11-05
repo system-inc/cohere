@@ -120,7 +120,7 @@ var IncompatibleLibrary = rule.Rule{
 	// parity guard tries an exact match before stripping the namespace, so the slash spelling would
 	// also match while being the wrong thing to write.
 	Name: "react-hooks/incompatible-library",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// A source-file pre-pass rather than a call-expression listener, because the
@@ -131,7 +131,7 @@ var IncompatibleLibrary = rule.Rule{
 				if len(incompatible.direct) == 0 && len(incompatible.indirect) == 0 {
 					return
 				}
-				incompatibleLibraryReport(ctx, node, incompatible)
+				incompatibleLibraryReport(ruleContext, node, incompatible)
 			},
 		}
 	},
@@ -259,7 +259,7 @@ func incompatibleLibraryBindings(sourceFile *ast.Node) incompatibleLibraryLocals
 // the enclosing function, so a second offending call in the same function never runs. Keyed by the
 // enclosing function node rather than by a single flag, because two sibling components in one file
 // each report their own first call.
-func incompatibleLibraryReport(ctx rule.Context, sourceFile *ast.Node, locals incompatibleLibraryLocals) {
+func incompatibleLibraryReport(ruleContext rule.Context, sourceFile *ast.Node, locals incompatibleLibraryLocals) {
 	reported := map[*ast.Node]bool{}
 
 	// Property accesses reached through a destructure of an incompatible hook's result, keyed by
@@ -285,7 +285,7 @@ func incompatibleLibraryReport(ctx rule.Context, sourceFile *ast.Node, locals in
 				enclosing := incompatibleLibraryEnclosingRoot(node)
 				if enclosing != nil && !reported[enclosing] {
 					reported[enclosing] = true
-					ctx.ReportNode(span, rule.Message{
+					ruleContext.ReportNode(span, rule.Message{
 						Id:          messageIncompatibleLibrary.Id,
 						Description: messageIncompatibleLibrary.Description + " " + message,
 					})

@@ -91,7 +91,7 @@ func DecodeNoMultiAssignOptions(raw []byte) (any, error) {
 // itself and is asserted rather than assumed.
 var NoMultiAssign = rule.Rule{
 	Name: "no-multi-assign",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. That is correct here only because the one option defaults to false; the fallback is
 		// written out rather than relied on so a later default change cannot invert the rule
@@ -111,7 +111,7 @@ var NoMultiAssign = rule.Rule{
 				if !nestedAssignmentIsChained(node, ignoreNonDeclaration) {
 					return
 				}
-				ctx.ReportNode(node, messageNoMultiAssign)
+				ruleContext.ReportNode(node, messageNoMultiAssign)
 			},
 		}
 	},

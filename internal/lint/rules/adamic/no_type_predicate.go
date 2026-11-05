@@ -39,10 +39,10 @@ var noTypePredicateText = policy.MessageOf("adamic/no-type-predicate", "typePred
 var NoTypePredicate = rule.Rule{
 	Name: "adamic/no-type-predicate",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindTypePredicate: func(node *ast.Node) {
-				ctx.ReportNode(node, rule.Message{Id: "typePredicate", Description: noTypePredicateText.Render(nil)})
+				ruleContext.ReportNode(node, rule.Message{Id: "typePredicate", Description: noTypePredicateText.Render(nil)})
 			},
 		}
 	},

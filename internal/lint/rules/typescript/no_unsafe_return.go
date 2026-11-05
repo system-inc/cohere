@@ -75,7 +75,7 @@ var NoUnsafeReturn = rule.Rule{
 	// The compiler options.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				argument := node.AsReturnStatement().Expression
@@ -85,7 +85,7 @@ var NoUnsafeReturn = rule.Rule{
 				// The finding points at the whole return STATEMENT while the type comes from its
 				// argument. Upstream passes both, and collapsing them would underline `1 as any`
 				// where upstream underlines `return 1 as any;`.
-				checkUnsafeReturn(ctx, argument, node)
+				checkUnsafeReturn(ruleContext, argument, node)
 			},
 			ast.KindArrowFunction: func(node *ast.Node) {
 				body := node.AsArrowFunction().Body
@@ -94,7 +94,7 @@ var NoUnsafeReturn = rule.Rule{
 					// selector says the same thing with `:not(BlockStatement).body`.
 					return
 				}
-				checkUnsafeReturn(ctx, body, body)
+				checkUnsafeReturn(ruleContext, body, body)
 			},
 		}
 	},
@@ -104,8 +104,8 @@ var NoUnsafeReturn = rule.Rule{
 //
 // `returnNode` is the value being returned and `reportingNode` is where the finding points. They
 // are the same node for a concise arrow body and they differ for a return statement.
-func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *ast.Node) {
-	if ctx.TypeChecker == nil {
+func checkUnsafeReturn(ruleContext rule.Context, returnNode *ast.Node, reportingNode *ast.Node) {
+	if ruleContext.TypeChecker == nil {
 		return
 	}
 
@@ -117,14 +117,14 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 		return
 	}
 
-	returnNodeType := ctx.TypeChecker.GetTypeAtLocation(returnNode)
+	returnNodeType := ruleContext.TypeChecker.GetTypeAtLocation(returnNode)
 	if returnNodeType == nil {
 		return
 	}
-	anyType := type_checking.DiscriminateAnyType(returnNodeType, ctx.TypeChecker, ctx.Program, returnNode)
-	constrainedReturnNodeType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, returnNode)
+	anyType := type_checking.DiscriminateAnyType(returnNodeType, ruleContext.TypeChecker, ruleContext.Program, returnNode)
+	constrainedReturnNodeType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, returnNode)
 
-	functionType := unsafeReturnFunctionType(ctx, functionNode)
+	functionType := unsafeReturnFunctionType(ruleContext, functionNode)
 	if functionType == nil {
 		return
 	}
@@ -134,7 +134,7 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 	// call signatures unflattened. That silently skipped the explicit-annotation check and turned
 	// one of upstream's own passing cases into a finding. `CollectAllCallSignatures` is the shelf's
 	// equivalent and its doc comment names the upstream function it mirrors.
-	callSignatures := type_checking.CollectAllCallSignatures(ctx.TypeChecker, functionType)
+	callSignatures := type_checking.CollectAllCallSignatures(ruleContext.TypeChecker, functionType)
 
 	isAsync := unsafeReturnIsAsync(functionNode)
 
@@ -142,7 +142,7 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 	// made, so the rule declines even when the type is `any`.
 	if unsafeReturnTypeAnnotation(functionNode) != nil {
 		for _, signature := range callSignatures {
-			signatureReturnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+			signatureReturnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 			if signatureReturnType == nil {
 				continue
 			}
@@ -156,8 +156,8 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 			}
 			// The same comparison one layer in, so an async function declaring `Promise<any>` is
 			// recognised as the same decision.
-			awaitedSignatureReturnType := checker.Checker_getAwaitedType(ctx.TypeChecker, signatureReturnType)
-			awaitedReturnNodeType := checker.Checker_getAwaitedType(ctx.TypeChecker, returnNodeType)
+			awaitedSignatureReturnType := checker.Checker_getAwaitedType(ruleContext.TypeChecker, signatureReturnType)
+			awaitedReturnNodeType := checker.Checker_getAwaitedType(ruleContext.TypeChecker, returnNodeType)
 			if awaitedReturnNodeType == awaitedSignatureReturnType ||
 				(awaitedSignatureReturnType != nil &&
 					type_checking.IsTypeFlagSet(awaitedSignatureReturnType,
@@ -171,7 +171,7 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 		// `unknown` is what a caller is supposed to receive when the value cannot be trusted, so
 		// returning `any` into it is the safe move rather than the unsafe one.
 		for _, signature := range callSignatures {
-			functionReturnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
+			functionReturnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
 			if functionReturnType == nil {
 				continue
 			}
@@ -180,10 +180,10 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 				return
 			}
 			if anyType == type_checking.DiscriminatedAnyTypeAnyArray &&
-				type_checking.IsTypeUnknownArrayType(functionReturnType, ctx.TypeChecker) {
+				type_checking.IsTypeUnknownArrayType(functionReturnType, ruleContext.TypeChecker) {
 				return
 			}
-			awaitedType := checker.Checker_getAwaitedType(ctx.TypeChecker, functionReturnType)
+			awaitedType := checker.Checker_getAwaitedType(ruleContext.TypeChecker, functionReturnType)
 			if awaitedType != nil && anyType == type_checking.DiscriminatedAnyTypePromiseAny &&
 				type_checking.IsTypeUnknownType(awaitedType) {
 				return
@@ -198,19 +198,19 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 
 		messageId := "unsafeReturn"
 		if !type_checking.IsStrictCompilerOptionEnabled(
-			ctx.Program.Options(), ctx.Program.Options().NoImplicitThis) {
+			ruleContext.Program.Options(), ruleContext.Program.Options().NoImplicitThis) {
 			// See the doc comment: this arm is correct and its id is unreachable through this
 			// package's fixtures, because the harness pins the option above the rule.
 			thisExpression := type_checking.GetThisExpression(returnNode)
 			if thisExpression != nil {
-				thisType := type_checking.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
+				thisType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, thisExpression)
 				if thisType != nil && type_checking.IsTypeAnyType(thisType) {
 					messageId = "unsafeReturnThis"
 				}
 			}
 		}
 
-		ctx.ReportNode(reportingNode, unsafeReturnMessageFor(messageId,
+		ruleContext.ReportNode(reportingNode, unsafeReturnMessageFor(messageId,
 			unsafeReturnTypeText(anyType, constrainedReturnNodeType)))
 		return
 	}
@@ -225,23 +225,23 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 	// which is why a union-typed receiver reaches this branch and declines rather than comparing
 	// against an arbitrary member. Reproduced deliberately; using the flattened list here would
 	// report inputs upstream is silent on.
-	directSignatures := type_checking.GetCallSignatures(ctx.TypeChecker, functionType)
+	directSignatures := type_checking.GetCallSignatures(ruleContext.TypeChecker, functionType)
 	if len(directSignatures) == 0 {
 		return
 	}
-	functionReturnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, directSignatures[0])
+	functionReturnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, directSignatures[0])
 	if functionReturnType == nil {
 		return
 	}
 	receiver, sender, unsafe := type_checking.IsUnsafeAssignment(returnNodeType, functionReturnType,
-		ctx.TypeChecker, returnNode)
+		ruleContext.TypeChecker, returnNode)
 	if !unsafe {
 		return
 	}
-	ctx.ReportNode(reportingNode, rule.Message{
+	ruleContext.ReportNode(reportingNode, rule.Message{
 		Id: "unsafeReturnAssignment",
-		Description: "Unsafe return of type `" + ctx.TypeChecker.TypeToString(sender) +
-			"` from function with return type `" + ctx.TypeChecker.TypeToString(receiver) + "`.",
+		Description: "Unsafe return of type `" + ruleContext.TypeChecker.TypeToString(sender) +
+			"` from function with return type `" + ruleContext.TypeChecker.TypeToString(receiver) + "`.",
 	})
 }
 
@@ -252,13 +252,13 @@ func checkUnsafeReturn(ctx rule.Context, returnNode *ast.Node, reportingNode *as
 // asking the node itself gives `() => Set<any>` for `const foo: () => Set<string> = () => new
 // Set<any>()` and the rule goes silent on a real finding. Upstream asks for the contextual type in
 // exactly those two cases and falls back to the node's own type when there is none.
-func unsafeReturnFunctionType(ctx rule.Context, functionNode *ast.Node) *checker.Type {
+func unsafeReturnFunctionType(ruleContext rule.Context, functionNode *ast.Node) *checker.Type {
 	if functionNode.Kind == ast.KindFunctionExpression || functionNode.Kind == ast.KindArrowFunction {
-		if contextual := type_checking.GetContextualType(ctx.TypeChecker, functionNode); contextual != nil {
+		if contextual := type_checking.GetContextualType(ruleContext.TypeChecker, functionNode); contextual != nil {
 			return contextual
 		}
 	}
-	return ctx.TypeChecker.GetTypeAtLocation(functionNode)
+	return ruleContext.TypeChecker.GetTypeAtLocation(functionNode)
 }
 
 // unsafeReturnTypeAnnotation answers the function's declared return type, or nil when it has none.

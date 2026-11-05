@@ -82,10 +82,10 @@ var NoAlert = rule.Rule{
 	Name:             "no-alert",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
 				callee := ast.SkipParentheses(node.AsCallExpression().Expression)
@@ -97,8 +97,8 @@ var NoAlert = rule.Rule{
 				// whatever it is spelled.
 				if callee.Kind == ast.KindIdentifier {
 					name := callee.Text()
-					if noAlertProhibited[name] && !identifierIsShadowed(ctx, callee) {
-						ctx.ReportNode(node, buildNoAlertMessage(name))
+					if noAlertProhibited[name] && !identifierIsShadowed(ruleContext, callee) {
+						ruleContext.ReportNode(node, buildNoAlertMessage(name))
 					}
 					return
 				}
@@ -119,7 +119,7 @@ var NoAlert = rule.Rule{
 					return
 				}
 				object = ast.SkipParentheses(object)
-				if !isGlobalObjectReference(ctx, object) {
+				if !isGlobalObjectReference(ruleContext, object) {
 					return
 				}
 
@@ -128,7 +128,7 @@ var NoAlert = rule.Rule{
 				// `window[alert]()` a clean case rather than a missed finding.
 				name, _ := property.AccessedName(callee, property.Static)
 				if noAlertProhibited[name] {
-					ctx.ReportNode(node, buildNoAlertMessage(name))
+					ruleContext.ReportNode(node, buildNoAlertMessage(name))
 				}
 			},
 		}
@@ -145,7 +145,7 @@ var NoAlert = rule.Rule{
 //
 // The `this` arm upstream carries is deliberately absent; see the rule's doc comment for the
 // measurement.
-func isGlobalObjectReference(ctx rule.Context, node *ast.Node) bool {
+func isGlobalObjectReference(ruleContext rule.Context, node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -153,5 +153,5 @@ func isGlobalObjectReference(ctx rule.Context, node *ast.Node) bool {
 	if name != "window" && name != "globalThis" {
 		return false
 	}
-	return !identifierIsShadowed(ctx, node)
+	return !identifierIsShadowed(ruleContext, node)
 }

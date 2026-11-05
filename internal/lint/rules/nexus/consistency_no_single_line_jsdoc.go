@@ -38,14 +38,14 @@ func messageUseSimpleComment() rule.Message {
 // should make unattended.
 var ConsistencyNoSingleLineJsDoc = rule.Rule{
 	Name: "nexus/consistency-no-single-line-jsdoc",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				for _, comment := range comments.ForFile(ctx) {
+				for _, comment := range comments.ForFile(ruleContext) {
 					if !comment.IsJsDoc() {
 						continue
 					}
@@ -60,15 +60,15 @@ var ConsistencyNoSingleLineJsDoc = rule.Rule{
 					description := lines[0]
 					isSingleSourceLine := comment.StartLine == comment.EndLine
 					if strings.Contains(description, "//") || !isSingleSourceLine ||
-						consistencyNoSingleLineJsDocCodeFollows(ctx.SourceFile.Text(), comment.Range.End()) {
-						ctx.ReportRange(comment.Range, messageUseSimpleComment())
+						consistencyNoSingleLineJsDocCodeFollows(ruleContext.SourceFile.Text(), comment.Range.End()) {
+						ruleContext.ReportRange(comment.Range, messageUseSimpleComment())
 						continue
 					}
 
-					ctx.Report(rule.Diagnostic{
+					ruleContext.Report(rule.Diagnostic{
 						Range:      comment.Range,
 						Message:    messageUseSimpleComment(),
-						SourceFile: ctx.SourceFile,
+						SourceFile: ruleContext.SourceFile,
 						Fixes: []rule.Fix{
 							rule.ReplaceRange(comment.Range, "// "+description),
 						},

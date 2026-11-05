@@ -153,7 +153,7 @@ func DecodeConsistentThisOptions(list []byte) (any, error) {
 // inside one source-file listener, which fires before its children.
 var ConsistentThis = rule.Rule{
 	Name: "consistent-this",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings, ok := rule.OptionsAs[ConsistentThisSettings](options)
 		if !ok || len(settings.Aliases) == 0 {
 			// A rule configured as a bare severity is handed nil options, and the zero value of the
@@ -163,7 +163,7 @@ var ConsistentThis = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkConsistentThisScope(ctx, node, settings.Aliases)
+				checkConsistentThisScope(ruleContext, node, settings.Aliases)
 			},
 		}
 	},
@@ -175,7 +175,7 @@ var ConsistentThis = rule.Rule{
 // expression. Arrow functions are deliberately absent, matching upstream's listener list, and that
 // is not an oversight on either side: an arrow has no `this` of its own, so a capture inside one
 // belongs to the enclosing scope.
-func checkConsistentThisScope(ctx rule.Context, scope *ast.Node, aliases []string) {
+func checkConsistentThisScope(ruleContext rule.Context, scope *ast.Node, aliases []string) {
 	// Declarations of an alias in THIS scope, and whether a plain assignment of `this` rescued each.
 	declaredAliases := []*ast.Node{}
 	rescuedAliases := map[string]bool{}
@@ -204,7 +204,7 @@ func checkConsistentThisScope(ctx rule.Context, scope *ast.Node, aliases []strin
 		// Treating an arrow as transparent reports the first of those, and treating it as a scope
 		// of its own reports it too, so both intuitive readings are wrong in the same direction.
 		if current.Kind == ast.KindArrowFunction {
-			checkConsistentThisAssignmentsOnly(ctx, current, aliases)
+			checkConsistentThisAssignmentsOnly(ruleContext, current, aliases)
 			return false
 		}
 
@@ -221,7 +221,7 @@ func checkConsistentThisScope(ctx rule.Context, scope *ast.Node, aliases []strin
 				break
 			}
 			if declaration.Initializer != nil {
-				checkConsistentThisAssignment(ctx, current, name.Text(),
+				checkConsistentThisAssignment(ruleContext, current, name.Text(),
 					declaration.Initializer, ast.KindEqualsToken, aliases)
 			}
 			if isDesignatedAlias(name.Text(), aliases) {
@@ -253,7 +253,7 @@ func checkConsistentThisScope(ctx rule.Context, scope *ast.Node, aliases []strin
 				break
 			}
 			name := binary.Left.Text()
-			checkConsistentThisAssignment(ctx, current, name, binary.Right,
+			checkConsistentThisAssignment(ruleContext, current, name, binary.Right,
 				binary.OperatorToken.Kind, aliases)
 
 			// A plain assignment of `this` written directly in this scope rescues a declaration.
@@ -277,11 +277,11 @@ func checkConsistentThisScope(ctx rule.Context, scope *ast.Node, aliases []strin
 		if rescuedAliases[name] {
 			continue
 		}
-		ctx.ReportNode(declaration, messageAliasNotAssignedToThis)
+		ruleContext.ReportNode(declaration, messageAliasNotAssignedToThis)
 	}
 
 	for _, nested := range nestedScopes {
-		checkConsistentThisScope(ctx, nested, aliases)
+		checkConsistentThisScope(ruleContext, nested, aliases)
 	}
 }
 
@@ -339,18 +339,18 @@ func liesInsideANestedEslintScope(write *ast.Node, scope *ast.Node) bool {
 // a capture under the wrong name. The operator test is the half a port is most likely to drop:
 // `self += this` assigns a `this` expression and is still a finding, because the alias ends up
 // holding a concatenation.
-func checkConsistentThisAssignment(ctx rule.Context, node *ast.Node, name string,
+func checkConsistentThisAssignment(ruleContext rule.Context, node *ast.Node, name string,
 	value *ast.Node, operator ast.Kind, aliases []string) {
 	valueIsThis := value != nil && value.Kind == ast.KindThisKeyword
 
 	if isDesignatedAlias(name, aliases) {
 		if !valueIsThis || operator != ast.KindEqualsToken {
-			ctx.ReportNode(node, messageAliasNotAssignedToThis)
+			ruleContext.ReportNode(node, messageAliasNotAssignedToThis)
 		}
 		return
 	}
 	if valueIsThis {
-		ctx.ReportNode(node, messageUnexpectedAlias)
+		ruleContext.ReportNode(node, messageUnexpectedAlias)
 	}
 }
 
@@ -390,11 +390,11 @@ func isAssignmentOperator(kind ast.Kind) bool {
 // arrow through listeners that do not depend on a scope, while its scope-exit listeners never fire
 // for one, so the declared-and-never-assigned judgment is skipped there and only there. A nested
 // function INSIDE an arrow is a scope again, which is why the descent resumes at one.
-func checkConsistentThisAssignmentsOnly(ctx rule.Context, node *ast.Node, aliases []string) {
+func checkConsistentThisAssignmentsOnly(ruleContext rule.Context, node *ast.Node, aliases []string) {
 	var visit func(*ast.Node) bool
 	visit = func(current *ast.Node) bool {
 		if isConsistentThisScope(current) {
-			checkConsistentThisScope(ctx, current, aliases)
+			checkConsistentThisScope(ruleContext, current, aliases)
 			return false
 		}
 
@@ -405,7 +405,7 @@ func checkConsistentThisAssignmentsOnly(ctx rule.Context, node *ast.Node, aliase
 				declaration.Name().Kind != ast.KindIdentifier || declaration.Initializer == nil {
 				break
 			}
-			checkConsistentThisAssignment(ctx, current, declaration.Name().Text(),
+			checkConsistentThisAssignment(ruleContext, current, declaration.Name().Text(),
 				declaration.Initializer, ast.KindEqualsToken, aliases)
 
 		case ast.KindBinaryExpression:
@@ -415,7 +415,7 @@ func checkConsistentThisAssignmentsOnly(ctx rule.Context, node *ast.Node, aliase
 				binary.Left.Kind != ast.KindIdentifier {
 				break
 			}
-			checkConsistentThisAssignment(ctx, current, binary.Left.Text(), binary.Right,
+			checkConsistentThisAssignment(ruleContext, current, binary.Left.Text(), binary.Right,
 				binary.OperatorToken.Kind, aliases)
 		}
 

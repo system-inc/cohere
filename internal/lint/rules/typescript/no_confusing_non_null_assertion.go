@@ -89,7 +89,7 @@ var NoConfusingNonNullAssertion = rule.Rule{
 	// what anything's type is.
 	NeedsTypeChecker: false,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binaryExpression := node.AsBinaryExpression()
@@ -102,8 +102,8 @@ var NoConfusingNonNullAssertion = rule.Rule{
 					return
 				}
 
-				leftRange := rule.TokenRange(ctx.SourceFile, binaryExpression.Left)
-				sourceText := ctx.SourceFile.Text()
+				leftRange := rule.TokenRange(ruleContext.SourceFile, binaryExpression.Left)
+				sourceText := ruleContext.SourceFile.Text()
 				if leftRange.Pos() < 0 || leftRange.End() > len(sourceText) ||
 					leftRange.End() <= leftRange.Pos() {
 					return
@@ -132,7 +132,7 @@ var NoConfusingNonNullAssertion = rule.Rule{
 				// offers only the wrap. Removing the trailing character there would delete the bang
 				// out of `b!`, which is a different edit than the one the message names.
 				if binaryExpression.Left.Kind != ast.KindNonNullExpression {
-					ctx.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
+					ruleContext.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
 						wrapSuggestion)
 					return
 				}
@@ -145,7 +145,7 @@ var NoConfusingNonNullAssertion = rule.Rule{
 
 				switch operatorText {
 				case "=":
-					ctx.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
+					ruleContext.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
 						rule.Suggestion{
 							Message: rule.Message{
 								Id: "notNeedInAssign",
@@ -155,7 +155,7 @@ var NoConfusingNonNullAssertion = rule.Rule{
 							Fixes: []rule.Fix{rule.RemoveRange(bangRange)},
 						})
 				case "==", "===":
-					ctx.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
+					ruleContext.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
 						rule.Suggestion{
 							Message: rule.Message{
 								Id: "notNeedInEqualTest",
@@ -166,7 +166,7 @@ var NoConfusingNonNullAssertion = rule.Rule{
 						})
 				default:
 					// `in` and `instanceof`, which offer both repairs in upstream's order.
-					ctx.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
+					ruleContext.ReportNodeWithSuggestions(node, buildConfusingMessage(operatorText),
 						rule.Suggestion{
 							Message: rule.Message{
 								Id: "notNeedInOperator",

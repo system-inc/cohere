@@ -88,13 +88,13 @@ var CorrectnessNoDiscardedPureResult = rule.Rule{
 	// The rule reads types and the default library's declarations, never an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.TypeChecker == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 		return rule.Listeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
-				correctnessNoDiscardedPureResultCheck(ctx, node)
+				correctnessNoDiscardedPureResultCheck(ruleContext, node)
 			},
 		}
 	},
@@ -124,7 +124,7 @@ var correctnessNoDiscardedPureResultMethods = map[string]map[string]bool{
 	"ReadonlyArray": correctnessNoDiscardedPureResultArrayMethods,
 }
 
-func correctnessNoDiscardedPureResultCheck(ctx rule.Context, statement *ast.Node) {
+func correctnessNoDiscardedPureResultCheck(ruleContext rule.Context, statement *ast.Node) {
 	call := ast.SkipParentheses(statement.AsExpressionStatement().Expression)
 	if call.Kind != ast.KindCallExpression {
 		return
@@ -134,23 +134,23 @@ func correctnessNoDiscardedPureResultCheck(ctx rule.Context, statement *ast.Node
 		return
 	}
 	name := callee.AsPropertyAccessExpression().Name()
-	if name.Kind != ast.KindIdentifier || !correctnessNoDiscardedPureResultIsPure(ctx, name) {
+	if name.Kind != ast.KindIdentifier || !correctnessNoDiscardedPureResultIsPure(ruleContext, name) {
 		return
 	}
 	if arguments := call.AsCallExpression().Arguments; arguments != nil {
 		for _, argument := range arguments.Nodes {
-			if correctnessNoDiscardedPureResultIsCallable(ctx, argument) {
+			if correctnessNoDiscardedPureResultIsCallable(ruleContext, argument) {
 				return
 			}
 		}
 	}
-	ctx.ReportNode(call, correctnessNoDiscardedPureResultMessage())
+	ruleContext.ReportNode(call, correctnessNoDiscardedPureResultMessage())
 }
 
 // correctnessNoDiscardedPureResultIsPure says whether a method name resolves, through every
 // declaration, to a side-effect-free method of the default library's String, Array or ReadonlyArray.
-func correctnessNoDiscardedPureResultIsPure(ctx rule.Context, name *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+func correctnessNoDiscardedPureResultIsPure(ruleContext rule.Context, name *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -164,7 +164,7 @@ func correctnessNoDiscardedPureResultIsPure(ctx rule.Context, name *ast.Node) bo
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !rule.IsSourceFileDefaultLibrary(ctx.Program, file) {
+		if file == nil || !rule.IsSourceFileDefaultLibrary(ruleContext.Program, file) {
 			return false
 		}
 	}
@@ -173,12 +173,12 @@ func correctnessNoDiscardedPureResultIsPure(ctx rule.Context, name *ast.Node) bo
 
 // correctnessNoDiscardedPureResultIsCallable says whether an argument is a function: written as one,
 // or of a type with a call signature in any part of it. A spread argument is read by its own type.
-func correctnessNoDiscardedPureResultIsCallable(ctx rule.Context, argument *ast.Node) bool {
+func correctnessNoDiscardedPureResultIsCallable(ruleContext rule.Context, argument *ast.Node) bool {
 	value := ast.SkipParentheses(argument)
 	if value.Kind == ast.KindArrowFunction || value.Kind == ast.KindFunctionExpression {
 		return true
 	}
-	argumentType := ctx.TypeChecker.GetTypeAtLocation(value)
+	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(value)
 	if argumentType == nil {
 		return true
 	}
@@ -186,7 +186,7 @@ func correctnessNoDiscardedPureResultIsCallable(ctx rule.Context, argument *ast.
 		if type_checking.IsTypeFlagSet(part, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
 			return true
 		}
-		if len(ctx.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall)) > 0 {
+		if len(ruleContext.TypeChecker.GetSignaturesOfType(part, checker.SignatureKindCall)) > 0 {
 			return true
 		}
 	}

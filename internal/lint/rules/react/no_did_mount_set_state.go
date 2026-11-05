@@ -109,7 +109,7 @@ var NoDidMountSetState = rule.Rule{
 	// strips the namespace on a `/` boundary, so `react-no-did-mount-set-state` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-did-mount-set-state",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// No file gate. oxc gated this on `source_type().is_jsx()`, and that gate came along when the
 		// rule was ported from oxc, but the authority here is eslint-plugin-react, which does not
 		// gate on the file name at all. A React class component in a `.ts` file is ordinary and
@@ -139,7 +139,7 @@ var NoDidMountSetState = rule.Rule{
 
 				// The callee, not the call. See the doc above: thirteen characters for
 				// `this.setState`, which the upstream snapshot underlines and the fixtures slice.
-				ctx.ReportNode(callee, messageNoDidMountSetState)
+				ruleContext.ReportNode(callee, messageNoDidMountSetState)
 			},
 		}
 	},

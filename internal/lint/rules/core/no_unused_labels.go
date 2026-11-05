@@ -74,7 +74,7 @@ var messageUnusedLabel = rule.Message{
 // the same place, which is what an exit hook would otherwise buy.
 var NoUnusedLabels = rule.Rule{
 	Name: "no-unused-labels",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				labeledStatements := []*ast.Node{}
@@ -105,11 +105,11 @@ var NoUnusedLabels = rule.Rule{
 					if statement == nil || statement.Label == nil {
 						continue
 					}
-					if removal, ok := labelRemovalFix(ctx, labeled, statement); ok {
-						ctx.ReportNodeWithFixes(statement.Label, messageUnusedLabel, removal)
+					if removal, ok := labelRemovalFix(ruleContext, labeled, statement); ok {
+						ruleContext.ReportNodeWithFixes(statement.Label, messageUnusedLabel, removal)
 						continue
 					}
-					ctx.ReportNode(statement.Label, messageUnusedLabel)
+					ruleContext.ReportNode(statement.Label, messageUnusedLabel)
 				}
 			},
 		}
@@ -149,17 +149,17 @@ func markTargetLabelUsed(jump *ast.Node, label *ast.Node, usedLabels map[int]boo
 // the name and the colon while leaving the body untouched. Token starts rather than Pos(), because
 // Pos() sits before leading trivia: for the inner label of `A: B: 'foo'` the raw Pos() covers the
 // space before `B`, and a fix built from it eats whitespace that belongs to nobody.
-func labelRemovalFix(ctx rule.Context, labeled *ast.Node, statement *ast.LabeledStatement) (rule.Fix, bool) {
-	labelStart := scanner.GetTokenPosOfNode(statement.Label, ctx.SourceFile, false)
-	bodyStart := scanner.GetTokenPosOfNode(statement.Statement, ctx.SourceFile, false)
+func labelRemovalFix(ruleContext rule.Context, labeled *ast.Node, statement *ast.LabeledStatement) (rule.Fix, bool) {
+	labelStart := scanner.GetTokenPosOfNode(statement.Label, ruleContext.SourceFile, false)
+	bodyStart := scanner.GetTokenPosOfNode(statement.Statement, ruleContext.SourceFile, false)
 
-	if commentLiesBetween(ctx, labelStart, bodyStart) {
+	if commentLiesBetween(ruleContext, labelStart, bodyStart) {
 		return rule.Fix{}, false
 	}
 	if wouldBecomeADirective(labeled, statement) {
 		return rule.Fix{}, false
 	}
-	if wouldRejoinWithThePreviousLine(ctx, labelStart, bodyStart) {
+	if wouldRejoinWithThePreviousLine(ruleContext, labelStart, bodyStart) {
 		return rule.Fix{}, false
 	}
 
@@ -175,8 +175,8 @@ func labelRemovalFix(ctx rule.Context, labeled *ast.Node, statement *ast.Labeled
 //
 // The comment cache is shared per file, so this costs one scan across every label in a file rather
 // than one per label.
-func commentLiesBetween(ctx rule.Context, start int, end int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func commentLiesBetween(ruleContext rule.Context, start int, end int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() < end && comment.Range.End() > start {
 			return true
 		}
@@ -245,8 +245,8 @@ func wouldBecomeADirective(labeled *ast.Node, statement *ast.LabeledStatement) b
 // The test is upstream's and it is deliberately about text rather than about the tree. If the token
 // before the label already terminates a statement then nothing can rejoin, and otherwise a body
 // opening with one of the continuation characters would bind to it.
-func wouldRejoinWithThePreviousLine(ctx rule.Context, labelStart int, bodyStart int) bool {
-	source := ctx.SourceFile.Text()
+func wouldRejoinWithThePreviousLine(ruleContext rule.Context, labelStart int, bodyStart int) bool {
+	source := ruleContext.SourceFile.Text()
 	if bodyStart >= len(source) {
 		return false
 	}

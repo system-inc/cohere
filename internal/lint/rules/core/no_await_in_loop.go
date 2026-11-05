@@ -87,12 +87,12 @@ var messageUnexpectedAwaitInLoop = rule.Message{
 // `Promise.all` changes what the program does.
 var NoAwaitInLoop = rule.Rule{
 	Name: "no-await-in-loop",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(waitingNode *ast.Node, reportNode *ast.Node) {
 			if !awaitInLoopIsInsideALoop(waitingNode) {
 				return
 			}
-			ctx.ReportNode(reportNode, messageUnexpectedAwaitInLoop)
+			ruleContext.ReportNode(reportNode, messageUnexpectedAwaitInLoop)
 		}
 
 		return rule.Listeners{

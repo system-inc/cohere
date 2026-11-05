@@ -98,7 +98,7 @@ var NoUselessReturn = rule.Rule{
 	Name:             "no-useless-return",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// One code path per root, as upstream runs one per function. A nested function's
@@ -108,9 +108,9 @@ var NoUselessReturn = rule.Rule{
 				// Only a root whose own code holds a bare `return;` can report, so only those are
 				// built. On a cold ahra run that is 4.4% of roots and 13% of the blocks every root
 				// used to cost (#tmn9n27).
-				for _, root := range codePathRoots(ctx, node) {
+				for _, root := range codePathRoots(ruleContext, node) {
 					if root.BareReturn {
-						noUselessReturnCheckRoot(ctx, root.Node)
+						noUselessReturnCheckRoot(ruleContext, root.Node)
 					} else if CheckCodePathGates {
 						noUselessReturnCheckSkipped(root.Node)
 					}
@@ -121,7 +121,7 @@ var NoUselessReturn = rule.Rule{
 }
 
 // noUselessReturnCheckRoot runs the judgment over one code-path root.
-func noUselessReturnCheckRoot(ctx rule.Context, root *ast.Node) {
+func noUselessReturnCheckRoot(ruleContext rule.Context, root *ast.Node) {
 	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[noUselessReturnEvent]{
 		Statement: func(builder *control_flow_graph.Builder[noUselessReturnEvent], node *ast.Node) {
 			builder.Emit(noUselessReturnEvent{
@@ -151,15 +151,15 @@ func noUselessReturnCheckRoot(ctx rule.Context, root *ast.Node) {
 			if noUselessReturnSomethingRunsAfter(block, index, event.enclosingTry) {
 				continue
 			}
-			if noUselessReturnTheCompilerRequiresIt(ctx, root, candidate) {
+			if noUselessReturnTheCompilerRequiresIt(ruleContext, root, candidate) {
 				continue
 			}
 
-			if fix, canFix := noUselessReturnFix(ctx, candidate); canFix {
-				ctx.ReportNodeWithFixes(candidate, messageNoUselessReturn, fix)
+			if fix, canFix := noUselessReturnFix(ruleContext, candidate); canFix {
+				ruleContext.ReportNodeWithFixes(candidate, messageNoUselessReturn, fix)
 				continue
 			}
-			ctx.ReportNode(candidate, messageNoUselessReturn)
+			ruleContext.ReportNode(candidate, messageNoUselessReturn)
 		}
 	}
 }
@@ -362,7 +362,7 @@ func noUselessReturnEnclosingTryBlock(node *ast.Node, root *ast.Node) *ast.Node 
 // A generator with an annotated return type declines without a type question. The checker unwraps
 // its return type through the generator's own type arguments, which is not ported, and staying
 // silent costs a missed report where guessing costs a broken build.
-func noUselessReturnTheCompilerRequiresIt(ctx rule.Context, root *ast.Node, candidate *ast.Node) bool {
+func noUselessReturnTheCompilerRequiresIt(ruleContext rule.Context, root *ast.Node, candidate *ast.Node) bool {
 	if !ast.IsFunctionLikeDeclaration(root) || !noUselessReturnIsTheOnlyReturn(root, candidate) {
 		return false
 	}
@@ -376,9 +376,9 @@ func noUselessReturnTheCompilerRequiresIt(ctx rule.Context, root *ast.Node, cand
 	if flags&ast.FunctionFlagsGenerator != 0 {
 		return true
 	}
-	declared := ctx.TypeChecker.GetTypeFromTypeNode(root.Type())
+	declared := ruleContext.TypeChecker.GetTypeFromTypeNode(root.Type())
 	if flags&ast.FunctionFlagsAsync != 0 {
-		declared = ctx.TypeChecker.GetPromisedTypeOfPromise(declared)
+		declared = ruleContext.TypeChecker.GetPromisedTypeOfPromise(declared)
 	}
 	if declared == nil {
 		return true
@@ -459,17 +459,17 @@ func noUselessReturnMaybeTypeOfKind(t *checker.Type, kind checker.TypeFlags) boo
 // surrounding whitespace alone. That matters for a deletion fixer in this tree specifically: a span
 // built from `Pos()` would eat the preceding trivia, and a span built from a neighbouring node's
 // offset is how a sibling rule stranded TypeScript type annotations across eight files.
-func noUselessReturnFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
+func noUselessReturnFix(ruleContext rule.Context, node *ast.Node) (rule.Fix, bool) {
 	if !noUselessReturnIsRemovable(node) {
 		return rule.Fix{}, false
 	}
 
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	if noUselessReturnHasCommentInside(ctx.SourceFile.Text(), nodeRange.Pos(), nodeRange.End()) {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	if noUselessReturnHasCommentInside(ruleContext.SourceFile.Text(), nodeRange.Pos(), nodeRange.End()) {
 		return rule.Fix{}, false
 	}
 
-	return ctx.RemoveNode(node), true
+	return ruleContext.RemoveNode(node), true
 }
 
 // noUselessReturnHasCommentInside scans the statement's own text for a comment.

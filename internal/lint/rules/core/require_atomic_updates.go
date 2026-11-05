@@ -257,7 +257,7 @@ var RequireAtomicUpdates = rule.Rule{
 	// unexplained survivor; the guard that can see it is the dry run against the real tree.
 	NeedsTypeChecker: true,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// A rule configured as a bare severity is handed nil options, which `options.(T)` turns into
 		// the zero value. The zero value is the right default here (upstream defaults
 		// `allowProperties` to false) but the fallback is written explicitly rather than relied on,
@@ -270,10 +270,10 @@ var RequireAtomicUpdates = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				analyzeNonAtomicUpdates(ctx, sourceFile, settings)
+				analyzeNonAtomicUpdates(ruleContext, sourceFile, settings)
 			},
 		}
 	},
@@ -314,9 +314,9 @@ type atomicEvent struct {
 }
 
 // analyzeNonAtomicUpdates reports every non-atomic assignment in one file.
-func analyzeNonAtomicUpdates(ctx rule.Context, sourceFile *ast.Node, settings RequireAtomicUpdatesOptions) {
+func analyzeNonAtomicUpdates(ruleContext rule.Context, sourceFile *ast.Node, settings RequireAtomicUpdatesOptions) {
 	for _, root := range atomicUpdateRoots(sourceFile) {
-		analyzeRootNonAtomicUpdates(ctx, root, settings)
+		analyzeRootNonAtomicUpdates(ruleContext, root, settings)
 	}
 }
 
@@ -393,7 +393,7 @@ func canSuspend(node *ast.Node) bool {
 }
 
 // analyzeRootNonAtomicUpdates runs the forward outdated-read dataflow over one suspending root.
-func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings RequireAtomicUpdatesOptions) {
+func analyzeRootNonAtomicUpdates(ruleContext rule.Context, root *ast.Node, settings RequireAtomicUpdatesOptions) {
 	// escapes is memoized per root rather than per candidate, because the escape scan walks the
 	// whole root looking for cross-scope references and a root with several writes to one binding
 	// would otherwise pay for it once per write.
@@ -425,7 +425,7 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 			}
 
 			plainTarget := isPlainAssignmentTarget(node)
-			symbol := resolveOccurrence(ctx, node)
+			symbol := resolveOccurrence(ruleContext, node)
 			if symbol == nil {
 				return
 			}
@@ -463,7 +463,7 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 			}
 		},
 		Write: func(builder *control_flow_graph.Builder[atomicEvent], node *ast.Node) {
-			recordAtomicWrite(builder, ctx, node, escapes, root)
+			recordAtomicWrite(builder, ruleContext, node, escapes, root)
 		},
 	})
 
@@ -472,7 +472,7 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 	// after the construct has finished evaluating. Both are placed by source position here, and the
 	// property arm is collected here too, since a member store emits no Write event at all. The
 	// reasoning for each is at `placeDeferredEvents`.
-	placeDeferredEvents(ctx, graph, escapes, root)
+	placeDeferredEvents(ruleContext, graph, escapes, root)
 
 	solution := control_flow_graph.Solve[atomicReadState, atomicEvent](
 		graph,
@@ -519,7 +519,7 @@ func analyzeRootNonAtomicUpdates(ctx rule.Context, root *ast.Node, settings Requ
 				return
 			}
 			reported[event.assignment.Pos()] = true
-			reportNonAtomicUpdate(ctx, event)
+			reportNonAtomicUpdate(ruleContext, event)
 		})
 	}
 }
@@ -673,20 +673,20 @@ func applyAtomicTransfer(
 // The span is the whole assignment rather than either side of it, matching upstream's
 // `context.report({ node: node.parent })` where `node` is the assigned expression. Both message arms
 // report on the same node; only the text differs.
-func reportNonAtomicUpdate(ctx rule.Context, event atomicEvent) {
+func reportNonAtomicUpdate(ruleContext rule.Context, event atomicEvent) {
 	name := event.symbol.Name
 	if event.isProperty {
-		ctx.ReportNode(event.assignment, rule.Message{
+		ruleContext.ReportNode(event.assignment, rule.Message{
 			Id: messageRequireAtomicUpdatesProperty.Id,
 			Description: fmt.Sprintf(
 				"%s Here the assignment writes %s and the object %s was read before the suspension.",
 				messageRequireAtomicUpdatesProperty.Description,
-				assignmentTargetText(ctx, event.assignment),
+				assignmentTargetText(ruleContext, event.assignment),
 				name),
 		})
 		return
 	}
-	ctx.ReportNode(event.assignment, rule.Message{
+	ruleContext.ReportNode(event.assignment, rule.Message{
 		Id: messageRequireAtomicUpdatesVariable.Id,
 		Description: fmt.Sprintf(
 			"%s Here the variable is %s.",
@@ -701,16 +701,16 @@ func reportNonAtomicUpdate(ctx rule.Context, event atomicEvent) {
 // Taking the slice rather than rebuilding it from the tree is what keeps those two right: a
 // reconstruction has to decide how to print a computed member and a private name, and upstream never
 // makes that decision.
-func assignmentTargetText(ctx rule.Context, assignment *ast.Node) string {
-	if assignment == nil || ctx.SourceFile == nil {
+func assignmentTargetText(ruleContext rule.Context, assignment *ast.Node) string {
+	if assignment == nil || ruleContext.SourceFile == nil {
 		return ""
 	}
 	left := assignmentLeftHandSide(assignment)
 	if left == nil {
 		return ""
 	}
-	text := ctx.SourceFile.Text()
-	start, end := rule.TokenRange(ctx.SourceFile, left).Pos(), left.End()
+	text := ruleContext.SourceFile.Text()
+	start, end := rule.TokenRange(ruleContext.SourceFile, left).Pos(), left.End()
 	if start < 0 || end > len(text) || start >= end {
 		return ""
 	}
@@ -732,7 +732,7 @@ func assignmentLeftHandSide(assignment *ast.Node) *ast.Node {
 // of the assigned expression rather than checking at the identifier.
 func recordAtomicWrite(
 	builder *control_flow_graph.Builder[atomicEvent],
-	ctx rule.Context,
+	ruleContext rule.Context,
 	node *ast.Node,
 	escapes map[*ast.Symbol]bool,
 	root *ast.Node,
@@ -741,14 +741,14 @@ func recordAtomicWrite(
 	if assignment == nil {
 		return
 	}
-	symbol := resolveOccurrence(ctx, node)
+	symbol := resolveOccurrence(ruleContext, node)
 	if symbol == nil {
 		return
 	}
 	// The variable arm asks whether the BINDING escapes, so isMemberAccess is false here. The
 	// property arm asks the same predicate with it true, which is what makes a parameter answer
 	// differently on the two sides. See the escape table in the rule's doc comment.
-	if !escapesEnclosingFunction(ctx, symbol, root, false, escapes) {
+	if !escapesEnclosingFunction(ruleContext, symbol, root, false, escapes) {
 		return
 	}
 	builder.Emit(atomicEvent{

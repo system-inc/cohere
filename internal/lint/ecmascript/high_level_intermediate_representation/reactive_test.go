@@ -47,20 +47,20 @@ func reactiveNames(test *testing.T, source string) []string {
 	probe := rule.Rule{
 		Name:             "reactive-names-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						test.Fatal("the typed harness handed this probe a nil checker, so it would " +
 							"pass vacuously; run it through RunTypedFiles")
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						collectReactiveNames(function, found)
 					})
 				},
@@ -224,16 +224,16 @@ func phiResultIsReactive(test *testing.T, source string, binding string) bool {
 	probe := rule.Rule{
 		Name:             "reactive-phi-result-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						for _, block := range function.Blocks {
 							for _, phi := range block.Phis {
 								identifier := function.Identifiers[phi.Place.Identifier]
@@ -594,24 +594,24 @@ export function Component(props: {c: boolean, n: number}) {
 	probe := rule.Rule{
 		Name:             "reactive-idempotent-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						found := map[string]bool{}
 						collectReactiveNames(function, found)
 						for name := range found {
 							first = append(first, name)
 						}
 
-						InferReactive(function, ctx.TypeChecker)
+						InferReactive(function, ruleContext.TypeChecker)
 						found = map[string]bool{}
 						collectReactiveNames(function, found)
 						for name := range found {
@@ -657,7 +657,7 @@ export function Component(props: {n: number}) {
 	var names []string
 	probe := rule.Rule{
 		Name: "reactive-no-checker-harness",
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -722,18 +722,18 @@ export function Component(props: {a: boolean, b: number, items: number[]}) {
 	probe := rule.Rule{
 		Name:             "reactive-rounds-harness",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
-						function := Lower(functionNode, ctx.TypeChecker)
+						function := Lower(functionNode, ruleContext.TypeChecker)
 						if function == nil {
 							return
 						}
 						Construct(function)
 						state := &reactivity{
 							function:    function,
-							typeChecker: ctx.TypeChecker,
+							typeChecker: ruleContext.TypeChecker,
 							reactive:    map[static_single_assignment.IdentifierId]bool{},
 							stable:      map[static_single_assignment.IdentifierId]bool{},
 						}

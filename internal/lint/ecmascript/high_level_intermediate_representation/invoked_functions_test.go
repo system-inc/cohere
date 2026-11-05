@@ -16,17 +16,17 @@ func invokedFor(test *testing.T, source string) (*Function, AssumedInvokedFuncti
 	probe := rule.Rule{
 		Name:             "assumed-invoked",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
-					if ctx.TypeChecker == nil {
+					if ruleContext.TypeChecker == nil {
 						return
 					}
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
 						if outer != nil {
 							return
 						}
-						lowered := Lower(functionNode, ctx.TypeChecker)
+						lowered := Lower(functionNode, ruleContext.TypeChecker)
 						if lowered == nil {
 							return
 						}

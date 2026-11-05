@@ -55,7 +55,7 @@ import (
 var NoDupeClassMembers = rule.Rule{
 	Name: "@typescript-eslint/no-dupe-class-members",
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The core rule's own listeners, which is where every finding comes from. Wrapping rather
 		// than reimplementing is the point of an extension rule: re-deriving the collision logic
 		// would give the two rules two chances to disagree about the same question.
@@ -66,7 +66,7 @@ var NoDupeClassMembers = rule.Rule{
 		// only the difference.
 		coreCheck := func(members *ast.NodeList) {
 			classmembers.ForEachDuplicate(members, func(name *ast.Node, key classmembers.Key) {
-				ctx.ReportNode(name, rule.Message{
+				ruleContext.ReportNode(name, rule.Message{
 					Id: "noDupeClassMembers",
 					Description: fmt.Sprintf(
 						"This class already declares a member named %s. The later declaration wins "+

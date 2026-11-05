@@ -1563,7 +1563,7 @@ func TestNoUnstableNestedComponentsRenderMethodGuard(test *testing.T) {
 	probe := rule.Rule{
 		Name:             "react/no-unstable-nested-components",
 		NeedsTypeChecker: true,
-		Run: func(ctx rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(sourceFile *ast.Node) {
 					validated := 0

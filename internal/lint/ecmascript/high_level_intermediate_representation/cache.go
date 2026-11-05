@@ -60,7 +60,7 @@ import (
 // and the findings cache stays correct: nothing here can make one file's result depend on another
 // file's contents beyond what the checker already answers, which is the failure `ProgramReads`
 // exists to declare.
-func ForFunction(ctx rule.Context, node *ast.Node) *Function {
+func ForFunction(ruleContext rule.Context, node *ast.Node) *Function {
 	if node == nil {
 		return nil
 	}
@@ -69,11 +69,11 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 	// resolves every reference as a global, making the result well-formed and meaningless, and two
 	// of the three callers already refused to run in that state. Deciding it once means a cached
 	// entry cannot depend on rule order.
-	if ctx.TypeChecker == nil {
+	if ruleContext.TypeChecker == nil {
 		return nil
 	}
-	return rule.Cached(ctx.FileCache, cacheKeyFor(node), func() *Function {
-		lowered := Lower(node, ctx.TypeChecker)
+	return rule.Cached(ruleContext.FileCache, cacheKeyFor(node), func() *Function {
+		lowered := Lower(node, ruleContext.TypeChecker)
 		if lowered == nil {
 			return nil
 		}
@@ -104,14 +104,14 @@ func ForFunction(ctx rule.Context, node *ast.Node) *Function {
 // hook is unaffected. A component nested in a unit is not reached here at all: it is part of its
 // parent's graph, as upstream lowers it.
 func AsCompilationUnit(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	function *Function,
 	lower func(rule.Context, *ast.Node) *Function,
 ) *Function {
 	if function == nil || function.Node == nil {
 		return function
 	}
-	if standalone := lower(ctx, function.Node); standalone != nil {
+	if standalone := lower(ruleContext, function.Node); standalone != nil {
 		return standalone
 	}
 	return function
@@ -175,8 +175,8 @@ func AsCompilationUnit(
 // terminal, so the control-flow graph is bit-identical and single-assignment form is undisturbed.
 // Only one instruction value per memo call changes, toward fewer operands.
 // `AnalyzePreservedManualMemoization` already sequences it post-Construct for the same reason.
-func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Function {
-	if node == nil || ctx.TypeChecker == nil {
+func ForFunctionWithoutManualMemoization(ruleContext rule.Context, node *ast.Node) *Function {
+	if node == nil || ruleContext.TypeChecker == nil {
 		return nil
 	}
 	// A function with no memo call anywhere in its text lowers to a graph the erasure cannot
@@ -190,10 +190,10 @@ func ForFunctionWithoutManualMemoization(ctx rule.Context, node *ast.Node) *Func
 	// The numbers this buys are in the header above rather than repeated here, so there is one
 	// place to correct when they go stale.
 	if !mentionsManualMemoization(node) {
-		return ForFunction(ctx, node)
+		return ForFunction(ruleContext, node)
 	}
-	return rule.Cached(ctx.FileCache, cacheKeyFor(node)+":no-manual-memo", func() *Function {
-		lowered := Lower(node, ctx.TypeChecker)
+	return rule.Cached(ruleContext.FileCache, cacheKeyFor(node)+":no-manual-memo", func() *Function {
+		lowered := Lower(node, ruleContext.TypeChecker)
 		if lowered == nil {
 			return nil
 		}

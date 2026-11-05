@@ -377,7 +377,7 @@ func noInvalidHtmlAttributeSpaceDelimited(attributeName string) rule.Message {
 // escape-processed would separate them again.
 var NoInvalidHtmlAttribute = rule.Rule{
 	Name: "react/no-invalid-html-attribute",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The only list besides the default is the empty one, which checks nothing, so the default
 		// check below is the whole rule whenever any attribute is configured.
 		if settings, configured := rule.OptionsAs[NoInvalidHtmlAttributeOptions](options); configured && len(settings.Attributes) == 0 {
@@ -385,17 +385,17 @@ var NoInvalidHtmlAttribute = rule.Rule{
 		}
 		return rule.Listeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {
-				noInvalidHtmlAttributeCheckJsxAttribute(ctx, node)
+				noInvalidHtmlAttributeCheckJsxAttribute(ruleContext, node)
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				noInvalidHtmlAttributeCheckCreateElement(ctx, node)
+				noInvalidHtmlAttributeCheckCreateElement(ruleContext, node)
 			},
 		}
 	},
 }
 
 // noInvalidHtmlAttributeCheckJsxAttribute is upstream's `JSXAttribute` listener plus `checkAttribute`.
-func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
+func noInvalidHtmlAttributeCheckJsxAttribute(ruleContext rule.Context, node *ast.Node) {
 	attribute := node.AsJsxAttribute()
 	if attribute == nil || attribute.Name() == nil {
 		return
@@ -426,14 +426,14 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 	// the value is looked at, so `<html rel="alternate">` reports `onlyMeaningfulFor` rather than
 	// anything about `alternate`.
 	if !noInvalidHtmlAttributeIsMeaningfulOn(attributeName, elementName) {
-		ctx.ReportNode(attribute.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
+		ruleContext.ReportNode(attribute.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
 			attributeName, noInvalidHtmlAttributeRenderTagNames(attributeName)))
 		return
 	}
 
 	// A bare `<a rel>` with no value at all.
 	if attribute.Initializer == nil {
-		ctx.ReportNode(attribute.Name(), noInvalidHtmlAttributeEmptyIsMeaningless(attributeName))
+		ruleContext.ReportNode(attribute.Name(), noInvalidHtmlAttributeEmptyIsMeaningless(attributeName))
 		return
 	}
 
@@ -441,7 +441,7 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 
 	// `rel="..."`, a string literal directly.
 	if initializer.Kind == ast.KindStringLiteral {
-		noInvalidHtmlAttributeCheckLiteralValue(ctx, attributeName, initializer, elementName)
+		noInvalidHtmlAttributeCheckLiteralValue(ruleContext, attributeName, initializer, elementName)
 		return
 	}
 
@@ -458,7 +458,7 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 	// `rel={"..."}`. Upstream checks `node.value.expression.type === 'Literal'` BEFORE its
 	// JSXExpressionContainer guard, so a string inside braces takes the literal path.
 	if inner.Kind == ast.KindStringLiteral {
-		noInvalidHtmlAttributeCheckLiteralValue(ctx, attributeName, inner, elementName)
+		noInvalidHtmlAttributeCheckLiteralValue(ruleContext, attributeName, inner, elementName)
 		return
 	}
 
@@ -467,7 +467,7 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 	// the literal itself rather than on the expression container, because it recurses into
 	// `checkLiteralValueNode` with `node.value.expression`.
 	if noInvalidHtmlAttributeIsNonStringLiteral(inner) {
-		ctx.ReportNode(inner, noInvalidHtmlAttributeOnlyStrings(attributeName))
+		ruleContext.ReportNode(inner, noInvalidHtmlAttributeOnlyStrings(attributeName))
 		return
 	}
 
@@ -475,7 +475,7 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 	// expression container rather than on the expression, which is upstream reporting `node.value`.
 	if inner.Kind == ast.KindObjectLiteralExpression ||
 		(inner.Kind == ast.KindIdentifier && inner.Text() == "undefined") {
-		ctx.ReportNode(initializer, noInvalidHtmlAttributeOnlyStrings(attributeName))
+		ruleContext.ReportNode(initializer, noInvalidHtmlAttributeOnlyStrings(attributeName))
 	}
 }
 
@@ -483,11 +483,11 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ctx rule.Context, node *ast.Node) {
 //
 // Four passes over one attribute value, in upstream's order, and each can report independently, so
 // one attribute can produce several findings.
-func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName string, node *ast.Node, elementName string) {
+func noInvalidHtmlAttributeCheckLiteralValue(ruleContext rule.Context, attributeName string, node *ast.Node, elementName string) {
 	attributeValue := node.Text()
 
 	if text.TrimWhitespace(attributeValue) == "" {
-		ctx.ReportNode(node, noInvalidHtmlAttributeNoEmpty(attributeName))
+		ruleContext.ReportNode(node, noInvalidHtmlAttributeNoEmpty(attributeName))
 		return
 	}
 
@@ -496,11 +496,11 @@ func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName str
 	for _, token := range text.WhitespaceFields(attributeValue) {
 		allowedTags, isKnownValue := allowedValues[token]
 		if !isKnownValue {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNeverValid(token, attributeName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNeverValid(token, attributeName))
 			continue
 		}
 		if !allowedTags[elementName] {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNotValidFor(token, attributeName, elementName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNotValidFor(token, attributeName, elementName))
 		}
 	}
 
@@ -522,12 +522,12 @@ func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName str
 		}
 		missing := noInvalidHtmlAttributeRenderSiblings(siblings)
 		if index+1 >= len(tokens) {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNotAlone(token, missing))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNotAlone(token, missing))
 			continue
 		}
 		following := tokens[index+1]
 		if !siblings[following] {
-			ctx.ReportNode(node, noInvalidHtmlAttributeNotPaired(token, following, missing))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeNotPaired(token, following, missing))
 		}
 	}
 
@@ -536,14 +536,14 @@ func noInvalidHtmlAttributeCheckLiteralValue(ctx rule.Context, attributeName str
 	//
 	// This reads the RAW source bytes rather than the cooked `Text()`, because upstream's own
 	// arithmetic is over source positions and an escape sequence makes the two lengths differ.
-	raw := noInvalidHtmlAttributeRawValue(ctx, node)
+	raw := noInvalidHtmlAttributeRawValue(ruleContext, node)
 	for _, run := range noInvalidHtmlAttributeWhitespaceRuns(raw) {
 		if run.start == 0 || run.end == len(raw) {
-			ctx.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
 			continue
 		}
 		if run.text != " " {
-			ctx.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
+			ruleContext.ReportNode(node, noInvalidHtmlAttributeSpaceDelimited(attributeName))
 		}
 	}
 }
@@ -618,11 +618,11 @@ func noInvalidHtmlAttributeIsSpaceRune(character rune) bool {
 // Falls back to the cooked text when the range cannot be read, which keeps the whitespace pass
 // working rather than silently skipping it. The two differ only for a value containing an escape,
 // and no corpus case writes one.
-func noInvalidHtmlAttributeRawValue(ctx rule.Context, node *ast.Node) string {
-	if ctx.SourceFile == nil {
+func noInvalidHtmlAttributeRawValue(ruleContext rule.Context, node *ast.Node) string {
+	if ruleContext.SourceFile == nil {
 		return node.Text()
 	}
-	source := ctx.SourceFile.Text()
+	source := ruleContext.SourceFile.Text()
 	start := node.Pos()
 	end := node.End()
 	if start < 0 || end > len(source) || start >= end {
@@ -639,7 +639,7 @@ func noInvalidHtmlAttributeRawValue(ctx rule.Context, node *ast.Node) string {
 }
 
 // noInvalidHtmlAttributeCheckCreateElement is upstream's `CallExpression` listener.
-func noInvalidHtmlAttributeCheckCreateElement(ctx rule.Context, node *ast.Node) {
+func noInvalidHtmlAttributeCheckCreateElement(ruleContext rule.Context, node *ast.Node) {
 	call := node.AsCallExpression()
 	if call == nil {
 		return
@@ -685,12 +685,12 @@ func noInvalidHtmlAttributeCheckCreateElement(ctx rule.Context, node *ast.Node) 
 	}
 
 	for _, attributeName := range noInvalidHtmlAttributeDefaultAttributes {
-		noInvalidHtmlAttributeCheckCreateProps(ctx, call, attributeName, elementName)
+		noInvalidHtmlAttributeCheckCreateProps(ruleContext, call, attributeName, elementName)
 	}
 }
 
 // noInvalidHtmlAttributeCheckCreateProps is upstream's `checkCreateProps`.
-func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpression, attributeName string, elementName string) {
+func noInvalidHtmlAttributeCheckCreateProps(ruleContext rule.Context, call *ast.CallExpression, attributeName string, elementName string) {
 	if len(call.Arguments.Nodes) < 2 {
 		return
 	}
@@ -712,7 +712,7 @@ func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpr
 		}
 
 		if !noInvalidHtmlAttributeIsMeaningfulOn(attributeName, elementName) {
-			ctx.ReportNode(property.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
+			ruleContext.ReportNode(property.Name(), noInvalidHtmlAttributeOnlyMeaningfulFor(
 				attributeName, noInvalidHtmlAttributeRenderTagNames(attributeName)))
 			continue
 		}
@@ -720,7 +720,7 @@ func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpr
 		// Upstream's `prop.method`. Anchored on the whole property rather than its key, which is
 		// upstream reporting `node: prop`.
 		if property.Kind == ast.KindMethodDeclaration {
-			ctx.ReportNode(property, noInvalidHtmlAttributeNoMethod(attributeName))
+			ruleContext.ReportNode(property, noInvalidHtmlAttributeNoMethod(attributeName))
 			continue
 		}
 
@@ -744,12 +744,12 @@ func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpr
 				continue
 			}
 			for _, element := range array.Elements.Nodes {
-				noInvalidHtmlAttributeCheckPropValue(ctx, element, attributeName, elementName)
+				noInvalidHtmlAttributeCheckPropValue(ruleContext, element, attributeName, elementName)
 			}
 			continue
 		}
 
-		noInvalidHtmlAttributeCheckPropValue(ctx, value, attributeName, elementName)
+		noInvalidHtmlAttributeCheckPropValue(ruleContext, value, attributeName, elementName)
 	}
 }
 
@@ -761,7 +761,7 @@ func noInvalidHtmlAttributeCheckCreateProps(ctx rule.Context, call *ast.CallExpr
 // `neverValid` naming the entire string, where the JSX spelling of the same value reports one
 // finding for the bad token alone. Corpus cases invalid[4] through invalid[8] pin both halves of
 // that asymmetry.
-func noInvalidHtmlAttributeCheckPropValue(ctx rule.Context, value *ast.Node, attributeName string, elementName string) {
+func noInvalidHtmlAttributeCheckPropValue(ruleContext rule.Context, value *ast.Node, attributeName string, elementName string) {
 	// Upstream's `value.type !== 'Literal'` declines anything it cannot read, including a template
 	// literal, an identifier and a nested call.
 	if !noInvalidHtmlAttributeIsLiteral(value) {
@@ -770,7 +770,7 @@ func noInvalidHtmlAttributeCheckPropValue(ctx rule.Context, value *ast.Node, att
 	if value.Kind != ast.KindStringLiteral {
 		// A numeric or boolean literal reaches upstream's `validTags.get(value.value)` with a
 		// non-string key, which misses, so it reports `neverValid` naming the rendered value.
-		ctx.ReportNode(value, noInvalidHtmlAttributeNeverValid(
+		ruleContext.ReportNode(value, noInvalidHtmlAttributeNeverValid(
 			noInvalidHtmlAttributeLiteralText(value), attributeName))
 		return
 	}
@@ -778,11 +778,11 @@ func noInvalidHtmlAttributeCheckPropValue(ctx rule.Context, value *ast.Node, att
 	text := value.Text()
 	allowedTags, isKnownValue := noInvalidHtmlAttributeRelValues[text]
 	if !isKnownValue {
-		ctx.ReportNode(value, noInvalidHtmlAttributeNeverValid(text, attributeName))
+		ruleContext.ReportNode(value, noInvalidHtmlAttributeNeverValid(text, attributeName))
 		return
 	}
 	if !allowedTags[elementName] {
-		ctx.ReportNode(value, noInvalidHtmlAttributeNotValidFor(text, attributeName, elementName))
+		ruleContext.ReportNode(value, noInvalidHtmlAttributeNotValidFor(text, attributeName, elementName))
 	}
 }
 

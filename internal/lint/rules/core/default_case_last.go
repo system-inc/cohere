@@ -50,7 +50,7 @@ var messageDefaultCaseLastNotLast = rule.Message{
 // switch, which is exactly the case where the finding is worth having.
 var DefaultCaseLast = rule.Rule{
 	Name: "default-case-last",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
 				clauses := node.AsSwitchStatement().CaseBlock.AsCaseBlock().Clauses.Nodes
@@ -62,7 +62,7 @@ var DefaultCaseLast = rule.Rule{
 					// `default` clauses is a syntax error the parser still recovers from, so the
 					// shape is reachable here, and upstream would report it once rather than twice.
 					if index != len(clauses)-1 {
-						ctx.ReportNode(clause, messageDefaultCaseLastNotLast)
+						ruleContext.ReportNode(clause, messageDefaultCaseLastNotLast)
 					}
 					return
 				}

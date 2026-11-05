@@ -89,20 +89,20 @@ var PreferExponentiationOperator = rule.Rule{
 	Name:             "prefer-exponentiation-operator",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				if ctx.TypeChecker == nil {
+				if ruleContext.TypeChecker == nil {
 					return
 				}
-				if !preferExponentiationOperatorIsMathPow(ctx, node) {
+				if !preferExponentiationOperatorIsMathPow(ruleContext, node) {
 					return
 				}
-				if fix, canFix := preferExponentiationOperatorFix(ctx, node); canFix {
-					ctx.ReportNodeWithFixes(node, messagePreferExponentiationOperator, fix)
+				if fix, canFix := preferExponentiationOperatorFix(ruleContext, node); canFix {
+					ruleContext.ReportNodeWithFixes(node, messagePreferExponentiationOperator, fix)
 					return
 				}
-				ctx.ReportNode(node, messagePreferExponentiationOperator)
+				ruleContext.ReportNode(node, messagePreferExponentiationOperator)
 			},
 		}
 	},
@@ -114,7 +114,7 @@ var PreferExponentiationOperator = rule.Rule{
 // optionally chained. The receiver is required to resolve to an ambient declaration, which is what
 // separates the real global from a local `Math` shadowing it, and the property name is required to
 // be STATIC, which is what keeps `Math[pow](a, b)` clean.
-func preferExponentiationOperatorIsMathPow(ctx rule.Context, node *ast.Node) bool {
+func preferExponentiationOperatorIsMathPow(ruleContext rule.Context, node *ast.Node) bool {
 	callee := preferExponentiationOperatorUnwrapParentheses(node.AsCallExpression().Expression)
 	if callee == nil {
 		return false
@@ -139,13 +139,13 @@ func preferExponentiationOperatorIsMathPow(ctx rule.Context, node *ast.Node) boo
 		}
 		innerReceiver = preferExponentiationOperatorUnwrapParentheses(innerReceiver)
 		return innerReceiver != nil && innerReceiver.Kind == ast.KindIdentifier &&
-			preferExponentiationOperatorResolvesToAnAmbientName(ctx, innerReceiver)
+			preferExponentiationOperatorResolvesToAnAmbientName(ruleContext, innerReceiver)
 	}
 
 	if receiver.Kind != ast.KindIdentifier || receiver.Text() != "Math" {
 		return false
 	}
-	return preferExponentiationOperatorResolvesToAnAmbientName(ctx, receiver)
+	return preferExponentiationOperatorResolvesToAnAmbientName(ruleContext, receiver)
 }
 
 // preferExponentiationOperatorStaticAccess reads a static property name off an access expression.
@@ -185,8 +185,8 @@ func preferExponentiationOperatorStaticAccess(node *ast.Node) (name string, rece
 // Every declaration must live in a declaration file. A local `var Math` or a parameter named `Math`
 // contributes a source declaration and the answer is false, which is how a shadowed global stops
 // this rule. Probed across seven shapes with controls before being built on.
-func preferExponentiationOperatorResolvesToAnAmbientName(ctx rule.Context, identifier *ast.Node) bool {
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+func preferExponentiationOperatorResolvesToAnAmbientName(ruleContext rule.Context, identifier *ast.Node) bool {
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	// globalThis has zero declarations: require a resolved symbol, but deliberately accept an
 	// empty declaration list. The all-declaration-files reader would reject that shipped case.
 	return symbol != nil && !rule.IsDeclaredInASourceFile(symbol)
@@ -207,7 +207,7 @@ func preferExponentiationOperatorUnwrapParentheses(node *ast.Node) *ast.Node {
 // Upstream's fixer, transcribed. It refuses on anything other than exactly two ordinary arguments
 // and on any comment inside the call, then assembles three pieces whose parenthesization is decided
 // independently.
-func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix, bool) {
+func preferExponentiationOperatorFix(ruleContext rule.Context, node *ast.Node) (rule.Fix, bool) {
 	call := node.AsCallExpression()
 	arguments := call.Arguments.Nodes
 
@@ -225,8 +225,8 @@ func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix
 	// A comment anywhere inside the call would be discarded, since the whole call is replaced.
 	// Upstream spends nine corpus cases on this, one per position a comment can occupy between
 	// `Math` and the closing parenthesis.
-	nodeRange := rule.TokenRange(ctx.SourceFile, node)
-	if preferExponentiationOperatorHasCommentInside(ctx, nodeRange.Pos(), node.End()) {
+	nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
+	if preferExponentiationOperatorHasCommentInside(ruleContext, nodeRange.Pos(), node.End()) {
 		return rule.Fix{}, false
 	}
 
@@ -239,8 +239,8 @@ func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix
 	if base == nil || exponent == nil {
 		return rule.Fix{}, false
 	}
-	baseText := ctx.NodeText(base)
-	exponentText := ctx.NodeText(exponent)
+	baseText := ruleContext.NodeText(base)
+	exponentText := ruleContext.NodeText(exponent)
 
 	if preferExponentiationOperatorBaseNeedsParentheses(base) {
 		baseText = "(" + baseText + ")"
@@ -257,7 +257,7 @@ func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix
 	// whole expression is wrapped. Only when the base was not already parenthesized, since that
 	// would have moved the opening character.
 	if !needsOuter && !preferExponentiationOperatorBaseNeedsParentheses(base) &&
-		preferExponentiationOperatorStartsExpressionStatement(ctx, node) &&
+		preferExponentiationOperatorStartsExpressionStatement(ruleContext, node) &&
 		preferExponentiationOperatorOpensAStatementAmbiguously(baseText) {
 		needsOuter = true
 	}
@@ -268,12 +268,12 @@ func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix
 	// Two lexical repairs, both upstream's. A replacement running into the token before it needs a
 	// space, and one starting a statement with a character that could continue the previous line
 	// needs a semicolon.
-	if preferExponentiationOperatorNeedsLeadingSpace(ctx, node, replacement) {
+	if preferExponentiationOperatorNeedsLeadingSpace(ruleContext, node, replacement) {
 		replacement = " " + replacement
-	} else if preferExponentiationOperatorNeedsLeadingSemicolon(ctx, node, replacement) {
+	} else if preferExponentiationOperatorNeedsLeadingSemicolon(ruleContext, node, replacement) {
 		replacement = ";" + replacement
 	}
-	if preferExponentiationOperatorNeedsTrailingSpace(ctx, node, replacement) {
+	if preferExponentiationOperatorNeedsTrailingSpace(ruleContext, node, replacement) {
 		replacement += " "
 	}
 
@@ -281,8 +281,8 @@ func preferExponentiationOperatorFix(ctx rule.Context, node *ast.Node) (rule.Fix
 }
 
 // preferExponentiationOperatorHasCommentInside answers whether a comment sits in a span.
-func preferExponentiationOperatorHasCommentInside(ctx rule.Context, from int, to int) bool {
-	for _, comment := range comments.ForFile(ctx) {
+func preferExponentiationOperatorHasCommentInside(ruleContext rule.Context, from int, to int) bool {
+	for _, comment := range comments.ForFile(ruleContext) {
 		if comment.Range.Pos() >= from && comment.Range.End() <= to {
 			return true
 		}
@@ -471,12 +471,12 @@ func preferExponentiationOperatorIsExpression(node *ast.Node) bool {
 // Upstream asks a tokenizer whether the two can be adjacent. The hazard here is an identifier or
 // keyword running straight into the replacement's first character, as in `typeof` followed by a
 // name, so the test is whether both sides can continue one identifier.
-func preferExponentiationOperatorNeedsLeadingSpace(ctx rule.Context, node *ast.Node, replacement string) bool {
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
+func preferExponentiationOperatorNeedsLeadingSpace(ruleContext rule.Context, node *ast.Node, replacement string) bool {
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
 	if start == 0 || replacement == "" {
 		return false
 	}
-	text := ctx.SourceFile.Text()
+	text := ruleContext.SourceFile.Text()
 	return preferExponentiationOperatorTokensWouldMerge(text[start-1], replacement[0])
 }
 
@@ -502,8 +502,8 @@ func preferExponentiationOperatorTokensWouldMerge(before byte, after byte) bool 
 // preferExponentiationOperatorNeedsTrailingSpace is the same question on the other side.
 //
 // `Math.pow(a, b)in c` becomes `a**b in c`, because `b` and `in` would otherwise form one token.
-func preferExponentiationOperatorNeedsTrailingSpace(ctx rule.Context, node *ast.Node, replacement string) bool {
-	text := ctx.SourceFile.Text()
+func preferExponentiationOperatorNeedsTrailingSpace(ruleContext rule.Context, node *ast.Node, replacement string) bool {
+	text := ruleContext.SourceFile.Text()
 	end := node.End()
 	if end >= len(text) || replacement == "" {
 		return false
@@ -517,7 +517,7 @@ func preferExponentiationOperatorNeedsTrailingSpace(ctx rule.Context, node *ast.
 // can continue the previous line under
 // automatic semicolon insertion, turning two statements into one. Upstream only does this when the
 // call starts an expression statement and no space was already added.
-func preferExponentiationOperatorNeedsLeadingSemicolon(ctx rule.Context, node *ast.Node, replacement string) bool {
+func preferExponentiationOperatorNeedsLeadingSemicolon(ruleContext rule.Context, node *ast.Node, replacement string) bool {
 	if replacement == "" {
 		return false
 	}
@@ -526,15 +526,15 @@ func preferExponentiationOperatorNeedsLeadingSemicolon(ctx rule.Context, node *a
 	default:
 		return false
 	}
-	if !preferExponentiationOperatorStartsExpressionStatement(ctx, node) {
+	if !preferExponentiationOperatorStartsExpressionStatement(ruleContext, node) {
 		return false
 	}
 	// Only when the previous statement could actually continue. Upstream asks
 	// `needsPrecedingSemicolon`, and measured, a preceding `;` or `}` already terminates it: after
 	// `foo;` or `if (foo) {}` no semicolon is added, while after `foo`, `foo()` or `var x = 1` one
 	// is. A statement at the top of a file has nothing to join at all.
-	start := rule.TokenRange(ctx.SourceFile, node).Pos()
-	preceding := text.TrimWhitespace(ctx.SourceFile.Text()[:start])
+	start := rule.TokenRange(ruleContext.SourceFile, node).Pos()
+	preceding := text.TrimWhitespace(ruleContext.SourceFile.Text()[:start])
 	if preceding == "" {
 		return false
 	}
@@ -547,13 +547,13 @@ func preferExponentiationOperatorNeedsLeadingSemicolon(ctx rule.Context, node *a
 
 // preferExponentiationOperatorStartsExpressionStatement answers whether this call is the first
 // thing in an expression statement.
-func preferExponentiationOperatorStartsExpressionStatement(ctx rule.Context, node *ast.Node) bool {
+func preferExponentiationOperatorStartsExpressionStatement(ruleContext rule.Context, node *ast.Node) bool {
 	current := node
 	for current.Parent != nil {
 		parent := current.Parent
 		if parent.Kind == ast.KindExpressionStatement {
-			return rule.TokenRange(ctx.SourceFile, parent).Pos() ==
-				rule.TokenRange(ctx.SourceFile, node).Pos()
+			return rule.TokenRange(ruleContext.SourceFile, parent).Pos() ==
+				rule.TokenRange(ruleContext.SourceFile, node).Pos()
 		}
 		if !preferExponentiationOperatorIsExpression(parent) &&
 			parent.Kind != ast.KindParenthesizedExpression {

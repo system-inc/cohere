@@ -105,7 +105,7 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 	Name:             "@typescript-eslint/no-unsafe-declaration-merging",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		report := func(node *ast.Node, opposite ast.Kind) {
 			// The nil-checker guard, kept even though it is inert on today's shim, and the
 			// measurement is here because the standing advice says a missing one PANICS.
@@ -117,7 +117,7 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 			// receiver, not a promise, and the failure it would produce if it changed is a crash
 			// rather than a quiet wrong answer. It also keeps a `.TypeChecker` selector in this
 			// file, which is what the registry's declaration guard reads.
-			if ctx.TypeChecker == nil {
+			if ruleContext.TypeChecker == nil {
 				return
 			}
 			name := node.Name()
@@ -127,7 +127,7 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 			if name == nil {
 				return
 			}
-			symbol := ctx.TypeChecker.GetSymbolAtLocation(name)
+			symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
 			if symbol == nil {
 				return
 			}
@@ -199,7 +199,7 @@ var NoUnsafeDeclarationMerging = rule.Rule{
 			// anonymous default forms: no merged declaration of either kind ever has a nil name. A
 			// guard written here survived the whole fixture set because nothing can reach it, which
 			// is a different thing from nothing covering it.
-			ctx.ReportNode(earliest.Name(), messageUnsafeDeclarationMerging)
+			ruleContext.ReportNode(earliest.Name(), messageUnsafeDeclarationMerging)
 		}
 
 		return rule.Listeners{

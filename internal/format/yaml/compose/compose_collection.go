@@ -4,15 +4,15 @@ package compose
 
 import "github.com/system-inc/cohere/internal/format/yaml/cst"
 
-func resolveCollection(ctx *composeContext, token *cst.Token, onError onErrorFunc, tagName string, tag *Tag) *Node {
+func resolveCollection(composition *composeContext, token *cst.Token, onError onErrorFunc, tagName string, tag *Tag) *Node {
 	var coll *Node
 	switch token.Type {
 	case "block-map":
-		coll = resolveBlockMap(ctx, token, onError, tag)
+		coll = resolveBlockMap(composition, token, onError, tag)
 	case "block-seq":
-		coll = resolveBlockSeq(ctx, token, onError, tag)
+		coll = resolveBlockSeq(composition, token, onError, tag)
 	default:
-		coll = resolveFlowCollection(ctx, token, onError, tag)
+		coll = resolveFlowCollection(composition, token, onError, tag)
 	}
 	// If we got a tagName matching the class, or the tag name is '!',
 	// then use the tagName from the node class used to create it.
@@ -26,11 +26,11 @@ func resolveCollection(ctx *composeContext, token *cst.Token, onError onErrorFun
 	return coll
 }
 
-func composeCollection(ctx *composeContext, token *cst.Token, props props, onError onErrorFunc) *Node {
+func composeCollection(composition *composeContext, token *cst.Token, props props, onError onErrorFunc) *Node {
 	tagToken := props.tag
 	tagName := ""
 	if tagToken != nil {
-		tagName = ctx.directives.tagName(tagToken.Source, func(msg string) {
+		tagName = composition.directives.tagName(tagToken.Source, func(msg string) {
 			onError(tagToken, "TAG_RESOLVE_FAILED", msg, false)
 		})
 	}
@@ -61,21 +61,21 @@ func composeCollection(ctx *composeContext, token *cst.Token, props props, onErr
 	// before jumping into the custom tag logic.
 	if tagToken == nil || tagName == "" || tagName == "!" || tagName == mapTagName && expType == "map" ||
 		tagName == seqTagName && expType == "seq" {
-		return resolveCollection(ctx, token, onError, tagName, nil)
+		return resolveCollection(composition, token, onError, tagName, nil)
 	}
 	var tag *Tag
-	for _, t := range ctx.schema.Tags {
+	for _, t := range composition.schema.Tags {
 		if t.Tag == tagName && t.Collection == expType {
 			tag = t
 			break
 		}
 	}
 	if tag == nil {
-		kt := knownTag(ctx.schema, tagName)
+		kt := knownTag(composition.schema, tagName)
 		if kt != nil && kt.Collection == expType {
 			copied := copyTag(kt)
 			copied.Default = defaultFalse
-			ctx.schema.Tags = append(ctx.schema.Tags, copied)
+			composition.schema.Tags = append(composition.schema.Tags, copied)
 			tag = kt
 		} else {
 			if kt != nil {
@@ -88,10 +88,10 @@ func composeCollection(ctx *composeContext, token *cst.Token, props props, onErr
 			} else {
 				onError(tagToken, "TAG_RESOLVE_FAILED", "Unresolved tag: "+tagName, true)
 			}
-			return resolveCollection(ctx, token, onError, tagName, nil)
+			return resolveCollection(composition, token, onError, tagName, nil)
 		}
 	}
-	coll := resolveCollection(ctx, token, onError, tagName, tag)
+	coll := resolveCollection(composition, token, onError, tagName, tag)
 	// `tag.resolve?.(coll, onError, ctx.options) ?? coll`: every collection tag has a resolve, and
 	// each returns a node, so `isNode(res) ? res : new Scalar(res)` is res.
 	node := coll
@@ -144,29 +144,29 @@ type scalarResolution struct {
 	valueRange []int
 }
 
-func composeScalar(ctx *composeContext, token *cst.Token, tagToken *cst.Token, onError onErrorFunc) *Node {
+func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.Token, onError onErrorFunc) *Node {
 	var resolved scalarResolution
 	if token.Type == "block-scalar" {
-		resolved = resolveBlockScalar(ctx, token, onError)
+		resolved = resolveBlockScalar(composition, token, onError)
 	} else {
-		resolved = resolveFlowScalar(token, ctx.options.Strict, onError)
+		resolved = resolveFlowScalar(token, composition.options.Strict, onError)
 	}
 	value := resolved.value
 	tagName := ""
 	if tagToken != nil {
-		tagName = ctx.directives.tagName(tagToken.Source, func(msg string) {
+		tagName = composition.directives.tagName(tagToken.Source, func(msg string) {
 			onError(tagToken, "TAG_RESOLVE_FAILED", msg, false)
 		})
 	}
 	var tag *Tag
-	if ctx.options.StringKeys && ctx.atKey {
-		tag = ctx.schema.scalarTag()
+	if composition.options.StringKeys && composition.atKey {
+		tag = composition.schema.scalarTag()
 	} else if tagName != "" {
-		tag = findScalarTagByName(ctx.schema, value, tagName, tagToken, onError)
+		tag = findScalarTagByName(composition.schema, value, tagName, tagToken, onError)
 	} else if token.Type == "scalar" {
-		tag = findScalarTagByTest(ctx, value, token, onError)
+		tag = findScalarTagByTest(composition, value, token, onError)
 	} else {
-		tag = ctx.schema.scalarTag()
+		tag = composition.schema.scalarTag()
 	}
 	// `tagToken ?? token`
 	var errorSource any = token
@@ -177,18 +177,18 @@ func composeScalar(ctx *composeContext, token *cst.Token, tagToken *cst.Token, o
 	if tag.resolveScalar == nil {
 		// An inherited property found by knownTag: `tag.resolve(...)` throws a TypeError.
 		onError(errorSource, "TAG_RESOLVE_FAILED", "tag.resolve is not a function", false)
-		scalar = ctx.newScalar(unitsToString(value))
+		scalar = composition.newScalar(unitsToString(value))
 	} else {
 		res, err := tag.resolveScalar(value, func(msg string) {
 			onError(errorSource, "TAG_RESOLVE_FAILED", msg, false)
-		}, ctx.options)
+		}, composition.options)
 		if err != nil {
 			onError(errorSource, "TAG_RESOLVE_FAILED", err.Error(), false)
-			scalar = ctx.newScalar(unitsToString(value))
+			scalar = composition.newScalar(unitsToString(value))
 		} else if node, isNode := res.(*Node); isNode && IsScalar(node) {
 			scalar = node
 		} else {
-			scalar = ctx.newScalar(res)
+			scalar = composition.newScalar(res)
 		}
 	}
 	scalar.Range = resolved.valueRange
@@ -242,11 +242,11 @@ func findScalarTagByName(schema *Schema, value []uint16, tagName string, tagToke
 	return schema.scalarTag()
 }
 
-func findScalarTagByTest(ctx *composeContext, value []uint16, _ *cst.Token, _ onErrorFunc) *Tag {
+func findScalarTagByTest(composition *composeContext, value []uint16, _ *cst.Token, _ onErrorFunc) *Tag {
 	// The view every test reads is made once, at the first tag with a test, rather than per tag (#vbjv3d6).
 	view, viewMade := "", false
-	for _, tag := range ctx.schema.Tags {
-		if (tag.Default == defaultTrue || ctx.atKey && tag.Default == defaultKey) && tag.Test != nil {
+	for _, tag := range composition.schema.Tags {
+		if (tag.Default == defaultTrue || composition.atKey && tag.Default == defaultKey) && tag.Test != nil {
 			if !viewMade {
 				view, viewMade = asciiView(value), true
 			}
@@ -256,5 +256,5 @@ func findScalarTagByTest(ctx *composeContext, value []uint16, _ *cst.Token, _ on
 		}
 	}
 	// schema.compat is never set on this path, so there is nothing to warn about.
-	return ctx.schema.scalarTag()
+	return composition.schema.scalarTag()
 }

@@ -129,8 +129,8 @@ func messageRequireNamespaceStyle(source string, expected string) rule.Message {
 // job here is to say which name and which form, and to say why.
 var ImportRequireModuleAlias = rule.Rule{
 	Name: "nexus/import-require-module-alias",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -195,9 +195,9 @@ var ImportRequireModuleAlias = rule.Rule{
 
 				if defaultBinding != nil {
 					if expectsNamespace {
-						ctx.ReportNode(defaultBinding, messageRequireNamespaceStyle(source, alias.Name))
+						ruleContext.ReportNode(defaultBinding, messageRequireNamespaceStyle(source, alias.Name))
 					} else if defaultBinding.Text() != alias.Name {
-						ctx.ReportNode(
+						ruleContext.ReportNode(
 							defaultBinding,
 							messageRequireAliasName(source, alias.Name, defaultBinding.Text()),
 						)
@@ -207,9 +207,9 @@ var ImportRequireModuleAlias = rule.Rule{
 				if namespaceBinding != nil {
 					namespaceName := namespaceBinding.AsNamespaceImport().Name()
 					if !expectsNamespace {
-						ctx.ReportNode(namespaceBinding, messageRequireDefaultStyle(source, alias.Name))
+						ruleContext.ReportNode(namespaceBinding, messageRequireDefaultStyle(source, alias.Name))
 					} else if namespaceName != nil && namespaceName.Text() != alias.Name {
-						ctx.ReportNode(
+						ruleContext.ReportNode(
 							namespaceName,
 							messageRequireAliasName(source, alias.Name, namespaceName.Text()),
 						)

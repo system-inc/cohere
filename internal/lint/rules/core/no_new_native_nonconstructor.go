@@ -60,7 +60,7 @@ var NoNewNativeNonconstructor = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				callee := node.AsNewExpression().Expression
@@ -71,11 +71,11 @@ var NoNewNativeNonconstructor = rule.Rule{
 				if !nativeNonConstructors[name] {
 					return
 				}
-				if !resolvesToAGlobal(ctx, callee) {
+				if !resolvesToAGlobal(ruleContext, callee) {
 					return
 				}
 
-				ctx.ReportNode(callee, rule.Message{
+				ruleContext.ReportNode(callee, rule.Message{
 					Id: "noNewNativeNonconstructor",
 					Description: fmt.Sprintf(
 						"This calls `new %s()`. %s is a function that returns a primitive and "+
@@ -96,9 +96,9 @@ var NoNewNativeNonconstructor = rule.Rule{
 //
 // An identifier the checker cannot resolve answers false. That is the conservative direction: a name
 // nothing declares is not provably the global, and reporting on it would be a guess.
-func resolvesToAGlobal(ctx rule.Context, identifier *ast.Node) bool {
-	if ctx.TypeChecker == nil {
+func resolvesToAGlobal(ruleContext rule.Context, identifier *ast.Node) bool {
+	if ruleContext.TypeChecker == nil {
 		return false
 	}
-	return rule.IsFirstDeclaredInDeclarationFile(ctx.TypeChecker.GetSymbolAtLocation(identifier))
+	return rule.IsFirstDeclaredInDeclarationFile(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }

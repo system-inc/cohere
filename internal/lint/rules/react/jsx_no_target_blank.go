@@ -242,7 +242,7 @@ var JsxNoTargetBlank = rule.Rule{
 	// strips the namespace on a `/` boundary, so a rule named `react-jsx-no-target-blank` would
 	// match no inventory entry and lint no files while passing every fixture in this package.
 	Name: "react/jsx-no-target-blank",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// An unconfigured rule reaches this with nil, and the comma-ok form yields the zero struct,
 		// whose `Links` is false rather than upstream's true. That difference decides nothing today
 		// because nothing reads `Links`, but relying on that would make a future wiring of `Links`
@@ -269,10 +269,10 @@ var JsxNoTargetBlank = rule.Rule{
 			spreadIndex := lastSpreadAttributeIndex(properties)
 
 			if jsx.IsIntrinsicElementNamed(tagName, "a") {
-				checkTargetBlankLink(ctx, node, properties, targetIndex, spreadIndex, settings)
+				checkTargetBlankLink(ruleContext, node, properties, targetIndex, spreadIndex, settings)
 			}
 			if jsx.IsIntrinsicElementNamed(tagName, "form") {
-				checkTargetBlankForm(ctx, node, properties, targetIndex, spreadIndex, settings)
+				checkTargetBlankForm(ruleContext, node, properties, targetIndex, spreadIndex, settings)
 			}
 		}
 
@@ -290,7 +290,7 @@ var JsxNoTargetBlank = rule.Rule{
 
 // checkTargetBlankLink is the `<a>` arm, which reports with a fix.
 func checkTargetBlankLink(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	element *ast.Node,
 	properties []*ast.Node,
 	targetIndex int,
@@ -317,12 +317,12 @@ func checkTargetBlankLink(
 		insertedRelValue = "noopener"
 	}
 
-	fix, fixable := targetBlankFix(ctx, properties, targetIndex, spreadIndex, insertedRelValue)
+	fix, fixable := targetBlankFix(ruleContext, properties, targetIndex, spreadIndex, insertedRelValue)
 	if !fixable {
-		ctx.ReportNode(element, message)
+		ruleContext.ReportNode(element, message)
 		return
 	}
-	ctx.ReportNodeWithFixes(element, message, fix)
+	ruleContext.ReportNodeWithFixes(element, message, fix)
 }
 
 // checkTargetBlankForm is the `<form>` arm, which reports WITHOUT a fix.
@@ -337,7 +337,7 @@ func checkTargetBlankLink(
 // form can report `noTargetBlankWithoutNoopener` while `noopener` would not have satisfied it,
 // which is upstream's inconsistency and is reproduced.
 func checkTargetBlankForm(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	element *ast.Node,
 	properties []*ast.Node,
 	targetIndex int,
@@ -371,7 +371,7 @@ func checkTargetBlankForm(
 	}
 	// No fix. Upstream's form report call has no `fix` property where the link arm's does, and
 	// inventing one here would rewrite a shape upstream declines to touch.
-	ctx.ReportNode(element, message)
+	ruleContext.ReportNode(element, message)
 }
 
 // reachesTargetBlankCheck reproduces the guard both arms open with, verbatim in structure.
@@ -760,7 +760,7 @@ func stringTextsOf(nodes []*ast.Node) ([]string, bool) {
 // `spreadIndex` is also -1, and -1 < -1 is false, so it does not. It fires when the target is
 // absent and a spread is present, which is exactly the warnOnSpreadAttributes case.
 func targetBlankFix(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	properties []*ast.Node,
 	targetIndex int,
 	spreadIndex int,
@@ -802,7 +802,7 @@ func targetBlankFix(
 	// above write `relValue`. Upstream's asymmetry, measured both ways.
 	if initializer.Kind == ast.KindStringLiteral {
 		return rule.ReplaceRange(
-			rule.TokenRange(ctx.SourceFile, initializer),
+			rule.TokenRange(ruleContext.SourceFile, initializer),
 			relLiteralWithNoreferrer(initializer.Text()),
 		), true
 	}
@@ -816,7 +816,7 @@ func targetBlankFix(
 	}
 	if expression.Kind == ast.KindStringLiteral {
 		return rule.ReplaceRange(
-			rule.TokenRange(ctx.SourceFile, expression),
+			rule.TokenRange(ruleContext.SourceFile, expression),
 			relLiteralWithNoreferrer(expression.Text()),
 		), true
 	}
@@ -824,7 +824,7 @@ func targetBlankFix(
 	// expression inside it, so `rel={5}` becomes `rel="noreferrer"` and not `rel={"noreferrer"}`.
 	// Measured on `rel={5}` and `rel={null}`; the fix range covers the braces in both.
 	if isNonStringLiteralExpression(expression) {
-		return rule.ReplaceRange(rule.TokenRange(ctx.SourceFile, initializer), "\"noreferrer\""), true
+		return rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, initializer), "\"noreferrer\""), true
 	}
 	// An identifier, a template, a conditional: upstream falls off the end and returns null.
 	return rule.Fix{}, false

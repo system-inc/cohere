@@ -315,12 +315,12 @@ var NoUseBeforeDefine = rule.Rule{
 	NeedsTypeChecker: true,
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declared once for the file rather than once per listener. `NeedsTypeChecker` governs the
 		// REGISTRATION path and says nothing about a Context built by hand, which
 		// `TestNoRegisteredRuleCrashesOnAbsentOptionalNodes` does, so the declaration is not the
 		// guard.
-		if ctx.TypeChecker == nil {
+		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
@@ -328,7 +328,7 @@ var NoUseBeforeDefine = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checkFileForUseBeforeDefine(ctx, node, settings)
+				checkFileForUseBeforeDefine(ruleContext, node, settings)
 			},
 		}
 	},
@@ -340,8 +340,8 @@ var NoUseBeforeDefine = rule.Rule{
 // through different indexes. Upstream visits every scope and reads the references it holds; we visit
 // every identifier and resolve it. The set of (reference, binding) pairs considered is the same, and
 // ours is the only one available without a scope graph.
-func checkFileForUseBeforeDefine(ctx rule.Context, sourceFile *ast.Node, settings noUseBeforeDefineSettings) {
-	cycles := newUseBeforeDefineCycles(ctx)
+func checkFileForUseBeforeDefine(ruleContext rule.Context, sourceFile *ast.Node, settings noUseBeforeDefineSettings) {
+	cycles := newUseBeforeDefineCycles(ruleContext)
 	var visit func(*ast.Node)
 	visit = func(current *ast.Node) {
 		if current == nil {
@@ -349,7 +349,7 @@ func checkFileForUseBeforeDefine(ctx rule.Context, sourceFile *ast.Node, setting
 		}
 
 		if current.Kind == ast.KindIdentifier {
-			checkIdentifierForUseBeforeDefine(ctx, current, settings, cycles)
+			checkIdentifierForUseBeforeDefine(ruleContext, current, settings, cycles)
 		}
 
 		current.ForEachChild(func(child *ast.Node) bool {
@@ -362,7 +362,7 @@ func checkFileForUseBeforeDefine(ctx rule.Context, sourceFile *ast.Node, setting
 
 // checkIdentifierForUseBeforeDefine judges one identifier occurrence.
 func checkIdentifierForUseBeforeDefine(
-	ctx rule.Context, identifier *ast.Node, settings noUseBeforeDefineSettings, cycles *useBeforeDefineCycles,
+	ruleContext rule.Context, identifier *ast.Node, settings noUseBeforeDefineSettings, cycles *useBeforeDefineCycles,
 ) {
 	// A declaring name is not a reference to itself. Upstream gets this for free, because
 	// eslint-scope never puts a declaration into `scope.references` in the first place; walking
@@ -411,7 +411,7 @@ func checkIdentifierForUseBeforeDefine(
 
 	// This file's declarations only: positions are compared below, and a declaration in another
 	// file has no position here.
-	declarations := rule.DeclarationsIn(ctx.SourceFile, useBeforeDefineResolveBinding(ctx, identifier))
+	declarations := rule.DeclarationsIn(ruleContext.SourceFile, useBeforeDefineResolveBinding(ruleContext, identifier))
 	if len(declarations) == 0 {
 		return
 	}
@@ -434,7 +434,7 @@ func checkIdentifierForUseBeforeDefine(
 		return
 	}
 
-	if !shouldCheckUseBeforeDefineReference(ctx, identifier, declaration, settings) {
+	if !shouldCheckUseBeforeDefineReference(ruleContext, identifier, declaration, settings) {
 		return
 	}
 
@@ -469,7 +469,7 @@ func checkIdentifierForUseBeforeDefine(
 		return
 	}
 
-	ctx.ReportNode(identifier, useBeforeDefineMessage(identifier, declaration))
+	ruleContext.ReportNode(identifier, useBeforeDefineMessage(identifier, declaration))
 }
 
 // useBeforeDefineBindingDeclaration picks which of a symbol's declarations the rule judges against.
@@ -503,7 +503,7 @@ func useBeforeDefineBindingDeclaration(declarations []*ast.Node) *ast.Node {
 // Ordered to match upstream's `shouldCheck` so a divergence is readable as a line-for-line
 // difference rather than a rewrite.
 func shouldCheckUseBeforeDefineReference(
-	ctx rule.Context,
+	ruleContext rule.Context,
 	identifier *ast.Node,
 	declaration *ast.Node,
 	settings noUseBeforeDefineSettings,
@@ -1040,7 +1040,7 @@ func forInOrOfExpression(statement *ast.Node) *ast.Node {
 //
 // `GetAliasedSymbol` is the recovery, guarded on the alias flag so it is asked only where there is
 // an alias to follow.
-func useBeforeDefineResolveBinding(ctx rule.Context, identifier *ast.Node) *ast.Symbol {
+func useBeforeDefineResolveBinding(ruleContext rule.Context, identifier *ast.Node) *ast.Symbol {
 	// A shorthand property needs a different accessor, and getting this wrong is silent and
 	// enormous. `GetSymbolAtLocation` on the `form` in `{ form }` resolves to the PROPERTY's own
 	// symbol, whose only declaration is the shorthand node itself, so a position comparison against
@@ -1052,12 +1052,12 @@ func useBeforeDefineResolveBinding(ctx rule.Context, identifier *ast.Node) *ast.
 	// invisible from the corpus: `{ form }` reported and `{ form: form }` did not, from the same
 	// binding on the same line, and upstream writes no shorthand property anywhere in its 354 cases.
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		if shorthand := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent); shorthand != nil {
+		if shorthand := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent); shorthand != nil {
 			return shorthand
 		}
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return nil
 	}
@@ -1070,8 +1070,8 @@ func useBeforeDefineResolveBinding(ctx rule.Context, identifier *ast.Node) *ast.
 	// whose position is its own. Following it would compare this file's positions against a
 	// different file's and answer nonsense, so the alias is kept unless it resolves to a declaration
 	// in this file.
-	aliased := ctx.TypeChecker.GetAliasedSymbol(symbol)
-	if aliased == nil || aliased == symbol || len(rule.DeclarationsIn(ctx.SourceFile, aliased)) == 0 {
+	aliased := ruleContext.TypeChecker.GetAliasedSymbol(symbol)
+	if aliased == nil || aliased == symbol || len(rule.DeclarationsIn(ruleContext.SourceFile, aliased)) == 0 {
 		return symbol
 	}
 

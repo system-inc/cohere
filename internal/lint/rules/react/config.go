@@ -110,7 +110,7 @@ var Config = rule.Rule{
 	// strips the namespace on a `/` boundary, so `react-config` would match no entry while still
 	// passing every fixture in this file.
 	Name: "react-hooks/config",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				moduleName, named := importedModuleName(node)
@@ -155,7 +155,7 @@ var Config = rule.Rule{
 						continue
 					}
 					if isHookName(importedName) != (declaredKind == typeConfigHook) {
-						ctx.ReportNode(element, messageInvalidTypeConfiguration)
+						ruleContext.ReportNode(element, messageInvalidTypeConfiguration)
 					}
 				}
 
@@ -166,7 +166,7 @@ var Config = rule.Rule{
 				if bindings.Default != nil {
 					declaredKind, present := properties["default"]
 					if present && isHookName(moduleName) != (declaredKind == typeConfigHook) {
-						ctx.ReportNode(bindings.Default, messageInvalidTypeConfiguration)
+						ruleContext.ReportNode(bindings.Default, messageInvalidTypeConfiguration)
 					}
 				}
 			},

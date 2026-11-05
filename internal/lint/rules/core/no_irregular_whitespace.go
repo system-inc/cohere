@@ -149,7 +149,7 @@ type skippedRegion struct {
 // that picks wrong here edits characters nobody can see, which is the worst place to be wrong.
 var NoIrregularWhitespace = rule.Rule{
 	Name: "no-irregular-whitespace",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// ESLint's defaults, which are also this tree's resolved configuration. Only SkipStrings defaults
 		// to on: irregular whitespace inside a string is usually data rather than a typo, and
 		// reporting it would flag every file that holds a no-break space on purpose.
@@ -175,7 +175,7 @@ var NoIrregularWhitespace = rule.Rule{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				text := ctx.SourceFile.Text()
+				text := ruleContext.SourceFile.Text()
 
 				// Nothing below runs on a file that holds none of these characters, which is very
 				// nearly every file. Without this the rule walks the whole tree collecting skip
@@ -200,7 +200,7 @@ var NoIrregularWhitespace = rule.Rule{
 					// per file and shares it. Reading trivia rather than matching on `//` is what
 					// makes this immune to a comment opener living inside a string, which was
 					// measured on this corpus: `var s = '// not a comment';` yields no comment.
-					for _, comment := range comments.ForFile(ctx) {
+					for _, comment := range comments.ForFile(ruleContext) {
 						skipped = append(skipped,
 							skippedRegion{comment.Range.Pos(), comment.Range.End()})
 					}
@@ -216,7 +216,7 @@ var NoIrregularWhitespace = rule.Rule{
 					}
 				}
 
-				collectSkippedLiterals(ctx.SourceFile, node, &skipped,
+				collectSkippedLiterals(ruleContext.SourceFile, node, &skipped,
 					skipStrings, skipTemplates, skipRegExps, skipJSXText)
 
 				// A run of irregular spaces is one finding and each irregular line terminator is
@@ -229,7 +229,7 @@ var NoIrregularWhitespace = rule.Rule{
 				runStart := -1
 				reportRun := func(end int) {
 					if runStart >= 0 && !isInsideAny(runStart, skipped) {
-						ctx.ReportRange(core.NewTextRange(runStart, end), messageIrregularWhitespace)
+						ruleContext.ReportRange(core.NewTextRange(runStart, end), messageIrregularWhitespace)
 					}
 					runStart = -1
 				}

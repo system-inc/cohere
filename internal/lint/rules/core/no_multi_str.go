@@ -90,19 +90,19 @@ var messageMultiStr = rule.Message{
 // the author may or may not have meant to include.
 var NoMultiStr = rule.Rule{
 	Name: "no-multi-str",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				if isPartOfJsxSyntax(node.Parent) {
 					return
 				}
 
-				literalRange := rule.TokenRange(ctx.SourceFile, node)
-				if !containsLineTerminator(ctx.SourceFile.Text()[literalRange.Pos():literalRange.End()]) {
+				literalRange := rule.TokenRange(ruleContext.SourceFile, node)
+				if !containsLineTerminator(ruleContext.SourceFile.Text()[literalRange.Pos():literalRange.End()]) {
 					return
 				}
 
-				ctx.ReportNode(node, messageMultiStr)
+				ruleContext.ReportNode(node, messageMultiStr)
 			},
 		}
 	},

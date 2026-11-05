@@ -108,15 +108,15 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 	// A file's verdict reads its own bytes, its own path, and the theme map, so the theme map is the whole
 	// fingerprint (#kdee854). See themeFingerprint.
 	ProgramFingerprint: themeFingerprint,
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil || !FileContextFor(ctx.SourceFile.FileName().AsString()).IsInLibrariesStructure {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsInLibrariesStructure {
 			return nil
 		}
-		if ctx.Program == nil {
+		if ruleContext.Program == nil {
 			return nil
 		}
 
-		themes := themeValuesForProgram(ctx.Program)
+		themes := themeValuesForProgram(ruleContext.Program)
 		if len(themes) == 0 {
 			// No themes found means the rule cannot decide anything, and reporting nothing would be
 			// indistinguishable from a clean tree. Declining is the honest answer; the coverage
@@ -167,7 +167,7 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 						return
 					}
 				}
-				ctx.ReportNode(attribute.Initializer,
+				ruleContext.ReportNode(attribute.Initializer,
 					messageForbiddenThemeValue(componentName, name.Text(), value, allowed))
 			},
 		}

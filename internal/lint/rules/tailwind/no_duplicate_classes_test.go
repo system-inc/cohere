@@ -258,10 +258,10 @@ func TestTemplateHoleIsReportedButNotFixed(test *testing.T) {
 	}
 
 	var diagnostics []rule.Diagnostic
-	ctx := rule.Context{
+	ruleContext := rule.Context{
 		Report: func(diagnostic rule.Diagnostic) { diagnostics = append(diagnostics, diagnostic) },
 	}
-	reportDuplicates(ctx, literal)
+	reportDuplicates(ruleContext, literal)
 
 	if len(diagnostics) != 1 {
 		test.Fatalf("expected one finding for the repeated visible class, got %d", len(diagnostics))
@@ -308,12 +308,12 @@ func TestAttributeOnlyReadingLosesFindings(test *testing.T) {
 		// The narrowed reader must not, which is what makes it dangerous.
 		narrowed := rule_testing.Run(test, rule.Rule{
 			Name: "attribute-only-control",
-			Run: func(ctx rule.Context, _ any) rule.Listeners {
+			Run: func(ruleContext rule.Context, _ any) rule.Listeners {
 				listeners := rule.Listeners{}
 				for _, kind := range ListenerKinds() {
 					listeners[kind] = func(node *ast.Node) {
 						for _, literal := range attributeOnly.ClassLiteralsIn(node) {
-							reportDuplicates(ctx, literal)
+							reportDuplicates(ruleContext, literal)
 						}
 					}
 				}

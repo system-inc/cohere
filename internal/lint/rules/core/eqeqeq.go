@@ -194,21 +194,21 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // on the wrong arm while every unparenthesized case stayed green.
 var Eqeqeq = rule.Rule{
 	Name: "eqeqeq",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		settings := EqeqeqOptions{}.resolve()
 		if decoded, configured := rule.OptionsAs[EqeqeqOptions](options); configured {
 			settings = decoded.resolve()
 		}
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				checkEqeqeq(ctx, node, settings)
+				checkEqeqeq(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
 // checkEqeqeq judges one binary expression.
-func checkEqeqeq(ctx rule.Context, node *ast.Node, settings eqeqeqSettings) {
+func checkEqeqeq(ruleContext rule.Context, node *ast.Node, settings eqeqeqSettings) {
 	binary := node.AsBinaryExpression()
 	// The operator token is optional on the node type even though the parser always supplies one,
 	// and the predicates below dereference their operands, so all three nil tests are here rather
@@ -226,7 +226,7 @@ func checkEqeqeq(ctx rule.Context, node *ast.Node, settings eqeqeqSettings) {
 		// An identity operator is reported ONLY under the inverted null policy, and only against
 		// null. Everywhere else it is the repair this rule asks for.
 		if settings.null == EqeqeqNullNever && isNull {
-			reportEqeqeq(ctx, node, binary, eqeqeqLooseSpellingOf(binary.OperatorToken.Kind))
+			reportEqeqeq(ruleContext, node, binary, eqeqeqLooseSpellingOf(binary.OperatorToken.Kind))
 		}
 		return
 	default:
@@ -246,7 +246,7 @@ func checkEqeqeq(ctx rule.Context, node *ast.Node, settings eqeqeqSettings) {
 		return
 	}
 
-	reportEqeqeq(ctx, node, binary, eqeqeqStrictSpellingOf(binary.OperatorToken.Kind))
+	reportEqeqeq(ruleContext, node, binary, eqeqeqStrictSpellingOf(binary.OperatorToken.Kind))
 }
 
 // reportEqeqeq reports one comparison, with a fix where coercion is provably impossible and a
@@ -255,13 +255,13 @@ func checkEqeqeq(ctx rule.Context, node *ast.Node, settings eqeqeqSettings) {
 // The finding is anchored on the OPERATOR TOKEN rather than on the whole expression, which is
 // upstream's `loc: operatorToken.loc`. That matters for a reader: a finding spanning `a == b` puts
 // the caret on `a`, and the thing being complained about is the two characters in the middle.
-func reportEqeqeq(ctx rule.Context, node *ast.Node, binary *ast.BinaryExpression, expected string) {
+func reportEqeqeq(ruleContext rule.Context, node *ast.Node, binary *ast.BinaryExpression, expected string) {
 	// The operator's spelling comes from the SOURCE rather than from `Text()`, which panics on a
 	// token node: `Unhandled case in Node.Text: *ast.Token`. That is the same hazard the shelf's
 	// `property.Name` documents for a computed key, arriving through a different kind, and it takes
 	// the whole file down rather than returning empty.
-	operatorRange := rule.TokenRange(ctx.SourceFile, binary.OperatorToken)
-	actual := ctx.SourceFile.Text()[operatorRange.Pos():operatorRange.End()]
+	operatorRange := rule.TokenRange(ruleContext.SourceFile, binary.OperatorToken)
+	actual := ruleContext.SourceFile.Text()[operatorRange.Pos():operatorRange.End()]
 
 	message := rule.Message{
 		Id: "unexpected",
@@ -277,12 +277,12 @@ func reportEqeqeq(ctx rule.Context, node *ast.Node, binary *ast.BinaryExpression
 	// what the comparison answers. Everything else is offered rather than applied, because there
 	// the swap CHANGES BEHAVIOUR and a human has to agree to it.
 	if eqeqeqHasTypeOfOperand(binary) || eqeqeqOperandsAreSameTypedLiterals(binary) {
-		ctx.ReportRangeWithFixes(operatorRange, message,
+		ruleContext.ReportRangeWithFixes(operatorRange, message,
 			rule.ReplaceRange(operatorRange, expected))
 		return
 	}
 
-	ctx.ReportRangeWithSuggestions(operatorRange, message, rule.Suggestion{
+	ruleContext.ReportRangeWithSuggestions(operatorRange, message, rule.Suggestion{
 		Message: rule.Message{
 			Id: "replaceOperator",
 			Description: fmt.Sprintf("Use `%s` instead of `%s`. This changes what the "+

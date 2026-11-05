@@ -124,8 +124,8 @@ var messageNoMisusedNewClassNew = rule.Message{
 // signature begins with `new`. It does: the parser only produces one when it sees that keyword.
 var NoMisusedNew = rule.Rule{
 	Name: "@typescript-eslint/no-misused-new",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
-		if ctx.SourceFile == nil {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
@@ -150,7 +150,7 @@ var NoMisusedNew = rule.Rule{
 					if !ok || returnTypeName != interfaceName {
 						continue
 					}
-					ctx.ReportRange(newKeywordRange(ctx, member),
+					ruleContext.ReportRange(newKeywordRange(ruleContext, member),
 						messageNoMisusedNewInterfaceConstruct)
 				}
 			},
@@ -169,7 +169,7 @@ var NoMisusedNew = rule.Rule{
 				if name.Kind != ast.KindIdentifier || name.Text() != "constructor" {
 					return
 				}
-				ctx.ReportNode(name, messageNoMisusedNewInterfaceConstructor)
+				ruleContext.ReportNode(name, messageNoMisusedNewInterfaceConstructor)
 			},
 
 			// The class arm anchors on the declaration and walks its members, and it requires a
@@ -177,11 +177,11 @@ var NoMisusedNew = rule.Rule{
 			// `const foo = class { new(): X;};` and `export default class { constructor(); }`
 			// unreachable rather than merely non-matching.
 			ast.KindClassDeclaration: func(node *ast.Node) {
-				reportClassMethodsNamedNew(ctx, node.AsClassDeclaration().Name(),
+				reportClassMethodsNamedNew(ruleContext, node.AsClassDeclaration().Name(),
 					node.AsClassDeclaration().Members)
 			},
 			ast.KindClassExpression: func(node *ast.Node) {
-				reportClassMethodsNamedNew(ctx, node.AsClassExpression().Name(),
+				reportClassMethodsNamedNew(ruleContext, node.AsClassExpression().Name(),
 					node.AsClassExpression().Members)
 			},
 		}
@@ -194,7 +194,7 @@ var NoMisusedNew = rule.Rule{
 // A class expression can carry a name (`const foo = class C { new(): C; }`), and upstream's arm is
 // anchored on `AstKind::Class`, which covers both forms. Splitting them here is a consequence of
 // our parser giving them separate kinds, not a difference in what is decided.
-func reportClassMethodsNamedNew(ctx rule.Context, className *ast.Node, members *ast.NodeList) {
+func reportClassMethodsNamedNew(ruleContext rule.Context, className *ast.Node, members *ast.NodeList) {
 	// Upstream returns early when the class has no id, so an anonymous class is exempt entirely
 	// rather than merely failing the name comparison. The distinction is invisible in the corpus
 	// but real: an anonymous class has no name for any return type to match, so both readings
@@ -224,7 +224,7 @@ func reportClassMethodsNamedNew(ctx rule.Context, className *ast.Node, members *
 		if !hasReturnTypeName || returnTypeName != name {
 			continue
 		}
-		ctx.ReportNode(memberName, messageNoMisusedNewClassNew)
+		ruleContext.ReportNode(memberName, messageNoMisusedNewClassNew)
 	}
 }
 
@@ -295,7 +295,7 @@ func returnTypeIdentifierText(returnType *ast.Node) (string, bool) {
 // beginning with that keyword. The parser only produces one when it sees `new`, so the assumption
 // holds, but the node's own start includes leading trivia here where upstream's does not, so the
 // three bytes have to be measured from the first token rather than from the node position.
-func newKeywordRange(ctx rule.Context, signature *ast.Node) core.TextRange {
-	tokenRange := rule.TokenRange(ctx.SourceFile, signature)
+func newKeywordRange(ruleContext rule.Context, signature *ast.Node) core.TextRange {
+	tokenRange := rule.TokenRange(ruleContext.SourceFile, signature)
 	return tokenRange.WithEnd(tokenRange.Pos() + len("new"))
 }

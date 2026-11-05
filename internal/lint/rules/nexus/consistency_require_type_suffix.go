@@ -61,14 +61,14 @@ func messageNoConstEnumSuffix(name string) rule.Message {
 // suffixes precisely because it cannot tell which one is right.
 var ConsistencyRequireTypeSuffix = rule.Rule{
 	Name: "nexus/consistency-require-type-suffix",
-	Run: func(ctx rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindTypeAliasDeclaration: func(node *ast.Node) {
 				name := node.AsTypeAliasDeclaration().Name()
 				if name == nil || hasAnySuffix(name.Text(), typeAliasSuffixes) {
 					return
 				}
-				ctx.ReportNode(name, messageNoTypeAliasSuffix(name.Text()))
+				ruleContext.ReportNode(name, messageNoTypeAliasSuffix(name.Text()))
 			},
 
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
@@ -76,7 +76,7 @@ var ConsistencyRequireTypeSuffix = rule.Rule{
 				if name == nil || hasAnySuffix(name.Text(), interfaceSuffixes) {
 					return
 				}
-				ctx.ReportNode(name, messageNoInterfaceSuffix(name.Text()))
+				ruleContext.ReportNode(name, messageNoInterfaceSuffix(name.Text()))
 			},
 
 			ast.KindVariableDeclaration: func(node *ast.Node) {
@@ -94,7 +94,7 @@ var ConsistencyRequireTypeSuffix = rule.Rule{
 				if strings.HasSuffix(name.Text(), "Kind") {
 					return
 				}
-				ctx.ReportNode(name, messageNoConstEnumSuffix(name.Text()))
+				ruleContext.ReportNode(name, messageNoConstEnumSuffix(name.Text()))
 			},
 		}
 	},
