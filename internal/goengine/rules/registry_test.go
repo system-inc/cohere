@@ -117,7 +117,7 @@ func expectBlock(test *testing.T, offset int, analyzers []*analysis.Analyzer, or
 // ruledStylecheck is the ST checks ruled on, written out here rather than read from the registry's own
 // table, so a check added to or dropped from that table by mistake fails the test.
 var ruledStylecheck = []string{
-	"ST1001", "ST1006", "ST1008", "ST1011", "ST1012", "ST1013", "ST1015", "ST1016", "ST1017", "ST1018", "ST1019",
+	"ST1001", "ST1006", "ST1008", "ST1011", "ST1012", "ST1013", "ST1016", "ST1017", "ST1018", "ST1019",
 }
 
 // staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order
@@ -302,7 +302,7 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 }
 
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
-// testdata, is one house rule named for it, and House lists it. A rule package nobody registered would build, pass
+// testdata and marker, is one house rule named for it, and House lists it. A rule package nobody registered would build, pass
 // its own fixtures and run on nothing.
 func TestEveryRulePackageIsInHouse(test *testing.T) {
 	test.Parallel()
@@ -316,7 +316,8 @@ func TestEveryRulePackageIsInHouse(test *testing.T) {
 	}
 	packages := 0
 	for _, entry := range entries {
-		if !entry.IsDir() || entry.Name() == "testdata" {
+		// marker is the reading of reasoned marker comments the rules share, a library and not a rule.
+		if !entry.IsDir() || entry.Name() == "testdata" || entry.Name() == "marker" {
 			continue
 		}
 		packages++
@@ -327,5 +328,17 @@ func TestEveryRulePackageIsInHouse(test *testing.T) {
 	}
 	if packages != len(House()) {
 		test.Errorf("rules/ holds %d rule packages, and House lists %d rules", packages, len(House()))
+	}
+}
+
+// ST1015 judges a misplaced default the way the house rule consistency-require-default-last does, so it stays out
+// of the registry while that rule is in the house, and a misplaced default is one finding, not two.
+func TestStylecheckLeavesTheDefaultClauseToTheHouseRule(test *testing.T) {
+	test.Parallel()
+	for _, registered := range All() {
+		if registered.Name == rule.Namespace+"ST1015" {
+			test.Fatalf("%s is registered beside cohere-go/consistency-require-default-last, which judges the same "+
+				"default", registered.Name)
+		}
 	}
 }

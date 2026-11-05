@@ -17,19 +17,51 @@ import (
 	"github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/internal/goengine/rules/concurrency_no_buffered_wait_delay"
 	"github.com/system-inc/cohere/internal/goengine/rules/concurrency_no_kill_by_name"
+	"github.com/system-inc/cohere/internal/goengine/rules/concurrency_require_escape_hatch_reason"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_ambiguous_identifier"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_any"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_boolean_outcome"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_console"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_dash_punctuation"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_else_return"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_empty_function"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_grouped_var"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_label"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_lone_block"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_lonely_if"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_long_file"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_parameter_reassignment"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_property_alias"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_redundant_import_alias"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_screaming_snake_case"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_shouting"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_stuttering_name"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_undefined_initializer"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_uppercase_initialism"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_use_before_define"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_useless_concatenation"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_utils_folder"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_warning_comment"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_default_last"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_error_clause"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_matching_file_name"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_octal_prefix"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_one_type_per_file"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_operator_assignment"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_caller_data_mutation"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_identical_branches"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_process_exit_after_output"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_write_only_collection"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_checked_assertion"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_declared_walk"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_handled_error"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_invariant_reason"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_response_status_check"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_wrapped_error"
+	"github.com/system-inc/cohere/internal/goengine/rules/security_no_interpolated_shell_command"
+	"github.com/system-inc/cohere/internal/goengine/rules/security_no_interpolated_sql_string"
 	"github.com/system-inc/cohere/internal/goengine/rules/testing_no_machine_path"
 	"github.com/system-inc/cohere/internal/goengine/rules/testing_no_timing_assertion"
 	"github.com/system-inc/cohere/internal/goengine/rules/testing_no_uncached_run"
@@ -56,8 +88,6 @@ var syntaxOnly = map[string]bool{
 	"SA9009": true,
 	// ST1001 reads import declarations for a dot import, and of a file only its name, to allow one in a test.
 	"ST1001": true,
-	// ST1015 reads the order of a switch's clauses for a default in the middle.
-	"ST1015": true,
 	// ST1018 reads string literals for control and format characters.
 	"ST1018": true,
 	// ST1019 reads import declarations for a package imported twice.
@@ -68,7 +98,9 @@ var syntaxOnly = map[string]bool{
 // code. ST1016 is among them although staticcheck leaves it off by default.
 //
 // Ruled off: ST1003, whose initialisms (`ID`, `JSON`) contradict the house's `Id` and `Json` and whose
-// underscores are this repository's package names, and ST1005.
+// underscores are this repository's package names, ST1005, and ST1015, whose default-in-the-middle finding is the
+// house rule cohere-go/consistency-require-default-last's, so one misplaced default would be two findings (and
+// ST1015 also accepts a default first, which the house rule does not).
 //
 // Off until ruled: ST1000, ST1020, ST1021 and ST1022, the form of package and exported declarations'
 // comments, and ST1023, a declared type the right-hand side would infer. Comment form and declared types
@@ -80,7 +112,6 @@ var stylecheckRuledOn = map[string]bool{
 	"ST1011": true,
 	"ST1012": true,
 	"ST1013": true,
-	"ST1015": true,
 	"ST1016": true,
 	"ST1017": true,
 	"ST1018": true,
@@ -145,19 +176,51 @@ func House() []rule.Rule {
 	return []rule.Rule{
 		concurrency_no_buffered_wait_delay.Rule,
 		concurrency_no_kill_by_name.Rule,
+		concurrency_require_escape_hatch_reason.Rule,
 		consistency_no_abbreviated_identifier.Rule,
 		consistency_no_ambiguous_identifier.Rule,
+		consistency_no_any.Rule,
+		consistency_no_boolean_outcome.Rule,
+		consistency_no_console.Rule,
+		consistency_no_dash_punctuation.Rule,
+		consistency_no_else_return.Rule,
+		consistency_no_empty_function.Rule,
+		consistency_no_grouped_var.Rule,
+		consistency_no_label.Rule,
+		consistency_no_lone_block.Rule,
+		consistency_no_lonely_if.Rule,
+		consistency_no_long_file.Rule,
 		consistency_no_long_line.Rule,
+		consistency_no_parameter_reassignment.Rule,
+		consistency_no_property_alias.Rule,
+		consistency_no_redundant_import_alias.Rule,
 		consistency_no_screaming_snake_case.Rule,
 		consistency_no_shouting.Rule,
+		consistency_no_stuttering_name.Rule,
+		consistency_no_undefined_initializer.Rule,
 		consistency_no_uppercase_initialism.Rule,
+		consistency_no_use_before_define.Rule,
+		consistency_no_useless_concatenation.Rule,
+		consistency_no_utils_folder.Rule,
+		consistency_no_warning_comment.Rule,
+		consistency_require_default_last.Rule,
 		consistency_require_error_clause.Rule,
+		consistency_require_matching_file_name.Rule,
+		consistency_require_octal_prefix.Rule,
 		consistency_require_one_type_per_file.Rule,
+		consistency_require_operator_assignment.Rule,
+		correctness_no_caller_data_mutation.Rule,
+		correctness_no_identical_branches.Rule,
+		correctness_no_process_exit_after_output.Rule,
+		correctness_no_write_only_collection.Rule,
 		correctness_require_checked_assertion.Rule,
 		correctness_require_declared_walk.Rule,
 		correctness_require_handled_error.Rule,
 		correctness_require_invariant_reason.Rule,
+		correctness_require_response_status_check.Rule,
 		correctness_require_wrapped_error.Rule,
+		security_no_interpolated_shell_command.Rule,
+		security_no_interpolated_sql_string.Rule,
 		testing_no_machine_path.Rule,
 		testing_no_timing_assertion.Rule,
 		testing_no_uncached_run.Rule,
