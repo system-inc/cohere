@@ -339,11 +339,11 @@ func interleavedStatements(
 // duplicate the comment. The verdict is unaffected, since the comparison uses the same span on both
 // sides.
 func extendPastNewline(sourceText string, offset int) int {
-	offset = skipTrailingComment(sourceText, offset)
-	if offset < len(sourceText) && sourceText[offset] == '\n' {
-		return offset + 1
+	pastComment := skipTrailingComment(sourceText, offset)
+	if pastComment < len(sourceText) && sourceText[pastComment] == '\n' {
+		return pastComment + 1
 	}
-	return offset
+	return pastComment
 }
 
 // skipTrailingComment advances past a comment written on the same line as what precedes it.

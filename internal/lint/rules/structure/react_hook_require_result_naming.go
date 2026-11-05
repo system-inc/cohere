@@ -103,6 +103,9 @@ type hookResultBinding struct {
 //
 // Both facts come from the same walk because they are found at the same nodes and a second traversal
 // would double the cost for nothing.
+//
+// Mutates: counts the walk adds one for each hook call it meets, so one map counts the whole file
+// Mutates: results the walk appends each hook result binding it meets, so one slice gathers the whole file
 func countHookInvocations(node *ast.Node, counts map[string]int, results *[]hookResultBinding) {
 	if node == nil {
 		return

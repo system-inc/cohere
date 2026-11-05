@@ -66,17 +66,17 @@ var fetchGlobalObjects = map[string]bool{"window": true, "globalThis": true}
 // happens to share the name, and reading every `.fetch` as the primitive would flag the wrapper
 // calls this rule exists to encourage.
 func isFetchCallee(callee *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
+	unwrapped := ast.SkipParentheses(callee)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text() == "fetch"
+		return unwrapped.Text() == "fetch"
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		name := access.Name()
 		if name == nil || name.Text() != "fetch" {
 			return false

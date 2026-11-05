@@ -443,8 +443,8 @@ export function Widget() {
 //
 // It exists because of a real difference between two binaries rather than to fake one.
 // `rule.Registered()` returns what the linked binary registered, and this package's test binary
-// links only `structure` rules, none of which declare the flag. The rules that do declare it —
-// `set-state-in-render` and `set-state-in-effect` — live in `internal/rules/react`, and importing
+// links only `structure` rules, none of which declare the flag. The rules that do declare it
+// (`set-state-in-render` and `set-state-in-effect`) live in `internal/rules/react`, and importing
 // that package here would both create a dependency this package does not want and be refused by the
 // leaf guard's spirit. So the branch is proven with a stand-in, and the empty branch is proven
 // separately below by asserting on what this binary genuinely has.
@@ -461,7 +461,9 @@ var reactHookNoAnyTypeStandInBlindedRule = rule.Rule{
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}
-		return rule.Listeners{ast.KindCallExpression: func(node *ast.Node) {}}
+		return rule.Listeners{ast.KindCallExpression: func(node *ast.Node) {
+			// The stand-in exists for its flag, so it has nothing to say about any call.
+		}}
 	},
 }
 
@@ -565,7 +567,7 @@ export function Widget() {
 //
 // One source, run twice, differing only in whether React's declarations are in the program. Every
 // other test here fixes one side of that and could pass over a rule keyed on something else
-// entirely — a rule reporting on the mere absence of a sibling file, or on the string `useState`,
+// entirely: a rule reporting on the mere absence of a sibling file, or on the string `useState`,
 // would satisfy them all. This one cannot be satisfied that way, because the bytes of the subject
 // file are identical in both runs.
 func TestReactHookAnyTypeSeesTheDifferenceTheDeclarationsMake(test *testing.T) {
@@ -594,7 +596,7 @@ export function Widget() {
 // three-or-more arm can only be exercised by a catalog holding three rules that declare
 // `ResolvesReactValueTypes`, and today the tree holds two. Reached through the rule, that arm is
 // unreachable, and a mutation removing its `and` separator survived the entire suite for exactly
-// that reason — not because the fixtures were blind, but because no input could reach the code.
+// that reason: not because the fixtures were blind, but because no input could reach the code.
 //
 // A third such rule is expected rather than hypothetical, which is what makes testing the arm now
 // worth doing: the alternative is an arm that silently renders wrong prose on the day it first runs.
