@@ -17,11 +17,12 @@ import (
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/sentence"
 )
 
 func main() {
 	if err := run(); err != nil {
-		dispatch.Report.Fail("cohere: %v", err)
+		dispatch.Report.Fail("cohere: %s", sentence.FromError(err))
 		os.Exit(1)
 	}
 }

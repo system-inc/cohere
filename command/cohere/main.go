@@ -26,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/unused_exports"
 )
@@ -47,7 +48,9 @@ func main() {
 		if activeOpen != nil {
 			activeOpen.Checked = false
 		}
-		fmt.Fprintf(os.Stderr, "cohere: %v\n", err)
+		// The chain is lowercase clauses until here, the one place a person reads it, where it becomes a
+		// sentence (see package sentence).
+		fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(err))
 		exitProcess(1)
 	}
 	finishRunCache(0)
