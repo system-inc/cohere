@@ -6,7 +6,10 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -108,6 +111,67 @@ func TestRunGoEngineRefusesATsconfig(test *testing.T) {
 	_, runError := runGoEngine(goTestLocation(test.TempDir()), map[string]bool{"tsconfig": true}, nil)
 	if runError == nil || !strings.Contains(runError.Error(), "is a Go module, so there is no tsconfig to use") {
 		test.Fatalf("--tsconfig at a Go root was not refused: %v", runError)
+	}
+}
+
+// runRealCohereAtAGoRoot runs the real cohere binary, not a stand-in, at a directory holding only a go.mod,
+// with the environment entries given, and a deadline. A front door that started engines without end would
+// otherwise hang the test and the pool with it, so running past the deadline fails the test instead.
+func runRealCohereAtAGoRoot(test *testing.T, environment ...string) (string, int) {
+	test.Helper()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	moduleFile := filepath.Join(root, goModuleMarker)
+	moduleContents := []byte("module example.com/lonely\n\ngo 1.27\n")
+	if writeError := os.WriteFile(moduleFile, moduleContents, 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	deadline, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	command := exec.CommandContext(deadline, binary, "--no-fix")
+	command.Dir = root
+	command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_RUN_CACHE=off")
+	command.Env = append(command.Env, environment...)
+	output, runError := command.CombinedOutput()
+	if deadline.Err() != nil {
+		test.Fatalf("cohere at a Go root was still running after 2 minutes, so it was killed:\n%s", output)
+	}
+	var exitError *exec.ExitError
+	if runError != nil && !errors.As(runError, &exitError) {
+		test.Fatalf("cohere did not run: %v", runError)
+	}
+	exitCode := 0
+	if exitError != nil {
+		exitCode = exitError.ExitCode()
+	}
+	return string(output), exitCode
+}
+
+// TestARealCohereAtAGoRootStartsOneEngine: the front door starts the Go engine once, the hidden dispatch
+// answers it, and with no engine built in yet the run says nothing was checked and fails. The guard against
+// a second engine never trips, because the dispatch is what answered.
+func TestARealCohereAtAGoRootStartsOneEngine(test *testing.T) {
+	test.Parallel()
+	output, exitCode := runRealCohereAtAGoRoot(test)
+	if exitCode != 1 || !strings.Contains(output, "The Go engine is not built into this cohere yet") ||
+		!strings.Contains(output, "The Go engine did not run, so nothing was checked.") {
+		test.Fatalf("exit %d, expected 1 with the dispatch's sentence and nothing checked:\n%s", exitCode, output)
+	}
+	if strings.Contains(output, goEngineChildVariable) {
+		test.Errorf("the guard against a second engine tripped, so the dispatch did not answer:\n%s", output)
+	}
+}
+
+// TestAFrontDoorStartedAsAGoEngineStartsNoOther: a process carrying the child mark that reaches the front
+// door's Go branch refuses to start an engine and exits 2, the contract's "did not run".
+func TestAFrontDoorStartedAsAGoEngineStartsNoOther(test *testing.T) {
+	test.Parallel()
+	output, exitCode := runRealCohereAtAGoRoot(test, goEngineChildVariable+"=1")
+	if exitCode != 2 || !strings.Contains(output, "was about to start another, so it refused") {
+		test.Fatalf("exit %d, expected 2 with the guard's sentence:\n%s", exitCode, output)
+	}
+	if strings.Contains(output, "not built into this cohere") {
+		test.Errorf("an engine was started though the guard should have refused first:\n%s", output)
 	}
 }
 

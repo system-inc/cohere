@@ -103,9 +103,9 @@ func TestOpenFlag(t *testing.T) {
 				want = append(want, filepath.Join(root, path))
 			}
 			if test.name == "missing editor" || test.name == "failed editor" {
-				want := "cohere: could not open editor: code is not on PATH\n"
+				want := "cohere: Could not open editor: code is not on PATH.\n"
 				if test.name == "failed editor" {
-					want = "cohere: could not open editor: exit status 42\n"
+					want = "cohere: Could not open editor: exit status 42.\n"
 				}
 				if strings.Count(output, want) != 1 {
 					t.Errorf("want exactly one %q in %s", want, output)
@@ -146,7 +146,7 @@ func TestOpenReport(t *testing.T) {
 		{"none", nil, true, nil, nil, "No findings.\n"},
 		{"unchecked", nil, false, nil, nil, ""},
 		{"global finding", []string{""}, true, nil, nil, ""},
-		{"editor failure", []string{"types.ts"}, true, errors.New("planted failure"), []string{"types.ts"}, "cohere: could not open editor: planted failure\n"},
+		{"editor failure", []string{"types.ts"}, true, errors.New("planted failure"), []string{"types.ts"}, "cohere: Could not open editor: planted failure.\n"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()

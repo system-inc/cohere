@@ -41,6 +41,11 @@ var cacheOff bool
 var processStart = time.Now()
 
 func main() {
+	// The Go engine is this binary in a hidden mode, matched before anything reads the command line or starts
+	// a run cache, since an engine is neither a front door nor a run of its own.
+	if len(os.Args) > 1 && os.Args[1] == goEngineVerb {
+		os.Exit(runGoEngineVerb(os.Stderr))
+	}
 	if err := run(); err != nil {
 		// A failure of the tool is never recorded by the run cache, and the recording stops before the
 		// error prints so the message reaches the terminal rather than a pipe nobody is reading.
@@ -1640,8 +1645,8 @@ func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceF
 			// A failed build-info write must not pass silently. The next run would be cold while
 			// this one reported success, and the symptom is a saving that quietly never appears.
 			for _, diagnostic := range writeDiagnostics {
-				fmt.Fprintf(os.Stderr, "cohere: writing the incremental cache: %s\n",
-					diagnostic.MessageKey())
+				fmt.Fprintf(os.Stderr, "cohere: %s\n",
+					sentence.Of(fmt.Sprintf("writing the incremental cache: %s", diagnostic.MessageKey())))
 			}
 		}
 	}

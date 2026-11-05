@@ -218,6 +218,11 @@ type engineRun struct {
 	// that renders a stream with no command line, checks nothing.
 	requested map[phaseName]bool
 
+	// engineEnvironment is what the engine's process gets in its environment beyond this one's, each
+	// `NAME=value`: the Go engine's child mark (goEngineChildVariable). Empty for an engine that needs
+	// nothing more, which inherits this process's environment as it is.
+	engineEnvironment []string
+
 	provenance *engineProvenanceRecord
 	project    *engineProjectRecord
 	summary    *engineSummaryRecord

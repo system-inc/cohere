@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -184,12 +185,14 @@ type projectRun struct {
 func runProjects(found discovery, arguments []string, out io.Writer) int {
 	executable, err := os.Executable()
 	if err != nil {
-		fmt.Fprintf(out, "cohere: finding this binary to run each project: %v\n", err)
+		fmt.Fprintf(out, "cohere: %s\n",
+			sentence.FromError(fmt.Errorf("finding this binary to run each project: %w", err)))
 		return 1
 	}
 	yieldDirectory, err := os.MkdirTemp("", "cohere-yield-")
 	if err != nil {
-		fmt.Fprintf(out, "cohere: making a place for what each project yields: %v\n", err)
+		fmt.Fprintf(out, "cohere: %s\n",
+			sentence.FromError(fmt.Errorf("making a place for what each project yields: %w", err)))
 		return 1
 	}
 	defer os.RemoveAll(yieldDirectory)
@@ -252,7 +255,8 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 			fmt.Fprintln(out)
 		}
 		if checked.err != nil {
-			fmt.Fprintf(out, "cohere: the %s run did not finish: %v\n", checked.project.Engine, checked.err)
+			fmt.Fprintf(out, "cohere: %s\n",
+				sentence.FromError(fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.err)))
 		}
 		fmt.Fprintln(account)
 		if checked.exitCode > worst {

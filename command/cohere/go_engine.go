@@ -2,13 +2,34 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/system-inc/cohere/internal/sentence"
 )
 
 // goEngineVerb is the hidden first argument that runs this binary as the Go engine rather than as the front
 // door. Hidden because nobody types it: the front door runs it as a child, the way it runs cohere-swift.
 const goEngineVerb = "go-engine"
+
+// goEngineChildVariable marks a process the front door started as its Go engine.
+//
+// The engine is this same binary, so a child that missed the `go-engine` dispatch would read its command
+// line as a front door's, find the same Go root, and start another engine, without end: each generation a
+// new process in a process group of its own, out of reach of any kill aimed at the first. So the front door
+// marks its child, and a front door that finds the mark refuses to start an engine, which makes the
+// recursion impossible however the dispatch is broken.
+const goEngineChildVariable = "COHERE_GO_ENGINE_CHILD"
+
+// runGoEngineVerb is the hidden `go-engine` mode, matched by main before anything else reads the command
+// line. The engine itself (internal/goengine) has not landed in this branch, so it says so and exits 2, the
+// contract's "did not run", and the front door that started it reports that nothing was checked.
+func runGoEngineVerb(standardError io.Writer) int {
+	fmt.Fprintf(standardError, "cohere %s: %s\n", goEngineVerb,
+		sentence.Of("the Go engine is not built into this cohere yet, so nothing was checked"))
+	return 2
+}
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded
 // with its absolute path, and the engine reads that file's `go` block in place of the root's settings. Any
@@ -33,6 +54,13 @@ var goFlags = engineFlags{
 // own resolution and packaging path, where `os.Executable()` already names an engine whose provenance is
 // this cohere's own.
 func runGoEngine(location projectLocation, given map[string]bool, positionals []string) (int, error) {
+	if os.Getenv(goEngineChildVariable) != "" {
+		// Exit 2, the contract's "did not run", so the front door above reports nothing checked.
+		fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.Of(fmt.Sprintf(
+			"this process was started as a Go engine (%s is set) and was about to start another, "+
+				"so it refused, and nothing was checked", goEngineChildVariable)))
+		return 2, nil
+	}
 	if given["tsconfig"] {
 		return 1, fmt.Errorf(
 			"--tsconfig names a TypeScript program, and %s is a Go %s, so there is no tsconfig to use",
@@ -51,6 +79,7 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 	run := newEngineRun(os.Stdout, mode, language, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.requested = engineRequestedPhases(given, flagValue)
+	run.engineEnvironment = []string{goEngineChildVariable + "=1"}
 	return runEngineBinary(executable, append([]string{goEngineVerb}, arguments...), run, os.Stderr)
 }
 

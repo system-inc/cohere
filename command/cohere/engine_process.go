@@ -45,6 +45,9 @@ func runEngineBinaryUntil(
 	interrupts <-chan os.Signal,
 ) (int, error) {
 	command := exec.Command(binaryPath, arguments...)
+	if len(run.engineEnvironment) > 0 {
+		command.Env = append(os.Environ(), run.engineEnvironment...)
+	}
 	command.Stderr = standardError
 	startInOwnProcessGroup(command)
 	command.WaitDelay = engineWaitDelay
