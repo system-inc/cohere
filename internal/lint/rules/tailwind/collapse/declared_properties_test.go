@@ -129,7 +129,7 @@ func TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld(test *testin
 // properties for that reason while the ordering tables deliberately keep them, and
 // `DeclaredPropertiesFor` has to keep making that split now that one emitter serves both.
 //
-// This exists because removing the strip was mutated and SURVIVED the whole suite. The corpus went
+// This exists because removing the strip was mutated and survived the whole suite. The corpus went
 // from 11,288 resolved to 11,292 and still reported zero findings, because no class list in it
 // happens to pair two classes whose only shared property is a `--tw-*` one. A rule can be wrong in a
 // way real code does not exercise, and a corpus measures the code somebody wrote rather than the

@@ -57,7 +57,8 @@ func TestCheckedInTablesMatchTheInstalledEngine(test *testing.T) {
 			repositoryOwned[name] = true
 		}
 
-		var missingFromTable, missingFromEngine []string
+		var missingFromTable []string
+		var missingFromEngine []string
 		registered := map[string]bool{}
 		for _, name := range engineStaticNames(test, system) {
 			if repositoryOwned[name] {

@@ -21,7 +21,8 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(test *testing.T) {
 	const sentinel = "zzsentinel"
 
 	var agreed int
-	var disagreements, unported []string
+	var disagreements []string
+	var unported []string
 
 	for root, utility := range FrameworkMultiDeclarationUtilities {
 		emitted := utility.Emit(root, "", ResolvedUtilityValue{Value: sentinel})
@@ -74,7 +75,8 @@ func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(test *testing.T) 
 	test.Parallel()
 	const sentinel = "zzsentinel"
 
-	var agreed, divergent int
+	var agreed int
+	var divergent int
 	var disagreements []string
 
 	for root, utility := range FrameworkMultiDeclarationUtilities {

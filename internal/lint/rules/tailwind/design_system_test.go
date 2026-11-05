@@ -219,7 +219,7 @@ func TestDesignSystemIsBuiltOncePerProgram(test *testing.T) {
 				"handing out per-file values", index)
 		}
 		// The descriptor table rides the same cache entry, so it gets the same assertion. The
-		// counter cannot cover it — it counts design system builds — and a table rebuilt per file
+		// counter cannot cover it (it counts design system builds), and a table rebuilt per file
 		// would be invisible to every check above while costing 959µs a file, which is more than the
 		// design system build it sits behind.
 		if result.Table != first.Table {
@@ -245,8 +245,8 @@ func TestDesignSystemIsBuiltOncePerProgram(test *testing.T) {
 // programs over two different projects are walked in sequence, and the second must see its own
 // design system.
 //
-// Mutating the key to nothing — deleting the `designSystemCache.program == ctx.Program` comparison
-// so any cached result is returned — makes this test fail on the entry-point assertion below, which
+// Mutating the key to nothing (deleting the `designSystemCache.program == ctx.Program` comparison
+// so any cached result is returned) makes this test fail on the entry-point assertion below, which
 // is what makes the key load-bearing rather than decorative.
 // Not parallel: it resets the package designSystemCache, the one slot every Tailwind rule's design system
 // is cached in, and then asserts on what that slot holds, so it walks its two programs in turn with no

@@ -466,10 +466,10 @@ func checkVariantOrderClassOrder(test *testing.T, name string, registry *Variant
 // whatever they start with." That rule was arrived at by fixture failure, and its comment names the
 // evidence honestly as four real class lists.
 //
-// The engine implements no such rule. `compile.ts` OR-s one bit per variant into a mask and
+// The engine implements no such rule. `compile.ts` sets one bit per variant in a mask and
 // compares the masks numerically, so a class's position is decided by its highest-ranked variant
 // and only ties on that are broken lower down. A stacked variant whose members all rank low
-// therefore sorts BEFORE a single variant that ranks high.
+// therefore sorts before a single variant that ranks high.
 //
 // Measured on the engine: `group-hover:disabled:` carries bits 0 and 2, mask 5. `dark:` carries bit
 // 3, mask 8. The stacked class sorts first, and the depth-first rule puts it second.
@@ -545,7 +545,7 @@ func TestVariantBitmaskIsNotDepthFirst(test *testing.T) {
 //
 // #4q5dsn3 swapped the rule onto the live design system, so the depth-first comparison this counts
 // against no longer ships anywhere: `compareVariants`, `variantSegments` and the rest of that path
-// were deleted with it. What this test compares is a depth-first rule REIMPLEMENTED here, in the loop
+// were deleted with it. What this test compares is a depth-first rule reimplemented here, in the loop
 // below, against the engine's masks from the fixture.
 //
 // It is kept in that form rather than repointed at the new code, because the two answer different
@@ -730,7 +730,7 @@ func TestRegistrationOrderIsSharedWithinAGroup(test *testing.T) {
 // TestCustomVariantOverridingAFrameworkNameKeepsItsOrder pins the per-repository behaviour, and it
 // is the opposite of what the task description assumed.
 //
-// A `@custom-variant` under a NEW name appends a position past the framework's last, and genuinely
+// A `@custom-variant` under a new name appends a position past the framework's last, and genuinely
 // changes what a repository's classes sort against. A `@custom-variant` that reuses a framework
 // name overwrites the registration in place: `Variants.set` assigns kind, applyFn and compounds
 // onto the existing record and never touches `order`.

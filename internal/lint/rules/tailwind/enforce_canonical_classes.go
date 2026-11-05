@@ -193,7 +193,7 @@ type candidateParts struct {
 	// Value is the text after the root, empty for a class like `border-l`.
 	//
 	// Decoded rather than verbatim, because it decides equality: `parseCandidate` resolves
-	// `bg-(--x)` and `bg-[var(--x)]` to the same value, and they ARE the same class, so the merge
+	// `bg-(--x)` and `bg-[var(--x)]` to the same value, and they really are the same class, so the merge
 	// precondition must see them as equal. SourceValue is the half that gets printed.
 	Value string
 	// SourceValue is the same value as the author spelled it, for printing back.

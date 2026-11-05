@@ -26,7 +26,8 @@ func TestEmittedDeclarationsAgreeWithTheMeasuredProperty(test *testing.T) {
 	const sentinel = "zzsentinel"
 
 	var agreed int
-	var disagreements, unported []string
+	var disagreements []string
+	var unported []string
 
 	for root, utility := range FrameworkFunctionalUtilities {
 		emitted := utility.Emit(root, ResolvedUtilityValue{Value: sentinel})
@@ -85,7 +86,8 @@ func TestEmittedDeclarationsAgreeWithTheMeasuredProperty(test *testing.T) {
 // feed.
 func TestEmittedPropertyNamesAreTheMeasuredOnes(test *testing.T) {
 	test.Parallel()
-	var compared, unknownToPropertyOrder int
+	var compared int
+	var unknownToPropertyOrder int
 	for root, utility := range FrameworkFunctionalUtilities {
 		emitted := utility.Emit(root, ResolvedUtilityValue{Value: "zzsentinel"})
 		if len(emitted) != 1 {

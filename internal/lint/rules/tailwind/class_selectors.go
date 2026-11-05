@@ -199,6 +199,8 @@ var DefaultSelectors = sync.OnceValue(func() []Selector {
 	decoder := json.NewDecoder(bytes.NewReader(defaultSelectorsJSON))
 	decoder.DisallowUnknownFields()
 	if decodeError := decoder.Decode(&selectors); decodeError != nil {
+		// Invariant: default_selectors.json is embedded at build time, and every test that reads the default
+		// selectors decodes this same file, so one that does not decode fails the tests before it ships.
 		panic(fmt.Sprintf("default_selectors.json does not decode, so it was not written by tools/generate_class_literals: %v", decodeError))
 	}
 	return selectors

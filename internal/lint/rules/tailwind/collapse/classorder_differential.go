@@ -14,7 +14,7 @@
 //
 // The precedent is on the record in this slice. `segment` was verified exclusively through
 // `InferDataType`, which launders its errors, so mutations to `segment` changed nothing any test
-// could observe. A component reachable only through its caller is not tested — and a *seam* is
+// could observe. A component reachable only through its caller is not tested, and a *seam* is
 // reachable only through a fixture that has already crossed it, so the same hole applies one level
 // up. This file starts from the class name and ends at the reading, and everything between is the
 // Go side's problem, which is the point.
@@ -26,7 +26,7 @@
 // ahra corpus 10 of 1,208 distinct classes return null from the engine, and the expanded registry
 // adds 30 more per system where the engine advertises a modifier it then refuses. Those are the
 // classes most likely to break and the ones a naive differential is blind to, so `BothSilent` is
-// counted, reported, and bounded — never folded into agreement.
+// counted, reported, and bounded, never folded into agreement.
 //
 // The rate a reader trusts is therefore computed over *answered* classes, and the silent counts are
 // asserted separately against measured figures. A run in which every class went silent scores an
@@ -356,7 +356,7 @@ func (report Report) Trustworthy() (bool, []string) {
 			bothSilentRate := float64(population.ByOutcome[OutcomeBothSilent]) / float64(total)
 			if bothSilentRate > maximumPlausibleBothSilentRate {
 				reasons = append(reasons, fmt.Sprintf(
-					"%s: %d of %d classes (%.1f%%) had neither side answer, above the %.0f%% ceiling — a side reporting nothing is a failed run",
+					"%s: %d of %d classes (%.1f%%) had neither side answer, above the %.0f%% ceiling \u2014 a side reporting nothing is a failed run",
 					population.SystemName, population.ByOutcome[OutcomeBothSilent], total,
 					bothSilentRate*100, maximumPlausibleBothSilentRate*100,
 				))
@@ -387,7 +387,7 @@ func (report Report) Trustworthy() (bool, []string) {
 			continue
 		}
 		reasons = append(reasons, fmt.Sprintf(
-			"control %q did not fire: %s — the harness has not been shown able to detect a difference",
+			"control %q did not fire: %s \u2014 the harness has not been shown able to detect a difference",
 			result.Control.Name, result.Detail,
 		))
 	}
@@ -470,7 +470,7 @@ func (report Report) Describe() string {
 		if result.Detected {
 			status = "fired"
 		}
-		fmt.Fprintf(builder, "    control %-22s %s: %d detections (floor %d) — %s\n",
+		fmt.Fprintf(builder, "    control %-22s %s: %d detections (floor %d) \u2014 %s\n",
 			result.Control.Name, status, result.Detections, result.Control.MinimumDetections, result.Control.Detail)
 	}
 
@@ -664,7 +664,7 @@ func runControl(systems []SystemCases, honest ReadingSource, control Control, re
 	result.Detected = result.Detections >= control.MinimumDetections
 	if !result.Detected {
 		result.Detail = fmt.Sprintf(
-			"%s — landed %d classes in %s, below the floor of %d",
+			"%s \u2014 landed %d classes in %s, below the floor of %d",
 			control.Detail, result.Detections, control.ExpectedOutcome, control.MinimumDetections,
 		)
 	}

@@ -436,7 +436,7 @@ func (registry *VariantRegistry) BuildVariantOrder(variants []ParsedVariant) *Ru
 	//
 	// This is the behaviour a reading of `getVariantOrder` does not predict, and it changes every
 	// mask. Upstream ranks `Array.from(parsedVariants.values())`, which is the design system's
-	// whole parse cache, and parsing `group-hover` populates that cache with the compound AND with
+	// whole parse cache, and parsing `group-hover` populates that cache with both the compound and
 	// the standalone `hover` it wraps. So a run that named two variants can rank four, and those
 	// extra entries are not inert: they consume dense indices and shift every later variant's bit
 	// upward.
@@ -467,7 +467,7 @@ func (registry *VariantRegistry) BuildVariantOrder(variants []ParsedVariant) *Ru
 	}
 
 	// SliceStable rather than Slice, though the choice is defensive rather than load-bearing and it
-	// is worth saying which. Tied variants receive the SAME index, so the order within a tie never
+	// is worth saying which. Tied variants receive the same index, so the order within a tie never
 	// reaches a mask and an unstable sort produces identical masks; mutating this to Slice does not
 	// fail the suite. What stability buys is that Variants() reports a reproducible sequence, which
 	// a caller diffing two runs depends on and the mask does not.
@@ -566,9 +566,9 @@ func (order *RunVariantOrder) VariantBitmask(variants []ParsedVariant) (*big.Int
 //
 // The mask is a *set* of bits, and comparing two sets numerically is decided by the highest bit on
 // which they differ. So a class's position is governed by its single highest-ranked variant, and
-// only ties on that are broken by the next one down. It follows that a stacked variant does NOT
+// only ties on that are broken by the next one down. It follows that a stacked variant does not
 // sort after every single variant. `group-hover:disabled:` sets bits for `group-hover` and
-// `disabled`, and `dark:` sets one much higher bit; the stacked class sorts FIRST. Measured on the
+// `disabled`, and `dark:` sets one much higher bit; the stacked class sorts first. Measured on the
 // engine, `group-hover:disabled:flex` precedes `dark:flex`, and in a four-class list it lands
 // between `hover:flex` and `dark:flex` rather than after both.
 //

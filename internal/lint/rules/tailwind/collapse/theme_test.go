@@ -234,9 +234,16 @@ func TestThemeMatchesEngine(test *testing.T) {
 func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 	test.Helper()
 
-	var totalEntries, totalNamespaces, totalNamespaceEntries, totalKeysInNamespace int
-	var totalResolutions, totalResolveWith, totalOptionQueries, totalNested int
-	var repositoriesChecked, syntheticChecked int
+	var totalEntries int
+	var totalNamespaces int
+	var totalNamespaceEntries int
+	var totalKeysInNamespace int
+	var totalResolutions int
+	var totalResolveWith int
+	var totalOptionQueries int
+	var totalNested int
+	var repositoriesChecked int
+	var syntheticChecked int
 
 	for _, aCase := range fixture.Cases {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
@@ -457,7 +464,9 @@ func TestThemeRepositoriesDiffer(test *testing.T) {
 
 	first, second := themes[0], themes[1]
 
-	var onlyInFirst, onlyInSecond, differingValues int
+	var onlyInFirst int
+	var onlyInSecond int
+	var differingValues int
 	for key, value := range first.keys {
 		otherValue, present := second.keys[key]
 		switch {

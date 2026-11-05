@@ -358,7 +358,7 @@ func TestPreconditionsAreCheckedNotAssumed(test *testing.T) {
 // The boundary is now `parseCandidate`'s rather than a prefix walk over a generated table, which is
 // the correction the migration carries: the walk re-derived where a root ends, and re-deriving it is
 // what lost `border-x` in the first place. `bg-linear-to-b` is the case that shows the difference on
-// real code — the walk read it as root `bg` with value `linear-to-b`, and `bg-linear` is a root.
+// real code: the walk read it as root `bg` with value `linear-to-b`, and `bg-linear` is a root.
 func TestLongestRootWinsInCollapse(test *testing.T) {
 	test.Parallel()
 	forEachEngineSystem(test, func(test *testing.T, designSystem DesignSystemResult) {
@@ -467,7 +467,7 @@ func TestSplitValueCarriesEverythingAfterTheRoot(test *testing.T) {
 //
 // `parseCandidate` decodes arbitrary values: `grid-cols-[1fr_auto]` becomes `1fr auto` and
 // `ring-(--x)` becomes `[var(--x)]`. Those decodings are correct and are what the merge precondition
-// must compare, and printing either back would name a class nobody can write — the first has a space
+// must compare, and printing either back would name a class nobody can write: the first has a space
 // in it, and a class attribute is split on whitespace.
 //
 // So the parts carry both forms. Measured on the corpus: 16 classes decode to something different

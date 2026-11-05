@@ -12,7 +12,7 @@
 // # Two details decide correctness
 //
 // A value starting with `var(` returns no type at all, before any check runs. Not "unknown, try the
-// checks anyway" — the short-circuit is the whole behavior, because `var(--x)` could hold anything
+// checks anyway": the short-circuit is the whole behavior, because `var(--x)` could hold anything
 // and Tailwind declines to guess. `IsColor` on its own would happily say `var(--color-red)` is not a
 // color and `isLength` would say it is not a length, but the short-circuit means callers never get
 // far enough to ask.
@@ -320,7 +320,7 @@ func scanNumber(value string) int {
 	for index < len(value) && value[index] >= '0' && value[index] <= '9' {
 		index++
 	}
-	// `\.?\d+` — the fractional digits are required, whether or not a dot appeared.
+	// `\.?\d+`: the fractional digits are required, whether or not a dot appeared.
 	if index < len(value) && value[index] == '.' {
 		index++
 		digitsStart := index

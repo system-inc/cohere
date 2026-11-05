@@ -58,7 +58,7 @@ import (
 // The first version of this helper walked upward from `.`, the package directory. That finds nothing,
 // so every fixture in this file skipped, and `go test` reports a file whose every case skipped as
 // `ok`. Measured: 7 of 7 reporting cases and 13 of 13 silent ones skipped while the package printed
-// PASS. A skip that reads as a pass is the same failure as silence that reads as agreement, one layer
+// `PASS`. A skip that reads as a pass is the same failure as silence that reads as agreement, one layer
 // out, so `TestClassOrderFixturesActuallyRan` below fails rather than skips when the package cannot
 // be found, and that test is the one that makes the rest of this file's greenness mean something.
 //
@@ -66,15 +66,15 @@ import (
 //
 // Pointing the fixture's `@import` at an absolute path does not work, and the reason is worth stating
 // because it looks like it should. The rule does not resolve the import itself: it calls
-// `findTailwindPackageRoot`, which walks UP from the stylesheet's own directory looking for
+// `findTailwindPackageRoot`, which walks up from the stylesheet's own directory looking for
 // `node_modules/tailwindcss`, and hands the result to `LoadDesignSystem` as the resolver's root. A
 // fixture in `t.TempDir()` has nothing above it, so that walk fails and the rule declines before it
 // ever reads what the stylesheet imports. Measured: every reporting fixture came back
 // `designSystemUnavailable` while the stylesheet held a perfectly good absolute import.
 //
 // So the fixture gets a real `node_modules/tailwindcss`, symlinked to the installed one. That makes
-// the rule take exactly the path it takes on a repository — its own upward walk, its own resolver,
-// the bare `tailwindcss` specifier — rather than a path arranged for the test.
+// the rule take exactly the path it takes on a repository (its own upward walk, its own resolver,
+// the bare `tailwindcss` specifier) rather than a path arranged for the test.
 const classOrderFixtureStylesheetPath = "app/_theme/styles/theme.css"
 
 // classOrderFixturePackageRoot is the installed tailwindcss the fixture stylesheets import: the vendored
@@ -532,7 +532,7 @@ func TestClassOrderVariantDimensions(test *testing.T) {
 //
 // The second is false as stated, and the first is true only by coincidence. The engine ORs one bit
 // per variant into a mask and compares masks numerically, so a class's position is decided by its
-// HIGHEST-ranked variant. A stacked variant sorts first whenever the class it is compared against
+// highest-ranked variant. A stacked variant sorts first whenever the class it is compared against
 // carries a higher bit.
 //
 // The evidence is the engine's own, from `class-order/stacked-against-single` and
@@ -585,7 +585,7 @@ func TestClassOrderDepthIsNotADimension(test *testing.T) {
 //	shadow-lg   {order: [315, 316], count: 2}
 //	ring-1      {order: [315, 318], count: 2}
 //
-// They SHARE their leading index and separate on the second. Index 315 is the `--tw-*` custom
+// They share their leading index and separate on the second. Index 315 is the `--tw-*` custom
 // property they both emit; 316 and 318 are their differing second declarations. So the property that
 // matters is that the reading holds more than one index at all: a lookup that dropped custom
 // properties, the way the conflict tables do, would leave both as a single `[box-shadow]` index and
@@ -593,7 +593,7 @@ func TestClassOrderDepthIsNotADimension(test *testing.T) {
 // conflict tables here.
 //
 // Asserting on `order[0]` differing, as the original did, is an assertion the engine fails. It passed
-// only because the deleted `declaredPropertiesForOrdering` returned property NAMES from a different
+// only because the deleted `declaredPropertiesForOrdering` returned property names from a different
 // table with a different shape, so the two tests were never asking the same question.
 func TestClassOrderReadingsKeepCustomProperties(test *testing.T) {
 	test.Parallel()
@@ -718,12 +718,12 @@ func classOrderLiveSort(test *testing.T, designSystem DesignSystemResult, classe
 //
 // Every fixture above skips when no installed tailwindcss can be found, and a skip is the honest
 // answer for a machine that genuinely has none. The problem is that `go test` prints `ok` for a
-// package whose every case skipped, so a mistake in where the walk STARTS looks identical to a
+// package whose every case skipped, so a mistake in where the walk starts looks identical to a
 // machine that lacks the package.
 //
 // That was not hypothetical. The first version of the helper walked upward from `.`, which is this
 // package's own directory inside a repository that vendors no `node_modules`. Every fixture skipped,
-// the package reported PASS, and the swap under test was never exercised by a single one of them.
+// the package reported `PASS`, and the swap under test was never exercised by a single one of them.
 //
 // So this test fails where the others skip. It asserts the package is findable and that the rule can
 // actually build a design system from the fixture stylesheet, which together are the precondition

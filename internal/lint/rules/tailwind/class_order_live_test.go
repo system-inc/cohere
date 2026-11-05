@@ -27,7 +27,7 @@ import (
 // to build against this task for exactly that reason, and was right to.
 //
 // So this suite reports a denominator alongside every rate. `classOrderLiveMeasure` counts the classes
-// the rule actually PLACED, and the tests below assert that count against a floor as well as asserting
+// the rule actually placed, and the tests below assert that count against a floor as well as asserting
 // the disagreement count against a ceiling. A run that placed nothing scores zero disagreements over
 // zero pairs and fails on the floor rather than passing on the empty diff.
 //
@@ -423,7 +423,7 @@ func TestClassOrderLiveMatchesTheEngineOverTheCorpus(test *testing.T) {
 // numerically, so a class's position is decided by its highest-ranked variant.
 //
 // `group-hover:disabled:flex` carries two variants and mask 5. `dark:flex` carries one and mask 8.
-// The engine sorts the stacked class FIRST, and the depth-first rule reversed it. Both fixtures are
+// The engine sorts the stacked class first, and the depth-first rule reversed it. Both fixtures are
 // the engine's own answers, quoted from variant_fixtures.json, not this port's output.
 //
 // The pairs are asserted rather than merely counted so that a corpus that lost its stacked-variant
