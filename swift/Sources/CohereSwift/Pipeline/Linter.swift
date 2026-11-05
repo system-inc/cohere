@@ -113,11 +113,17 @@ struct Linter {
         let unchecked = files.filter { file in
             symbols.unavailable[file.url.path] != nil && enabledTyped.contains { $0.applies(to: file) }
         }
+        /*
+         Each crash names the rules it cost, so a reader knows what the file was not judged for and that every other
+         rule judged it: a count with no rule leaves nobody able to say what a crashed file missed (@system_cohere,
+         2026-11-05, from a one-file package that crashed under `--lint` before any build).
+         */
         let crashes = unchecked.map { file in
-            LintRecord.Crash(
+            let missed = enabledTyped.filter { $0.applies(to: file) }.map(\.name).sorted()
+            return LintRecord.Crash(
                 file: file.url.path,
                 error:
-                    "the typed rules could not read what its names resolve to: \(symbols.unavailable[file.url.path] ?? "")",
+                    "\(symbols.unavailable[file.url.path] ?? ""), so the rules that read what its names resolve to could not judge it (\(missed.joined(separator: ", "))); every other rule ran on it",
             )
         }
         let silent = ranNames.filter { (listening[$0] ?? 0) == 0 }.sorted()

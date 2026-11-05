@@ -88,7 +88,7 @@ struct XcodeProjectPipelineTests {
      holds a `:` and an `=`, so `redundant-type-annotation` applies to it.
      */
     static let typedRulesUnread =
-        "the typed rules could not read what its names resolve to: the build's index does not describe it as it stands, and no build recorded how to compile it"
+        "the build's index does not describe it as it stands, and no build recorded how to compile it, so the rules that read what its names resolve to could not judge it (cohere-swift/redundant-type-annotation); every other rule ran on it"
 
     static let cleanCounter = cleanSource.replacingOccurrences(of: "Greeter", with: "Counter")
 

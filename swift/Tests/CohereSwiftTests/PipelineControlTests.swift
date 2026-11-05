@@ -190,6 +190,26 @@ struct PipelineControlTests {
         #expect(run.of("summary").first?["exitCode"] as? Int == 1)
     }
 
+    /*
+     A `--lint` run on a package no run has built has no index and no compile commands, so a typed rule that applies
+     to a file cannot judge it. The crash names that rule, and says every other rule ran on the file, so a reader can
+     tell what it missed (@ahra_os_presence_motion's one-file package, 2026-11-05: a bare count with no rule).
+     */
+    @Test func aTypedRuleThatCannotJudgeAFileIsNamedInItsCrash() async throws {
+        let source = Self.cleanSource.replacingOccurrences(
+            of: "        value * 2",
+            with: "        let doubled: Int = value * 2\n        return doubled",
+        )
+        let run = try await Self.run(source: source, arguments: ["--lint"])
+        let crashes = (run.of("lint").first?["crashes"] as? [[String: Any]] ?? []).map { $0["error"] as? String ?? "" }
+        #expect(crashes.count == 1)
+        #expect(
+            crashes.first
+                == "the build's index does not describe it as it stands, and no build recorded how to compile it, so the rules that read what its names resolve to could not judge it (cohere-swift/redundant-type-annotation); every other rule ran on it"
+        )
+        #expect(run.of("summary").first?["complete"] as? Bool == false)
+    }
+
     /* The naming rule judges with the compiled-in words: no argument names a file, and a word from policy's file is still flagged. */
     @Test func theCompiledInVocabularyIsTheOneJudgedWith() async throws {
         let source = Self.cleanSource.replacingOccurrences(of: "    let value: Int", with: "    let val: Int")
