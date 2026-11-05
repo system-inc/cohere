@@ -1744,66 +1744,6 @@ func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *
 	))
 }
 
-// changedConfiguration names the configuration file in a changed-file scope, or empty when none is.
-//
-// Three kinds, and all three reach every file at once: the rule config, the tsconfig that built the
-// program, and every tsconfig that one extends. The extends chain matters here rather than being a
-// completeness gesture. On this tree the root tsconfig holds one line, `extends`, and every option
-// and every include pattern lives in the base it points at, so a guard checking only the root would
-// miss every real change to how the program is built.
-//
-// Dependencies are deliberately not a fourth kind, and the reason is worth stating because
-// `package.json` looks like the obvious next entry. It is a declaration; the checker reads
-// `node_modules`, and the two move independently: a version edited with no install changes nothing
-// the program can see, and an install changes every consumer of a package without touching a
-// tracked file. `node_modules` is gitignored, so git cannot report the change that actually
-// matters. A guard on `package.json` would fire on the edits that mean nothing and stay silent on
-// the ones that mean everything, which is worse than the gap it appears to close.
-//
-// So a dependency change is a real limit of `--changed` rather than a defect in it. The honest
-// answer after an install is a whole-tree run, and the coverage line saying how many files were
-// checked is what leaves that visible.
-//
-// Its own function so a fixture can hold the comparison rather than reconstruct it. The
-// reconstruction is what makes this untestable in place: asserting that `resolveLintConfigPath`
-// plus `Clean` matches an absolute scope entry is a true statement about two helpers and says
-// nothing about whether the call site passes them the right directory.
-//
-// It passed the wrong one first. `--directory` defaults to empty, so resolving against the flag
-// left a bare relative name that never matched an absolute scope entry, and the guard silently
-// never fired. Resolving against the graph's directory is what makes it fire.
-func changedConfiguration(scope formatScope, graph *program.Graph, lintConfigFileName string) string {
-	currentDirectory := ""
-	if graph.Config != nil {
-		currentDirectory = graph.Anchor.Root()
-	}
-
-	// The lint config resolves against the graph's directory when there is one, and against the
-	// tsconfig's own directory otherwise. Both are the tree root in practice, and falling back to the
-	// empty string would leave a relative path that matches nothing, which is how the first version
-	// of this guard was silently inert.
-	if currentDirectory == "" && graph.ConfigFileName != "" {
-		currentDirectory = filepath.Dir(graph.ConfigFileName)
-	}
-
-	candidates := append(configuration.SourcesOnDisk(lintConfigSources(resolveLintConfigPath(lintConfigFileName, currentDirectory))), graph.ConfigFileName)
-	if graph.Config != nil {
-		for _, extended := range graph.Config.ExtendedSourceFiles() {
-			candidates = append(candidates, extended.AsString())
-		}
-	}
-
-	for _, candidate := range candidates {
-		if candidate == "" {
-			continue
-		}
-		if scope.includes(filepath.Clean(candidate)) {
-			return candidate
-		}
-	}
-	return ""
-}
-
 // registeredRuleNames is every rule this binary runs, by name, which the config loader needs to tell a
 // key spelled differently from the one it inherits apart from a twin rule's key.
 func registeredRuleNames() []string {
@@ -1828,17 +1768,6 @@ func lintConfigSources(path string) []string {
 		return []string{path}
 	}
 	return sources
-}
-
-// resolveLintConfigPath finds the lint config relative to the directory paths resolve against.
-//
-// A relative config path resolved against the process's own working directory rather than the
-// project's would quietly find nothing, and "nothing" here means every rule runs everywhere.
-func resolveLintConfigPath(configPath string, directory string) string {
-	if filepath.IsAbs(configPath) || directory == "" {
-		return configPath
-	}
-	return filepath.Join(directory, configPath)
 }
 
 // writeOrphanedConfigKeys says which config entries name a rule that does not exist. Printed in full

@@ -18,10 +18,7 @@ func contractFixture(test *testing.T, name string) []string {
 	if err != nil {
 		test.Fatal(err)
 	}
-	lines := []string{}
-	for _, line := range strings.Split(strings.TrimRight(string(contents), "\n"), "\n") {
-		lines = append(lines, line)
-	}
+	lines := strings.Split(strings.TrimRight(string(contents), "\n"), "\n")
 	if len(lines) < 2 {
 		test.Fatalf("%s holds %d records, which cannot be a contract fixture", name, len(lines))
 	}

@@ -15,9 +15,9 @@ import (
 // started with, and go vet holds until the test lets it go, so the test can change the pool between the
 // gate's first command and its second.
 type steppedGate struct {
-	fixture        *landFixture
-	log, release   string
-	slots, waiting string
+	fixture      *landFixture
+	log, release string
+	slots        string
 }
 
 func newSteppedGate(test *testing.T) steppedGate {

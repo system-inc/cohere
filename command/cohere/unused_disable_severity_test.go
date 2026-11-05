@@ -59,10 +59,14 @@ func TestUnusedDisableSeverity(test *testing.T) {
 		test.Run(fixture.name, func(test *testing.T) {
 			test.Parallel()
 			project := newRunCacheFixture(test, binary)
-			settings := map[string]any{"rules": map[string]string{"nexus/consistency-no-ambiguous-identifier": "off", "@typescript-eslint/no-inferrable-types": "off", "no-debugger": "error"}}
-			if fixture.level != "" {
-				settings["rules"].(map[string]string)["unused-disable"] = fixture.level
+			rules := map[string]string{
+				"nexus/consistency-no-ambiguous-identifier": "off", "@typescript-eslint/no-inferrable-types": "off",
+				"no-debugger": "error",
 			}
+			if fixture.level != "" {
+				rules["unused-disable"] = fixture.level
+			}
+			settings := map[string]any{"rules": rules}
 			if fixture.override != "" {
 				settings["overrides"] = []any{map[string]any{"files": []string{"source/a.ts"}, "rules": map[string]string{"unused-disable": fixture.override}}}
 			}
