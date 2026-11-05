@@ -68,6 +68,10 @@ type Options struct {
 	// Never inside OutputDirectory: the scratch is over a gigabyte, and everything in the output is
 	// packed into the artifact every proof downloads.
 	SwiftScratchDirectory string
+
+	// Progress is where the notarization of each macOS binary, minutes against Apple's service, is announced
+	// as it starts and ends. Nil announces nothing.
+	Progress io.Writer
 }
 
 // Result reports what a release build produced.
@@ -91,6 +95,25 @@ type StagedPackage struct {
 	// drastically smaller than its siblings is usually a build that failed into an empty file.
 	SizeInBytes int64
 }
+
+// MinimumReleaseCommit is the oldest cohere commit a release may be built from.
+//
+// It is `1bd41fb1`, where formatting options started coming only from CohereSettings.json's format
+// block. An engine from before it does not know that block, and in a repository whose package.json
+// no longer has a prettier key it formats silently with Prettier's defaults rather than failing:
+// one printed 2-space indentation over api's GraphQL. A repository that pins a published version
+// gets that version's engine and nothing newer can intervene, so the only place to stop it is here,
+// before it is published.
+//
+// A launcher check was considered and rejected. Platform packages are pinned to the launcher's
+// exact version, so a normal install never pairs a new launcher with an old engine, and an old
+// published version carries an old launcher that no check written later can reach.
+//
+// Written out in full because an abbreviated hash is only unambiguous for the history it was
+// abbreviated against.
+const MinimumReleaseCommit = "1bd41fb1bdb465f4453c472bcb1e17da5d2d6cf1"
+
+const minimumReleaseReason = "older engines ignore CohereSettings.json's format block and format with Prettier's defaults"
 
 // Build stages every platform package and the dispatcher package.
 //
@@ -203,25 +226,6 @@ func requireReleaseVersion(version string) error {
 	return nil
 }
 
-// MinimumReleaseCommit is the oldest cohere commit a release may be built from.
-//
-// It is `1bd41fb1`, where formatting options started coming only from CohereSettings.json's format
-// block. An engine from before it does not know that block, and in a repository whose package.json
-// no longer has a prettier key it formats silently with Prettier's defaults rather than failing:
-// one printed 2-space indentation over api's GraphQL. A repository that pins a published version
-// gets that version's engine and nothing newer can intervene, so the only place to stop it is here,
-// before it is published.
-//
-// A launcher check was considered and rejected. Platform packages are pinned to the launcher's
-// exact version, so a normal install never pairs a new launcher with an old engine, and an old
-// published version carries an old launcher that no check written later can reach.
-//
-// Written out in full because an abbreviated hash is only unambiguous for the history it was
-// abbreviated against.
-const MinimumReleaseCommit = "1bd41fb1bdb465f4453c472bcb1e17da5d2d6cf1"
-
-const minimumReleaseReason = "older engines ignore CohereSettings.json's format block and format with Prettier's defaults"
-
 // requireAncestor refuses a release built from a commit that does not contain minimum.
 //
 // git answers with three exit codes, and only one of them is a pass. 0 means minimum is in the
@@ -243,7 +247,7 @@ func requireAncestor(moduleDirectory string, minimum string, reason string) erro
 		)
 	}
 	return fmt.Errorf(
-		"could not tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
+		"git cannot tell whether this release contains %s, so it is refused rather than assumed: %w\n%s\nA shallow clone is the usual cause; fetch full history and release again",
 		ShortCommit(minimum), outputError, strings.TrimSpace(string(output)),
 	)
 }
@@ -304,7 +308,7 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 	// it, so a binary the notary service refused never reaches a package.
 	if target.IsMacOS() && options.Signing.CanNotarize() {
 		for _, executable := range executables {
-			if notarizeError := Notarize(executable, options.Signing); notarizeError != nil {
+			if notarizeError := Notarize(executable, options.Signing, options.Progress); notarizeError != nil {
 				return StagedPackage{}, notarizeError
 			}
 		}
@@ -465,12 +469,20 @@ func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error
 		if readError != nil {
 			return fmt.Errorf("reading the settings schema the dispatcher ships: %w", readError)
 		}
-		var schema map[string]any
-		if decodeError := json.Unmarshal(contents, &schema); decodeError != nil || len(schema) == 0 {
+		// Its members are left as written: what is checked is that it is an object with any at all.
+		var schema map[string]json.RawMessage
+		if decodeError := json.Unmarshal(contents, &schema); decodeError != nil {
 			return fmt.Errorf(
-				"%s is not a JSON schema (%v), so the dispatcher would ship a $schema target that validates nothing",
+				"%s is not a JSON schema (%w), so the dispatcher would ship a $schema target that validates nothing",
 				source,
 				decodeError,
+			)
+		}
+		if len(schema) == 0 {
+			return fmt.Errorf(
+				"%s is not a JSON schema (an empty object), so the dispatcher would ship a $schema target that "+
+					"validates nothing",
+				source,
 			)
 		}
 		if writeError := os.WriteFile(
@@ -600,7 +612,7 @@ func requireExecutableFormat(path string, target Target) error {
 	if openError != nil {
 		return fmt.Errorf("reading the binary at %s: %w", path, openError)
 	}
-	defer file.Close()
+	defer file.Close() // Ignored: the binary was only read, so a failed close loses nothing.
 
 	header := make([]byte, len(magic))
 	if _, readFullError := io.ReadFull(file, header); readFullError != nil {

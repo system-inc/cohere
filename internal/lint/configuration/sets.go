@@ -90,7 +90,7 @@ func SourcesOnDisk(sources []string) []string {
 // SetNames returns every embedded set's name, prefixed and sorted.
 func SetNames() []string {
 	var names []string
-	// The walk reads only the embedded tree, which the build checked exists, so it cannot fail.
+	// Ignored: the walk reads only the embedded tree, which the build checked exists, so it cannot fail.
 	_ = fs.WalkDir(setFiles, "sets", func(path string, entry fs.DirEntry, pathError error) error {
 		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
 			return pathError

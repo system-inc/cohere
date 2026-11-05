@@ -1,6 +1,7 @@
 package gocache
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -33,8 +34,11 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		if pathError != nil {
 			return pathError
 		}
-		relative, _ := filepath.Rel(root, path)
-		relative = filepath.ToSlash(relative)
+		native, relativeError := filepath.Rel(root, path)
+		if relativeError != nil {
+			return relativeError
+		}
+		relative := filepath.ToSlash(native)
 		if entry.IsDir() {
 			// The vendored compiler, caches and fixtures hold no caller of ours.
 			if relative != "." &&
@@ -48,13 +52,17 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 			strings.HasPrefix(relative, trimCaller+"/") {
 			return nil
 		}
-		imports, parseFileError := parser.ParseFile(files, path, nil, parser.ImportsOnly)
-		if parseFileError != nil {
-			return parseFileError
+		imports, parseImportsError := parser.ParseFile(files, path, nil, parser.ImportsOnly)
+		if parseImportsError != nil {
+			return parseImportsError
 		}
 		name := ""
 		for _, spec := range imports.Imports {
-			if importPath, _ := strconv.Unquote(spec.Path.Value); importPath == gocacheImport {
+			importPath, unquoteError := strconv.Unquote(spec.Path.Value)
+			if unquoteError != nil {
+				return fmt.Errorf("reading an import path in %s: %w", path, unquoteError)
+			}
+			if importPath == gocacheImport {
 				name = "gocache"
 				if spec.Name != nil {
 					name = spec.Name.Name
@@ -64,9 +72,9 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		if name == "" {
 			return nil
 		}
-		parsed, parseFileError := parser.ParseFile(files, path, nil, 0)
-		if parseFileError != nil {
-			return parseFileError
+		parsed, parseError := parser.ParseFile(files, path, nil, 0)
+		if parseError != nil {
+			return parseError
 		}
 		ast.Inspect(parsed, func(node ast.Node) bool {
 			if selector, ok := node.(*ast.SelectorExpr); ok && selector.Sel.Name == "Trim" {

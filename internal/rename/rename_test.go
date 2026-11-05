@@ -1,8 +1,11 @@
 package rename
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -531,9 +534,9 @@ func copyTree(test *testing.T, source string, destination string) {
 		if pathError != nil {
 			return pathError
 		}
-		relative, relativePathError := filepath.Rel(source, path)
-		if relativePathError != nil {
-			return relativePathError
+		relative, relativeError := filepath.Rel(source, path)
+		if relativeError != nil {
+			return relativeError
 		}
 		target := filepath.Join(destination, relative)
 		if info.IsDir() {
@@ -726,5 +729,35 @@ func TestPositionResolvesTheIdentifierUnderTheCursor(test *testing.T) {
 			"the position resolved to %q, want `toUpperCase` \u2014 a column selects the identifier it points at",
 			plan.OldName,
 		)
+	}
+}
+
+// A plan or a candidate list that never reached the writer is an error, not a silent gap in what the user
+// was shown, and a writer that takes everything returns none. A pipe whose reader is closed refuses every
+// write, so it stands in for a closed stdout.
+func TestWritersReturnTheWriteError(test *testing.T) {
+	test.Parallel()
+	plan := &Plan{OldName: "before", NewName: "after", Edits: []Edit{{FileName: "a.ts", Line: 1, Column: 1}}}
+	refused := &Plan{OldName: "before", Refusals: []string{"the symbol is declared outside the project"}}
+	candidates := []Candidate{{Name: "before", FileName: "a.ts", Line: 1, Column: 1, Kind: "variable"}}
+	for name, write := range map[string]func(io.Writer) error{
+		"a plan":         func(out io.Writer) error { return Write(out, plan, false) },
+		"a refused plan": func(out io.Writer) error { return Write(out, refused, false) },
+		"the candidates": func(out io.Writer) error { return WriteCandidates(out, "before", candidates) },
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			reader, writer := io.Pipe()
+			if closeError := reader.Close(); closeError != nil {
+				test.Fatal(closeError)
+			}
+			if writeError := write(writer); !errors.Is(writeError, io.ErrClosedPipe) {
+				test.Errorf("writing to a closed pipe returned %v, want %v", writeError, io.ErrClosedPipe)
+			}
+			var buffer bytes.Buffer
+			if writeError := write(&buffer); writeError != nil || !strings.Contains(buffer.String(), "before") {
+				test.Errorf("writing to a buffer returned %v and printed %q", writeError, buffer.String())
+			}
+		})
 	}
 }

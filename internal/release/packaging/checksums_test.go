@@ -413,7 +413,8 @@ func (installation installedRelease) run(test *testing.T, argument string, envir
 	command.Env = append(command.Env, "HOME="+installation.home)
 	command.Env = append(command.Env, environment...)
 
-	var standardOutput, standardError bytes.Buffer
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
 	command.Stdout = &standardOutput
 	command.Stderr = &standardError
 	runError := command.Run()

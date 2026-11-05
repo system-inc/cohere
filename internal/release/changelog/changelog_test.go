@@ -168,13 +168,85 @@ func TestRenderNamesEverySetThatChanged(test *testing.T) {
 	if diffError != nil {
 		test.Fatal(diffError)
 	}
-	section := Render("1.1.0", "2026-10-03", changed, nil)
+	section, renderError := Render("1.1.0", "2026-10-03", changed, nil)
+	if renderError != nil {
+		test.Fatal(renderError)
+	}
 	want := "## 1.1.0 (2026-10-03)\n\n### `cohere:typescript`\n\n- On: `c (error)`\n"
 	if section != want || bump != Minor {
 		test.Fatalf("rendered (bump %s):\n%s\nwant:\n%s", bump, section, want)
 	}
 	if strings.Contains(section, "react") {
 		test.Fatal("a set that did not change was listed")
+	}
+}
+
+// Values compare by what they decode to, so a set rewritten with its keys in another order, its numbers spelled
+// another way or other spacing has not changed, while a value that differs anywhere inside it has.
+func TestDiffSetComparesValuesByWhatTheyDecodeTo(test *testing.T) {
+	test.Parallel()
+	before := []byte(`{"format": {"printWidth": 120, "tabs": [1, "two", true, null]},
+		"rules": {"a": ["error", {"max": 1, "names": ["x"]}]}}`)
+	for _, testCase := range []struct {
+		name     string
+		after    []byte
+		settings []string
+		options  []string
+	}{
+		{
+			"respelled",
+			[]byte(`{"rules":{"a":["error",{"names":["x"],"max":1.0}]},` +
+				`"format":{"tabs":[1e0,"two",true,null],"printWidth":120}}`),
+			nil,
+			nil,
+		},
+		{
+			"a nested value changed",
+			[]byte(`{"rules":{"a":["error",{"max":1,"names":["y"]}]},` +
+				`"format":{"printWidth":120,"tabs":[1,"two",false,null]}}`),
+			[]string{"format"},
+			[]string{"a"},
+		},
+		{
+			"a member added",
+			[]byte(`{"rules":{"a":["error",{"max":1,"names":["x"],"more":null}]},` +
+				`"format":{"printWidth":120,"tabs":[1,"two",true]}}`),
+			[]string{"format"},
+			[]string{"a"},
+		},
+	} {
+		changes, diffSetError := DiffSet(before, testCase.after)
+		if diffSetError != nil {
+			test.Fatalf("%s: %v", testCase.name, diffSetError)
+		}
+		if !slices.Equal(changes.Settings, testCase.settings) || !slices.Equal(changes.Options, testCase.options) {
+			test.Errorf(
+				"%s: settings %q and options %q, want %q and %q",
+				testCase.name,
+				changes.Settings,
+				changes.Options,
+				testCase.settings,
+				testCase.options,
+			)
+		}
+	}
+}
+
+// The first release's sets are read nowhere before Render, so a set it cannot read is refused rather than counted as
+// turning no rules on.
+func TestRenderRefusesAFirstReleaseSetItCannotRead(test *testing.T) {
+	test.Parallel()
+	section, renderError := Render("0.1.0", "2026-11-05", nil, map[string][]byte{"broken": []byte(`{"rules":`)})
+	if renderError == nil || !strings.Contains(renderError.Error(), "cohere:broken") {
+		test.Fatalf("rendered %q with error %v, want the broken set refused by name", section, renderError)
+	}
+	first := map[string][]byte{"base": []byte(`{"rules":{"a":"error","b":"off"}}`)}
+	section, renderError = Render("0.1.0", "2026-11-05", nil, first)
+	if renderError != nil {
+		test.Fatal(renderError)
+	}
+	if !strings.Contains(section, "- `cohere:base`, 1 rules on\n") {
+		test.Fatalf("rendered:\n%s", section)
 	}
 }
 

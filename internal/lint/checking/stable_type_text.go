@@ -11,6 +11,17 @@ import (
 )
 
 /*
+ * A type is printed within stableTypeTextBudget characters, as TypeToString keeps one short: first with the widest
+ * limits, then with each narrower pair in turn, until it fits or the narrowest is used. Members past the member
+ * limit become `... N more ...`, and nesting past the depth limit becomes the type's name, or `...`. The steps are
+ * fixed, so the text is the same in every run. Without a budget, one union of column definitions printed 6,247
+ * characters where TypeToString had printed at most 1,484.
+ */
+const stableTypeTextBudget = 400
+
+var stableTypeLimits = []struct{ members, depth int }{{8, 5}, {4, 4}, {3, 3}, {2, 2}, {1, 1}}
+
+/*
  * StableTypeText prints a type the same way whichever checker holds it and whatever that checker did before, so
  * a message that names a type reads the same in every run (#dq881as).
  *
@@ -44,17 +55,6 @@ func StableTypeText(typeChecker *checker.Checker, subjectType *checker.Type) str
 	}
 	return text
 }
-
-/*
- * A type is printed within stableTypeTextBudget characters, as TypeToString keeps one short: first with the widest
- * limits, then with each narrower pair in turn, until it fits or the narrowest is used. Members past the member
- * limit become `... N more ...`, and nesting past the depth limit becomes the type's name, or `...`. The steps are
- * fixed, so the text is the same in every run. Without a budget, one union of column definitions printed 6,247
- * characters where TypeToString had printed at most 1,484.
- */
-const stableTypeTextBudget = 400
-
-var stableTypeLimits = []struct{ members, depth int }{{8, 5}, {4, 4}, {3, 3}, {2, 2}, {1, 1}}
 
 type stableTypePrinter struct {
 	typeChecker *checker.Checker
@@ -200,11 +200,12 @@ func (printer *stableTypePrinter) sortedJoin(printed []string, separator string)
 		}
 		return strings.Compare(left, right)
 	})
+	shown := printed
 	if len(printed) > printer.maximumMembers {
 		more := len(printed) - printer.maximumMembers + 1
-		printed = append(printed[:printer.maximumMembers-1], "... "+strconv.Itoa(more)+" more ...")
+		shown = append(printed[:printer.maximumMembers-1], "... "+strconv.Itoa(more)+" more ...")
 	}
-	return strings.Join(printed, separator)
+	return strings.Join(shown, separator)
 }
 
 // tuple prints a tuple's elements in their positions, which no checker reorders.

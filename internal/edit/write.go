@@ -181,7 +181,9 @@ func WriteAtomically(fileName string, text string) error {
 	// Any failure from here leaves a temp file behind unless it is removed, and a stale dotfile in
 	// a source directory is its own small mess.
 	cleanup := func() {
+		// Ignored: the write already failed and its error is the one returned; the file is abandoned unread.
 		temporary.Close()
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
 	}
 
@@ -204,16 +206,19 @@ func WriteAtomically(fileName string, text string) error {
 		return fmt.Errorf("syncing %s: %w", temporaryName, syncError)
 	}
 	if closeError := temporary.Close(); closeError != nil {
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
 		return fmt.Errorf("closing %s: %w", temporaryName, closeError)
 	}
 	if changeModeError := os.Chmod(temporaryName, mode); changeModeError != nil {
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
 		return fmt.Errorf("setting the mode on %s: %w", temporaryName, changeModeError)
 	}
 	// replace.File rather than os.Rename: on Windows a rename over a file another process is reading is
 	// refused for as long as the read takes, and is retried through that.
 	if fileError := replace.File(temporaryName, fileName); fileError != nil {
+		// Ignored: the failure that brought us here is the one returned, and a leftover dotfile must not mask it.
 		os.Remove(temporaryName)
 		return fmt.Errorf("renaming %s over %s: %w", temporaryName, fileName, fileError)
 	}

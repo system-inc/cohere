@@ -25,6 +25,8 @@ var lintTypes = gotypes.Product{
 
 // Not parallel: it builds the product every other test here reads, so it finishes before they resume. A
 // runner of prebuilt tests skips it and finds the product Workshop built.
+//
+//cohere:ignore consistency-no-screaming-snake-case loom finds product tests by the name TestProduct_<name>
 func TestProduct_LintTypes(test *testing.T) {
 	exports, buildError := lintTypes.Build()
 	if buildError != nil {
@@ -35,6 +37,11 @@ func TestProduct_LintTypes(test *testing.T) {
 
 // lintExports is lintTypes found once per test binary.
 var lintExports = sync.OnceValues(lintTypes.Find)
+
+var lintLoads = struct {
+	sync.Mutex
+	byOverlay map[string]*lintLoad
+}{byOverlay: map[string]*lintLoad{}}
 
 // lintPackages is ./internal/lint/... loaded with its syntax and types, read with overlay in place of the
 // files it names: cohere's own packages from source, and every other from lintTypes. The creating-getter
@@ -64,11 +71,6 @@ func lintPackages(test *testing.T, overlay map[string][]byte) []*gotypes.Package
 	}
 	return load.packages
 }
-
-var lintLoads = struct {
-	sync.Mutex
-	byOverlay map[string]*lintLoad
-}{byOverlay: map[string]*lintLoad{}}
 
 type lintLoad struct {
 	once     sync.Once

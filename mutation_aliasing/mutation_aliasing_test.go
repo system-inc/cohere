@@ -75,7 +75,9 @@ func (testGraph) Block(function *testFunction, id ssa.BlockId) (*testBlock, bool
 	block, ok := function.table[id]
 	return block, ok
 }
-func (testGraph) Blocks(function *testFunction) []*testBlock            { return function.blocks }
+func (testGraph) Blocks(function *testFunction) []*testBlock { return function.blocks }
+
+// Mutates: function the passes hand their new block order back through this setter, as through a real IR's
 func (testGraph) SetBlocks(function *testFunction, blocks []*testBlock) { function.blocks = blocks }
 func (testGraph) Retain(function *testFunction, keep func(ssa.BlockId) bool) {
 	for id := range function.table {
@@ -87,10 +89,14 @@ func (testGraph) Retain(function *testFunction, keep func(ssa.BlockId) bool) {
 func (testGraph) Placeholder(function *testFunction, block *testBlock) *testBlock { return block }
 func (testGraph) Id(block *testBlock) ssa.BlockId                                 { return block.id }
 func (testGraph) Predecessors(block *testBlock) []ssa.BlockId                     { return block.predecessors }
+
+// Mutates: block the passes record its recomputed predecessors through this setter, as through a real IR's
 func (testGraph) SetPredecessors(block *testBlock, predecessors []ssa.BlockId) {
 	block.predecessors = predecessors
 }
-func (testGraph) Phis(block *testBlock) []*ssa.Phi[testPlace]          { return block.phis }
+func (testGraph) Phis(block *testBlock) []*ssa.Phi[testPlace] { return block.phis }
+
+// Mutates: block the passes record its phis through this setter, as through a real IR's
 func (testGraph) SetPhis(block *testBlock, phis []*ssa.Phi[testPlace]) { block.phis = phis }
 func (testGraph) EachEdge(block *testBlock, visit func(ssa.BlockId, ssa.Edge)) {
 	for _, successor := range block.successors {
@@ -124,7 +130,12 @@ func (testGraph) ContextStoreDefines(function *testFunction, block *testBlock, i
 func (testGraph) SetInstructionOrder(function *testFunction, block *testBlock, index int, order ssa.EvaluationOrder) {
 	block.instructions[index].order = order
 }
-func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.Role)) {}
+func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.Role)) {
+	// Only construction and verification walk a terminal's places, and these tests build their functions
+	// already in single assignment form, so neither runs here.
+}
+
+// Mutates: block the passes record its terminal's evaluation order through this setter, as through a real IR's
 func (testGraph) SetTerminalOrder(block *testBlock, order ssa.EvaluationOrder) {
 	block.terminalOrder = order
 }

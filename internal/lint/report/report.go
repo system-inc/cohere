@@ -10,7 +10,6 @@ package report
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"time"
@@ -45,7 +44,7 @@ func (coverage Coverage) String() string {
 //
 // It returns whether the run passed, so the caller sets an exit code from the same value the
 // reader sees rather than recomputing it and risking the two disagreeing.
-func Write(out io.Writer, diagnostics []rule.Diagnostic, coverage Coverage) bool {
+func Write(out *strings.Builder, diagnostics []rule.Diagnostic, coverage Coverage) bool {
 	sorted := make([]rule.Diagnostic, len(diagnostics))
 	copy(sorted, diagnostics)
 	sort.SliceStable(sorted, func(first, second int) bool {
@@ -83,7 +82,7 @@ func Write(out io.Writer, diagnostics []rule.Diagnostic, coverage Coverage) bool
 //
 // This is deliberately not a clean result. A tool that cannot check must say so in the same breath
 // it would have said "clean", because the two are otherwise identical from outside.
-func WriteNothingChecked(out io.Writer, reason string) {
+func WriteNothingChecked(out *strings.Builder, reason string) {
 	fmt.Fprintf(out, "✗ cohere checked nothing: %s\n", reason)
 }
 

@@ -133,7 +133,7 @@ func DispatcherManifest(version string) ([]byte, error) {
 // Two-space indentation and a trailing newline, because these files are committed in staged
 // releases and read in diffs. A manifest that reformats on every generation makes every release
 // diff look like a rewrite.
-func marshalManifest(manifest map[string]any) ([]byte, error) {
+func marshalManifest[Manifest any](manifest Manifest) ([]byte, error) {
 	encoded, encodeError := json.MarshalIndent(manifest, "", "  ")
 	if encodeError != nil {
 		return nil, fmt.Errorf("rendering the package manifest: %w", encodeError)

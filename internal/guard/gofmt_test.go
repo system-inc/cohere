@@ -61,7 +61,10 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
 	// The release's own set is required in particular, so a walk that lost it cannot pass on the rest.
 	var underReleaseSet int
 	for _, path := range files {
-		relative, _ := filepath.Rel(module, path)
+		relative, relativeError := filepath.Rel(module, path)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
 		if strings.HasPrefix(filepath.ToSlash(relative), "command/") ||
 			strings.HasPrefix(filepath.ToSlash(relative), "internal/") {
 			underReleaseSet++
@@ -85,8 +88,12 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
 					continue
 				}
 				mutex.Lock()
-				relative, _ := filepath.Rel(module, path)
-				unformatted = append(unformatted, filepath.ToSlash(relative)+problem)
+				// A worker cannot end the test, so a path Rel cannot shorten is named in full instead.
+				named := path
+				if relative, relativeError := filepath.Rel(module, path); relativeError == nil {
+					named = filepath.ToSlash(relative)
+				}
+				unformatted = append(unformatted, named+problem)
 				mutex.Unlock()
 			}
 		}()

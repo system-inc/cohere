@@ -59,9 +59,11 @@ func main() {
 		*out,
 	)
 	if recordError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintf(os.Stderr, "record: %v\n", recordError)
 		os.Exit(1)
 	}
+	// Ignored: the record is already on disk, and this line only names where.
 	fmt.Printf("recorded %s\n", path)
 }
 
@@ -209,7 +211,7 @@ func readRuns(path string) ([]benchresults.Run, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer file.Close() // Ignored: the file was only read, so a failed close loses nothing.
 	modes := map[string]benchresults.Mode{
 		"cold": benchresults.ModeCold,
 		"warm": benchresults.ModeWarm,

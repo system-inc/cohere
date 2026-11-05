@@ -149,6 +149,7 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	if temporaryDirectoryError != nil {
 		return fmt.Errorf("creating a snapshot directory: %w", temporaryDirectoryError)
 	}
+	// Ignored: a snapshot left behind has no writer once this build ends, and the prune removes it after the hour.
 	defer os.RemoveAll(created)
 
 	// Every path below is the resolved one. Go resolves the build's working directory through any
@@ -191,6 +192,8 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	temporary := strings.TrimSuffix(binaryPath, executableSuffix) +
 		fmt.Sprintf(".partial-%d", os.Getpid()) +
 		executableSuffix
+	// Ignored: after the rename the name is gone and this fails by design, and a partial file left behind on a
+	// failure path is removed by the prune once its writer has been gone for the hour.
 	defer os.Remove(temporary)
 
 	if goBuildSnapshotError := goBuildSnapshot(
@@ -274,6 +277,7 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 		return "", fmt.Errorf("creating a compiler directory: %w", temporaryDirectoryError)
 	}
 	// After a successful rename the name no longer exists and this does nothing.
+	// Ignored: a partial extraction left behind on a failure path is removed by the prune once it is an hour old.
 	defer os.RemoveAll(partial)
 
 	submodule := filepath.Join(paths.ModuleDirectory, "TypeScript")
@@ -426,6 +430,7 @@ func extractGitArchive(repository string, commit string, subdirectory string, de
 
 	written, extractError := extractTar(stream, destination)
 	// Drained so git is never blocked writing into a pipe nobody reads after an extraction error.
+	// Ignored: the drain only frees git to exit, and what went wrong is said by the extraction's error or by Wait's.
 	_, _ = io.Copy(io.Discard, stream)
 	waitError := command.Wait()
 
@@ -475,6 +480,7 @@ func extractTar(stream io.Reader, destination string) (int, error) {
 				return written, openError
 			}
 			if _, copyError := io.Copy(file, reader); copyError != nil {
+				// Ignored: the copy failed and its error is the one returned, and the whole extraction is discarded.
 				file.Close()
 				return written, copyError
 			}

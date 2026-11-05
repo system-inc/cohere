@@ -29,12 +29,13 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 	}
 
 	for _, testCase := range cases {
-		manifest := decodeManifest(test, mustPlatformManifest(test, testCase.target, "1.2.3"))
+		encoded := mustPlatformManifest(test, testCase.target, "1.2.3")
+		manifest := decodeManifest(test, encoded)
 
 		if manifest["name"] != testCase.expectedName {
 			test.Errorf("%s published as %v, wanted %s", testCase.target, manifest["name"], testCase.expectedName)
 		}
-		if got := singleString(test, manifest["os"]); got != testCase.expectedOperatingSystem {
+		if got := singleString(test, encoded, "os"); got != testCase.expectedOperatingSystem {
 			test.Errorf(
 				// The dash is written as its escape, the same bytes, so the message reads as it always has.
 				"%s declared os %q, wanted %q \u2014 npm would install it on the wrong machine",
@@ -43,7 +44,7 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 				testCase.expectedOperatingSystem,
 			)
 		}
-		if got := singleString(test, manifest["cpu"]); got != testCase.expectedArchitecture {
+		if got := singleString(test, encoded, "cpu"); got != testCase.expectedArchitecture {
 			test.Errorf(
 				// The dash is written as its escape, the same bytes, so the message reads as it always has.
 				"%s declared cpu %q, wanted %q \u2014 npm would install it on the wrong machine",
@@ -62,12 +63,13 @@ func TestPlatformManifestMatchesWhatTheLauncherLooksFor(test *testing.T) {
 	// npm's spelling. This asserts the published name is the one it will ask for, for every target
 	// we ship. A mismatch here is a package that publishes, installs, and is never found.
 	for _, target := range Targets {
-		manifest := decodeManifest(test, mustPlatformManifest(test, target, "1.2.3"))
+		encoded := mustPlatformManifest(test, target, "1.2.3")
+		manifest := decodeManifest(test, encoded)
 
 		expected := PlatformPackagePrefix +
-			singleString(test, manifest["os"]) +
+			singleString(test, encoded, "os") +
 			"-" +
-			singleString(test, manifest["cpu"])
+			singleString(test, encoded, "cpu")
 		if manifest["name"] != expected {
 			test.Errorf(
 				"%s publishes as %v, but the launcher on that machine asks for %s",
@@ -259,16 +261,16 @@ func decodeManifest(test *testing.T, encoded []byte) map[string]any {
 	return manifest
 }
 
-// singleString reads a JSON array that should hold exactly one string.
-func singleString(test *testing.T, value any) string {
+// singleString reads a field of a generated manifest that should be an array holding exactly one string.
+func singleString(test *testing.T, encoded []byte, field string) string {
 	test.Helper()
-	values, ok := value.([]any)
-	if !ok || len(values) != 1 {
-		test.Fatalf("expected a one-element array, got %#v", value)
+	fields := map[string]json.RawMessage{}
+	if decodeError := json.Unmarshal(encoded, &fields); decodeError != nil {
+		test.Fatalf("the generated manifest is not a JSON object: %v", decodeError)
 	}
-	text, ok := values[0].(string)
-	if !ok {
-		test.Fatalf("expected a string, got %#v", values[0])
+	var values []string
+	if decodeError := json.Unmarshal(fields[field], &values); decodeError != nil || len(values) != 1 {
+		test.Fatalf("expected %s to be a one-element array of strings, got %s", field, fields[field])
 	}
-	return text
+	return values[0]
 }

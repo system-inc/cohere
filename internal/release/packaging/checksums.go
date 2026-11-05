@@ -77,7 +77,7 @@ func sha256File(path string) (string, error) {
 	if openError != nil {
 		return "", fmt.Errorf("opening %s to checksum it: %w", path, openError)
 	}
-	defer file.Close()
+	defer file.Close() // Ignored: the file was only read, so a failed close loses nothing.
 
 	hash := sha256.New()
 	if _, copyError := io.Copy(hash, file); copyError != nil {

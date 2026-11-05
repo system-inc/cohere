@@ -142,7 +142,9 @@ func runRenameVerb(arguments []string) error {
 			)
 		}
 		if len(symbols) > 1 {
-			rename.WriteCandidates(streams.Output, target, candidates)
+			if writeError := rename.WriteCandidates(streams.Output, target, candidates); writeError != nil {
+				return writeError
+			}
 			return fmt.Errorf("%q is ambiguous, so nothing was renamed", target)
 		}
 		position = rename.Position{
@@ -158,18 +160,21 @@ func runRenameVerb(arguments []string) error {
 	}
 
 	if len(plan.Refusals) > 0 {
-		rename.Write(streams.Output, plan, false)
+		if writeError := rename.Write(streams.Output, plan, false); writeError != nil {
+			return writeError
+		}
 		return fmt.Errorf("the rename was refused, so nothing was written")
 	}
 
 	if !*write {
-		rename.Write(streams.Output, plan, false)
-		return nil
+		return rename.Write(streams.Output, plan, false)
 	}
 
 	// Printed before applying, so the record of what was about to happen exists even if the write
 	// fails partway. A summary printed only on success cannot explain a tree that was half-written.
-	rename.Write(streams.Output, plan, true)
+	if writeError := rename.Write(streams.Output, plan, true); writeError != nil {
+		return writeError
+	}
 	streams.Show(streams.Output)
 
 	written, applyError := rename.Apply(plan)

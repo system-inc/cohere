@@ -214,11 +214,11 @@ func TestEveryLicenseTextIsUsedAndEveryReferenceExists(test *testing.T) {
 			return pathError
 		}
 		present[filepath.Base(path)] = true
-		contents, readFileError := licenseTexts.ReadFile(path)
-		if readFileError == nil && len(bytes.TrimSpace(contents)) == 0 {
+		contents, readError := licenseTexts.ReadFile(path)
+		if readError == nil && len(bytes.TrimSpace(contents)) == 0 {
 			test.Errorf("%s is empty", path)
 		}
-		return readFileError
+		return readError
 	})
 	if walkDirectoryError != nil {
 		test.Fatal(walkDirectoryError)
@@ -246,8 +246,8 @@ func TestNoGPLFileIsTracked(test *testing.T) {
 	// file took 6.9 seconds and these take a fifth of one.
 	var titles []string
 	for _, kind := range []string{"GENERAL", "LESSER GENERAL", "AFFERO GENERAL"} {
-		title := "GNU " + kind + " PUBLIC" + " LICENSE"
-		titles = append(titles, title, "GNU "+cases(kind)+" Public"+" License")
+		title := "GNU " + kind + " PUBLIC LICENSE"
+		titles = append(titles, title, "GNU "+cases(kind)+" Public License")
 	}
 	arguments := []string{"grep", "-l", "-I", "-F"}
 	for _, title := range titles {
@@ -289,7 +289,11 @@ func TestNoGPLFileIsTracked(test *testing.T) {
 	}
 	probeCommand := exec.Command("git", arguments...)
 	probeCommand.Dir = probe
-	if found, _ := probeCommand.Output(); strings.TrimSpace(string(found)) != "COPYING" {
+	found, probeError := probeCommand.Output()
+	if probeError != nil {
+		test.Fatalf("git grep could not search the probe repository: %v", probeError)
+	}
+	if strings.TrimSpace(string(found)) != "COPYING" {
 		test.Fatalf(
 			"the search found %q in a repository tracking a GPL file, so it can't be trusted to find one",
 			found,

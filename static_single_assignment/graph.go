@@ -13,6 +13,21 @@ package static_single_assignment
 
 import "sync"
 
+var reversePostorderScratchPool = sync.Pool{New: func() any {
+	scratch := new(reversePostorderScratch)
+	scratch.collect = func(next BlockId, edge Edge) {
+		if edge == Fallthrough {
+			scratch.fallthroughBlock, scratch.hasFallthrough = next, true
+			return
+		}
+		scratch.real = append(scratch.real, next)
+	}
+	scratch.keep = func(id BlockId) bool {
+		return int(id) < scratch.bound && (scratch.used[id] || scratch.usedFallthroughs[id])
+	}
+	return scratch
+}}
+
 // ReversePostorder reorders the function's blocks into reverse postorder and drops unreachable blocks.
 //
 // # Why unreachable blocks are dropped here and kept in controlflow
@@ -38,7 +53,12 @@ import "sync"
 // terminal's required target. An IR whose terminals have only real edges reports no Fallthrough, and
 // the walk is then a plain reverse postorder.
 func ReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) {
-	scratch := reversePostorderScratchPool.Get().(*reversePostorderScratch)
+	scratch, ok := reversePostorderScratchPool.Get().(*reversePostorderScratch)
+	if !ok {
+		// Invariant: the pool's New makes a *reversePostorderScratch, and the one Put, in this function's
+		// defer, hands back the scratch this Get returned.
+		panic("static_single_assignment: reversePostorderScratchPool held something other than its scratch")
+	}
 	postorder := scratch.postorder[:0]
 
 	// The three sets are dense slices over block ids rather than maps, and the walk keeps its frames
@@ -180,21 +200,6 @@ type reversePostorderScratch struct {
 	keep    func(id BlockId) bool
 }
 
-var reversePostorderScratchPool = sync.Pool{New: func() any {
-	scratch := new(reversePostorderScratch)
-	scratch.collect = func(next BlockId, edge Edge) {
-		if edge == Fallthrough {
-			scratch.fallthroughBlock, scratch.hasFallthrough = next, true
-			return
-		}
-		scratch.real = append(scratch.real, next)
-	}
-	scratch.keep = func(id BlockId) bool {
-		return int(id) < scratch.bound && (scratch.used[id] || scratch.usedFallthroughs[id])
-	}
-	return scratch
-}}
-
 // edgeScratch gathers one block's edges, for a pass that reads them in a loop of its own rather than
 // in a callback. Pooled with its callback for the reason reversePostorderScratch says.
 type edgeScratch struct {
@@ -216,7 +221,19 @@ var edgeScratchPool = sync.Pool{New: func() any {
 	return scratch
 }}
 
+// takeEdgeScratch is an edgeScratch from its pool, for the caller to hand back with edgeScratchPool.Put.
+func takeEdgeScratch() *edgeScratch {
+	scratch, ok := edgeScratchPool.Get().(*edgeScratch)
+	if !ok {
+		// Invariant: the pool's New makes an *edgeScratch, and every Put hands back one takeEdgeScratch returned.
+		panic("static_single_assignment: edgeScratchPool held something other than an *edgeScratch")
+	}
+	return scratch
+}
+
 // edgesOf gathers a block's edges into the scratch, replacing what it held.
+//
+// Mutates: scratch its edges are replaced with this block's, so the slice returned is good only until the next call
 func edgesOf[G Graph[F, B, P], F any, B comparable, P any](graph G, block B, scratch *edgeScratch) []edgeTo {
 	scratch.edges = scratch.edges[:0]
 	graph.EachEdge(block, scratch.collect)
@@ -228,9 +245,9 @@ func clearedFlags(flags []bool, length int) []bool {
 	if cap(flags) < length {
 		return make([]bool, length)
 	}
-	flags = flags[:length]
-	clear(flags)
-	return flags
+	resized := flags[:length]
+	clear(resized)
+	return resized
 }
 
 // MarkPredecessors recomputes every block's predecessors from the real edges.
@@ -245,7 +262,7 @@ func MarkPredecessors[G Graph[F, B, P], F any, B comparable, P any](graph G, fun
 	for _, block := range blocks {
 		graph.SetPredecessors(block, graph.Predecessors(block)[:0])
 	}
-	scratch := edgeScratchPool.Get().(*edgeScratch)
+	scratch := takeEdgeScratch()
 	defer edgeScratchPool.Put(scratch)
 	for _, block := range blocks {
 		id := graph.Id(block)

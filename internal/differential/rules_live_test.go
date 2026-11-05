@@ -13,7 +13,8 @@ import (
 // copy of what I believed the format was, and the failure this guards against is precisely the
 // format not matching that belief. Run with:
 //
-//	COHERE_BINARY=/tmp/cohere-head COHERE_TREE=~/Projects/ahra go test -run TestCompiledRulesAgainstARealBinary ./internal/differential/
+//	COHERE_BINARY=/tmp/cohere-head COHERE_TREE=~/Projects/ahra \
+//	  go test -run TestCompiledRulesAgainstARealBinary ./internal/differential/
 func TestCompiledRulesAgainstARealBinary(test *testing.T) {
 	test.Parallel()
 	binary := os.Getenv("COHERE_BINARY")

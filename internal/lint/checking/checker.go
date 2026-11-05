@@ -32,7 +32,8 @@ type ConstraintTypeInfo struct {
  * If the type is a generic, but it is not constrained, `constraintType` will be
  * `undefined` (rather than an `unknown` type), due to https://github.com/microsoft/TypeScript/issues/60475
  *
- * Successor to {@link getConstrainedTypeAtLocation} due to https://github.com/typescript-eslint/typescript-eslint/issues/10438
+ * Successor to {@link getConstrainedTypeAtLocation} due to
+ * https://github.com/typescript-eslint/typescript-eslint/issues/10438
  *
  * This is considered internal since it is unstable for now and may have breaking changes at any time.
  * Use at your own risk.
@@ -118,7 +119,7 @@ func GetTypeName(
 		// via AST.
 		symbol := checker.Type_symbol(subjectType)
 		decls := symbol.Declarations
-		if decls != nil && len(decls) > 0 {
+		if len(decls) > 0 {
 			if ast.IsTypeParameterDeclaration(decls[0]) {
 				typeParamDecl := decls[0].AsTypeParameterDeclaration()
 				if typeParamDecl.Constraint != nil {
@@ -253,6 +254,9 @@ func CanBeUnsafeAssignment(typeChecker *checker.Checker, sender *checker.Type) b
 	return canBeUnsafeAssignmentWorker(typeChecker, sender, map[*checker.Type]bool{})
 }
 
+// canBeUnsafeAssignmentWorker is CanBeUnsafeAssignment's search from one type down.
+//
+// Mutates: visited gains each type reference searched, so the rest of the same search skips it.
 func canBeUnsafeAssignmentWorker(
 	typeChecker *checker.Checker,
 	subjectType *checker.Type,
@@ -299,6 +303,10 @@ func IsUnsafeAssignment(
 	)
 }
 
+// isUnsafeAssignmentWorker is IsUnsafeAssignment's comparison from one sender and receiver down.
+//
+// Mutates: visited gains each receiver a sender was compared against, so the rest of the same comparison skips
+// the pair.
 func isUnsafeAssignmentWorker(
 	subjectType *checker.Type,
 	receiver *checker.Type,
@@ -329,7 +337,7 @@ func isUnsafeAssignmentWorker(
 	}
 
 	if checker.IsNonDeferredTypeReference(subjectType) && checker.IsNonDeferredTypeReference(receiver) {
-		// TODO - figure out how to handle cases like this,
+		// Upstream leaves open how to handle cases like this,
 		// where the types are assignable, but not the same type
 		/*
 		   function foo(): ReadonlySet<number> { return new Set<any>(); }
@@ -421,7 +429,7 @@ func GetContextualType(
 		// parent is not something we know we can get the contextual type of
 		return nil
 	}
-	// TODO - support return statement checking
+	// Upstream reads no return statement's contextual type here either.
 
 	return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
 }
@@ -429,15 +437,17 @@ func GetContextualType(
 func GetThisExpression(
 	node *ast.Node,
 ) *ast.Node {
+	// The expression reached so far, walking in through calls and member accesses.
+	current := node
 	for {
-		node = ast.SkipParentheses(node)
+		current = ast.SkipParentheses(current)
 
-		if ast.IsCallExpression(node) {
-			node = node.Expression()
-		} else if node.Kind == ast.KindThisKeyword {
-			return node
-		} else if ast.IsAccessExpression(node) {
-			node = node.Expression()
+		if ast.IsCallExpression(current) {
+			current = current.Expression()
+		} else if current.Kind == ast.KindThisKeyword {
+			return current
+		} else if ast.IsAccessExpression(current) {
+			current = current.Expression()
 		} else {
 			break
 		}
@@ -512,9 +522,10 @@ const (
 )
 
 /**
-  * @returns `DiscriminatedAnyTypeAny ` if the type is `any`, `DiscriminatedAnyTypeAnyArray` if the type is `any[]` or `readonly any[]`, `DiscriminatedAnyTypePromiseAny` if the type is `Promise<any>`,
-*          otherwise it returns `DiscriminatedAnyTypeSafe`.
-*/
+ * @returns `DiscriminatedAnyTypeAny` if the type is `any`, `DiscriminatedAnyTypeAnyArray` if the type is `any[]` or
+ *          `readonly any[]`, `DiscriminatedAnyTypePromiseAny` if the type is `Promise<any>`,
+ *          otherwise it returns `DiscriminatedAnyTypeSafe`.
+ */
 func DiscriminateAnyType(
 	subjectType *checker.Type,
 	typeChecker *checker.Checker,
@@ -529,7 +540,8 @@ func discriminateAnyTypeWorker(
 	typeChecker *checker.Checker,
 	program rule.Program,
 	node *ast.Node,
-	// TODO(port): do we really need visited here?
+	// visited holds every type this walk has reached, so a type met again on the way down through awaited
+	// types answers safe rather than being walked a second time.
 	visited *Set[*checker.Type],
 ) DiscriminatedAnyType {
 	if visited.Has(subjectType) {
@@ -635,7 +647,8 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 		return member.AsPrivateIdentifier().Text, MemberNameTypePrivate
 	case ast.KindComputedPropertyName:
 		expr := member.AsComputedPropertyName().Expression
-		// TODO(port): support boolean keywords, null keywords, etc
+		// A literal key is named by its text. A keyword key, such as true or null, falls through to the
+		// computed name's source text, as any other expression does.
 		if ast.IsLiteralExpression(expr) {
 			text := expr.Text()
 			if !scanner.IsValidIdentifier(text) {

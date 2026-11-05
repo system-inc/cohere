@@ -78,6 +78,8 @@ func buildSwiftEngine(
 	if writeError := os.WriteFile(stamp, []byte(stampSource), 0o644); writeError != nil {
 		return fmt.Errorf("writing the Swift engine's commit stamp: %w", writeError)
 	}
+	// Ignored: the stamp is gitignored and read only under COHERE_RELEASE_STAMP, which only a release build sets,
+	// and every release writes it again before building, so one left behind changes no release.
 	defer os.Remove(stamp)
 
 	resolve := exec.Command("swift", append([]string{"package", "resolve"}, location...)...)

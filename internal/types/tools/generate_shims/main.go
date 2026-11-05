@@ -24,6 +24,12 @@ import (
 
 const tsgoInternalPrefix = "github.com/microsoft/TypeScript/tsc/internal/"
 
+// deprecatedReexportSuppression goes on the line above a re-export of a deprecated upstream name, where the
+// re-export's own reference to that name is a use SA1019 would report. The re-export carries upstream's Deprecated
+// paragraph as its own doc, so SA1019 still reports every caller of the shim's name.
+const deprecatedReexportSuppression = "//cohere:ignore SA1019 the shim re-exports upstream whole; " +
+	"a caller of this name is judged where it uses it"
+
 type ExtraShim struct {
 	// ExtraFunctions and ExtraMethods name upstream's unexported functions and methods to re-export by
 	// `//go:linkname`, with no mirror, so the risk is the signature rather than a layout.
@@ -260,6 +266,8 @@ func main() {
 			matchedExtraFields[name] = false
 		}
 
+		deprecations := deprecatedDeclarations(goPackage.Syntax)
+
 		scope := goPackage.Types.Scope()
 		for _, name := range scope.Names() {
 			object := scope.Lookup(name)
@@ -283,6 +291,18 @@ func main() {
 				shimBuilder.WriteString(".")
 				shimBuilder.WriteString(name)
 				shimBuilder.WriteString("\n")
+			}
+
+			// A linked function names upstream only inside its directive's text, which SA1019 does not read, so only
+			// a type, constant or variable re-export takes the deprecation and its suppression.
+			if deprecation, deprecated := deprecations[name]; deprecated {
+				if _, isFunction := object.(*types.Func); !isFunction {
+					shimBuilder.WriteString("// ")
+					shimBuilder.WriteString(deprecation)
+					shimBuilder.WriteString("\n")
+					shimBuilder.WriteString(deprecatedReexportSuppression)
+					shimBuilder.WriteString("\n")
+				}
 			}
 
 			switch typedObject := object.(type) {
@@ -517,6 +537,56 @@ func main() {
 		shimHeaderBuilder.Reset()
 		shimBuilder.Reset()
 	}
+}
+
+// deprecatedDeclarations maps each package-level name in files whose doc comment holds a Deprecated paragraph to
+// that paragraph, joined onto one line. A spec inside a parenthesized group has its own doc; an ungrouped one is
+// documented by its declaration's.
+func deprecatedDeclarations(files []*ast.File) map[string]string {
+	deprecations := map[string]string{}
+	record := func(name string, documentation *ast.CommentGroup) {
+		if documentation == nil {
+			return
+		}
+		for paragraph := range strings.SplitSeq(documentation.Text(), "\n\n") {
+			if strings.HasPrefix(paragraph, "Deprecated: ") {
+				deprecations[name] = strings.Join(strings.Fields(paragraph), " ")
+				return
+			}
+		}
+	}
+	for _, file := range files {
+		for _, declaration := range file.Decls {
+			switch typedDeclaration := declaration.(type) {
+			case *ast.FuncDecl:
+				if typedDeclaration.Recv == nil {
+					record(typedDeclaration.Name.Name, typedDeclaration.Doc)
+				}
+			case *ast.GenDecl:
+				for _, specification := range typedDeclaration.Specs {
+					documentation := typedDeclaration.Doc
+					if typedDeclaration.Lparen.IsValid() {
+						documentation = nil
+					}
+					switch typedSpecification := specification.(type) {
+					case *ast.ValueSpec:
+						if typedSpecification.Doc != nil {
+							documentation = typedSpecification.Doc
+						}
+						for _, identifier := range typedSpecification.Names {
+							record(identifier.Name, documentation)
+						}
+					case *ast.TypeSpec:
+						if typedSpecification.Doc != nil {
+							documentation = typedSpecification.Doc
+						}
+						record(typedSpecification.Name.Name, documentation)
+					}
+				}
+			}
+		}
+	}
+	return deprecations
 }
 
 // verifyTypeSubstitutions refuses to emit a mirror whose stand-in types do not match the size and

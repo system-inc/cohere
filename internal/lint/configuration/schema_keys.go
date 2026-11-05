@@ -104,6 +104,8 @@ func fieldIndex(structType reflect.Type, jsonName string) int {
 			return index
 		}
 	}
+	// Invariant: the one caller asks for rawConfig's "rules", which rawConfig declares, so a renamed
+	// tag stops the package at load, in every test, before any config is read.
 	panic("configuration: rawConfig has no field " + jsonName)
 }
 

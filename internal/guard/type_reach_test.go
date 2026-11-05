@@ -148,7 +148,7 @@ func TestShapeReadersHandBackNoSyntax(test *testing.T) {
 			test.Errorf("shapeReaders names %s, which is not a function in the rule package", name)
 			continue
 		}
-		results := function.Type().(*types.Signature).Results()
+		results := function.Signature().Results()
 		for index := range results.Len() {
 			if carried := carriesCompilerValue(results.At(index).Type(), map[types.Type]bool{}); carried != "" {
 				test.Errorf("%s hands back %s, which carries %s: a caller could descend from it into another file",
@@ -160,18 +160,20 @@ func TestShapeReadersHandBackNoSyntax(test *testing.T) {
 
 // carriesCompilerValue names the first compiler type subject can hold, through pointers, slices, arrays,
 // maps, channels, struct fields, functions and interfaces, or "" when it holds none.
+//
+// Mutates: seen the caller's set of types already walked, shared down the recursion so a cycle ends
 func carriesCompilerValue(subject types.Type, seen map[types.Type]bool) string {
 	// The shim's types are aliases of the compiler's, which only name their package once unaliased.
-	subject = types.Unalias(subject)
-	if seen[subject] {
+	unaliased := types.Unalias(subject)
+	if seen[unaliased] {
 		return ""
 	}
-	seen[subject] = true
-	if named, ok := subject.(*types.Named); ok && named.Obj().Pkg() != nil &&
+	seen[unaliased] = true
+	if named, ok := unaliased.(*types.Named); ok && named.Obj().Pkg() != nil &&
 		strings.Contains(named.Obj().Pkg().Path(), "TypeScript/tsc") {
-		return types.TypeString(subject, nil)
+		return types.TypeString(unaliased, nil)
 	}
-	switch typed := subject.Underlying().(type) {
+	switch typed := unaliased.Underlying().(type) {
 	case *types.Pointer:
 		return carriesCompilerValue(typed.Elem(), seen)
 	case *types.Slice:
@@ -193,7 +195,7 @@ func carriesCompilerValue(subject types.Type, seen map[types.Type]bool) string {
 		}
 	case *types.Signature, *types.Interface:
 		// A function or an interface value can close over anything.
-		return types.TypeString(subject, nil)
+		return types.TypeString(unaliased, nil)
 	}
 	return ""
 }
@@ -249,19 +251,20 @@ func isDeclarationSource(subject types.Type) bool {
 // rule's variable can carry the alias rather than the named type, and a check that missed it went blind
 // to every such read.
 func isCompilerType(subject types.Type, packageName string, typeName string) bool {
+	current := subject
 	for {
-		subject = types.Unalias(subject)
-		if pointer, ok := subject.(*types.Pointer); ok {
-			subject = pointer.Elem()
+		current = types.Unalias(current)
+		if pointer, ok := current.(*types.Pointer); ok {
+			current = pointer.Elem()
 			continue
 		}
-		if slice, ok := subject.(*types.Slice); ok {
-			subject = slice.Elem()
+		if slice, ok := current.(*types.Slice); ok {
+			current = slice.Elem()
 			continue
 		}
 		break
 	}
-	named, ok := subject.(*types.Named)
+	named, ok := current.(*types.Named)
 	if !ok || named.Obj().Pkg() == nil {
 		return false
 	}
@@ -361,8 +364,7 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 	) func(ast.Node, *types.Info) bool {
 		memo := map[types.Object]int{} // 1 visiting, 2 no, 3 yes
 		var walk func(ast.Node, *types.Info) bool
-		var follow func(types.Object) bool
-		follow = func(object types.Object) bool {
+		follow := func(object types.Object) bool {
 			switch memo[object] {
 			case 1, 2:
 				return false
@@ -516,8 +518,11 @@ func ruleLiteralTypeReach(file *ast.File) (string, bool) {
 			}
 			switch key.Name {
 			case "Name":
-				if value, ok := pair.Value.(*ast.BasicLit); ok {
-					name, _ = strconv.Unquote(value.Value)
+				// A Name that is not a string literal names nothing, and the scan goes on as if it were unset.
+				if nameLiteral, ok := pair.Value.(*ast.BasicLit); ok {
+					if unquoted, unquoteError := strconv.Unquote(nameLiteral.Value); unquoteError == nil {
+						name = unquoted
+					}
 				}
 			case "TypeReach":
 				if value, ok := pair.Value.(*ast.SelectorExpr); ok && value.Sel.Name == "TypeReachShapes" {

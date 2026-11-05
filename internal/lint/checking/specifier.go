@@ -126,9 +126,8 @@ func typeDeclaredInDeclarationFile(
 	// 	typesPackageName = packageName[1:slashIndex] + "__" + packageName[slashIndex+1:]
 	// }
 
-	// TODO(port): there is no sourceFileToPackageName anymore
-	// it looks like there is no other way to know sourceFile2PackageName,
-	// other than set package name for ast.SourceFile in resolver
+	// tsgo keeps no map from a source file to the package it came from, so a declaration file cannot be
+	// traced to its package here, and the answer is no.
 
 	return false
 
@@ -239,6 +238,8 @@ func wholeTypeMatchesSpecifier(
 	case TypeOrValueSpecifierFromPackage:
 		return typeDeclaredInPackageDeclarationFile(specifier.Package, declarations, declarationFiles, program)
 	default:
+		// Invariant: every specifier is built by a rule that maps its option's `from` to one of the three
+		// constants above, and the zero value is the first of them.
 		panic(fmt.Sprintf("unknown type specifier from: %v", specifier.From))
 	}
 }

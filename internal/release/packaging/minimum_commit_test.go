@@ -100,7 +100,7 @@ func TestReleaseRefusesWhenGitCannotTell(test *testing.T) {
 	if requireAncestorError == nil {
 		test.Fatal("a minimum git could not find was treated as present")
 	}
-	if !strings.Contains(requireAncestorError.Error(), "could not tell") {
+	if !strings.Contains(requireAncestorError.Error(), "cannot tell") {
 		test.Fatalf("an undecidable check was reported as a plain refusal: %v", requireAncestorError)
 	}
 }

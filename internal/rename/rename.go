@@ -176,7 +176,8 @@ func ParsePosition(argument string) (Position, bool) {
 	if secondColon <= 0 {
 		return Position{}, false
 	}
-	var line, column int
+	var line int
+	var column int
 	if _, scanError := fmt.Sscanf(argument[secondColon+1:lastColon], "%d", &line); scanError != nil {
 		return Position{}, false
 	}
@@ -187,6 +188,24 @@ func ParsePosition(argument string) (Position, bool) {
 		return Position{}, false
 	}
 	return Position{FileName: argument[:secondColon], Line: line, Column: column}, true
+}
+
+// reservedWords are the names that cannot be a binding, so renaming to one produces source that
+// does not parse or that parses as something else entirely.
+//
+// The strict-mode reserved words are included because our tree is modules, which are strict by
+// construction. Contextual keywords like `type` and `as` are deliberately absent: they are legal
+// identifiers and refusing them would be a false refusal.
+var reservedWords = map[string]bool{
+	"break": true, "case": true, "catch": true, "class": true, "const": true,
+	"continue": true, "debugger": true, "default": true, "delete": true, "do": true,
+	"else": true, "enum": true, "export": true, "extends": true, "false": true,
+	"finally": true, "for": true, "function": true, "if": true, "import": true,
+	"in": true, "instanceof": true, "new": true, "null": true, "return": true,
+	"super": true, "switch": true, "this": true, "throw": true, "true": true,
+	"try": true, "typeof": true, "var": true, "void": true, "while": true,
+	"with": true, "implements": true, "interface": true, "let": true, "package": true,
+	"private": true, "protected": true, "public": true, "static": true, "yield": true,
 }
 
 // IsValidIdentifier reports whether a name can be written as a plain identifier.
@@ -217,22 +236,4 @@ func IsValidIdentifier(name string) bool {
 		}
 	}
 	return !reservedWords[name]
-}
-
-// reservedWords are the names that cannot be a binding, so renaming to one produces source that
-// does not parse or that parses as something else entirely.
-//
-// The strict-mode reserved words are included because our tree is modules, which are strict by
-// construction. Contextual keywords like `type` and `as` are deliberately absent: they are legal
-// identifiers and refusing them would be a false refusal.
-var reservedWords = map[string]bool{
-	"break": true, "case": true, "catch": true, "class": true, "const": true,
-	"continue": true, "debugger": true, "default": true, "delete": true, "do": true,
-	"else": true, "enum": true, "export": true, "extends": true, "false": true,
-	"finally": true, "for": true, "function": true, "if": true, "import": true,
-	"in": true, "instanceof": true, "new": true, "null": true, "return": true,
-	"super": true, "switch": true, "this": true, "throw": true, "true": true,
-	"try": true, "typeof": true, "var": true, "void": true, "while": true,
-	"with": true, "implements": true, "interface": true, "let": true, "package": true,
-	"private": true, "protected": true, "public": true, "static": true, "yield": true,
 }

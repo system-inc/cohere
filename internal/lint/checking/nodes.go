@@ -72,14 +72,15 @@ func TypeRecurser(subjectType *checker.Type, predicate func(subjectType *checker
 			}
 		}
 		return false
-	} else {
-		return predicate(subjectType)
 	}
+	return predicate(subjectType)
 }
 
 // SUPER DIRTY HACK FOR OPTIONAL FIELDS :(
 func Ref[T any](value T) *T {
-	return &value
+	// A copy of its own, so the pointer handed out reaches nothing the caller passed.
+	copied := value
+	return &copied
 }
 
 func GetNumberIndexType(typeChecker *checker.Checker, subjectType *checker.Type) *checker.Type {
@@ -182,7 +183,8 @@ func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier 
 	})
 }
 
-// Source: https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
+// Source:
+// https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
 func IsStrWhiteSpace(character rune) bool {
 	// This is different than stringutil.IsWhiteSpaceLike.
 

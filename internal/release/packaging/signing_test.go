@@ -62,6 +62,32 @@ func TestVerifySignatureRefusesAnAdHocSignature(test *testing.T) {
 	}
 }
 
+// An announcement that cannot be written stops the notarization before anything goes to Apple, as a release's
+// other prints stop it. The binary is archived first, so this runs ditto, and the progress is a closed file.
+func TestNotarizeStopsWhenItsProgressCannotBeWritten(test *testing.T) {
+	test.Parallel()
+	if runtime.GOOS != "darwin" {
+		test.Skip("ditto, which archives the binary for the notary service, exists only on macOS")
+	}
+
+	binaryPath := filepath.Join(test.TempDir(), "cohere")
+	if writeError := os.WriteFile(binaryPath, []byte("a binary\n"), 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	progress, createError := os.Create(filepath.Join(test.TempDir(), "progress"))
+	if createError != nil {
+		test.Fatal(createError)
+	}
+	if closeError := progress.Close(); closeError != nil {
+		test.Fatal(closeError)
+	}
+	signing := Signing{Identity: "Developer ID Application: Nobody", KeychainProfile: "cohere-test-no-such-profile"}
+	notarizeError := Notarize(binaryPath, signing, progress)
+	if notarizeError == nil || !strings.Contains(notarizeError.Error(), "announcing the notarization") {
+		test.Fatalf("a notarization whose progress could not be written went on: %v", notarizeError)
+	}
+}
+
 // The verdict is read from notarytool's JSON, never from its exit code, so these hold the reading to
 // Apple's own shape: an Accepted answer, an Invalid one, and output that carries no status at all.
 

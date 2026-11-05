@@ -94,6 +94,8 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	// Built to a temporary name and renamed only once proven, so a concurrent run never execs a binary
 	// that failed its proof.
 	temporary := binaryPath + fmt.Sprintf(".partial-%d", os.Getpid())
+	// Ignored: after the rename the name is gone and this fails by design, and a partial file left behind on a
+	// failure path is removed by the prune once its writer has been gone for the hour.
 	defer os.Remove(temporary)
 
 	if buildSwiftProductError := buildSwiftProduct(
@@ -190,6 +192,8 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 			_, writeError := temporary.WriteString(strings.Join(objects, "\n") + "\n")
 			closeError := temporary.Close()
 			if writeError != nil || closeError != nil || os.Rename(temporary.Name(), kept) != nil {
+				// Ignored: keeping the answer only saves a git call, and a temporary that outlives this is a few
+				// bytes under a name nothing reads.
 				os.Remove(temporary.Name())
 			}
 		}

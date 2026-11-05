@@ -50,19 +50,20 @@ func EliminateRedundantPhis[G Graph[F, B, P], F any, B comparable, P any](graph 
 		// end before rewriting. The chain is acyclic because a phi only collapses to a value that
 		// is not itself.
 		resolve := func(id IdentifierId) IdentifierId {
+			current := id
 			seen := 0
 			for {
-				next, ok := rewrites[id]
+				next, ok := rewrites[current]
 				if !ok {
-					return id
+					return current
 				}
-				id = next
+				current = next
 				seen++
 				if seen > len(rewrites) {
 					// Defensive: a cycle cannot arise from the redundancy test above, but a caller
 					// that hand-built phis could create one, and looping forever is the worst
 					// possible response.
-					return id
+					return current
 				}
 			}
 		}

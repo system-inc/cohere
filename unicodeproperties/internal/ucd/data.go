@@ -53,10 +53,14 @@ func span(text string) Range {
 	}
 	a, parseError := strconv.ParseInt(lo, 16, 32)
 	if parseError != nil {
+		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
+		// time, whose code points are all hex within 32 bits.
 		panic(parseError)
 	}
 	b, parseError := strconv.ParseInt(hi, 16, 32)
 	if parseError != nil {
+		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
+		// time, whose code points are all hex within 32 bits.
 		panic(parseError)
 	}
 	return Range{rune(a), rune(b)}
@@ -100,9 +104,12 @@ func Build() (Tables, error) {
 			return Tables{}, openError
 		}
 		content, readError := io.ReadAll(reader)
-		reader.Close()
+		closeError := reader.Close()
 		if readError != nil {
 			return Tables{}, readError
+		}
+		if closeError != nil {
+			return Tables{}, fmt.Errorf("closing %s: %w", file.Name, closeError)
 		}
 		files[file.Name] = content
 	}

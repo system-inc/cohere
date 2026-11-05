@@ -18,7 +18,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 )
@@ -72,16 +71,25 @@ func (changes SetChanges) Empty() bool {
 
 // severity ranks a rule entry's severity: 0 off, 1 warn, 2 error, the way ESLint does, from a string, a
 // number, or the first element of a list.
-func severity(entry any) (int, error) {
-	if list, ok := entry.([]any); ok {
+func severity(entry json.RawMessage) (int, error) {
+	severityJson := entry
+	if kindOf(entry) == '[' {
+		var list []json.RawMessage
+		if decodeError := json.Unmarshal(entry, &list); decodeError != nil {
+			return 0, decodeError
+		}
 		if len(list) == 0 {
 			return 0, fmt.Errorf("an empty rule entry")
 		}
-		entry = list[0]
+		severityJson = list[0]
 	}
-	switch value := entry.(type) {
-	case string:
-		switch value {
+	switch kindOf(severityJson) {
+	case '"':
+		var name string
+		if decodeError := json.Unmarshal(severityJson, &name); decodeError != nil {
+			return 0, decodeError
+		}
+		switch name {
 		case "off":
 			return 0, nil
 		case "warn":
@@ -89,20 +97,135 @@ func severity(entry any) (int, error) {
 		case "error":
 			return 2, nil
 		}
-	case float64:
-		if value == 0 || value == 1 || value == 2 {
-			return int(value), nil
+	case '0':
+		var level float64
+		if decodeError := json.Unmarshal(severityJson, &level); decodeError != nil {
+			return 0, decodeError
+		}
+		if level == 0 || level == 1 || level == 2 {
+			return int(level), nil
 		}
 	}
-	return 0, fmt.Errorf("%v is not a severity", entry)
+	return 0, fmt.Errorf("%s is not a severity", bytes.TrimSpace(severityJson))
 }
 
 // options is a rule entry's options, everything after its severity.
-func options(entry any) []any {
-	if list, ok := entry.([]any); ok && len(list) > 1 {
-		return list[1:]
+func options(entry json.RawMessage) ([]json.RawMessage, error) {
+	if kindOf(entry) != '[' {
+		return nil, nil
 	}
-	return nil
+	var list []json.RawMessage
+	if decodeError := json.Unmarshal(entry, &list); decodeError != nil {
+		return nil, decodeError
+	}
+	if len(list) > 1 {
+		return list[1:], nil
+	}
+	return nil, nil
+}
+
+// sameOptions is whether two rule entries carry the same options.
+func sameOptions(before json.RawMessage, after json.RawMessage) (bool, error) {
+	optionsBefore, beforeError := options(before)
+	if beforeError != nil {
+		return false, beforeError
+	}
+	optionsAfter, afterError := options(after)
+	if afterError != nil {
+		return false, afterError
+	}
+	return sameElements(optionsBefore, optionsAfter)
+}
+
+// kindOf is the kind of JSON value raw holds, by its first byte: '{', '[', '"', 't', 'f' or 'n', and '0' for every
+// number. An absent value reads as null, as a missing key reads from a decoded map.
+func kindOf(raw json.RawMessage) byte {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return 'n'
+	}
+	if trimmed[0] == '-' || (trimmed[0] >= '0' && trimmed[0] <= '9') {
+		return '0'
+	}
+	return trimmed[0]
+}
+
+// sameJson is whether left and right decode to the same value, as reflect.DeepEqual compares decoded JSON: objects
+// by their members in any order, arrays element by element, strings by their text, numbers by their value, and an
+// absent value as null.
+func sameJson(left json.RawMessage, right json.RawMessage) (bool, error) {
+	kind := kindOf(left)
+	if kind != kindOf(right) {
+		return false, nil
+	}
+	switch kind {
+	case '{':
+		leftMembers, rightMembers, decodeError := decodeBoth[map[string]json.RawMessage](left, right)
+		if decodeError != nil || len(leftMembers) != len(rightMembers) {
+			return false, decodeError
+		}
+		for key, leftMember := range leftMembers {
+			rightMember, present := rightMembers[key]
+			if !present {
+				return false, nil
+			}
+			if same, sameError := sameJson(leftMember, rightMember); sameError != nil || !same {
+				return false, sameError
+			}
+		}
+		return true, nil
+	case '[':
+		leftElements, rightElements, decodeError := decodeBoth[[]json.RawMessage](left, right)
+		if decodeError != nil {
+			return false, decodeError
+		}
+		return sameElements(leftElements, rightElements)
+	case '"':
+		leftText, rightText, decodeError := decodeBoth[string](left, right)
+		return decodeError == nil && leftText == rightText, decodeError
+	case '0':
+		leftNumber, rightNumber, decodeError := decodeBoth[float64](left, right)
+		return decodeError == nil && leftNumber == rightNumber, decodeError
+	}
+	// true, false and null are each the only value of their kind.
+	return true, nil
+}
+
+// sameElements is whether two lists hold the same values in the same order.
+func sameElements(left []json.RawMessage, right []json.RawMessage) (bool, error) {
+	if len(left) != len(right) {
+		return false, nil
+	}
+	for index := range left {
+		if same, sameError := sameJson(left[index], right[index]); sameError != nil || !same {
+			return false, sameError
+		}
+	}
+	return true, nil
+}
+
+// decodeBoth decodes two values of one kind into the type that kind decodes to.
+func decodeBoth[Value any](left json.RawMessage, right json.RawMessage) (Value, Value, error) {
+	var leftValue Value
+	var rightValue Value
+	if decodeError := json.Unmarshal(left, &leftValue); decodeError != nil {
+		return leftValue, rightValue, decodeError
+	}
+	decodeError := json.Unmarshal(right, &rightValue)
+	return leftValue, rightValue, decodeError
+}
+
+// membersOf is a JSON object's members, or none when raw holds another kind, as a type assertion to a map reads
+// a decoded value that is no object.
+func membersOf(raw json.RawMessage) (map[string]json.RawMessage, error) {
+	if kindOf(raw) != '{' {
+		return nil, nil
+	}
+	members := map[string]json.RawMessage{}
+	if decodeError := json.Unmarshal(raw, &members); decodeError != nil {
+		return nil, decodeError
+	}
+	return members, nil
 }
 
 var severityNames = []string{"off", "warn", "error"}
@@ -119,13 +242,19 @@ func DiffSet(before []byte, after []byte) (SetChanges, error) {
 		return SetChanges{}, fmt.Errorf("reading the set after: %w", decodeSetError)
 	}
 
-	oldRules, _ := old["rules"].(map[string]any)
-	newRules, _ := updated["rules"].(map[string]any)
+	oldRules, oldRulesError := membersOf(old["rules"])
+	if oldRulesError != nil {
+		return SetChanges{}, fmt.Errorf("reading the rules before: %w", oldRulesError)
+	}
+	newRules, newRulesError := membersOf(updated["rules"])
+	if newRulesError != nil {
+		return SetChanges{}, fmt.Errorf("reading the rules after: %w", newRulesError)
+	}
 	for _, name := range slices.Sorted(maps.Keys(unionKeys(oldRules, newRules))) {
 		was, wasError := severityOf(oldRules, name)
 		now, nowError := severityOf(newRules, name)
 		if wasError != nil || nowError != nil {
-			return SetChanges{}, fmt.Errorf("rule %s: %v", name, firstError(wasError, nowError))
+			return SetChanges{}, fmt.Errorf("rule %s: %w", name, firstError(wasError, nowError))
 		}
 		switch {
 		case was == 0 && now > 0:
@@ -140,8 +269,14 @@ func DiffSet(before []byte, after []byte) (SetChanges, error) {
 			if now > was {
 				changes.Bump = Minor
 			}
-		case now > 0 && !reflect.DeepEqual(options(oldRules[name]), options(newRules[name])):
-			changes.Options = append(changes.Options, name)
+		case now > 0:
+			same, sameError := sameOptions(oldRules[name], newRules[name])
+			if sameError != nil {
+				return SetChanges{}, fmt.Errorf("rule %s: %w", name, sameError)
+			}
+			if !same {
+				changes.Options = append(changes.Options, name)
+			}
 		}
 	}
 	if len(changes.TurnedOn) > 0 || len(changes.Options) > 0 {
@@ -151,7 +286,11 @@ func DiffSet(before []byte, after []byte) (SetChanges, error) {
 	delete(old, "rules")
 	delete(updated, "rules")
 	for _, key := range slices.Sorted(maps.Keys(unionKeys(old, updated))) {
-		if !reflect.DeepEqual(old[key], updated[key]) {
+		same, sameError := sameJson(old[key], updated[key])
+		if sameError != nil {
+			return SetChanges{}, fmt.Errorf("setting %s: %w", key, sameError)
+		}
+		if !same {
 			changes.Settings = append(changes.Settings, key)
 		}
 	}
@@ -166,8 +305,9 @@ func DiffSet(before []byte, after []byte) (SetChanges, error) {
 	return changes, nil
 }
 
-func decodeSet(text []byte) (map[string]any, error) {
-	decoded := map[string]any{}
+// decodeSet reads a set's keys, each value kept as written for the comparisons that read it.
+func decodeSet(text []byte) (map[string]json.RawMessage, error) {
+	decoded := map[string]json.RawMessage{}
 	if text == nil {
 		return decoded, nil
 	}
@@ -177,7 +317,7 @@ func decodeSet(text []byte) (map[string]any, error) {
 	return decoded, nil
 }
 
-func severityOf(rules map[string]any, name string) (int, error) {
+func severityOf(rules map[string]json.RawMessage, name string) (int, error) {
 	entry, present := rules[name]
 	if !present {
 		return 0, nil
@@ -185,7 +325,7 @@ func severityOf(rules map[string]any, name string) (int, error) {
 	return severity(entry)
 }
 
-func unionKeys(left map[string]any, right map[string]any) map[string]bool {
+func unionKeys[Value any](left map[string]Value, right map[string]Value) map[string]bool {
 	keys := map[string]bool{}
 	for key := range left {
 		keys[key] = true
@@ -245,7 +385,10 @@ func SetsAt(moduleDirectory string, reference string) (map[string][]byte, error)
 			if readError != nil {
 				return readError
 			}
-			relative, _ := filepath.Rel(root, path)
+			relative, relativeError := filepath.Rel(root, path)
+			if relativeError != nil {
+				return relativeError
+			}
 			sets[strings.TrimSuffix(filepath.ToSlash(relative), ".json")] = contents
 			return nil
 		})
@@ -287,15 +430,22 @@ func git(directory string, arguments ...string) ([]byte, error) {
 
 // Render writes a release's section: its heading, then one subsection per set that changed, in name
 // order, with every change named. The section for the first release, which has nothing to compare
-// with, lists each set and how many rules it turns on.
-func Render(version string, date string, changed map[string]SetChanges, first map[string][]byte) string {
+// with, lists each set and how many rules it turns on, and refuses a set it cannot read, since nothing
+// read those sets before.
+func Render(version string, date string, changed map[string]SetChanges, first map[string][]byte) (string, error) {
 	var section strings.Builder
 	fmt.Fprintf(&section, "## %s (%s)\n\n", version, date)
 	if first != nil {
 		section.WriteString("The first release. It carries these rule sets:\n\n")
 		for _, name := range slices.Sorted(maps.Keys(first)) {
-			decoded, _ := decodeSet(first[name])
-			rules, _ := decoded["rules"].(map[string]any)
+			decoded, decodeError := decodeSet(first[name])
+			if decodeError != nil {
+				return "", fmt.Errorf("cohere:%s: %w", name, decodeError)
+			}
+			rules, rulesError := membersOf(decoded["rules"])
+			if rulesError != nil {
+				return "", fmt.Errorf("cohere:%s: reading the rules: %w", name, rulesError)
+			}
 			on := 0
 			for ruleName := range rules {
 				if level, severityOfError := severityOf(rules, ruleName); severityOfError == nil && level > 0 {
@@ -304,11 +454,11 @@ func Render(version string, date string, changed map[string]SetChanges, first ma
 			}
 			fmt.Fprintf(&section, "- `cohere:%s`, %d rules on\n", name, on)
 		}
-		return section.String()
+		return section.String(), nil
 	}
 	if len(changed) == 0 {
 		section.WriteString("No rule set changed.\n")
-		return section.String()
+		return section.String(), nil
 	}
 	for _, name := range slices.Sorted(maps.Keys(changed)) {
 		changes := changed[name]
@@ -331,7 +481,7 @@ func Render(version string, date string, changed map[string]SetChanges, first ma
 		list("Setting changed:", changes.Settings)
 		section.WriteString("\n")
 	}
-	return strings.TrimRight(section.String(), "\n") + "\n"
+	return strings.TrimRight(section.String(), "\n") + "\n", nil
 }
 
 // RequireBump refuses a version that moves less than the change allows. Versions are compared as plain

@@ -65,7 +65,11 @@ func TestTheMatcherAgreesWithGitOnRealTrees(test *testing.T) {
 // tree holds. COHERE_GITIGNORE_GENERATED is how many trees, COHERE_GITIGNORE_SEED fixes the sequence.
 func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
 	test.Parallel()
-	count, _ := strconv.Atoi(os.Getenv("COHERE_GITIGNORE_GENERATED"))
+	generated := os.Getenv("COHERE_GITIGNORE_GENERATED")
+	count, countError := strconv.Atoi(generated)
+	if countError != nil && generated != "" {
+		test.Fatalf("COHERE_GITIGNORE_GENERATED is %q, which is not a count of trees: %v", generated, countError)
+	}
 	if count <= 0 {
 		test.Skip("COHERE_GITIGNORE_GENERATED asks for no generated trees")
 	}
@@ -157,6 +161,7 @@ func newOracle(test *testing.T) *oracle {
 	// network connection both fail, and a write inside succeeds.
 	outside := filepath.Join(os.Getenv("HOME"), fmt.Sprintf(".cohere-sandbox-probe-%d", os.Getpid()))
 	if runError := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/touch", outside).Run(); runError == nil {
+		// Ignored: the test fails on the next line whatever the remove does, and the probe is named for its pid.
 		_ = os.Remove(outside)
 		test.Fatal("the sandbox let a write outside its scratch directory through")
 	}
@@ -398,6 +403,7 @@ func writeTreeTolerant(test *testing.T, root string, files map[string]string) {
 	for _, name := range keys {
 		full := filepath.Join(root, filepath.FromSlash(name))
 		if strings.HasSuffix(name, "/") {
+			// Ignored: a file that already took this name keeps it, the tolerance this writer exists for.
 			_ = os.MkdirAll(full, 0o755)
 			continue
 		}

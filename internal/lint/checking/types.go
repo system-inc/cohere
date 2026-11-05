@@ -197,16 +197,19 @@ func IsCallback(
 	return false
 }
 
-// TODO(note): why there is no IntersectionTypeParts
+// IsThenableType splits only a union into its parts, as tsutils' isThenableType does, so an intersection is
+// read whole, through its apparent type.
 func IsThenableType(
 	typeChecker *checker.Checker,
 	node *ast.Node,
 	subjectType *checker.Type,
 ) bool {
-	if subjectType == nil {
-		subjectType = typeChecker.GetTypeAtLocation(node)
+	// The type passed in, or the node's own when none was.
+	thenableType := subjectType
+	if thenableType == nil {
+		thenableType = typeChecker.GetTypeAtLocation(node)
 	}
-	for typePart := range UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, subjectType)) {
+	for typePart := range UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, thenableType)) {
 		then := checker.Checker_getPropertyOfType(typeChecker, typePart, "then")
 		if then == nil {
 			continue

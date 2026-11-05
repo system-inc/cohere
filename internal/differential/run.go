@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -73,7 +74,13 @@ type RunOptions struct {
 	// implementation. So the asymmetry is confined to rules the gate cannot express at all, where
 	// there is no shared setting to diverge from, and every finding it produces is classified
 	// not-ported rather than counted against agreement.
-	ExtraCohereRuleSettings map[string]any
+	//
+	// Each setting is the rule's JSON as the config file would hold it, carried through unread.
+	ExtraCohereRuleSettings map[string]json.RawMessage
+	// Diagnostics is where cleanup says what it could not undo: a planted control or an extended
+	// config it failed to remove, or a directory it left because something else landed in it. Nil
+	// discards them.
+	Diagnostics io.Writer
 }
 
 // Control is a violation planted where the harness knows in advance what should happen to it.
@@ -363,13 +370,16 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 	// `git status` as an unexplained empty directory. An earlier run of this harness did precisely
 	// that and the leftover was found by someone else.
 	createdDirectories := make([]string, 0, len(options.Controls))
+	diagnostics := diagnosticsOf(options)
 
 	cleanup := func() {
 		for _, path := range written {
 			// A control left behind would be linted by the next person to run either gate, so a
 			// failure to remove one is worth saying out loud rather than swallowing.
 			if removeError := os.Remove(path); removeError != nil && !os.IsNotExist(removeError) {
-				fmt.Fprintf(os.Stderr, "differential: could not remove planted control %s: %v\n", path, removeError)
+				// Ignored: the diagnostics writer is the only place cleanup can say this, so a note
+				// that fails to land has nowhere left to go.
+				fmt.Fprintf(diagnostics, "differential: could not remove planted control %s: %v\n", path, removeError)
 			}
 		}
 		// Deepest first, and only the ones this plant created. Remove refuses on a non-empty
@@ -377,8 +387,10 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 		// gates ran, it stays and so does the directory.
 		for index := len(createdDirectories) - 1; index >= 0; index-- {
 			if removeError := os.Remove(createdDirectories[index]); removeError != nil && !os.IsNotExist(removeError) {
+				// Ignored: the diagnostics writer is the only place cleanup can say this, so a note
+				// that fails to land has nowhere left to go.
 				fmt.Fprintf(
-					os.Stderr,
+					diagnostics,
 					"differential: left the directory %s in place: %v\n",
 					createdDirectories[index],
 					removeError,
@@ -419,6 +431,14 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 	}
 
 	return planted, cleanup, nil
+}
+
+// diagnosticsOf is where a run's cleanup writes what it could not undo.
+func diagnosticsOf(options RunOptions) io.Writer {
+	if options.Diagnostics == nil {
+		return io.Discard
+	}
+	return options.Diagnostics
 }
 
 // runGate executes one side and returns its stdout.
@@ -462,6 +482,9 @@ func runGate(callerContext context.Context, command GateCommand) (string, error)
 	return string(output), nil
 }
 
+// maximumStderrLines is how much of a failed gate's stderr reaches the error message.
+const maximumStderrLines = 5
+
 // stderrTail renders a failed gate's stderr for an error message, or nothing when it stayed quiet.
 //
 // Trimmed to the last few lines because a crashing linter can emit a great deal, and the part that
@@ -479,9 +502,6 @@ func stderrTail(text string) string {
 	}
 	return "; its stderr ended with: " + strings.Join(lines, " | ")
 }
-
-// maximumStderrLines is how much of a failed gate's stderr reaches the error message.
-const maximumStderrLines = 5
 
 // cohereCoverageLinePattern reads the population out of cohere's own coverage line:
 //
@@ -506,8 +526,13 @@ func cohereCoverageFrom(summaryLines []string) (int, int) {
 		if match == nil {
 			continue
 		}
-		rulesRun, _ := strconv.Atoi(match[1])
-		filesWalked, _ := strconv.Atoi(match[2])
+		// The pattern takes only digits, so a count fails to read only past an int's range. Such a line
+		// reads as no line at all, which leaves the zeros the vacuity guard refuses.
+		rulesRun, rulesError := strconv.Atoi(match[1])
+		filesWalked, filesError := strconv.Atoi(match[2])
+		if rulesError != nil || filesError != nil {
+			continue
+		}
 		return filesWalked, rulesRun
 	}
 	return 0, 0
@@ -561,7 +586,7 @@ func missingDirectories(directory string, root string) ([]string, error) {
 // With no extra rules this returns the command untouched, so the ordinary path allocates nothing
 // and writes nothing.
 func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error) {
-	noCleanup := func() {}
+	noCleanup := func() { /* The ordinary path wrote nothing, so there is nothing to remove. */ }
 	if len(options.ExtraCohereRuleSettings) == 0 {
 		return options.Cohere, noCleanup, nil
 	}
@@ -577,14 +602,24 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 		return options.Cohere, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", readError)
 	}
 
-	var document map[string]any
+	// Held as raw JSON, so every key but the rules, and every rule's setting, is written back as it was read.
+	var document map[string]json.RawMessage
 	if decodeError := json.Unmarshal(existing, &document); decodeError != nil {
 		return options.Cohere, noCleanup, fmt.Errorf("parsing the lint config to extend it: %w", decodeError)
 	}
 
-	rules, _ := document["rules"].(map[string]any)
-	if rules == nil {
-		rules = map[string]any{}
+	rules := map[string]json.RawMessage{}
+	if rulesJson, found := document["rules"]; found {
+		if decodeError := json.Unmarshal(rulesJson, &rules); decodeError != nil {
+			return options.Cohere, noCleanup, fmt.Errorf(
+				"parsing the lint config's rules to extend them: %w",
+				decodeError,
+			)
+		}
+		// A rules key of null decodes to a nil map, which takes no rule.
+		if rules == nil {
+			rules = map[string]json.RawMessage{}
+		}
 	}
 	for name, setting := range options.ExtraCohereRuleSettings {
 		// Refusing rather than overwriting. A rule the shared config already configures is one the
@@ -598,7 +633,11 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 		}
 		rules[name] = setting
 	}
-	document["rules"] = rules
+	rulesJson, encodeError := json.Marshal(rules)
+	if encodeError != nil {
+		return options.Cohere, noCleanup, fmt.Errorf("encoding the extended lint config's rules: %w", encodeError)
+	}
+	document["rules"] = rulesJson
 
 	extended, encodeError := json.Marshal(document)
 	if encodeError != nil {
@@ -619,9 +658,12 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 		return options.Cohere, noCleanup, fmt.Errorf("writing the extended lint config: %w", writeError)
 	}
 
+	diagnostics := diagnosticsOf(options)
 	cleanup := func() {
 		if removeError := os.Remove(extendedPath); removeError != nil && !os.IsNotExist(removeError) {
-			fmt.Fprintf(os.Stderr, "differential: could not remove %s: %v\n", extendedPath, removeError)
+			// Ignored: the diagnostics writer is the only place cleanup can say this, so a note that
+			// fails to land has nowhere left to go.
+			fmt.Fprintf(diagnostics, "differential: could not remove %s: %v\n", extendedPath, removeError)
 		}
 	}
 

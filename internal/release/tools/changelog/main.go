@@ -21,6 +21,7 @@ import (
 
 func main() {
 	if runError := run(); runError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "changelog:", runError)
 		os.Exit(1)
 	}
@@ -43,8 +44,12 @@ func run() error {
 		return setsAtError
 	}
 	if *previous == "" {
-		fmt.Print(changelog.Render(*version, *date, nil, after))
-		return nil
+		section, renderError := changelog.Render(*version, *date, nil, after)
+		if renderError != nil {
+			return renderError
+		}
+		_, printError := fmt.Print(section)
+		return printError
 	}
 
 	if *from == "" {
@@ -61,6 +66,10 @@ func run() error {
 	if requireBumpError := changelog.RequireBump(*previous, *version, bump); requireBumpError != nil {
 		return requireBumpError
 	}
-	fmt.Print(changelog.Render(*version, *date, changed, nil))
-	return nil
+	section, renderError := changelog.Render(*version, *date, changed, nil)
+	if renderError != nil {
+		return renderError
+	}
+	_, printError := fmt.Print(section)
+	return printError
 }

@@ -187,7 +187,8 @@ func TestTheCompilerRepositoryIsReadFromTheCommittedGitmodules(test *testing.T) 
 			"system-inc/TypeScript"},
 		{
 			"over https, quoted",
-			"[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
+			"[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n" +
+				"\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
 			"system-inc/TypeScript",
 		},
 		{

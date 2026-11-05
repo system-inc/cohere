@@ -17,18 +17,25 @@ import (
 
 func main() {
 	if len(os.Args) != 2 {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintln(os.Stderr, "usage: runoutput <log>")
 		os.Exit(2)
 	}
 	output, readError := os.ReadFile(os.Args[1])
 	if readError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintf(os.Stderr, "runoutput: %v\n", readError)
 		os.Exit(1)
 	}
 	run, parseRunOutputError := benchresults.ParseRunOutput(output)
 	if parseRunOutputError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintf(os.Stderr, "runoutput: %s: %v\n", os.Args[1], parseRunOutputError)
 		os.Exit(1)
 	}
-	fmt.Printf("%.3f\t%d\t%s\n", run.EngineSeconds, run.Findings, run.Cache)
+	if _, printError := fmt.Printf("%.3f\t%d\t%s\n", run.EngineSeconds, run.Findings, run.Cache); printError != nil {
+		// Ignored: the exit code below says the columns never arrived even when standard error cannot.
+		fmt.Fprintf(os.Stderr, "runoutput: printing the columns: %v\n", printError)
+		os.Exit(1)
+	}
 }

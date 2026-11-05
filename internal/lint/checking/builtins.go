@@ -109,9 +109,9 @@ func IsReadonlyTypeLike(
 type builtinPredicateMatches uint8
 
 const (
-	builtinPredicateMatches_Unknown builtinPredicateMatches = iota
-	builtinPredicateMatches_False
-	builtinPredicateMatches_True
+	builtinPredicateMatchesUnknown builtinPredicateMatches = iota
+	builtinPredicateMatchesFalse
+	builtinPredicateMatchesTrue
 )
 
 func IsBuiltinTypeAliasLike(
@@ -125,14 +125,14 @@ func IsBuiltinTypeAliasLike(
 	) builtinPredicateMatches {
 		aliasSymbol := checker.Type_alias(subtype)
 		if aliasSymbol == nil || len(aliasSymbol.TypeArguments()) == 0 {
-			return builtinPredicateMatches_False
+			return builtinPredicateMatchesFalse
 		}
 
 		if rule.IsSymbolFromDefaultLibrary(program, aliasSymbol.Symbol()) && predicate(subtype) {
-			return builtinPredicateMatches_True
+			return builtinPredicateMatchesTrue
 		}
 
-		return builtinPredicateMatches_Unknown
+		return builtinPredicateMatchesUnknown
 	})
 }
 
@@ -147,17 +147,17 @@ func IsBuiltinSymbolLike(
 	) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
-			return builtinPredicateMatches_False
+			return builtinPredicateMatchesFalse
 		}
 
 		actualSymbolName := symbol.Name
 
 		if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) &&
 			rule.IsSymbolFromDefaultLibrary(program, symbol) {
-			return builtinPredicateMatches_True
+			return builtinPredicateMatchesTrue
 		}
 
-		return builtinPredicateMatches_Unknown
+		return builtinPredicateMatchesUnknown
 	})
 }
 
@@ -171,14 +171,14 @@ func IsAnyBuiltinSymbolLike(
 	) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
-			return builtinPredicateMatches_False
+			return builtinPredicateMatchesFalse
 		}
 
 		if rule.IsSymbolFromDefaultLibrary(program, symbol) {
-			return builtinPredicateMatches_True
+			return builtinPredicateMatchesTrue
 		}
 
-		return builtinPredicateMatches_Unknown
+		return builtinPredicateMatchesUnknown
 	})
 }
 
@@ -209,9 +209,9 @@ func IsBuiltinSymbolLikeRecurser(
 	}
 
 	predicateResult := predicate(subjectType)
-	if predicateResult == builtinPredicateMatches_True {
+	if predicateResult == builtinPredicateMatchesTrue {
 		return true
-	} else if predicateResult == builtinPredicateMatches_False {
+	} else if predicateResult == builtinPredicateMatchesFalse {
 		return false
 	}
 

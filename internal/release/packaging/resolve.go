@@ -133,7 +133,7 @@ func Resolve(searchRoots []string) (string, error) {
 	}
 
 	return "", fmt.Errorf(
-		"%w: %s/%s wants %s, and it is not installed.\nLooked in:\n  %s\nInstall %s without skipping optional dependencies, which brings it in, or point %s at a local build.",
+		"%w: %s/%s wants %s, and it is not installed.\nLooked in:\n  %s\nInstall %s without skipping optional dependencies, which brings it in, or point %s at a local build",
 		ErrNoBinary, runtime.GOOS, runtime.GOARCH, packageName,
 		strings.Join(attempted, "\n  "), DispatcherPackageName, BinaryOverrideVariable,
 	)

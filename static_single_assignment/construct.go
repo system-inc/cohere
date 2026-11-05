@@ -56,6 +56,8 @@ import "fmt"
 // without constructing.
 func Construct[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) {
 	if entry, predecessors, entered := entryPredecessors(graph, function); entered {
+		// Invariant: Graph.Entry names a block no edge enters, and neither IR builds a function whose entry has a
+		// predecessor; one that did has a bug in its adapter or its lowering, which this message names.
 		panic(fmt.Sprintf("static_single_assignment.Construct: the entry block bb%d has predecessors %v; "+
 			"Graph.Entry must be a block no edge enters", entry, predecessors))
 	}
@@ -131,6 +133,18 @@ type incompletePhi[P any] struct {
 	renamed P
 }
 
+// walking is which of run's three visits a place is in.
+type walking uint8
+
+const (
+	// walkingUses renames an instruction's uses, and passes over its definitions.
+	walkingUses walking = iota
+	// walkingDefinitions renames an instruction's definitions, and passes over its uses.
+	walkingDefinitions
+	// walkingTerminal renames a terminal's places, uses and definitions both.
+	walkingTerminal
+)
+
 type ssaBuilder[G Graph[F, B, P], F any, B comparable, P any] struct {
 	graph    G
 	function F
@@ -180,7 +194,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	// type parameter's method, and so does every local it captures; one per instruction would be an
 	// allocation per instruction.
 	visit := func(place *P, role Role) { builder.visitPlace(place, role) }
-	edges := edgeScratchPool.Get().(*edgeScratch)
+	edges := takeEdgeScratch()
 	defer edgeScratchPool.Put(edges)
 
 	for _, block := range builder.graph.Blocks(builder.function) {
@@ -235,18 +249,6 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	builder.renameReturns()
 }
 
-// walking is which of run's three visits a place is in.
-type walking uint8
-
-const (
-	// walkingUses renames an instruction's uses, and passes over its definitions.
-	walkingUses walking = iota
-	// walkingDefinitions renames an instruction's definitions, and passes over its uses.
-	walkingDefinitions
-	// walkingTerminal renames a terminal's places, uses and definitions both.
-	walkingTerminal
-)
-
 // visitPlace is run's one visitor, doing what b.walking says for the block b.walkingBlock.
 func (builder *ssaBuilder[G, F, B, P]) visitPlace(place *P, role Role) {
 	switch builder.walking {
@@ -296,6 +298,8 @@ func (builder *ssaBuilder[G, F, B, P]) defineIn(blockId BlockId, place *P) {
 }
 
 // defineInMaybeContext is `defineIn`, told whether this definition is a context store.
+//
+// Mutates: place it is rewritten in the caller's instruction to name the definition this mints or reuses
 func (builder *ssaBuilder[G, F, B, P]) defineInMaybeContext(blockId BlockId, place *P, contextStore bool) {
 	binding := builder.graph.Declaration(builder.function, builder.graph.IdentifierOf(*place))
 	// # A context binding is defined once and every later write reuses that definition
@@ -326,6 +330,8 @@ func (builder *ssaBuilder[G, F, B, P]) defineInMaybeContext(blockId BlockId, pla
 }
 
 // useIn rewrites a use to whatever value reaches this block.
+//
+// Mutates: place it is rewritten in the caller's instruction to name the value that reaches this block
 func (builder *ssaBuilder[G, F, B, P]) useIn(blockId BlockId, place *P) {
 	*place = builder.graph.WithIdentifier(*place, builder.valueAt(*place, blockId))
 }

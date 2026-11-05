@@ -90,6 +90,7 @@ func run() error {
 		Signing:         signing,
 
 		SwiftScratchDirectory: *swiftScratch,
+		Progress:              os.Stdout,
 	})
 	if buildError != nil {
 		return buildError

@@ -129,8 +129,9 @@ func fixText(
 	propose Propose,
 	maximumPasses int,
 ) (FileResult, *ast.SourceFile, error) {
-	if maximumPasses <= 0 {
-		maximumPasses = DefaultMaxPasses
+	passBudget := maximumPasses
+	if passBudget <= 0 {
+		passBudget = DefaultMaxPasses
 	}
 
 	result := FileResult{FileName: fileName, Text: text}
@@ -157,7 +158,7 @@ func fixText(
 	// can name the rules still proposing at the ceiling rather than only the file they landed on.
 	lastProposals := []Proposal{}
 
-	for pass := 1; pass <= maximumPasses; pass++ {
+	for pass := 1; pass <= passBudget; pass++ {
 		result.Passes = pass
 
 		proposals, proposeError := propose(fileName, current)
@@ -222,7 +223,7 @@ func fixText(
 		// mangled file that parses survives review far more easily than an unfixed one does.
 		result.Rejected = append(result.Rejected, Rejection{
 			Proposal: Proposal{RuleName: "fix-engine"},
-			Reason:   fmt.Sprintf("%s (%d passes)", ReasonPassesReached, maximumPasses),
+			Reason:   fmt.Sprintf("%s (%d passes)", ReasonPassesReached, passBudget),
 		})
 		result.UnconvergedRules = ruleNamesOf(lastProposals)
 		result.Applied = nil
@@ -437,6 +438,12 @@ func CheckTextSeeded(fileName string, text string, seed *ast.SourceFile, propose
 	return fixAndTransformText(fileName, text, seed, propose, transform, maximumPasses)
 }
 
+// FormatFixRoundLimit bounds how many times a file goes back through fix and format when the
+// printer's output trips a fixer. The case that found it settles in two rounds, a fix and then a
+// format the fix leaves nothing for; a third that still changes something means a rule and the
+// printer are undoing each other.
+const FormatFixRoundLimit = 3
+
 // fixAndTransformText is FixAndTransformText with a seed for the starting guard (fixText).
 func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
 	maximumPasses int) (FileResult, error) {
@@ -525,12 +532,6 @@ func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, pro
 	}
 }
 
-// FormatFixRoundLimit bounds how many times a file goes back through fix and format when the
-// printer's output trips a fixer. The case that found it settles in two rounds, a fix and then a
-// format the fix leaves nothing for; a third that still changes something means a rule and the
-// printer are undoing each other.
-const FormatFixRoundLimit = 3
-
 // applyTransform runs the transform once over result.Text and records what happened, reporting
 // whether it changed the text, and the guard's tree of the text it printed. A skip, a failure, a result
 // that does not parse, and text already in the transform's shape all leave the text as it was and report
@@ -538,16 +539,20 @@ const FormatFixRoundLimit = 3
 //
 // tree is the guard's tree of result.Text, or nil, and is offered to the transform only while it is still
 // that text's.
+//
+// Mutates: result the caller's file result is where this records the transform's outcome, its text, and its
+// skip or refusal
 func applyTransform(
 	result *FileResult,
 	fileName string,
 	transform Transform,
 	tree *ast.SourceFile,
 ) (bool, *ast.SourceFile) {
-	if tree != nil && tree.Text() != result.Text {
-		tree = nil
+	offeredTree := tree
+	if offeredTree != nil && offeredTree.Text() != result.Text {
+		offeredTree = nil
 	}
-	transformed, transformError := transform(fileName, result.Text, tree)
+	transformed, transformError := transform(fileName, result.Text, offeredTree)
 	switch {
 	case errors.Is(transformError, ErrSkipped):
 		// The transform declined this file on purpose: a file type it does not handle, or one it
@@ -701,9 +706,19 @@ type NotTransformedFile struct {
 	// Reason is the transform's own words for a skip, or the failure it reported.
 	Reason string
 
-	// Failed is a transform that broke rather than declined.
-	Failed bool
+	// Outcome is whether the transform declined the file or broke on it.
+	Outcome NotTransformedOutcome
 }
+
+// NotTransformedOutcome is how the whole-text transform came to leave a file as it was.
+type NotTransformedOutcome string
+
+const (
+	// NotTransformedSkipped is a transform that declined the file on purpose.
+	NotTransformedSkipped NotTransformedOutcome = "Skipped"
+	// NotTransformedFailed is a transform that broke rather than declined.
+	NotTransformedFailed NotTransformedOutcome = "Failed"
+)
 
 // ChangedFile is one file a run rewrote, or under `--no-fix` would rewrite, and what rewrote it.
 type ChangedFile struct {
@@ -753,7 +768,11 @@ func Summarize(results []FileResult) Summary {
 			summary.TransformSkipReasons[result.TransformSkipReason]++
 			summary.NotTransformed = append(
 				summary.NotTransformed,
-				NotTransformedFile{FileName: result.FileName, Reason: result.TransformSkipReason},
+				NotTransformedFile{
+					FileName: result.FileName,
+					Reason:   result.TransformSkipReason,
+					Outcome:  NotTransformedSkipped,
+				},
 			)
 		}
 		summary.FixesApplied += len(result.Applied)
@@ -795,7 +814,11 @@ func Summarize(results []FileResult) Summary {
 			if rejection.Proposal.RuleName == transformRuleName {
 				summary.NotTransformed = append(
 					summary.NotTransformed,
-					NotTransformedFile{FileName: result.FileName, Reason: rejection.Reason, Failed: true},
+					NotTransformedFile{
+						FileName: result.FileName,
+						Reason:   rejection.Reason,
+						Outcome:  NotTransformedFailed,
+					},
 				)
 			}
 		}

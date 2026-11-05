@@ -69,8 +69,14 @@ func TestVersionPrecedenceIsSemverOrder(test *testing.T) {
 		"2.0.0",
 	}
 	for index := 0; index+1 < len(ordered); index++ {
-		lower, _ := parseSemanticVersion(ordered[index])
-		higher, _ := parseSemanticVersion(ordered[index+1])
+		lower, lowerError := parseSemanticVersion(ordered[index])
+		if lowerError != nil {
+			test.Fatalf("%s does not parse: %v", ordered[index], lowerError)
+		}
+		higher, higherError := parseSemanticVersion(ordered[index+1])
+		if higherError != nil {
+			test.Fatalf("%s does not parse: %v", ordered[index+1], higherError)
+		}
 		if compareVersions(lower, higher) != -1 || compareVersions(higher, lower) != 1 {
 			test.Errorf("%s should sort below %s", ordered[index], ordered[index+1])
 		}
