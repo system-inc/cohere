@@ -30,11 +30,12 @@ const Name = "cohere-go/consistency-require-error-clause"
 // Analyzer runs the rule over one package.
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_require_error_clause",
-	Doc: "Flags the literal text given to errors.New or fmt.Errorf when it opens with a capital that is no proper " +
-		"name, ends with a period, exclamation mark or colon, or opens with failed to, failure, error:, err:, unable " +
-		"to or could not, since an error's text is a clause that reads right after a caller wraps it. A text that is " +
-		"not a string literal is not judged, and neither is whether the clause is a gerund, which cannot be told " +
-		"without a dictionary.",
+	Doc: "Flags the literal text given to errors.New or fmt.Errorf when it opens on an ordinary English word from " +
+		"policy/ErrorOpeningWords.json written with a sentence's capital, ends with a period, exclamation mark or " +
+		"colon, or opens with failed to, failure, error:, err:, unable to or could not, since an error's text is a " +
+		"clause that reads right after a caller wraps it. A capitalized word outside the vocabulary is never " +
+		"flagged, since a proper name cannot be told by its shape. A text that is not a string literal is not " +
+		"judged, and neither is whether the clause is a gerund, which cannot be told without a dictionary.",
 	Run: run,
 }
 
@@ -112,7 +113,7 @@ func judge(pass *analysis.Pass, argument ast.Expr, text string) {
 	// the prefix removes the capital with it.
 	if prefix, found := failurePrefixOf(text); found {
 		report(pass, argument, failurePrefixMessage, map[string]string{"prefix": prefix})
-	} else if word := openingWord(text); word != "" && !isProperName(pass, argument.Pos(), word) {
+	} else if word := sentenceCapitalOpening(text); word != "" {
 		report(pass, argument, capitalizedOpeningMessage, map[string]string{"word": word})
 	}
 	// Trailing space or a newline after the mark still leaves the mark at the end of the clause.
@@ -138,42 +139,32 @@ func failurePrefixOf(text string) (string, bool) {
 	return "", false
 }
 
-// openingWord is the identifier-shaped word text opens with when it opens on a capital, or empty when it opens on
-// anything else: a lowercase word, a verb such as %s, a digit or a mark.
-func openingWord(text string) string {
-	first, _ := utf8.DecodeRuneInString(text)
+// sentenceCapitalOpening is the word text opens on when that word is an ordinary English word from the house
+// vocabulary written with a sentence's capital, `The` or `Couldn't`, or empty otherwise. A word outside the
+// vocabulary may be a proper name, a language, a tool or another package's type, and no shape tells those apart, so
+// it is never flagged. The word runs over letters, digits, underscores and apostrophes, so `Couldn't` is one word and
+// an identifier such as `No_proxy` is read whole and stays quiet.
+func sentenceCapitalOpening(text string) string {
+	first, firstSize := utf8.DecodeRuneInString(text)
 	if !unicode.IsUpper(first) {
 		return ""
 	}
 	end := strings.IndexFunc(text, func(character rune) bool {
-		return !(unicode.IsLetter(character) || unicode.IsDigit(character) || character == '_')
+		return !(unicode.IsLetter(character) || unicode.IsDigit(character) || character == '_' || character == '\'')
 	})
 	if end == -1 {
-		return text
+		end = len(text)
 	}
-	return text[:end]
-}
-
-// isProperName is whether word, which opens on a capital, is a name that keeps its capital in any sentence, decided
-// without a list: Go itself; a word with a capital after its first letter, which covers an initialism such as JSON
-// and a name such as TypeScript; or an exported name declared where the error is made, such as a type the text
-// describes.
-func isProperName(pass *analysis.Pass, position token.Pos, word string) bool {
-	if word == "Go" {
-		return true
-	}
-	_, firstSize := utf8.DecodeRuneInString(word)
+	word := text[:end]
+	// A capital after the first letter is no sentence capital: `IT`, `NO` and `ON` are initialisms or codes that
+	// happen to spell a vocabulary word, and a sentence would keep them as written.
 	if strings.IndexFunc(word[firstSize:], unicode.IsUpper) != -1 {
-		return true
+		return ""
 	}
-	// The innermost scope at the literal sees the function's own names as well as the file's imports and the
-	// package's declarations, and the position keeps out a local declared after the call.
-	scope := pass.Pkg.Scope().Innermost(position)
-	if scope == nil {
-		scope = pass.Pkg.Scope()
+	if !policy.ErrorOpeningWords.Holds(strings.ToLower(word)) {
+		return ""
 	}
-	_, object := scope.LookupParent(word, position)
-	return object != nil && token.IsExported(word)
+	return word
 }
 
 // report flags argument with message rendered from values.

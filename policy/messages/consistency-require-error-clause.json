@@ -4,7 +4,7 @@
   },
   "messages": {
     "capitalizedOpening": {
-      "text": "This error opens with `{{word}}`, and an error's text is a clause that reads right after a caller wraps it, `open config: permission denied`, so the capital lands in the middle of the line. Open on a lowercase word, or, if `{{word}}` is a proper name, spell it as one: a name declared where the error is made, an initialism such as `JSON`, or a word with a capital inside such as `TypeScript`."
+      "text": "This error opens with `{{word}}`, capitalized as if it began a sentence. An error's text is a clause that reads right after a caller wraps it, `open config: permission denied`, so a sentence's capital lands in the middle of the line once it is wrapped. Write the word lowercase and let whoever prints the whole line decide how it begins."
     },
     "trailingPunctuation": {
       "text": "This error ends with `{{punctuation}}`, and an error's text is a clause a caller wraps and goes on from, `open config: permission denied`, so the mark lands in the middle of the line once it is wrapped. End on the last word, and leave the end of the sentence to whoever prints it."
