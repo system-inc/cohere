@@ -17,11 +17,12 @@ import (
 // engineArguments). It used to be dropped, and `--format-only` dropped meant a format gate that type-checked
 // and linted the whole package, minutes of compiling under a verdict that said formatting (#nqb3mjv). The
 // engine has read `--format-only` and `--no-format` with TypeScript's meaning since c024df4b, so both pass
-// through.
+// through. The engine reads `--no-cache` since 9def2dc1: every phase from source, in a scratch of its own that
+// it removes.
 var swiftFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-		"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing",
+		"rules", "rules-enabled", "version", "unused", "unused-all", "unused-deep", "timing", "no-cache",
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "fix-passes", "verbose", "json", "phases", "coverage", "profile", "open",

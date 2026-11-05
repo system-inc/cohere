@@ -29,12 +29,16 @@ public struct CommandOptions: Equatable, Sendable {
     public var formatOnly = false
     /* Formatting left out of a bare run, `--fix` or `--no-fix`: fix, type-check and lint only, as TypeScript's `--no-format`. */
     public var noFormat = false
+    /* Every phase from source: nothing read from or written to the engine's caches, as TypeScript's `--no-cache`. */
+    public var noCache = false
     public var lintConfiguration: URL?
     public var fixPasses = 10
     public var singleThreaded = false
     public var listRules = false
     public var listRulesEnabled = false
     public var showVersion = false
+    /* Print which packages inside the root a run there checks, and exit: the front door's answer to which nested packages it may skip. */
+    public var listCoveredPackages = false
     public var unused = false
     public var paths: [String] = []
 
@@ -86,6 +90,7 @@ public struct CommandOptions: Equatable, Sendable {
                 case "--format-all": options.formatAll = true
                 case "--format-only": options.formatOnly = true
                 case "--no-format": options.noFormat = true
+                case "--no-cache": options.noCache = true
                 case "--lint-config":
                     options.lintConfiguration =
                         URL(fileURLWithPath: try value(for: flag), relativeTo: workingDirectory).standardizedFileURL
@@ -99,6 +104,7 @@ public struct CommandOptions: Equatable, Sendable {
                 case "--rules": options.listRules = true
                 case "--rules-enabled": options.listRulesEnabled = true
                 case "--version": options.showVersion = true
+                case "--covered-packages": options.listCoveredPackages = true
                 case "--unused", "--unused-all", "--unused-deep": options.unused = true
                 case "--timing", "--explain":
                     throw UsageFailure(

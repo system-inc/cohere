@@ -644,7 +644,7 @@ struct CorrectnessNoDefaultForOwnedEnumTests {
         let parsed = await SourceParser().parse(try FileSet.build(package: package).owned)
         let candidates = parsed.files.filter { CorrectnessNoDefaultForOwnedEnum().applies(to: $0) }
         var provider = SymbolProvider(
-            scratchPaths: Pipeline.symbolScratchPaths(package: package, root: root),
+            scratchPaths: Pipeline.symbolScratchPaths(package: package, scratch: Pipeline.scratchPath(for: root)),
             runner: ProcessRunner(),
         )
         provider.ownedModules = Pipeline.ownedModules(of: package)

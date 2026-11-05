@@ -8,11 +8,13 @@
 //	go run ./command/cohere-dev land                  merge main, gate and fast-forward main, one landing at a time
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //	go run ./command/cohere-dev quiet on|off          a quiet window: the cache trim holds off until off (quiet.go)
+//	go run ./command/cohere-dev worktree <name>       a hand's worktree, made or moved to main by git (worktree.go)
+//	go run ./command/cohere-dev worktree remove <x>   retire one, refusing as a move does
 //
-// Every one of them takes a token from the machine's pool, in arrival order, and runs with Go held to the
-// token's share of the cores (pool.go). A dozen members each running go on all sixteen cores held the machine
-// at load 110 to 180, and made every run slower, not only later. When a token's run ends, the Go build
-// cache is looked at, and trimmed under its cap with the pool held (cache.go).
+// Every one of them but status, quiet and worktree takes a token from the machine's pool, in arrival order,
+// and runs with Go held to the token's share of the cores (pool.go). A dozen members each running go on all
+// sixteen cores held the machine at load 110 to 180, and made every run slower, not only later. When a
+// token's run ends, the Go build cache is looked at, and trimmed under its cap with the pool held (cache.go).
 //
 // A whole-module run never passes -count=1. Go's test cache skips every package whose inputs did not
 // change, which on a one-file change is most of the module, and -count=1 throws that away. A flaky test
@@ -45,6 +47,8 @@ func main() {
 		os.Exit(trimCache())
 	case "quiet":
 		os.Exit(quiet(os.Args[2:]))
+	case "worktree":
+		os.Exit(namedWorktree(os.Args[2:]))
 	case "test", "build", "vet", "exec", "land":
 		os.Exit(run(os.Args[1], os.Args[2:]))
 	}
@@ -57,7 +61,9 @@ func usage() {
 		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
 		"       cohere-dev land\n"+
 		"       cohere-dev status\n"+
-		"       cohere-dev quiet [on [--for <duration>] [why] | off]")
+		"       cohere-dev quiet [on [--for <duration>] [why] | off]\n"+
+		"       cohere-dev worktree <name> [--branch <branch>]   a name per hand, not per member: system_cohere_tools_1\n"+
+		"       cohere-dev worktree remove <name>")
 	os.Exit(2)
 }
 

@@ -154,6 +154,156 @@ func TestFormatOnlyRunsTheSwiftEngineInItsFormatOnlyMode(test *testing.T) {
 	}
 }
 
+// coveringRepository writes a repository whose root package has three below it: Libraries/Lib, a path
+// dependency the root's run checks; Vendor/Third, a vendored one it lists as not checked; and Tools/Sim,
+// which nothing depends on, the shape of ahraos-presence's VRMKit and RigSimulator (#sxs26s3).
+func coveringRepository(t *testing.T) string {
+	t.Helper()
+	root := newRepository(t, nil)
+	for _, directory := range []string{".", "Libraries/Lib", "Vendor/Third", "Tools/Sim"} {
+		writeTree(t, filepath.Join(root, filepath.FromSlash(directory)), map[string]string{
+			"Package.swift":         discoveryPackage,
+			"Sources/Toy/Toy.swift": "let toy = 1\n",
+		})
+	}
+	return root
+}
+
+// coveringSwiftEngine is a stand-in engine for coveringRepository. It logs every command line to the file
+// it returns, answers `--covered-packages` with coverage, and otherwise runs check: both shell, with the
+// `--root` it was given in $root. A check run reports Lib's findings from Lib's own run and from the root's,
+// which checks Lib too, so a test can count how often they appear.
+func coveringSwiftEngine(t *testing.T, coverage string) (string, string) {
+	t.Helper()
+	log := filepath.Join(t.TempDir(), "arguments")
+	findings := filepath.Join(contractDirectory(t), "Findings.jsonl")
+	engine := fakeSwiftEngine(t, "echo \"$@\" >> '"+log+"'\n"+
+		"root=''; covering=''; previous=''\n"+
+		"for argument in \"$@\"; do\n"+
+		"  if [ \"$previous\" = --root ]; then root=$argument; fi\n"+
+		"  if [ \"$argument\" = --covered-packages ]; then covering=1; fi\n"+
+		"  previous=$argument\n"+
+		"done\n"+
+		"if [ -n \"$covering\" ]; then\n"+coverage+"\nfi\n"+
+		"case \"$root\" in */Libraries/Lib) cat '"+findings+"'; exit 1;; esac\n"+
+		"if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then cat '"+findings+"'; exit 1; fi\n"+
+		"cat '"+filepath.Join(contractDirectory(t), "Clean.jsonl")+"'")
+	return engine, log
+}
+
+// coverageAnswerThrough is the shell that answers `--covered-packages` the way the engine does for coveringRepository:
+// each package checks itself, the root checks Lib as well and vendors Third, and Sim is in neither list.
+// Paths are printed through alias, a symbolic link to the repository, so the front door must resolve links
+// on both sides to match them, as it must for the engine's `/tmp` against its own `/private/tmp`.
+func coverageAnswerThrough(repository string, alias string, provenance string) string {
+	return "real=$(cd \"$root\" && pwd -P); base=$(cd '" + repository + "' && pwd -P); printed=\"" + alias + "${real#\"$base\"}\"\n" +
+		"checked=\"\\\"$printed\\\"\"; vendored=''\n" +
+		"if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then checked=\"$checked,\\\"$printed/Libraries/Lib\\\"\"; fi\n" +
+		"if [ -f \"$root/Vendor/Third/Package.swift\" ]; then vendored=\"\\\"$printed/Vendor/Third\\\"\"; fi\n" +
+		"head -1 '" + provenance + "'\n" +
+		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$printed\\\",\\\"checked\\\":[$checked],\\\"vendored\\\":[$vendored]}\"\n" +
+		"exit 0"
+}
+
+// A package the root's run checks, or vendors, is not run again as its own project, and says why; its
+// findings appear once and its run is not counted. A package below the root that nothing depends on is no
+// part of the root's run, so it runs, whatever its nesting on disk says (#sxs26s3).
+func TestASwiftPackageAnotherRunCoversIsNotCheckedTwice(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	root := coveringRepository(t)
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Fatal(err)
+	}
+	engine, log := coveringSwiftEngine(t, coverageAnswerThrough(root, alias, filepath.Join(contractDirectory(t), "Clean.jsonl")))
+
+	output, exitCode := runWithEngine(t, binary, engine, root, "--no-fix")
+	if exitCode == 0 {
+		t.Errorf("the root's findings, Lib's among them, did not fail the run:\n%s", output)
+	}
+	for _, want := range []string{
+		"== . (Swift) ==",
+		"== Tools/Sim (Swift) ==",
+		"Libraries/Lib not run: checked as part of .",
+		"Vendor/Third not run: vendored in ., whose run lists it as not checked",
+		"projects: 2 checked (2 Swift), 1 failed; not run: 2 Swift packages another package's run covers",
+		"2 projects",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("the report lacks %q:\n%s", want, output)
+		}
+	}
+	for _, skipped := range []string{"== Libraries/Lib (Swift) ==", "== Vendor/Third (Swift) =="} {
+		if strings.Contains(output, skipped) {
+			t.Errorf("%s ran though the root's run covers it:\n%s", skipped, output)
+		}
+	}
+	if count := strings.Count(output, "ByteRing.swift:159"); count != 1 {
+		t.Errorf("Lib's finding appears %d times, want once:\n%s", count, output)
+	}
+	logged, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count := strings.Count(string(logged), "--covered-packages"); count != 4 {
+		t.Errorf("the engine was asked its coverage %d times, want once per package, 4:\n%s", count, logged)
+	}
+}
+
+// A coverage query that fails derives nothing: every package runs, the dependency's findings counted twice,
+// which is visible, rather than a package hidden, which is not, and the failure is named with the engine's
+// reason.
+func TestAFailedCoverageQueryRunsEveryPackageAndSaysSo(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	root := coveringRepository(t)
+	engine, _ := coveringSwiftEngine(t, "echo 'cohere-swift: the manifest would not load' >&2; exit 2")
+
+	output, _ := runWithEngine(t, binary, engine, root, "--no-fix")
+	for _, want := range []string{
+		"== . (Swift) ==",
+		"== Libraries/Lib (Swift) ==",
+		"== Tools/Sim (Swift) ==",
+		"== Vendor/Third (Swift) ==",
+		"projects: 4 checked (4 Swift)",
+		".: the Swift coverage query failed, so every package it might check runs as its own project too: the engine exited 2: cohere-swift: the manifest would not load",
+		// Said on the verdict line too, which every view prints, since notes are --verbose's alone.
+		"⚠ 4 Swift coverage queries failed, so some files may be counted twice",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("the report lacks %q:\n%s", want, output)
+		}
+	}
+	if count := strings.Count(output, "the Swift coverage query failed"); count != 4 {
+		t.Errorf("the failed query is named %d times, want once per package, 4:\n%s", count, output)
+	}
+	if strings.Contains(output, "not run: checked as part of") {
+		t.Errorf("a package was skipped on a coverage nobody answered:\n%s", output)
+	}
+}
+
+// One Swift package has nothing to share, so the engine is never asked its coverage, and the run is the one
+// it was before.
+func TestOneSwiftPackageAsksNoCoverage(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	engine, log := coveringSwiftEngine(t, "echo 'asked' >&2; exit 2")
+	root := mixedRepository(t, "apple/Toy")
+
+	output, exitCode := runWithEngine(t, binary, engine, root, "--no-fix")
+	if exitCode != 0 || !strings.Contains(output, "projects: 2 checked (1 TypeScript, 1 Swift), every one green") {
+		t.Errorf("a repository with one Swift package did not run as it did (exit %d):\n%s", exitCode, output)
+	}
+	logged, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(logged), "--covered-packages") || !strings.Contains(string(logged), "--root") {
+		t.Errorf("want one check run and no coverage query, the engine was run with:\n%s", logged)
+	}
+}
+
 // contractDirectory is where the Swift contract's fixtures are.
 func contractDirectory(test *testing.T) string {
 	test.Helper()

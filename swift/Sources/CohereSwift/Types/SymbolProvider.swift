@@ -65,6 +65,18 @@ struct SymbolProvider {
                     "the build's index does not describe it as it stands, and no build recorded how to compile it"
                 continue
             }
+            /*
+             A command naming a file that no longer exists compiled a module that is not this one: a file was
+             renamed, moved or deleted since that build. sourcekitd would still answer from it, from a module
+             missing the file's new name and holding the old one, after printing "error opening input file" for
+             it. So the command vouches for nothing, and a run with types builds the module as it is now.
+             Presence, 2026-11-04 (#zggj9xy): `cohere --lint` after renames with plain mv.
+             */
+            if let gone = command.files.first(where: { !FileManager.default.fileExists(atPath: $0) }) {
+                result.unavailable[file.url.path] =
+                    "the last build compiled its module with \(gone), which no longer exists, so that build's arguments describe another module; a run with types rebuilds it"
+                continue
+            }
             do {
                 var found = try session.symbols(
                     file: file.url.resolvingSymlinksInPath().path,
