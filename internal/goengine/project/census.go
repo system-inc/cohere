@@ -41,7 +41,8 @@ type Exclusion struct {
 // owned module's directory, never entering testdata, a directory whose name starts with `.` or `_`, one
 // below a `vendor` directory, one the module's go.mod names in an `ignore` directive, a directory with a
 // go.mod of its own (an owned one is walked as itself, and an unowned one is another project), or a
-// repository of its own, a submodule's checkout included. A file git ignores is excluded, by the ignore
+// repository of its own, a submodule's checkout included, and never counting a file whose name starts with
+// `.` or `_`, which go does not read either. A file git ignores is excluded, by the ignore
 // files of the nearest repository at or above the root; a root in no repository ignores nothing. Generated
 // files are counted as ours here: the format and lint phases decide about those.
 func TakeCensus(workspace Workspace) (Census, error) {
@@ -84,7 +85,7 @@ func TakeCensus(workspace Workspace) (Census, error) {
 				}
 				return enterScope(rootMatcher, scopes, repositoryRoot, visited)
 			}
-			if !strings.HasSuffix(entry.Name(), ".go") {
+			if !goSees(entry.Name()) {
 				return nil
 			}
 			census.Files = append(census.Files, visited)
@@ -139,6 +140,12 @@ func partOfModule(directory string, moduleRelative string, directives []string) 
 		}
 	}
 	return true
+}
+
+// goSees reports whether go reads a file of a package's directory as Go source: a `.go` file whose name does not
+// start with `_` or `.`, which go/build's matchFile drops before it even lists one as ignored.
+func goSees(name string) bool {
+	return strings.HasSuffix(name, ".go") && !strings.HasPrefix(name, "_") && !strings.HasPrefix(name, ".")
 }
 
 // readIgnoreDirectives is the paths a module's go.mod names in `ignore` directives, read leniently as go

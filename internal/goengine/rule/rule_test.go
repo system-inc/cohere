@@ -16,6 +16,19 @@ var plantedAnalyzer = &analysis.Analyzer{
 	},
 }
 
+// optionedAnalyzer finds nothing and has one option, readsFile, for the rules that are configured by one.
+var optionedAnalyzer = func() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{
+		Name: "optioned",
+		Doc:  "optioned finds nothing; it exists so a rule under test has an analyzer with an option",
+		Run: func(pass *analysis.Pass) (any, error) {
+			return nil, nil
+		},
+	}
+	analyzer.Flags.String("readsFile", "", "the file a rule under test would read")
+	return analyzer
+}()
+
 // TestValidateAcceptsAWellFormedRule is the control for the refusals below: a house rule and each kind of
 // ported rule, written the way the registry will hold them.
 func TestValidateAcceptsAWellFormedRule(t *testing.T) {
@@ -25,6 +38,10 @@ func TestValidateAcceptsAWellFormedRule(t *testing.T) {
 		{Name: "cohere-go/printf", Origin: OriginVet, UpstreamName: "printf", TypeAware: true, Analyzer: plantedAnalyzer},
 		{Name: "cohere-go/SA4006", Origin: OriginStaticcheck, UpstreamName: "SA4006", Analyzer: plantedAnalyzer},
 		{Name: "cohere-go/nilness", Origin: OriginTools, UpstreamName: "nilness", TypeAware: true, Analyzer: plantedAnalyzer},
+		{
+			Name: "cohere-go/correctness-require-declared-walk", Origin: OriginHouse, Analyzer: optionedAnalyzer,
+			ConfiguredBy: []string{"readsFile"},
+		},
 	}
 	for _, testCase := range cases {
 		if validateError := testCase.Validate(); validateError != nil {
@@ -53,6 +70,18 @@ func TestValidateRefusesEachMalformedRule(t *testing.T) {
 		{"a staticcheck rule with no upstream name", Rule{Name: "cohere-go/SA4006", Origin: OriginStaticcheck, Analyzer: plantedAnalyzer}, "names no upstream rule"},
 		{"a tools rule with no upstream name", Rule{Name: "cohere-go/nilness", Origin: OriginTools, Analyzer: plantedAnalyzer}, "names no upstream rule"},
 	}
+	cases = append(cases, struct {
+		name   string
+		rule   Rule
+		saying string
+	}{
+		"an option its analyzer has no flag for",
+		Rule{
+			Name: "cohere-go/correctness-require-declared-walk", Origin: OriginHouse, Analyzer: optionedAnalyzer,
+			ConfiguredBy: []string{"readsFiles"},
+		},
+		"has no flag for",
+	})
 	for _, testCase := range cases {
 		validateError := testCase.rule.Validate()
 		if validateError == nil {

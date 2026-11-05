@@ -44,8 +44,13 @@ type Rule struct {
 	UpstreamName string
 	// TypeAware is whether the rule reads type information, for the docs, as swift/Rules.json's typeAware.
 	TypeAware bool
-	// Analyzer is what runs.
+	// Analyzer is what runs. Its options are flags on Analyzer.Flags, which the engine sets from the
+	// options object of the rule's entry in the settings.
 	Analyzer *analysis.Analyzer
+	// ConfiguredBy names the options without which the rule reports nothing, each a flag on Analyzer.Flags.
+	// While any of them is empty the engine lists the rule in the lint record's rulesNotConfigured, so a rule
+	// that cannot report reads as not configured rather than as quiet.
+	ConfiguredBy []string
 }
 
 // Validate refuses a rule the registry should never hold, so a malformed rule fails a test at the
@@ -77,6 +82,13 @@ func (rule Rule) Validate() error {
 			"rule %q has origin %q, which is none of %q, %q, %q and %q",
 			rule.Name, rule.Origin, OriginHouse, OriginVet, OriginStaticcheck, OriginTools,
 		)
+	}
+	// A name with no flag behind it could never be set, so the rule would read as not configured forever.
+	for _, option := range rule.ConfiguredBy {
+		if rule.Analyzer.Flags.Lookup(option) == nil {
+			return fmt.Errorf("rule %q is configured by option %q, which its analyzer has no flag for", rule.Name,
+				option)
+		}
 	}
 	return nil
 }
