@@ -4,7 +4,10 @@
   },
   "messages": {
     "uncheckedAssertion": {
-      "text": "This assertion panics when the value is not a `{{type}}`, and a nil value never is one. Use the comma-ok form, `typed, ok := value.({{type}})`, and say what happens when it is not, or a type switch when the value may be one of several types, so a miss has code to run instead of stopping the process."
+      "text": "This assertion panics when the value is not of type `{{type}}`, and a nil value never is. Use the comma-ok form, `typed, ok := value.({{type}})`, and say what happens when it is not, or a type switch when the value may be one of several types, so a miss has code to run instead of stopping the process."
+    },
+    "assertionInMatchingCase": {
+      "text": "The type switch around this assertion already matched `{{value}}` as type `{{type}}`, so the assertion repeats what the switch knows and reads to the next person like a claim that could fail. Bind the switch, `switch typed := {{value}}.(type)`, and use `typed` here, where it already has type `{{type}}`."
     }
   }
 }

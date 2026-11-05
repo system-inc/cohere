@@ -32,6 +32,28 @@ var allowedRuleImports = map[string]bool{
 	// the high-level IR already, which is under the shelf's prefix, so naming it directly adds no
 	// package to any rule edit's rebuild.
 	"github.com/system-inc/cohere/static_single_assignment": true,
+	// The house vocabularies both Go engines read: the abbreviation words' loader and finder, and the shouting
+	// safe list and masks. Each moved out of package nexus so the Go engine's rules could read the same data
+	// without linking the TypeScript checker (#ec8mvbg). internal/naming/abbreviation imports only the standard
+	// library and policy, and internal/shouting only the standard library and internal/lint/ecmascript/text, which
+	// is under the shelf's prefix, so both are leaves by their imports and change only when the house vocabulary
+	// does. Measured on 2026-11-05, three warm rounds each of `go build ./internal/lint/registry` after a one-comment
+	// edit, under a load average of about 44: editing internal/shouting rebuilds in 0.27 to 0.39s and
+	// internal/naming/abbreviation in 0.32 to 0.73s, with nothing past them rebuilt; editing a nexus rule, which
+	// imports both, 6.92 to 8.27s, and a base rule, which imports neither, 4.61 to 6.19s. nexus holds 89 source files
+	// to base's 33, so the load and the package's own size dominate that gap; it does not isolate the imports.
+	"github.com/system-inc/cohere/internal/naming/abbreviation": true,
+	"github.com/system-inc/cohere/internal/shouting":            true,
+	// The SQL reading nexus/security-no-interpolated-sql-string and its Go engine twin share: which holes in SQL
+	// text sit inside a quoted value or bare after a comparison. It moved out of package nexus so the Go rule reads
+	// SQL as the TypeScript one does without linking the TypeScript checker, the move internal/shouting made. It
+	// imports only `strings`, and `go list -deps` names nothing past the standard library, so it is a leaf by its
+	// imports, and it changes only when the shared reading does. Measured on 2026-11-05, three warm rounds each of
+	// `go build ./internal/lint/registry` after a one-comment edit, under a load average of about 19 to 20 (31 over
+	// fifteen minutes): editing internal/sqltext rebuilds in 0.12 to 0.13s, and `go build -v` shows it is the only
+	// package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule that imports it,
+	// 2.57 to 2.76s.
+	"github.com/system-inc/cohere/internal/sqltext": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.

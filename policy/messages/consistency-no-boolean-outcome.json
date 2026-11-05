@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/consistency-no-boolean-outcome",
-    "Swift": "cohere-swift/consistency-no-boolean-outcome"
+    "Swift": "cohere-swift/consistency-no-boolean-outcome",
+    "Go": "cohere-go/consistency-no-boolean-outcome"
   },
   "messages": {
     "booleanOutcome": {
@@ -9,11 +10,13 @@
       "terms": {
         "flag": {
           "TypeScript": "`{{flagName}}: boolean`",
-          "Swift": "{{flagName}}: Bool"
+          "Swift": "{{flagName}}: Bool",
+          "Go": "`{{flagName}} bool`"
         },
         "repairAndWhy": {
           "TypeScript": "Return a named outcome instead: a union of `outcome` members naming each way the operation can turn out, with the payload on the arm that carries it. Suggested name: {{suggested}}OutcomeType.",
-          "Swift": "It also leaves the reader to know which other fields hold for which value of the flag. Return a named outcome instead: an enum with a case for each way the operation can turn out and the payload on the case that carries it, or Result, or a throw for the failure. Suggested name: {{suggested}}Outcome."
+          "Swift": "It also leaves the reader to know which other fields hold for which value of the flag. Return a named outcome instead: an enum with a case for each way the operation can turn out and the payload on the case that carries it, or Result, or a throw for the failure. Suggested name: {{suggested}}Outcome.",
+          "Go": "It also leaves the reader to know which other fields hold for which value of the flag. Say the failure the way Go does instead: return the value and an error, or, when there are more than two ways the operation can turn out, give the outcome a named type with a constant for each and keep the payload beside it. Suggested name: {{suggested}}Outcome."
         }
       }
     }

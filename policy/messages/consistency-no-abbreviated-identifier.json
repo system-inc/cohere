@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/consistency-no-abbreviated-identifier",
-    "Swift": "cohere-swift/consistency-no-abbreviated-identifier"
+    "Swift": "cohere-swift/consistency-no-abbreviated-identifier",
+    "Go": "cohere-go/consistency-no-abbreviated-identifier"
   },
   "phrases": {
     "reasoning": "A name is written once and read everywhere, so the letters saved at the declaration are paid back at every call site by a reader who has to expand the abbreviation themselves and hope they expanded it the way the author meant."

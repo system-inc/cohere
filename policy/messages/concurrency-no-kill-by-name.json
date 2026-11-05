@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "Go": "cohere-go/concurrency-no-kill-by-name"
+  },
+  "messages": {
+    "killByName": {
+      "text": "This command stops processes by name through `{{program}}`, so it takes every matching process on the machine with it, including other agents' and other runs', and the failure lands on whoever was running. Keep the process you started and stop it by its pid instead, with Kill on its exec.Cmd's Process or with syscall.Kill(pid, signal)."
+    }
+  }
+}

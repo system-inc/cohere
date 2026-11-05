@@ -114,6 +114,7 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 	test.Helper()
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			if testCase.harnessBound != "" {
 				test.Skip(testCase.harnessBound)
 			}
