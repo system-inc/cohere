@@ -14,9 +14,9 @@ import (
 func answersFor(test *testing.T, source string, target string) []bool {
 	test.Helper()
 	var answers []bool
-	rule_testing.Run(test, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "foreign-probe",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindIdentifier: func(node *ast.Node) {
 					if node.Text() == target {
