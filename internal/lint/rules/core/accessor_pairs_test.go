@@ -239,14 +239,14 @@ func accessorPairsFiresCases() []accessorPairsCase {
 		{"A = class {\n  set [\n a](foo) {} };", AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue, EnforceForClassMembers: accessorPairsTrue}, []string{"missingGetterInClass"}},
 		{"class A { static get b() {} };", AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue, EnforceForClassMembers: accessorPairsTrue}, []string{"missingSetterInClass"}},
 		{"({ set prop(value) {} });", nil, []string{"missingGetterInObjectLiteral"}},
-		{"interface I { set prop(value: any): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
-		{"interface I { set prop(value: any): any, get other(): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
-		{"interface I { set prop(value: any): any, prop(): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
-		{"interface I { set [prop](value: any): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
-		{"interface I { get prop(): any } interface J { set prop(value: any): void }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
-		{"type T = { set prop(value: any): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
-		{"function fn(): { set prop(value: any): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
-		{"type T = { get prop(): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}, []string{"missingSetterInType"}},
+		{"interface I { set prop(value: any): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
+		{"interface I { set prop(value: any): any, get other(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
+		{"interface I { set prop(value: any): any, prop(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
+		{"interface I { set [prop](value: any): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
+		{"interface I { get prop(): any } interface J { set prop(value: any): void }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
+		{"type T = { set prop(value: any): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
+		{"function fn(): { set prop(value: any): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{"missingGetterInType"}},
+		{"type T = { get prop(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}, []string{"missingSetterInType"}},
 	}
 }
 
@@ -374,17 +374,17 @@ func accessorPairsSilentCases() []accessorPairsCase {
 		{"class A { static set a(foo) {} static a() {} static get a() {} }", AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue, EnforceForClassMembers: accessorPairsTrue}, []string{}},
 		{"interface I { get prop(): any }", nil, []string{}},
 		{"type T = { set prop(value: any): void }", nil, []string{}},
-		{"interface I { get prop(): any, set prop(value: any): void }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"type T = { get prop(): any, set prop(value: any): void }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I { get prop(): any, between: true, set prop(value: any): void }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I { set prop(value: any): void, get prop(): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I { set prop(value: any): void, get 'prop'(): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I {}", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I { (...args): void }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I { new(...args): unknown }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I { prop: () => any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"interface I { method(): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
-		{"type T = { get prop(): any }", AccessorPairsOptions{EnforceForTSTypes: accessorPairsTrue}, []string{}},
+		{"interface I { get prop(): any, set prop(value: any): void }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"type T = { get prop(): any, set prop(value: any): void }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I { get prop(): any, between: true, set prop(value: any): void }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I { set prop(value: any): void, get prop(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I { set prop(value: any): void, get 'prop'(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I {}", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I { (...args): void }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I { new(...args): unknown }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I { prop: () => any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I { method(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"type T = { get prop(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
 	}
 }
 
@@ -632,7 +632,7 @@ func TestDecodeAccessorPairsOptions(test *testing.T) {
 		}
 		settings := options.resolve()
 		if settings.getWithoutSet != false || settings.setWithoutGet != true ||
-			settings.enforceForClassMembers != true || settings.enforceForTSTypes != false {
+			settings.enforceForClassMembers != true || settings.enforceForTsTypes != false {
 			test.Fatalf("defaults came back as %+v", settings)
 		}
 	})

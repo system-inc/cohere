@@ -1720,10 +1720,11 @@ func applyLogicalAssignmentFixes(source string, fixes []rule.Fix) string {
 		}
 		ordered[inner+1] = current
 	}
+	fixed := source
 	for _, fix := range ordered {
-		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 	}
-	return source
+	return fixed
 }
 
 // TestLogicalAssignmentOperatorsDeclinesToRepair pins the cases upstream reports and deliberately

@@ -108,17 +108,18 @@ func noNegatedConditionIsNegated(test *ast.Node) bool {
 	if test == nil {
 		return false
 	}
-	for test.Kind == ast.KindParenthesizedExpression {
-		test = test.AsParenthesizedExpression().Expression
-		if test == nil {
+	unwrapped := test
+	for unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
+		if unwrapped == nil {
 			return false
 		}
 	}
-	if test.Kind == ast.KindPrefixUnaryExpression {
-		return test.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
+	if unwrapped.Kind == ast.KindPrefixUnaryExpression {
+		return unwrapped.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken
 	}
-	if test.Kind == ast.KindBinaryExpression {
-		switch test.AsBinaryExpression().OperatorToken.Kind {
+	if unwrapped.Kind == ast.KindBinaryExpression {
+		switch unwrapped.AsBinaryExpression().OperatorToken.Kind {
 		case ast.KindExclamationEqualsToken, ast.KindExclamationEqualsEqualsToken:
 			return true
 		}

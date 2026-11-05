@@ -74,8 +74,8 @@ func noUnusedVarsMessage(name string, assigned bool, underscoreSilences bool) ru
 //
 // `no_useless_assignment_analysis.go` in this package is a real backward-liveness dataflow over the
 // control-flow graph, and the temptation to route this rule through it is strong: oxc spends
-// roughly 990 lines in `usage.rs` hand-matching patterns — a self-reference inside a function's own
-// body, a variable only ever reassigned to itself, a write nothing reads — that a dataflow answers
+// roughly 990 lines in `usage.rs` hand-matching patterns (a self-reference inside a function's own
+// body, a variable only ever reassigned to itself, a write nothing reads) that a dataflow answers
 // in one query. oxc has an SSA crate in the same repository and this rule does not touch it, which
 // reads like an omission.
 //
@@ -230,8 +230,8 @@ const (
 // candidateBinding is one declared name this rule may judge, with everything needed to judge it.
 //
 // The declaring node is carried alongside the name because the exemptions ask about the shape
-// around the declaration — whether a parameter is followed by a used one, whether a variable sits
-// in a `for` head — and the name alone cannot answer those.
+// around the declaration (whether a parameter is followed by a used one, whether a variable sits
+// in a `for` head), and the name alone cannot answer those.
 type candidateBinding struct {
 	name        *ast.Node
 	declaration *ast.Node
@@ -242,7 +242,7 @@ type candidateBinding struct {
 // reads.
 //
 // Two passes rather than one, and the order is forced. A read can precede its declaration in source
-// order — a hoisted function body referring to a `const` declared below it is legal and common — so
+// order (a hoisted function body referring to a `const` declared below it is legal and common), so
 // no single walk can decide a binding at the moment it sees it.
 // noUnusedVarsUsedOnlyAsTypeMessage renders the finding for a binding whose only references are
 // `typeof` type queries, typescript-eslint's `usedOnlyAsType`.
@@ -554,7 +554,7 @@ func declaringScopeOf(ruleContext rule.Context, symbol *ast.Symbol) *ast.Node {
 // they are separated here rather than folded into one predicate.
 //
 // A declaring name is not a use of itself. Without this every binding would be trivially used by
-// its own declaration and the rule would report nothing — the failure mode that looks exactly like
+// its own declaration and the rule would report nothing, the failure mode that looks exactly like
 // a clean tree.
 //
 // A pure write is not a use. `let y = 10; y = 5;` leaves `y` unused, because nothing ever observes
@@ -595,7 +595,7 @@ func countsAsRead(identifier *ast.Node, declaringScope *ast.Node) bool {
 	// function expression (`cb = function(a){ return cb(1+a); }()`, which runs now and so really
 	// does read `cb`) and a sequence whose value is the binding itself (`cb = (function(a){...},
 	// cb)`). Upstream ships both spellings of the sequence form in its fail list too, commented
-	// out, at `tests/eslint.rs:743` and `:745` — it knows they should report and cannot make them.
+	// out, at `tests/eslint.rs:743` and `:745`. It knows they should report and cannot make them.
 	// Those two stay silent here for the same reason, which is a reproduced gap and not an
 	// oversight.
 	if isReadInsideAClosureAssignedToItself(identifier) {
@@ -1248,7 +1248,7 @@ func isUsedBinding(ruleContext rule.Context, candidate candidateBinding, symbol 
 	//
 	// An `import X = Y` is excluded, and this is the one place the two alias forms must be told
 	// apart. There the aliased symbol is a local binding in the same file, so a read of `Y`
-	// anywhere — including the `= Y` in the alias's own declaration — would count as a read of `X`
+	// anywhere, including the `= Y` in the alias's own declaration, would count as a read of `X`
 	// and keep every such alias permanently alive. A module import has no such hazard because the
 	// symbol it aliases lives in another file that this rule never reads.
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 &&
@@ -1541,8 +1541,8 @@ func isSelfReassignmentRead(identifier *ast.Node, declaringScope *ast.Node) bool
 // `is_discarded_read` at `usage.rs:709`.
 //
 // An expression's result is discarded when it sits directly as a statement, or as a non-final
-// element of a comma sequence whose own result is discarded. Everything else — an initializer, an
-// argument, an operand, a return value, a condition — consumes it.
+// element of a comma sequence whose own result is discarded. Everything else (an initializer, an
+// argument, an operand, a return value, a condition) consumes it.
 func isDiscardedResult(expression *ast.Node) bool {
 	current := expression
 	for current != nil && current.Parent != nil {
@@ -1624,16 +1624,17 @@ func updatedBindingName(expression *ast.Node) string {
 
 // unwrapAssignmentTarget strips the wrappers an assignment target can wear.
 func unwrapAssignmentTarget(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	unwrapped := node
+	for unwrapped != nil {
+		switch unwrapped.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			unwrapped = unwrapped.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			unwrapped = unwrapped.AsNonNullExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			unwrapped = unwrapped.AsAsExpression().Expression
 		default:
-			return node
+			return unwrapped
 		}
 	}
 	return nil

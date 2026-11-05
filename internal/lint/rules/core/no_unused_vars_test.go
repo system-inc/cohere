@@ -197,7 +197,7 @@ func TestDecodeNoUnusedVarsOptions(test *testing.T) {
 			test.Errorf("vars default is %q, want %q", decoded.Vars, "all")
 		}
 		if decoded.Args != "after-used" {
-			test.Errorf("args default is %q, want %q — NOT \"all\"", decoded.Args, "after-used")
+			test.Errorf("args default is %q, want %q, not \"all\"", decoded.Args, "after-used")
 		}
 		if decoded.CaughtErrors != "all" {
 			test.Errorf("caughtErrors default is %q, want %q", decoded.CaughtErrors, "all")

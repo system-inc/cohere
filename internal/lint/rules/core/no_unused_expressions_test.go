@@ -264,10 +264,10 @@ func TestNoUnusedExpressionsUnderOptions(test *testing.T) {
 		{"a tagged template with the option off", "tag`tagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: false}, 1},
 
 		// enforceForJSX
-		{"an element used as an initialiser is still not a statement", "var partial = <div />", NoUnusedExpressionsOptions{EnforceForJSX: true}, 0},
-		{"a fragment used as an initialiser", "var partial = <></>", NoUnusedExpressionsOptions{EnforceForJSX: true}, 0},
-		{"a self-closing element as a statement", "<div />", NoUnusedExpressionsOptions{EnforceForJSX: true}, 1},
-		{"a fragment as a statement", "<></>", NoUnusedExpressionsOptions{EnforceForJSX: true}, 1},
+		{"an element used as an initialiser is still not a statement", "var partial = <div />", NoUnusedExpressionsOptions{EnforceForJsx: true}, 0},
+		{"a fragment used as an initialiser", "var partial = <></>", NoUnusedExpressionsOptions{EnforceForJsx: true}, 0},
+		{"a self-closing element as a statement", "<div />", NoUnusedExpressionsOptions{EnforceForJsx: true}, 1},
+		{"a fragment as a statement", "<></>", NoUnusedExpressionsOptions{EnforceForJsx: true}, 1},
 
 		// ignoreDirectives. Every one of these already passes without the option, because a real
 		// directive prologue is exempt unconditionally in both upstreams. They are here verbatim
@@ -741,7 +741,7 @@ func TestNoUnusedExpressionsReadsOptionsFromJSON(test *testing.T) {
 		test.Fatalf("decoded to %T rather than NoUnusedExpressionsOptions", decoded)
 	}
 	if !options.AllowShortCircuit || !options.AllowTernary || !options.AllowTaggedTemplates ||
-		!options.EnforceForJSX || !options.IgnoreDirectives {
+		!options.EnforceForJsx || !options.IgnoreDirectives {
 		test.Errorf("some option did not survive the round trip: %+v", options)
 	}
 }

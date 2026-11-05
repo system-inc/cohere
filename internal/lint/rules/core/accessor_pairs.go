@@ -31,12 +31,12 @@ type AccessorPairsOptions struct {
 	// EnforceForClassMembers extends the check to class bodies. Defaults to `true` upstream.
 	EnforceForClassMembers *bool `json:"enforceForClassMembers"`
 
-	// EnforceForTSTypes extends the check to interface bodies and type literals. Defaults to `false`.
+	// EnforceForTsTypes extends the check to interface bodies and type literals. Defaults to `false`.
 	//
 	// Off by default because a type declaring only `get prop(): T` is a legitimate way to describe a
 	// readonly-through-an-accessor shape, and a setter with no getter in a type is far less
 	// obviously a mistake than the same thing in a class.
-	EnforceForTSTypes *bool `json:"enforceForTSTypes"`
+	EnforceForTsTypes *bool `json:"enforceForTSTypes"`
 }
 
 // accessorPairsSettings is the decoded form, with every default already applied.
@@ -44,7 +44,7 @@ type accessorPairsSettings struct {
 	getWithoutSet          bool
 	setWithoutGet          bool
 	enforceForClassMembers bool
-	enforceForTSTypes      bool
+	enforceForTsTypes      bool
 }
 
 // defaultAccessorPairsSettings mirrors upstream's `meta.defaultOptions`.
@@ -53,7 +53,7 @@ func defaultAccessorPairsSettings() accessorPairsSettings {
 		getWithoutSet:          false,
 		setWithoutGet:          true,
 		enforceForClassMembers: true,
-		enforceForTSTypes:      false,
+		enforceForTsTypes:      false,
 	}
 }
 
@@ -69,8 +69,8 @@ func (options AccessorPairsOptions) resolve() accessorPairsSettings {
 	if options.EnforceForClassMembers != nil {
 		settings.enforceForClassMembers = *options.EnforceForClassMembers
 	}
-	if options.EnforceForTSTypes != nil {
-		settings.enforceForTSTypes = *options.EnforceForTSTypes
+	if options.EnforceForTsTypes != nil {
+		settings.enforceForTsTypes = *options.EnforceForTsTypes
 	}
 	return settings
 }
@@ -193,7 +193,7 @@ var AccessorPairs = rule.Rule{
 			listeners[ast.KindClassDeclaration] = classBody
 			listeners[ast.KindClassExpression] = classBody
 		}
-		if settings.enforceForTSTypes {
+		if settings.enforceForTsTypes {
 			typeBody := func(node *ast.Node) {
 				checkAccessorPairsTypeBody(ruleContext, node, settings)
 			}
@@ -422,6 +422,8 @@ func accessorPairsTokensOf(ruleContext rule.Context, accessor *ast.Node) []acces
 // Whitespace never contributes, because `TokenRange` strips leading trivia and no marker carries
 // position. That is what pairs `[x + 1]` with `[x  +  1]`, which is upstream's behaviour and the
 // reason this path exists at all.
+//
+// Mutates: tokens the walk appends every token it renders, so one slice gathers the whole expression
 func accessorPairsCollectTokens(ruleContext rule.Context, node *ast.Node, tokens *[]accessorPairsToken) {
 	if node == nil {
 		return
@@ -590,7 +592,8 @@ func checkAccessorPairsClassBody(
 	node *ast.Node,
 	settings accessorPairsSettings,
 ) {
-	var staticSide, instanceSide []*ast.Node
+	var staticSide []*ast.Node
+	var instanceSide []*ast.Node
 	for _, member := range accessorPairsMembersOf(node) {
 		if ast.IsStatic(member) {
 			staticSide = append(staticSide, member)

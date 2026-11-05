@@ -178,25 +178,26 @@ func impliedEvalCalleeName(ruleContext rule.Context, callee *ast.Node) (string, 
 	// arrives here wrapped where upstream sees the identifier directly. Unwrapped in a loop because
 	// `((setTimeout))('s')` nests, and with the nil check written out rather than delegated to
 	// ast.SkipParentheses, which dereferences its argument.
-	for callee != nil && callee.Kind == ast.KindParenthesizedExpression {
-		callee = callee.AsParenthesizedExpression().Expression
+	unwrapped := callee
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if callee == nil {
+	if unwrapped == nil {
 		return "", false
 	}
 
 	// The bare form. `setTimeout('s')` reports only when that name is the global one.
-	if callee.Kind == ast.KindIdentifier {
-		return callee.Text(), impliedEvalResolvesToAGlobal(ruleContext, callee)
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text(), impliedEvalResolvesToAGlobal(ruleContext, unwrapped)
 	}
 
 	// The member forms. Read the property being called, then walk the receiver.
-	functionName, settled := impliedEvalAccessedName(callee)
+	functionName, settled := impliedEvalAccessedName(unwrapped)
 	if !settled {
 		return "", false
 	}
 
-	receiver := impliedEvalAccessReceiver(callee)
+	receiver := impliedEvalAccessReceiver(unwrapped)
 	for {
 		for receiver != nil && receiver.Kind == ast.KindParenthesizedExpression {
 			receiver = receiver.AsParenthesizedExpression().Expression
@@ -394,21 +395,22 @@ func impliedEvalFirstArgumentIsAString(call *ast.Node) bool {
 func impliedEvalIsEvaluatedString(node *ast.Node) bool {
 	// Our parser keeps parentheses that upstream's parser folds away, so `('foo' + bar)` arrives
 	// here wrapped. Unwrapped in a loop, since the wrapping nests.
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if node == nil {
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral,
 		ast.KindNoSubstitutionTemplateLiteral,
 		ast.KindTemplateExpression:
 		return true
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindPlusToken {
 			return false
 		}

@@ -152,6 +152,8 @@ var NoImportAssign = rule.Rule{
 //
 // The member and mutation-function shapes apply only to `import * as`. A default or named import is
 // an ordinary value and mutating it is upstream's first ten clean cases.
+//
+// Mutates: judged marks each declaration it reports, so two imports naming one binding report it once
 func reportWritesToImport(ruleContext rule.Context, name *ast.Node, isNamespace bool, judged map[*ast.Node]bool) {
 	if name == nil {
 		return

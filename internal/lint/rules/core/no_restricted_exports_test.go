@@ -11,7 +11,7 @@ import (
 const noRestrictedExportsFile = "/repository/source/NoRestrictedExports.ts"
 
 // noRestrictedExportsFlag spells an optional boolean in a fixture row.
-func noRestrictedExportsFlag(value bool) *bool { return &value }
+func noRestrictedExportsFlag(value bool) *bool { return new(value) }
 
 // noRestrictedExportsCase is one imported corpus row.
 type noRestrictedExportsCase struct {

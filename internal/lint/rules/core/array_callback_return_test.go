@@ -145,10 +145,11 @@ func applyArrayCallbackFixes(source string, fixes []rule.Fix) string {
 	sort.SliceStable(ordered, func(left, right int) bool {
 		return ordered[left].Range.Pos() > ordered[right].Range.Pos()
 	})
+	fixed := source
 	for _, fix := range ordered {
-		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 	}
-	return source
+	return fixed
 }
 
 // TestArrayCallbackReturnSpan asserts where each finding points.

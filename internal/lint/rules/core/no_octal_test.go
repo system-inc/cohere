@@ -160,7 +160,7 @@ func TestNoOctalStaysSilent(test *testing.T) {
 // ESLint's own `/^0\d/u` against that string returns false. So declining is upstream-faithful and
 // not a gap, `tsc` catches the input separately as TS6188, and the case lives in the silent list
 // with the other declines. Written down because the failing fixture was the porter being wrong.
-func TestNoOctalOnSourceOurParserAcceptsAndESLintRejects(test *testing.T) {
+func TestNoOctalOnSourceOurParserAcceptsAndEsLintRejects(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

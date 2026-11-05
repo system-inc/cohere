@@ -8,6 +8,25 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// useBeforeDefineDeclarationCategory names what kind of thing a binding is, in the terms the option
+// surface is written in.
+//
+// Not the AST kind, deliberately. Upstream's options are spelled against `eslint-scope`'s definition
+// types (`FunctionName`, `ClassName`, `Variable`, `TSEnumName`, `Type`), which group several AST
+// kinds each: an interface and a type alias are both `Type`, and a `var`, a `let` and a `const` are
+// all `Variable`. Mapping to that vocabulary once here keeps the option checks below readable as
+// upstream's own conditions.
+type useBeforeDefineDeclarationCategory int
+
+const (
+	useBeforeDefineOther useBeforeDefineDeclarationCategory = iota
+	useBeforeDefineFunction
+	useBeforeDefineClass
+	useBeforeDefineVariable
+	useBeforeDefineEnum
+	useBeforeDefineType
+)
+
 // NoUseBeforeDefineOptions configures which kinds of binding the rule judges.
 //
 // Every field is a pointer, and that is load-bearing rather than tidy. Six of the seven options
@@ -569,25 +588,6 @@ func shouldCheckUseBeforeDefineReference(
 
 	return true
 }
-
-// useBeforeDefineDeclarationCategory names what kind of thing a binding is, in the terms the option
-// surface is written in.
-//
-// Not the AST kind, deliberately. Upstream's options are spelled against `eslint-scope`'s definition
-// types (`FunctionName`, `ClassName`, `Variable`, `TSEnumName`, `Type`), which group several AST
-// kinds each: an interface and a type alias are both `Type`, and a `var`, a `let` and a `const` are
-// all `Variable`. Mapping to that vocabulary once here keeps the option checks above readable as
-// upstream's own conditions.
-type useBeforeDefineDeclarationCategory int
-
-const (
-	useBeforeDefineOther useBeforeDefineDeclarationCategory = iota
-	useBeforeDefineFunction
-	useBeforeDefineClass
-	useBeforeDefineVariable
-	useBeforeDefineEnum
-	useBeforeDefineType
-)
 
 // useBeforeDefineDeclarationKind classifies a declaration into the option vocabulary above.
 func useBeforeDefineDeclarationKind(declaration *ast.Node) useBeforeDefineDeclarationCategory {

@@ -183,6 +183,8 @@ var NoConstAssign = rule.Rule{
 // a failing case for the write coming first (`x = 123; const x = 1;`) and notes that reporting it
 // aligns with ESLint. Anchoring the search on the file and the match on symbol identity is what
 // makes the position of the write irrelevant.
+//
+// Mutates: judged marks each anchor it reports, so a constant declared twice is reported once per file
 func reportConstWrites(ruleContext rule.Context, boundName *ast.Node, judged map[*ast.Node]bool) {
 	// Resolved through the checker rather than taken as the declarator node directly, so that both
 	// sides of the comparison are answers to the same question: asking the AST for one side and the

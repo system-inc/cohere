@@ -44,50 +44,6 @@ type RequireDescriptionOptions struct {
 	AdditionalDirectives []string `json:"additionalDirectives"`
 }
 
-// DecodeRequireDescriptionOptions reads the option object, refusing what upstream's schema refuses.
-//
-// The schema says `additionalProperties: false`, an `ignore` enum, and `uniqueItems`. There is no
-// schema layer here, so each is checked by hand: a misspelled key or kind would otherwise decode
-// silently to "ignore nothing", which reports more than the author asked for and says nothing.
-// A bare severity hands this no bytes, which is the zero options and not an error.
-func DecodeRequireDescriptionOptions(raw []byte) (any, error) {
-	options := RequireDescriptionOptions{}
-	if len(raw) == 0 {
-		return options, nil
-	}
-	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
-		return options, fmt.Errorf("%s: %w", RequireDescription.Name, unmarshalOptionsError)
-	}
-	seen := map[string]bool{}
-	for _, kind := range options.Ignore {
-		known := false
-		for _, ignorable := range RequireDescriptionIgnorable {
-			if kind == ignorable {
-				known = true
-				break
-			}
-		}
-		if !known {
-			return options, fmt.Errorf("%s: ignore names %q, wanted one of %s",
-				RequireDescription.Name, kind, strings.Join(RequireDescriptionIgnorable, ", "))
-		}
-		if seen[kind] {
-			return options, fmt.Errorf("%s: ignore names %q twice", RequireDescription.Name, kind)
-		}
-		seen[kind] = true
-	}
-	return options, nil
-}
-
-// messageRequireDescriptionMissing is upstream's `missingDescription`, with the repair spelled out.
-var messageRequireDescriptionMissing = rule.Message{
-	Id: "missingDescription",
-	Description: "Unexpected undescribed directive comment. Include descriptions to explain why the " +
-		"comment is necessary: write the reason after ` -- ` at the end of the directive, as in " +
-		"`// eslint-disable-next-line some-rule -- why this line is the exception`. A suppression " +
-		"that does not say why cannot be told apart from one nobody remembers adding.",
-}
-
 // RequireDescription reports a directive comment that carries no ` -- reason`.
 //
 //	valid:   // eslint-disable-next-line eqeqeq -- comparing against a DOM attribute
@@ -160,6 +116,50 @@ var RequireDescription = rule.Rule{
 			},
 		}
 	},
+}
+
+// DecodeRequireDescriptionOptions reads the option object, refusing what upstream's schema refuses.
+//
+// The schema says `additionalProperties: false`, an `ignore` enum, and `uniqueItems`. There is no
+// schema layer here, so each is checked by hand: a misspelled key or kind would otherwise decode
+// silently to "ignore nothing", which reports more than the author asked for and says nothing.
+// A bare severity hands this no bytes, which is the zero options and not an error.
+func DecodeRequireDescriptionOptions(raw []byte) (any, error) {
+	options := RequireDescriptionOptions{}
+	if len(raw) == 0 {
+		return options, nil
+	}
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("%s: %w", RequireDescription.Name, unmarshalOptionsError)
+	}
+	seen := map[string]bool{}
+	for _, kind := range options.Ignore {
+		known := false
+		for _, ignorable := range RequireDescriptionIgnorable {
+			if kind == ignorable {
+				known = true
+				break
+			}
+		}
+		if !known {
+			return options, fmt.Errorf("%s: ignore names %q, wanted one of %s",
+				RequireDescription.Name, kind, strings.Join(RequireDescriptionIgnorable, ", "))
+		}
+		if seen[kind] {
+			return options, fmt.Errorf("%s: ignore names %q twice", RequireDescription.Name, kind)
+		}
+		seen[kind] = true
+	}
+	return options, nil
+}
+
+// messageRequireDescriptionMissing is upstream's `missingDescription`, with the repair spelled out.
+var messageRequireDescriptionMissing = rule.Message{
+	Id: "missingDescription",
+	Description: "Unexpected undescribed directive comment. Include descriptions to explain why the " +
+		"comment is necessary: write the reason after ` -- ` at the end of the directive, as in " +
+		"`// eslint-disable-next-line some-rule -- why this line is the exception`. A suppression " +
+		"that does not say why cannot be told apart from one nobody remembers adding.",
 }
 
 // reportRequireDescription is upstream's `create` body, run once per file.

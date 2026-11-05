@@ -137,6 +137,8 @@ var NoFuncAssign = rule.Rule{
 // binding. Anchoring the search on the file and the match on the symbol is what makes the position of
 // the write irrelevant. An identifier resolves to one declaration, so each write is reported by at
 // most one function.
+//
+// Mutates: judged marks each declaration it reports, so overloads sharing one are reported once
 func reportWritesToFunctionName(ruleContext rule.Context, function *ast.Node, judged map[*ast.Node]bool) {
 	name := function.Name()
 	if name == nil || name.Kind != ast.KindIdentifier {
