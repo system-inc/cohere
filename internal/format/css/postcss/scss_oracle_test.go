@@ -317,8 +317,12 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
+		name, isString := record["name"].(string)
+		if !isString {
+			test.Fatalf("the oracle printed a record without a name: %s", line)
+		}
 		records = append(records, record)
-		seen[record["name"].(string)] = true
+		seen[name] = true
 	}
 	for _, each := range inputs {
 		if each.Js == "" && !seen[each.Name] {
@@ -334,8 +338,11 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 		}
 	}
 	for _, want := range records {
-		name := want["name"].(string)
-		text := want["text"].(string)
+		name, nameIsString := want["name"].(string)
+		text, textIsString := want["text"].(string)
+		if !nameIsString || !textIsString {
+			test.Fatalf("the oracle printed a record without a name and text: %v", want)
+		}
 		if !corpusFiles[name] && !strings.HasPrefix(name, "fixture: ") {
 			templates++
 		}

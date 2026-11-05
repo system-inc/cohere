@@ -29,7 +29,7 @@ func TestParseTree(test *testing.T) {
 		test.Errorf("first rule %s %q %v", first.Type(), first.String("selector"), first.Range)
 	}
 	declaration := first.List("nodes")[0]
-	raws := declaration.Get("raws").(map[string]any)
+	raws := objectOf(test, declaration.Get("raws"), "declaration raws")
 	if declaration.String("prop") != "b" || declaration.String("value") != "c" || !declaration.Bool("important") || raws["important"] != " ! important" || raws["between"] != ":" {
 		test.Errorf("declaration %v %v", declaration.Keys(), raws)
 	}
@@ -38,13 +38,13 @@ func TestParseTree(test *testing.T) {
 	}
 
 	second := rules[1]
-	start := second.Get("source").(map[string]any)["start"].(map[string]any)
+	start := objectOf(test, objectOf(test, second.Get("source"), "second rule source")["start"], "second rule source start")
 	if start["offset"] != 20 || start["line"] != 2 || start["column"] != 1 {
 		test.Errorf("second rule starts at %v", start)
 	}
 	children := second.List("nodes")
 	comment := children[0]
-	commentStart := comment.Get("source").(map[string]any)["start"].(map[string]any)
+	commentStart := objectOf(test, objectOf(test, comment.Get("source"), "comment source")["start"], "comment source start")
 	// The comment starts at column 5 of line 2 (the emoji is two units), 26 bytes into the text.
 	if comment.Type() != "comment" || comment.String("text") != "x" || commentStart["column"] != 5 || commentStart["offset"] != 26 {
 		test.Errorf("comment %q at %v", comment.String("text"), commentStart)
@@ -53,6 +53,16 @@ func TestParseTree(test *testing.T) {
 	if custom.String("prop") != "--d" || custom.String("value") != "{e}" {
 		test.Errorf("custom property %q %q", custom.String("prop"), custom.String("value"))
 	}
+}
+
+// objectOf is value as the JavaScript object a node field holds, failing the test when it is not one.
+func objectOf(test *testing.T, value any, what string) map[string]any {
+	test.Helper()
+	object, isObject := value.(map[string]any)
+	if !isObject {
+		test.Fatalf("%s is %#v, want an object", what, value)
+	}
+	return object
 }
 
 // TestParseByteOrderMark checks that offsets count from after the byte order mark, as postcss's do.
