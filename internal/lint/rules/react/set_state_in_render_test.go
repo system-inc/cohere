@@ -692,8 +692,8 @@ func TestSetStateInRenderIsRegistered(test *testing.T) {
 		test.Errorf("rule name = %q, want %q", SetStateInRender.Name, "set-state-in-render")
 	}
 	found := false
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == SetStateInRender.Name {
+	for _, entry := range rule.Registered() {
+		if entry.Name == SetStateInRender.Name {
 			found = true
 			break
 		}

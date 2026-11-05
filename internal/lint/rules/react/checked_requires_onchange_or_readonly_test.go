@@ -640,8 +640,8 @@ func TestCheckedRequiresNeedsTheTypedHarness(test *testing.T) {
 func TestCheckedRequiresHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(test, CheckedRequiresOnChangeOrReadOnly,
-		checkedRequiresFile, "<input checked defaultChecked />", nil)
+	result := rule_testing.RunTyped(test, CheckedRequiresOnChangeOrReadOnly,
+		checkedRequiresFile, "<input checked defaultChecked />")
 	rule_testing.ExpectFindings(test, result, "exclusiveCheckedAttribute", "missingProperty")
 }
 

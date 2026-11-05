@@ -788,12 +788,12 @@ func TestButtonHasTypeRejectsMalformedOptions(test *testing.T) {
 func TestButtonHasTypeHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	clean := rule_testing.RunTypedWithOptions(test, ButtonHasType, buttonHasTypeFile,
-		"const a = <button type=\"button\"/>;\n", nil)
+	clean := rule_testing.RunTyped(test, ButtonHasType, buttonHasTypeFile,
+		"const a = <button type=\"button\"/>;\n")
 	rule_testing.ExpectClean(test, clean)
 
-	reporting := rule_testing.RunTypedWithOptions(test, ButtonHasType, buttonHasTypeFile,
-		"const a = <button/>;\n", nil)
+	reporting := rule_testing.RunTyped(test, ButtonHasType, buttonHasTypeFile,
+		"const a = <button/>;\n")
 	rule_testing.ExpectFindings(test, reporting, "missingType")
 }
 

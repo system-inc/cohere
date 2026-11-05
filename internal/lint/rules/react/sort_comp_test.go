@@ -432,7 +432,7 @@ var sortCompSilentCases = []sortCompCase{
 // is what the config layer calls and it carries two behaviours nothing else would test: the
 // empty-input path a bare `"error"` configuration takes, and the pointer fields that keep an
 // explicitly empty `order` distinct from an absent one.
-func decodedSortCompOptions(test *testing.T, raw string) any {
+func decodedSortCompOptions(test *testing.T, raw string) SortCompOptions {
 	test.Helper()
 	decoded, decodeSortCompOptionsError := DecodeSortCompOptions([]byte(raw))
 	if decodeSortCompOptionsError != nil {
@@ -514,7 +514,7 @@ func TestSortCompSurvivesNilOptions(test *testing.T) {
 
 	const reporting = "class Hello extends React.Component {\n  render() { return <div>Hello</div>; }\n  componentDidMount() {}\n}\n"
 
-	result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, reporting, nil)
+	result := rule_testing.Run(test, SortComp, sortCompFile, reporting)
 	rule_testing.ExpectFindings(test, result, "unsortedProps")
 }
 

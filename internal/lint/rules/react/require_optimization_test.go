@@ -646,20 +646,20 @@ func TestRequireOptimizationRejectsMalformedOptions(test *testing.T) {
 func TestRequireOptimizationHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	reporting := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
-		"declare const React: any;\nclass C extends React.Component {}\n", nil)
+	reporting := rule_testing.Run(test, RequireOptimization, requireOptimizationFile,
+		"declare const React: any;\nclass C extends React.Component {}\n")
 	rule_testing.ExpectFindings(test, reporting, "noShouldComponentUpdate")
 
-	clean := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
-		"declare const React: any;\nclass C extends React.PureComponent {}\n", nil)
+	clean := rule_testing.Run(test, RequireOptimization, requireOptimizationFile,
+		"declare const React: any;\nclass C extends React.PureComponent {}\n")
 	rule_testing.ExpectClean(test, clean)
 
 	// The rows above cannot see the allow list at all, because neither carries a decorator, so a
 	// mutant giving the nil path a non-empty list survived them. This is the case that separates
 	// "nil means no decorators are allowed" from any other default: a bare decorator must still
 	// report when nothing configured it.
-	decorated := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
-		"declare const pure: any;\ndeclare const Component: any;\n@pure\nclass C extends Component {}\n", nil)
+	decorated := rule_testing.Run(test, RequireOptimization, requireOptimizationFile,
+		"declare const pure: any;\ndeclare const Component: any;\n@pure\nclass C extends Component {}\n")
 	rule_testing.ExpectFindings(test, decorated, "noShouldComponentUpdate")
 }
 

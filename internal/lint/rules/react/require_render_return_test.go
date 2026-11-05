@@ -567,6 +567,6 @@ func TestRequireRenderReturnIgnoresOptions(test *testing.T) {
 	test.Parallel()
 
 	const sourceText = "class Hello extends React.Component {\n  render() {}\n}\n"
-	result := rule_testing.RunWithOptions(test, RequireRenderReturn, requireRenderReturnFile, sourceText, nil)
+	result := rule_testing.Run(test, RequireRenderReturn, requireRenderReturnFile, sourceText)
 	rule_testing.ExpectFindings(test, result, "noRenderReturn")
 }

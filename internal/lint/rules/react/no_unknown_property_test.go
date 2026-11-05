@@ -35,7 +35,7 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
 // the defaults under test. An empty body is the nil-options case.
-func noUnknownPropertyOptions(test *testing.T, raw string) any {
+func noUnknownPropertyOptions(test *testing.T, raw string) NoUnknownPropertyOptions {
 	test.Helper()
 	decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions([]byte(raw))
 	if decodeNoUnknownPropertyOptionsError != nil {

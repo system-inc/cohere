@@ -24,7 +24,7 @@ const preferStatelessFunctionFile = "/repository/source/Pure.tsx"
 // [severity, options] tuple before dispatch, so copying ESLint's spelling fails on every row.
 func runPreferStatelessFunction(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	var decoded any
+	var decoded PreferStatelessFunctionOptions
 	var err error
 	if rawOptions == "" {
 		decoded, err = DecodePreferStatelessFunctionOptions(nil)
@@ -635,8 +635,8 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 		// Bypasses the decoder entirely, which is the path every other fixture misses. A
 		// PureComponent is the case that measures anything: it reports under the real default and
 		// would be clean under a wrong fallback of ignorePureComponents true.
-		result := rule_testing.RunWithOptions(test, PreferStatelessFunction, preferStatelessFunctionFile,
-			"class Foo extends React.PureComponent { render() { return <div/>; } }", nil)
+		result := rule_testing.Run(test, PreferStatelessFunction, preferStatelessFunctionFile,
+			"class Foo extends React.PureComponent { render() { return <div/>; } }")
 		rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 	})
 }

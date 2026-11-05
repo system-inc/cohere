@@ -308,22 +308,47 @@ func TestJsxNoUndefAllowGlobals(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[JsxNoUndefOptions]
 		wantCount  int
 	}{
-		{"a global under the default", "export {}; var React: any; React.render(<Text />);", nil, 1},
-		{"a global under allowGlobals false", "export {}; var React: any; React.render(<Text />);", disallowed, 1},
-		{"a global under allowGlobals", "export {}; var React: any; React.render(<Text />);", allowed, 0},
-		{"a lib global under the default", "export {}; <Map />;", nil, 1},
-		{"a lib global under allowGlobals", "export {}; <Map />;", allowed, 0},
-		{"an import under allowGlobals false", "import Text from './globals'; <Text />;", disallowed, 0},
-		{"a declare global member in the same file", "declare global { var G: any } export {}; <G />;", nil, 0},
-		{"an undeclared name under allowGlobals", "export {}; <Missing />;", allowed, 1},
+		{
+			"a global under the default",
+			"export {}; var React: any; React.render(<Text />);",
+			rule.Given[JsxNoUndefOptions]{},
+			1,
+		},
+		{
+			"a global under allowGlobals false",
+			"export {}; var React: any; React.render(<Text />);",
+			rule.Configured(disallowed),
+			1,
+		},
+		{
+			"a global under allowGlobals",
+			"export {}; var React: any; React.render(<Text />);",
+			rule.Configured(allowed),
+			0,
+		},
+		{"a lib global under the default", "export {}; <Map />;", rule.Given[JsxNoUndefOptions]{}, 1},
+		{"a lib global under allowGlobals", "export {}; <Map />;", rule.Configured(allowed), 0},
+		{
+			"an import under allowGlobals false",
+			"import Text from './globals'; <Text />;",
+			rule.Configured(disallowed),
+			0,
+		},
+		{
+			"a declare global member in the same file",
+			"declare global { var G: any } export {}; <G />;",
+			rule.Given[JsxNoUndefOptions]{},
+			0,
+		},
+		{"an undeclared name under allowGlobals", "export {}; <Missing />;", rule.Configured(allowed), 1},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFilesWithOptions(test, JsxNoUndef, map[string]string{
+			result := rule_testing.RunTypedFilesGiven(test, JsxNoUndef, map[string]string{
 				globals:        "declare var Text: any;\n",
 				jsxNoUndefFile: testCase.sourceText,
 			}, jsxNoUndefFile, testCase.options)

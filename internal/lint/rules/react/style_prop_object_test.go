@@ -33,7 +33,7 @@ const stylePropObjectFile = "/repository/source/StylePropObject.tsx"
 // An empty body is the nil-options case, which here means an empty allow list and therefore full
 // enforcement. That is the opposite direction from the sibling forbid rules, where an empty list
 // means the rule declines everything.
-func stylePropObjectOptions(test *testing.T, raw string) any {
+func stylePropObjectOptions(test *testing.T, raw string) StylePropObjectOptions {
 	test.Helper()
 	decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions([]byte(raw))
 	if decodeStylePropertyObjectOptionsError != nil {

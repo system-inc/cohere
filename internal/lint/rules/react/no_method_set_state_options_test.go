@@ -7,7 +7,7 @@ import "testing"
 // The option column in the three set-state rules' tables is upstream's spelling: "" for a bare
 // severity, and otherwise the single string upstream passes. Routing it through the decoder rather
 // than building the struct is what keeps the decoder under every fixture.
-func noMethodSetStateOptions(test *testing.T, option string) any {
+func noMethodSetStateOptions(test *testing.T, option string) NoMethodSetStateOptions {
 	test.Helper()
 	raw := []byte(nil)
 	if option != "" {

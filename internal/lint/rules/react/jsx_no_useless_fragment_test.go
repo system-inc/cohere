@@ -615,8 +615,8 @@ func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(test *testing.T)
 func TestJsxNoUselessFragmentHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, JsxNoUselessFragment, jsxNoUselessFragmentFile,
-		"declare const x: any;\nconst a = <>{x}</>;\n", nil)
+	result := rule_testing.Run(test, JsxNoUselessFragment, jsxNoUselessFragmentFile,
+		"declare const x: any;\nconst a = <>{x}</>;\n")
 	rule_testing.ExpectFindings(test, result, "NeedsMoreChildren")
 }
 

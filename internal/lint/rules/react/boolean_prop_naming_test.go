@@ -1344,8 +1344,8 @@ func TestBooleanPropNamingDeclinesWithoutOptions(test *testing.T) {
 		sourceText, DefaultBooleanPropNamingOptions())
 	rule_testing.ExpectFindings(test, configured, "patternMismatch")
 
-	unconfigured := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile,
-		sourceText, nil)
+	unconfigured := rule_testing.RunTyped(test, BooleanPropNaming, booleanPropNamingFile,
+		sourceText)
 	rule_testing.ExpectClean(test, unconfigured)
 }
 

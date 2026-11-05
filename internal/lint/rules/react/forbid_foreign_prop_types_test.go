@@ -37,19 +37,18 @@ const forbidForeignPropTypesFile = "/repository/source/ForbidForeignPropTypes.ts
 // forbidForeignPropTypesOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the registered decoder rather than building the struct, so the decode path
-// is under test rather than assumed. An empty body is the nil-options case: the decoder errors, the
-// config turns that into nil for a non-required rule, and the rule's type assertion yields the zero
-// struct.
-func forbidForeignPropTypesOptions(test *testing.T, raw string) any {
+// is under test rather than assumed. An empty body is the unconfigured case: the decoder errors on it, so
+// a rule configured as a bare severity is handed no options, and the rule reads its zero struct.
+func forbidForeignPropTypesOptions(test *testing.T, raw string) rule.Given[ForbidForeignPropTypesOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[ForbidForeignPropTypesOptions]{}
 	}
 	decoded, err := rule.DecodeOptionsInto[ForbidForeignPropTypesOptions]()([]byte(raw))
 	if err != nil {
 		test.Fatalf("decoding %q: %v", raw, err)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // TestForbidForeignPropTypesFires runs the eight failing cases from upstream.
@@ -135,7 +134,7 @@ func TestForbidForeignPropTypesFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				ForbidForeignPropTypes,
 				forbidForeignPropTypesFile,
@@ -192,7 +191,7 @@ func TestForbidForeignPropTypesStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				ForbidForeignPropTypes,
 				forbidForeignPropTypesFile,
@@ -440,7 +439,7 @@ func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(
+			result := rule_testing.RunGiven(
 				test,
 				ForbidForeignPropTypes,
 				forbidForeignPropTypesFile,
@@ -467,7 +466,7 @@ func TestForbidForeignPropTypesDoesNotApplyTheOptionToPatterns(test *testing.T) 
 	test.Parallel()
 
 	source := `Foo.propTypes = (function () { const { propTypes } = Bar; return propTypes; })();`
-	result := rule_testing.RunWithOptions(
+	result := rule_testing.RunGiven(
 		test,
 		ForbidForeignPropTypes,
 		forbidForeignPropTypesFile,
@@ -488,10 +487,10 @@ func TestForbidForeignPropTypesDefaultsWithoutADecoder(test *testing.T) {
 
 	source := `Foo.propTypes = { a: Bar.propTypes.b };`
 
-	withoutOptions := rule_testing.RunWithOptions(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, source, nil)
+	withoutOptions := rule_testing.Run(test, ForbidForeignPropTypes, forbidForeignPropTypesFile, source)
 	rule_testing.ExpectFindings(test, withoutOptions, "forbiddenPropType")
 
-	withExplicitFalse := rule_testing.RunWithOptions(
+	withExplicitFalse := rule_testing.RunGiven(
 		test,
 		ForbidForeignPropTypes,
 		forbidForeignPropTypesFile,
@@ -502,7 +501,7 @@ func TestForbidForeignPropTypesDefaultsWithoutADecoder(test *testing.T) {
 
 	// The option is what moves the verdict, which is what makes the two above a measurement rather
 	// than a coincidence.
-	withTrue := rule_testing.RunWithOptions(
+	withTrue := rule_testing.RunGiven(
 		test,
 		ForbidForeignPropTypes,
 		forbidForeignPropTypesFile,
