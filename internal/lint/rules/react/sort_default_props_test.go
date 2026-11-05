@@ -99,7 +99,7 @@ func TestSortDefaultPropsFires(test *testing.T) {
 	}
 }
 
-// TestSortDefaultPropsRawKeyTextComparison pins the comparison being on SOURCE TEXT.
+// TestSortDefaultPropsRawKeyTextComparison pins the comparison being on source text.
 //
 // Upstream's `getKey` calls `getText` on the key node, so quotes the author wrote are part of the
 // string being compared. The consequence is an ordering nobody would design, and all three rows
@@ -131,7 +131,7 @@ func TestSortDefaultPropsRawKeyTextComparison(test *testing.T) {
 		},
 		{
 			// Four computed-key rows, because this is where the two trees disagree about what the
-			// key node IS. ESTree's `key` for `{[x]: 1}` is the inner expression `x`; our parser
+			// key node is. ESTree's `key` for `{[x]: 1}` is the inner expression `x`; our parser
 			// wraps it in a ComputedPropertyName carrying the brackets. Since `[` sorts between
 			// uppercase and lowercase, comparing the wrapper flips the verdict on two of these four
 			// and leaves the other two unchanged, which is exactly the shape that makes a wrong
@@ -167,7 +167,7 @@ func TestSortDefaultPropsRawKeyTextComparison(test *testing.T) {
 
 // TestSortDefaultPropsSpreadRestartsTheRun pins the spread behaviour.
 //
-// Upstream's reduce returns the element AFTER the spread rather than the spread itself, so that
+// Upstream's reduce returns the element after the spread rather than the spread itself, so that
 // element becomes the accumulator without being compared to anything. A spread therefore splits the
 // object into independently sorted runs rather than being skipped over. Measured: `{b, ...x, a}` is
 // clean while both `{...x, b, a}` and `{b, a, ...x}` report.
@@ -210,7 +210,7 @@ func TestSortDefaultPropsSpreadRestartsTheRun(test *testing.T) {
 
 // TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding pins how many findings one object yields.
 //
-// When a property is out of order upstream returns the PREVIOUS accumulator rather than advancing
+// When a property is out of order upstream returns the previous accumulator rather than advancing
 // past the offender, so `{c, b, a}` reports twice, both measured against the same `c`. A port that
 // resynced would report once and pass every imported case, because upstream's longest failing
 // object has a single inversion.
@@ -222,7 +222,7 @@ func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(test *testing.T) {
 		findings         int
 	}{
 		{
-			// This row does NOT distinguish the two designs and is kept for contrast: a descending
+			// This row does not distinguish the two designs and is kept for contrast: a descending
 			// run reports twice whether the accumulator holds or advances, which is why a mutation
 			// making it advance survived until the rows below existed.
 			"a fully descending run reports on each step either way",
@@ -263,8 +263,8 @@ func TestSortDefaultPropsAccumulatorDoesNotAdvanceOnAFinding(test *testing.T) {
 
 // TestSortDefaultPropsIgnoreCase pins the option, using the pair that inverts across it.
 //
-// `{B: 1, a: 2}` is SORTED by default, because uppercase letters sort before lowercase, and
-// UNSORTED once case is folded. Both measured. A pair that inverts is the only kind that can tell a
+// `{B: 1, a: 2}` is sorted by default, because uppercase letters sort before lowercase, and
+// unsorted once case is folded. Both measured. A pair that inverts is the only kind that can tell a
 // working option from one that is read and discarded.
 func TestSortDefaultPropsIgnoreCase(test *testing.T) {
 	test.Parallel()
@@ -282,9 +282,9 @@ func TestSortDefaultPropsIgnoreCase(test *testing.T) {
 
 // TestSortDefaultPropsWhichObjectsAreReached pins the two routes and three shapes that are not.
 //
-// The `getDefaultProps` METHOD row is the one worth reading twice: the name is one of the two this
+// The `getDefaultProps` method row is the one worth reading twice: the name is one of the two this
 // rule accepts, and the object is right there in the return, and it is still silent. Upstream looks
-// at the property's VALUE rather than at a return statement, so a method never reaches the check.
+// at the property's value rather than at a return statement, so a method never reaches the check.
 // Measured.
 func TestSortDefaultPropsWhichObjectsAreReached(test *testing.T) {
 	test.Parallel()
@@ -345,7 +345,7 @@ func TestSortDefaultPropsWhichObjectsAreReached(test *testing.T) {
 
 // TestSortDefaultPropsSpanAndMessage asserts where the finding points and what it says.
 //
-// The finding anchors on the offending PROPERTY rather than on the object or the declaration, so a
+// The finding anchors on the offending property rather than on the object or the declaration, so a
 // reader is shown the key that is in the wrong place. No message here interpolates, but the text is
 // asserted against a literal typed here rather than against the rule's own constant, which would
 // move both sides together under mutation.
@@ -381,7 +381,7 @@ func TestSortDefaultPropsSpanAndMessage(test *testing.T) {
 // TestDecodeSortDefaultPropsOptions routes configuration through the exported decoder.
 //
 // The nil row is the one that matters: a rule configured as a bare "error" is handed empty input,
-// and this option defaults to FALSE so the zero value happens to be right. That is worth pinning
+// and this option defaults to `false` so the zero value happens to be right. That is worth pinning
 // rather than relying on, because the sibling rule in this package needed a pointer decoder for
 // exactly the opposite reason.
 func TestDecodeSortDefaultPropsOptions(test *testing.T) {
@@ -448,7 +448,7 @@ func TestSortDefaultPropsRequiresTheTypedHarness(test *testing.T) {
 //
 // `Pos()` includes leading trivia here, so slicing a key node raw picks up the newline, indentation
 // and any comment written before it. Whitespace and `/` sort below every letter, so an untrimmed
-// key compares as less than almost anything and a correctly SORTED object reports.
+// key compares as less than almost anything and a correctly sorted object reports.
 //
 // Both rows are measured silent against the installed build, and both report without the trim. The
 // multiline row is the one that matters in practice: a defaults object written across lines is the
@@ -483,7 +483,7 @@ func TestSortDefaultPropsLeadingTriviaIsNotPartOfTheKey(test *testing.T) {
 // TestSortDefaultPropsGetDefaultPropsSpelling pins the second accepted name.
 //
 // Upstream accepts `getDefaultProps` alongside `defaultProps` in both arms, and a mutation dropping
-// it survived because upstream's corpus writes the name only as a METHOD, which is silent for a
+// it survived because upstream's corpus writes the name only as a method, which is silent for a
 // different reason. As a field or an assignment it reports, both measured.
 func TestSortDefaultPropsGetDefaultPropsSpelling(test *testing.T) {
 	test.Parallel()

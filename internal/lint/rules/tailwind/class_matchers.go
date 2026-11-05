@@ -43,6 +43,8 @@ func compileMatchers(matchers []SelectorMatcher) []compiledMatcher {
 	for _, matcher := range matchers {
 		entry := compiledMatcher{matcherType: matcher.Type, hasPath: matcher.Path != "", inner: compileMatchers(matcher.Match)}
 		if entry.hasPath {
+			// Ignored: a pattern that does not compile leaves path nil, which matches no path rather than
+			// refusing the run, as compiledMatcher's path says.
 			entry.path, _ = esregexp.Compile(matcher.Path, "")
 		}
 		compiled = append(compiled, entry)
@@ -251,7 +253,7 @@ const (
 	liveMatcherReturnStatement
 )
 
-// matcherResult is a matcher's answer about one node: upstream's MATCH, NO_MATCH, UNCROSSABLE_BOUNDARY,
+// matcherResult is a matcher's answer about one node: upstream's `MATCH`, `NO_MATCH`, `UNCROSSABLE_BOUNDARY`,
 // or a list of matchers to ask in its place.
 type matcherResult int
 
@@ -315,7 +317,8 @@ func (walker *nestingWalker) visit(node esNode, live []liveMatcher) {
 	isMatch := false
 	current := live
 	for len(current) > 0 {
-		var next, nested []liveMatcher
+		var next []liveMatcher
+		var nested []liveMatcher
 		for _, matcher := range current {
 			result, made := matcher.evaluate(node)
 			switch result {

@@ -19,7 +19,7 @@ const forbidDomPropsFile = "/repository/source/ForbidDomProps.tsx"
 // values, so no escape sequence was typed on the way here. Upstream carries 12 valid and 11 invalid
 // cases.
 //
-// # The expected counts are the INSTALLED build's, not the clone's, and they differ on three cases
+// # The expected counts are the installed build's, not the clone's, and they differ on three cases
 //
 // The clone's working tree carries a `disallowedValues` feature that the installed build, version
 // 7.37.5, does not have. Replaying all 23 cases against the installed build through the ESLint
@@ -154,7 +154,7 @@ func TestForbidDomPropsFires(test *testing.T) {
 		{"a bare prop with no value", `<div someProp />`, `{"forbid":["someProp"]}`, 1},
 		{"an expression container value", `<div someProp={x} />`, `{"forbid":["someProp"]}`, 1},
 		{"a numeric expression value", `<div someProp={5} />`, `{"forbid":["someProp"]}`, 1},
-		// A repeated prop name keeps the LAST entry's restriction. Measured both ways; its partner
+		// A repeated prop name keeps the last entry's restriction. Measured both ways; its partner
 		// in the silent table uses the first entry's tag and is clean.
 		{"repeated propName keeps the last restriction", `<span className="x" />`, `{"forbid":[{"propName":"className","disallowedFor":["div"]},{"propName":"className","disallowedFor":["span"]}]}`, 1},
 		// An empty message string is falsy upstream, so the default text is used rather than an
@@ -247,10 +247,10 @@ func TestForbidDomPropsStaysSilent(test *testing.T) {
       `, `{"forbid":[{"propName":"someProp","disallowedValues":["someValue"],"disallowedFor":["span"]}]}`},
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
-		// An empty disallowedFor list is truthy upstream and matches no tag, which is NOT the same
+		// An empty disallowedFor list is truthy upstream and matches no tag, which is not the same
 		// as an absent list meaning every tag. Its partner in the firing table omits the key.
 		{"an empty disallowedFor matches no tag", `<div className="x" />`, `{"forbid":[{"propName":"className","disallowedFor":[]}]}`},
-		// The DOM-node test asks whether the first character CHANGES under upper-casing, not
+		// The DOM-node test asks whether the first character changes under upper-casing, not
 		// whether it is lowercase. An underscore upper-cases to itself, so this is clean. Measured,
 		// and no corpus case writes it.
 		{"a tag starting with an underscore is not a DOM node", `<_div someProp="v" />`, `{"forbid":["someProp"]}`},
@@ -261,7 +261,7 @@ func TestForbidDomPropsStaysSilent(test *testing.T) {
 		{"a spread has no name to match", `<div {...properties} />`, `{"forbid":["someProp"]}`},
 		{"no options at all", `<div className="x" />`, ``},
 		{"an empty forbid list", `<div className="x" />`, `{"forbid":[]}`},
-		// The partner to the repeated-name case: the FIRST entry's tag no longer applies.
+		// The partner to the repeated-name case: the first entry's tag no longer applies.
 		{"repeated propName drops the first restriction", `<div className="x" />`, `{"forbid":[{"propName":"className","disallowedFor":["div"]},{"propName":"className","disallowedFor":["span"]}]}`},
 	}
 
@@ -275,7 +275,7 @@ func TestForbidDomPropsStaysSilent(test *testing.T) {
 	}
 }
 
-// TestForbidDomPropsReportsOnTheWholeAttribute pins WHERE the finding points.
+// TestForbidDomPropsReportsOnTheWholeAttribute pins where the finding points.
 //
 // Upstream reports on the JSXAttribute, so the span covers the name and the value together rather
 // than either alone. A port anchoring on the name node, or on the element, would pass every
@@ -298,7 +298,7 @@ func TestForbidDomPropsReportsOnTheWholeAttribute(test *testing.T) {
 // TestForbidDomPropsMessageText asserts the rendered findings exactly.
 //
 // The default message interpolates the prop name, so an id assertion cannot see anything the format
-// string does. The custom-message branch replaces the text entirely, and an EMPTY custom message
+// string does. The custom-message branch replaces the text entirely, and an empty custom message
 // falls back to the default rather than reporting an empty finding. All three are asserted against
 // literals typed here rather than against the rule's own constants, which would move under mutation.
 func TestForbidDomPropsMessageText(test *testing.T) {
@@ -343,7 +343,7 @@ func TestForbidDomPropsMessageText(test *testing.T) {
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue. Upstream has no
 // such gate anywhere.
 //
-// `.ts` is absent for a PARSER reason rather than a rule one: TypeScript reads an opening angle
+// `.ts` is absent for a parser reason rather than a rule one: TypeScript reads an opening angle
 // bracket there as a type assertion, so no JSX attribute node exists for any rule to see. Probed
 // with a control across all four extensions on a sibling rule with the same anchor.
 func TestForbidDomPropsHasNoFileSuffixGate(test *testing.T) {
@@ -466,7 +466,7 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 // TestForbidDomPropsIsDomNodeName probes the component test at the characters that separate the two
 // readings.
 //
-// Upstream asks whether the first character CHANGES under upper-casing, not whether it is
+// Upstream asks whether the first character changes under upper-casing, not whether it is
 // lowercase, and the two disagree on every character with no case. Each expectation here was
 // measured by driving the installed rule on the corresponding tag.
 func TestForbidDomPropsIsDomNodeName(test *testing.T) {
@@ -481,7 +481,7 @@ func TestForbidDomPropsIsDomNodeName(test *testing.T) {
 		{"a", true},
 		{"Div", false},
 		{"Foo", false},
-		// A character with no case is unchanged by upper-casing, so it is NOT a DOM node. This is
+		// A character with no case is unchanged by upper-casing, so it is not a DOM node. This is
 		// the whole difference between upstream's test and an is-lowercase test.
 		{"_div", false},
 		{"", false},

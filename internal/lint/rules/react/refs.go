@@ -50,12 +50,12 @@ import (
 // Six elements: none, nullable, guard, ref, refValue, structure. The important part is not the
 // elements but the equality relation over them, and it is the single subtlety most worth carrying
 // forward. Upstream hand-writes `PartialEq` rather than deriving it, and its doc comment says why:
-// a join mints a FRESH ref id, so an equality that compared ids would report "changed" on every
+// a join mints a fresh ref id, so an equality that compared ids would report "changed" on every
 // iteration and **the fixpoint would never converge**. `refsTypeEqual` below reproduces that
 // deliberately: `ref` ignores its id entirely, and `refValue` compares only its access span.
 //
 // Equality for convergence is not equality for identity. Two values that are genuinely distinct
-// refs compare EQUAL here, and that is correct, because what the fixpoint needs to know is whether
+// refs compare equal here, and that is correct, because what the fixpoint needs to know is whether
 // the lattice element moved, not whether the underlying ref is the same object. Deriving this
 // comparison is the natural thing to do in Go and it produces a rule that either loops ten times on
 // every function or emits a spurious non-convergence finding. `TestRefsConvergenceEqualityIgnores
@@ -79,21 +79,21 @@ import (
 // The bound is reproduced exactly, ten rounds, including the non-convergence finding. On the real
 // tree the sweep settled in two rounds on every function it saw; see the test file.
 //
-// # Two signals identify a ref, and BOTH are required
+// # Two signals identify a ref, and both are required
 //
 // This is the part a reader is most likely to get wrong, because either signal alone looks
 // sufficient and each covers a different part of the corpus.
 //
 //   - **The checker.** `useRef` returns `RefObject<T>`, and a ref is identified by that type's
-//     SYMBOL. `RefObject` is an interface, so its type alias is correctly nil. This is the exact
-//     mirror image of `set_state_in_render.go`'s setter predicate, which keys on the ALIAS because
+//     symbol. `RefObject` is an interface, so its type alias is correctly nil. This is the exact
+//     mirror image of `set_state_in_render.go`'s setter predicate, which keys on the alias because
 //     `Dispatch` is a type alias whose symbol renders as a non-printable internal marker. A
 //     predicate written for one of them silently reports nothing for the other, and an agent
 //     writing this rule keyed on the alias first and reported a genuine `useRef` as neither.
 //     Probed on our own checker rather than assumed: `const myRef = useRef(null)` gives
 //     `alias=<nil> symbol=RefObject`, while `setX` gives `alias=Dispatch symbol=<binary noise>`.
 //
-//   - **The name.** Upstream's `enableTreatRefLikeIdentifiersAsRefs` DEFAULTS TO TRUE
+//   - **The name.** Upstream's `enableTreatRefLikeIdentifiersAsRefs` defaults to `true`
 //     (`environment_config.rs:157`) and matches `/^(?:[a-zA-Z$_][\w$]*)Ref$|^ref$/` against the
 //     name of the binding whose `current` is being accessed. Only 1 of the 42 corpus fixtures sets
 //     the flag explicitly, so it is silently active across the whole corpus. This is what reaches
@@ -106,7 +106,7 @@ import (
 // # What the name signal matches, measured against the executable rather than read
 //
 // The regex reads as though it matches any `somethingRef.current` anywhere. It does not, and the
-// difference is the object's BINDING name rather than the text of the member expression. Driven on
+// difference is the object's binding name rather than the text of the member expression. Driven on
 // `eslint-plugin-react-hooks` 7.1.1 through the ESLint Linter API on each input:
 //
 //	const fooRef = {};      fooRef.current        REPORTS   binding named fooRef
@@ -120,7 +120,7 @@ import (
 // The apparent inconsistency between rows 3 and 4 is not a special case for `props`. Upstream types
 // a property load as `Type::Property{object_name, property_name}` where `object_name` is the name
 // of the object's own binding, and `is_ref_like_name` is asked at each unification. For
-// `props.ref.current` the INNER load produces a value whose binding name is `ref`, and the outer
+// `props.ref.current` the inner load produces a value whose binding name is `ref`, and the outer
 // `.current` then matches against that. For `props.fooRef.current` the inner load is also named
 // `fooRef`, so by the regex it should match too, and upstream is nonetheless silent. Reading
 // alone would have produced the wrong rule here in both directions; every row above is a
@@ -136,22 +136,22 @@ import (
 // agrees (`props.Ref.current` is clean, measured). Reproduced rather than tidied, because a rule
 // that helpfully matched `Ref` would disagree with React on real code while looking more correct.
 //
-// # The component gate is NOT used here, and that is a deliberate difference from its neighbours
+// # The component gate is not used here, and that is a deliberate difference from its neighbours
 //
 // `static_components.go`, `globals.go` and `set_state_in_render.go` all gate on the shelf's
 // `IsComponentOrHookLike`, and three of them reuse the predicate whole. This rule does not, and the
 // reason is that upstream's own gate for this validator is different. Measured on the executable: a
-// lowercase `function helper(props) { return props.ref.current; }` is CLEAN, so a gate is real; but
+// lowercase `function helper(props) { return props.ref.current; }` is clean, so a gate is real; but
 // the gate that decides it is compilation admission, which for this validator already excludes a
 // non-component. What this rule needs beyond that is the `!is_function_expression` condition at
 // `infer_mutation_aliasing_ranges.rs:470`, which is "this is the outer function under compilation,
 // not a nested function expression" and is a different question from "is this a component".
 //
 // So the compilation gate is reused (a function must look like a component or a hook and must
-// actually create JSX or call a hook), and nested functions are analysed as INNER functions through
+// actually create JSX or call a hook), and nested functions are analysed as inner functions through
 // the structure element rather than as subjects in their own right. A nested function that touches
 // a ref does not report at its own site; it makes its enclosing binding carry a `readRefEffect`, and
-// the finding lands where that function is CALLED. That is what makes `capture-ref-for-mutation`
+// the finding lands where that function is called. That is what makes `capture-ref-for-mutation`
 // report at `handleKey('left')()` rather than inside `handleKey`.
 //
 // # One span where upstream has two, and one message shape
@@ -215,7 +215,7 @@ func refsForEachCompiledFunction(root *ast.Node, visit func(*ast.Node)) {
 // refsAnalyzeCompilationUnit runs the sweep over the functions upstream would have compiled.
 //
 // The gate is upstream's `getReactFunctionType`: a function is admitted only when its name looks
-// like a component or a hook AND its body actually creates JSX or calls a hook. A function that is
+// like a component or a hook and its body actually creates JSX or calls a hook. A function that is
 // not a unit is walked past into the functions it contains, because one of those may be a unit even
 // when its wrapper is not.
 func refsAnalyzeCompilationUnit(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
@@ -245,7 +245,7 @@ func refsAnalyzeCompilationUnit(ruleContext rule.Context, function *high_level_i
 // representation cannot drift about what a component name is. The body half asks whether the
 // function creates JSX or calls a hook.
 //
-// Unlike static_components.go, the hook half IS asked here and is reachable. That rule's finding
+// Unlike static_components.go, the hook half is asked here and is reachable. That rule's finding
 // requires a JSX tag, so every reportable input contains JSX and the hook branch cannot change its
 // answer. This rule reports on a bare `useRef` read with no JSX anywhere, so a hook-calling
 // component with no JSX is a real subject: `function useHook({value}) { const ref = useRef(null);
@@ -343,7 +343,7 @@ func refsInstructionAt(function *high_level_intermediate_representation.Function
 //
 // This is the seam `high_level_intermediate_representation.Identifier.Node` documents itself as existing for: the node goes to the
 // checker rather than to a local inference pass. Reporting through it rather than through a Place's
-// range matters because a Place's range is the range of the node that produced the INSTRUCTION.
+// range matters because a Place's range is the range of the node that produced the instruction.
 func refsIdentifierNode(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
@@ -369,7 +369,7 @@ func refsIdentifierName(function *high_level_intermediate_representation.Functio
 
 // refsIsRefLikeName is upstream's `is_ref_like_name`, minus the property half.
 //
-// The TypeScript regex is `/^(?:[a-zA-Z$_][\w$]*)Ref$|^ref$/`. Note that `Ref` alone does NOT
+// The TypeScript regex is `/^(?:[a-zA-Z$_][\w$]*)Ref$|^ref$/`. Note that `Ref` alone does not
 // match: the alternation requires at least one character before `Ref`. Upstream states this at
 // `infer_types.rs:235` and the executable agrees, measured on `props.Ref.current`, which is clean.
 func refsIsRefLikeName(name string) bool {
@@ -386,7 +386,7 @@ func refsIsRefLikeName(name string) bool {
 
 // refsIsUseRefType asks the checker whether a value is a `RefObject`.
 //
-// Keyed on the type's SYMBOL, not its alias. `RefObject` is an interface, so the checker records it
+// Keyed on the type's symbol, not its alias. `RefObject` is an interface, so the checker records it
 // on the type's symbol and the alias is correctly nil. `set_state_in_render.go`'s setter predicate
 // is the exact mirror and reads the alias instead, because `Dispatch` is a type alias whose symbol
 // renders as a non-printable internal marker. A predicate written for one silently answers false
@@ -466,10 +466,10 @@ func refsNodeHasRefType(ruleContext rule.Context, node *ast.Node) bool {
 	if valueType == nil {
 		return false
 	}
-	// The ALIAS is checked as well as the symbol, and the two carry different names.
+	// The alias is checked as well as the symbol, and the two carry different names.
 	//
 	// `RefObject` is an interface, so it lands on the type's symbol and its alias is nil.
-	// `RefCallback` is a TYPE ALIAS, so it lands on the alias and its symbol is an anonymous
+	// `RefCallback` is a type alias, so it lands on the alias and its symbol is an anonymous
 	// function type. A predicate reading only one field answers false for the other, which is the
 	// same asymmetry `set_state_in_render.go` documents from the opposite side, and
 	// `internal/utilities/typecheck/specifier.go:39` already does this alias-then-symbol fallback for
@@ -484,12 +484,12 @@ func refsNodeHasRefType(ruleContext rule.Context, node *ast.Node) bool {
 		return false
 	}
 	// `RefCallback` is included for the mergeRefs pattern, and it is upstream's exemption rather
-	// than a convenience. A function whose result is a ref legitimately RECEIVES refs: that is what
+	// than a convenience. A function whose result is a ref legitimately receives refs: that is what
 	// merging two refs into one callback means. Upstream expresses this as "the lvalue is a ref"
 	// at the call site (`is_ref_lvalue`, the mergeRefs comment at `:697`), and the type our own
 	// `mergeReferences` returns is `React.RefCallback<T>`.
 	//
-	// Measured: `const set = mergeReferences([inner, ref])` is CLEAN upstream and was 8 findings on
+	// Measured: `const set = mergeReferences([inner, ref])` is clean upstream and was 8 findings on
 	// Kirk's tree, one in every form-field component that forwards a ref. The corpus cannot see this
 	// because no fixture merges refs.
 	return symbol.Name == "RefObject" || symbol.Name == "MutableRefObject" || symbol.Name == "RefCallback"
@@ -511,7 +511,7 @@ const (
 	refsGuard
 	// refsRef is the ref object itself, the thing `useRef` returns.
 	refsRef
-	// refsRefValue is what came OUT of a ref, the `current` property. Reading one during render is
+	// refsRefValue is what came out of a ref, the `current` property. Reading one during render is
 	// the finding this rule is named for.
 	refsRefValue
 	// refsStructure is an object, array or function that carries a ref somewhere inside it.
@@ -529,7 +529,7 @@ type refsAccessType struct {
 
 	// RefId identifies which ref this came from. Meaningful for refsGuard, refsRef and refsRefValue.
 	//
-	// A join MINTS A FRESH ONE, which is the whole reason `refsTypeEqual` must ignore it for
+	// A join mints a fresh one, which is the whole reason `refsTypeEqual` must ignore it for
 	// refsRef and refsRefValue. See the rule comment.
 	RefId int
 	// HasRefId separates "no ref id" from ref id zero, which a bare int cannot express.
@@ -552,7 +552,7 @@ type refsAccessType struct {
 // refsFunctionType records what calling a function value would do to a ref.
 type refsFunctionType struct {
 	// ReadRefEffect is true when analysing the function's body produced a ref finding, so calling it
-	// during render commits that finding at the CALL site rather than inside the function.
+	// during render commits that finding at the call site rather than inside the function.
 	ReadRefEffect bool
 	// RefAccessSpan is where inside the function the ref was touched.
 	RefAccessSpan    static_single_assignment.IdentifierId
@@ -561,20 +561,20 @@ type refsFunctionType struct {
 	ReturnType *refsAccessType
 }
 
-// refsTypeEqual is equality FOR CONVERGENCE, and it is deliberately not equality for identity.
+// refsTypeEqual is equality for convergence, and it is deliberately not equality for identity.
 //
 // This reproduces upstream's hand-written `PartialEq`, and the reason it is hand-written rather
 // than derived is the single most load-bearing detail in this rule. `refsJoin` mints a fresh ref id
 // whenever it merges two different refs. A derived comparison would see that fresh id, report the
-// environment as changed, and do so again on the next round: THE FIXPOINT WOULD NEVER CONVERGE, and
+// environment as changed, and do so again on the next round: the fixpoint would never converge, and
 // every function carrying a joined ref would burn all ten rounds and then emit a spurious
 // non-convergence finding.
 //
 // So: refsRef ignores its ref id entirely, and refsRefValue compares only its access span. Two
-// genuinely distinct refs therefore compare EQUAL here. That is correct, because the question the
+// genuinely distinct refs therefore compare equal here. That is correct, because the question the
 // sweep asks is "did this lattice element move", not "is this the same ref object".
 //
-// refsGuard is the exception and DOES compare its id, because a guard is only sound for the
+// refsGuard is the exception and does compare its id, because a guard is only sound for the
 // specific ref it guards; treating two guards as interchangeable would let `if (a.current == null)`
 // authorize a write to `b.current`.
 func refsTypeEqual(a, b *refsAccessType) bool {
@@ -614,7 +614,7 @@ func refsFunctionEqual(a, b *refsFunctionType) bool {
 // The ordering of the cases is upstream's and is load-bearing: refsNone is the identity, a guard
 // meeting a nullable collapses to refsNone (the guard is no longer sound once a non-guarded path
 // reaches the same value), and two different guards also collapse. Everything that survives to the
-// bottom is a ref-carrying element, where a mismatch mints a FRESH ref id. That mint is exactly the
+// bottom is a ref-carrying element, where a mismatch mints a fresh ref id. That mint is exactly the
 // thing `refsTypeEqual` must not look at.
 func refsJoin(a, b *refsAccessType, nextRefId func() int) *refsAccessType {
 	if a == nil {
@@ -740,7 +740,7 @@ func refsDestructure(t *refsAccessType) *refsAccessType {
 
 // refsSafeBlock is a region where one write to a specific ref is permitted.
 //
-// Registered on the fallthrough of an `if` whose test is a guard, and CONSUMED by the first write
+// Registered on the fallthrough of an `if` whose test is a guard, and consumed by the first write
 // it authorizes, which is what makes a second write under one guard still report.
 type refsSafeBlock struct {
 	Block static_single_assignment.BlockId
@@ -766,7 +766,7 @@ const (
 // refsFinding is one diagnostic, held as data until the sweep settles.
 //
 // Deferred rather than reported inline for a reason that is upstream's and is easy to miss: the
-// sweep runs the SAME instructions up to ten times, so reporting at the moment a check fails would
+// sweep runs the same instructions up to ten times, so reporting at the moment a check fails would
 // emit each finding once per round. Upstream clears its error list at the top of every iteration
 // and returns early once any error exists; this collects per-round and keeps the last round's set.
 type refsFinding struct {
@@ -776,7 +776,7 @@ type refsFinding struct {
 	HasValue bool
 	// Node overrides where the finding points when the value alone would point at the wrong syntax.
 	//
-	// A ref access is a member expression, and upstream underlines the WHOLE of it (`ref.current`,
+	// A ref access is a member expression, and upstream underlines the whole of it (`ref.current`,
 	// eleven characters in the goldens). The identifier a lattice value carries is `ref`, which is
 	// the object rather than the access, so pointing through it underlines three characters and no
 	// message-id fixture can see the difference. A read whose value is a pure temporary has no
@@ -795,7 +795,7 @@ type refsEnvironment struct {
 	temporaries map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
 	// names carries a source binding name onto the temporary that loaded it.
 	//
-	// Populated ONLY from LoadLocal, which is upstream's `set_name` and is called from exactly one
+	// Populated only from LoadLocal, which is upstream's `set_name` and is called from exactly one
 	// instruction arm (`infer_types.rs:482`). That single restriction is what makes
 	// `props.fooRef.current` silent while `const fooRef = x; fooRef.current` reports: a property
 	// load's result never receives a name, so the name test finds nothing to match on the outer
@@ -807,7 +807,7 @@ type refsEnvironment struct {
 	propertyNames map[static_single_assignment.IdentifierId]string
 	// declarations and byDeclaration recover a value whose single-assignment numbering did not
 	// unify. See `get`.
-	// accessNodes is the member-expression node a ref VALUE came from, so a finding underlines the
+	// accessNodes is the member-expression node a ref value came from, so a finding underlines the
 	// whole access rather than only the object identifier.
 	accessNodes   map[static_single_assignment.IdentifierId]*ast.Node
 	declarations  map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId
@@ -898,12 +898,12 @@ func (env *refsEnvironment) get(key static_single_assignment.IdentifierId) *refs
 	if found, ok := env.data[env.operandId(key)]; ok {
 		return found
 	}
-	// Fall back to whatever the same source BINDING holds elsewhere in this function.
+	// Fall back to whatever the same source binding holds elsewhere in this function.
 	//
 	// This exists because single-assignment renaming is not total in our lowering: measured on the
 	// corpus fixture `error.invalid-aliased-ref-in-callback-invoked-during-render-`, a closure that
 	// builds an alias chain produces two identifiers for one `const current`, ids 8 and 20, both
-	// carrying declaration 3, and the LOAD reads id 8 while the STORE wrote id 20. Without the
+	// carrying declaration 3, and the load reads id 8 while the store wrote id 20. Without the
 	// alias in the same closure the two coincide and everything works, which is why this is
 	// invisible on all but one fixture.
 	//
@@ -924,7 +924,7 @@ func (env *refsEnvironment) get(key static_single_assignment.IdentifierId) *refs
 	return nil
 }
 
-// set widens rather than overwrites, and records whether the element MOVED.
+// set widens rather than overwrites, and records whether the element moved.
 //
 // The widening join is what makes the sweep monotone, and the `changed` flag it maintains is the
 // fixpoint's only termination signal. The comparison uses `refsTypeEqual`, which ignores minted ref
@@ -942,7 +942,7 @@ func (env *refsEnvironment) set(key static_single_assignment.IdentifierId, value
 		env.changed = true
 	}
 	env.data[operandId] = widened
-	// Record against the ORIGINAL key's declaration as well as the resolved one: an alias chain
+	// Record against the original key's declaration as well as the resolved one: an alias chain
 	// resolves a named binding onto an unnamed temporary, so the declaration lives on the key that
 	// was asked about rather than on the value it resolved to.
 	if widened.Kind != refsNone {
@@ -999,7 +999,7 @@ func refsSweepFunction(ruleContext rule.Context, function *high_level_intermedia
 // refsCollectTemporaries builds the aliasing side map, upstream's `collect_temporaries_sidemap`.
 //
 // One detail is load-bearing and looks like an omission: a property load of `current` off a value
-// that IS a ref is deliberately NOT aliased. That is what keeps `ref` and `ref.current` distinct,
+// that is a ref is deliberately not aliased. That is what keeps `ref` and `ref.current` distinct,
 // which is the entire distinction between "you passed a ref somewhere" and "you read a ref's
 // value". Aliasing them would collapse two of the four diagnostics into one.
 func refsCollectTemporaries(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment) {
@@ -1017,7 +1017,7 @@ func refsCollectTemporaries(ruleContext rule.Context, function *high_level_inter
 			case *high_level_intermediate_representation.LoadLocal:
 				env.setName(function, instruction.LValue.Identifier, value.Place.Identifier)
 				env.define(instruction.LValue.Identifier, value.Place.Identifier)
-			// There is deliberately NO LoadContext arm here, and it is worth saying why, because
+			// There is deliberately no LoadContext arm here, and it is worth saying why, because
 			// adding one is the obvious move and it was in this file until a mutant proved it
 			// inert.
 			//
@@ -1026,7 +1026,7 @@ func refsCollectTemporaries(ruleContext rule.Context, function *high_level_inter
 			// closure. It is not: the declaration fallback in `get` already recovers that case,
 			// because both numberings of the alias carry the same DeclarationId. Measured three
 			// ways: deleting this arm alone changes nothing across the whole suite, deleting the
-			// fallback alone changes nothing, and deleting BOTH turns
+			// fallback alone changes nothing, and deleting both turns
 			// `error.invalid-aliased-ref-in-callback-invoked-during-render-` silent. Two mechanisms
 			// covering one case is one mechanism plus a thing that will drift, so the redundant one
 			// is gone. Upstream has no LoadContext arm here either.
@@ -1041,7 +1041,7 @@ func refsCollectTemporaries(ruleContext rule.Context, function *high_level_inter
 				// to one reports spuriously, which was five of this corpus's residuals.
 				env.setName2(instruction.LValue.Identifier, value.Name)
 			case *high_level_intermediate_representation.PropertyLoad:
-				// The loaded PROPERTY names the result, which is what carries `props.ref` into the
+				// The loaded property names the result, which is what carries `props.ref` into the
 				// name test. Upstream reaches the same place by unifying a nested `Type::Property`,
 				// whose `object_name` is resolved when the outer `.current` unifies against it
 				// (`infer_types.rs:1353`); recording the property name here is that resolution
@@ -1052,12 +1052,12 @@ func refsCollectTemporaries(ruleContext rule.Context, function *high_level_inter
 				if value.Property == "current" && refsIsRefBinding(ruleContext, function, env, value.Object.Identifier) {
 					continue
 				}
-				// A load whose RESULT is itself a ref is not aliased to its object either, for the
+				// A load whose result is itself a ref is not aliased to its object either, for the
 				// same reason the `current` case above is not: the alias would make the object and
 				// the field indistinguishable, and the object here is a props bag rather than a ref.
 				//
 				// Without this, reading one ref-typed field marks the whole object as a ref, and
-				// every OTHER field read off it then reports as a ref access. Measured on Kirk's
+				// every other field read off it then reports as a ref access. Measured on Kirk's
 				// tree: an interface carrying two refs beside a `currentWidth: number` and a
 				// `columnId: string` produced six findings in one file, all on the non-ref fields.
 				// Upstream never has this problem because it types each property independently
@@ -1071,7 +1071,7 @@ func refsCollectTemporaries(ruleContext rule.Context, function *high_level_inter
 	}
 }
 
-// refsIsRefBinding is the two-signal ref test: the checker's type OR the binding's name.
+// refsIsRefBinding is the two-signal ref test: the checker's type or the binding's name.
 //
 // Both are required and each covers a part of the corpus the other cannot. See the rule comment for
 // the measurements.
@@ -1080,8 +1080,8 @@ func refsCollectTemporaries(ruleContext rule.Context, function *high_level_inter
 //
 // The name test asks for the binding name of the value whose `current` is being accessed, and the
 // obvious way to ask that is to read `Identifier.Name` off the property load's object. That is
-// WRONG and it is silently wrong: lowering emits `LoadLocal ref -> t13` and then
-// `PropertyLoad t13.current`, so the object is the TEMPORARY, whose Name is empty, while the name
+// wrong and it is silently wrong: lowering emits `LoadLocal ref -> t13` and then
+// `PropertyLoad t13.current`, so the object is the temporary, whose Name is empty, while the name
 // lives on the source identifier the temporary loaded from. Asked directly, every `props.ref` case
 // declines and looks exactly like a rule that simply does not implement them.
 //
@@ -1102,7 +1102,7 @@ func refsIsRefBinding(ruleContext rule.Context, function *high_level_intermediat
 	if refsIsRefLikeName(env.nameOf(function, id)) {
 		return true
 	}
-	// A property load names its result by the property read, but ONLY the exact name `ref` is
+	// A property load names its result by the property read, but only the exact name `ref` is
 	// honoured here rather than the full regex. Measured on the executable: `props.ref.current`
 	// reports while `props.fooRef.current` is clean, so the wider regex is wrong in this position
 	// even though it is right for a binding. Reproduced as measured rather than as read.
@@ -1185,7 +1185,7 @@ func refsRunOneRound(ruleContext rule.Context, function *high_level_intermediate
 			// A guard value may only be consumed by an `if` test. Using one anywhere else means the
 			// code read `ref.current` for its value rather than to check it against null.
 			//
-			// OPERANDS only. `EachInstructionPlace` also yields the instruction's own LValue, and
+			// Operands only. `EachInstructionPlace` also yields the instruction's own LValue, and
 			// including it makes the guard report itself the moment it is created: the binary
 			// expression that produces the guard has that guard as its lvalue, so the check fires on
 			// the very instruction implementing `ref.current == null` and the sanctioned idiom
@@ -1221,7 +1221,7 @@ func refsRunOneRound(ruleContext rule.Context, function *high_level_intermediate
 		_, isReturn := block.Terminal.(*high_level_intermediate_representation.Return)
 		high_level_intermediate_representation.EachTerminalPlace(block.Terminal, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			if isReturn {
-				// Returning a ref object is allowed; returning a ref VALUE is not. That asymmetry is
+				// Returning a ref object is allowed; returning a ref value is not. That asymmetry is
 				// what makes `return ref;` clean in a hook while `return ref.current;` reports.
 				findings = refsCheckDirectValueAccess(env, place.Identifier, findings)
 				return
@@ -1257,7 +1257,7 @@ func refsApplyDeclaredType(ruleContext rule.Context, function *high_level_interm
 	if current != nil && current.Kind == refsRef {
 		return
 	}
-	// A value already known to be a FUNCTION is never widened into a ref by the name test. The
+	// A value already known to be a function is never widened into a ref by the name test. The
 	// name heuristic is a guess and this is not: a closure named `setRef` is a function whose body
 	// was just analysed, and letting `setRef` match the `...Ref$` regex would discard that analysis
 	// and score the call as passing a ref rather than as calling a ref-reading function.
@@ -1287,7 +1287,7 @@ func refsCheckDirectValueAccess(env *refsEnvironment, id static_single_assignmen
 	return findings
 }
 
-// refsCheckValueAccess reports a bare ref value OR a function whose body reads one.
+// refsCheckValueAccess reports a bare ref value or a function whose body reads one.
 func refsCheckValueAccess(env *refsEnvironment, id static_single_assignment.IdentifierId, findings []refsFinding) []refsFinding {
 	current := env.get(id)
 	if current == nil {
@@ -1349,14 +1349,14 @@ func refsTransfer(
 	target := instruction.LValue.Identifier
 
 	switch value := instruction.Value.(type) {
-	// Rendering a ref value is a read. A function that merely CARRIES a ref may be rendered, which
+	// Rendering a ref value is a read. A function that merely carries a ref may be rendered, which
 	// is why this is the direct check rather than the general one.
 	case *high_level_intermediate_representation.JsxExpression, *high_level_intermediate_representation.JsxFragment:
 		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
 			findings = refsCheckDirectValueAccess(env, place.Identifier, findings)
 		})
 
-	// Reading a property off a ref produces a ref VALUE, which is the element the whole rule is
+	// Reading a property off a ref produces a ref value, which is the element the whole rule is
 	// about. Reading a property off a structure yields what the structure carries.
 	case *high_level_intermediate_representation.PropertyLoad:
 		findings = refsPropertyLoadTransfer(ruleContext, function, env, instruction, value.Object.Identifier, target, findings)
@@ -1383,7 +1383,7 @@ func refsTransfer(
 		env.carryAccessNode(target, value.Value.Identifier)
 		env.set(value.LValue.Identifier, stored)
 		env.set(target, refsCarryOrSeed(ruleContext, function, env, value.Value.Identifier, target))
-		// Pin the value under the WRITTEN binding's declaration. `env.set` records against whatever
+		// Pin the value under the written binding's declaration. `env.set` records against whatever
 		// the lvalue resolves to through the aliasing map, which for a store into a fresh binding is
 		// an unnamed temporary carrying no declaration, so the entry the declaration fallback needs
 		// would never be written. See `get` for why that fallback exists at all.
@@ -1413,8 +1413,8 @@ func refsTransfer(
 			}
 		})
 
-	// A nested function is analysed as an inner subject and its verdict is recorded ON THE VALUE.
-	// A ref touched inside it does not report there; it reports where the function is CALLED.
+	// A nested function is analysed as an inner subject and its verdict is recorded on the value.
+	// A ref touched inside it does not report there; it reports where the function is called.
 	case *high_level_intermediate_representation.FunctionExpression:
 		findings = refsNestedFunctionTransfer(ruleContext, function, env, instruction, value, target, findings)
 
@@ -1422,8 +1422,8 @@ func refsTransfer(
 		findings = refsCallTransfer(ruleContext, function, env, instruction, value.Callee.Identifier, interpolatedAsJsx, findings)
 
 	// A method call keeps its receiver, so `object.foo()` arrives here rather than as a property
-	// load plus a call. The callee to score is the PROPERTY, but the property is a fresh temporary
-	// with no lattice entry of its own: what carries the function is the RECEIVER's structure. So
+	// load plus a call. The callee to score is the property, but the property is a fresh temporary
+	// with no lattice entry of its own: what carries the function is the receiver's structure. So
 	// the property is seeded from the receiver first, and only then scored.
 	//
 	// Without that seeding a closure stored on an object and called through it scores as an
@@ -1431,7 +1431,7 @@ func refsTransfer(
 	// diagnostics. Two corpus fixtures are this shape and both said `refPassedToFunction` where
 	// upstream says `functionAccessesRef`.
 	case *high_level_intermediate_representation.MethodCall:
-		// `React.useEffect(...)` is a METHOD call, so the hook's name is the property rather than a
+		// `React.useEffect(...)` is a method call, so the hook's name is the property rather than a
 		// binding, and the hook test cannot see it without this. Recording it is what makes the
 		// namespaced spelling behave like the bare import.
 		//
@@ -1454,7 +1454,7 @@ func refsTransfer(
 	case *high_level_intermediate_representation.ObjectExpression, *high_level_intermediate_representation.ArrayExpression:
 		var elementTypes []*refsAccessType
 		high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
-			// An aggregate feeding a call whose RESULT is a ref is the mergeRefs shape, and
+			// An aggregate feeding a call whose result is a ref is the mergeRefs shape, and
 			// collecting refs into a list is the entire point of it. Upstream reaches the same
 			// silence through the aliasing effects of the call rather than at the aggregate, so the
 			// exemption is expressed here instead and this is a divergence in mechanism that agrees
@@ -1463,7 +1463,7 @@ func refsTransfer(
 			// Measured: `mergeReferences([inputReference, ref])` is clean upstream, and it was 8
 			// findings on Kirk's tree, one in every form-field component that forwards a ref. No
 			// corpus fixture merges refs, so nothing imported can see this either way.
-			// The exemption covers a ref OBJECT only, never a ref VALUE. Collecting refs into a
+			// The exemption covers a ref object only, never a ref value. Collecting refs into a
 			// list or an options object and handing it to a hook is ordinary React; reading
 			// `ref.current` into that same object is a render-time read whatever the object is for.
 			//
@@ -1513,7 +1513,7 @@ func refsTransfer(
 			env.set(target, &refsAccessType{Kind: refsNullable})
 		}
 
-	// `!ref.current` is both a read AND a guard: it reports, and it marks the result so the write it
+	// `!ref.current` is both a read and a guard: it reports, and it marks the result so the write it
 	// authorizes does not report a second time on the same line.
 	case *high_level_intermediate_representation.UnaryExpression:
 		if value.Operator == "!" {
@@ -1543,7 +1543,7 @@ func refsTransfer(
 	return findings
 }
 
-// refsCallResultIsRef asks the checker what a CALL yields, through the call's own syntax.
+// refsCallResultIsRef asks the checker what a call yields, through the call's own syntax.
 //
 // `refsIsRefBinding` reaches the checker through `Identifier.Node`, which a call's temporary lvalue
 // does not have. This asks the same question of the call expression instead.
@@ -1565,7 +1565,7 @@ func refsCallResultIsRef(ruleContext rule.Context, instruction *high_level_inter
 		}
 	}
 	if symbol := shimchecker.Type_symbol(resultType); symbol != nil {
-		// `bivarianceHack` is what the REAL `@types/react` `RefCallback` resolves to, and matching it
+		// `bivarianceHack` is what the real `@types/react` `RefCallback` resolves to, and matching it
 		// is not a workaround on our side.
 		//
 		// `RefCallback<T>` is declared as an indexed access over an object type whose single member
@@ -1574,7 +1574,7 @@ func refsCallResultIsRef(ruleContext rule.Context, instruction *high_level_inter
 		// the alias and leaves the method's own symbol, so the type arrives with a nil alias and the
 		// symbol `bivarianceHack`.
 		//
-		// Measured on Kirk's tree rather than reasoned about, and a hand-written stub does NOT
+		// Measured on Kirk's tree rather than reasoned about, and a hand-written stub does not
 		// reproduce it: a fixture declaring `type RefCallback<T> = (i: T) => void` carries the alias
 		// and passes, which is precisely the failure where code and fixtures share one wrong belief.
 		// The eight findings this silenced were all `mergeReferences([inner, ref])`, one in every
@@ -1587,19 +1587,19 @@ func refsCallResultIsRef(ruleContext rule.Context, instruction *high_level_inter
 
 // refsAggregateIsExempt reports whether an aggregate is consumed by a call that may hold refs.
 //
-// Asked at the AGGREGATE rather than at the call, because an argument list is evaluated first and
+// Asked at the aggregate rather than at the call, because an argument list is evaluated first and
 // would otherwise have already reported by the time the call's own exemptions are considered. Two
 // consumers qualify, and both are upstream's:
 //
-//   - a call whose RESULT is a ref, which is the mergeRefs shape
-//   - a HOOK call, which upstream exempts because a hook is independently validated
+//   - a call whose result is a ref, which is the mergeRefs shape
+//   - a hook call, which upstream exempts because a hook is independently validated
 //
 // Both were measured on the executable with live controls rather than inferred. Collecting refs
 // into an object and handing it to `useTableColumnResize` is clean; handing the identical object to
 // a plain `doThing` reports; and a plain `useRef` read during render still reports, which is the
 // control proving the probe could see a finding at all.
 //
-// The state hooks are deliberately NOT exempt here, for the same reason they are not at the call:
+// The state hooks are deliberately not exempt here, for the same reason they are not at the call:
 // `useState`, `useReducer` and `useMemo` run what they are given during render.
 func refsAggregateIsExempt(ruleContext rule.Context, function *high_level_intermediate_representation.Function, env *refsEnvironment, instruction *high_level_intermediate_representation.Instruction) bool {
 	aggregate := instruction.LValue.Identifier
@@ -1653,7 +1653,7 @@ func refsCarryOrSeed(ruleContext rule.Context, function *high_level_intermediate
 
 // refsPropertyLoadTransfer decides what reading a property off a value yields.
 //
-// Off a ref, it is a ref VALUE carrying where the access happened. Off a structure, it is whatever
+// Off a ref, it is a ref value carrying where the access happened. Off a structure, it is whatever
 // the structure carries. Otherwise it falls back to the declared type.
 func refsPropertyLoadTransfer(
 	ruleContext rule.Context,
@@ -1696,13 +1696,15 @@ func refsPropertyLoadTransfer(
 
 // refsNestedFunctionTransfer analyses an inner function and records its verdict on the value.
 //
-// This is what makes a ref touched inside a callback report at the CALL rather than at the touch.
+// This is what makes a ref touched inside a callback report at the call rather than at the touch.
 // `capture-ref-for-mutation` is the shipped fixture: the ref is read inside `handleKey`, and the
 // finding lands on `handleKey('left')()` because that is where the reading actually happens during
 // render.
 //
-// The inner sweep shares the OUTER environment rather than starting fresh, which is upstream's
+// The inner sweep shares the outer environment rather than starting fresh, which is upstream's
 // choice and is what lets a captured ref be visible inside the nested function at all.
+//
+// Mutates: env advances its ref id seed past every id the nested function minted, so ids never collide.
 func refsNestedFunctionTransfer(
 	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
@@ -1718,24 +1720,24 @@ func refsNestedFunctionTransfer(
 		return findings
 	}
 
-	// The inner function gets its OWN environment, and this is the single most load-bearing line in
+	// The inner function gets its own environment, and this is the single most load-bearing line in
 	// the nested analysis.
 	//
-	// Identifier ids are per-function and they OVERLAP. Measured by dumping the representation for
+	// Identifier ids are per-function and they overlap. Measured by dumping the representation for
 	// the corpus's `capture-ref-for-mutation` fixture: the outer function uses ids 18 through 35 and
 	// the innermost closure independently uses 20 through 37. Sweeping the inner function into the
 	// outer environment therefore conflates two unrelated values at every shared id, and the failure
-	// is not a dropped finding but a WRONG one: the inner `pos`, a ref value, lands on an outer id
+	// is not a dropped finding but a wrong one: the inner `pos`, a ref value, lands on an outer id
 	// that the outer function then passes to a call, so the rule reported `refPassedToFunction` in a
 	// function that never passed a ref anywhere. Upstream reports once at the outer call site and
 	// nothing at the inner read, measured on the executable.
 	//
 	// This is the trap the porting brief names as "a value identifier does not survive a function
-	// boundary", and it arrives here in its most misleading form: the id is VALID in both spaces, so
+	// boundary", and it arrives here in its most misleading form: the id is valid in both spaces, so
 	// nothing is nil, nothing panics, and every message-id fixture that does not involve a nested
 	// closure stays green.
-	inner_env := newRefsEnvironment()
-	inner_env.refIdSeed = env.refIdSeed
+	innerEnvironment := newRefsEnvironment()
+	innerEnvironment.refIdSeed = env.refIdSeed
 
 	// A captured value must be translated into the inner function's identifier space before the
 	// inner sweep can see it. `Function.Context` is the capture edge that performs the translation:
@@ -1746,26 +1748,26 @@ func refsNestedFunctionTransfer(
 		}
 		contextId := inner.Context[index].Identifier
 		if outerType := env.get(captured.Identifier); outerType != nil {
-			inner_env.data[contextId] = outerType
+			innerEnvironment.data[contextId] = outerType
 		}
-		// The captured value's NAME crosses the boundary too. Without it a ref that the outer
+		// The captured value's name crosses the boundary too. Without it a ref that the outer
 		// function knows only by name rather than by type arrives inside as an anonymous context
 		// value, and the name signal cannot fire on the alias chain the closure builds from it.
 		// `error.invalid-aliased-ref-in-callback-invoked-during-render-` is exactly that shape:
 		// `const aliasedRef = ref; aliasedRef.current` inside a callback.
 		if name := env.nameOf(function, captured.Identifier); name != "" {
-			inner_env.names[contextId] = name
+			innerEnvironment.names[contextId] = name
 		}
 	}
 
-	refsCollectTemporaries(ruleContext, inner, inner_env)
-	innerFindings := refsRunOneRound(ruleContext, inner, inner_env)
+	refsCollectTemporaries(ruleContext, inner, innerEnvironment)
+	innerFindings := refsRunOneRound(ruleContext, inner, innerEnvironment)
 	// Ref identity is minted from a single counter so two functions cannot collide on an id; the
 	// seed travels back out rather than the whole environment.
-	env.refIdSeed = inner_env.refIdSeed
+	env.refIdSeed = innerEnvironment.refIdSeed
 	functionType := &refsFunctionType{ReturnType: &refsAccessType{Kind: refsNone}}
 	if len(innerFindings) == 0 {
-		if returned := inner_env.get(refsReturnedValue(inner)); returned != nil {
+		if returned := innerEnvironment.get(refsReturnedValue(inner)); returned != nil {
 			functionType.ReturnType = returned
 		}
 	} else {
@@ -1783,7 +1785,7 @@ func refsNestedFunctionTransfer(
 
 // refsReturnedValue is the identifier a function actually yields.
 //
-// `Function.Returns` is the documented seam and it is NOT sufficient on its own: lowering populates
+// `Function.Returns` is the documented seam and it is not sufficient on its own: lowering populates
 // it only from an explicit `return` statement (`lower.go:596`), while a concise arrow body
 // terminates with `Return{Value: value}` and leaves `Returns` an empty temporary
 // (`lower.go:164-166`). So `d => () => {...}` yields nothing through `Returns`, and a rule reading
@@ -1809,7 +1811,7 @@ func refsReturnedValue(function *high_level_intermediate_representation.Function
 // refsMethodName is the property being called in a method call, read from the syntax.
 //
 // The representation gives a method call its receiver and a Place for the property, but the
-// property's NAME lives on the syntax rather than on the value, so it is read back from the node.
+// property's name lives on the syntax rather than on the value, so it is read back from the node.
 func refsMethodName(function *high_level_intermediate_representation.Function, instruction *high_level_intermediate_representation.Instruction) string {
 	if instruction == nil || instruction.Node == nil {
 		return ""
@@ -1845,7 +1847,7 @@ func refsNestedFunction(function *high_level_intermediate_representation.Functio
 // passing these arguments risk a read.
 //
 // The hook exemption is upstream's and is narrow: a hook call is independently validated, so a ref
-// passed to one is allowed, EXCEPT for `useState` and `useReducer`, whose initializers run during
+// passed to one is allowed, except for `useState` and `useReducer`, whose initializers run during
 // render and so genuinely would read the ref then.
 func refsCallTransfer(
 	ruleContext rule.Context,
@@ -1873,7 +1875,7 @@ func refsCallTransfer(
 	if !didError {
 		// The call's own node is consulted as well as the target value, because a call's lvalue is a
 		// temporary with no `Identifier.Node`, so asking the checker about the value alone answers
-		// false for every call. Handing it the CALL EXPRESSION recovers the result type, which is
+		// false for every call. Handing it the call expression recovers the result type, which is
 		// what makes the mergeRefs shape (`mergeReferences(...)` returning `RefCallback`) exempt.
 		//
 		// Measured on Kirk's tree: without this the eight `mergeReferences([inner, ref])` sites all
@@ -1882,13 +1884,13 @@ func refsCallTransfer(
 			refsCallResultIsRef(ruleContext, instruction)
 		hookName := env.nameOf(function, callee)
 		isHook := refsIsHookName(hookName)
-		// `useState`, `useReducer` and `useMemo` are NOT exempt, because each runs the argument it
+		// `useState`, `useReducer` and `useMemo` are not exempt, because each runs the argument it
 		// is given during render: a state initializer and a memo callback both execute on the spot,
 		// so a ref reaching one is genuinely read during render. Every other hook defers.
 		//
 		// Upstream's own condition names only UseState and UseReducer (`:691`), and reading it
 		// would have produced a rule that lets `useMemo(() => foo(ref), [])` through. Measured on
-		// the executable across ten hooks, `useMemo` REPORTS, and the fixture
+		// the executable across ten hooks, `useMemo` reports, and the fixture
 		// `error.maybe-mutable-ref-not-preserved` is exactly that shape. oxc reaches the same
 		// verdict by a different route (the memo callback is lowered and its body analysed rather
 		// than the call being exempted), so this is a divergence in mechanism that agrees in
@@ -1896,7 +1898,7 @@ func refsCallTransfer(
 		isStateHook := hookName == "useState" || hookName == "useReducer" || hookName == "useMemo"
 
 		switch {
-		// Producing a ref (the `mergeRefs` shape) or calling a hook: only a bare ref VALUE in the
+		// Producing a ref (the `mergeRefs` shape) or calling a hook: only a bare ref value in the
 		// arguments is a problem, because the ref object itself is what these legitimately take.
 		case isRefResult || (isHook && !isStateHook):
 			high_level_intermediate_representation.EachPlace(instruction.Value, func(place high_level_intermediate_representation.Place, role high_level_intermediate_representation.PlaceRole) {
@@ -1926,8 +1928,10 @@ func refsCallTransfer(
 //
 // The safe-block consultation is what permits the guarded initialization idiom: inside the
 // fallthrough of `if (ref.current == null)`, one write to that specific ref is allowed, and the
-// permission is CONSUMED so a second write on the same guard still reports. That consumption is why
+// permission is consumed so a second write on the same guard still reports. That consumption is why
 // `ref-initialization-linear`, which writes twice under one guard, reports exactly once.
+//
+// Mutates: safeBlocks removes the guard a permitted write consumes, so a second write under it reports.
 func refsStoreTransfer(
 	env *refsEnvironment,
 	instruction *high_level_intermediate_representation.Instruction,
@@ -2064,7 +2068,7 @@ func refsMessageFor(kind refsFindingKind) rule.Message {
 // refsReport points a finding at the syntax its value came from.
 //
 // Through `ctx.ReportNode` rather than a Place's range, because a Place's range is the range of the
-// node that produced the INSTRUCTION, and reporting through the node routes via `rule.TokenRange`,
+// node that produced the instruction, and reporting through the node routes via `rule.TokenRange`,
 // which trims leading trivia at the harness. A finding whose value is a pure temporary with no
 // syntactic source falls back to the function's own node rather than being dropped.
 func refsReport(ruleContext rule.Context, function *high_level_intermediate_representation.Function, finding refsFinding) {

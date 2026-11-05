@@ -22,8 +22,8 @@ import (
 // disagreements: silence reads as agreement. `#4q5dsn3` was blocked over exactly that, on a
 // regression check that named a number without naming the population it had to be measured over.
 //
-// So every measurement here reports how many classes the rule actually PLACED — resolved to a root,
-// or to a property set, or to an existence answer — beside whatever else it reports. A rule that went
+// So every measurement here reports how many classes the rule actually placed (resolved to a root,
+// or to a property set, or to an existence answer) beside whatever else it reports. A rule that went
 // quiet fails on the denominator rather than passing on the rate.
 //
 // # The corpus
@@ -123,7 +123,7 @@ func livePlacementSystem(test *testing.T, spelling string) DesignSystemResult {
 // a rule that answers "unknown" for everything reports the whole corpus.
 //
 // Before the migration this measured 11,431 classes with zero reported, on tables generated from
-// these same two repositories. That zero was not evidence the rule was right — it was evidence the
+// these same two repositories. That zero was not evidence the rule was right. It was evidence the
 // tables described the corpus, which is the thing the migration removes. The number to watch is that
 // it is still zero now that the answer comes from each repository's own stylesheet.
 func TestUnknownClassesPlacesEveryCorpusClass(test *testing.T) {
@@ -189,12 +189,12 @@ func TestUnknownClassesPlacesEveryCorpusClass(test *testing.T) {
 //
 // A placement drop of 2,141 with an unchanged finding count is exactly the shape that should be
 // distrusted, so it is decomposed here rather than asserted away. Every dropped class is one whose
-// FIRST engine reading is static, and a static has no root-plus-value structure for a collapse
+// first engine reading is static, and a static has no root-plus-value structure for a collapse
 // family to relate: `flex`, `block`, `border-dashed`, `cursor-pointer`. 135 distinct classes, 2,141
 // occurrences, zero unparseable and zero unexplained.
 //
 // The shipped prefix walk placed them because it forced a functional reading that the engine does not
-// take — it read `border-dashed` as root `border` with value `dashed`, when `parseCandidate` returns
+// take: it read `border-dashed` as root `border` with value `dashed`, when `parseCandidate` returns
 // `border-dashed` as a static first. Those placements never became findings, because a static's
 // bucket never matches a collapse family, so the rule's output is unchanged and 2,141 wasted lookups
 // are gone.
@@ -326,7 +326,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(test *testing.T) {
 //
 // Seven tables moved, the largest change of the three, so the population is the thing to watch. The
 // rule resolves a class to a property set, a selector shape, a variant string and a composition flag,
-// and a class it cannot resolve is skipped rather than reported — which is precisely how a migration
+// and a class it cannot resolve is skipped rather than reported, which is precisely how a migration
 // of this rule could go silent without a single test failing.
 //
 // Measured over the corpus, before and after:
@@ -339,7 +339,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(test *testing.T) {
 //
 //   - `bg-linear-to-r`, `-to-b`, `-to-t`. The shipped prefix walk read these as root `bg` and gave
 //     them `background-color`. They are root `bg-linear`, which sets `background-image`, and
-//     `RootDeclaredProperties` has no entry for it — so the old answer was a wrong property set that
+//     `RootDeclaredProperties` has no entry for it, so the old answer was a wrong property set that
 //     would collide with any real `bg-*` color class on the same element.
 //   - `ring-inset`. Reads static first and `StaticDeclaredProperties` carries no entry, so declining
 //     is correct. The walk forced root `ring` and answered `box-shadow`; `ring` is a composing root,
@@ -532,7 +532,8 @@ func TestConflictingClassesPerRepositoryPlacement(test *testing.T) {
 // resolved nothing would pass every comparison below without measuring anything.
 func TestRepositoryColorTokensReadAsColors(test *testing.T) {
 	test.Parallel()
-	var checkedRepositories, checkedTokens int
+	var checkedRepositories int
+	var checkedTokens int
 
 	for entryPoint := range livePlacementLiterals(test) {
 		designSystem := livePlacementSystem(test, entryPoint)

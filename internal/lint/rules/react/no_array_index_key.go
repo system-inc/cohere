@@ -66,7 +66,7 @@ var noArrayIndexKeyIteratorPositions = map[string]int{
 // `no_multi_comp.go` and `no_class_assign.go` both use.
 //
 // The stack rather than a single name is load-bearing: nested iterators each contribute a name, and
-// `foo.map((a, i) => bar.map((b, j) => <Foo key={i} />))` reports on the OUTER index from inside the
+// `foo.map((a, i) => bar.map((b, j) => <Foo key={i} />))` reports on the outer index from inside the
 // inner callback. Measured.
 //
 // # Which calls push, and the two-argument form
@@ -78,7 +78,7 @@ var noArrayIndexKeyIteratorPositions = map[string]int{
 // a literal function, and `foo["map"](...)` is a computed access whose property is not an
 // identifier.
 //
-// `React.Children.map` and `Children.map` take the collection first and the callback SECOND, so the
+// `React.Children.map` and `Children.map` take the collection first and the callback second, so the
 // callback argument index shifts. Upstream detects this by asking whether the callee's object is
 // named `Children`, or is itself a member expression whose own object is the React pragma. Measured:
 // `Children.map(c, (child, i) => ...)` and `React.Children.map(...)` both report, while
@@ -100,7 +100,7 @@ var noArrayIndexKeyIteratorPositions = map[string]int{
 // the five shapes, even though the index is plainly in it. A port that generalized any of these
 // would report on code upstream leaves alone.
 //
-// # A template or binary expression reports once PER index reference
+// # A template or binary expression reports once per index reference
 //
 // Upstream filters the expression list and reports inside a `forEach`, so a template naming the
 // index twice reports twice, both times on the whole template. Measured, and no corpus case has
@@ -121,7 +121,7 @@ var noArrayIndexKeyIteratorPositions = map[string]int{
 //
 // # Where the finding points
 //
-// Four of the five shapes report the whole key expression; `String(i)` reports the ARGUMENT rather
+// Four of the five shapes report the whole key expression; `String(i)` reports the argument rather
 // than the call, which is upstream passing `node.arguments[0]` at that one site and the whole node
 // at the other four. A message-id fixture cannot see the difference and the corpus does not assert
 // it, so the span cases below do.
@@ -207,7 +207,7 @@ func (w *noArrayIndexKeyWalker) checkAttribute(node *ast.Node) {
 		// Not inside any iterator callback, so nothing can be an index. Upstream checks this first
 		// too, and it is what makes `<Foo key={i} />` at the top level clean.
 		//
-		// The check is SUBSUMED here and is kept as a cost guard rather than as a behavioural one.
+		// The check is subsumed here and is kept as a cost guard rather than as a behavioural one.
 		// A mutation forcing it always-false survived the whole fixture set, correctly: every one
 		// of the five report sites in `checkKeyExpression` is gated on `isArrayIndex`, whose loop
 		// over an empty slice answers false, and the one non-nil return in
@@ -267,7 +267,7 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 		// `key={'foo' + bar}`. Upstream collects every identifier in the binary tree and reports
 		// once per one that names an index, always on the whole expression.
 		//
-		// A LOGICAL operator is excluded, and this is a parser difference that costs findings in
+		// A logical operator is excluded, and this is a parser difference that costs findings in
 		// the reporting direction rather than the silent one. In ESTree `||`, `&&` and `??` are a
 		// `LogicalExpression`, a node type distinct from `BinaryExpression`, and upstream's
 		// `checkPropValue` has an arm only for the latter. Our parser gives all of them
@@ -283,7 +283,7 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 		// logical expressions, which reads as though they were meant to be covered. They are not
 		// reachable from the dispatch above, so that arm is dead in upstream. Reproduced as
 		// upstream behaves rather than as upstream appears to intend.
-		// This decline and the one inside `binaryIdentifiersNamingAnIndex` are a PAIR, and each
+		// This decline and the one inside `binaryIdentifiersNamingAnIndex` are a pair, and each
 		// survives mutation alone. Removing either one leaves the other declining the same inputs:
 		// the dispatch's decline stops a logical key before the walk, and the walk's decline stops
 		// it at the top of the tree, so both routes end in silence. Mutating both at once is caught
@@ -316,7 +316,7 @@ func (w *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 			return
 		}
 
-		// `key={String(bar)}`. This is the one site that reports the ARGUMENT rather than the
+		// `key={String(bar)}`. This is the one site that reports the argument rather than the
 		// whole call, which the span fixtures pin.
 		if callee.Kind == ast.KindIdentifier && callee.Text() == "String" &&
 			call.Arguments != nil && len(call.Arguments.Nodes) > 0 &&
@@ -359,7 +359,7 @@ func (w *noArrayIndexKeyWalker) binaryIdentifiersNamingAnIndex(node *ast.Node) [
 //
 // Nil-safe at every step, and the steps are where a port panics rather than where it mis-decides.
 // A callee can be a call expression (`getFoo().map(...)`), an element access (`foo["map"](...)`) or
-// a bare identifier, and `Text()` panics on the first two, so the KIND is checked before the text
+// a bare identifier, and `Text()` panics on the first two, so the kind is checked before the text
 // is read every time. Measured: the computed form is silent upstream and the call-as-callee form
 // reports, so neither may crash and they must answer differently.
 func (w *noArrayIndexKeyWalker) indexParameterName(node *ast.Node) (string, bool) {
@@ -372,13 +372,13 @@ func (w *noArrayIndexKeyWalker) indexParameterName(node *ast.Node) (string, bool
 	access := callee.AsPropertyAccessExpression()
 	methodName := access.Name()
 	if methodName == nil || methodName.Kind != ast.KindIdentifier {
-		// The kind half of this is EQUIVALENT rather than load-bearing, and it is kept because the
+		// The kind half of this is equivalent rather than load-bearing, and it is kept because the
 		// reason is not obvious from the line.
 		//
 		// A property access's name can be a private identifier here, so `foo.#map(...)` is a real
 		// parse rather than a hypothetical. It is not a panic hazard: probed, `Text()` on a private
 		// identifier returns `#map` rather than crashing, unlike `Text()` on a property access or a
-		// call expression, which is why the CALLEE kind test above is a genuine crash guard and this
+		// call expression, which is why the callee kind test above is a genuine crash guard and this
 		// one is not.
 		//
 		// No input can distinguish the two versions, and the argument is one sentence: every key in
@@ -423,7 +423,7 @@ func (w *noArrayIndexKeyWalker) indexParameterName(node *ast.Node) (string, bool
 
 	parameter := parameters.Nodes[position].AsParameterDeclaration()
 	if parameter.Initializer != nil {
-		// A defaulted parameter, and this is a PARSER difference rather than a rule decision.
+		// A defaulted parameter, and this is a parser difference rather than a rule decision.
 		//
 		// Upstream reads `params[n].name`, and ESTree wraps a defaulted parameter in an
 		// `AssignmentPattern` whose `.name` is undefined, so `foo.map((bar, i = 0) => ...)` is
@@ -500,7 +500,7 @@ func (w *noArrayIndexKeyWalker) checkCreateElementCall(node *ast.Node) bool {
 	}
 	if len(w.indexNames) == 0 {
 		// Upstream checks the stack before reading the props, so a createElement call outside any
-		// iterator is silent AND still counts as handled. Measured silent.
+		// iterator is silent and still counts as handled. Measured silent.
 		return true
 	}
 
@@ -568,7 +568,7 @@ func (w *noArrayIndexKeyWalker) isCreateOrCloneElement(callee *ast.Node) bool {
 // source. The checker resolves the same binding; the declaration is an import specifier whose
 // import declaration carries the module specifier.
 //
-// Note that upstream checks the SOURCE and not the imported name, so any identifier imported from
+// Note that upstream checks the source and not the imported name, so any identifier imported from
 // `react` qualifies here, not only `createElement` and `cloneElement`. That is upstream being loose
 // rather than upstream being right, and it is reproduced: the name has already been used as a
 // callee with a props object, so the shapes that reach this are narrow in practice.

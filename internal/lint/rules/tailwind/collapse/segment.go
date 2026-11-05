@@ -100,7 +100,7 @@ var mathFunctions = []string{
 // hasMathFunction ports `hasMathFn`: does input contain `(` and any `<mathFn>(` anywhere.
 //
 // Anywhere, not at the start. `1px_calc(2px)` has a math function, and so does
-// `url(rounded.png)` — `round` is in the list and `round(` appears inside. That last one is not a
+// `url(rounded.png)`: `round` is in the list and `round(` appears inside. That last one is not a
 // hypothetical: it is why `isNumber` is true for strings that are visibly not numbers, and why the
 // caller's type order is what decides the answer rather than this predicate.
 //

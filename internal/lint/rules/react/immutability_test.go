@@ -9,7 +9,7 @@ import (
 
 // TestImmutabilityFires covers every input measured to report under React's own rule.
 //
-// Every expectation in this file and in TestImmutabilityStaysSilent was produced by RUNNING
+// Every expectation in this file and in TestImmutabilityStaysSilent was produced by running
 // `eslint-plugin-react-hooks` 7.1.1 through the ESLint Linter API on the exact source below, not by
 // reading either implementation. That matters more than usual for this rule: three separate
 // hypotheses formed from reading were wrong, and each would have shipped as a confident fixture.
@@ -291,7 +291,7 @@ function Component(props) {
 	}
 }
 
-// TestImmutabilityStaysSilent covers every input measured CLEAN under React's own rule.
+// TestImmutabilityStaysSilent covers every input measured clean under React's own rule.
 //
 // The ordering pairs here are the rule's whole reason for existing: `s_before_hook` and
 // `s_before_jsx` mutate exactly the value that `f_hook_arg` and `f_jsx_captured` mutate, and differ
@@ -306,18 +306,18 @@ func TestImmutabilityStaysSilent(test *testing.T) {
 	}{
 		{
 			// The effect-cleanup idiom, which is the most common shape in any React codebase and which
-			// the ownership check exists for. `cancelled` is declared INSIDE the effect callback, so the
+			// the ownership check exists for. `cancelled` is declared inside the effect callback, so the
 			// closure that writes it writes a binding the effect owns rather than one the render owns,
-			// and no render outlives it. Measured CLEAN under React against a control that reports twice.
+			// and no render outlives it. Measured clean under React against a control that reports twice.
 			//
 			// Added for a surviving mutant: forcing the ownership test always-true left every fixture
 			// green, because nothing in the imported set declares a variable inside a callback and writes
 			// it from a deeper one. It was 30 findings on Kirk's tree.
-			// A ref reached by NAME rather than by type, which is the half of the ref exemption a
+			// A ref reached by name rather than by type, which is the half of the ref exemption a
 			// fixture can actually see. `rule_testing`'s tsconfig sets `types: []` and resolves no
-			// `node_modules`, so `@types/react` never resolves here and the CHECKER half of that
+			// `node_modules`, so `@types/react` never resolves here and the checker half of that
 			// exemption is unreachable through this harness at all; it is pinned by the dry run instead,
-			// where it removed 211 findings. Measured CLEAN under React against
+			// where it removed 211 findings. Measured clean under React against
 			// `f_non_ref_name_current_write`, which is the same shape with a name the ref regex rejects.
 			name: "s_ref_by_name_is_exempt",
 			source: `function Component(props) {
@@ -342,7 +342,7 @@ func TestImmutabilityStaysSilent(test *testing.T) {
 		},
 		{
 			// The other half of that pair: a variable declared inside a callback and written from a
-			// branch of the SAME callback. Also clean under React.
+			// branch of the same callback. Also clean under React.
 			name: "s_callback_declares_and_writes_its_own_local",
 			source: `function Component(props) {
   const cb = () => { let v; if (props.c) { v = 1; } else { v = 2; } return v; };
@@ -505,11 +505,11 @@ function Component(props) {
 	}
 }
 
-// TestImmutabilitySpans asserts WHERE each finding points, which no message-id fixture can see.
+// TestImmutabilitySpans asserts where each finding points, which no message-id fixture can see.
 //
 // The expectations are React's own spans, read off the executable's rendered underline for the same
-// source, and the first draft of this test guessed all six of them WRONG in the same direction. The
-// guess was that a write underlines the assignment; React underlines the OBJECT BEING MUTATED, so
+// source, and the first draft of this test guessed all six of them wrong in the same direction. The
+// guess was that a write underlines the assignment; React underlines the object being mutated, so
 // `props.a = 1` underlines `props` and `props.a.q = 1` underlines `props.a`. Every one of those six
 // was green under `ExpectFindings`, which is exactly the failure this step exists to catch.
 func TestImmutabilitySpans(test *testing.T) {
@@ -586,7 +586,7 @@ func TestImmutabilitySpans(test *testing.T) {
 // TestImmutabilityMessagesAreDistinct pins the four message ids and their descriptions.
 //
 // Asserted against literal strings typed here rather than against the rule's own constants: the
-// brief records a porter whose message-id mutant and message-text mutant BOTH survived a test
+// brief records a porter whose message-id mutant and message-text mutant both survived a test
 // written the other way, because equality against the constant moves with the constant.
 func TestImmutabilityMessagesAreDistinct(test *testing.T) {
 	test.Parallel()
@@ -607,7 +607,7 @@ func TestImmutabilityMessagesAreDistinct(test *testing.T) {
 
 // TestImmutabilityReasonSelectsTheMessage is the split this rule is most likely to get wrong.
 //
-// The lattice KIND decides whether to report; the reason set decides what the finding SAYS. One
+// The lattice kind decides whether to report; the reason set decides what the finding says. One
 // verdict has ten different explanations and a reader who conflates the two ships a rule that is
 // right about every verdict and wrong about every sentence. Each expectation is React's own wording
 // for the same input, matched on the distinguishing clause rather than on the whole sentence.
@@ -647,7 +647,7 @@ func TestImmutabilityReasonSelectsTheMessage(test *testing.T) {
 //
 // The reason set only ever grows, so a convergence test comparing whole abstract values would see a
 // reason bit arriving at a value whose kind is already final and call it movement, on every round,
-// until the bound ran out. `immutabilityMergeValues` merges both halves; only the KIND is allowed to
+// until the bound ran out. `immutabilityMergeValues` merges both halves; only the kind is allowed to
 // vote on termination, and this asserts that directly rather than through a fixture, because a
 // fixture can only observe the symptom as slowness.
 func TestImmutabilityConvergenceEqualityIgnoresReasons(test *testing.T) {
@@ -671,7 +671,7 @@ func TestImmutabilityConvergenceEqualityIgnoresReasons(test *testing.T) {
 //
 // `internal/utilities/hir/high_level_intermediate_representation.go` carries a warning addressed to this rule: a dataflow pass whose join
 // is "take the larger constant" is self-consistent, passes its own tests, and is wrong, because
-// `Frozen` joined with `Mutable` is `MaybeFrozen`, an element that is NEITHER operand. Every row
+// `Frozen` joined with `Mutable` is `MaybeFrozen`, an element that is neither operand. Every row
 // here was measured against React's executable with the compilation gate held constant.
 func TestImmutabilityJoinIsNotAnOrdering(test *testing.T) {
 	test.Parallel()
@@ -700,7 +700,7 @@ func TestImmutabilityJoinIsNotAnOrdering(test *testing.T) {
 		})
 	}
 
-	// A maybe-frozen value must REPORT. The scoping measurement for this rule described the gate as
+	// A maybe-frozen value must report. The scoping measurement for this rule described the gate as
 	// an equality against Frozen, and a rule built from that reading is silent on every joined
 	// value while passing every straight-line fixture.
 	if immutabilityMutate(immutabilityMaybeFrozen) != immutabilityMutationFrozen {
@@ -740,7 +740,7 @@ func TestImmutabilityRequiresTheTypedHarness(test *testing.T) {
 // not an error this rule names). cohere used to analyze `Page` as a function nested in the test
 // callback and report all three writes, twice each.
 //
-// The control is the component writing its OWN local after render, which the compiler reports at
+// The control is the component writing its own local after render, which the compiler reports at
 // the same line nested or not, so the nested component is still analyzed, as itself.
 func TestImmutabilityAnalyzesANestedComponentAsItsOwnUnit(test *testing.T) {
 	test.Parallel()

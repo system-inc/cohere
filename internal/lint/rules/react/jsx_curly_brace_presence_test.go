@@ -445,7 +445,7 @@ func TestJsxCurlyBracePresenceFires(test *testing.T) {
 // repairs the right span with the wrong text fails here and passes everywhere else.
 //
 // A case whose upstream `output` equals its input is excluded, because upstream writes that
-// when the fixer DECLINES; those are asserted separately by name below.
+// when the fixer declines; those are asserted separately by name below.
 func TestJsxCurlyBracePresenceRepairsSource(test *testing.T) {
 	test.Parallel()
 
@@ -809,13 +809,13 @@ func TestJsxCurlyBracePresenceLeavesTypeScriptExpressionsAlone(test *testing.T) 
 //
 // Upstream's missing-curly fixer returns null rather than guessing, and a declined repair is part
 // of what is being ported: a rule that repairs a case upstream refuses to touch is a defect no
-// message-id fixture can see. Each row must REPORT and must carry no fix.
+// message-id fixture can see. Each row must report and must carry no fix.
 //
 // Which shapes actually reach the decline was measured rather than read, and the reading would have
-// been wrong. `containsOnlyHtmlEntities` runs on the literal's RAW text, which for an attribute
+// been wrong. `containsOnlyHtmlEntities` runs on the literal's raw text, which for an attribute
 // includes its own surrounding quotes, so an attribute is never "only character references" and
 // `<App p="&middot;" />` is repaired rather than declined. The reference arm is reachable only
-// through a CHILD, and a child that is only references is already declined one level earlier by
+// through a child, and a child that is only references is already declined one level earlier by
 // `shouldCheckForMissingCurly`, so it never reports at all. That leaves the line-terminator arm as
 // the only decline this rule can produce, and the entity arm as reachable-but-subsumed. Both were
 // driven through the installed build.
@@ -830,7 +830,7 @@ func TestJsxCurlyBracePresenceDeclinesSomeRepairs(test *testing.T) {
 		test.Errorf("an attribute holding a line terminator must report without a repair, got %q", fixes[0].Text)
 	}
 
-	// The neighbouring shapes that DO carry a repair, so the decline above is shown to be narrow
+	// The neighbouring shapes that do carry a repair, so the decline above is shown to be narrow
 	// rather than the fixer being broken for attributes generally.
 	for _, testCase := range []struct{ source, want string }{
 		{`<App p="&middot;" />`, `<App p={"&middot;"} />`},
@@ -854,7 +854,7 @@ func TestJsxCurlyBracePresenceDeclinesSomeRepairs(test *testing.T) {
 func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(test *testing.T) {
 	test.Parallel()
 
-	// Character references. Upstream's corpus only ever writes the NAMED form, so the digits and
+	// Character references. Upstream's corpus only ever writes the named form, so the digits and
 	// the hash in the reference grammar are unreached by it and a scanner accepting only letters
 	// would pass every imported case while repairing source it must decline.
 	for _, source := range []string{
@@ -884,7 +884,7 @@ func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(test *testing.T) {
 //
 // A multi-line child is repaired line by line, and a line upstream considers blank is left as it is
 // while any other line is wrapped. "Blank" there is `String.prototype.trim`, whose character set is
-// the same as the regular expression's, and NOT `strings.TrimSpace`, whose set also contains U+0085.
+// the same as the regular expression's, and not `strings.TrimSpace`, whose set also contains U+0085.
 // Written with the Go-native spelling, a line holding only that character was skipped and written
 // back bare, where the installed build wraps it in an empty container. That is the whole difference
 // between the two spellings and nothing in upstream's corpus can reach it.
@@ -892,7 +892,7 @@ func TestJsxCurlyBracePresenceShapesTheCorpusDoesNotWrite(test *testing.T) {
 // The expectation was taken from the installed build as raw bytes, so the container holds the
 // character itself, rather than read off a terminal: this character prints as nothing and a lone
 // one reads as an empty string. That misreading cost a round trip here, because `trim()` on it
-// LOOKS empty and the comparison against the empty string is false.
+// looks empty and the comparison against the empty string is false.
 func TestJsxCurlyBracePresenceUsesJavaScriptWhitespaceWhenTrimming(test *testing.T) {
 	test.Parallel()
 

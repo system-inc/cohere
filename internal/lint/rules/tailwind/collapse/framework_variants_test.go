@@ -10,7 +10,7 @@ import (
 // The generated framework registry, tested against the engine's own measurements.
 //
 // Two claims are separable here and both are tested. The first is that the checked-in table says
-// what the engine says, which is a differential against `variant_fixtures.json` — the same fixture
+// what the engine says, which is a differential against `variant_fixtures.json`, the same fixture
 // `variant_test.go` uses, captured by a different generator, so agreement between them is agreement
 // between two independent readings of the engine rather than a tool checking itself. The second is
 // that `LoadDesignSystem` wires the table in so that the behaviour downstream changes, which is
@@ -402,7 +402,7 @@ func TestLoadedDesignSystemRegistersTheFrameworkVariants(test *testing.T) {
 
 	// `dark` is the repository's own redefinition and must not have appended: it is already a
 	// framework name. Its presence proves nothing on its own, which is why `hover` is checked
-	// beside it — before this landed `dark` was the only variant a loaded system knew.
+	// beside it: before this landed `dark` was the only variant a loaded system knew.
 	for _, root := range []string{"hover", "focus", "md", "group", "peer", "dark", "@max"} {
 		if !system.HasVariant(root) {
 			test.Errorf("a loaded system does not know %q, so `%s:` classes would not parse", root, root)

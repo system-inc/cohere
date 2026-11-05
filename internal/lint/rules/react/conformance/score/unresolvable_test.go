@@ -11,9 +11,9 @@ import (
 // TestUnresolvableTypesIsEarnedNotAssumed probes the excuse rather than trusting it.
 //
 // `VerdictUnresolvableTypes` says a type-aware rule read `any` because the fixture never imports
-// react. That is a claim about a MECHANISM, and the danger the category carries is that it is also
-// what a simply-broken rule looks like. So this supplies the missing types — a local `react.d.ts`
-// declaring the hooks the fixture calls — and requires the rule's answer to CHANGE.
+// react. That is a claim about a mechanism, and the danger the category carries is that it is also
+// what a simply-broken rule looks like. So this supplies the missing types (a local `react.d.ts`
+// declaring the hooks the fixture calls) and requires the rule's answer to change.
 //
 // A fixture that stays silent with types present was never excused by their absence, and its
 // verdict is an excuse rather than a measurement.
@@ -42,14 +42,17 @@ func TestUnresolvableTypesIsEarnedNotAssumed(test *testing.T) {
 		// this probe stripped a hardcoded pragma line with TrimPrefix, which matched only some of
 		// these fixtures and silently left the rest unchanged; the module specifier was also './react'
 		// rather than 'react', so the `declare module 'react'` stub could not resolve. Both bugs
-		// produced the same symptom — every fixture silent — which read as the rule being broken.
+		// produced the same symptom, every fixture silent, which read as the rule being broken.
 		typed := fixture
 		typed.Source = "import {useState} from 'react';\n" + fixture.Source
 		directory := test.TempDir()
 		if writeReactStubError := writeReactStub(directory); writeReactStubError != nil {
 			test.Fatalf("writing the stub: %v", writeReactStubError)
 		}
-		withTypes, _ := Analyze(subject, typed, directory)
+		withTypes, typedAnalyzeError := Analyze(subject, typed, directory)
+		if typedAnalyzeError != nil {
+			test.Fatalf("analyzing %s with react types present: %v", fixture.Name, typedAnalyzeError)
+		}
 
 		if len(withTypes.Errors) > 0 {
 			moved++
@@ -66,12 +69,12 @@ func TestUnresolvableTypesIsEarnedNotAssumed(test *testing.T) {
 }
 
 func writeReactStub(directory string) error {
-	// Copied in SHAPE from `set_state_in_render_test.go:reactStateDeclarations`, not invented.
+	// Copied in shape from `set_state_in_render_test.go:reactStateDeclarations`, not invented.
 	//
 	// The first version of this stub declared the setter as a plain function type and every fixture
 	// stayed silent, which read exactly like the rule being broken. It was the stub. This rule keys
-	// on the setter type's ALIAS symbol, so `Dispatch` has to be a TYPE ALIAS and `RefObject` an
-	// INTERFACE, matching `@types/react`. A stub that made both aliases, or neither, tests a checker
+	// on the setter type's alias symbol, so `Dispatch` has to be a type alias and `RefObject` an
+	// interface, matching `@types/react`. A stub that made both aliases, or neither, tests a checker
 	// behaviour that does not exist and produces a confident wrong measurement.
 	const stub = `declare module 'react' {
   export type SetStateAction<S> = S | ((prev: S) => S);

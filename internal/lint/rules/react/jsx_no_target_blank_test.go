@@ -8,7 +8,7 @@ import (
 
 // jsxNoTargetBlankFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because every case is JSX and needs a parser that reads it. It is NOT load-bearing:
+// A `.tsx` name because every case is JSX and needs a parser that reads it. It is not load-bearing:
 // this rule has no file gate, and `TestJsxNoTargetBlankHasNoFileGate` pins that by running one
 // reporting source under three JSX-capable extensions.
 const jsxNoTargetBlankFile = "/repository/source/JsxNoTargetBlank.tsx"
@@ -29,11 +29,11 @@ const jsxNoTargetBlankFile = "/repository/source/JsxNoTargetBlank.tsx"
 //
 // `linkComponentsUtil` starts from `['a']` and concatenates `settings.linkComponents`. cohere
 // reads no React settings, so `<Link>` is not a link component here by any route.
-// Each of the five was re-run against the installed build with its settings REMOVED and every one
+// Each of the five was re-run against the installed build with its settings removed and every one
 // went clean, which is the answer this port has to produce. They are recorded as clean fixtures
 // with the note at the line.
 //
-// # The options column is RAW JSON, on purpose
+// # The options column is raw JSON, on purpose
 //
 // Two of the five options have a default that is not Go's zero value: `enforceDynamicLinks` is a
 // string enum whose absent value means `always`, and `links` defaults to true. Handing
@@ -45,7 +45,7 @@ const jsxNoTargetBlankFile = "/repository/source/JsxNoTargetBlank.tsx"
 // An empty string in that column means the rule was configured as a bare severity, which is what
 // hands a real rule nil options.
 
-// TestJsxNoTargetBlankFires asserts ids, count, AND the repaired source where upstream ships one.
+// TestJsxNoTargetBlankFires asserts ids, count, and the repaired source where upstream ships one.
 //
 // 26 of the 48 reporting cases carry an `output`, which is the exact text upstream's fixer writes.
 // A finding with a wrong repair reads as a correct finding to any id assertion, so the fix column
@@ -113,7 +113,7 @@ func TestJsxNoTargetBlankFires(test *testing.T) {
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 
-		// The `_blank` comparison is case-INSENSITIVE; upstream lowercases before comparing.
+		// The `_blank` comparison is case-insensitive; upstream lowercases before comparing.
 		{"t1", "<a target='_BLANK' href='http://x.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_BLANK' href='http://x.com' rel=\"noreferrer\"></a>"},
 
 		// A `mailto:` scheme matches `/^(?:\w+:|\/\/)/` and counts as external. Reads as over-broad
@@ -123,11 +123,11 @@ func TestJsxNoTargetBlankFires(test *testing.T) {
 		// A protocol-relative href, the second half of the same pattern.
 		{"t3", "<a target='_blank' href='//example.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='//example.com' rel=\"noreferrer\"></a>"},
 
-		// The LAST target decides. `findLastIndex`, not `indexOf`, and a first-match search would call
+		// The last target decides. `findLastIndex`, not `indexOf`, and a first-match search would call
 		// this clean.
 		{"t4", "<a target='_self' target='_blank' href='http://x.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_self' target='_blank' href='http://x.com' rel=\"noreferrer\"></a>"},
 
-		// The judgment reads the LAST rel and the fixer repairs the FIRST. Upstream uses
+		// The judgment reads the last rel and the fixer repairs the first. Upstream uses
 		// `findLastIndex` for one and `find` for the other, so this reports on the trailing `rel="x"`
 		// and rewrites the leading `rel="noreferrer"`. Reproduced rather than unified; the fix column
 		// is what pins which one moved.
@@ -141,10 +141,10 @@ func TestJsxNoTargetBlankFires(test *testing.T) {
 		// `_blank` is the insecure one.
 		{"t12", "<a href='http://x.com' target={c ? '_blank' : '_self'} rel={c ? 'x' : 'noreferrer'}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
 
-		// The conditional pairing declined: the tests differ, so BOTH rel branches must be secure.
+		// The conditional pairing declined: the tests differ, so both rel branches must be secure.
 		{"t13", "<a href='http://x.com' target={c ? '_blank' : '_self'} rel={d ? 'noreferrer' : 'x'}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
 
-		// `rel={undefined}` is an IDENTIFIER in JavaScript, not a literal, so it misses upstream's
+		// `rel={undefined}` is an identifier in JavaScript, not a literal, so it misses upstream's
 		// non-string-literal branch and gets no fix. Upstream's own comment names undefined in that
 		// branch and the code cannot reach it. The three literals below do get the fix.
 		{"t14", "<a href='http://x.com' target='_blank' rel={undefined}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
@@ -161,13 +161,13 @@ func TestJsxNoTargetBlankFires(test *testing.T) {
 		{"t19", "<a target='_blank' href='http://x.com'></a>", "{\"links\": false}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='http://x.com' rel=\"noreferrer\"></a>"},
 		{"t20", "<a target='_blank' href='http://x.com'></a>", "{\"links\": true}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='http://x.com' rel=\"noreferrer\"></a>"},
 
-		// A form under `{forms: true, allowReferrer: true}` with `rel="noopener"`. It REPORTS, because
+		// A form under `{forms: true, allowReferrer: true}` with `rel="noopener"`. It reports, because
 		// the form arm calls `hasSecureRel(node)` with one argument so `allowReferrer` arrives
 		// undefined inside it, while the message id is chosen outside the call and still switches. So
 		// the finding says noopener would do and noopener did not do. Upstream inconsistency, reproduced.
 		{"t21", "<form target='_blank' action='http://x.com' rel='noopener'></form>", "{\"forms\": true, \"allowReferrer\": true}", []string{"noTargetBlankWithoutNoopener"}, ""},
 
-		// The form arm reports with NO fix, where the link arm ships one. The empty fix column is the
+		// The form arm reports with no fix, where the link arm ships one. The empty fix column is the
 		// assertion.
 		{"t22", "<form target='_blank' action='http://x.com'></form>", "{\"forms\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
 
@@ -192,7 +192,7 @@ func TestJsxNoTargetBlankFires(test *testing.T) {
 		// `_blank` branch decides and this reports.
 		{"t36", "<a target={c ? '' : '_blank'} href='http://x.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target={c ? '' : '_blank'} href='http://x.com' rel=\"noreferrer\"></a>"},
 
-		// Under `allowReferrer` the INSERTED value is `noopener`, not `noreferrer`. Only the two insert
+		// Under `allowReferrer` the inserted value is `noopener`, not `noreferrer`. Only the two insert
 		// arms read `relValue`; all three replace arms hardcode `noreferrer`.
 		{"t38", "<a target='_blank' href='http://x.com'></a>", "{\"allowReferrer\": true}", []string{"noTargetBlankWithoutNoopener"}, "<a target='_blank' href='http://x.com' rel=\"noopener\"></a>"},
 	}
@@ -215,7 +215,7 @@ func TestJsxNoTargetBlankFires(test *testing.T) {
 			// to touch would be applied unattended. `ExpectFixedSource` refuses a no-fix result
 			// rather than agreeing with any expectation, so the decline has to be checked here.
 			//
-			// Written after a mutation removing BOTH of the fixer's decline paths survived the
+			// Written after a mutation removing both of the fixer's decline paths survived the
 			// whole suite: every case covering them asserted the message id and never what was
 			// offered, which is the failure mode the empty column looked like it was closing.
 			for index, diagnostic := range result.Diagnostics {
@@ -304,7 +304,7 @@ func TestJsxNoTargetBlankStaysSilent(test *testing.T) {
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 
-		// The LAST href decides, and it is relative.
+		// The last href decides, and it is relative.
 		{"t5", "<a target='_blank' href='http://x.com' href='/rel'></a>", ""},
 
 		// The last rel is secure, so no finding at all.
@@ -371,7 +371,7 @@ func decodeTargetBlankOptionsForTest(test *testing.T, raw string) any {
 	return options
 }
 
-// TestJsxNoTargetBlankSpans pins that the finding lands on the OPENING element.
+// TestJsxNoTargetBlankSpans pins that the finding lands on the opening element.
 //
 // Upstream reports `node`, which is the `JSXOpeningElement` its listener receives, so the underline
 // stops at the closing angle bracket and never covers the children or the closing tag. Our tree has
@@ -440,7 +440,7 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 		{"never inverts the flag", "{\"enforceDynamicLinks\":\"never\"}",
 			JsxNoTargetBlankOptions{Links: true, EnforceDynamicLinksNever: true}},
 
-		// `links` defaults to TRUE, so the zero struct is wrong for it and an explicit false has to
+		// `links` defaults to `true`, so the zero struct is wrong for it and an explicit false has to
 		// survive the decode even though nothing reads it.
 		{"links false survives", "{\"links\":false}", JsxNoTargetBlankOptions{Links: false}},
 
@@ -481,7 +481,7 @@ func TestJsxNoTargetBlankHandlesNilOptions(test *testing.T) {
 		"<a target=\"_blank\" href=\"http://x.com\"></a>", nil)
 	rule_testing.ExpectFindings(test, result, "noTargetBlankWithoutNoreferrer")
 
-	// And the dynamic-href arm, which is the one the absent enum turns ON. A nil-options rule that
+	// And the dynamic-href arm, which is the one the absent enum turns on. A nil-options rule that
 	// read the enum as "never" would be silent here.
 	dynamic := rule_testing.RunWithOptions(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
 		"<a target=\"_blank\" href={dynamicLink}></a>", nil)

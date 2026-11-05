@@ -114,7 +114,8 @@ func strictVariantsOf(className string, system *tailwindengine.LoadedDesignSyste
 // rest in insertion order. A repeated key keeps its first position.
 func jsKeyOrder(keys []string) []string {
 	seen := make(map[string]bool, len(keys))
-	var indexes, rest []string
+	var indexes []string
+	var rest []string
 	for _, key := range keys {
 		if seen[key] {
 			continue
@@ -127,7 +128,9 @@ func jsKeyOrder(keys []string) []string {
 		}
 	}
 	sort.SliceStable(indexes, func(left int, right int) bool {
+		// Ignored: indexes holds only keys isArrayIndexKey already parsed as a uint below 2^32 - 1.
 		leftValue, _ := strconv.ParseUint(indexes[left], 10, 64)
+		// Ignored: the same keys, so this parse cannot fail either.
 		rightValue, _ := strconv.ParseUint(indexes[right], 10, 64)
 		return leftValue < rightValue
 	})

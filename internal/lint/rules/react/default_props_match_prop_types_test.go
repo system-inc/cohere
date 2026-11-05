@@ -8,7 +8,7 @@ import (
 
 // The corpus is upstream's, extracted by stubbing its RuleTester and capturing what the test file
 // hands it, so no case was retyped and no escape was typed by hand. Every case was run against the
-// installed build first, carrying its own options AND its languageOptions, and the expectations
+// installed build first, carrying its own options and its languageOptions, and the expectations
 // here are what that build reported.
 //
 // Eight of the ninety cases are excluded with the reason recorded rather than dropped; see
@@ -83,7 +83,7 @@ func TestDefaultPropsMatchPropTypesStaysSilent(test *testing.T) {
 	}
 }
 
-// TestDefaultPropsMatchPropTypesFires asserts the count AND the rendered message of every
+// TestDefaultPropsMatchPropTypesFires asserts the count and the rendered message of every
 // finding. Both messages interpolate the prop name, so a message-id assertion could not see an
 // interpolation defect, and the two arms differ only by which id fires on which input.
 func TestDefaultPropsMatchPropTypesFires(test *testing.T) {
@@ -181,7 +181,7 @@ func TestDefaultPropsMatchPropTypesFires(test *testing.T) {
 			result := rule_testing.RunWithOptions(test, DefaultPropsMatchPropTypes, defaultPropsMatchPropTypesFile, testCase.sourceText, testCase.options)
 
 			// The ids first, through the harness helper. `TestEveryRuleShipsAFixturePair` looks for
-			// this call BY NAME, so asserting the rendered text alone reads to that guard as a rule
+			// this call by name, so asserting the rendered text alone reads to that guard as a rule
 			// nothing proves can fire. It caught exactly that here.
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
@@ -213,7 +213,7 @@ func TestDefaultPropsMatchPropTypesFires(test *testing.T) {
 // `NeedsTypeChecker` costs the per-file checker lock across the whole tree.
 //
 // That trade was measured rather than assumed, on 2026-08-28 and with a seeded control proving the
-// counter worked: this tree contains ZERO occurrences of `defaultProps`, `propTypes` or
+// counter worked: this tree contains zero occurrences of `defaultProps`, `propTypes` or
 // `getDefaultProps` in any TypeScript or JavaScript file, against 56 files naming `React.Component`.
 // So the annotation arm would buy nothing here and cost every file the lock.
 //

@@ -41,12 +41,12 @@ var messageJsxNoCommentTextnodes = rule.Message{
 // all three report. A `.ts` file cannot hold JSX at all, so there is no fourth row to measure and
 // the gate would be unobservable rather than wrong.
 //
-// # The predicate is a regex over the RAW source, and both halves of that matter
+// # The predicate is a regex over the raw source, and both halves of that matter
 //
 // Upstream tests `/^\s*\/(\/|\*)/m` against `getText(context, node)`, which is the source slice
 // rather than any cooked value. Two consequences, both measured:
 //
-//   - The `m` flag anchors `^` at every LINE start, not only at the node's start. So a comment on
+//   - The `m` flag anchors `^` at every line start, not only at the node's start. So a comment on
 //     the third line of a multi-line text node reports, and that is the shape the corpus's own
 //     failing cases are written in. A port anchoring only at the node start passes the two
 //     single-line cases and goes silent on four of the seven.
@@ -86,11 +86,11 @@ var messageJsxNoCommentTextnodes = rule.Message{
 // and trailing whitespace, not the comment within it.
 //
 // `ctx.ReportNode` cannot express that here. It routes through `rule.TokenRange`, which calls
-// `GetRangeOfTokenAtPosition` to skip leading trivia, and a JSX text node whose content IS a
+// `GetRangeOfTokenAtPosition` to skip leading trivia, and a JSX text node whose content is a
 // comment is exactly the input that breaks: the scanner reads `// invalid` as trivia and returns
-// the position of the NEXT token, past the node's own end. Probed on
+// the position of the next token, past the node's own end. Probed on
 // `const a = <div>// invalid</div>;` the node spans 15 to 25 while `TokenRange` answers 33 to 25,
-// an INVERTED range whose start is after its end. Slicing the source with it panics.
+// an inverted range whose start is after its end. Slicing the source with it panics.
 //
 // This is a defect in `TokenRange` for this node kind rather than in this rule, and it is worth
 // naming because the trivia-skipping it performs is correct and load-bearing everywhere else. It

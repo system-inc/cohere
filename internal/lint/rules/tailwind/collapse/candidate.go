@@ -832,8 +832,8 @@ type rootCandidate struct {
 // `border-b` and `border` registered, it yields `{border-b, -}` then `{border, b}`, and the caller
 // keeps the first that compiles.
 //
-// Upstream is a generator and this returns a slice. That is not equivalent in general — a generator
-// stops when the consumer stops — but it is equivalent here, because both consumers drain it: the
+// Upstream is a generator and this returns a slice. That is not equivalent in general (a generator
+// stops when the consumer stops), but it is equivalent here, because both consumers drain it: the
 // candidate side loops over every root, and the variant side returns from inside the loop, which
 // this port reproduces by returning from inside its own loop over the collected slice. The cost is
 // that a variant returning on the first root still computed the rest, which is a slice of at most a
@@ -969,8 +969,8 @@ func GateCandidates(parsed []ParsedCandidate) []Candidate {
 		}
 
 		// The modifier is folded into the value key rather than dropped. Two classes differing only
-		// by their modifier are not interchangeable — `bg-red-500/50` and `bg-red-500` produce
-		// different colours — so losing it here would let them share a bucket.
+		// by their modifier are not interchangeable: `bg-red-500/50` and `bg-red-500` produce
+		// different colours, so losing it here would let them share a bucket.
 		if reading.Modifier != nil {
 			candidate.Value.Value += "/" + reading.Modifier.Value
 		}

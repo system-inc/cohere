@@ -16,9 +16,9 @@ import (
 // into the same cases.
 const exhaustiveDepsFile = "/repository/source/ExhaustiveDeps.tsx"
 
-// The corpus is oxc's 325 cases, with every verdict re-derived from REACT rather than from oxc.
+// The corpus is oxc's 325 cases, with every verdict re-derived from React rather than from oxc.
 //
-// oxc's own pass/fail split is deliberately NOT the expectation. React is this rule's authority
+// oxc's own pass/fail split is deliberately not the expectation. React is this rule's authority
 // and the two disagree on seven inputs, so using the split would have pinned the reimplementation
 // wherever it is wrong. Each case below was run through eslint-plugin-react-hooks 7.1.1 via the
 // ESLint Linter API with `@typescript-eslint/parser`, and each message it produced was mapped to
@@ -26,12 +26,12 @@ const exhaustiveDepsFile = "/repository/source/ExhaustiveDeps.tsx"
 // from elsewhere.
 //
 // One note about the parser, because it produced a confident wrong answer first. Run with the
-// default JavaScript parser, this same comparison reported ELEVEN disagreements. Seven were the
+// default JavaScript parser, this same comparison reported eleven disagreements. Seven were the
 // probe failing to parse TypeScript, which surfaces as a parse error rather than as a finding, so
 // those cases read as React declining inputs it actually reports on. A probe that cannot read its
 // input agrees with everything.
 //
-// Findings are expected in SOURCE POSITION order, which is this rule's emission order: entries in
+// Findings are expected in source position order, which is this rule's emission order: entries in
 // the dependency array are reported as the array is read, and the finding about the array as a
 // whole comes last. ESLint reports the summary first, so an expectation copied from its output
 // order would be wrong about eleven cases while being right about every id.
@@ -236,7 +236,7 @@ func TestExhaustiveDepsFires(test *testing.T) {
 // here: this rule's whole difficulty is staying quiet when the array is already right, and most of
 // these were added upstream because somebody hit a false positive.
 //
-// Three of them are NOT clean upstream and are marked at the line. They are the deliberate
+// Three of them are not clean upstream and are marked at the line. They are the deliberate
 // divergence recorded in the rule's doc comment: a TypeScript non-null assertion inside the
 // dependency array, which React turns into two findings because its chain walk throws on a node
 // kind it does not name, and which this rule unwraps because `!` cannot change what is read.
@@ -403,12 +403,12 @@ func TestExhaustiveDepsStaysSilent(test *testing.T) {
 // The eight corpus cases this port does not carry, named rather than deleted.
 //
 // Step 5 of the porting standard says to copy every case verbatim, and a case that is dropped
-// silently looks identical to a case nobody noticed. These are dropped for SCOPE rather than for
+// silently looks identical to a case nobody noticed. These are dropped for scope rather than for
 // disagreement: each asserts only the two diagnostic kinds this port leaves out, or mixes one of
 // those with a kind it does carry so no expectation over the whole input would be honest.
 //
 // The test asserts they still parse and that the rule survives them, which is the part that can
-// regress: an unported kind's input must not crash the walk or produce a finding of a DIFFERENT
+// regress: an unported kind's input must not crash the walk or produce a finding of a different
 // kind, and only running them says so.
 func TestExhaustiveDepsScopeIsStated(test *testing.T) {
 	test.Parallel()
@@ -508,7 +508,7 @@ func TestExhaustiveDepsRequiresTheTypedHarness(test *testing.T) {
 // replacing the effect-name pattern `Effect($|[^a-z])` with a plain `Effect` substring test survived
 // the entire 325-case corpus, because neither upstream corpus writes a hook name where the two
 // disagree. The axis is observable and was measured against React before either row was written:
-// an EFFECT keeps a declared dependency it never reads, and a non-effect calls that dependency
+// an effect keeps a declared dependency it never reads, and a non-effect calls that dependency
 // unnecessary. So `useEffective` reports and `useMyEffect2` is silent, and a substring test gets
 // both backwards.
 func TestExhaustiveDepsAdditionalHooks(test *testing.T) {
@@ -547,13 +547,13 @@ func TestExhaustiveDepsAdditionalHooks(test *testing.T) {
 			`{"additionalHooks": "["}`,
 			"function C() { const a = someFunc(); useCustomEffect(() => { console.log(a); }, []); }",
 			nil},
-		// `Effect` followed by a lowercase letter is NOT an effect, so an unread declared
+		// `Effect` followed by a lowercase letter is not an effect, so an unread declared
 		// dependency is unnecessary rather than kept.
 		{"Effect followed by a lowercase letter is not an effect",
 			`{"additionalHooks": "useEffective"}`,
 			"function C() { const a = someFunc(); useEffective(() => {}, [a]); }",
 			[]string{"exhaustiveDepsUnnecessary"}},
-		// `Effect` followed by a digit IS an effect, so the same dependency is kept.
+		// `Effect` followed by a digit is an effect, so the same dependency is kept.
 		{"Effect followed by a digit is an effect",
 			`{"additionalHooks": "useMyEffect2"}`,
 			"function C() { const a = someFunc(); useMyEffect2(() => {}, [a]); }",
@@ -583,7 +583,7 @@ func TestExhaustiveDepsAdditionalHooks(test *testing.T) {
 //
 // This is the assertion that separates this rule from every other one in the catalog, and it is not
 // optional here. `ExpectFindings` compares message ids and a count and nothing else, so a rule that
-// names the RIGHT problem and then advises the WRONG array passes a complete fixture pair. That is
+// names the right problem and then advises the wrong array passes a complete fixture pair. That is
 // not a hypothetical: a mutation stopping optional chaining from being recorded survived all 325
 // corpus cases, because every one of them asserts which finding fired and none asserts what it
 // offered. The array is the whole product of this rule, so it gets its own test.
@@ -653,12 +653,12 @@ func TestExhaustiveDepsSuggestsTheCorrectedArray(test *testing.T) {
 	}
 }
 
-// The corrected array is offered as a SUGGESTION and never as a FIX.
+// The corrected array is offered as a suggestion and never as a fix.
 //
 // Both upstreams already say this rewrite must not be applied unattended: React promotes it to a fix
 // only under an option named `enableDangerousAutofixThisMayCauseInfiniteLoops`, and oxc classifies
 // its own version as a dangerous suggestion in five of its six dependency-array fix vectors. The
-// reason is the asymmetry in the rule's doc comment — an array naming a value rebuilt every render
+// reason is the asymmetry in the rule's doc comment: an array naming a value rebuilt every render
 // re-runs the effect every render, and an effect that sets state then never stops.
 //
 // `internal/fix.ProposalsFrom` collects `Fixes` and ignores `Suggestions`, so this is the mechanical
@@ -683,7 +683,7 @@ func TestExhaustiveDepsProposesNoAutomaticFix(test *testing.T) {
 // The every-render construction check, on shapes the imported corpus does not separate.
 //
 // `getConstructionExpressionType` recurses through a ternary and through the logical operators, so
-// a value built in EITHER branch makes the whole expression a construction. A mutation looking only
+// a value built in either branch makes the whole expression a construction. A mutation looking only
 // at a ternary's first branch survived all 325 corpus cases: every conditional it writes happens to
 // construct on the left. The rows below were measured against React 7.1.1 before they were written,
 // which is what separates a fixture from a guess about a survivor.
@@ -730,7 +730,7 @@ func TestExhaustiveDepsConstructionRecursesThroughBranches(test *testing.T) {
 //
 // Three of this rule's findings point at three different things and the choice is upstream's rather
 // than convenient: the array as a whole for a list problem, the offending entry for an entry
-// problem, and the DECLARATION for a construction, because the fix is at the declaration and not at
+// problem, and the declaration for a construction, because the fix is at the declaration and not at
 // the Hook. A rule pointing all three at the Hook call would pass every other test in this file.
 func TestExhaustiveDepsPointsAtTheRightNode(test *testing.T) {
 	test.Parallel()
@@ -772,15 +772,15 @@ func TestExhaustiveDepsPointsAtTheRightNode(test *testing.T) {
 // `useMemo` and `useCallback` rebuild the whole suggested array from the reads rather than adding
 // the missing entries to what was declared, so fixing a missing dependency also drops the entries
 // that were never read. An effect keeps them. The corpus never separates the two, because a case
-// needs a satisfying entry AND a missing one AND an author order that is not the sorted order, and
+// needs a satisfying entry and a missing one and an author order that is not the sorted order, and
 // no upstream case has all three.
 //
-// This test exists because a mutation disabling the recompute SURVIVED all 325 corpus cases, and
+// This test exists because a mutation disabling the recompute survived all 325 corpus cases, and
 // then a direct comparison of the two code paths showed the mutant matching React on three shapes
 // while the original did not. The survivor was right about the code: the missing paths were being
 // sorted at gather time to make a Go map deterministic, which quietly sorted every suggestion. That
-// is the sixth survivor category and this brief's list does not name it — a mutant that survives
-// because the ORIGINAL is wrong.
+// is the sixth survivor category and this brief's list does not name it: a mutant that survives
+// because the original is wrong.
 //
 // Every expectation below was read off React 7.1.1 before it was written.
 func TestExhaustiveDepsNonEffectRebuildsTheArray(test *testing.T) {
@@ -797,13 +797,13 @@ func TestExhaustiveDepsNonEffectRebuildsTheArray(test *testing.T) {
 		{"a non-effect drops an outer-scope entry it never reads",
 			"const o = 1; function C(props) { useMemo(() => { console.log(props.b, props.a); }, [props.b, o]); }",
 			"Update the dependency array to [props.b, props.a]."},
-		// THE pair that separates the two code paths, and it took three wrong guesses to find.
+		// The one pair that separates the two code paths, and it took three wrong guesses to find.
 		//
-		// It needs all four of: a missing dependency, at least two SATISFYING entries, a declared
-		// order that differs from the READ order, and a declared array that is not already sorted so
+		// It needs all four of: a missing dependency, at least two satisfying entries, a declared
+		// order that differs from the read order, and a declared array that is not already sorted so
 		// no re-sort masks the difference. The callback reads b then c; the array declares c then b.
-		// A non-effect rebuilds from the reads and answers in READ order; an effect adds to what was
-		// declared and answers in DECLARED order. Both were read off React 7.1.1.
+		// A non-effect rebuilds from the reads and answers in read order; an effect adds to what was
+		// declared and answers in declared order. Both were read off React 7.1.1.
 		//
 		// A mutation disabling the recompute survived the 325-case corpus and then survived three
 		// fixtures written for it, each from a hypothesis that was wrong about which input could
@@ -819,8 +819,8 @@ func TestExhaustiveDepsNonEffectRebuildsTheArray(test *testing.T) {
 			"function C(props) { const u = someFunc(); useCallback(() => { console.log(props.b, props.a); }, [u, props.b]); }",
 			"Update the dependency array to [props.b, props.a]."},
 		// The effect side, so the asymmetry is pinned from both directions rather than only from
-		// the branch that changes. The distinguishing entry has to be a LOCAL that is never read:
-		// an outer-scope entry is dropped by BOTH, which is a wrong guess this test made first and
+		// the branch that changes. The distinguishing entry has to be a local that is never read:
+		// an outer-scope entry is dropped by both, which is a wrong guess this test made first and
 		// React corrected. The two rows below are the same input under two hook names.
 		{"an effect keeps an unread local",
 			"function C(props) { const u = someFunc(); useEffect(() => { console.log(props.b, props.a); }, [props.b, u]); }",

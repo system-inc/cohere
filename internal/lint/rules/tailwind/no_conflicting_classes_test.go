@@ -15,8 +15,8 @@ import (
 // Same reason the other three migrated rules' fixtures give. The rule now reads the live design
 // system to resolve a class to its declared properties, so it declares `ProgramReads` and returns
 // nil listeners when the Program is nil. `rule_testing.Run` hands it exactly that, so a fixture left on
-// it would exercise the nil-Program branch: the reporting half fails loudly and the silent half —
-// which this rule's own header calls the load-bearing one — passes while proving nothing.
+// it would exercise the nil-Program branch: the reporting half fails loudly and the silent half,
+// which this rule's own header calls the load-bearing one, passes while proving nothing.
 //
 // `TestConflictFixturesActuallyRan` is what stops the converted file from going green on nothing in
 // the other direction, where the walk for an installed tailwindcss finds none and every fixture
@@ -389,9 +389,9 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(test *testing.T) {
 			"block; the repository half is not carrying the population it should", compiled)
 	}
 
-	// The complement, and it asserts the SOURCE rather than the answer. `background--0` still
+	// The complement, and it asserts the source rather than the answer. `background--0` still
 	// resolves against a design system that does not declare it, because `RootDeclaredProperties`
-	// carries the root `background-` — the same generated-table leak
+	// carries the root `background-`, the same generated-table leak
 	// TestRepositoryNamesInTheFrameworkTablesAreStillVouchedFor pins for `KnownStatics`. What must
 	// differ is which half answered: the repository's compiled block on ahra, the framework table
 	// elsewhere.
@@ -409,7 +409,7 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(test *testing.T) {
 // TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables pins a gap this task did not close.
 //
 // The repository half of the resolution compiles functional `@utility` blocks, which is where 913 of
-// the corpus's class occurrences are answered. A STATIC `@utility` block cannot be compiled from
+// the corpus's class occurrences are answered. A static `@utility` block cannot be compiled from
 // here: `LoadedDesignSystem.staticUtilityNodes` is unexported and has no accessor, and the only path
 // to it is `Table.Statics`, which holds a `{order, count}` reading rather than property names.
 // conflict_facts.go's file comment records why a reading is not a substitute for a declaration list.
@@ -423,7 +423,7 @@ func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(test *testing.T) {
 // the same one #gnqbn4b tracks. The error direction is the safe one: an unresolvable class is skipped
 // rather than reported, so the rule under-reports on a repository whose statics it cannot see.
 //
-// Pinned on the CURRENT behaviour so closing it upstream breaks this test deliberately.
+// Pinned on the current behaviour so closing it upstream breaks this test deliberately.
 func TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables(test *testing.T) {
 	test.Parallel()
 	independent := loadedDesignSystemResult(independentLiveSystem(test), "")
@@ -434,7 +434,7 @@ func TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables(test *testing.
 			"test exists to notice: delete it and assert the corrected behaviour instead")
 	}
 
-	// The complement: a FUNCTIONAL block on the same stylesheet does resolve, so the gap is about
+	// The complement: a functional block on the same stylesheet does resolve, so the gap is about
 	// static blocks specifically rather than about the repository half being inert.
 	if _, canResolve := resolveClassFactsIn("synthetic-fn-small", independent); !canResolve {
 		test.Error("a functional @utility block did not resolve either, so the repository half is not " +

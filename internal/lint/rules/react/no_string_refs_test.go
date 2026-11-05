@@ -9,7 +9,7 @@ import (
 
 // stringRefsFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because the corpus is JSX and needs a parser that reads it. It is NOT load-bearing
+// A `.tsx` name because the corpus is JSX and needs a parser that reads it. It is not load-bearing
 // the way the previous port's was: this rule has no file gate, and `TestNoStringRefsHasNoFileGate`
 // pins that by running the same source under four extensions.
 const stringRefsFile = "/repository/source/StringRefs.tsx"
@@ -242,7 +242,7 @@ func TestNoStringRefsSpellingsOfTheRefsRead(test *testing.T) {
 			"class H extends React.Component { m() { return this[`refs`].x; } }\n",
 			nil,
 		},
-		// An IDENTIFIER key does have `.name`, and it is `refs`, and `computed` is never checked.
+		// An identifier key does have `.name`, and it is `refs`, and `computed` is never checked.
 		// So an unrelated variable named `refs` is read as the registry and reports. Measured on
 		// the installed build. This is an upstream defect, reproduced rather than corrected.
 		{
@@ -285,7 +285,7 @@ func TestNoStringRefsSpellingsOfTheRefsRead(test *testing.T) {
 	}
 }
 
-// Which enclosing component counts, which is a SCOPE walk and not a parent-chain walk.
+// Which enclosing component counts, which is a scope walk and not a parent-chain walk.
 //
 // This is the group that the previous port got wrong in two directions, and neither was visible
 // from the imported corpus, which writes exactly one nesting shape. `getParentES6Component` stops
@@ -309,7 +309,7 @@ func TestNoStringRefsEnclosingComponentIsAScopeWalk(test *testing.T) {
 			"class H extends React.Component { m() { class Inner { k() { return this.refs.x; } } } }\n",
 			false,
 		},
-		// The mirror image: the first class scope IS the component, so the plain class above it
+		// The mirror image: the first class scope is the component, so the plain class above it
 		// does not matter. Measured reporting.
 		{
 			"a component nested inside a plain class still counts",

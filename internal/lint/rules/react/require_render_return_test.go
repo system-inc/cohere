@@ -9,7 +9,7 @@ import (
 
 // requireRenderReturnFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because the corpus is JSX and needs a parser that reads it. It is NOT load-bearing:
+// A `.tsx` name because the corpus is JSX and needs a parser that reads it. It is not load-bearing:
 // this rule has no file gate, and `TestRequireRenderReturnHasNoFileGate` pins that by running one
 // reporting source under four extensions.
 const requireRenderReturnFile = "/repository/source/RequireRenderReturn.tsx"
@@ -49,7 +49,7 @@ func TestRequireRenderReturnFires(test *testing.T) {
 		//
 		// espree produces no parenthesized-expression node at all, so `node.superClass` is the bare
 		// member expression however the parens are written and upstream never sees them. Our parser
-		// does produce the node, and the shelf's `IsEs6ComponentClass` skips it on the RECEIVER
+		// does produce the node, and the shelf's `IsEs6ComponentClass` skips it on the receiver
 		// only, so `(React).Component` answers true there while `(React.Component)` answers false.
 		// The first and third of these fail against the shelf helper and pass against the local
 		// one, which is the entire reason `isRenderReturnEs6ComponentClass` exists. Measured on
@@ -73,7 +73,7 @@ func TestRequireRenderReturnFires(test *testing.T) {
 		// declaration and the rule's own filter keeps.
 		{"class expression component", "var Hello = class extends React.Component {\n  render() {}\n};\n", []string{"noRenderReturn"}},
 
-		// An arrow with a BLOCK body has no implicit return, so it falls through to the walk and
+		// An arrow with a block body has no implicit return, so it falls through to the walk and
 		// reports. Its expression-bodied twin is a silent fixture below, and the pair is what
 		// separates the two listeners.
 		{"arrow render with empty block body", "class Hello extends React.Component {\n  render = () => {}\n}\n", []string{"noRenderReturn"}},
@@ -100,7 +100,7 @@ func TestRequireRenderReturnFires(test *testing.T) {
 		{"es5 return only inside a nested arrow", "var Hello = createReactClass({\n  render: function() { var f = () => { return 1; }; }\n});\n", []string{"noRenderReturn"}},
 
 		// The per-component flag, in the direction that reports. Both renders empty reports once,
-		// on the FIRST, which is `findRenderMethod` taking the first match.
+		// on the first, which is `findRenderMethod` taking the first match.
 		{"two empty render methods report once on the first", "class Hello extends React.Component {\n  render() {}\n  render() {}\n}\n", []string{"noRenderReturn"}},
 
 		// A return in a sibling method does not satisfy `render`: the ancestor named `render` is
@@ -114,7 +114,7 @@ func TestRequireRenderReturnFires(test *testing.T) {
 		// return inside it marks the inner and leaves the outer unmarked.
 		{"inner component returns, outer does not", "class Outer extends React.Component {\n  render() {\n    class Inner extends React.Component { render() { return <div/>; } }\n  }\n}\n", []string{"noRenderReturn"}},
 
-		// An implicit-return arrow whose parent property is NOT named `render` must not satisfy
+		// An implicit-return arrow whose parent property is not named `render` must not satisfy
 		// anything. Upstream's second listener returns early on exactly this test, and a mutation
 		// removing it survived every other fixture: the arm then marks the enclosing component for
 		// any expression-bodied arrow anywhere inside it, which is three of the commonest shapes
@@ -125,7 +125,7 @@ func TestRequireRenderReturnFires(test *testing.T) {
 
 		// A `render` arrow on a plain object elsewhere in the file does not reach this component,
 		// because the climb from that arrow stops at the nearest enclosing component and there is
-		// none. Its nested twin, which DOES reach, is a silent fixture below.
+		// none. Its nested twin, which does reach, is a silent fixture below.
 		{"stray render arrow outside the component", "class Hello extends React.Component {\n  render() {}\n}\nvar o = { render: () => <div/> };\n", []string{"noRenderReturn"}},
 	}
 
@@ -167,7 +167,7 @@ func TestRequireRenderReturnStaysSilent(test *testing.T) {
 		{"bare createClass is not a component", "var Hello = createClass({\n  render: function() {}\n});\n"},
 		{"namespaced React.createClass is not a component", "var Hello = React.createClass({\n  render: function() {}\n});\n"},
 
-		// The parenthesized factory callee with a render that DOES return. Paired with the
+		// The parenthesized factory callee with a render that does return. Paired with the
 		// reporting fixture above, this separates the parenthesis handling from the verdict.
 		{"parenthesized factory callee with a returning render", "var Hello = (createReactClass)({\n  render: function() { return <div/>; }\n});\n"},
 
@@ -204,15 +204,15 @@ func TestRequireRenderReturnStaysSilent(test *testing.T) {
 		// upstream's clean cases and this third shape beside them.
 		{"return inside an if block", "class Hello extends React.Component {\n  render() { if (a) { return <div/>; } }\n}\n"},
 
-		// The per-component flag, in the direction that goes quiet. A return in EITHER render marks
+		// The per-component flag, in the direction that goes quiet. A return in either render marks
 		// the whole component, so both orderings are clean while the both-empty pair reports. This
 		// is upstream being loose and it is reproduced.
 		{"second render returns, first is empty", "class Hello extends React.Component {\n  render() {}\n  render() { return <div/>; }\n}\n"},
 		{"first render returns, second is empty", "class Hello extends React.Component {\n  render() { return <div/>; }\n  render() {}\n}\n"},
 
-		// The measured false negative, and the reason the flag climbs to the nearest REGISTERED
+		// The measured false negative, and the reason the flag climbs to the nearest registered
 		// component rather than to the nearest class. `Inner` is not a component, so the return
-		// inside it climbs past and marks `Outer`. Its twin where `Inner` IS a component is a
+		// inside it climbs past and marks `Outer`. Its twin where `Inner` is a component is a
 		// reporting fixture above, and the pair is the only thing that can see this decision.
 		{"return inside a nested plain class marks the outer component", "class Outer extends React.Component {\n  render() {\n    class Inner { render() { return <div/>; } }\n  }\n}\n"},
 
@@ -248,7 +248,7 @@ func TestRequireRenderReturnStaysSilent(test *testing.T) {
 // The span, which no `ExpectFindings` assertion can see.
 //
 // Upstream reports `node: findRenderMethod(component.node)`, and `findRenderMethod` returns the
-// PROPERTY rather than its value, so the finding covers the whole `render() {}` or
+// property rather than its value, so the finding covers the whole `render() {}` or
 // `render: function() {}` including the empty body. A port anchoring on the function would carry
 // the right message id on every fixture above while pointing at the wrong node, and the four
 // upstream cases would all still pass.
@@ -290,13 +290,13 @@ func TestRequireRenderReturnSpan(test *testing.T) {
 			"get render() {}",
 		},
 		{
-			// Both must be empty. A return in EITHER marks the whole component, so a middle
+			// Both must be empty. A return in either marks the whole component, so a middle
 			// `render` that returns makes all three clean, which is measured and is the
 			// per-component flag rather than a per-method one. Writing this case with a returning
 			// render was the first draft's mistake and the rule was right.
 			//
-			// The two renders must also read DIFFERENTLY, and this is the case's whole point.
-			// `findRenderMethod` takes the FIRST match, and a mutation flipping that to the last
+			// The two renders must also read differently, and this is the case's whole point.
+			// `findRenderMethod` takes the first match, and a mutation flipping that to the last
 			// survived every fixture while two identical `render() {}` bodies were the probe: the
 			// slices compared equal whichever one was reported. Giving the second a parameter is
 			// what makes the choice visible. Measured on the installed build, which reports the

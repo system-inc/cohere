@@ -233,15 +233,15 @@ func TestAllDataTypesIsTheEnginesOrder(test *testing.T) {
 // TestSegmentMatchesEngine compares the splitter directly against the engine's own.
 //
 // This test exists because of a measured gap rather than for completeness. Breaking bracket nesting
-// in segment — making `[` stop pushing a closer, so `[a,b]` splits into two parts — changes the
+// in segment (making `[` stop pushing a closer, so `[a,b]` splits into two parts) changes the
 // split of 15 corpus values and changes the inferred type of none of them, because the bracket
 // fragments are nonsense to every predicate whether they arrive as one part or two. A mutation that
 // real code would notice slipped through a suite that only ever asked segment questions through
 // InferDataType.
 //
 // The type answers are what production consumes, so they stay the primary check. But segment is
-// about to have other callers in this port — the candidate parser and the value parser both need
-// it — and a splitter verified only by the one consumer that cannot see its mistakes is verified
+// about to have other callers in this port (the candidate parser and the value parser both need
+// it), and a splitter verified only by the one consumer that cannot see its mistakes is verified
 // for that consumer alone.
 func TestSegmentMatchesEngine(test *testing.T) {
 	test.Parallel()

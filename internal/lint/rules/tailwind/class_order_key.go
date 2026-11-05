@@ -41,13 +41,13 @@
 // that "every single variant precedes every stacked one, whatever they start with." The engine
 // implements nothing of the kind. It ORs one bit per variant into a mask and compares masks
 // numerically, so a class's position is decided by its *highest-ranked* variant and only ties on
-// that are broken by the next bit down. A stacked variant therefore sorts FIRST whenever its
+// that are broken by the next bit down. A stacked variant therefore sorts first whenever its
 // outermost variant is outranked by the other class's.
 //
 // Measured on the corpus before this file existed: 15 disagreeing pairs of 4,265 separable pairs
 // across 7 class lists. `ahra/list-99` is a real literal in this repository where the engine keeps
 // `dark:hover:bg-light-50` (mask 5, two variants) ahead of `[&_svg]:me-3` (mask 8, one variant) and
-// the shipped rule reversed them — so the rule reported a finding on correctly ordered code and
+// the shipped rule reversed them, so the rule reported a finding on correctly ordered code and
 // asked the author to break it.
 //
 // # Declining is a state, and it is not the same state as agreeing
@@ -190,7 +190,7 @@ func readingFor(
 // step is the engine's and none of them is this port's invention.
 //
 // `SliceStable` rather than `Slice` because the final tiebreak is the class name and two distinct
-// classes cannot tie on it, so stability is not load-bearing for the result — it is here so that a
+// classes cannot tie on it, so stability is not load-bearing for the result. It is here so that a
 // list containing a duplicate (which the caller rejects before reaching this, but which a future
 // caller might not) degrades to source order rather than to whatever the sort happened to do.
 func sortClassesByKey(classes []string, keys map[string]classOrderKey) []string {

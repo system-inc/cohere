@@ -150,7 +150,7 @@ type noStringRefsWireOptions struct {
 // keeps the parenthesis as a real node, so reproducing upstream means skipping it deliberately.
 // Measured; the previous port was silent on this input.
 //
-// # The enclosing component is found by SCOPE, not by walking parents
+// # The enclosing component is found by scope, not by walking parents
 //
 // `getParentES6Component` walks *scopes* to the first `class` scope and asks whether that one class
 // is a component. It does not keep climbing. `getParentES5Component` walks scopes upward asking, at
@@ -193,7 +193,7 @@ type noStringRefsWireOptions struct {
 // reason, which is the same resolution `no-unsafe` in this package reached for the same helper.
 //
 // `utilsreact.IsEs6ComponentClass` is used as-is, and that is measured rather than assumed. It
-// skips parentheses on the heritage receiver, which is a divergence from oxc and is NOT one from
+// skips parentheses on the heritage receiver, which is a divergence from oxc and is not one from
 // this authority: `(React.Component)` and `(React).Component` both report upstream, because ESTree
 // has no parenthesized node for the check to trip over. Its accepted base names, `Component` and
 // `PureComponent` bare or under the React namespace, are `/^(Pure)?Component$/` at
@@ -314,7 +314,7 @@ func hasEnclosingComponent(node *ast.Node) bool {
 	return hasEnclosingEs6Component(node) || hasEnclosingEs5Component(node)
 }
 
-// hasEnclosingEs6Component reproduces `getParentES6Component`, whose walk STOPS at the first class.
+// hasEnclosingEs6Component reproduces `getParentES6Component`, whose walk stops at the first class.
 //
 // Upstream walks scopes to the nearest one whose type is `class` and then asks whether that single
 // class is a component, returning null rather than continuing if it is not. So a plain class nested
@@ -335,7 +335,7 @@ func hasEnclosingEs6Component(node *ast.Node) bool {
 	return false
 }
 
-// hasEnclosingEs5Component reproduces `getParentES5Component`, which walks FUNCTION scopes.
+// hasEnclosingEs5Component reproduces `getParentES5Component`, which walks function scopes.
 //
 // Upstream's loop is four lines and every one of them matters:
 //
@@ -347,7 +347,7 @@ func hasEnclosingEs6Component(node *ast.Node) bool {
 // is the `ObjectExpression`. That object is the node handed to `isES5Component`, which then reads
 // `node.parent.callee` at `componentUtil.js:43`. So the question asked at each function scope is
 // really "is this function a property of an object literal that is the argument of a factory call",
-// and the chain from the function to the call is FOUR hops rather than two.
+// and the chain from the function to the call is four hops rather than two.
 //
 // Our parser spells the same chain `FunctionExpression -> PropertyAssignment ->
 // ObjectLiteralExpression -> CallExpression`, read off the tree rather than assumed: an earlier
@@ -386,7 +386,7 @@ func hasEnclosingEs5Component(node *ast.Node) bool {
 // correct constant there.
 //
 // Our parser does not have it. A property holding a function expression or an arrow goes through a
-// `PropertyAssignment`, which is two hops, but a shorthand method or an accessor IS the member, so
+// `PropertyAssignment`, which is two hops, but a shorthand method or an accessor is itself the member, so
 // the object literal is one hop up:
 //
 //	{ m: function() {} }    FunctionExpression -> PropertyAssignment -> ObjectLiteralExpression
@@ -440,6 +440,13 @@ func opensFunctionScope(kind ast.Kind) bool {
 	return false
 }
 
+// createReactClassPragma is upstream's default `createClass` pragma.
+//
+// Configurable upstream through `settings.react.createClass`, which cannot reach a rule here for
+// the same reason the React version cannot. Fixed to the default, which is what an unconfigured
+// upstream uses.
+const createReactClassPragma = "createReactClass"
+
 // isEs5FactoryCall is upstream's `isES5Component`, and its narrowness is the point.
 //
 // `componentUtil.js:39` reads the `createClass` pragma, which defaults to `createReactClass`, and
@@ -476,13 +483,6 @@ func isEs5FactoryCall(node *ast.Node) bool {
 	}
 	return false
 }
-
-// createReactClassPragma is upstream's default `createClass` pragma.
-//
-// Configurable upstream through `settings.react.createClass`, which cannot reach a rule here for
-// the same reason the React version cannot. Fixed to the default, which is what an unconfigured
-// upstream uses.
-const createReactClassPragma = "createReactClass"
 
 // isStringRefValue reports whether a ref attribute's value is a string this rule refuses.
 //

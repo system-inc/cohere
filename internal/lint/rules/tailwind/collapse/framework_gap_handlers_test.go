@@ -167,8 +167,10 @@ var gapCellsMeasuredElsewhere = map[string]string{
 // for two properties `PropertyOrder` does not know.
 func TestGapRootEmittersAgreeWithTheirMeasuredReadings(test *testing.T) {
 	test.Parallel()
-	var agreed, compared int
-	var disagreements, unported []string
+	var agreed int
+	var compared int
+	var disagreements []string
+	var unported []string
 
 	// Which skip keys actually matched. A key that matches nothing is not a harmless typo: it reads
 	// as a documented exemption while the cell it names is being compared anyway, or worse, while a
@@ -285,13 +287,14 @@ func TestEveryGapRootHasAnEmitter(test *testing.T) {
 // the comparison has nothing left to compare against.
 //
 // What it was really asserting was that the arms are distinct, and that is asserted directly here.
-// A root whose arms returned the same property list would have made the old comparison AGREE, which
+// A root whose arms returned the same property list would have made the old comparison report agreement, which
 // is the direction that reads as success, so this is the check that carried the weight.
 func TestGapRootPropertyNamesAreDistinctPerArm(test *testing.T) {
 	test.Parallel()
 	// The roots that branch colour against not-colour. Each must declare different properties on the
 	// two arms, or a width and a colour of the same root would read as conflicting.
-	var distinct, identical int
+	var distinct int
+	var identical int
 	for _, root := range gapRoots {
 		ordinary := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true}))
 		colour := PropertySort(EmitGapRoot(root, UtilityBranch{HasValue: true, ResolvedAsColor: true}))

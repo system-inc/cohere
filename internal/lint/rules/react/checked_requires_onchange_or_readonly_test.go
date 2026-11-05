@@ -10,7 +10,7 @@ import (
 
 // checkedRequiresFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because most cases are JSX and need a parser that reads it. It is NOT load-bearing:
+// A `.tsx` name because most cases are JSX and need a parser that reads it. It is not load-bearing:
 // this rule has no file gate, and `TestCheckedRequiresHasNoFileGate` pins that by reporting on a
 // `.ts` file too. Three shipped react rules in this package carry a `.tsx`-only gate that is oxc
 // residue rather than upstream behavior (task 2abaqvt); this rule deliberately does not, because
@@ -29,20 +29,20 @@ const checkedRequiresFile = "/repository/source/CheckedRequires.tsx"
 // and its verdict agreed with the clone on every one: 24 clean and 11 reporting with the stated
 // counts and message ids in the stated order. The two authorities are one for this rule.
 //
-// # The options column is RAW JSON, on purpose
+// # The options column is raw JSON, on purpose
 //
 // Every fixture routes through `DecodeCheckedRequiresOnChangeOrReadOnlyOptions`, the same function
 // the config layer calls. Handing `RunWithOptions` a struct built by hand would leave the decoder
 // untested, and the decoder is the one line with no upstream counterpart: it has to answer the
-// defaults on EMPTY input where the generic helper would error. An empty string in that column
+// defaults on empty input where the generic helper would error. An empty string in that column
 // means the rule was configured as a bare severity, which is what hands a real rule nil options,
 // and 27 of the 35 cases take that path.
 //
-// The wire shape is the BARE object, not upstream's `[{...}]` array. cohere's config layer unwraps
+// The wire shape is the bare object, not upstream's `[{...}]` array. cohere's config layer unwraps
 // the `[severity, options]` tuple before dispatch, so the array wrapper the corpus writes is gone
 // by the time a decoder sees anything.
 
-// TestCheckedRequiresFires asserts the ids, the count, AND the order.
+// TestCheckedRequiresFires asserts the ids, the count, and the order.
 //
 // Order is asserted rather than incidental: three of the eleven reporting cases produce two findings
 // on one node, and upstream reports `exclusiveCheckedAttribute` before `missingProperty` because it
@@ -133,7 +133,7 @@ func TestCheckedRequiresStaysSilent(test *testing.T) {
 //
 // `RunTyped` rather than `Run` because the rule declares `NeedsTypeChecker`: the bare
 // `createElement(...)` arm asks the checker which binding that name is. The plain harness hands a
-// rule a nil checker, and the failure mode there is SILENCE rather than a crash. Every StaysSilent
+// rule a nil checker, and the failure mode there is silence rather than a crash. Every StaysSilent
 // case would pass vacuously, so `TestCheckedRequiresNeedsTheTypedHarness` pins the requirement
 // with a case that only the typed path can report.
 func runCheckedRequires(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
@@ -148,7 +148,7 @@ func runCheckedRequires(test *testing.T, sourceText string, rawOptions string) r
 
 // TestCheckedRequiresResolvesEveryPragmaShape covers the four bindings upstream accepts.
 //
-// The corpus writes NONE of these: every one of its `createElement` cases is namespaced
+// The corpus writes none of these: every one of its `createElement` cases is namespaced
 // `React.createElement`, so the entire bare-identifier arm, and the checker declaration that arm
 // forces, is invisible to the imported fixtures. These rows exist because the reference
 // implementation has a whole helper for them, and each verdict below was measured on the installed
@@ -207,7 +207,7 @@ func TestCheckedRequiresResolvesEveryPragmaShape(test *testing.T) {
 			"function createElement(tag: string, properties: object) { return tag; }\ncreateElement('input', { checked: true });\n",
 			nil,
 		},
-		// The five below pin the INITIALIZER side of the binding, which the accepting rows above
+		// The five below pin the initializer side of the binding, which the accepting rows above
 		// cannot see on their own: each accepting row proves the shape is reached, and only a
 		// matching declining row proves the pragma test inside it decides anything. Three separate
 		// mutants survived the whole suite without them, one per line these cover: the identifier
@@ -238,14 +238,14 @@ func TestCheckedRequiresResolvesEveryPragmaShape(test *testing.T) {
 			"declare function require(name: string): any;\nconst createElement = require('preact').createElement;\ncreateElement('input', { checked: true });\n",
 			nil,
 		},
-		// The three below cover DECLARATION MERGING, where the symbol carries more than one
+		// The three below cover declaration merging, where the symbol carries more than one
 		// declaration and the import is not necessarily first. A mutant replacing the loop in
-		// `bindsToPragmaImport` with the first declaration only SURVIVED the rest of this suite,
+		// `bindsToPragmaImport` with the first declaration only survived the rest of this suite,
 		// and probing the checker showed why: an ambient declaration written above the import puts
 		// the import at index 1, which is the index-zero trap the port brief names for six other
 		// rules here.
 		//
-		// The third row is a stated DIVERGENCE rather than a match. Upstream resolves the LATEST
+		// The third row is a stated divergence rather than a match. Upstream resolves the latest
 		// definition, so an import followed by an ambient declaration is silent there; this loop
 		// finds the import wherever it sits and reports. Measured on the installed build with the
 		// TypeScript parser. The reasoning for reporting rather than reproducing is at
@@ -345,10 +345,10 @@ func TestCheckedRequiresMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
 			"declare const React: any;\nReact.createElement('input', { readonly: true, checked: true });\n",
 			[]string{"missingProperty"},
 		},
-		// The next five pin the TAG gate, which upstream's corpus cannot see. Its only non-input
+		// The next five pin the tag gate, which upstream's corpus cannot see. Its only non-input
 		// cases are `<span/>` and `React.createElement('span')`, neither of which writes `checked`,
 		// so a rule that dropped the tag test entirely passes all 35 imported cases. A mutant
-		// replacing `IsIntrinsicElementNamed(tagName, "input")` with a bare nil check SURVIVED the
+		// replacing `IsIntrinsicElementNamed(tagName, "input")` with a bare nil check survived the
 		// whole imported set and these are what kill it. Every verdict below measured silent on the
 		// installed build first.
 		{
@@ -376,9 +376,9 @@ func TestCheckedRequiresMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
 			"declare const React: any;\nReact.createElement('Checkbox', { checked: true });\n",
 			nil,
 		},
-		// The next two pin the PROPERTY name on the namespaced callee. The corpus writes only
+		// The next two pin the property name on the namespaced callee. The corpus writes only
 		// `React.createElement`, so a rule accepting any property on the pragma passes all 35
-		// imported cases; a mutant dropping that name test SURVIVED the whole set. Both verdicts
+		// imported cases; a mutant dropping that name test survived the whole set. Both verdicts
 		// measured silent on the installed build.
 		{
 			"another React member declines",
@@ -401,13 +401,13 @@ func TestCheckedRequiresMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
 	}
 }
 
-// TestCheckedRequiresReportsOnTheWholeElement asserts WHERE each finding points.
+// TestCheckedRequiresReportsOnTheWholeElement asserts where each finding points.
 //
 // `ExpectFindings` asserts ids and count and nothing else, so a rule anchoring on the attribute
 // rather than on the element passes a complete fixture pair while pointing somewhere the reader was
 // never shown. Upstream reports on the `JSXOpeningElement` and on the `CallExpression`, which are
-// the whole opening tag and the whole call. The expected text is sliced from the SOURCE THE HARNESS
-// WROTE rather than from the literal above, because `RunTyped` trims the fixture and a span sliced
+// the whole opening tag and the whole call. The expected text is sliced from the source the harness
+// wrote rather than from the literal above, because `RunTyped` trims the fixture and a span sliced
 // from an untrimmed literal is off by one.
 func TestCheckedRequiresReportsOnTheWholeElement(test *testing.T) {
 	test.Parallel()
@@ -500,9 +500,9 @@ func TestCheckedRequiresMessagesReadAsWritten(test *testing.T) {
 // TestCheckedRequiresDecodesItsOptions exercises the decoder the config layer calls.
 //
 // The empty-input row is the one with no upstream counterpart and the reason the decoder is
-// hand-written: `rule.DecodeOptionsInto` ERRORS on empty input, and a rule configured as a bare
+// hand-written: `rule.DecodeOptionsInto` errors on empty input, and a rule configured as a bare
 // `"error"` is handed exactly that. A rule whose decoder errored there would be handed nil options,
-// `options.(T)` would yield the zero value, and because both defaults here happen to BE the zero
+// `options.(T)` would yield the zero value, and because both defaults here happen to be the zero
 // value, the rule would still behave correctly while its decoder was broken. So this asserts the
 // decoder rather than inferring it from a passing fixture.
 func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
@@ -564,7 +564,7 @@ func TestCheckedRequiresRejectsMalformedOptions(test *testing.T) {
 // `NeedsTypeChecker` fails here rather than quietly halving the rule.
 //
 // The control matters as much as the subject. The JSX arm needs no checker at all, so it must
-// report under BOTH harnesses; if it did not, this test would be measuring a broken harness rather
+// report under both harnesses; if it did not, this test would be measuring a broken harness rather
 // than a real dependency.
 func TestCheckedRequiresNeedsTheTypedHarness(test *testing.T) {
 	test.Parallel()
@@ -588,7 +588,7 @@ func TestCheckedRequiresNeedsTheTypedHarness(test *testing.T) {
 //
 // Every other test here routes through the decoder, which always produces a struct. A rule can still
 // be handed nil: `config.OptionsRegistry.Decode` turns a decoder error into nil for a non-required
-// rule, and `options.(T)` on nil yields the zero value. Both defaults ARE the zero value for this
+// rule, and `options.(T)` on nil yields the zero value. Both defaults are the zero value for this
 // rule, so nil must behave exactly like an absent option object, and this asserts it rather than
 // assuming it. A rule whose defaults were not zero would be silently inverted on this path, which is
 // a failure 21 of 21 imported cases could not see on a rule that hit it.
@@ -602,7 +602,7 @@ func TestCheckedRequiresHandlesNilOptions(test *testing.T) {
 
 // TestCheckedRequiresHasNoFileGate reports on a `.ts` file, not only on `.tsx`.
 //
-// Three shipped rules in this package USED to gate on `.tsx`/`.jsx` through `isJsxFileName`, which
+// Three shipped rules in this package used to gate on `.tsx`/`.jsx` through `isJsxFileName`, which
 // was oxc residue rather than upstream behavior: real ESLint reports on `.ts` too, measured by
 // probing eslint-plugin-react with the same source under four suffixes, all four of which reported.
 // Filed as task 2abaqvt and removed in 4cff5fe, 206b628 and 9dbd234, so no rule in this package
@@ -634,7 +634,7 @@ func TestCheckedRequiresHasNoFileGate(test *testing.T) {
 
 // TestCheckedRequiresSurvivesShapesThatWouldPanic drives the callee shapes with no name to read.
 //
-// The walk recovers per FILE rather than per rule, so one nil dereference in this rule takes the
+// The walk recovers per file rather than per rule, so one nil dereference in this rule takes the
 // whole file away from every other rule in the tree. Upstream's own corpus carries exactly one of
 // these, `(()=>{})()`, and the rest are ordinary code this rule will meet on the real tree: a
 // `super()` call whose callee is a bare keyword, a dynamic `import()`, an optional call, and a

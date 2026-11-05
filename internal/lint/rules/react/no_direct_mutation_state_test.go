@@ -20,7 +20,7 @@ const directMutationStateFile = "/repository/source/DirectMutationState.tsx"
 // `oxc/crates/oxc_linter/src/rules/react/no_direct_mutation_state.rs`, checked byte against byte by
 // a script that asserted each extracted string appears in the Rust source rather than by reading
 // them. The extractor reported one tester block, 8 pass and 15 fail, no case carrying options, and
-// a DISCREPANCY: 22 diagnostics against 15 fail inputs.
+// a discrepancy: 22 diagnostics against 15 fail inputs.
 //
 // That discrepancy is real rather than a second-snapshot artifact. There is one snapshot file and
 // its 22 location headers partition over the 15 inputs uniquely, because diagnostics appear in
@@ -511,7 +511,7 @@ class Outer extends React.Component {
 	}
 }
 
-// TestNoDirectMutationStateReportsInNonJsxFiles pins the ABSENCE of a source-type gate.
+// TestNoDirectMutationStateReportsInNonJsxFiles pins the absence of a source-type gate.
 //
 // oxc's `should_run` returns false for a file the parser does not read as JSX, and that gate came
 // along with the port from oxc. eslint-plugin-react, the authority this rule is ported against,

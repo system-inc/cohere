@@ -34,7 +34,7 @@ type StaticPropertyPlacementOptions struct {
 // staticPropertyPlacementProperties is the fixed set of names this rule judges, in upstream's own
 // declaration order.
 //
-// The order is load-bearing rather than cosmetic. Upstream finds the FIRST matching name and
+// The order is load-bearing rather than cosmetic. Upstream finds the first matching name and
 // reports under it, and `props` with a type annotation matches `propTypes` while `context` with one
 // matches `contextTypes`, so a node could in principle answer two predicates. Keeping the order
 // keeps the reported name the same as upstream's.
@@ -59,7 +59,7 @@ func DefaultStaticPropertyPlacementOptions() StaticPropertyPlacementOptions {
 
 // DecodeStaticPropertyPlacementOptions reads upstream's option list off the config.
 //
-// Upstream's option surface is POSITIONAL, `[default, overrides]`, and the rule registers with
+// Upstream's option surface is positional, `[default, overrides]`, and the rule registers with
 // `DecodeOptionList` so both slots arrive:
 //
 //	nothing                                                    a static public field everywhere
@@ -174,7 +174,7 @@ func messageStaticPropertyPlacement(
 // # The six properties, and why the order they are listed in matters
 //
 // `propTypes`, `defaultProps`, `childContextTypes`, `contextTypes`, `contextType`, `displayName`.
-// Upstream finds the FIRST name whose predicate matches and reports under that name, and two of the
+// Upstream finds the first name whose predicate matches and reports under that name, and two of the
 // predicates accept a second spelling: a class field named `props` carrying a type annotation counts
 // as `propTypes`, and one named `context` carrying one counts as `contextTypes`. Keeping upstream's
 // order keeps the reported name identical.
@@ -186,8 +186,8 @@ func messageStaticPropertyPlacement(
 // position the one I am", and additionally, for the two in-class positions, whether the member is
 // actually `static`.
 //
-// The getter arm is narrower than it looks: upstream requires BOTH `static` and `kind === 'get'`
-// before checking anything, so a NON-static getter is silent under every configuration. Measured
+// The getter arm is narrower than it looks: upstream requires both `static` and `kind === 'get'`
+// before checking anything, so a non-static getter is silent under every configuration. Measured
 // against the installed build. That is a gap rather than a decision, and it is reproduced.
 //
 // # Which assignments count
@@ -203,7 +203,7 @@ func messageStaticPropertyPlacement(
 //	class C extends Other {}; C.propTypes = {}               SILENT, not a React class
 //	function C(){}; C.propTypes = {}                         SILENT, not an ES6 class
 //
-// An assignment written INSIDE a class body is skipped entirely, which is upstream's
+// An assignment written inside a class body is skipped entirely, which is upstream's
 // `isContextInClass` walking the scope chain for an enclosing class. Measured silent.
 //
 // # No fix
@@ -228,7 +228,7 @@ var StaticPropertyPlacement = rule.Rule{
 		}
 
 		// judge is upstream's `reportNodeIncorrectlyPositioned`. The node reports when the
-		// configured position differs from the one this arm represents, OR when the configured
+		// configured position differs from the one this arm represents, or when the configured
 		// position is one of the two in-class ones and the member is not actually static.
 		judge := func(node *ast.Node, propertyName string, arm StaticPropertyPlacementPosition, isStatic bool) {
 			expected, isJudged := settings.Positions[propertyName]
@@ -263,7 +263,7 @@ var StaticPropertyPlacement = rule.Rule{
 				if ruleContext.TypeChecker == nil {
 					return
 				}
-				// Upstream requires static AND a getter before it looks at the name at all, so a
+				// Upstream requires static and a getter before it looks at the name at all, so a
 				// non-static getter is silent under every configuration. Measured; reproduced.
 				if !staticPropertyPlacementIsStatic(node) {
 					return
@@ -372,7 +372,7 @@ func staticPropertyPlacementInReactClass(member *ast.Node) bool {
 
 // staticPropertyPlacementInsideAClass reports whether a node sits anywhere inside a class body.
 //
-// Upstream's `isContextInClass` walks the SCOPE chain looking for a block that is a class
+// Upstream's `isContextInClass` walks the scope chain looking for a block that is a class
 // declaration, which reaches through nested functions, so an assignment inside a method of a class
 // is skipped. Walking parents reaches the same answer for the same inputs and does not need a scope
 // table.

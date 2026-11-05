@@ -12,9 +12,9 @@ import (
 // against the installed build before being written down and every one reproduced its upstream
 // verdict exactly, with no substitution needed.
 //
-// Each row carries its options as the RAW JSON the config layer would deliver, routed through this
+// Each row carries its options as the raw JSON the config layer would deliver, routed through this
 // rule's own decoder rather than built as a struct. That matters more here than usual: upstream's
-// option surface is a POSITIONAL pair whose two slots have different types, and flattening it into
+// option surface is a positional pair whose two slots have different types, and flattening it into
 // a per-property map is this port's own code with no upstream counterpart. Building the struct
 // directly in a fixture would leave the whole decoder untested.
 const staticPropertyPlacementFile = "/repository/source/StaticPropertyPlacement.tsx"
@@ -144,7 +144,7 @@ func TestStaticPropertyPlacementFires(test *testing.T) {
 // TestStaticPropertyPlacementPositionMatrix pins every arm against every configured position.
 //
 // All nine rows measured against the installed build on 2026-08-27. The two that would not occur to
-// a reader are the last two: a NON-static getter is silent under every configuration, because
+// a reader are the last two: a non-static getter is silent under every configuration, because
 // upstream requires both `static` and the getter kind before it looks at the name at all, and an
 // unrelated static field is silent because it is not one of the six names.
 func TestStaticPropertyPlacementPositionMatrix(test *testing.T) {
@@ -197,7 +197,7 @@ func TestStaticPropertyPlacementPositionMatrix(test *testing.T) {
 		{
 			// The two rows below are what make the getter arm's static gate visible. Under the
 			// getter position a non static getter is silent either way, because the arm passes
-			// through and the configured position matches, so only a DIFFERENT configured position
+			// through and the configured position matches, so only a different configured position
 			// separates a rule that gates from one that does not. Both measured silent upstream.
 			"a NON static getter is silent under the field position too",
 			"class MyComponent extends React.Component { get propTypes(){ return {}; } render(){ return null; } }",
@@ -360,7 +360,7 @@ func TestStaticPropertyPlacementMessageText(test *testing.T) {
 
 // TestStaticPropertyPlacementSpans asserts where each finding points.
 //
-// The in-class arms anchor on the whole member and the assignment arm anchors on the LEFT side of
+// The in-class arms anchor on the whole member and the assignment arm anchors on the left side of
 // the assignment rather than on the statement, which is upstream reporting the MemberExpression it
 // was visiting. A message-id assertion cannot see either.
 func TestStaticPropertyPlacementSpans(test *testing.T) {
@@ -408,7 +408,7 @@ func TestStaticPropertyPlacementSpans(test *testing.T) {
 
 // TestDecodeStaticPropertyPlacementOptions covers the decoder's accepted list shapes.
 //
-// This is the port's own code with no upstream counterpart: upstream reads two POSITIONAL options
+// This is the port's own code with no upstream counterpart: upstream reads two positional options
 // and applies the default lazily per property, while this flattens both into one map at decode
 // time. The nil row is the one that matters most, because a rule configured as a bare "error" is
 // handed empty input and a decoder without a fallback would give every property an unmatched
@@ -526,7 +526,7 @@ func TestStaticPropertyPlacementRequiresTheTypedHarness(test *testing.T) {
 //
 // Upstream's `propTypes` predicate accepts a class field named `props` when it carries a type
 // annotation, and its `contextTypes` predicate accepts one named `context` the same way. Both
-// report under the MAPPED name rather than the written one, measured against the installed build:
+// report under the mapped name rather than the written one, measured against the installed build:
 // `props: {a: number}` produces a finding naming `propTypes`.
 //
 // The annotation is required. A field named `props` with no annotation is silent, which is what

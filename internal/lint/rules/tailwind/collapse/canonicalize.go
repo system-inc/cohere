@@ -253,7 +253,7 @@ func cloneVariant(variant ParsedVariant) ParsedVariant {
 	return cloned
 }
 
-// gradientDirections is upstream's DIRECTIONS, the eight a legacy `bg-gradient-to-*` can name.
+// gradientDirections is upstream's `DIRECTIONS`, the eight a legacy `bg-gradient-to-*` can name.
 var gradientDirections = map[string]bool{"t": true, "tr": true, "r": true, "br": true, "b": true, "bl": true, "l": true, "tl": true}
 
 // bgGradientToLinear is upstream's pass of the same name: Tailwind 4's `bg-linear-to-*` for the static

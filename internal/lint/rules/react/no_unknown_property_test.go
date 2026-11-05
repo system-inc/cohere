@@ -19,17 +19,17 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 // byte against the decoded corpus with a script. Upstream carries 92 valid and 33 invalid cases.
 //
 // All 125 were replayed against the installed build, eslint-plugin-react 7.37.5, through the ESLint
-// Linter API before any Go was written, and 121 agreed. The four disagreements are TABLE CONTENT
+// Linter API before any Go was written, and 121 agreed. The four disagreements are table content
 // rather than logic: the clone knows three property names the installed build does not and widens
 // one tag list.
 //
-// The tables in this port come from the CLONE, so those four cases are clean here and agree with
+// The tables in this port come from the clone, so those four cases are clean here and agree with
 // upstream's own expectation. Both artifacts declare 7.37.5, meaning the clone is unreleased
 // commits on the same tag rather than a release we lag, and diffing the two extractions shows the
 // clone is a strict superset with no removals. The four rows carry the reasoning at their site.
 //
 // Every other expected message id is the installed build's own, per case, so a case reporting
-// twice carries two ids and their ORDER is asserted. The two artifacts agree on all 121.
+// twice carries two ids and their order is asserted. The two artifacts agree on all 121.
 
 // noUnknownPropertyOptions decodes a raw option body the way the config layer does.
 //
@@ -92,19 +92,19 @@ func TestNoUnknownPropertyFires(test *testing.T) {
         </div>
       `, ``, []string{`unknownProp`}},
 
-		// The only two corpus cases carrying `settings.react.version`, and each is clean UPSTREAM
+		// The only two corpus cases carrying `settings.react.version`, and each is clean upstream
 		// only because of that setting. cohere has no shared-settings surface, so this port answers
 		// as though there were none, and both report. Recorded here at this port's verdict with the
 		// upstream one named, rather than deleted: the gap is a missing configuration surface, not
 		// a defect in the judgment, and deleting the cases would hide it.
 		//
-		// Upstream sets 16.0.99 to ACCEPT `allowTransparency`, a name React dropped in 16.1.
+		// Upstream sets 16.0.99 to accept `allowTransparency`, a name React dropped in 16.1.
 		{"valid 46", `<div allowTransparency="true" />`, ``, []string{`unknownProp`}},
 		// Upstream sets 19.0.0 to accept `precedence`, which the no-settings default does not reach.
 		{"valid 50", `<link precedence="medium" href="https://foo.bar" rel="canonical" />`, ``, []string{`unknownProp`}},
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
-		// A namespaced attribute REPORTS, which is why this rule reads source text rather than
+		// A namespaced attribute reports, which is why this rule reads source text rather than
 		// calling jsx.AttributeName: that shelf helper declines a namespaced name by design, and
 		// using it would silently drop every one of these.
 		{"a namespaced xlink attribute", `<svg><use xlink:href="#a" /></svg>`, ``, []string{"unknownPropWithStandardName"}},
@@ -112,25 +112,25 @@ func TestNoUnknownPropertyFires(test *testing.T) {
 		{"a bogus namespaced attribute", `<div foo:bar="x" />`, ``, []string{"unknownProp"}},
 		// The xml exclusion inside the data-attribute test.
 		{"a data-xml prefixed attribute", `<div data-xmlFoo="x" />`, ``, []string{"unknownProp"}},
-		// An ARIA name is matched EXACTLY, so a miscased one is not exempt.
+		// An ARIA name is matched exactly, so a miscased one is not exempt.
 		{"an unknown aria attribute", `<div aria-bogus="true" />`, ``, []string{"unknownProp"}},
 		// The tag-restricted table reports when the tag is wrong.
 		{"a restricted attribute on the wrong tag", `<div charset="utf-8" />`, ``, []string{"invalidPropOnTag"}},
-		// The ignore list is matched against the spelling as WRITTEN, before case normalisation.
+		// The ignore list is matched against the spelling as written, before case normalisation.
 		// Naming the canonical form does not exempt the written one, which is the half a single
 		// row would miss and which a mutant normalising first survives without these two.
 		// `charset` is already the canonical spelling in the ignore-case list, so normalising it
 		// changes nothing and that row cannot separate the two orders. `allowfullscreen` can:
-		// normalisation rewrites it to `allowFullScreen`, so a port matching the ignore list AFTER
+		// normalisation rewrites it to `allowFullScreen`, so a port matching the ignore list after
 		// normalisation would exempt on the canonical spelling and not on the written one, which is
 		// the exact inverse of upstream. All three rows measured against the installed build.
 		{"the canonical spelling does not exempt allowfullscreen", `<div allowfullscreen="true" />`, `{"ignore":["allowFullScreen"]}`, []string{"invalidPropOnTag"}},
 		{"an unignored allowfullscreen on the wrong tag reports", `<div allowfullscreen="true" />`, ``, []string{"invalidPropOnTag"}},
 		{"the canonical spelling does not exempt charset", `<div charset="utf-8" />`, `{"ignore":["charSet"]}`, []string{"invalidPropOnTag"}},
-		// The ARIA list is matched EXACTLY, unlike the property search below it. A mutant lowering
+		// The ARIA list is matched exactly, unlike the property search below it. A mutant lowering
 		// the name before the lookup survives every corpus case, because upstream writes no
 		// miscased ARIA attribute anywhere.
-		// A plain COMPONENT reaches the data-attribute branch, because that branch runs before the
+		// A plain component reaches the data-attribute branch, because that branch runs before the
 		// html-like guard. This is the control for the member-tag row in the silent table: the two
 		// differ only in the dot, and without upstream's early member-tag return the member form
 		// would report here too. Both measured on the installed build.
@@ -292,7 +292,7 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
-		// A hyphenated name is a plain identifier in our parser, NOT a namespaced node, and both
+		// A hyphenated name is a plain identifier in our parser, not a namespaced node, and both
 		// of these branches depend on reading it correctly.
 		{"a well formed data attribute", `<div data-foo="x" />`, ``},
 		{"an uppercase data attribute is accepted by default", `<div data-Foo="x" />`, ``},
@@ -300,10 +300,10 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		// A component, a member tag and a custom element are all outside the rule's scope.
 		{"an unknown attribute on a component", `<Foo bogus="x" />`, ``},
 		{"an unknown attribute on a member tag", `<Foo.Bar bogus="x" />`, ``},
-		// The member-tag return happens BEFORE the data-attribute branch, so this stays clean while
+		// The member-tag return happens before the data-attribute branch, so this stays clean while
 		// the same attribute on a plain component reports. A mutant deleting that early return
 		// survives every other fixture, because the html-like guard further down declines the same
-		// inputs for every branch AFTER it. This row is the only one that can see it.
+		// inputs for every branch after it. This row is the only one that can see it.
 		{"a member tag is skipped before the data branch", `<Foo.Bar data-Baz="x" />`, `{"requireDataLowercase":true}`},
 		{"an unknown attribute on a custom element", `<my-elem bogus="x" />`, ``},
 		{"the is attribute exempts a customised built-in", `<div is="my-elem" bogus="x" />`, ``},
@@ -315,7 +315,7 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		{"the canonical svg spelling", `<path strokeWidth="1" />`, ``},
 		// The control for the ignore-list pair above: the written spelling exempts.
 		{"the written spelling exempts charset", `<div charset="utf-8" />`, `{"ignore":["charset"]}`},
-		// The control for the pair above: the WRITTEN spelling exempts, and this is the row the
+		// The control for the pair above: the written spelling exempts, and this is the row the
 		// mutant has to break.
 		{"the written spelling exempts allowfullscreen", `<div allowfullscreen="true" />`, `{"ignore":["allowfullscreen"]}`},
 	}
@@ -330,9 +330,9 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 	}
 }
 
-// TestNoUnknownPropertyRepairs asserts what the fixer WRITES, not merely that it fires.
+// TestNoUnknownPropertyRepairs asserts what the fixer writes, not merely that it fires.
 //
-// Only the standard-name branch carries a repair, and it replaces the NAME node alone so the value
+// Only the standard-name branch carries a repair, and it replaces the name node alone so the value
 // survives. `ExpectFixedSource` replays the fix and compares the whole rewritten file, so a repair
 // with the right text over the wrong span fails here even though its message id is correct.
 func TestNoUnknownPropertyRepairs(test *testing.T) {
@@ -367,7 +367,7 @@ func TestNoUnknownPropertyRepairs(test *testing.T) {
 // repair.
 //
 // Only `unknownPropWithStandardName` knows what to write. A fixer on the other three would be
-// guessing, and a fix is applied unattended. Asserting the ABSENCE of a repair is something no
+// guessing, and a fix is applied unattended. Asserting the absence of a repair is something no
 // message-id fixture can see.
 func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(test *testing.T) {
 	test.Parallel()
@@ -447,10 +447,10 @@ func TestNoUnknownPropertyMessageText(test *testing.T) {
 	}
 }
 
-// TestNoUnknownPropertyAnchor pins WHERE each finding points.
+// TestNoUnknownPropertyAnchor pins where each finding points.
 //
 // Upstream reports on the whole JSXAttribute for every message, so the span covers the name and the
-// value together rather than either alone. The repair, by contrast, replaces only the NAME node,
+// value together rather than either alone. The repair, by contrast, replaces only the name node,
 // and that asymmetry is exactly the shape the brief warns about: a fix that lands correctly while
 // the finding points elsewhere shows the reader a line they were never told about.
 func TestNoUnknownPropertyAnchor(test *testing.T) {
@@ -482,10 +482,10 @@ func TestNoUnknownPropertyAnchor(test *testing.T) {
 	}
 }
 
-// TestNoUnknownPropertyIgnoreOption pins that the ignore list matches the ACTUAL spelling.
+// TestNoUnknownPropertyIgnoreOption pins that the ignore list matches the actual spelling.
 //
 // Upstream tests the ignore list before normalising case, so an entry has to be written the way the
-// attribute is written. Naming the canonical spelling does NOT exempt the DOM one, which is the
+// attribute is written. Naming the canonical spelling does not exempt the DOM one, which is the
 // half a single-row fixture would miss.
 func TestNoUnknownPropertyIgnoreOption(test *testing.T) {
 	test.Parallel()
@@ -541,7 +541,7 @@ func TestNoUnknownPropertyRequireDataLowercase(test *testing.T) {
 // Three siblings in this package once gated on `.tsx` and `.jsx`, which was oxc residue and has
 // since been removed from all three. Upstream gates nothing.
 //
-// `.ts` is absent for a PARSER reason rather than a rule one: TypeScript reads an opening angle
+// `.ts` is absent for a parser reason rather than a rule one: TypeScript reads an opening angle
 // bracket there as a type assertion, so no JSX attribute node exists for any rule to see.
 func TestNoUnknownPropertyHasNoFileSuffixGate(test *testing.T) {
 	test.Parallel()
@@ -604,7 +604,7 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 
 // TestNoUnknownPropertyTables guards the extracted data against silent truncation.
 //
-// The tables ARE the rule, so a generator that emitted half of one would leave most fixtures
+// The tables are the rule, so a generator that emitted half of one would leave most fixtures
 // passing while the rule quietly stopped knowing names. These counts were taken from the installed
 // module's own constants at extraction time.
 func TestNoUnknownPropertyTables(test *testing.T) {
@@ -633,7 +633,7 @@ func TestNoUnknownPropertyTables(test *testing.T) {
 		}
 	}
 
-	// Spot-check the entries whose CASING is the rule, in both directions.
+	// Spot-check the entries whose casing is the rule, in both directions.
 	if noUnknownPropertySvgDomAttributeNames["stroke-width"] != "strokeWidth" {
 		test.Error("the svg map lost its stroke-width entry")
 	}

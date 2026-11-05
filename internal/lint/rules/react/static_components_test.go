@@ -13,7 +13,7 @@ import (
 // find the source file. oxc's linter tester carries only one of these plus one clean case, which
 // badly understates the corpus; the fixture directory is the real floor.
 //
-// The clean cases below the corpus are measured rather than invented. Upstream ships NO valid
+// The clean cases below the corpus are measured rather than invented. Upstream ships no valid
 // fixtures for this rule at all, so every pass case here was established by running the release
 // `oxlint` binary on the input and recording what it decided. That is the port brief's rule about
 // taking truth only from the corpus, applied where the corpus has a hole: a pass case written from
@@ -127,7 +127,7 @@ func TestStaticComponentsFires(test *testing.T) {
 }
 `},
 
-		// A component created inside a NESTED function still reports, which is what makes the
+		// A component created inside a nested function still reports, which is what makes the
 		// recursion into `function.Functions` load-bearing rather than tidy. Measured: upstream
 		// reports at the inner `<Component />` on the arrow's own line, so each function is
 		// analysed as its own graph rather than the outer one being the only subject. Added after
@@ -149,7 +149,7 @@ func TestStaticComponentsFires(test *testing.T) {
 	}
 }
 
-// A component declared inside a component is NOT a second compilation unit.
+// A component declared inside a component is not a second compilation unit.
 //
 // Upstream reports once here, at `<Inner />`, because `Inner` is a value created during `Outer`'s
 // render. It never reports the `<Component />` inside `Inner`, because `Inner` is lowered into
@@ -271,7 +271,7 @@ function Outer() {
 		// The back edge. `C` is dynamic only on the loop's second and later iterations, and a
 		// single forward pass over blocks in reverse postorder cannot see taint that arrives on an
 		// edge it has already passed. Upstream has the identical limitation, confirmed by running
-		// it: taint written BEFORE the loop reports, taint written INSIDE reaching a use after the
+		// it: taint written before the loop reports, taint written inside reaching a use after the
 		// loop does not. This is fidelity, not a gap, and the fixture exists so a later reader who
 		// notices the silence does not helpfully repair it into a divergence.
 		{"loopBackEdge", `function Outer(items) {
@@ -310,10 +310,10 @@ function Outer() {
 // one Range, so that detail moves into the message instead. Asserted on the sliced source rather
 // than on a line number, so a change to where the finding points fails here.
 //
-// # Slice what was PARSED, not what was passed
+// # Slice what was parsed, not what was passed
 //
 // `rule_testing.RunTyped` writes each fixture to disk as `strings.TrimSpace(contents)+"\n"`, so a case
-// carrying leading or trailing whitespace is parsed as a DIFFERENT string from the one handed to
+// carrying leading or trailing whitespace is parsed as a different string from the one handed to
 // it. oxc's tester writes every case with a leading newline and this file copies them verbatim, so
 // every diagnostic offset here is shifted one byte from the Go literal. Slicing the literal reports
 // `<Componen` for a finding that is correctly on `Component`, which reads exactly like an

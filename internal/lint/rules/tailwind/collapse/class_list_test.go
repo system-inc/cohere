@@ -49,7 +49,9 @@ func TestClassListAgreesWithTailwind(test *testing.T) {
 				actual[entry.Name] = sortedModifiers(entry.Modifiers)
 			}
 
-			var missing, extra, modifierDifferences []string
+			var missing []string
+			var extra []string
+			var modifierDifferences []string
 			for name, modifiers := range expected {
 				got, listed := actual[name]
 				if !listed {

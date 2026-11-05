@@ -11,9 +11,9 @@ import (
 //
 // One mechanical substitution was applied and it is a correction rather than an adaptation.
 // Upstream writes six of its nine failing cases with `React.createClass`, which the version this
-// repository runs does NOT recognise: `componentUtil` reads the factory name from
+// repository runs does not recognise: `componentUtil` reads the factory name from
 // `settings.react.createClass`, whose default is `createReactClass`, and upstream's own test
-// harness never sets it. Measured against the installed build, all six are SILENT as written and
+// harness never sets it. Measured against the installed build, all six are silent as written and
 // report on byte-identical bodies once the call is spelled `createReactClass`. So `React.createClass(`
 // was rewritten to `createReactClass(` and every one of the nineteen cases was then replayed; all
 // nineteen reproduce their upstream verdict exactly. Without the rewrite, six of the nine failing
@@ -151,7 +151,7 @@ func TestNoAccessStateInSetstateMessageText(test *testing.T) {
 //
 // The two-findings rows matter most. Upstream's longest failing case reports once, so nothing in
 // the imported corpus can tell a rule that reports per access from one that reports per call, and
-// the method route reporting TWICE AT THE SAME SPAN is bookkeeping a reader would reasonably
+// the method route reporting twice at the same span is bookkeeping a reader would reasonably
 // "correct" into deduplication.
 func TestNoAccessStateInSetstateShapesUpstreamDoesNotWrite(test *testing.T) {
 	test.Parallel()
@@ -313,7 +313,7 @@ func TestNoAccessStateInSetstateOnlyStateIsMatched(test *testing.T) {
 
 // TestNoAccessStateInSetstateIdentifierPosition pins where a recorded variable has to appear.
 //
-// Upstream requires the identifier to be a property's VALUE or a member access's OBJECT. A mutation
+// Upstream requires the identifier to be a property's value or a member access's object. A mutation
 // removing that gate survived every other fixture here, and the distinguishing inputs are both
 // counterintuitive enough that a reader would call them bugs:
 //
@@ -369,7 +369,7 @@ func TestNoAccessStateInSetstateIdentifierPosition(test *testing.T) {
 // TestNoAccessStateInSetstateBinaryExpressionClimb pins the walk past enclosing binary expressions.
 //
 // Without it, `{value: v + 1}` puts the identifier's parent at a binary expression rather than at
-// the property, so the position gate declines and the finding is lost. Upstream climbs in a LOOP
+// the property, so the position gate declines and the finding is lost. Upstream climbs in a loop
 // rather than one step, which the nested row is what distinguishes: `v + 1 + 2` nests two deep and
 // a single step would still land on a binary expression.
 //
@@ -401,23 +401,23 @@ func TestNoAccessStateInSetstateBinaryExpressionClimb(test *testing.T) {
 // TestNoAccessStateInSetstateMethodRoute pins the method route across ten shapes, all measured
 // against the installed build on 2026-08-27.
 //
-// This test exists because the port was WRONG on two of them and no imported case could see it.
+// This test exists because the port was wrong on two of them and no imported case could see it.
 // Upstream's corpus writes the method route exactly once, in the object-literal one-hop spelling,
 // which happens to be the shape where the divergence does not show.
 //
 // The asymmetry is upstream's and it is easy to miss reading the source. Its propagation walk tests
 // `current.type === 'MethodDefinition'` alone, while its `this.state` walk tests MethodDefinition
-// OR a FunctionExpression under a property. So a two-hop chain propagates in a class and not in an
+// or a FunctionExpression under a property. So a two-hop chain propagates in a class and not in an
 // object literal.
 //
-// The second half is a PARSER difference rather than an upstream one. ESTree reserves
+// The second half is a parser difference rather than an upstream one. ESTree reserves
 // MethodDefinition for a class member and spells an object method shorthand as a Property holding a
 // FunctionExpression; our parser gives both the same kind. So the propagation arm needs an explicit
 // class-parent check, which nothing in the ESTree-shaped source suggests. Without it this port
 // reported the object shorthand two-hop chain, which upstream calls clean.
 //
 // The class-property rows are a third distinction: upstream's `else if` requires a
-// FunctionExpression, so a property holding an ARROW is silent and one holding a `function` reports.
+// FunctionExpression, so a property holding an arrow is silent and one holding a `function` reports.
 func TestNoAccessStateInSetstateMethodRoute(test *testing.T) {
 	test.Parallel()
 

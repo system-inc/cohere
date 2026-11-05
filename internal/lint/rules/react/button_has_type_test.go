@@ -28,7 +28,7 @@ const buttonHasTypeFile = "/repository/source/ButtonHasType.tsx"
 // # Three cases are held back, and each is recorded rather than dropped
 //
 // Two carry `settings: {react: {pragma: 'Foo'}}`, which has no counterpart here because
-// cohere reads no React settings. `Foo.createElement("button")` reports upstream ONLY
+// cohere reads no React settings. `Foo.createElement("button")` reports upstream only
 // under that setting: re-run with settings removed it goes clean, measured, and clean is the answer
 // this port has to produce. Both are pinned as declining cases in
 // `TestButtonHasTypePragmaIsFixedAtReact` with the measurement at the line, rather than sitting in
@@ -39,23 +39,23 @@ const buttonHasTypeFile = "/repository/source/ButtonHasType.tsx"
 // upstream's own case verbatim below that preamble, and it was re-run with the preamble against the
 // installed build to confirm the preamble does not change the verdict.
 //
-// # The invalid table asserts the RENDERED TEXT of the two interpolating ids
+// # The invalid table asserts the rendered text of the two interpolating ids
 //
 // `invalidValue` and `forbiddenValue` interpolate the offending value and carry byte-identical text
 // upstream, differing only by id. So an id assertion alone cannot see a message that interpolates
 // the wrong thing, which is the defect the port brief records as costing a porter a whole suite. The
 // fifth column is the exact string the installed build rendered, captured during the same run that
-// verified the ids, and those two are asserted as a PREFIX because this port appends a sentence of
+// verified the ids, and those two are asserted as a prefix because this port appends a sentence of
 // reasoning after upstream's wording.
 //
-// `missingType` and `complexType` interpolate nothing, and this port REPLACES their wording rather
+// `missingType` and `complexType` interpolate nothing, and this port replaces their wording rather
 // than appending to it, because upstream's two sentences name the symptom and not the consequence.
 // So an upstream-prefix assertion is meaningless for them and the fifth column is empty. Their text
 // is pinned instead by `TestButtonHasTypeMessagesReadAsWritten`, against literals typed there.
 //
-// # The options column is RAW JSON, on purpose
+// # The options column is raw JSON, on purpose
 //
-// All three options default to TRUE, which is not Go's zero value, so a fixture handed a struct
+// All three options default to `true`, which is not Go's zero value, so a fixture handed a struct
 // built by hand would leave the decoder's default restoration entirely untested and would pass
 // either way. Every case routes through `DecodeButtonHasTypeOptions`, the same function the config
 // calls. An empty string means a bare severity, which is what hands a real rule nil options.
@@ -205,7 +205,7 @@ func TestButtonHasTypeAcceptsTheTypedUpstreamCase(test *testing.T) {
 //
 // Upstream reads the pragma from `settings.react.pragma` or from a `@jsx` annotation comment.
 // cohere reads neither, so the pragma is the literal `React` here and a project renaming it
-// gets a false NEGATIVE. Recorded rather than hidden, because both of these sit in upstream's corpus
+// gets a false negative. Recorded rather than hidden, because both of these sit in upstream's corpus
 // and dropping them silently would leave the next reader believing the corpus was fully imported.
 //
 // Measured on the installed build: with `{react: {pragma: 'Foo'}}` the second reports `missingType`;
@@ -237,7 +237,7 @@ func TestButtonHasTypePragmaIsFixedAtReact(test *testing.T) {
 // corpus writes only strings and one template, so none of this is visible from the imported cases.
 // Every row was measured on the installed build before it was written here.
 //
-// The numeric rows are also a check on OUR parser: `.Text()` on a NumericLiteral is already the
+// The numeric rows are also a check on our own parser: `.Text()` on a NumericLiteral is already the
 // canonical rendering of the double, so `0x10` is `16` and `1.50` is `1.5` without any arithmetic.
 // A BigInt is the one place the two disagree, keeping its `n` suffix here, and the rule trims it.
 func TestButtonHasTypeReadsStaticValuesUpstreamsWay(test *testing.T) {
@@ -262,7 +262,7 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(test *testing.T) {
 		{"an empty template is an empty string", "const a = <button type={``}/>;\n", []string{"invalidValue"}, "\"\""},
 		{"an empty string attribute", "const a = <button type=\"\"/>;\n", []string{"invalidValue"}, "\"\""},
 		{"a valueless attribute renders true", "const a = <button type/>;\n", []string{"invalidValue"}, "\"true\""},
-		// The four below are NOT literals to upstream's parser and land on the complex arm. They are
+		// The four below are not literals to upstream's parser and land on the complex arm. They are
 		// the ones a port is most likely to get backwards, because `undefined` and `-1` read as
 		// constants to a human and are an Identifier and a unary expression to a parser.
 		{"undefined is an identifier", "const a = <button type={undefined}/>;\n", []string{"complexType"}, ""},
@@ -293,7 +293,7 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(test *testing.T) {
 
 // TestButtonHasTypeRecursesThroughTernaries pins the recursion and the per-branch count.
 //
-// `checkExpression` calls itself on both arms, so a ternary with two bad branches reports TWICE and
+// `checkExpression` calls itself on both arms, so a ternary with two bad branches reports twice and
 // a nested ternary is walked to its full depth. The corpus writes no ternary with two bad branches
 // and no nested ternary at all, so a rule that reported once per element would pass every imported
 // case. Both verdicts measured on the installed build.
@@ -355,15 +355,15 @@ func TestButtonHasTypeRecursesThroughTernaries(test *testing.T) {
 	}
 }
 
-// TestButtonHasTypeSpans asserts WHERE each finding points.
+// TestButtonHasTypeSpans asserts where each finding points.
 //
-// This is the assertion the rule most needs, because `complexType` anchors on the EXPRESSION and
+// This is the assertion the rule most needs, because `complexType` anchors on the expression and
 // every other id anchors on the element or the call. That is upstream's `reportComplex(expression)`
 // against `report(context, ..., {node})` everywhere else, and a rule anchoring all four on the
 // element would pass every id fixture in this file while pointing at a whole tag where upstream
 // points at three characters.
 //
-// The text is sliced from the source the harness WROTE rather than from the literal above, because
+// The text is sliced from the source the harness wrote rather than from the literal above, because
 // `RunTyped` trims the fixture and a span sliced from an untrimmed literal is off by one.
 func TestButtonHasTypeSpans(test *testing.T) {
 	test.Parallel()
@@ -402,9 +402,9 @@ func TestButtonHasTypeSpans(test *testing.T) {
 			"declare const React: any;\ndeclare const type: string;\nReact.createElement(\"button\", {type});",
 			[]string{"type"},
 		},
-		// The three below pin PARENTHESIS handling, which the corpus writes nowhere. Upstream's
+		// The three below pin parenthesis handling, which the corpus writes nowhere. Upstream's
 		// parser folds parentheses away entirely, so a parenthesized value reaches the same arm as
-		// the bare one and the finding lands INSIDE the parentheses. Ours preserves them, so the
+		// the bare one and the finding lands inside the parentheses. Ours preserves them, so the
 		// rule skips them, and these assert that the skip goes all the way through rather than one
 		// level. Measured on the installed build: `(foo)` reports at columns 16-19, `((foo))` at
 		// 17-20, both of which are the bare identifier.
@@ -527,7 +527,7 @@ func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
 
 // TestButtonHasTypeDecodesItsOptions exercises the decoder the config layer calls.
 //
-// Every default here is TRUE, so this is the decoder the port brief warns about specifically: a
+// Every default here is `true`, so this is the decoder the port brief warns about specifically: a
 // `rule.DecodeOptionsInto` on this struct yields all-false and inverts the rule, and every fixture
 // built from a struct rather than routed through the decoder passes anyway. The empty-input and
 // empty-object rows are the ones that catch it, and the explicit-false rows are what prove the
@@ -584,7 +584,7 @@ func TestButtonHasTypeRejectsMalformedOptions(test *testing.T) {
 // TestButtonHasTypeHandlesNilOptions covers the path the fixtures cannot reach.
 //
 // The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the ZERO value, which for this rule forbids all three types and would report
+// yields the zero value, which for this rule forbids all three types and would report
 // `forbiddenValue` on `<button type="button"/>`. The rule restores the defaults explicitly on that
 // path and this asserts it, because no fixture routed through the decoder can ever see it.
 func TestButtonHasTypeHandlesNilOptions(test *testing.T) {
@@ -615,7 +615,7 @@ func TestButtonHasTypeSeparatesInvalidFromForbidden(test *testing.T) {
 	rule_testing.ExpectFindings(test, runButtonHasType(test, element, `{"reset":false}`), "forbiddenValue")
 	rule_testing.ExpectFindings(test, runButtonHasType(test, "const a = <button type=\"nope\"/>;\n", `{"reset":false}`), "invalidValue")
 
-	// Each flag is then exercised against its OWN type, with the other two left on. Upstream's
+	// Each flag is then exercised against its own type, with the other two left on. Upstream's
 	// corpus only ever switches `reset` off, so a rule whose `submit` arm read the `button` flag
 	// passes every imported case: a mutant doing exactly that survived the rest of this suite. The
 	// three pairs below are what separate the flags from each other.
@@ -692,7 +692,7 @@ func TestButtonHasTypeHasNoFileGate(test *testing.T) {
 
 // TestButtonHasTypeSurvivesShapesThatWouldPanic drives the shapes with nothing to read.
 //
-// The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
+// The walk recovers per file rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic. These are ordinary
 // code: a `super()` whose callee is a bare keyword, a dynamic `import()`, an optional call, and a
 // JSX element with a malformed attribute list.
@@ -781,7 +781,7 @@ func TestButtonHasTypeMessagesReadAsWritten(test *testing.T) {
 // default removes `undefined` and the annotation removes every other string.
 //
 // The reporting rows are the controls that keep the exemption exactly as wide as the proof: the same
-// prop WITHOUT the default (so `undefined` is a constituent and HTML's `submit` default can apply), a
+// prop without the default (so `undefined` is a constituent and HTML's `submit` default can apply), a
 // `string`, a union with one bad member, `any`, and a fully valid union under a config that forbids
 // one of its members, where "permitted" rather than "known" is the test.
 func TestButtonHasTypeTrustsAProvenType(test *testing.T) {

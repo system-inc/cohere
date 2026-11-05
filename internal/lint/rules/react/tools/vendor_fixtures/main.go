@@ -10,8 +10,8 @@
 //
 // The research pass this corpus comes from reported 221 error fixtures. The real number is 325. The
 // cause was a grep anchored at the fixture root, which excluded the nine subdirectories that hold
-// 103 of them — wrong by a third, and it read exactly like a clean result. It was caught only
-// because a parallel investigation returned a different number.
+// 103 of them. It was wrong by a third, and it read exactly like a clean result. It was caught
+// only because a parallel investigation returned a different number.
 //
 // So this tool does not filter by path prefix at any point. It walks the full tree, keys fixtures
 // by their path relative to the fixture root, and reports the top-level and nested split separately
@@ -112,10 +112,13 @@ func main() {
 		subdirectories[path.Dir(name)]++
 	}
 
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("sha              %s\n", *sha)
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("error fixtures   %d  (%d top-level, %d across %d subdirectories)\n",
 		len(names), topLevel, nested, len(subdirectories))
 	for _, directory := range sortedKeys(subdirectories) {
+		// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 		fmt.Printf("                   %-40s %d\n", directory, subdirectories[directory])
 	}
 
@@ -132,6 +135,7 @@ func main() {
 	if err != nil {
 		fail("listing the clean fixtures: %v", err)
 	}
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("clean fixtures   %d  (carry %s and expect no error)\n", len(clean), preserveMemoizationPragma)
 
 	// Asserted exactly rather than as a floor. A run collecting zero clean fixtures restores the
@@ -144,6 +148,7 @@ func main() {
 	}
 
 	if *dryRun {
+		// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 		fmt.Println("dry run, nothing written")
 		return
 	}
@@ -152,6 +157,7 @@ func main() {
 	if err != nil {
 		fail("writing fixtures: %v", err)
 	}
+	// Ignored: the counts are a report to the terminal, and a failed print changes nothing this tool writes.
 	fmt.Printf("wrote            %d files (%d pairs) into %s\n", written, written/2, *out)
 }
 
@@ -162,6 +168,7 @@ func errorFixtureNames(sha string) ([]string, error) {
 	if getError != nil {
 		return nil, getError
 	}
+	// Ignored: the body was only read, so a failed close loses nothing.
 	defer body.Close()
 
 	var tree struct {
@@ -251,12 +258,14 @@ func fixtureContents(sha string) (map[string][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Ignored: the body was only read, so a failed close loses nothing.
 	defer body.Close()
 
 	gzipReader, err := gzip.NewReader(body)
 	if err != nil {
 		return nil, err
 	}
+	// Ignored: the gzip stream was only read, so a failed close loses nothing.
 	defer gzipReader.Close()
 
 	contents := map[string][]byte{}
@@ -361,6 +370,7 @@ func get(url string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	if response.StatusCode != http.StatusOK {
+		// Ignored: the body is dropped unread for the status error below, so a failed close loses nothing.
 		response.Body.Close()
 		return nil, fmt.Errorf("%s: %s", url, response.Status)
 	}
@@ -377,6 +387,7 @@ func sortedKeys(counts map[string]int) []string {
 }
 
 func fail(format string, arguments ...any) {
+	// Ignored: the process exits next, so a failed write to standard error has nowhere left to be reported.
 	fmt.Fprintf(os.Stderr, "react/vendor_fixtures: "+format+"\n", arguments...)
 	os.Exit(1)
 }

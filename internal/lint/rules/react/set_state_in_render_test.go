@@ -22,7 +22,7 @@ import (
 // # Four fixtures whose name is not their verdict
 //
 // Fourteen vendored fixtures match `set.?state` by name. Only ten expect this rule's diagnostic.
-// Three expect `Calling setState from useMemo`, which is this validator's OTHER arm, and
+// Three expect `Calling setState from useMemo`, which is this validator's other arm, and
 // `error.invalid-hoisting-setstate` expects `Cannot access variable before it is declared`, which
 // is a different pass entirely. Selecting by filename would have imported a corpus a quarter of
 // which asserts something this rule never emits.
@@ -39,12 +39,12 @@ import (
 // nothing else changed, the same identifier has alias `Dispatch` and type
 // `Dispatch<SetStateAction<number>>`. One line of input decides it.
 //
-// So each fixture is recorded TWICE, and both halves are real assertions rather than one being a
+// So each fixture is recorded twice, and both halves are real assertions rather than one being a
 // workaround:
 //
 //   - `TestSetStateInRenderStaysSilentOnTheCorpusAsWritten` runs the body verbatim and asserts
 //     silence. That is the honest verdict for a file where the setter has no type, and it is a
-//     genuine guard: a later change that starts guessing from the NAME `setX` rather than from the
+//     genuine guard: a later change that starts guessing from the name `setX` rather than from the
 //     type would turn these green cases red, which is exactly the divergence worth catching.
 //   - `TestSetStateInRenderFires` prepends one import line and asserts the finding. The body is
 //     untouched; the prepend is stated in the helper rather than baked into the constant, so the
@@ -61,7 +61,7 @@ import (
 // fixture cannot pick up whatever happens to be installed near the test. There is no `node_modules`
 // to resolve. `reactStateDeclarations` below is the minimum of `@types/react` this rule reads, and
 // the two declarations that matter are copied in the shape upstream writes them: `Dispatch` is a
-// TYPE ALIAS and `RefObject` is an INTERFACE. That difference is the rule's whole predicate, so a
+// type alias and `RefObject` is an interface. That difference is the rule's whole predicate, so a
 // stand-in that made both aliases would test a checker behaviour that does not exist.
 const (
 	unconditionalSetState     = "// @validateNoSetStateInRender\nfunction Component(props) {\n  const [x, setX] = useState(0);\n  const aliased = setX;\n\n  setX(1);\n  aliased(2);\n\n  return x;\n}\n"
@@ -79,7 +79,7 @@ const (
 // reactStateDeclarations is the part of `@types/react` this rule reads.
 //
 // `Dispatch` is declared as a type alias and `RefObject` as an interface, matching
-// `@types/react/index.d.ts` at lines 1645 and 154 respectively. The rule keys on the type's ALIAS,
+// `@types/react/index.d.ts` at lines 1645 and 154 respectively. The rule keys on the type's alias,
 // which is populated for the first and nil for the second, so writing `RefObject` as an alias here
 // would make a passing test out of a predicate that cannot work on real code.
 //
@@ -171,7 +171,7 @@ func TestSetStateInRenderFires(test *testing.T) {
 			want:          []string{"setStateInRender"},
 		},
 		{
-			// The case that fixes the exit set. A throwing arm is NOT an exit, so the break is the
+			// The case that fixes the exit set. A throwing arm is not an exit, so the break is the
 			// only way out and the tail is unconditional. Counting throws as exits makes this clean
 			// and disagrees with React.
 			name:          "a setter after a loop whose other arm throws",
@@ -213,7 +213,7 @@ func TestSetStateInRenderFires(test *testing.T) {
 // fixtures whose golden expects this diagnostic and whose shipped rule does not produce it.
 //
 // Both are gated on `@enableTreatSetIdentifiersAsStateSetters`, a compiler pragma that treats any
-// callee whose NAME starts with `set` as a setter. It defaults to false, the ESLint rule exposes no
+// callee whose name starts with `set` as a setter. It defaults to false, the ESLint rule exposes no
 // option to turn it on, and running both fixtures through the shipped rule produces nothing.
 //
 // They are kept as silent cases rather than deleted, because the alternative readings are both
@@ -227,22 +227,22 @@ func TestSetStateInRenderStaysSilentOnFixturesTheShippedRuleDoesNotReport(test *
 
 	// `function Component({setX})` with no type annotation. The prop is `any`, and a setter arriving
 	// as an untyped prop is unrecoverable by any type-directed analysis. Upstream only catches it by
-	// matching the NAME, under a pragma that defaults to off and that the ESLint rule exposes no
+	// matching the name, under a pragma that defaults to off and that the ESLint rule exposes no
 	// option for. Measured: the shipped rule produces nothing on this input, with or without the
 	// import, so we and React agree here and only the compiler golden differs.
 	rule_testing.ExpectClean(test, runSetStateFixture(test, reactImport+propInRender))
 }
 
-// TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference records a DIVERGENCE, in the
+// TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference records a divergence, in the
 // direction of finding a real defect React's shipped rule misses.
 //
 // The vendored golden for this fixture expects two findings. React's shipped ESLint rule produces
-// ZERO, measured both as written and with the import prepended, because its own inference does not
-// follow a custom hook's return type without `@enableTreatSetIdentifiersAsStateSetters` — a compiler
+// zero, measured both as written and with the import prepended, because its own inference does not
+// follow a custom hook's return type without `@enableTreatSetIdentifiersAsStateSetters`, a compiler
 // pragma with no ESLint option surface. The golden was produced by the compiler harness with that
 // pragma on.
 //
-// This port produces TWO, matching the golden, and it does so with no pragma and no name heuristic:
+// This port produces two, matching the golden, and it does so with no pragma and no name heuristic:
 // `useCustomState` is declared in the same file, so once `useState` resolves the checker infers the
 // hook's return type and `Dispatch` propagates to its caller. That is the capability the task's
 // research pass measured and the reason this rule dropped a tier.
@@ -266,7 +266,7 @@ func TestSetStateInRenderReportsWhereTheCheckerBeatsReactsInference(test *testin
 //
 // This is a real guard rather than a concession. Nine of the ten do not import React, so the setter
 // has no type and this rule correctly declines. A later change that started guessing from the name
-// `setX` — which is exactly what upstream's optional pragma does — would turn these red, and that
+// `setX`, which is exactly what upstream's optional pragma does, would turn these red, and that
 // is the divergence most worth catching, because it would silently widen the rule on every file in
 // the tree that happens to name a callback `setSomething`.
 func TestSetStateInRenderStaysSilentOnTheCorpusAsWritten(test *testing.T) {
@@ -330,7 +330,7 @@ func TestSetStateInRenderStaysSilent(test *testing.T) {
 		},
 		{
 			// The distinguishing case for post dominance versus plain dominance. The entry block
-			// DOMINATES the block holding the call, so a forward-dominance test reports here and
+			// dominates the block holding the call, so a forward-dominance test reports here and
 			// React does not. Measured clean on React's rule.
 			name: "a setter called after an early return",
 			source: reactImport + "function Component(props: {c: boolean}) {\n" +
@@ -407,7 +407,7 @@ func TestSetStateInRenderStaysSilent(test *testing.T) {
 				"}\n",
 		},
 		{
-			// A structurally identical function with no alias. `Dispatch<A>` IS `(value: A) => void`
+			// A structurally identical function with no alias. `Dispatch<A>` is `(value: A) => void`
 			// structurally, so this is what proves the predicate is nominal rather than structural.
 			// Without this case a change from the alias to a structural signature test would pass
 			// every other fixture here.
@@ -491,7 +491,7 @@ func TestSetStateInRenderStaysSilent(test *testing.T) {
 // TestSetStateInRenderFiresInsideAHook records that the subject is any compiled function, not only
 // a component.
 //
-// The rule's NAME says render and a hook is not render, but React compiles hooks too and reports
+// The rule's name says render and a hook is not render, but React compiles hooks too and reports
 // there. Measured on React's rule: this exact input reports. Kept as its own test because it is the
 // clearest case of the name being narrower than the behaviour.
 func TestSetStateInRenderFiresInsideAHook(test *testing.T) {
@@ -528,7 +528,7 @@ func TestSetStateInRenderFollowsAnAliasChain(test *testing.T) {
 // TestSetStateInRenderFollowsACustomHook checks the capability the checker supplies and upstream
 // needs a pragma and a name heuristic to approximate.
 //
-// With `useCustomState` actually DECLARED, its inferred return type carries `Dispatch` through, so
+// With `useCustomState` actually declared, its inferred return type carries `Dispatch` through, so
 // the setter is identified with no seed data at all. The vendored fixture for this is silent only
 // because it leaves the hook undeclared.
 func TestSetStateInRenderFollowsACustomHook(test *testing.T) {
@@ -548,7 +548,7 @@ func TestSetStateInRenderFollowsACustomHook(test *testing.T) {
 
 // TestSetStateInRenderReportsInsideUseMemo covers the validator's second arm.
 //
-// The `useMemo` test comes BEFORE the unconditional test upstream, so a call that is conditional
+// The `useMemo` test comes before the unconditional test upstream, so a call that is conditional
 // within the callback still reports. Both cases measured on React's rule, which produces `Calling
 // setState from useMemo may trigger an infinite loop` for each.
 func TestSetStateInRenderReportsInsideUseMemo(test *testing.T) {
@@ -600,14 +600,14 @@ func TestSetStateInRenderBailsOutPerFunctionRatherThanPerFile(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "setStateInRender")
 }
 
-// TestSetStateInRenderPointsAtTheCallee asserts WHERE the finding lands, which no message-id
+// TestSetStateInRenderPointsAtTheCallee asserts where the finding lands, which no message-id
 // assertion can see.
 //
 // Upstream's span is `callee.span`: React's own golden underlines four characters for `setX(1)` and
 // seven for `aliased(2)`, the name being called rather than the whole call expression. A rule
 // pointing at the call, at the statement, or at the argument satisfies every count assertion above.
 //
-// The source is sliced the way the HARNESS wrote it rather than the way the literal reads.
+// The source is sliced the way the harness wrote it rather than the way the literal reads.
 // `rule_testing.RunTyped` writes `strings.TrimSpace(contents)+"\n"`, so a fixture carrying leading
 // whitespace is one byte offset on disk from the Go string, and slicing the literal reports a span
 // shifted by one. That is transformed here rather than worked around.
@@ -707,7 +707,7 @@ func TestSetStateInRenderIsRegistered(test *testing.T) {
 // copied from, byte for byte.
 //
 // Reading them is not enough and this has cost three porters. The failure is not transcription by
-// hand, which is obvious when wrong; it is a TOOL silently cooking an escape on the way in, so that
+// hand, which is obvious when wrong; it is a tool silently cooking an escape on the way in, so that
 // `  ` becomes real spaces or `\\1` becomes `\1`, and the fixture then sits in the suite
 // asserting the opposite of upstream while compiling and going green.
 //
@@ -756,14 +756,14 @@ func TestFixturesMatchTheVendoredCorpusByte(test *testing.T) {
 //
 // Written for a mutant that rewrote `nested.Context[index]` to `nested.Context[0]`. The first
 // fixture written for it captured a plain value and then a setter, which looked like the
-// distinguishing shape and was not: with the mutation that input STILL reports, because a directly
+// distinguishing shape and was not: with the mutation that input still reports, because a directly
 // captured setter is recognized by a second, independent route. Inside the nested function the call
 // to `setX` has a real syntax node, so `isStateSetter` asks the checker about it and answers true
 // without consulting the translated set at all. The set is a redundant guard for that case.
 //
-// The set is the ONLY route for a TRANSITIVE capture: a value that is a function proven to set
+// The set is the only route for a transitive capture: a value that is a function proven to set
 // state carries no type saying so, so nothing but the translated set can recognize it. Making that
-// value the SECOND capture is what separates the two versions, and the separation is total —
+// value the second capture is what separates the two versions, and the separation is total:
 // pristine reports one finding, the mutant reports none.
 //
 // Recorded at this length because the first hypothesis was right about the mechanism and wrong
@@ -806,12 +806,12 @@ func TestSetStateInRenderFindsADirectlyCapturedSetterAfterAnother(test *testing.
 	rule_testing.ExpectFindings(test, result, "setStateInRender")
 }
 
-// TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo covers a defect a MUTATION found and no
+// TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo covers a defect a mutation found and no
 // fixture could.
 //
 // A mutant removing the "does this nested function capture a setter" guard survived the whole suite.
 // Hunting for an input that separated the two versions produced this one, and the separating input
-// turned out to be a case React REPORTS and this rule did not: the mutant was right and the original
+// turned out to be a case React reports and this rule did not: the mutant was right and the original
 // was wrong. That is the port brief's first survivor category, and it is the reason it says to
 // consider it first rather than last.
 //
@@ -822,10 +822,10 @@ func TestSetStateInRenderFindsADirectlyCapturedSetterAfterAnother(test *testing.
 // reaches its setter through a capture, so none of them could see the guard being wrong.
 //
 // The three surrounding verdicts were measured at the same time and pin the boundary:
-//   - the same body inside `useCallback` is CLEAN, because that callback is not invoked in render
-//   - the same body with the call made conditional still REPORTS, because the memoized arm is
+//   - the same body inside `useCallback` is clean, because that callback is not invoked in render
+//   - the same body with the call made conditional still reports, because the memoized arm is
 //     tested before the unconditional one
-//   - a nested plain arrow declaring its own setter is CLEAN, because it is not inlined
+//   - a nested plain arrow declaring its own setter is clean, because it is not inlined
 func TestSetStateInRenderFindsASetterDeclaredInsideAUseMemo(test *testing.T) {
 	test.Parallel()
 

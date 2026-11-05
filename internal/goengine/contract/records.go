@@ -207,13 +207,15 @@ type LintRecord struct {
 	// ConfigNote is the line saying which defaults ran when no config was read, empty when one was.
 	ConfigNote string `json:"configNote"`
 
-	// WithheldBySuppression and WithheldAsGenerated are additive within contract 3, which the front door
-	// ignores until it reads them, as it ignores any field the contract does not list. Each counts by rule the
-	// findings a run found and did not write: those a //cohere:ignore comment withheld, and those of a house
-	// rule in a generated file. Without them a run that hid everything reads like a run that found nothing.
-	// Both are always written as objects, `{}` when empty (see MarshalJSON).
+	// WithheldBySuppression, WithheldAsGenerated and WithheldAsCopied are additive within contract 3, which the
+	// front door ignores until it reads them, as it ignores any field the contract does not list. Each counts by
+	// rule the findings a run found and did not write: those a //cohere:ignore comment withheld, those of a house
+	// rule in a generated file, and those of a house rule in a file that declares itself a copy of upstream source.
+	// Without them a run that hid everything reads like a run that found nothing. All are always written as
+	// objects, `{}` when empty (see MarshalJSON).
 	WithheldBySuppression map[string]int `json:"withheldBySuppression"`
 	WithheldAsGenerated   map[string]int `json:"withheldAsGenerated"`
+	WithheldAsCopied      map[string]int `json:"withheldAsCopied"`
 }
 
 // Crash is a rule that failed on a file, which makes the run incomplete.
@@ -299,6 +301,9 @@ func (record LintRecord) MarshalJSON() ([]byte, error) {
 	}
 	if counted.WithheldAsGenerated == nil {
 		counted.WithheldAsGenerated = map[string]int{}
+	}
+	if counted.WithheldAsCopied == nil {
+		counted.WithheldAsCopied = map[string]int{}
 	}
 	return encodeWithoutHTMLEscaping(counted)
 }

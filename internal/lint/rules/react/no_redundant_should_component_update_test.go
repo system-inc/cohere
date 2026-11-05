@@ -9,7 +9,7 @@ import (
 
 // noRedundantShouldComponentUpdateFile is where the fixtures pretend to live.
 //
-// A .tsx extension because the neighbours use one, and NO file-suffix gate exists in this rule.
+// A .tsx extension because the neighbours use one, and no file-suffix gate exists in this rule.
 // Three shipped react rules here gate on .tsx or .jsx, which is oxc-era residue rather than
 // upstream behavior, and TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate below pins the
 // absence so nobody reintroduces it by pattern-matching a neighbour. This rule never touches JSX,
@@ -81,7 +81,7 @@ func TestNoRedundantShouldComponentUpdateStaysSilent(test *testing.T) {
 // discrimination this rule makes is invisible to it. Each verdict below was measured against the
 // installed eslint-plugin-react through the Linter API before being written here.
 
-// TestNoRedundantShouldComponentUpdateBaseClassBoundary pins WHICH heritage counts.
+// TestNoRedundantShouldComponentUpdateBaseClassBoundary pins which heritage counts.
 //
 // This is the test that separates this rule from react.IsEs6ComponentClass, which accepts Component
 // and PureComponent alike. Routing through the shelf would report upstream's first valid case, and
@@ -98,10 +98,10 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(test *testing.T) {
 		{"the bare spelling a direct import writes", "class Foo extends PureComponent { shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
 		{"a parenthesized heritage, which upstream reports because its tree has no parenthesis node", "class Foo extends (React.PureComponent) { shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
 		{"Component is the whole point of the boundary and is silent", "class Foo extends React.Component { shouldComponentUpdate() { return true; } }", nil},
-		// The BARE Component spelling, which neither upstream's corpus nor the namespaced case
+		// The bare Component spelling, which neither upstream's corpus nor the namespaced case
 		// above covers. Added for a surviving mutant that broke the identifier comparison into an
 		// always-true test: every fixture stayed green, because the only bare identifier any of
-		// them writes in a heritage IS PureComponent, so a rule accepting every bare identifier
+		// them writes in a heritage is PureComponent, so a rule accepting every bare identifier
 		// agreed with all of them. Both lines measured silent on the installed build.
 		{"the bare Component spelling a direct import writes is silent", "class Foo extends Component { shouldComponentUpdate() { return true; } }", nil},
 		{"and so is an unrelated base class", "class Foo extends Whatever { shouldComponentUpdate() { return true; } }", nil},
@@ -115,9 +115,9 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(test *testing.T) {
 		// never populates. So silence is upstream's answer structurally rather than by measurement,
 		// and that is stated rather than claimed as a probe result.
 		//
-		// These exist for a surviving mutant, and the first one is a REAL false positive the token
+		// These exist for a surviving mutant, and the first one is a real false positive the token
 		// guard prevents. With that guard neutralized to a constant, `implements (PureComponent)`
-		// REPORTS: the parser hands a malformed implements clause a KindExpressionWithTypeArguments
+		// reports: the parser hands a malformed implements clause a KindExpressionWithTypeArguments
 		// whose expression is a parenthesized identifier, and the parenthesis skip in
 		// isPureComponentBase then unwraps it to a bare `PureComponent`.
 		//
@@ -139,7 +139,7 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(test *testing.T) {
 	}
 }
 
-// TestNoRedundantShouldComponentUpdateMemberShapes pins WHICH member spellings count.
+// TestNoRedundantShouldComponentUpdateMemberShapes pins which member spellings count.
 //
 // Upstream applies no filter to the class body at all, so static, accessor, field and private
 // spellings all report, while a computed key and a string key do not. The corpus writes exactly two
@@ -213,7 +213,7 @@ func TestNoRedundantShouldComponentUpdateNameDerivation(test *testing.T) {
 	}
 }
 
-// TestNoRedundantShouldComponentUpdateSpan asserts WHERE the finding points.
+// TestNoRedundantShouldComponentUpdateSpan asserts where the finding points.
 //
 // Upstream reports on the class node itself rather than on the offending member, measured: a class
 // expression assigned to a variable spans from `class` to the closing brace and excludes the
@@ -246,7 +246,7 @@ func TestNoRedundantShouldComponentUpdateSpan(test *testing.T) {
 	})
 }
 
-// TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate pins the ABSENCE of a suffix gate.
+// TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate pins the absence of a suffix gate.
 //
 // Three shipped react rules in this package gate on .tsx or .jsx, which is residue from an oxc-era
 // port rather than upstream behavior, and it blinds them to most of this tree. Measured against
@@ -276,11 +276,11 @@ func TestNoRedundantShouldComponentUpdateHasNoFileSuffixGate(test *testing.T) {
 // behavioral fixture.
 //
 // ast.Node.Text has no case for a ComputedPropertyName and reaches its unhandled-case panic,
-// measured directly with a probe. The walk recovers per FILE rather than per rule, so a single
+// measured directly with a probe. The walk recovers per file rather than per rule, so a single
 // computed member inside a PureComponent would cost every rule in this package every finding in that
 // file, and the run would still print a plausible summary line.
 //
-// No ExpectFindings fixture can see a panic, so the sweep reports SURVIVED identically whether the
+// No ExpectFindings fixture can see a panic, so the sweep reports `SURVIVED` identically whether the
 // kind guard in identifierMemberName matters or not. This test exists to name what that guard
 // prevents rather than what it decides.
 //

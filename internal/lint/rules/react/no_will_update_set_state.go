@@ -212,7 +212,7 @@ func willUpdateIsThisSetStateCallee(callee *ast.Node) bool {
 
 // willUpdateIsBareThisReceiver reports whether an expression is `this` written without parentheses.
 //
-// Parentheses are deliberately NOT skipped, which is measured rather than reasoned about:
+// Parentheses are deliberately not skipped, which is measured rather than reasoned about:
 // `(this).setState({})` inside a real `componentWillUpdate` is silent on the release oxlint binary.
 // oxc destructures `Expression::ThisExpression` directly, so a parenthesized receiver is a different
 // variant and falls through. Skipping would have been the natural thing to write, it reads as an
@@ -286,8 +286,8 @@ func willUpdateFunctionCountBeforeLifecycle(node *ast.Node) (int, bool) {
 					functionCount++
 				}
 				// The same kinds are counted on the non-latching branch below, and that is not a
-				// duplication. A method-like node reached by the walk is EITHER the lifecycle name,
-				// in which case it latches here and its own scope is counted here, OR it is some
+				// duplication. A method-like node reached by the walk is either the lifecycle name,
+				// in which case it latches here and its own scope is counted here, or it is some
 				// other member on the way out, in which case it is only a function scope and is
 				// counted there. Exactly one branch runs per node.
 				//
@@ -317,7 +317,7 @@ func willUpdateFunctionCountBeforeLifecycle(node *ast.Node) (int, bool) {
 // accessor are deliberately absent here and counted at the latch instead, because in our tree they
 // are the same node that carries the lifecycle name; see the walk above.
 //
-// The walk that calls this ALSO counts the method-like kinds on this same branch, by asking
+// The walk that calls this also counts the method-like kinds on this same branch, by asking
 // `willUpdateIsMethodLike` beside this. They are kept as two predicates rather than one because the
 // latch needs the method-like half alone, and folding them together would count a plain function
 // expression twice there. What the pair means together is oxc's `AstKind::Function(_) |
@@ -338,7 +338,7 @@ func willUpdateIsCountedFunction(node *ast.Node) bool {
 
 // willUpdateIsMethodLike reports whether a node carries its own function scope as one node.
 //
-// These are the kinds that latch the lifecycle name AND introduce a function, which in oxc are two
+// These are the kinds that latch the lifecycle name and introduce a function, which in oxc are two
 // nodes and here are one. A class property holding an arrow is absent on purpose: there the arrow is
 // a separate node passed by the walk before the property that names it, so counting the property
 // would double it. A fixture covers that shape directly, with `componentWillUpdate = () => {}`

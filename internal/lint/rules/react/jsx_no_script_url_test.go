@@ -84,7 +84,7 @@ func TestJsxNoScriptUrlFires(test *testing.T) {
 		{"prefix 0x09 tab", "<a href=\"\tjavascript:x\"></a>", ``, 1},
 		{"prefix 0x1f", "<a href=\"\x1fjavascript:x\"></a>", ``, 1},
 		{"prefix space", `<a href=" javascript:x"></a>`, ``, 1},
-		// A newline BETWEEN letters is in the interleaving class and reports. Its partner in the
+		// A newline between letters is in the interleaving class and reports. Its partner in the
 		// silent table is the same shape with a space, which is not.
 		{"newline inside the word", "<a href=\"ja\nvascript:x\"></a>", ``, 1},
 		// The separator class applies after the final letter too, before the colon.
@@ -95,10 +95,10 @@ func TestJsxNoScriptUrlFires(test *testing.T) {
 		// A self-closing element is a different node kind here and upstream's one selector covers
 		// both, so this pins that the attribute listener reaches it.
 		{"self-closing anchor", `<a href="javascript:" />`, ``, 1},
-		// A legacy entry naming a component twice keeps the LAST entry's prop list. Measured both
+		// A legacy entry naming a component twice keeps the last entry's prop list. Measured both
 		// ways; the partner case in the silent table uses the first entry's prop and is clean.
 		{"repeated name keeps the last props", `<Foo to="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`, 1},
-		// An entry named `a` REPLACES the built-in href pair rather than adding to it, so the
+		// An entry named `a` replaces the built-in href pair rather than adding to it, so the
 		// replacement's own prop reports. Its partner below shows `href` going clean.
 		{"an entry named a replaces the default", `<a to="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`, 1},
 	}
@@ -137,7 +137,7 @@ func TestJsxNoScriptUrlStaysSilent(test *testing.T) {
 		{"valid 6", `<Foo href="javascript:"></Foo>`, ``},
 		{"valid 7", `<a href />`, ``},
 		{"valid 8", `<Foo other="javascript:"></Foo>`, `[[{"name":"Foo","props":["to","href"]}]]`},
-		// Clean upstream WITH its settings and clean here without them, so the missing surface
+		// Clean upstream with its settings and clean here without them, so the missing surface
 		// costs nothing on these two. Measured both ways. Upstream's valid 11 carries
 		// `includeFromSettings: true` and is in TestJsxNoScriptUrlRefusesIncludeFromSettings.
 		{"valid 9", `<Foo href="javascript:"></Foo>`, ``},
@@ -145,7 +145,7 @@ func TestJsxNoScriptUrlStaysSilent(test *testing.T) {
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
-		// A space between the letters is NOT in the interleaving class, unlike a newline. This is
+		// A space between the letters is not in the interleaving class, unlike a newline. This is
 		// the distinction a port reusing the wider prefix class would get wrong, and its partner
 		// in the firing table is the same shape with a newline.
 		{"space inside the word", `<a href="ja vascript:x"></a>`, ``},
@@ -161,14 +161,14 @@ func TestJsxNoScriptUrlStaysSilent(test *testing.T) {
 		{"namespaced tag name", `<svg:a href="javascript:"></svg:a>`, ``},
 		// A capitalised tag is a different name from the built-in `a`, matched exactly.
 		{"uppercase tag", `<A href="javascript:"></A>`, ``},
-		// `form` and `action` are the FORM component defaults, which this rule never consults.
+		// `form` and `action` are the form component defaults, which this rule never consults.
 		{"a form action is not a link", `<form action="javascript:"></form>`, ``},
 		// A template literal is not a Literal upstream, so it declines like the expression case.
 		{"template literal value", "<a href={`javascript:`}></a>", ``},
 		// The partner to the replacement case above: once `a` is redefined, its built-in `href`
 		// pair is gone and the same source goes clean.
 		{"an entry named a drops the built-in href", `<a href="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`},
-		// The partner to the repeated-name case: the FIRST entry's prop no longer applies.
+		// The partner to the repeated-name case: the first entry's prop no longer applies.
 		{"repeated name drops the first props", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`},
 		// An empty prop list matches nothing.
 		{"empty props list", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":[]}]]`},
@@ -184,7 +184,7 @@ func TestJsxNoScriptUrlStaysSilent(test *testing.T) {
 	}
 }
 
-// TestJsxNoScriptUrlReportsOnTheWholeAttribute pins WHERE the finding points.
+// TestJsxNoScriptUrlReportsOnTheWholeAttribute pins where the finding points.
 //
 // Upstream reports on the JSXAttribute, so the span covers the name and the value together rather
 // than either alone. Measured on the installed build: the attribute in this source reports from
@@ -234,7 +234,7 @@ func TestJsxNoScriptUrlMessageText(test *testing.T) {
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue. Upstream has no
 // such gate anywhere, and a gate here would blind the rule to most of a tree.
 //
-// `.ts` is deliberately absent, and it is absent for a PARSER reason rather than a rule one, which
+// `.ts` is deliberately absent, and it is absent for a parser reason rather than a rule one, which
 // is a distinction worth stating because the two look identical from a fixture. TypeScript reads
 // `<a href="...">` in a `.ts` file as a type assertion, not as JSX, so no attribute node is
 // produced for any rule to see. Probed with a control across all four extensions: `.tsx`, `.jsx`

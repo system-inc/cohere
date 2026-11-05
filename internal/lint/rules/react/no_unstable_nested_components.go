@@ -34,8 +34,8 @@ type NoUnstableNestedComponentsOptions struct {
 // `(context.options[0] || {}).propNamePattern || 'render*'`, so an absent key and an explicit empty
 // string both land on `render*` there. The empty string is falsy in JavaScript, which is a
 // distinction Go does not make for free and which the decoder below reproduces deliberately.
-// The pattern's default is defended at THREE sites: this literal, the decoder's fold of an empty
-// string, and Run's fallback for nil options. A mutation emptying any one of them SURVIVES the
+// The pattern's default is defended at three sites: this literal, the decoder's fold of an empty
+// string, and Run's fallback for nil options. A mutation emptying any one of them survives the
 // sweep, because the other two still produce `render*`. Mutating all three together fails 12 lines,
 // which is what establishes the fixtures can see the default at all.
 //
@@ -94,7 +94,7 @@ const componentAsPropsInfo = " If you want to allow component creation in props,
 //
 // React reconciles by component type, so a component whose identity is recreated on every parent
 // render is a different type every time. React unmounts the old subtree, discards its state and its
-// DOM nodes, and mounts a new one. The finding is therefore about WHERE a function is defined
+// DOM nodes, and mounts a new one. The finding is therefore about where a function is defined
 // relative to a component boundary rather than about what it contains.
 //
 // # This rule is a filter over a detection pass that already exists in this package
@@ -206,7 +206,7 @@ type unstableNestedState struct {
 // validate reproduces upstream's function of the same name.
 //
 // The order of the exceptions is upstream's order and it is load bearing: several of them overlap,
-// and `isDeclaredInsideProps` is computed BEFORE the component test because the message depends on
+// and `isDeclaredInsideProps` is computed before the component test because the message depends on
 // it even when component-hood is established by a different route.
 func (s *unstableNestedState) validate(node *ast.Node) {
 	if node == nil || node.Parent == nil {
@@ -227,7 +227,7 @@ func (s *unstableNestedState) validate(node *ast.Node) {
 		return
 
 	// A component created inside `items.map(...)` is a callback rather than a nested component.
-	// Upstream tests the node AND its parent, which is what catches both the arrow itself and a
+	// Upstream tests the node and its parent, which is what catches both the arrow itself and a
 	// function expression sitting under one.
 	case isMapCallExpression(node), isMapCallExpression(semanticParentOf(node)):
 		return
@@ -308,7 +308,7 @@ func unstableNestedMessage(parentName string) string {
 
 // closestComponentAncestor is upstream's `getClosestMatchingParent(node, context, components.get)`.
 //
-// Strictly an ANCESTOR search: upstream starts at `node.parent` and never considers the node
+// Strictly an ancestor search: upstream starts at `node.parent` and never considers the node
 // itself, which matters because the node being judged is usually a component too and would
 // otherwise be its own parent.
 //
@@ -369,7 +369,7 @@ func resolveNestedComponentName(node *ast.Node) string {
 	}
 
 	// Upstream's fallback is guarded on `ArrowFunctionExpression` specifically, so a function
-	// expression assigned to a const does NOT take its name from the binding. Measured against the
+	// expression assigned to a const does not take its name from the binding. Measured against the
 	// installed build on 2026-08-27: `const Parent = function () { const N = () => <div/>; return
 	// <N/>; }` reports with the no-name wording, while the same file written with an arrow parent
 	// names `Parent`. Reproducing the narrower guard rather than the more useful one, because the
@@ -388,9 +388,9 @@ func resolveNestedComponentName(node *ast.Node) string {
 
 // startsUppercase is upstream's `parentName[0] === parentName[0].toLowerCase()`, inverted.
 //
-// Deliberately NOT `hasComponentCapitalization`, which is upstream's `isFirstLetterCapitalized` and
+// Deliberately not `hasComponentCapitalization`, which is upstream's `isFirstLetterCapitalized` and
 // strips leading underscores before testing. This site does neither: it indexes character zero and
-// compares it against its own lowercase, so `_Foo` is a LOWERCASE parent here and a capitalized
+// compares it against its own lowercase, so `_Foo` is a lowercase parent here and a capitalized
 // name there. Measured against the installed build on 2026-08-27: a nested component inside
 // `function _Parent()` is silent, and inside `function Parent()` reports, while `no-multi-comp`
 // counts `_Foo` as a component. Two predicates in one plugin that look interchangeable and are not.
@@ -419,12 +419,18 @@ func isMapCallExpression(node *ast.Node) bool {
 	return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "map"
 }
 
+// hookNamePattern is upstream's `HOOK_REGEXP`, copied verbatim.
+//
+// Note it requires a character after the digit or capital, so bare `use` and `useX` differ: `useX`
+// matches through `.*` being allowed to be empty, and `use` alone does not match at all.
+var hookNamePattern = regexp.MustCompile(`^use[A-Z0-9].*$`)
+
 // isReturnStatementOfHook is upstream's function of the same name.
 //
 // Two conditions, and the second is looser than it reads. The node must sit directly under a return
-// statement, and the closest enclosing CALL must have a callee whose name matches `use[A-Z0-9]`.
+// statement, and the closest enclosing call must have a callee whose name matches `use[A-Z0-9]`.
 // Upstream reads `callExpression.callee.name`, which is undefined for a member callee, so
-// `React.useCallback(() => ...)` does NOT satisfy this and is exempted by a different route.
+// `React.useCallback(() => ...)` does not satisfy this and is exempted by a different route.
 func (s *unstableNestedState) isReturnStatementOfHook(node *ast.Node) bool {
 	parent := semanticParentOf(node)
 	if parent == nil || parent.Kind != ast.KindReturnStatement {
@@ -443,12 +449,6 @@ func (s *unstableNestedState) isReturnStatementOfHook(node *ast.Node) bool {
 	}
 	return hookNamePattern.MatchString(callee.Text())
 }
-
-// hookNamePattern is upstream's `HOOK_REGEXP`, copied verbatim.
-//
-// Note it requires a character after the digit or capital, so bare `use` and `useX` differ: `useX`
-// matches through `.*` being allowed to be empty, and `use` alone does not match at all.
-var hookNamePattern = regexp.MustCompile(`^use[A-Z0-9].*$`)
 
 // isComponentInRenderProp is upstream's function of the same name.
 //
@@ -471,7 +471,7 @@ func (s *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
 	//
 	// # This branch is inert, in upstream as well as here, and it is kept anyway
 	//
-	// A mutation disabling it SURVIVES the sweep. That is not a fixture gap: `validate` returns at
+	// A mutation disabling it survives the sweep. That is not a fixture gap: `validate` returns at
 	// its first gate for every node this branch can answer true for, because a bare arrow passed as
 	// children is not a detected component and is not in a prop, so the exceptions below it are
 	// never consulted.
@@ -480,9 +480,9 @@ func (s *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
 	// returning a nested component, and a named function expression: every node for which this
 	// branch answers true has `isComponent=false` and `isComponentInProp=false`.
 	//
-	// Measured at the AUTHORITY too, rather than concluding our port had narrowed something.
+	// Measured at the authority too, rather than concluding our port had narrowed something.
 	// Instrumenting the installed 7.37.5 build over the whole corpus: 185 function-like nodes
-	// reach the rule, upstream's own version of this branch answers true for 2 of them, and NEITHER
+	// reach the rule, upstream's own version of this branch answers true for 2 of them, and neither
 	// passes `components.get`. So the exception is dead in the original as well.
 	//
 	// Kept rather than deleted because the brief's standing instruction is fidelity to the
@@ -542,7 +542,7 @@ func (s *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) bool
 //
 // Upstream's first branch is `isPropertyOfObjectExpressionMatcher(node)`, whose body is
 // `node && node.parent && node.parent.type === 'Property'`. Despite the name, which reads as though
-// it were about the property rather than about its value, that is the node's DIRECT parent, so it
+// it were about the property rather than about its value, that is the node's direct parent, so it
 // asks whether the function is the value of an object property.
 //
 // I first read it as a grandparent test, on the strength of the helper's name, and wrote a doc
@@ -584,9 +584,9 @@ func (s *unstableNestedState) isComponentInProp(node *ast.Node) bool {
 // nothing imported can see the kind test.
 //
 // Two rounds of fixtures failed to close it and each taught something. The first put a nested
-// component in the parent's BODY beside a string-valued attribute; that component's ancestry is
+// component in the parent's body beside a string-valued attribute; that component's ancestry is
 // Block then FunctionDeclaration then SourceFile, so it never walks near an attribute and the
-// predicate is not consulted. The second tried to make the walk climb PAST a string-valued
+// predicate is not consulted. The second tried to make the walk climb past a string-valued
 // attribute toward an outer container attribute, which is what the guard would really bound, and
 // both such shapes are silent upstream for an unrelated reason:
 //
@@ -594,7 +594,7 @@ func (s *unstableNestedState) isComponentInProp(node *ast.Node) bool {
 //	<Outer footer={<Inner title="x" render={...} />} />   silent
 //	<Outer footer={<Inner title="x">{...}</Inner>} />     silent
 //
-// So there is no measured input where the kind test changes a verdict. This is NOT filed as an
+// So there is no measured input where the kind test changes a verdict. This is not filed as an
 // equivalence verdict: I could not name such an input, which is a different claim from showing none
 // exists. The check is kept because it is upstream's own condition and because the nil half of it is
 // load bearing regardless.
@@ -610,7 +610,7 @@ func isJsxAttributeOfExpressionContainer(node *ast.Node) bool {
 //
 // Upstream gates on `components.get(node)` first, so a function that is not already a detected
 // component takes no part in this. Then it requires the closest enclosing object literal to be
-// exactly the SECOND argument of the closest enclosing `createElement` call, which is the props
+// exactly the second argument of the closest enclosing `createElement` call, which is the props
 // position. Object identity is the test upstream uses and node identity is the same test here.
 func (s *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node) bool {
 	if !s.isComponent[node] {
@@ -623,7 +623,7 @@ func (s *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node
 	// one. An ancestor walk hands it every kind on the way up, and the first `VariableDeclaration`
 	// above a nested component panics. Caught by upstream's own passing case 34 on the first run.
 	//
-	// The cost of getting this wrong is not this rule's verdict: the walk recovers per FILE, so a
+	// The cost of getting this wrong is not this rule's verdict: the walk recovers per file, so a
 	// panic here takes that file away from every rule in the tree.
 	call := closestMatchingAncestor(node, func(candidate *ast.Node) bool {
 		return candidate.Kind == ast.KindCallExpression && createElementCallCounts(s.ctx, candidate)
@@ -640,11 +640,11 @@ func (s *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node
 	//
 	// A mutation changing it to 0 survives. Instrumented over all 77 corpus cases plus probe
 	// shapes: this route is reached 92 times once the paths that short-circuit in
-	// `isComponentInProp`'s property branch are excluded, exactly ONE of those reaches a
+	// `isComponentInProp`'s property branch are excluded, exactly one of those reaches a
 	// `createElement` call carrying two or more arguments, and for that one both indices answer
 	// false. Every other reach is a direct property value, which an earlier branch claims first.
 	//
-	// A distinguishing input needs a DETECTED component inside a props object that is not itself a
+	// A distinguishing input needs a detected component inside a props object that is not itself a
 	// direct property value; three attempts to build one produced source upstream does not detect
 	// as a component at all. Recorded as unresolved rather than as equivalence.
 	object := closestMatchingAncestor(node, func(candidate *ast.Node) bool {
@@ -656,7 +656,7 @@ func (s *unstableNestedState) isComponentInsideCreateElementProps(node *ast.Node
 // isStatelessComponentReturningNull is upstream's function of the same name.
 //
 // It asks `getStatelessComponent(node)` again rather than reading the registry, because the
-// registry holds the ANCHOR a component reports on and this question is about the node itself. A
+// registry holds the anchor a component reports on and this question is about the node itself. A
 // `memo(() => null)` is in the registry under the call while this asks about the arrow.
 func (s *unstableNestedState) isStatelessComponentReturningNull(node *ast.Node) bool {
 	component, isStateless := statelessComponentFor(s.ctx, node, nil)
@@ -672,7 +672,7 @@ func (s *unstableNestedState) isStatelessComponentReturningNull(node *ast.Node) 
 // # What upstream's guard actually protects against
 //
 // Its test is `node.parent.type === 'MethodDefinition' && node.parent.key.name === 'render'`, which
-// is the node's DIRECT parent. In estree a class method is a `MethodDefinition` whose `value` is a
+// is the node's direct parent. In estree a class method is a `MethodDefinition` whose `value` is a
 // separate `FunctionExpression`, so exactly one node in a class satisfies this: the render method's
 // own function expression. Upstream's comment calls it "prevent reporting nested class components
 // twice", and that is what it does: the render method's function expression is itself detected as a
@@ -726,14 +726,14 @@ func (s *unstableNestedState) isInsideRenderMethod(node *ast.Node) bool {
 // declared inside a class component, so this recovers those. All four conjuncts are required, and
 // the third is what confines it to classes.
 //
-// # A mutation making this always false SURVIVES, and the reason is a parser difference
+// # A mutation making this always false survives, and the reason is a parser difference
 //
 // Measured against the installed 7.37.5 build on 2026-08-27 by evaluating upstream's four conjuncts
 // beside `components.get` at every validated node across the whole corpus: 196 nodes, the recovery
-// fires for 8 of them, and it is DECISIVE, meaning `components.get` was false, for exactly 3.
+// fires for 8 of them, and it is decisive, meaning `components.get` was false, for exactly 3.
 //
 // Those 3 are in upstream's invalid cases 10, 11 and 29, and in every one the decisive node is the
-// class component's RENDER METHOD FUNCTION EXPRESSION rather than the nested component. Upstream
+// class component's render method function expression rather than the nested component. Upstream
 // recovers that node into the rule, and then `isInsideRenderMethod` immediately drops it again, so
 // the pair is a no-op that exists because estree gives a method's value a node of its own.
 //
@@ -769,10 +769,10 @@ func (s *unstableNestedState) isFunctionComponentInsideClassComponent(node *ast.
 // parentComponentOf is upstream's `getParentComponent`, which tries the class forms and then falls
 // back to the stateless walk.
 //
-// # This walk INCLUDES the node itself, matching upstream
+// # This walk includes the node itself, matching upstream
 //
 // Upstream's three components all start from `getScope(context, node)`, and ESLint's scope for a
-// class or a function-like node is the scope that node CREATES, not the one it sits in. So
+// class or a function-like node is the scope that node creates, not the one it sits in. So
 // `getParentES6Component(theClass)` returns that class, and `getParentStatelessComponent(theFn)`
 // returns that function.
 //
@@ -783,26 +783,26 @@ func (s *unstableNestedState) isFunctionComponentInsideClassComponent(node *ast.
 // `FunctionDeclaration@4: stateless=FunctionDeclaration@4`, both naming themselves.
 //
 // An exclusive walk reads as the obviously correct one, because "parent" is in the name and because
-// `closestComponentAncestor` below genuinely IS exclusive. They are not the same walk:
+// `closestComponentAncestor` below genuinely is exclusive. They are not the same walk:
 // `getClosestMatchingParent` starts at `node.parent` explicitly in its own source, while these
 // three start at a scope. Two walks in one rule, opposite on this point, and only one of them says
 // so in its name.
 //
-// # What is NOT established: whether the difference is observable here
+// # What is not established: whether the difference is observable here
 //
 // An earlier revision of this comment claimed the exclusive version cost nine of upstream's failing
 // cases. That was wrong, and it is recorded rather than deleted because it is the exact shape the
 // brief warns about, a confident divergence written from attribution rather than from measurement.
 // Both under-report groups were fixed by `isInsideRenderMethod` and `isComponentInProp`; running
-// the whole corpus with BOTH walks made exclusive again passes all 77.
+// the whole corpus with both walks made exclusive again passes all 77.
 //
-// A mutation flipping this walk back to exclusive therefore SURVIVES the sweep, and no fixture was
+// A mutation flipping this walk back to exclusive therefore survives the sweep, and no fixture was
 // added for it, because none could be justified: three candidate shapes were built to separate the
 // two, a function component directly in a render method, one behind a plain helper function, and an
 // arrow inside an arrow, and all three produce one finding under both versions and match upstream.
 //
 // This is deliberately not filed as an equivalence verdict. The only caller requires the result to
-// be a CLASS, and a node being validated is never the class enclosing it, so inclusivity cannot
+// be a class, and a node being validated is never the class enclosing it, so inclusivity cannot
 // change that half; the stateless half then asks `statelessComponentFor` about whatever it found,
 // and for the inclusive case that is the node itself, which is already a component by construction.
 // Both routes reach the same verdict, which is the "same answer by a different path" shape the
@@ -828,7 +828,7 @@ func (s *unstableNestedState) parentComponentOf(node *ast.Node) *ast.Node {
 // that chain to this one is measured rather than assumed; the measurement and its control are
 // recorded in this file's header comment.
 //
-// The node itself is INCLUDED, matching upstream. See `parentComponentOf` for the measurement:
+// The node itself is included, matching upstream. See `parentComponentOf` for the measurement:
 // ESLint's scope for a function-like node is the scope it creates, so the first thing upstream's
 // loop asks about is the node itself.
 func (s *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *ast.Node {
@@ -842,6 +842,9 @@ func (s *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *ast.No
 	}
 	return nil
 }
+
+// propNamePatternMatchers holds compilePropNamePattern's matcher for each pattern seen.
+var propNamePatternMatchers sync.Map
 
 // compilePropNamePattern turns upstream's minimatch pattern into a matcher.
 //
@@ -877,9 +880,6 @@ func compilePropNamePattern(pattern string) func(string) bool {
 	}
 	return matcher
 }
-
-// propNamePatternMatchers holds compilePropNamePattern's matcher for each pattern seen.
-var propNamePatternMatchers sync.Map
 
 // buildPropNamePattern compiles one pattern, for compilePropNamePattern to keep.
 func buildPropNamePattern(pattern string) func(string) bool {

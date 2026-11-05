@@ -37,7 +37,7 @@ var messageNoNamespace = rule.Message{
 // through `jsx-ast-utils`'s `elementType` and tests for a colon. The call arm asks
 // `isCreateElement(context, node)` and then reads a string first argument.
 //
-// **The call arm does NOT use the same createElement predicate the rest of this package does, and
+// **The call arm does not use the same createElement predicate the rest of this package does, and
 // the difference is the whole reason this rule does not call the shelf.** `react.IsCreateElementCall`
 // accepts a bare `createElement(...)`, accepts any object (`Preact.createElement`), and accepts a
 // computed member (`React["createElement"]`). Upstream's `util/isCreateElement.js` accepts none of
@@ -94,9 +94,9 @@ var messageNoNamespace = rule.Message{
 //	<TestComponent />         KindIdentifier
 //	<this.Foo />              KindPropertyAccessExpression whose object is KindThisKeyword
 //
-// **`node.Text()` PANICS on a property-access tag name.** `ast.Node.Text` has no case for
+// **`node.Text()` panics on a property-access tag name.** `ast.Node.Text` has no case for
 // `*ast.PropertyAccessExpression` and reaches its unhandled-case panic, which the walk recovers per
-// FILE rather than per rule, so one dotted tag name would cost every rule in this package every
+// file rather than per rule, so one dotted tag name would cost every rule in this package every
 // finding in that file. The first version of this probe hit it directly. That is why the JSX arm
 // reads the namespaced kind and never calls `Text()` on an arbitrary tag: the dotted forms are all
 // clean upstream anyway, so there is nothing to gain from rendering them and a whole file to lose.

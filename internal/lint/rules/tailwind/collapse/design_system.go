@@ -10,7 +10,7 @@
 // `LoadDesignSystem` walks an `@import` graph, parses every stylesheet in it, and fills a Theme.
 // That is cheap once and ruinous per file. The precedent is in this repository and it is not
 // hypothetical: `boundary-no-project-theme-value` memoized nothing and rescanned the program per
-// file, measured at 2,329ms of setup against 0.54ms of listening across 1,862 files — 64.5% of all
+// file, measured at 2,329ms of setup against 0.54ms of listening across 1,862 files, 64.5% of all
 // rule time for a rule that reported nothing. Nothing failed. It was just slow, and its own comment
 // said the scan happened once.
 //
@@ -26,8 +26,8 @@
 // `internal/program/walk.go` runs up to 16 goroutines striding over files with one mutex for the
 // final merge only. A DesignSystem is therefore shared across all of them with no synchronization
 // at all, which is safe only because nothing here is written after LoadDesignSystem returns. Every
-// table this composes is already immutable — Theme, VariantRegistry and UtilityEvaluator each say
-// so in their own doc comments — and this file keeps that property rather than introducing the
+// table this composes is already immutable (Theme, VariantRegistry and UtilityEvaluator each say
+// so in their own doc comments), and this file keeps that property rather than introducing the
 // package's first mutable one. `MarkUsedVariable` is the one method on Theme that writes, and the
 // Theme accessor's own comment says so rather than the type enforcing it, because Go has no way to
 // hand out a read-only view of a struct with pointer methods.
@@ -193,7 +193,7 @@ func (system *LoadedDesignSystem) Prefix() string { return system.theme.Prefix }
 // The repository's own `@utility` blocks are asked first, then the framework's registry. That order
 // is upstream's: `@utility` registration runs after the framework's and `Utilities.set` overwrites,
 // so a repository redefining a framework root wins. Both are consulted because neither alone is
-// right — the framework tables do not know about `slide-in-from-top`, and the repository's blocks
+// right: the framework tables do not know about `slide-in-from-top`, and the repository's blocks
 // do not know about `bg`.
 //
 // A repository `@utility` block is always functional or static according to whether its name
@@ -316,12 +316,12 @@ func (system *LoadedDesignSystem) VariantKind(root string) ParsedVariantKind {
 // Upstream answers this from a bitwise-and of two `compounds` bitmasks: the parent's, assigned at
 // registration in `variants.ts`, and the child's, which for an arbitrary variant is computed from
 // its selector instead of looked up. Neither half is reachable from shipped Go. The masks are not in
-// any generated table, and `compoundsForSelectors` — the selector computation — is ported only
+// any generated table, and `compoundsForSelectors` (the selector computation) is ported only
 // inside `candidate_test.go`, where the shipped path cannot call it.
 //
 // So this answers the parent's half alone: a compound variant accepts a child, anything else
 // accepts nothing. That is upstream's answer whenever the child produces style rules, which is the
-// overwhelming majority, and it is wrong in one direction for one shape — a compound whose parent
+// overwhelming majority, and it is wrong in one direction for one shape: a compound whose parent
 // accepts only style rules wrapping an at-rule-only child, `group-[@media(print)]` and its kin,
 // where upstream refuses and this accepts.
 //
@@ -431,7 +431,7 @@ type LoadOptions struct {
 //
 // One walk of the graph fills everything: the theme, the `@utility` blocks and the
 // `@custom-variant` names all come out of the same parse rather than three. That is not only
-// cheaper, it is the only way they can agree — a second walk that resolved imports differently
+// cheaper, it is the only way they can agree: a second walk that resolved imports differently
 // would produce a theme and a utility set describing different graphs.
 //
 // Returns an error and no value when the graph cannot be read. Never a partial system: see the
@@ -554,8 +554,8 @@ func nextBuildCount() int {
 // BuildsSoFar is how many design systems this process has built.
 //
 // Exported for the assertion in internal/rules/tailwind. The build-once property is the one this
-// component is most likely to lose silently — the sibling rule that lost it kept a comment claiming
-// it had not, while costing 2,329ms — so the claim is a counter a test reads rather than a sentence
+// component is most likely to lose silently (the sibling rule that lost it kept a comment claiming
+// it had not, while costing 2,329ms), so the claim is a counter a test reads rather than a sentence
 // a reader believes.
 func BuildsSoFar() int {
 	builds.Lock()
@@ -566,7 +566,7 @@ func BuildsSoFar() int {
 // stylesheetCollector walks one `@import` graph and gathers everything a design system needs.
 //
 // Deliberately a second walker rather than a change to themeLoader. That type's file comment states
-// its own boundary — theme only, with `@utility` and `@custom-variant` named as sibling tasks — and
+// its own boundary (theme only, with `@utility` and `@custom-variant` named as sibling tasks), and
 // widening it would make a component that documents what it does not do into one that quietly does
 // more. The duplicated part is import resolution and cycle detection, about thirty lines, and the
 // alternative was a shared walker with a visitor interface that both callers would have had to be
@@ -682,7 +682,7 @@ func (collector *stylesheetCollector) ingest(nodes []*Node, path string) error {
 // resolveImport turns one `@import` into the path it names.
 //
 // Every modifier other than `source(...)` changes what the imported file means, so an unrecognized
-// one is an error rather than a silently dropped qualifier — a `theme(reference)` import quietly
+// one is an error rather than a silently dropped qualifier: a `theme(reference)` import quietly
 // treated as plain produces entries that all lack the reference bit, which is a wrong answer that
 // looks exactly like a right one. Same judgement as themeloader.go's followImport, and deliberately
 // the same error text so a repository hitting it finds one explanation rather than two.
@@ -837,7 +837,7 @@ func (collector *stylesheetCollector) ingestUtilityBlock(node *Node, path string
 //
 // The name is the first space-separated word of the params: `@custom-variant dark (&:where(.dark
 // *))` names `dark`. The selector is deliberately not recorded, because nothing in this port emits
-// CSS and a variant's sort position does not depend on what it emits — see the file comment in
+// CSS and a variant's sort position does not depend on what it emits. See the file comment in
 // variant.go, where both corpus repositories redefine `dark` and keep the framework's position.
 func (collector *stylesheetCollector) ingestCustomVariant(node *Node) {
 	parts := segment(text.TrimWhitespace(node.Params), ' ')

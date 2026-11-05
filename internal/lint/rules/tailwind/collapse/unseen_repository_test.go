@@ -66,7 +66,8 @@ func TestTheUnseenRepositorySeparatesClassesFromTypos(test *testing.T) {
 		"bg-weird":      false,
 	}
 
-	var resolved, refused int
+	var resolved int
+	var refused int
 	for className, wantResolves := range answers {
 		candidates := ParseCandidate(className, system)
 		if len(candidates) == 0 {

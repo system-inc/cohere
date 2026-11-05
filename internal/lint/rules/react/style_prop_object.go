@@ -33,7 +33,7 @@ type stylePropObjectWireOptions struct {
 // DecodeStylePropObjectOptions turns the configured JSON into the struct the rule reads.
 //
 // Exported so fixtures drive the same path the config drives. A rule configured as a bare severity
-// is handed nil options, and the empty body has to produce an EMPTY allow list rather than an
+// is handed nil options, and the empty body has to produce an empty allow list rather than an
 // error. An empty list is the fully-enforcing state here, which is the opposite direction from the
 // two sibling forbid rules where the empty list means the rule declines everything: upstream reads
 // `context.options[0].allow || []` and an empty set exempts nothing.
@@ -130,10 +130,10 @@ func stylePropObjectIsNonNullLiteral(expression *ast.Node) bool {
 // ESLint Linter API before any code was written, and it agreed on all 35. Everything below that the
 // corpus does not state was measured the same way.
 //
-// # The identifier arm resolves through the checker, and it takes the FIRST declaration
+// # The identifier arm resolves through the checker, and it takes the first declaration
 //
 // Upstream asks scope analysis for the variable and reads `defs[0].node.init`, so a name declared
-// twice is judged by the declaration written FIRST. Measured on the installed build:
+// twice is judged by the declaration written first. Measured on the installed build:
 //
 //	var s = 'x'; var s = {};   REPORTS, judged by the string
 //	var s = {}; var s = 'x';   CLEAN, judged by the object
@@ -160,7 +160,7 @@ func stylePropObjectIsNonNullLiteral(expression *ast.Node) bool {
 // A member or namespaced tag has no plain name for the allow list to match, so the lookup simply
 // misses and the element is still examined. That is the opposite of the two sibling forbid rules
 // ported beside this one, where an unreadable tag name ends the check. Measured: `<a.b style="x" />`
-// and `<svg:a style="x" />` both REPORT, and naming `a.b` in the allow list does not exempt it.
+// and `<svg:a style="x" />` both report, and naming `a.b` in the allow list does not exempt it.
 //
 // # There is no file-suffix gate
 //
@@ -190,7 +190,7 @@ var StylePropObject = rule.Rule{
 		//
 		// `shorthand` is the property node when this identifier is a shorthand property's name,
 		// and it is not an optimization. `GetSymbolAtLocation` on such a name resolves to the
-		// PROPERTY's own symbol, whose single declaration is the shorthand assignment itself, so
+		// property's own symbol, whose single declaration is the shorthand assignment itself, so
 		// the variable declaration is never reached and the rule goes silent on an input upstream
 		// reports. Probed directly: the plain accessor answers a `KindShorthandPropertyAssignment`
 		// declaration and `GetShorthandAssignmentValueSymbol` answers the `KindVariableDeclaration`.
@@ -233,7 +233,7 @@ var StylePropObject = rule.Rule{
 					return
 				}
 
-				// The allow list is consulted only to SKIP. A tag with no plain name simply fails
+				// The allow list is consulted only to skip. A tag with no plain name simply fails
 				// to match and the element is still examined, which is upstream's behaviour and
 				// the opposite of the sibling forbid rules.
 				attributes := node.Parent
@@ -255,7 +255,7 @@ var StylePropObject = rule.Rule{
 				}
 
 				expression := stylePropObjectUnwrapParentheses(attribute.Initializer.AsJsxExpression().Expression)
-				// An EMPTY container, `<div style={} />`, reports. Upstream reaches its literal
+				// An empty container, `<div style={} />`, reports. Upstream reaches its literal
 				// test with an undefined expression, which fails, and then falls into the report
 				// branch because the container test already passed. Measured; no corpus case
 				// writes it. The nil here is that same undefined.
@@ -282,7 +282,7 @@ var StylePropObject = rule.Rule{
 					return
 				}
 
-				// The allow list matches the first argument's NAME, so it applies to an identifier
+				// The allow list matches the first argument's name, so it applies to an identifier
 				// component and not to a string element. Measured: allowing "div" does not exempt
 				// `React.createElement("div", ...)`, because a string literal has no name.
 				first := arguments.Nodes[0]
@@ -333,7 +333,7 @@ var StylePropObject = rule.Rule{
 						return
 					}
 					if stylePropObjectIsNonNullLiteral(value) {
-						// Upstream reports on the VALUE here, not on the property and not on the
+						// Upstream reports on the value here, not on the property and not on the
 						// call, which is a different anchor from the JSX arm above. A span fixture
 						// pins both.
 						ruleContext.ReportNode(value, stylePropObjectMessage)

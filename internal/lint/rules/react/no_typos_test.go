@@ -26,7 +26,7 @@ const noTyposFile = "/repository/source/NoTypos.tsx"
 // # The one case they disagree about is held back, and the cause is an ESLint version
 //
 // `/** @extends React.Component */ class MyComponent extends BaseComponent {}` followed by
-// `MyComponent.PROPTYPES = {}` is asserted as reporting in the clone and is SILENT on the installed
+// `MyComponent.PROPTYPES = {}` is asserted as reporting in the clone and is silent on the installed
 // build. The cause is `componentUtil.isExplicitComponent`, which calls `sourceCode.getJSDocComment`;
 // that method was removed in ESLint 9, so the branch cannot fire any more. Measured under both the
 // TypeScript parser and the default one, with a control confirming the same class reports when it
@@ -188,7 +188,7 @@ func runNoTypos(test *testing.T, sourceText string) rule_testing.Result {
 // TestNoTyposJsDocComponentAnnotationIsNotHonored records the one corpus case held back.
 //
 // The clone asserts that a class annotated `/** @extends React.Component */` counts as a component,
-// so a mis-cased static property on it reports. The installed build is SILENT, because
+// so a mis-cased static property on it reports. The installed build is silent, because
 // `componentUtil.isExplicitComponent` reads the annotation through `sourceCode.getJSDocComment` and
 // that method was removed in ESLint 9.
 //
@@ -217,7 +217,7 @@ func TestNoTyposJsDocComponentAnnotationIsNotHonored(test *testing.T) {
 //
 // The source-order rows are the reason this rule walks the file rather than registering per-kind
 // listeners: upstream sets the binding as ESLint reaches the import, so a propTypes object written
-// ABOVE the import sees no binding.
+// above the import sees no binding.
 func TestNoTyposImportBindingsGateThePropTypeArms(test *testing.T) {
 	test.Parallel()
 
@@ -257,9 +257,9 @@ func TestNoTyposImportBindingsGateThePropTypeArms(test *testing.T) {
 			[]string{"typoPropType"},
 		},
 		// The rows above cannot see the import guard on their own, and a mutant deleting it survived
-		// them: with NO import both the guard AND `isPropTypesPackage` decline, so both versions
+		// them: with no import both the guard and `isPropTypesPackage` decline, so both versions
 		// reach silence by different routes. The three below separate them. A chain qualifier
-		// reached through a CALL never consults `isPropTypesPackage` at all, so the import guard is
+		// reached through a call never consults `isPropTypesPackage` at all, so the import guard is
 		// the only thing deciding, and it flips on whether either package has been named.
 		{
 			"a call-chain typo is silent with no import",
@@ -298,13 +298,13 @@ func TestNoTyposImportBindingsGateThePropTypeArms(test *testing.T) {
 
 // TestNoTyposReturningJsxDecidesTheMemberArm pins upstream's isReturningJSX.
 //
-// The member-assignment arm accepts a class component OR a non-class whose own body returns JSX.
+// The member-assignment arm accepts a class component or a non-class whose own body returns JSX.
 // That predicate is narrower than it sounds and the corpus barely exercises it. Every row measured
 // on the installed build before it was written here.
 //
 // The last row is the one a port is most likely to get wrong: JSX inside a nested callback belongs
 // to that callback, not to the enclosing function, so a component that only maps over items and
-// returns null does NOT count.
+// returns null does not count.
 func TestNoTyposReturningJsxDecidesTheMemberArm(test *testing.T) {
 	test.Parallel()
 
@@ -331,7 +331,7 @@ func TestNoTyposReturningJsxDecidesTheMemberArm(test *testing.T) {
 		{"a parenthesized non-JSX return still does not", preamble + "function Foo() { return (null); }\nFoo.PropTypes = {};\n", nil},
 		{"JSX only inside a callback does NOT count", preamble + "function Foo() { items.map(() => <div/>); return null; }\nFoo.PropTypes = {};\n", nil},
 		// The row above cannot see the nested-function skip, and a mutant removing it survived: an
-		// arrow's JSX is a concise BODY rather than a return statement, so the walk never meets a
+		// arrow's JSX is a concise body rather than a return statement, so the walk never meets a
 		// return there and both versions reach silence. These two carry an explicit `return` inside
 		// a nested function, which is the only shape where the skip alone decides. Both measured
 		// silent on the installed build.
@@ -400,7 +400,7 @@ func TestNoTyposRecursesThroughShapeAndOneOfType(test *testing.T) {
 		{"a typo inside oneOfType reports", preamble + "Foo.propTypes = { a: PropTypes.oneOfType([PropTypes.strng]) };\n", []string{"typoPropType"}},
 		{"a typo nested two deep reports", preamble + "Foo.propTypes = { a: PropTypes.shape({ b: PropTypes.shape({ c: PropTypes.strng }) }) };\n", []string{"typoPropType"}},
 		// Only three property names have their object walked, and `defaultProps` is deliberately
-		// not among them: it holds VALUES rather than validators, so a name that looks like a
+		// not among them: it holds values rather than validators, so a name that looks like a
 		// misspelled prop type there is just data. A mutant widening the gate to every property
 		// survived the rest of this suite until this row existed. Measured silent on the installed
 		// build, with the three walked names beside it as controls.
@@ -480,9 +480,9 @@ func TestNoTyposLifecycleArmsAreIndependent(test *testing.T) {
 	}
 }
 
-// TestNoTyposSpans asserts WHERE each finding points.
+// TestNoTyposSpans asserts where each finding points.
 //
-// The two casing ids point at the KEY, the two prop-type ids point at the offending identifier
+// The two casing ids point at the key, the two prop-type ids point at the offending identifier
 // inside the chain, and the two lifecycle ids point at the whole member. Those are three different
 // anchors that no id assertion can tell apart, and getting one wrong means underlining a whole
 // method where upstream underlines one word.
@@ -609,7 +609,7 @@ func TestNoTyposComponentGate(test *testing.T) {
 		{"createReactClass counts", "declare function createReactClass(spec: any): any;\ncreateReactClass({ PropTypes: {} });\n", []string{"typoPropDeclaration"}},
 		{"a bare createClass does not", "declare function createClass(spec: any): any;\ncreateClass({ PropTypes: {} });\n", nil},
 		{"React.createClass does not", "declare const React: any;\nReact.createClass({ PropTypes: {} });\n", nil},
-		// The namespaced form of the PRAGMA does count, and this port was silent on it at first.
+		// The namespaced form of the pragma does count, and this port was silent on it at first.
 		// Eleven corpus cases are written this way and every one of them caught it. The row below it
 		// is the control that keeps the namespace load-bearing.
 		{"React.createReactClass counts", "declare const React: any;\nReact.createReactClass({ PropTypes: {} });\n", []string{"typoPropDeclaration"}},
@@ -680,7 +680,7 @@ func TestNoTyposHasNoFileGate(test *testing.T) {
 
 // TestNoTyposSurvivesShapesThatWouldPanic drives shapes with pieces missing.
 //
-// The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
+// The walk recovers per file rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic.
 func TestNoTyposSurvivesShapesThatWouldPanic(test *testing.T) {
 	test.Parallel()
@@ -713,7 +713,7 @@ func TestNoTyposSurvivesShapesThatWouldPanic(test *testing.T) {
 // for each is what sent me to measure rather than reason. Two of my three checks were wrong and the
 // mutants were right.
 //
-// The right-hand row is the surprising one: merely READING `target = Foo.PropTypes` reports, as if
+// The right-hand row is the surprising one: merely reading `target = Foo.PropTypes` reports, as if
 // the property had been written. That reads as an upstream oversight, and it is reproduced because
 // narrowing it would silence an input upstream reports and no imported fixture would notice.
 //

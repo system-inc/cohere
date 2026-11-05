@@ -60,7 +60,7 @@ func TestForbidElementsFires(test *testing.T) {
 		{"invalid 5 nested elements, both objects", `<button><input /></button>`, `{"forbid":[{"element":"button"},{"element":"input"}]}`, []string{"forbiddenElement", "forbiddenElement"}},
 		{"invalid 6 nested elements, object then string", `<button><input /></button>`, `{"forbid":[{"element":"button"},"input"]}`, []string{"forbiddenElement", "forbiddenElement"}},
 		{"invalid 7 nested elements, string then object", `<button><input /></button>`, `{"forbid":["input",{"element":"button"}]}`, []string{"forbiddenElement", "forbiddenElement"}},
-		// The corpus's one statement that later entries win. The finding carries the SECOND note,
+		// The corpus's one statement that later entries win. The finding carries the second note,
 		// which the message-text assertion below pins, since both entries share a message id.
 		{"invalid 8 the same name twice keeps the last note", `<button />`, `{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`, []string{"forbiddenElement_message"}},
 		{"invalid 9 a createElement literal with children", `React.createElement("button", {}, child)`, `{"forbid":["button"]}`, []string{"forbiddenElement"}},
@@ -159,7 +159,7 @@ func TestForbidElementsHasNoFileSuffixGate(test *testing.T) {
 // TestForbidElementsAnchorsOnTheName asserts where each finding points.
 //
 // The corpus asserts message ids only, so nothing in it can see a rule reporting the right judgment
-// in the wrong place. Upstream reports on the NAME node for JSX and on the ARGUMENT node for a
+// in the wrong place. Upstream reports on the name node for JSX and on the argument node for a
 // createElement call, so neither finding covers the whole element or the whole call. Both were read
 // from upstream's reported columns rather than from its source.
 func TestForbidElementsAnchorsOnTheName(test *testing.T) {
@@ -202,7 +202,7 @@ func TestForbidElementsAnchorsOnTheName(test *testing.T) {
 // TestForbidElementsLaterEntriesWin pins the lookup's assignment order.
 //
 // Upstream builds a map keyed by element name and assigns in list order, so a name written twice
-// keeps the LAST entry. The corpus states this once, for two objects sharing a message id, which
+// keeps the last entry. The corpus states this once, for two objects sharing a message id, which
 // means an id assertion cannot see which of the two won. The rendered text can, and the mixed
 // spellings were measured against the installed build because the corpus writes neither.
 func TestForbidElementsLaterEntriesWin(test *testing.T) {
@@ -221,7 +221,7 @@ func TestForbidElementsLaterEntriesWin(test *testing.T) {
 		}
 	})
 
-	// A string entry after an object entry ERASES the note, which is the direction a port storing
+	// A string entry after an object entry erases the note, which is the direction a port storing
 	// the first match would get backwards.
 	test.Run("a bare string after an object drops the note", func(test *testing.T) {
 		test.Parallel()
@@ -245,7 +245,7 @@ func TestForbidElementsLaterEntriesWin(test *testing.T) {
 // TestForbidElementsEmptyMessageIsNotAMessage pins upstream's truthiness test.
 //
 // `message ? messages.forbiddenElement_message : messages.forbiddenElement` takes the else branch on
-// an empty string, so an entry carrying `message: ""` reports the PLAIN id. Measured against the
+// an empty string, so an entry carrying `message: ""` reports the plain id. Measured against the
 // installed build. A port testing for the key's presence rather than its truthiness would report a
 // message id with an empty tail, and no corpus case writes an empty message.
 func TestForbidElementsEmptyMessageIsNotAMessage(test *testing.T) {
@@ -284,7 +284,7 @@ func TestForbidElementsArgumentShapes(test *testing.T) {
 		// alternative is a port that quietly disagrees with the running rule.
 		{"a boolean keyword reaches the lookup as its text", `React.createElement(true)`, `{"forbid":["true"]}`, []string{"forbiddenElement"}},
 		{"a false keyword likewise", `React.createElement(false)`, `{"forbid":["false"]}`, []string{"forbiddenElement"}},
-		// The member arm reads SOURCE TEXT, so the spelling survives into the lookup key. A port
+		// The member arm reads source text, so the spelling survives into the lookup key. A port
 		// rebuilding the name from the tree would answer "a.b" for all three of these.
 		{"a deep member reports its whole path", `React.createElement(a.b.c)`, `{"forbid":["a.b.c"]}`, []string{"forbiddenElement"}},
 		{"a computed member keeps its brackets and quotes", `React.createElement(a["b"])`, `{"forbid":["a[\"b\"]"]}`, []string{"forbiddenElement"}},

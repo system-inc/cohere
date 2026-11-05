@@ -104,7 +104,7 @@ var (
 // Linter API runs from `~/Projects/ahra`, and the release oxlint binary is at
 // `~/Projects/system/oxc/target/release/oxlint`.
 //
-// # The three measured divergences between oxc HEAD and ESLint 7.1.1
+// # The three measured divergences between oxc `HEAD` and ESLint 7.1.1
 //
 // The dispatch that commissioned this port expected oxc to be pinned at 2024 and therefore behind.
 // It is not: `git log` on `rules_of_hooks.rs` shows its last change on 2026-08-14, ten days before
@@ -138,7 +138,7 @@ var (
 // oxc's `is_react_hook_name` tests the fourth character with `char::is_uppercase`, which is Unicode.
 // ESLint's is `/^use[A-Z0-9]/`, which is not. Reproduced as oxc, which means this rule's hook
 // predicate is Unicode-uppercase-or-ASCII-digit, and that is why it cannot use
-// `internal/utilities/react.IsHookName` — see below.
+// `internal/utilities/react.IsHookName` (see below).
 //
 // One more difference is cosmetic rather than behavioural and is recorded so nobody re-derives it:
 // for `Namespace.useThing()` oxc renders the hook name as `useThing` and ESLint renders it as
@@ -170,8 +170,8 @@ var (
 // scope references, and it resolves function names by inspecting the enclosing declarator through
 // scope analysis. We have a resident type checker and a whole-program graph and could answer both by
 // resolution. This port answers neither by resolution, and that is a fidelity decision rather than a
-// capability one: oxc's `get_declaration_identifier` reads the **syntactic** parent — a variable
-// declarator, an assignment target, an assignment pattern, an object property key — and never
+// capability one: oxc's `get_declaration_identifier` reads the **syntactic** parent (a variable
+// declarator, an assignment target, an assignment pattern, an object property key) and never
 // resolves anything. Resolving would report on shapes upstream is silent for. The rule therefore
 // declares no type checker, and the checker is not consulted anywhere.
 //
@@ -304,11 +304,11 @@ func runRulesOfHooks(ruleContext rule.Context, options any) rule.Listeners {
 				return
 			}
 
-			// `try` is answered syntactically and it is answered FIRST, ahead of every graph
+			// `try` is answered syntactically and it is answered first, ahead of every graph
 			// question including reachability. That ordering is upstream's and it is observable
 			// rather than incidental: `try { throw err; useState(); } catch {}` is upstream case 112
-			// and it REPORTS, while the same unreachable Hook with no `try` around it is upstream
-			// case 18 and is SILENT. Measured on the release binary both ways after this rule got it
+			// and it reports, while the same unreachable Hook with no `try` around it is upstream
+			// case 18 and is silent. Measured on the release binary both ways after this rule got it
 			// backwards on its first run. A cyclic Hook inside a `try` is still a loop rather than a
 			// condition, which is why the cycle test sits inside this arm as well.
 			if isInsideTryStatement(node, enclosing) {
@@ -379,7 +379,7 @@ func reportEnclosingFunctionShape(ruleContext rule.Context, hook *ast.Node, call
 		return true
 	}
 
-	// An anonymous function whose surrounding syntax gives it a name — a declarator, an assignment,
+	// An anonymous function whose surrounding syntax gives it a name: a declarator, an assignment,
 	// an object property, a destructuring default. The name is read syntactically, never resolved.
 	if name, named := declarationIdentifierOf(enclosing); named && !isComponentOrHookName(name) {
 		ruleContext.ReportNode(callee, messageRulesOfHooksNotComponent)
@@ -426,6 +426,10 @@ func (f *hookPathFacts) blockOf(call *ast.Node) (*control_flow_graph.Block[hookE
 	return block, found
 }
 
+// factsForRoot is the Hook path facts for root's control-flow graph, built on the first call under root and
+// reused for every later one.
+//
+// Mutates: cache keeps the facts built for root, so the next Hook call under the same root reuses them.
 func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathFacts {
 	if existing, cached := cache[root]; cached {
 		return existing
@@ -442,7 +446,7 @@ func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathF
 				return
 			}
 			block, _ := builder.Emit(hookEvent{position: node.Pos()})
-			// Keyed by position rather than by node, and the LAST layout wins.
+			// Keyed by position rather than by node, and the last layout wins.
 			//
 			// The duplicate-layout trap is real and `internal/unused` was bitten by it: the graph
 			// lays a `finally` body out twice, once for normal completion and once for the path that
@@ -452,12 +456,12 @@ func factsForRoot(cache map[*ast.Node]*hookPathFacts, root *ast.Node) *hookPathF
 			//
 			// Measured on this substrate. `try { f(); } finally { useHook(); }` lays the Hook out in
 			// b4 (onEveryFinal=true) and then again in b1 (onEveryFinal=false), so which copy wins
-			// decides the verdict — and neither answer is ever read, because a `finally` body is
+			// decides the verdict, and neither answer is ever read, because a `finally` body is
 			// syntactically inside a `TryStatement` and `isInsideTryStatement` answers above the
 			// graph. Every shape that produces a duplicate layout is a `try` shape, so the
 			// preference has no reachable effect at all.
 			//
-			// A preference was written here first and a mutation flipping it SURVIVED the whole
+			// A preference was written here first and a mutation flipping it survived the whole
 			// fixture set. The survivor was not a fixture gap; the branch was subsumed by an earlier
 			// guard in the same function. Disabling the `try` check and re-running confirmed it: the
 			// verdict is unchanged either way. So the preference is gone rather than kept with a
@@ -573,9 +577,9 @@ func enclosingFunctionForHook(node *ast.Node) *ast.Node {
 // A constructor, an accessor and a static block only exist in a class, so their kind settles it. A
 // **method does not**, and that is the trap: `({ useHook() { ... } })` parses to the same
 // `KindMethodDeclaration` as a class method does, so a kind test alone reads an object literal as a
-// class and reports the wrong arm. Upstream's own corpus pins both sides of it — case 19 writes
+// class and reports the wrong arm. Upstream's own corpus pins both sides of it: case 19 writes
 // `({useHook() { useState(); }})` as a passing case and case 101 writes `({g() { useState(); }})` as
-// a `notComponent` failure — and this rule reported `classComponent` for both on its first run. The
+// a `notComponent` failure, and this rule reported `classComponent` for both on its first run. The
 // parent is what separates them.
 //
 // A field initializer is an ordinary function whose parent is a property declaration, and a class is
@@ -621,11 +625,11 @@ func ownFunctionName(fn *ast.Node) string {
 // it is empty", which matters because the caller's verdict differs between them: an unnamed default
 // export is silent and a lowercase-named arrow reports.
 func declarationIdentifierOf(fn *ast.Node) (string, bool) {
-	// An object-literal method is its OWN name-bearer rather than borrowing one from a parent: the
-	// function-like node IS the `KindMethodDeclaration`, and there is no anonymous function nested
+	// An object-literal method is its own name-bearer rather than borrowing one from a parent: the
+	// function-like node is the `KindMethodDeclaration`, and there is no anonymous function nested
 	// inside it whose parent could be consulted. Every other shape below reads the parent, which is
 	// why this one has to be answered before the switch rather than inside it. Missed on the first
-	// pass, and upstream's case 101 hid it — that case reports nine findings and this rule reported
+	// pass, and upstream's case 101 hid it: that case reports nine findings and this rule reported
 	// nine, one of them from a different arm on a different line.
 	if fn.Kind == ast.KindMethodDeclaration {
 		if text, readable := ast.TryGetTextOfPropertyName(fn.Name()); readable {
@@ -669,7 +673,7 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 	// looks like an oversight.
 	//
 	// Our parser reaches it from exactly one shape: an assignment-destructuring default,
-	// `({k = () => { useState(); }} = {})`. Upstream is SILENT on that, measured standalone on the
+	// `({k = () => { useState(); }} = {})`. Upstream is silent on that, measured standalone on the
 	// release binary against the binding-declaration spelling beside it:
 	//
 	//	const {j = () => { useState(); }} = {};    REPORTS
@@ -677,7 +681,7 @@ func declarationIdentifierOf(fn *ast.Node) (string, bool) {
 	//
 	// The two are one line apart in upstream case 101 and only nine of its ten statements report,
 	// which is the only place in the whole corpus that says so. oxc reaches that silence through a
-	// node kind rather than a decision: a destructuring default in an ASSIGNMENT is an
+	// node kind rather than a decision: a destructuring default in an assignment is an
 	// `AssignmentTargetWithDefault` there, which its `get_declaration_identifier` does not name, so
 	// no name is available and the caller declines. Our parser calls the same shape a shorthand
 	// property assignment, and reading a name off it would report where upstream does not.
@@ -765,7 +769,7 @@ func isDirectlyInsideComponentOrHook(fn *ast.Node) bool {
 // component or a Hook.
 //
 // This is what separates a Hook in a callback inside a component, which reports, from a Hook in a
-// callback inside a plain function, which is silent — upstream's judgment being that the second is
+// callback inside a plain function, which is silent, upstream's judgment being that the second is
 // somebody else's library code and not a React mistake.
 func isSomewhereInsideComponentOrHook(fn *ast.Node) bool {
 	for current := fn; current != nil; current = current.Parent {

@@ -122,7 +122,7 @@ func TestNoDidUpdateSetStateStaysSilent(test *testing.T) {
 		{"a lifecycle property on a plain object literal", "\nvar Hello = {\n  componentDidUpdate: function() {\n    this.setState({ data: 123 });\n  }\n};\n", ""},
 		{"a lifecycle property in a call that is not createReactClass", "\nvar Hello = somethingElse({\n  componentDidUpdate: function() {\n    this.setState({ data: 123 });\n  }\n});\n", ""},
 
-		// `createClass` and `React.createClass` are NOT components to this rule, and this is the
+		// `createClass` and `React.createClass` are not components to this rule, and this is the
 		// one place the shelf would have over-reported. `utilsreact.IsEs5ComponentCall` accepts
 		// both of those names as well as `createReactClass`, matching a different oxc helper, while
 		// `no_did_update_set_state.rs` reaches `is_es5_component`, which accepts only the name
@@ -152,7 +152,7 @@ func TestNoDidUpdateSetStateStaysSilent(test *testing.T) {
 		// computed key crashes here rather than in Kirk's tree.
 		{"an interpolated computed key beside a real one", "\nvar Hello = createReactClass({\n  [`componentDidUpdate${suffix}`]: function() {\n    this.setState({ data: 123 });\n  }\n});\n", ""},
 
-		// A component nested inside the lifecycle. The walk stops at the FIRST component it reaches
+		// A component nested inside the lifecycle. The walk stops at the first component it reaches
 		// after the lifecycle name, and here it never reaches the lifecycle name at all: the inner
 		// `render` is not `componentDidUpdate`, so the counting loop runs to the top and answers
 		// nothing. Measured clean on the release binary.
@@ -166,14 +166,14 @@ func TestNoDidUpdateSetStateStaysSilent(test *testing.T) {
 		// counting the accessor the default mode reports and upstream does not.
 		{"a callback inside a getter named for the lifecycle", "\nclass Hello extends React.Component {\n  get componentDidUpdate() {\n    someClass.on(function() {\n      this.setState({ data: 123 });\n    });\n    return 1;\n  }\n}\n", ""},
 
-		// Parentheses, which are the two cases this rule gets right by NOT being clever and which
+		// Parentheses, which are the two cases this rule gets right by not being clever and which
 		// a mutation sweep found unguarded. Both were measured silent on the release binary before
 		// the rule was written, and then no fixture asserted either, so a mutant adding the
 		// paren-skip that reads like an improvement survived twice. oxc destructures
 		// `Expression::ThisExpression` for the receiver and reaches `as_member_expression()` for the
 		// callee, and neither looks through a parenthesized expression.
 		//
-		// Worth contrasting with `(createReactClass)({...})`, which DOES report, because the ES5
+		// Worth contrasting with `(createReactClass)({...})`, which does report, because the ES5
 		// component check goes through `get_identifier_reference()`, which does skip parentheses.
 		// The asymmetry is upstream's and the fires table below pins that half.
 		{"a parenthesized this receiver", "\nclass Hello extends React.Component {\n  componentDidUpdate() {\n    (this).setState({ data: 123 });\n  }\n}\n", ""},

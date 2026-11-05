@@ -133,7 +133,9 @@ func TestGapRootDescriptionsResolveWhatTheEngineCompiles(test *testing.T) {
 func expectGapRootDescriptionsResolve(test *testing.T, system *LoadedDesignSystem) {
 	test.Helper()
 
-	var agreed, unparsed, undescribed int
+	var agreed int
+	var unparsed int
+	var undescribed int
 	var disagreements []string
 
 	for className, engineCompiles := range gapRootResolutionCases {
@@ -186,7 +188,8 @@ func compiledWord(compiles bool) string {
 // description with no emitter describes something this port does not otherwise know about.
 func TestEveryGapRootIsDescribed(test *testing.T) {
 	test.Parallel()
-	var missingDescription, missingEmitter []string
+	var missingDescription []string
+	var missingEmitter []string
 
 	for root := range gapEmitters {
 		if _, described := GapRootDescriptions[root]; !described {

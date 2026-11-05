@@ -1,7 +1,7 @@
 // Package tailwind decides which class names could possibly collapse, so that almost none of them
 // have to be asked about.
 //
-// Tailwind's collapse logic — the thing that knows `px-4 py-4` is `p-4` and `w-8 h-8` is `size-8` —
+// Tailwind's collapse logic (the thing that knows `px-4 py-4` is `p-4` and `w-8 h-8` is `size-8`)
 // is a signature-equivalence search sitting on the whole Tailwind compiler. It is JavaScript, it is
 // eight to ten thousand lines, and it changes every Tailwind minor. cohere is Go. That boundary is
 // the one place in this tool where the answer is not "delete the boundary."
@@ -61,7 +61,7 @@
 //     `overflow-y-hidden` and stops reporting `overflow-hidden`.
 //   - Requiring two classes to declare the same CSS property family cuts engine calls by an order
 //     of magnitude and stops reporting `w-8 h-8` into `size-8`, because a shorthand can absorb
-//     properties that share no name — `width` and `height` become `size`, `column-gap` and
+//     properties that share no name: `width` and `height` become `size`, `column-gap` and
 //     `row-gap` become `gap`.
 //
 // Every one was caught by a fixture and none by review. So this package errs toward asking, always,
@@ -136,7 +136,7 @@ type Variant struct {
 // this package ports resolves it by silently taking the first reading without recording why. That
 // made it worth checking rather than inheriting: over all 4,375 candidate pairs in the corpus, of
 // which 75 collapse, keying on the first reading loses none, and the order is stable across calls.
-// So the choice is safe — but it was verified against the engine, not assumed from the source it
+// So the choice is safe, but it was verified against the engine, not assumed from the source it
 // was ported from. See DeclaredValues for the static case.
 type Candidate struct {
 	Kind      CandidateKind
@@ -222,7 +222,7 @@ func (g *Gate) computeGroupKey(className string) string {
 	}
 
 	// The first reading, deliberately. Tailwind returns readings in a stable order and the first is
-	// the one that preserves every collapse the engine finds — measured over all 4,375 candidate
+	// the one that preserves every collapse the engine finds, measured over all 4,375 candidate
 	// pairs in the real corpus, of which 75 collapse, with zero lost to this choice.
 	candidate := candidates[0]
 
@@ -306,8 +306,8 @@ func valueKey(value Value) string {
 // theme name: `z-[1]` is `z-1`, `w-[100%]` is `w-full`. A static can be renamed outright, which
 // Tailwind keeps in a table: `order-none` is `order-0`, `break-words` is `wrap-break-word`.
 //
-// Functional candidates with a named value — `px-4`, `rounded-md`, `text-sm`, the overwhelming
-// majority — never rewrite alone, because a named value is already the theme's own spelling. Those
+// Functional candidates with a named value (`px-4`, `rounded-md`, `text-sm`, the overwhelming
+// majority) never rewrite alone, because a named value is already the theme's own spelling. Those
 // are the ones worth never asking about.
 func (g *Gate) CouldRewriteAlone(className string) bool {
 	key := g.GroupKey(className)

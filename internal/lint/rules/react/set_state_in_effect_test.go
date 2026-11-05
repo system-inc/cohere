@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// The imported corpus is twelve cases and every case here was RUN before being written down.
+// The imported corpus is twelve cases and every case here was run before being written down.
 //
 // oxc's linter rule ships a tester block of exactly one pass and one fail, and that floor is
 // misleading rather than small: `set_state_in_effect.rs` is the twenty-two-rule dispatcher body, so
@@ -17,7 +17,7 @@ import (
 //
 // React ships no `EffectSetState` golden among the 325 vendored at `internal/react_conformance`.
 // Searched for both message texts and for the category name; the zero is real, established with
-// three controls in the same command that DID fire: 13 files matching the useMemo setState message,
+// three controls in the same command that did fire: 13 files matching the useMemo setState message,
 // 21 matching `setState` at all, 14 containing `useEffect`. The `setState`-named goldens there
 // belong to `set-state-in-render` and to `use-memo`, which is the "an error-named fixture can be
 // exactly the wrong half" trap.
@@ -40,7 +40,7 @@ import (
 // through `RunTypedFiles` against the stub below, whose declarations are copied from the real
 // `@types/react`: `useState` at index.d.ts:1689, `Dispatch` at 1645, `useEffect` at 1785,
 // `useLayoutEffect` at 1775, `useInsertionEffect` at 1915, `useRef` at 1737, `RefObject` at 154.
-// The CASE TEXT is upstream's byte for byte; only the module specifier moves, from 'react' to
+// The case text is upstream's byte for byte; only the module specifier moves, from 'react' to
 // "./react", and a script verified every remaining line against the upstream file rather than a
 // reading of it.
 //
@@ -51,12 +51,12 @@ import (
 // reactStub is a faithful subset of `@types/react`, not an invention.
 //
 // Only the declarations this rule's predicates read are present, and each is copied from the real
-// file rather than approximated, because the whole rule rests on `Dispatch` being an ALIAS and
-// `RefObject` being an INTERFACE. A stub that made either the other kind would test the opposite of
+// file rather than approximated, because the whole rule rests on `Dispatch` being an alias and
+// `RefObject` being an interface. A stub that made either the other kind would test the opposite of
 // what ships.
 const reactStub = "export type SetStateAction<S> = S | ((prevState: S) => S);\nexport type Dispatch<A> = (value: A) => void;\nexport type Destructor = () => void;\nexport type EffectCallback = () => void | Destructor;\nexport type DependencyList = readonly unknown[];\nexport interface RefObject<T> { current: T }\nexport declare function useState<S>(initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>];\nexport declare function useEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useLayoutEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useInsertionEffect(effect: EffectCallback, deps?: DependencyList): void;\nexport declare function useEffectEvent<T extends Function>(callback: T): T;\nexport declare function useRef<T>(initialValue: T): RefObject<T>;\nexport declare function useCallback<T extends Function>(callback: T, deps: DependencyList): T;\nexport declare function useMemo<T>(factory: () => T, deps: DependencyList): T;\nexport type ActionDispatch<A extends unknown[]> = (...args: A) => void;\nexport declare function useReducer<S, A>(r: (s: S, a: A) => S, i: S): [S, ActionDispatch<[A]>];\n"
 
-// otherModuleStub declares hooks that are NOT React's, for the custom-hook-name cases.
+// otherModuleStub declares hooks that are not React's, for the custom-hook-name cases.
 const otherModuleStub = "export declare function useMyEffect2(cb: () => void): void;\nexport declare function useEffective(cb: () => void): void;\n"
 
 type setStateInEffectCase struct {
@@ -120,45 +120,45 @@ func TestSetStateInEffectFires(test *testing.T) {
 			name:   "useInsertionEffectReports",
 			source: "import {useInsertionEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useInsertionEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n",
 		},
-		// Measured: REPORTS. Upstream keys on `binding.imported`, so the local spelling is not consulted.
+		// Measured: reports. Upstream keys on `binding.imported`, so the local spelling is not consulted.
 		// 	// This is the fixture that proves the rule resolves rather than reading the written name.
 		{
 			name:   "renamedImportStillReports",
 			source: "import {useEffect as useFx, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useFx(() => {\n    setState(1);\n  });\n  return state;\n}\n",
 		},
-		// Measured: REPORTS. The checker carries `Dispatch` through the assignment, so an alias chain needs
+		// Measured: reports. The checker carries `Dispatch` through the assignment, so an alias chain needs
 		// 	// no extra machinery here even though upstream needs its LoadLocal bookkeeping for it.
 		{
 			name:   "aliasedSetterReports",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  const aliased = setState;\n  useEffect(() => {\n    aliased(1);\n  });\n  return state;\n}\n",
 		},
-		// Measured: TWO findings. Paired with `threeCallsReportOnce` below, this pins the granularity as
+		// Measured: two findings. Paired with `threeCallsReportOnce` below, this pins the granularity as
 		// 	// per-effect rather than per-call, which is a property no single-finding fixture can show.
 		{
 			name:   "twoEffectsReportTwice",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    setState(2);\n  });\n  return state;\n}\n",
 		},
-		// Measured: REPORTS. The effect's first argument is a plain identifier rather than an inline
+		// Measured: reports. The effect's first argument is a plain identifier rather than an inline
 		// 	// function, which is the arm of upstream's switch that reads `args[0]` as an Identifier.
 		{
 			name:   "effectBodyIsAHoistedFunction",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  const body = () => {\n    setState(1);\n  };\n  useEffect(body);\n  return state;\n}\n",
 		},
-		// Measured: REPORTS. A branch on something that is NOT a ref does not exempt, which is the control
+		// Measured: reports. A branch on something that is not a ref does not exempt, which is the control
 		// 	// that gives the ref-controlled exemption its meaning.
 		{
 			name:   "setStateBehindABranchReports",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component({flag}) {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    if (flag) {\n      setState(1);\n    }\n  });\n  return state;\n}\n",
 		},
-		// KNOWN DIVERGENCE in the same direction, found by probing rather than by any fixture.
+		// A known divergence in the same direction, found by probing rather than by any fixture.
 		//
-		// A setter laundered through a custom hook is SILENT upstream, measured on this exact input with a
+		// A setter laundered through a custom hook is silent upstream, measured on this exact input with a
 		// firing control beside it. React's compiler loses its `BuiltInSetState` shape crossing the hook
 		// boundary, because a custom hook's return type comes from its own unification pass rather than
 		// from a declaration it can read.
 		//
 		// TypeScript's `Dispatch` alias survives the boundary intact, so we report. This is the clearest
-		// instance of the rule's central trade: the checker is STRONGER than upstream's inference here,
+		// instance of the rule's central trade: the checker is stronger than upstream's inference here,
 		// and being stronger is still a divergence in a port. It is a true positive by the rule's stated
 		// purpose, which is what makes it dangerous to leave unstated, since a reader comparing against
 		// upstream would call it a bug.
@@ -200,7 +200,7 @@ func TestSetStateInEffectStaysSilent(test *testing.T) {
 			name:   "refControlledBranchIsAKnownDivergence",
 			source: "import {useState, useRef, useEffect} from \"./react\";\n\nfunction Component({x, y}) {\n  const previousXRef = useRef(null);\n  const previousYRef = useRef(null);\n\n  const [data, setData] = useState(null);\n\n  useEffect(() => {\n    const previousX = previousXRef.current;\n    previousXRef.current = x;\n    const previousY = previousYRef.current;\n    previousYRef.current = y;\n    if (!areEqual(x, previousX) || !areEqual(y, previousY)) {\n      const data = load({x, y});\n      setData(data);\n    }\n  }, [x, y]);\n\n  return data;\n}\n\nfunction areEqual(a, b) {\n  return a === b;\n}\n\nfunction load({x, y}) {\n  return x * y;\n}\n",
 		},
-		// valid-setState-in-useEffect-listener.js. The setter is PASSED to setTimeout, never called in the
+		// valid-setState-in-useEffect-listener.js. The setter is passed to setTimeout, never called in the
 		// 	// body, which is the distinction the whole rule exists to draw.
 		{
 			name:   "upstreamListenerSetTimeout",
@@ -236,7 +236,7 @@ func TestSetStateInEffectStaysSilent(test *testing.T) {
 			name:   "upstreamLayoutEffectFromRef",
 			source: "import {useState, useRef, useLayoutEffect} from \"./react\";\n\nfunction Tooltip() {\n  const ref = useRef(null);\n  const [tooltipHeight, setTooltipHeight] = useState(0);\n\n  useLayoutEffect(() => {\n    const {height} = ref.current.getBoundingClientRect();\n    setTooltipHeight(height);\n  }, []);\n\n  return tooltipHeight;\n}\n",
 		},
-		// Measured: CLEAN, and this is the rule's most surprising behaviour. Moving that same declaration
+		// Measured: clean, and this is the rule's most surprising behaviour. Moving that same declaration
 		// 	// one line up, outside the effect, makes it report; see `upstreamTransitiveThroughTwoLocals`.
 		// 	// `getSetStateCall` walks the effect's own blocks and never descends into a function declared
 		// 	// inside it. A real hole rather than an exemption, reproduced rather than improved on.
@@ -244,27 +244,27 @@ func TestSetStateInEffectStaysSilent(test *testing.T) {
 			name:   "nestedFunctionInsideEffectIsNotFollowed",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    const f = () => {\n      setState(1);\n    };\n    f();\n  });\n  return state;\n}\n",
 		},
-		// Measured: CLEAN. The cleanup runs on unmount, not during the effect body, and it is a nested
+		// Measured: clean. The cleanup runs on unmount, not during the effect body, and it is a nested
 		// 	// function so the same non-descent applies.
 		{
 			name:   "setterInCleanupIsClean",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    return () => {\n      setState(1);\n    };\n  });\n  return state;\n}\n",
 		},
-		// Measured: CLEAN. `useReducer` returns `ActionDispatch`, a different alias, so the predicate
+		// Measured: clean. `useReducer` returns `ActionDispatch`, a different alias, so the predicate
 		// 	// correctly declines it. This is the fixture that proves the alias name is doing real work rather
 		// 	// than matching anything function-shaped.
 		{
 			name:   "dispatchFromUseReducerIsNotASetter",
 			source: "import {useEffect, useReducer} from \"./react\";\nfunction reducer(s: number, a: number) {\n  return s + a;\n}\nfunction Component() {\n  const [state, dispatch] = useReducer(reducer, 0);\n  useEffect(() => {\n    dispatch(1);\n  });\n  return state;\n}\n",
 		},
-		// Measured: CLEAN. `exhaustive-deps` computes isEffect as /Effect($|[^a-z])/, under which
-		// 	// `useMyEffect2` WOULD be an effect. That regex is not consulted by this rule, and this fixture is
+		// Measured: clean. `exhaustive-deps` computes isEffect as /Effect($|[^a-z])/, under which
+		// 	// `useMyEffect2` would be an effect. That regex is not consulted by this rule, and this fixture is
 		// 	// what stops a porter importing it from the neighbouring rule.
 		{
 			name:   "customHookNamedLikeAnEffectIsNotOne",
 			source: "import {useState} from \"./react\";\nimport {useMyEffect2} from \"./other\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useMyEffect2(() => {\n    setState(1);\n  });\n  return state;\n}\n",
 		},
-		// Measured: CLEAN. Only the FIRST argument is read, so a setter anywhere else is not a callback.
+		// Measured: clean. Only the first argument is read, so a setter anywhere else is not a callback.
 		{
 			name:   "setterAsSecondArgumentIsClean",
 			source: "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {}, setState);\n  return state;\n}\n",
@@ -285,7 +285,7 @@ func TestSetStateInEffectStaysSilent(test *testing.T) {
 	}
 }
 
-// TestSetStateInEffectPointsAtTheSetterCall asserts WHERE the finding lands, which no message-id
+// TestSetStateInEffectPointsAtTheSetterCall asserts where the finding lands, which no message-id
 // fixture can see.
 //
 // Upstream carries two spans: a primary on the setter reading "Avoid calling setState() directly
@@ -293,7 +293,7 @@ func TestSetStateInEffectStaysSilent(test *testing.T) {
 // Our Diagnostic has one Range, so the primary is kept where upstream puts it. oxc's snapshot for
 // its single fail case underlines `setState` at 6:5, eight characters, which is what this pins.
 //
-// The expectation is sliced from the source the HARNESS wrote rather than from the Go literal.
+// The expectation is sliced from the source the harness wrote rather than from the Go literal.
 // `rule_testing.RunTypedFiles` writes `strings.TrimSpace(contents)+"\n"`, so a fixture carrying a
 // leading newline sits one byte off from its literal, and an assertion built by slicing the literal
 // reports a span shifted by one while the rule is correct. That is a documented trap in this
@@ -318,13 +318,13 @@ func TestSetStateInEffectPointsAtTheSetterCall(test *testing.T) {
 			source:   "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  const aliased = setState;\n  useEffect(() => {\n    aliased(1);\n  });\n  return state;\n}\n",
 			wantText: "aliased",
 		},
-		// The transitive case reports at the call INSIDE THE EFFECT, not at the setter inside the
+		// The transitive case reports at the call inside the effect, not at the setter inside the
 		// helper. Measured against React 7.1.1: the finding underlines `f` at 8:5, seven lines
 		// after the `setState` it eventually reaches.
 		//
 		// This expectation was written the other way round first, from reading upstream's
 		// `getSetStateCall` and seeing it return the setter's callee. That reading was wrong about
-		// WHICH invocation of that function produces the reported value, and only running React on
+		// which invocation of that function produces the reported value, and only running React on
 		// the input settled it. The rule was wrong in the same direction, so code and fixture
 		// agreed with each other and disagreed with upstream, which is the failure a span
 		// assertion exists to catch.
@@ -404,7 +404,7 @@ func TestSetStateInEffectMessage(test *testing.T) {
 //
 // The port brief's measured warning: on this shim `GetSymbolAtLocation` and `GetTypeAtLocation`
 // return nil on a nil checker rather than crashing, so a typed rule missing its guard buys a
-// VACUOUS GREEN rather than an obvious panic, and every silent fixture passes for the wrong reason.
+// vacuous green rather than an obvious panic, and every silent fixture passes for the wrong reason.
 // This asserts the untyped harness produces nothing, so a later revert to `rule_testing.Run` fails
 // loudly here instead of quietly everywhere.
 func TestSetStateInEffectRequiresTheTypedHarness(test *testing.T) {
@@ -419,7 +419,7 @@ func TestSetStateInEffectRequiresTheTypedHarness(test *testing.T) {
 // Upstream proceeds only when `args[0].kind === 'Identifier'`, which excludes a spread, and the
 // spread guard here reproduces that. Measured against React on both inputs below: silent.
 //
-// This exists because a mutation deleting `|| args[0].Spread` SURVIVED the whole imported corpus,
+// This exists because a mutation deleting `|| args[0].Spread` survived the whole imported corpus,
 // which writes no spread anywhere. Before writing it, the question asked was whether the branch is
 // reachable at all or merely crash protection, since `Argument.Place` is a real Place even for a
 // spread and nothing would panic. It is reachable and it is a real judgment: without the guard,
@@ -431,7 +431,7 @@ func TestSetStateInEffectSpreadArgument(test *testing.T) {
 	// A bare spread of an unknown array. Upstream silent, and the guard is what makes us silent.
 	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\nfunction Component({args}: {args: [() => void]}) {\n  const [state, setState] = useState(0);\n  useEffect(...args);\n  return state;\n}\n"))
 
-	// A spread of an array literal holding a callback that DOES call a setter. This is the input
+	// A spread of an array literal holding a callback that does call a setter. This is the input
 	// that separates the two versions: the callback is a real setter-calling closure, so without
 	// the spread guard the first argument reads as one.
 	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  const args: [() => void] = [() => { setState(1); }];\n  useEffect(...args);\n  return state;\n}\n"))
@@ -439,7 +439,7 @@ func TestSetStateInEffectSpreadArgument(test *testing.T) {
 
 // TestSetStateInEffectDescendsIntoNestedFunctions pins the walk over `Function.Functions`.
 //
-// A component or hook written INSIDE another function is lowered into its parent's arena rather
+// A component or hook written inside another function is lowered into its parent's arena rather
 // than visited by `forEachCompiledFunction`, which stops at the outermost function-like node on
 // each branch. Without the recursion at the end of `reportSetStateInEffects`, an effect written in
 // such a nested function is never analysed at all, and a mutation deleting that loop survived the
@@ -467,10 +467,10 @@ func TestSetStateInEffectDescendsIntoNestedFunctions(test *testing.T) {
 // survived the imported corpus, because every fail case there closes over a setter and every pass
 // case either has no effect or no setter at all.
 //
-// The distinguishing input is an effect whose callback calls something that is NOT a setter. With
+// The distinguishing input is an effect whose callback calls something that is not a setter. With
 // the gate, the callback is never scanned; without it, the callback is scanned and declines on the
-// type test instead. Both reach silence, so this fixture pins the OBSERVABLE behaviour rather than
-// the path — and the path is what the gate is for, since scanning every callback in the tree is the
+// type test instead. Both reach silence, so this fixture pins the observable behaviour rather than
+// the path, and the path is what the gate is for, since scanning every callback in the tree is the
 // cost the gate exists to avoid. Measured against React: silent.
 func TestSetStateInEffectDeclinesACallbackClosingOverNoSetter(test *testing.T) {
 	test.Parallel()

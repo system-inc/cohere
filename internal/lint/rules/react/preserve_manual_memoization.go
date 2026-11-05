@@ -82,16 +82,16 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // # One anchor per declaration rather than per use, which is a bounded substrate gap
 //
 // When several memo blocks in one function name the same value, upstream reports one finding per
-// block at the block's own column, and this rule reports the same NUMBER of findings collapsed onto
-// FEWER distinct columns. Measured against the installed rule on two `useCallback` blocks sharing
+// block at the block's own column, and this rule reports the same number of findings collapsed onto
+// fewer distinct columns. Measured against the installed rule on two `useCallback` blocks sharing
 // one mutated dependency: upstream gives four findings at 6:25, 6:37, 7:25 and 7:37, and this rule
-// gives the same four at THREE anchors. The two callbacks keep their own anchors because they are
+// gives the same four at three anchors. The two callbacks keep their own anchors because they are
 // distinct syntax; only the shared dependency collapses, because both blocks name one
 // declaration.
 //
 // The count is faithful and the anchor is not, and the cause is one field. Upstream's `loc` comes
-// from the operand's own `Place`, which is a per-USE record; a `PreserveManualMemoizationFinding`
-// carries an `IdentifierId`, which names the DECLARATION, so the per-use span is discarded before
+// from the operand's own `Place`, which is a per-use record; a `PreserveManualMemoizationFinding`
+// carries an `IdentifierId`, which names the declaration, so the per-use span is discarded before
 // the finding is built even though `Place.Range` carries it. Closing it means adding a range to the
 // finding at both report sites in
 // `internal/lint/ecmascript/high_level_intermediate_representation/preserve_manual_memoization.go`, which
@@ -147,11 +147,11 @@ var PreserveManualMemoization = rule.Rule{
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// Declined once per file rather than once per node. `NeedsTypeChecker` governs the
-		// REGISTRATION path and says nothing about the harness path, where a context is built by
+		// registration path and says nothing about the harness path, where a context is built by
 		// hand with no checker at all, so the declaration is not the guard.
 		//
 		// What this guard is worth was measured rather than assumed, because a mutation
-		// neutralizing it SURVIVES the fixture set and that survival is honest. Handed a nil
+		// neutralizing it survives the fixture set and that survival is honest. Handed a nil
 		// checker the pipeline does not panic: `Lower` returns a function, `Construct` runs, and
 		// the analysis completes reporting zero. So the verdict is silence either way, and no
 		// fixture can separate the two. The guard is a cost decline, not a correctness one -- it
@@ -200,7 +200,7 @@ var PreserveManualMemoization = rule.Rule{
 						identifier := function.Identifier(finding.Identifier)
 						if identifier == nil || identifier.Node == nil {
 							// Crash protection rather than a filter, which is worth stating because
-							// a mutation removing this guard SURVIVES the whole fixture set and
+							// a mutation removing this guard survives the whole fixture set and
 							// reads as a blind spot.
 							//
 							// Measured over all 395 vendored corpus fixtures: 48 findings, zero
@@ -209,7 +209,7 @@ var PreserveManualMemoization = rule.Rule{
 							// prevents is a panic, which no `ExpectFindings` fixture can see:
 							// `rule.TokenRange` reads `node.Loc` inside its own nil branch
 							// (`internal/rule/rule.go:452`), so a nil node handed to `ReportNode`
-							// takes the walk down. The walk recovers per FILE rather than per rule,
+							// takes the walk down. The walk recovers per file rather than per rule,
 							// so that costs every rule its verdict on the file, not just this one.
 							//
 							// It is reachable in principle rather than merely defensive: the memo

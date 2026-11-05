@@ -31,7 +31,7 @@ func DefaultPreferStatelessFunctionOptions() PreferStatelessFunctionOptions {
 
 // DecodePreferStatelessFunctionOptions is hand-rolled rather than `rule.DecodeOptionsInto`.
 //
-// The generic decoder ERRORS on empty input, and a rule configured as a bare `"error"` is handed
+// The generic decoder errors on empty input, and a rule configured as a bare `"error"` is handed
 // nil options. Answering the documented default explicitly makes the unconfigured path a decision
 // rather than a coincidence, which is the failure the port brief records costing a rule 3,407 inert
 // registrations.
@@ -85,22 +85,22 @@ var messagePreferStatelessFunction = rule.Message{
 //	class Foo extends Bar { render() { return <div/>; } }                       SILENT   wrong base
 //
 // So the port anchors directly on the two shapes that can report and asks the questions upstream's
-// registry would have answered. That is fidelity to the DECISION rather than to the mechanism, and
+// registry would have answered. That is fidelity to the decision rather than to the mechanism, and
 // it is why this rule is a few hundred lines instead of a substrate build. A sibling rule
 // (`no-set-state`) genuinely needs the function half and is correctly not ported yet.
 //
 // # What upstream calls "other properties", which is an exemption list rather than a check
 //
-// `hasOtherProperties` walks every member and asks whether any is something OTHER than the five
+// `hasOtherProperties` walks every member and asks whether any is something other than the five
 // React reads as configuration. If one is, the class is doing something a function cannot, and the
-// rule stays silent. So the five names below are the ALLOWED set and everything else exempts:
+// rule stays silent. So the five names below are the allowed set and everything else exempts:
 //
 //	displayName          contextTypes         defaultProps
 //	propTypes  (and a `props` member carrying a type annotation)
 //	render
 //	a constructor whose body is a redundant super call
 //
-// Measured, and the getter spellings matter because upstream reads a property NAME rather than a
+// Measured, and the getter spellings matter because upstream reads a property name rather than a
 // member kind, so `static get displayName()` and `static displayName =` are the same name:
 //
 //	static displayName = 'Foo';       REPORTS   allowed member
@@ -133,9 +133,9 @@ var messagePreferStatelessFunction = rule.Message{
 //	let {props:{foo}, bar} = this;           SILENT    `bar` is a name other than props/context
 //	let {props:{foo}, context:{bar}} = this; REPORTS   both names are exempt
 //
-// # childContextTypes is asked about the OTHER side of a member access
+// # childContextTypes is asked about the other side of a member access
 //
-// Upstream's `MemberExpression` handler has a second branch for a receiver that is NOT `this`: if
+// Upstream's `MemberExpression` handler has a second branch for a receiver that is not `this`: if
 // the property is named `childContextTypes`, it resolves which component the receiver names and
 // marks that component. This is upstream reaching for `Foo.childContextTypes = {}` written outside
 // the class body, which is how the legacy child-context API was declared.
@@ -148,20 +148,20 @@ var messagePreferStatelessFunction = rule.Message{
 //	class Foo ... }  Foo.somethingElse = {};           REPORTS   wrong property
 //	class Foo ... }  const x = y.childContextTypes;    REPORTS   wrong receiver
 //
-// So the question is whether the receiver names THIS component, which for a named class is a
+// So the question is whether the receiver names this same component, which for a named class is a
 // comparison against its own name rather than a resolution. Reproduced that way. The narrowing is
 // stated because it is real: an aliased receiver (`const Alias = Foo; Alias.childContextTypes = {}`)
 // resolves upstream and is silent, and is a false positive here. Measured zero occurrences of
 // `childContextTypes` anywhere in this tree, against controls of 146 files for `useEffect` and 1,129
 // for `className`, so nothing exercises even the faithful branch today.
 //
-// A `childContextTypes` member written INSIDE the class body is a separate path and is handled by
+// A `childContextTypes` member written inside the class body is a separate path and is handled by
 // the allowed-member list above, which does not contain it.
 //
 // # ignorePureComponents, and why it is not the same question as no-redundant-should-component-update
 //
 // The option exempts a class extending PureComponent. `react.IsEs6ComponentClass` accepts Component
-// and PureComponent alike and is therefore the wrong predicate for the option, while being the RIGHT
+// and PureComponent alike and is therefore the wrong predicate for the option, while being the right
 // predicate for the outer gate. Both are used here, for their two different questions.
 var PreferStatelessFunction = rule.Rule{
 	Name: "react/prefer-stateless-function",
@@ -304,11 +304,11 @@ func preferStatelessFunctionUnwrapParentheses(node *ast.Node) *ast.Node {
 // string for those is the same decision reached the same way.
 //
 // A string-literal key is read too, because upstream's `this` handler falls back to
-// `property.value`, and `this['props']` is measured REPORTING while `this['bar']` is silent. The
+// `property.value`, and `this['props']` is measured reporting while `this['bar']` is silent. The
 // member path and the `this` path share this reader so the two agree.
 //
 // **`Text()` is never called on an arbitrary name node.** It panics on a ComputedPropertyName, and
-// the walk recovers per FILE rather than per rule, so one computed member would cost every rule in
+// the walk recovers per file rather than per rule, so one computed member would cost every rule in
 // this package every finding in that file.
 func preferStatelessFunctionMemberName(nameNode *ast.Node) string {
 	if nameNode == nil {
@@ -324,9 +324,9 @@ func preferStatelessFunctionMemberName(nameNode *ast.Node) string {
 // preferStatelessFunctionIsAllowedMember reports whether a member is one React reads as
 // configuration.
 //
-// This is upstream's `hasOtherProperties` inverted: it asks whether ANY member is something other
+// This is upstream's `hasOtherProperties` inverted: it asks whether any member is something other
 // than these, and stays silent if so. So this list is the allowed set and anything outside it
-// exempts the component. Read by NAME rather than by member kind, which is why a getter and a static
+// exempts the component. Read by name rather than by member kind, which is why a getter and a static
 // field with the same name are the same answer, measured on the installed build.
 func preferStatelessFunctionIsAllowedMember(member *ast.Node) bool {
 	if member == nil {
@@ -447,7 +447,7 @@ func preferStatelessFunctionIsRedundantConstructor(member *ast.Node) bool {
 
 // preferStatelessFunctionExtendsPureComponent reports whether a class extends a PureComponent base.
 //
-// Deliberately NOT `react.IsEs6ComponentClass`, which accepts Component and PureComponent alike and
+// Deliberately not `react.IsEs6ComponentClass`, which accepts Component and PureComponent alike and
 // would make `ignorePureComponents` exempt every class component. The two predicates answer
 // different questions and both are used in this rule.
 //
@@ -544,7 +544,7 @@ func preferStatelessFunctionFileUsesRef(sourceFile *ast.Node) bool {
 //
 // A member access on `this` is exempt only when the property reads as `props` or `context`.
 // Upstream reads `node.property.name || node.property.value`, so an identifier and a string
-// subscript both answer, while a computed key answers undefined and therefore is NOT exempt.
+// subscript both answer, while a computed key answers undefined and therefore is not exempt.
 // Measured, and the last line is the one nobody would guess:
 //
 //	this.props.foo       exempt
@@ -553,7 +553,7 @@ func preferStatelessFunctionFileUsesRef(sourceFile *ast.Node) bool {
 //	this['bar']          a real use of this
 //	this[bar]            a real use of this, because the name cannot be read
 //
-// A destructuring of `this` is exempt only when EVERY bound name is props or context. Upstream's
+// A destructuring of `this` is exempt only when every bound name is props or context. Upstream's
 // `some` asks whether any name is neither, so one stray name disqualifies the whole pattern:
 //
 //	let {props:{foo}, context:{bar}} = this;   exempt
@@ -604,7 +604,7 @@ func preferStatelessFunctionUsesThis(component *ast.Node) bool {
 					continue
 				}
 				binding := element.AsBindingElement()
-				// The PROPERTY name is what upstream reads, not the local binding, so
+				// The property name is what upstream reads, not the local binding, so
 				// `{props: {foo}}` reads as `props` rather than `foo`.
 				readable := binding.PropertyName
 				if readable == nil {
@@ -645,7 +645,7 @@ func preferStatelessFunctionIsPropsOrContext(name string) bool {
 //	render() { return 42; }                    SILENT    neither JSX nor null
 //
 // The conditional is upstream's `isReturningJSX` with `strict` false, which accepts a conditional
-// when EITHER branch is JSX. The strict form is only used when null is disallowed, which this tree's
+// when either branch is JSX. The strict form is only used when null is disallowed, which this tree's
 // React version never selects.
 func preferStatelessFunctionHasInvalidRender(component *ast.Node) bool {
 	invalid := false

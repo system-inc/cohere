@@ -56,7 +56,11 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 	test.Helper()
 	table := NewTable(system)
 
-	var agreed, bothDeclined, tableSilent, inventedOnRegistry, inventedOnProbe int
+	var agreed int
+	var bothDeclined int
+	var tableSilent int
+	var inventedOnRegistry int
+	var inventedOnProbe int
 	var disagreements []string
 
 	for _, testCase := range fixture.Cases {
@@ -184,7 +188,7 @@ func loadWave3Fixture(test *testing.T, name string) wave3Fixture {
 // of the contract. Reversing it to shortest-first changes no answer, in wave 3 or in the full
 // differential, and this is the measurement behind that rather than a shrug.
 //
-// The order is observable only when a key belongs to two namespaces AND some root consumes both. The
+// The order is observable only when a key belongs to two namespaces and some root consumes both. The
 // second half nearly holds: `font` consumes `--font-weight` and `--font`, the only such root of the
 // 84 namespaces here. The first half does not. `bold` and `medium` are keys of `--font-weight`
 // alone, `sans` of `--font` alone, so the loop's membership guard admits exactly one namespace per

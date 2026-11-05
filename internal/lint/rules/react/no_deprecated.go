@@ -10,6 +10,21 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// defaultPragma is the pragma a file has when no comment names another, which is nearly every file.
+const defaultPragma = "React"
+
+// defaultPragmaDeprecations is the table for the default pragma, built once rather than per file.
+// Rebuilding it was most of this rule's time: 230ms of 296ms over ahra's 3,787 files. It is only
+// read, so every file's walk can share it.
+var defaultPragmaDeprecations = deprecationsForPragma(defaultPragma)
+
+// noDeprecatedMessageId is the single id this rule reports under.
+//
+// Upstream has one `messages` entry and interpolates four slots into it. The id is therefore not
+// enough to tell two findings apart, which is why the fixtures for this rule assert the rendered
+// Description rather than only the id: a mutation moving a slot leaves the id and the count fixed.
+const noDeprecatedMessageId = "deprecated"
+
 // NoDeprecated flags a React API that React itself has deprecated.
 //
 //	valid:   React.createElement('p', {}, null)
@@ -46,7 +61,7 @@ import (
 //
 // So the `since` version survives here only as the number the message prints. It decides nothing.
 //
-// # The member arm matches SOURCE TEXT, not a resolved path, and that is load-bearing
+// # The member arm matches source text, not a resolved path, and that is load-bearing
 //
 // Upstream's `MemberExpression` listener calls `checkDeprecation(node, getText(context, node))`,
 // which is the member expression's own source slice. A map lookup on that string is not the same
@@ -66,13 +81,13 @@ import (
 // whitespace or trivia a future file happens to contain.
 //
 // The nesting consequence is the same mechanism read forward. `React.PropTypes.component` reports
-// TWICE, because the listener fires on the outer member and again on the inner `React.PropTypes`,
+// twice, because the listener fires on the outer member and again on the inner `React.PropTypes`,
 // and both slices are keys in the map. That is upstream's behavior, measured, and it is why the
 // walk here visits every property access rather than only the outermost.
 //
 // # The pragma, which renames React for the whole file
 //
-// `pragmaUtil.getFromContext` scans EVERY comment in the file for `@jsx <name>`, takes the part
+// `pragmaUtil.getFromContext` scans every comment in the file for `@jsx <name>`, takes the part
 // before the first dot, and uses it in place of `React`. Four things about it were measured because
 // the source leaves each ambiguous:
 //
@@ -100,11 +115,11 @@ import (
 // Both measured. Neither is in the corpus. A port reading the key's text through a helper that
 // cooks a string literal would report both and look more correct while diverging.
 //
-// What does NOT decline is anything about the member's kind. A getter, a static, and a class field
-// holding a non-function all report, measured, so this arm tests the NAME and nothing else.
+// What does not decline is anything about the member's kind. A getter, a static, and a class field
+// holding a non-function all report, measured, so this arm tests the name and nothing else.
 //
 // And the ES5 factory name here is `createReactClass` alone, from `getCreateClassFromContext`'s
-// default. `React.createClass({componentWillMount(){}})` therefore reports ONE finding, for the
+// default. `React.createClass({componentWillMount(){}})` therefore reports one finding, for the
 // member expression `React.createClass`, and not the lifecycle method inside it. Measured; it is
 // the case where the two arms most look like they should agree and do not.
 //
@@ -185,13 +200,6 @@ var NoDeprecated = rule.Rule{
 	},
 }
 
-// noDeprecatedMessageId is the single id this rule reports under.
-//
-// Upstream has one `messages` entry and interpolates four slots into it. The id is therefore not
-// enough to tell two findings apart, which is why the fixtures for this rule assert the rendered
-// Description rather than only the id: a mutation moving a slot leaves the id and the count fixed.
-const noDeprecatedMessageId = "deprecated"
-
 // deprecation is one row of upstream's table.
 //
 // `since` is printed and decides nothing, for the reason in the rule's doc comment. `replacement`
@@ -244,14 +252,6 @@ const (
 // The rows and their order are upstream's, from `getDeprecated` at `no-deprecated.js:34`. The three
 // entries whose key does not begin with the pragma (`this.transferPropsTo`, and the `ReactPerf` and
 // `Perf` pairs) are upstream's too: those names are fixed and the pragma does not reach them.
-// defaultPragma is the pragma a file has when no comment names another, which is nearly every file.
-const defaultPragma = "React"
-
-// defaultPragmaDeprecations is the table for the default pragma, built once rather than per file.
-// Rebuilding it was most of this rule's time: 230ms of 296ms over ahra's 3,787 files. It is only
-// read, so every file's walk can share it.
-var defaultPragmaDeprecations = deprecationsForPragma(defaultPragma)
-
 func deprecationsForPragma(pragma string) map[string]deprecation {
 	return map[string]deprecation{
 		// 0.12.0
@@ -321,13 +321,13 @@ func deprecationsForPragma(pragma string) map[string]deprecation {
 
 // deprecatedModules maps an import specifier to the object name its exports are deprecated under.
 //
-// Upstream's `MODULES` maps each module to a LIST of names and then uses only `[0]`, everywhere it
+// Upstream's `MODULES` maps each module to a list of names and then uses only `[0]`, everywhere it
 // is read. `react-addons-perf` is the one entry whose list has two, and its second name (`Perf`) is
 // never reached by any code path: the import arm takes `[0]`, and `getReactModuleName`'s
 // `arguments[0].value` branch also takes `[0]`. Verified by reading both call sites and by driving
 // `import { printDOM } from 'react-addons-perf'`, which reports as `ReactPerf.printDOM` and never as
 // `Perf.printDOM`. So one name per module here rather than a list, with the discarded name recorded
-// in `perfIdentifierNames` below, where it IS reachable.
+// in `perfIdentifierNames` below, where it is reachable.
 var deprecatedModules = map[string]string{
 	"react":             "React",
 	"react-addons-perf": "ReactPerf",
@@ -351,7 +351,7 @@ var moduleNamesByIdentifier = map[string]string{
 
 // reactPragmaFor reads the `@jsx` annotation out of the file's comments, or answers React.
 //
-// Upstream's regular expression is `/@jsx\s+([^\s]+)/` applied to the comment's VALUE, which is its
+// Upstream's regular expression is `/@jsx\s+([^\s]+)/` applied to the comment's value, which is its
 // text with the delimiters stripped, and it takes the first comment in the file that matches at all
 // rather than the first well-formed one. Both details are reproduced: the scan is over every
 // comment in source order, and the captured token is cut at its first dot.
@@ -387,12 +387,12 @@ func commentValueOf(comment comments.Comment) string {
 		text = strings.TrimPrefix(text, "/*")
 		return strings.TrimSuffix(text, "*/")
 	}
-	// The `//` strip is EQUIVALENT under the current `jsxAnnotationIn` and is kept anyway.
+	// The `//` strip is equivalent under the current `jsxAnnotationIn` and is kept anyway.
 	//
 	// Measured: a mutant replacing this line with a bare `return text` survives the whole fixture
 	// set, and its inverse (returning the empty string) is caught by five lines, so the arm is
 	// reached and the fixtures can see it. The reason no input distinguishes the two is mechanical:
-	// `jsxAnnotationIn` searches for `@jsx` at any offset and reads the name from what FOLLOWS it,
+	// `jsxAnnotationIn` searches for `@jsx` at any offset and reads the name from what follows it,
 	// so a `//` sitting before the marker can never land inside a captured name. The `*/` on the
 	// block arm can, which is why that one has a fixture and this one has this paragraph.
 	//
@@ -491,7 +491,7 @@ func deprecatedModuleAlias(node *ast.Node) (string, bool) {
 // default import and a namespace import both lack it. Both are therefore silent, measured, and the
 // kind check below is how that filter is spelled here.
 //
-// The name visited is the IMPORTED one rather than the local alias, which is upstream's
+// The name visited is the imported one rather than the local alias, which is upstream's
 // `specifier.imported.name`. `import { createClass as cc }` reports as `React.createClass`, and the
 // span is the whole specifier including the alias. Measured; the corpus writes no alias.
 func forEachNamedImportSpecifier(node *ast.Node, visit func(specifier *ast.Node, importedName string)) {
@@ -502,7 +502,7 @@ func forEachNamedImportSpecifier(node *ast.Node, visit func(specifier *ast.Node,
 			continue
 		}
 		specifier := element.AsImportSpecifier()
-		// `PropertyName` is set only when an alias is written; without one the local name IS the
+		// `PropertyName` is set only when an alias is written; without one the local name is the
 		// imported name. Reading only `Name()` would report the alias, which upstream does not do.
 		nameNode := specifier.PropertyName
 		if nameNode == nil {
@@ -518,7 +518,7 @@ func forEachNamedImportSpecifier(node *ast.Node, visit func(specifier *ast.Node,
 // destructuredReactModuleName answers the object name a destructuring binding's keys belong to.
 //
 // Upstream's `VariableDeclarator` arm accepts two initializers, and its guard is a pair of
-// conjunctions that reduce to: the binding must be an object pattern, AND either the initializer is
+// conjunctions that reduce to: the binding must be an object pattern, and either the initializer is
 // a bare identifier naming a known module, or it is a `require(...)` of a known module specifier.
 //
 // The `pragma` parameter reproduces the fallback in upstream's report call,
@@ -571,7 +571,7 @@ func destructuredReactModuleName(node *ast.Node, pragma string) (string, bool) {
 // forEachDestructuredProperty visits each `{ key }` or `{ key: local }` element of an object pattern.
 //
 // Upstream filters `p.type !== 'RestElement' && p.key`, so a rest element is skipped and so is
-// anything with no key. The name read is `property.key.name`, an IDENTIFIER key, so a computed key
+// anything with no key. The name read is `property.key.name`, an identifier key, so a computed key
 // is silent: `var {['createClass']: c} = require('react')` reports nothing upstream, measured. The
 // span is the whole property, which is why the element is what gets visited rather than its key.
 func forEachDestructuredProperty(node *ast.Node, visit func(property *ast.Node, key string)) {
@@ -622,13 +622,21 @@ func reportLifeCycleMethods(report func(node *ast.Node, name string)) func(node 
 	}
 }
 
+// createReactClassFactoryName is `getCreateClassFromContext`'s default and the only reachable value.
+//
+// `settings.react.createClass` would override it and cohere reads no React settings, so this is
+// the answer for every file. Named rather than inlined because it appears in the doc comment below
+// as a measured divergence from the shelf helper, and a reader checking that claim should find one
+// spelling.
+const createReactClassFactoryName = "createReactClass"
+
 // isDeprecatedEs5Component reports whether an object literal is the argument to createReactClass.
 //
 // Upstream's `isES5Component` looks at `node.parent.callee`, so the object literal is a component
 // only when it sits directly in a call. The factory name is `getCreateClassFromContext`'s default,
 // `createReactClass`, and the namespaced form requires the pragma as its object.
 //
-// The shelf's `react.IsEs5ComponentCall` is NOT used here and the difference is measured: it
+// The shelf's `react.IsEs5ComponentCall` is not used here and the difference is measured: it
 // accepts `createClass` as well as `createReactClass`, and upstream accepts only the latter for
 // this question. `var F = createClass({componentWillMount(){}})` is silent on the installed build
 // and would report through the shelf helper. Its own doc comment records that widening as
@@ -666,14 +674,6 @@ func isDeprecatedEs5Component(node *ast.Node) bool {
 	return false
 }
 
-// createReactClassFactoryName is `getCreateClassFromContext`'s default and the only reachable value.
-//
-// `settings.react.createClass` would override it and cohere reads no React settings, so this is
-// the answer for every file. Named rather than inlined because it appears in the doc comment above
-// as a measured divergence from the shelf helper, and a reader checking that claim should find one
-// spelling.
-const createReactClassFactoryName = "createReactClass"
-
 // isDeprecatedEs6Component reports whether a class extends a React component base.
 //
 // This reproduces upstream's `isES6Component` minus its JSDoc branch, which is recorded as
@@ -681,7 +681,7 @@ const createReactClassFactoryName = "createReactClass"
 //
 // **`react.IsEs6ComponentClass` is not used, and the reason is a paren difference in the opposite
 // direction from the one its doc comment describes.** That helper skips parentheses on the
-// RECEIVER (`(React).Component`) and not on the heritage expression as a whole, so
+// receiver (`(React).Component`) and not on the heritage expression as a whole, so
 // `class F extends (React.Component)` answers false there. Upstream reports it, because espree
 // produces no parenthesized node and `node.superClass` is the bare member expression however the
 // parens are written. All four spellings were measured on the installed build and all four report:
@@ -770,7 +770,7 @@ func isDeprecatedComponentBaseName(name string) bool {
 // identifier and on nothing else, which is why a computed key and a string-literal key are both
 // silent upstream. Both were measured and neither is in the corpus.
 //
-// Nothing here filters on what the member IS. A getter, a static method, and a class field holding
+// Nothing here filters on what the member is. A getter, a static method, and a class field holding
 // a number all report on the installed build, so this arm tests the name and only the name.
 func forEachComponentMemberName(node *ast.Node, visit func(nameNode *ast.Node, name string)) {
 	var members *ast.NodeList

@@ -218,7 +218,7 @@ var messageUseMemoCallbackReassignsOuterVariable = rule.Message{
 // lowercased, which `isKnownReactModule` in this package already answers and which oxc's
 // `is_known_react_module` matches exactly.
 //
-// **The module test applies to the CALLEE only, never to the receiver**, which is not symmetric and
+// **The module test applies to the callee only, never to the receiver**, which is not symmetric and
 // is easy to get backwards. The receiver is recognized in `collectTemporaries` by a bare
 // `binding.name === 'React'` with no module component at all, so `import React from 'preact/compat'`
 // followed by `React.useMemo(...)` reports. That was measured after a surviving mutant contradicted
@@ -390,7 +390,7 @@ func manualMemoKind(ruleContext rule.Context, callee *ast.Node) (manualMemoKindV
 		if object == nil || object.Kind != ast.KindIdentifier {
 			return 0, false
 		}
-		// The receiver is keyed on the LOCAL name being `React`, for a global and for a default or
+		// The receiver is keyed on the local name being `React`, for a global and for a default or
 		// namespace import alike. Measured: `import Rct from 'react'` then `Rct.useMemo(...)` is
 		// silent, because upstream's `ImportDefault` arm looks up `binding.name`.
 		name, resolved := reactModuleLocalName(ruleContext, object)
@@ -433,7 +433,7 @@ func reactModuleBindingName(ruleContext rule.Context, identifier *ast.Node) (str
 	if specifier == nil {
 		// Declared in source and not by an import, so a local binding shadows the global.
 		//
-		// This guard is SUBSUMED by the module lookup below and is kept for what it says rather
+		// This guard is subsumed by the module lookup below and is kept for what it says rather
 		// than for what it decides. Measured: a mutation neutralizing it to `specifier == nil &&
 		// false` survives the whole fixture set, and a hunt for a distinguishing input over seven
 		// shapes that reach this line, a local const, a module const, a function declaration, a
@@ -455,7 +455,7 @@ func reactModuleBindingName(ruleContext rule.Context, identifier *ast.Node) (str
 }
 
 // reactModuleLocalName answers the same question for a member-expression receiver, where upstream
-// keys on the LOCAL name rather than the imported one.
+// keys on the local name rather than the imported one.
 //
 // A true global answers its own text, and so does a default or namespace import, **whatever module
 // it came from**. A named import is not a receiver shape upstream recognizes and answers nothing,
@@ -811,7 +811,7 @@ func reportOuterReassignments(ruleContext rule.Context, callback *ast.Node) {
 // element-write cases measured silent. A target resolving to no symbol is a true global, also
 // measured silent. A target whose declarations all sit inside the callback is a local and is fine.
 func reportIfOuterBinding(ruleContext rule.Context, callback *ast.Node, target *ast.Node) {
-	// The identifier test is SUBSUMED by the symbol lookup below, established rather than assumed.
+	// The identifier test is subsumed by the symbol lookup below, established rather than assumed.
 	// Measured: a mutation dropping it to `target == nil` survives the whole fixture set, and a
 	// hunt over nine assignment-target shapes chosen to reach it produced an identical verdict on
 	// every one with and without the test. A property write, an element write in both spellings, a

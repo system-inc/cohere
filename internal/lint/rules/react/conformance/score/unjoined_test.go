@@ -7,15 +7,15 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/react/conformance"
 )
 
-// TestUnjoinedMessageIdsAreEnumerated measures what the message join DROPS.
+// TestUnjoinedMessageIdsAreEnumerated measures what the message join drops.
 //
 // `Analyze` skips a finding whose message id is not in the rule's table, which is the right default
-// — a wrong join manufactures a confident false failure — but it is silent, and silence about
+// (a wrong join manufactures a confident false failure), but it is silent, and silence about
 // dropped findings is exactly what this harness exists to refuse. A rule could find the right thing
 // under an unjoined id and score as a miss, and nothing would say so.
 //
 // This enumerates the drops instead. It exists because a mutation making unjoined ids map to a
-// default message SURVIVED the whole suite: nothing could see the join's behaviour on an id outside
+// default message survived the whole suite: nothing could see the join's behaviour on an id outside
 // the table, in either direction.
 func TestUnjoinedMessageIdsAreEnumerated(test *testing.T) {
 	test.Parallel()
@@ -27,13 +27,13 @@ func TestUnjoinedMessageIdsAreEnumerated(test *testing.T) {
 		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
-	// The ids the join is EXPECTED to carry, written as literals rather than read from
+	// The ids the join is expected to carry, written as literals rather than read from
 	// `Rules[...].Messages`.
 	//
 	// This is the whole reason this test works. The first version compared each observed id against
-	// the live table, so deleting an entry removed it from the join AND from the comparison at the
+	// the live table, so deleting an entry removed it from the join and from the comparison at the
 	// same time and the two always agreed: a control mutation dropping a real, exercised entry
-	// SURVIVED twice. Both sides moved together, which reads exactly like a correct join. Assert
+	// survived twice. Both sides moved together, which reads exactly like a correct join. Assert
 	// against a literal you typed, never against the constant the code under test reports with.
 	joinedIds := map[string]bool{
 		"globals :: globalReassignment":                     true,

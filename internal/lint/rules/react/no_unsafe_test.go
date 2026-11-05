@@ -49,11 +49,11 @@ func TestNoUnsafeFires(test *testing.T) {
 		{"unprefixed lifecycle properties on a createReactClass component under checkAliases", "\n\t\t\t        const Foo = createReactClass({\n\t\t\t          componentWillMount: function() {},\n\t\t\t          componentWillReceiveProps: function() {},\n\t\t\t          componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", true, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
 		{"prefixed lifecycle methods on a class component", "\n\t\t\t        class Foo extends React.Component {\n\t\t\t          UNSAFE_componentWillMount() {}\n\t\t\t          UNSAFE_componentWillReceiveProps() {}\n\t\t\t          UNSAFE_componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ", false, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
 		{"prefixed lifecycle properties on a createReactClass component", "\n\t\t\t        const Foo = createReactClass({\n\t\t\t          UNSAFE_componentWillMount: function() {},\n\t\t\t          UNSAFE_componentWillReceiveProps: function() {},\n\t\t\t          UNSAFE_componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", false, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
-		// The two cases below are upstream PASS cases recorded here as reporting, deliberately.
+		// The two cases below are upstream pass cases recorded here as reporting, deliberately.
 		//
 		// Each is clean upstream only because its tester block configures
 		// `settings.react.version = "16.2.0"`, which predates the `UNSAFE_` prefix, and each is
-		// byte-identical to a FAIL case above that differs only in carrying `"16.3.0"`. cohere
+		// byte-identical to a fail case above that differs only in carrying `"16.3.0"`. cohere
 		// reads no React settings, so no React version can reach a rule here
 		// and oxc's own default branch, `is_none_or(supports_unsafe_lifecycle_prefix)`, is the only
 		// reachable one. Measured rather than reasoned about: with no version configured that exact

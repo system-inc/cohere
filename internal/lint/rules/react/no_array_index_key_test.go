@@ -306,7 +306,7 @@ func TestNoArrayIndexKeyIteratorMethods(test *testing.T) {
 		{"reduceRight at position two", "foo.reduceRight((acc, bar, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
 
 		// The row that separates a table from a constant: a two-parameter fold's second parameter
-		// is the ITEM, not an index, so nothing is pushed.
+		// is the item, not an index, so nothing is pushed.
 		{"reduce with only two parameters", "foo.reduce((acc, bar) => <Foo key={bar} />)\n", nil},
 
 		// Not in the set at all.
@@ -330,7 +330,7 @@ func TestNoArrayIndexKeyIteratorMethods(test *testing.T) {
 // rather than where it mis-decides.
 //
 // `ast.Node.Text()` panics on a property access and on a call expression, and the walk recovers per
-// FILE rather than per rule, so one such node costs every rule in the package every finding in that
+// file rather than per rule, so one such node costs every rule in the package every finding in that
 // file while the run still prints a plausible summary. Each row below reaches the callee inspection
 // with a different node kind, and two of them would panic if the kind were not checked before the
 // text was read.
@@ -422,7 +422,7 @@ func TestNoArrayIndexKeyKeyExpressionShapes(test *testing.T) {
 		{"a binary expression", "{'x-' + i}", []string{"noArrayIndex"}},
 		{"a nested binary expression", "{'x-' + i + '-y'}", []string{"noArrayIndex"}},
 
-		// A LOGICAL operator is a different node type upstream and is not dispatched to the binary
+		// A logical operator is a different node type upstream and is not dispatched to the binary
 		// arm, so all three of these are silent there while being `KindBinaryExpression` here.
 		// Found on the real tree rather than in a fixture: the dry run produced four findings
 		// ESLint does not, every one of them `key={item.id ?? index}`, which is an ordinary thing
@@ -513,7 +513,7 @@ func TestNoArrayIndexKeyStackBehaviour(test *testing.T) {
 
 // TestNoArrayIndexKeyReactChildren pins the argument shift for the React children iterator.
 //
-// `Children.map(collection, callback)` takes the callback SECOND, so a port reading argument zero
+// `Children.map(collection, callback)` takes the callback second, so a port reading argument zero
 // finds the collection and pushes nothing. Upstream detects this by the receiver's name, and the
 // last row shows how narrow that test is: any other receiver keeps the ordinary argument order, so
 // the same two-argument shape is silent.
@@ -535,7 +535,7 @@ func TestNoArrayIndexKeyReactChildren(test *testing.T) {
 		// Any other receiver keeps the ordinary order, so argument zero is the collection.
 		{"another receiver with two arguments", "Other.map(c, (child, i) => <Foo key={i} />)\n", nil},
 
-		// Upstream restricts the argument shift to `map` and `forEach`, which is NARROWER than the
+		// Upstream restricts the argument shift to `map` and `forEach`, which is narrower than the
 		// ten-method set the caller has already matched. So a Children receiver with any other
 		// iterator method keeps the ordinary order, reads argument zero, finds the collection
 		// rather than a callback, and pushes nothing. A mutation removing that restriction survived
@@ -635,7 +635,7 @@ func TestNoArrayIndexKeyCreateElement(test *testing.T) {
 
 // TestNoArrayIndexKeySpans asserts where each finding points.
 //
-// Four of the five shapes report the whole key expression and `String(i)` reports the ARGUMENT,
+// Four of the five shapes report the whole key expression and `String(i)` reports the argument,
 // which is upstream passing a different node at that one site. A message-id fixture cannot see the
 // difference and the corpus asserts none of it.
 //
