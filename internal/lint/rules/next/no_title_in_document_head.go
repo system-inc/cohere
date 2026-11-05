@@ -70,13 +70,13 @@ var messageNoTitleInDocumentHead = rule.Message{
 // specifier node by identity reproduces upstream exactly, including the aliased form, and a shadowed
 // `Head` resolves to its own variable declaration rather than to the import. Measured on all three
 // shapes before the rule was written.
-var NoTitleInDocumentHead = rule.Rule{
+var NoTitleInDocumentHead = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-title-in-document-head` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name:             "@next/next/no-title-in-document-head",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The specifier nodes this file watches, at most one per `next/document` declaration.
 		var watched []*ast.Node
 

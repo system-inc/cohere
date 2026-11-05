@@ -625,13 +625,9 @@ func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(test *testing.T) {
 			if decodeNoHtmlLinkForPagesOptionsError != nil {
 				test.Fatalf("refused: %v", decodeNoHtmlLinkForPagesOptionsError)
 			}
-			got, isOptions := decoded.(NoHtmlLinkForPagesOptions)
-			if !isOptions {
-				test.Fatalf("decoded to a %T, want NoHtmlLinkForPagesOptions", decoded)
-			}
-			if got.Configured != testCase.want.Configured ||
-				!slices.Equal(got.PagesDirectories, testCase.want.PagesDirectories) {
-				test.Errorf("decoded %+v, want %+v", got, testCase.want)
+			if decoded.Configured != testCase.want.Configured ||
+				!slices.Equal(decoded.PagesDirectories, testCase.want.PagesDirectories) {
+				test.Errorf("decoded %+v, want %+v", decoded, testCase.want)
 			}
 		})
 	}
@@ -698,7 +694,7 @@ func htmlLinkFingerprintOf(test *testing.T, files map[string]string, option stri
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := NoHtmlLinkForPages
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(ruleContext rule.Context, options rule.Given[NoHtmlLinkForPagesOptions]) rule.Listeners {
 		fingerprint = NoHtmlLinkForPages.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}
@@ -891,7 +887,7 @@ func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(test *testin
 	var fingerprints [workers][sha256.Size]byte
 	var fileSystem *countingFileSystem
 	probe := NoHtmlLinkForPages
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(ruleContext rule.Context, options rule.Given[NoHtmlLinkForPagesOptions]) rule.Listeners {
 		fileSystem = &countingFileSystem{FS: ruleContext.Program.FS(), checks: map[string]int{}}
 		program := countingProgram{Program: ruleContext.Program, fileSystem: fileSystem}
 		var wait sync.WaitGroup
@@ -899,7 +895,10 @@ func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(test *testin
 			wait.Add(1)
 			go func() {
 				defer wait.Done()
-				fingerprints[worker] = NoHtmlLinkForPages.ProgramFingerprint(program, nil)
+				fingerprints[worker] = NoHtmlLinkForPages.ProgramFingerprint(
+					program,
+					rule.Given[NoHtmlLinkForPagesOptions]{},
+				)
 			}()
 		}
 		wait.Wait()

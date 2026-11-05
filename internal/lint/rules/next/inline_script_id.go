@@ -114,13 +114,13 @@ var messageInlineScriptId = rule.Message{
 // the whole JsxElement, and that is a disagreement in which oxc is the port target.
 //
 // No fix. Upstream ships none, and the repair is a name only the author can choose.
-var InlineScriptId = rule.Rule{
+var InlineScriptId = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `nextjs/inline-script-id` and the parity guard strips
 	// the namespace on a `/` boundary, so a prefixed name would match no inventory entry and lint no
 	// files while every fixture in this package stayed green.
 	Name: "@next/next/inline-script-id",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		scriptNames := defaultImportNamesOf(ruleContext.SourceFile, "next/script")
 		if len(scriptNames) == 0 {
 			// Nothing in this file binds the framework's script component, so no element can

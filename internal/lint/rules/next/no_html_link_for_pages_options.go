@@ -48,7 +48,7 @@ type NoHtmlLinkForPagesOptions struct {
 // An element written as "" is kept as "", not anchored. Anchored, it would name the config's own
 // directory and walk the whole project as a pages directory; upstream finds no directory named ""
 // and reads nothing from it, and so does the rule here.
-func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, error) {
+func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (NoHtmlLinkForPagesOptions, error) {
 	if len(raw) == 0 {
 		return NoHtmlLinkForPagesOptions{}, nil
 	}
@@ -60,7 +60,10 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 	case len(trimmed) > 0 && trimmed[0] == '"':
 		var directory string
 		if decodeError := json.Unmarshal(trimmed, &directory); decodeError != nil {
-			return nil, fmt.Errorf("expected a pages directory or a list of them: %w", decodeError)
+			return NoHtmlLinkForPagesOptions{}, fmt.Errorf(
+				"expected a pages directory or a list of them: %w",
+				decodeError,
+			)
 		}
 		if directory == "" {
 			return NoHtmlLinkForPagesOptions{}, nil
@@ -70,7 +73,10 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 	case len(trimmed) > 0 && trimmed[0] == '[':
 		var elements []json.RawMessage
 		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
-			return nil, fmt.Errorf("expected a pages directory or a list of them: %w", decodeError)
+			return NoHtmlLinkForPagesOptions{}, fmt.Errorf(
+				"expected a pages directory or a list of them: %w",
+				decodeError,
+			)
 		}
 		written = make([]string, 0, len(elements))
 		seen := make(map[string]bool, len(elements))
@@ -79,7 +85,7 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 			decodeError := json.Unmarshal(element, &directory)
 			// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 			if decodeError != nil || bytes.TrimSpace(element)[0] != '"' {
-				return nil, fmt.Errorf(
+				return NoHtmlLinkForPagesOptions{}, fmt.Errorf(
 					"element %d of the pages directory list is %s, and each must be a string",
 					index+1,
 					element,
@@ -87,7 +93,7 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 			}
 			// Upstream's schema says uniqueItems, so ESLint refuses the config before the rule runs.
 			if seen[directory] {
-				return nil, fmt.Errorf(
+				return NoHtmlLinkForPagesOptions{}, fmt.Errorf(
 					"the pages directory list names %q twice, and its entries must be unique",
 					directory,
 				)
@@ -97,7 +103,7 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 		}
 
 	default:
-		return nil, fmt.Errorf("expected a pages directory or a list of them, got %s", trimmed)
+		return NoHtmlLinkForPagesOptions{}, fmt.Errorf("expected a pages directory or a list of them, got %s", trimmed)
 	}
 
 	anchored := make([]string, 0, len(written))
@@ -105,8 +111,11 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 		switch {
 		case directory == "" || filepath.IsAbs(directory):
 		case base.ConfigDirectory == "":
-			return nil, fmt.Errorf("the pages directory %q is relative and the config's directory is not known, "+
-				"so there is nothing to resolve it against", directory)
+			return NoHtmlLinkForPagesOptions{}, fmt.Errorf(
+				"the pages directory %q is relative and the config's directory is not known, "+
+					"so there is nothing to resolve it against",
+				directory,
+			)
 		default:
 			directory = filepath.Join(base.ConfigDirectory, directory)
 		}

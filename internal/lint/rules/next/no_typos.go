@@ -105,11 +105,11 @@ var messageNoTypos = rule.Message{
 // pages directory entirely. Our harness normalizes separators before a rule sees the path, so the
 // same input arrives as `pages/api/test.tsx` and is exempted as a genuine API route. Same verdict,
 // and ours is the one that would still hold if the reason changed.
-var NoTypos = rule.Rule{
+var NoTypos = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-typos` and matching strips the namespace on a
 	// `/` boundary, so a prefixed name matches nothing and runs on no files while every test passes.
 	Name: "@next/next/no-typos",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if !nextjs.IsInPagesDirectory(ruleContext.SourceFile.FileName().AsString()) {
 			return nil
 		}

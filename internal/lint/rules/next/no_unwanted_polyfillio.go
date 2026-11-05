@@ -161,12 +161,12 @@ var nextPolyfilledFeatures = map[string]struct{}{
 // silent against a measured upstream that reports on both. `imports.BindingsOf` is used instead,
 // which returns all three shapes, and the first-entry rule is reproduced by preferring the default
 // binding and falling back in source order.
-var NoUnwantedPolyfillio = rule.Rule{
+var NoUnwantedPolyfillio = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-unwanted-polyfillio` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files while
 	// its own tests pass.
 	Name: "@next/next/no-unwanted-polyfillio",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The local name `next/script` is bound to in this file, empty when it is not imported.
 		//
 		// Filled by the import listener and read by the JSX listener. The walk is a single

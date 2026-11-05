@@ -93,8 +93,11 @@ func noHtmlLinkForPagesRouteModelFor(
 // can tell them apart. A route that does not compile is dropped before any anchor sees it. The root
 // reaches a record only through the routes, and is in the findings key besides. A page's contents are
 // never read, so an edit inside one leaves the fingerprint alone.
-func noHtmlLinkForPagesFingerprint(program rule.Program, options any) [sha256.Size]byte {
-	settings, _ := rule.OptionsAs[NoHtmlLinkForPagesOptions](options)
+func noHtmlLinkForPagesFingerprint(
+	program rule.Program,
+	options rule.Given[NoHtmlLinkForPagesOptions],
+) [sha256.Size]byte {
+	settings, _ := options.Read()
 	model := noHtmlLinkForPagesRouteModelFor(program, program.GetCurrentDirectory(), settings)
 	hash := sha256.New()
 	if model.found {
