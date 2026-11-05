@@ -9,7 +9,7 @@ import (
 // TestSingleSpreadFiresOnEverySpreadAfterAnything: probes h06 and h07, and the shapes between them.
 func TestSingleSpreadFiresOnEverySpreadAfterAnything(test *testing.T) {
 	test.Parallel()
-	const declarations = `declare const a: { x: number }; declare const b: { y: number }; declare const c: { z: number };` + "\n"
+	const declarations = "declare const a: { x: number }; declare const b: { y: number }; declare const c: { z: number };\n"
 	for name, fixture := range map[string]struct {
 		source string
 		spans  []string
