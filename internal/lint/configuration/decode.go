@@ -150,8 +150,8 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 // that read their element with json.Unmarshal rather than rule.UnmarshalOptions.
 func refuseNulls(elements []json.RawMessage) error {
 	for index, element := range elements {
-		var value any
-		if decodeError := json.Unmarshal(element, &value); decodeError != nil {
+		value, parseError := optionschema.ParseJsonValue(element)
+		if parseError != nil {
 			// Malformed JSON is the decoder's to report, in its own words.
 			continue
 		}
@@ -169,17 +169,17 @@ func refuseNulls(elements []json.RawMessage) error {
 
 // nullPath finds the first null in a decoded JSON value, walking object keys in sorted order so the
 // same config always names the same path, and returns its dotted path.
-func nullPath(value any, path string) (string, bool) {
+func nullPath(value optionschema.JsonValue, path string) (string, bool) {
 	switch typed := value.(type) {
-	case nil:
+	case optionschema.JsonNull:
 		return path, true
-	case []any:
+	case optionschema.JsonArray:
 		for index, member := range typed {
 			if found, isNull := nullPath(member, joinPath(path, strconv.Itoa(index))); isNull {
 				return found, true
 			}
 		}
-	case map[string]any:
+	case optionschema.JsonObject:
 		keys := make([]string, 0, len(typed))
 		for key := range typed {
 			keys = append(keys, key)
