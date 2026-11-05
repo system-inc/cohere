@@ -95,7 +95,8 @@ function Component(props) {
 // Overlapping reactive scopes; upstream anchors at 23:10 on the dependency identifier.
 const useMemoOverlappingScopes = "// @validatePreserveExistingMemoizationGuarantees:true\nimport {useMemo} from 'react';\nimport {arrayPush} from 'shared-runtime';\n\n/**\n * Repro showing differences between mutable ranges and scope ranges.\n *\n * For useMemo dependency `x`:\n * - mutable range ends after the `arrayPush(x, b)` instruction\n * - scope range is extended due to MergeOverlappingScopes\n *\n * Since manual memo deps are guaranteed to be named (guaranteeing valid\n * codegen), it's correct to take a dependency on a dep *before* the end\n * of its scope (but after its mutable range ends).\n */\n\nfunction useFoo(a, b) {\n  const x = [];\n  const y = [];\n  arrayPush(x, b);\n  const result = useMemo(() => {\n    return [Math.max(x[1], a)];\n  }, [a, x]);\n  arrayPush(y, 3);\n  return {result, y};\n}\n\nexport const FIXTURE_ENTRYPOINT = {\n  fn: useFoo,\n  params: [1, 2],\n};\n"
 
-// mixedOptionalNonOptionalPropertyChain is `error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js`.
+// mixedOptionalNonOptionalPropertyChain is
+// `error.todo-preserve-memo-deps-mixed-optional-nonoptional-property-chain.js`.
 //
 // A dependency chain written with mixed optional and non-optional links. Upstream
 // reports it at 7:26, on the memo callback.
