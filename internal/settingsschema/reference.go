@@ -26,6 +26,7 @@ var examples = map[string]string{
 	"output":         `{ "phases": true }`,
 	"go":             `{ "rules": { "cohere-go/performance-require-parallel-test": ["warn", {}] } }`,
 	FormatKey:        `{ "printWidth": 120, "tabWidth": 4, "singleQuote": true, "ignore": ["pnpm-lock.yaml", "*.sqlite"] }`,
+	SwiftKey:         `{ "rules": { "cohere-swift/force-unwrapping": "error", "cohere-swift/file-length": "warning", "cohere-swift/force-cast": "off" } }`,
 }
 
 // reference renders the reference document.
@@ -84,6 +85,8 @@ func reference(ruleNames []string) string {
 			where = "the file cohere reads first"
 		case "go":
 			where = "the file beside go.work or go.mod, or the one --lint-config names"
+		case SwiftKey:
+			where = "the file beside a Swift project, or the one --lint-config names; never a file another extends"
 		}
 		write("| [`%s`](#%s) | %s | %s |\n", key.Name, anchor(key.Name), typeName(key), where)
 	}

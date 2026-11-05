@@ -79,10 +79,14 @@ public struct TypesOracle {
     public func run() throws -> Report {
         let toolchain = EngineVersion.toolchain(runner: runner)
         let scratchPath = Pipeline.scratchPath(for: root)
-        /* A Package.swift wins over an Xcode project beside it, the choice `Pipeline` makes. */
-        let xcodeSource =
-            FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path)
-            ? nil : try XcodeProject.source(at: root)
+        /* The project `Pipeline` checks at this root; a root holding none is read as a package, which then says why it cannot be. */
+        let xcodeSource: XcodeProject.Source?
+        if case let .xcode(source) = try XcodeProject.rootProject(at: root) {
+            xcodeSource = source
+        }
+        else {
+            xcodeSource = nil
+        }
         let xcodeProject = try xcodeSource.map {
             try XcodeProject.load(source: $0, root: root, scratchPath: scratchPath, runner: runner)
         }

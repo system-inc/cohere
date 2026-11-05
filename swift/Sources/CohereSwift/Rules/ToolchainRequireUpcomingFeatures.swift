@@ -21,6 +21,11 @@ import SwiftSyntax
  Plugin and macro targets are skipped: their settings serve the build tool, not the code being judged. So
  is a target with no Swift sources (a C or C++ target like Presence's `MotionCorrection`): Swift features
  mean nothing to it.
+
+ At an Xcode root a feature is on when every configuration turns it on, by its build setting or by
+ `-enable-upcoming-feature` in `OTHER_SWIFT_FLAGS` (`XcodeBuildSettings`), and the advice is the build setting,
+ with the edit to project.yml that sets it offered as a suggestion and never applied: turning it on is migration
+ work, and a fix would leave a build that may not compile.
  */
 public struct ToolchainRequireUpcomingFeatures: PackageRule {
     public let name = "cohere-swift/toolchain-require-upcoming-features"
@@ -41,9 +46,52 @@ public struct ToolchainRequireUpcomingFeatures: PackageRule {
 
     public init() {}
 
+    /* Whether the target's settings are this rule's to judge; the reasons are in the comment above. */
+    static func judges(_ target: PackageModel.Target) -> Bool {
+        target.kind != "plugin" && target.kind != "macro" && !target.sources.isEmpty
+    }
+
+    /* The build settings `target` lacks, as project.yml spells them; empty when it passes or is not this rule's to judge. */
+    func xcodeSettingsMissing(for target: PackageModel.Target) -> [XcodeGenSpecification.Setting] {
+        guard Self.judges(target) else { return [] }
+        return Self.required.filter { !target.upcomingFeatures.contains($0.feature) }.compactMap { required in
+            XcodeBuildSettings.featureSettings.first { $0.value == required.feature }.map {
+                XcodeGenSpecification.Setting(key: $0.key, value: "YES")
+            }
+        }
+    }
+
     public func findings(in package: PackageModel, manifest: ParsedFile?) -> [FindingRecord] {
-        package.targets
-            .filter { $0.kind != "plugin" && $0.kind != "macro" && !$0.sources.isEmpty }
+        if let settings = package.xcodeBuildSettings {
+            return package.toolchainTargets.filter { !xcodeSettingsMissing(for: $0).isEmpty }.map { target in
+                let missing = Self.required.filter { !target.upcomingFeatures.contains($0.feature) }
+                /* Each feature named with the configurations it is missing from, once any of them is missing from only some. */
+                let partial = missing.map { required in
+                    settings.configurations(
+                        of: target.name,
+                        where: { !$0.upcomingFeatures.contains(required.feature) },
+                    )
+                }
+                let features = zip(missing, partial).map { required, configurations in
+                    guard partial.contains(where: { $0 != nil }) else { return required.feature }
+                    return
+                        "\(required.feature) in \(configurations.map(XcodeBuildSettings.listed) ?? "every configuration")"
+                }
+                let keys = xcodeSettingsMissing(for: target).map(\.key)
+                return settings.finding(rule: name, target: target.name, missing: xcodeSettingsMissing(for: target)) {
+                    lineFound in
+                    RuleMessages.ToolchainRequireUpcomingFeatures.upcomingFeatureMissingInXcode(
+                        target: target.name,
+                        features: features.joined(separator: " and "),
+                        settings: keys.joined(separator: " and "),
+                        reasons: missing.map { "\($0.feature): \($0.reason)" }.joined(separator: "; "),
+                        located: lineFound ? .found : .notFound(definition: settings.definitionName),
+                    )
+                }
+            }
+        }
+        return package.targets
+            .filter(Self.judges)
             .compactMap { target -> FindingRecord? in
                 let missing = Self.required.filter { !target.upcomingFeatures.contains($0.feature) }
                 guard !missing.isEmpty else { return nil }

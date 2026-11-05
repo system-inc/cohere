@@ -14,10 +14,10 @@ import Foundation
  for what a source path includes are xcodegen's, and a second reading of them would drift from the first.
 
  What the run takes from each native target: its name, its product type spelled as SwiftPM's kinds, its Swift
- files and its `SWIFT_VERSION`, and from the product type whether its public declarations are API (`isAPI`). The settings the package rules judge (upcoming features, strict memory safety,
- the language mode as Xcode resolves it through configuration files) are block D's (#6vjs9n7). Until then those
- rules are not run against an Xcode project (`Linter`), because a judgment made from half the settings would be
- a guess.
+ files and its `SWIFT_VERSION`, and from the product type whether its public declarations are API (`isAPI`). The
+ settings the package rules judge (the language mode, upcoming features, strict memory safety) are not read from the
+ project file, which holds only the layers Xcode resolves them through: they are Xcode's own answer, asked for
+ when the rules will run (`XcodeBuildSettings`), and until then a target's language mode is its project file's.
  */
 public enum XcodeProject {
     /* Where an Xcode root's project comes from. */
@@ -37,6 +37,24 @@ public enum XcodeProject {
     /* The root holds Xcode files this engine cannot choose a project from. */
     public struct AmbiguousRoot: Error, CustomStringConvertible {
         public var description: String
+    }
+
+    /* What a run at a root checks: the SwiftPM package there, or its Xcode project. */
+    public enum RootProject: Equatable, Sendable {
+        case swiftPackage
+        case xcode(Source)
+    }
+
+    /*
+     The project a run at `root` checks, or nil when the root holds none. A Package.swift wins over an Xcode project
+     beside it, as it did before Xcode projects were checked at all. The one place that choice is made, for the run,
+     the config note's file and the types oracle alike. Throws `AmbiguousRoot` where `source(at:)` does.
+     */
+    public static func rootProject(at root: URL) throws -> RootProject? {
+        if FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path) {
+            return .swiftPackage
+        }
+        return try source(at: root).map(RootProject.xcode)
     }
 
     /* The Xcode project at `root`, or nil when it holds none. A Package.swift at the root is the caller's to look for first. */
