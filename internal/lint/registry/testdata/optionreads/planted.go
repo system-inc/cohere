@@ -71,3 +71,37 @@ func runPlanted(options plantedOptions) int {
 	}
 	return count
 }
+
+// plantedWireEntry is decoded and then converted whole to plantedEntry, so the conversion reads both
+// fields and no selector ever names them.
+type plantedWireEntry struct {
+	ConvertedElement string `json:"element"`
+	ConvertedMessage string `json:"message"`
+}
+
+type plantedEntry struct {
+	ConvertedElement string
+	ConvertedMessage string
+}
+
+// plantedKeptWire is decoded and only handed to a function shaped like a conversion, which is a call and
+// reads nothing.
+type plantedKeptWire struct {
+	KeptUnread string `json:"keptUnread"`
+}
+
+func keepPlantedWire(wire plantedKeptWire) plantedKeptWire {
+	return wire
+}
+
+func decodePlantedEntry(raw []byte) (plantedEntry, plantedKeptWire, error) {
+	var wire plantedWireEntry
+	if decodeError := rule.UnmarshalOptions(raw, &wire); decodeError != nil {
+		return plantedEntry{}, plantedKeptWire{}, decodeError
+	}
+	var kept plantedKeptWire
+	if decodeError := rule.UnmarshalOptions(raw, &kept); decodeError != nil {
+		return plantedEntry{}, plantedKeptWire{}, decodeError
+	}
+	return plantedEntry(wire), keepPlantedWire(kept), nil
+}
