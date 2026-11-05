@@ -122,7 +122,8 @@ func enumerate(packageRoot string) ([]byte, error) {
 	script := filepath.Join(directory, "enumerate.mjs")
 
 	command := exec.Command("node", script, packageRoot)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 

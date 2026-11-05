@@ -12,7 +12,7 @@
 // and outputs. This one captures neither: it captures a *class name* and the engine's answer, and
 // nothing about the path between them. That is the whole distinction. A component fixture supplies a
 // value the JavaScript side has already decoded, which is correct for testing the component and
-// steps over the seam between components. `segment` is the recorded precedent — verified only
+// steps over the seam between components. `segment` is the recorded precedent: verified only
 // through `InferDataType`, which launders its errors, so mutations to it changed nothing any test
 // could see. A seam reachable only through a fixture that has already crossed it has the same hole.
 //
@@ -32,8 +32,8 @@
 // drifts from the first, and the drift would surface here as a differential finding pointing at the
 // Go port, which is the most expensive possible way to discover a copy-paste.
 //
-// The table is per repository by construction — `keysByNamespace` is keyed on that repository's own
-// `@theme` — so the fixture carries one per system rather than one shared. That is the defect the
+// The table is per repository by construction (`keysByNamespace` is keyed on that repository's own
+// `@theme`), so the fixture carries one per system rather than one shared. That is the defect the
 // whole port exists to fix, and a fixture that carried a single table would reproduce it inside the
 // instrument built to detect it.
 //
@@ -285,7 +285,8 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 // their progress is how a summary stops being read.
 func runNode(script string, arguments ...string) ([]byte, error) {
 	command := exec.Command("node", append([]string{script}, arguments...)...)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if runError := command.Run(); runError != nil {

@@ -5,8 +5,8 @@
 //	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root <tailwindcss package> [-output <file.go>] [-check]
 //
 // The table it writes is what lets `LoadDesignSystem` build a registry that knows `hover`. Without
-// it a run-scoped design system registers only the repository's own `@custom-variant` names —
-// measured on this repository, one registration against the engine's 88 — and the consequence is
+// it a run-scoped design system registers only the repository's own `@custom-variant` names:
+// measured on this repository, one registration against the engine's 88. And the consequence is
 // not degraded ranking but refusal to parse: `ParseVariant` returns nil for an unregistered root
 // and `ParseCandidate` then yields zero candidates for the whole class. Every rule reading it would
 // decline on every class carrying a variant, and a differential would score that as agreement
@@ -331,7 +331,7 @@ func main() {
 	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(
 		os.Stderr,
-		"generate_framework_variants: wrote %s — Tailwind %s, %d registrations over %d distinct orders, %d carrying a comparison.\n",
+		"generate_framework_variants: wrote %s \u2014 Tailwind %s, %d registrations over %d distinct orders, %d carrying a comparison.\n",
 		*output, result.TailwindVersion, len(result.Entries), len(distinct), len(result.Comparisons),
 	)
 	for _, comparison := range result.Comparisons {

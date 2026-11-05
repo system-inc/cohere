@@ -15,7 +15,7 @@
 // ~/Projects/connected/www-connected-app and diffing to zero. The instrument could not support the
 // conclusion: both vendor the Structure submodule and import its `global.css`, so they share its
 // `@theme` and `@utility` blocks and are one observation wearing two names. Re-measured against a
-// system sharing nothing, the claim does hold — the same 44 families, identical down to the value
+// system sharing nothing, the claim does hold: the same 44 families, identical down to the value
 // each was discovered at, across a registry differing by 25 functional roots and 7,850 probed
 // pairs. `-verify-invariance-against` is that measurement made repeatable, and it refuses a second
 // system whose registry matches the first, since two systems that cannot differ cannot detect a
@@ -304,7 +304,7 @@ func main() {
 	// blocks: that diff measured a shared dependency, and two repositories that cannot differ
 	// cannot detect a table that varies. Re-measured against
 	// internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css, which shares nothing, the
-	// families do hold — the same 44, identical down to the value each was discovered at, across a
+	// families do hold: the same 44, identical down to the value each was discovered at, across a
 	// registry that differs by 25 functional roots and 7,850 probed pairs. The claim is true. The
 	// instrument that had been asserting it was not measuring it.
 	//
@@ -427,7 +427,7 @@ func main() {
 		os.Exit(1)
 	}
 	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
-	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s — %d ordered properties.\n", orderPath, len(result.PropertyOrder))
+	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s \u2014 %d ordered properties.\n", orderPath, len(result.PropertyOrder))
 
 	if writeError := os.WriteFile(*output, rendered, 0o644); writeError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
@@ -450,7 +450,7 @@ func main() {
 	}
 
 	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
-	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s — Tailwind %s, %d families from %d pairs over %d roots.\n",
+	fmt.Fprintf(os.Stderr, "generate_collapse: wrote %s \u2014 Tailwind %s, %d families from %d pairs over %d roots.\n",
 		*output, result.TailwindVersion, len(result.Families), result.PairsProbed, result.FunctionalRoots)
 }
 

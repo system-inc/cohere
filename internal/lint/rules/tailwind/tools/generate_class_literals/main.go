@@ -48,7 +48,8 @@ func main() {
 	casesPath := filepath.Join(packageDirectory, "testdata", "class_literals", "cases.json")
 
 	command := exec.Command("node", filepath.Join(toolDirectory, "extract.mjs"), *packages, casesPath)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if runError := command.Run(); runError != nil {

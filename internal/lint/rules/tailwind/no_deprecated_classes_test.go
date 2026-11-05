@@ -360,7 +360,7 @@ func TestImportanceIsStrippedBeforeMatching(test *testing.T) {
 		test.Errorf("variants %q, want %q", variants, "sm:hover:")
 	}
 	if base != "flex-grow-2" {
-		test.Errorf("base %q, want %q — the deprecation patterns match the base, so punctuation left "+
+		test.Errorf("base %q, want %q \u2014 the deprecation patterns match the base, so punctuation left "+
 			"here would be carried into a capture", base, "flex-grow-2")
 	}
 	if !important {

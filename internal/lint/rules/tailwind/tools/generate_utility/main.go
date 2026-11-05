@@ -138,7 +138,8 @@ func enumerate(theme string) ([]byte, error) {
 	script := filepath.Join(directory, "enumerate.mjs")
 
 	command := exec.Command("node", script, theme)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if runError := command.Run(); runError != nil {

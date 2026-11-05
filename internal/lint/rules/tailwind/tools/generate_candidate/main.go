@@ -139,7 +139,8 @@ func enumerate(packageRoot, corpusRoot, themeEntry string) ([]byte, error) {
 	arguments := []string{script, packageRoot, corpusRoot, themeEntry}
 
 	command := exec.Command("node", arguments...)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 
