@@ -29,6 +29,83 @@ var messageNoUnwantedPolyfillioDuplicate = rule.Message{
 		"bytes are downloaded and parsed to redefine what is present.",
 }
 
+// nextPolyfilledFeatures is the feature list Next.js already ships, transcribed mechanically from
+// oxc's `NEXT_POLYFILLED_FEATURES` so the shapes a hand copy corrupts survive.
+//
+// Three of those shapes are load-bearing. `Array.prototype.@@iterator` and
+// `String.prototype.@@iterator` carry a literal double at sign. `Number.EPSILON` and
+// `Number.Epsilon` are both present on purpose, upstream compensating for a real world misspelling,
+// so removing the duplicate would change behaviour. The `es5` through `es2019` aliases and `fetch`
+// are the only lowercase entries and matching is case-sensitive.
+//
+// eslint's copy of this list also carries `Object.hasOwn`; oxc's does not, and oxc is what the gate
+// compares against, so it is deliberately absent here rather than overlooked.
+var nextPolyfilledFeatures = map[string]struct{}{
+	"Array.from":                       {},
+	"Array.of":                         {},
+	"Array.prototype.@@iterator":       {},
+	"Array.prototype.at":               {},
+	"Array.prototype.copyWithin":       {},
+	"Array.prototype.fill":             {},
+	"Array.prototype.find":             {},
+	"Array.prototype.findIndex":        {},
+	"Array.prototype.flat":             {},
+	"Array.prototype.flatMap":          {},
+	"Array.prototype.includes":         {},
+	"Function.prototype.name":          {},
+	"Map":                              {},
+	"Number.EPSILON":                   {},
+	"Number.Epsilon":                   {},
+	"Number.MAX_SAFE_INTEGER":          {},
+	"Number.MIN_SAFE_INTEGER":          {},
+	"Number.isFinite":                  {},
+	"Number.isInteger":                 {},
+	"Number.isNaN":                     {},
+	"Number.isSafeInteger":             {},
+	"Number.parseFloat":                {},
+	"Number.parseInt":                  {},
+	"Object.assign":                    {},
+	"Object.entries":                   {},
+	"Object.fromEntries":               {},
+	"Object.getOwnPropertyDescriptor":  {},
+	"Object.getOwnPropertyDescriptors": {},
+	"Object.is":                        {},
+	"Object.keys":                      {},
+	"Object.values":                    {},
+	"Promise":                          {},
+	"Promise.prototype.finally":        {},
+	"Reflect":                          {},
+	"Set":                              {},
+	"String.fromCodePoint":             {},
+	"String.prototype.@@iterator":      {},
+	"String.prototype.codePointAt":     {},
+	"String.prototype.endsWith":        {},
+	"String.prototype.includes":        {},
+	"String.prototype.padEnd":          {},
+	"String.prototype.padStart":        {},
+	"String.prototype.repeat":          {},
+	"String.prototype.startsWith":      {},
+	"String.prototype.trimEnd":         {},
+	"String.prototype.trimStart":       {},
+	"String.raw":                       {},
+	"Symbol":                           {},
+	"Symbol.asyncIterator":             {},
+	"URL":                              {},
+	"URL.prototype.toJSON":             {},
+	"URLSearchParams":                  {},
+	"WeakMap":                          {},
+	"WeakSet":                          {},
+	"es2015":                           {},
+	"es2016":                           {},
+	"es2017":                           {},
+	"es2018":                           {},
+	"es2019":                           {},
+	"es5":                              {},
+	"es6":                              {},
+	"es7":                              {},
+	"fetch":                            {},
+}
+
 // NoUnwantedPolyfillio flags a script that loads polyfills from polyfill.io or duplicates one.
 //
 //	valid:   <script src='https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=AbortController' />
@@ -269,81 +346,4 @@ func stringAttributeWithNode(attributes *ast.Node, name string) (string, *ast.No
 	}
 
 	return "", nil
-}
-
-// nextPolyfilledFeatures is the feature list Next.js already ships, transcribed mechanically from
-// oxc's `NEXT_POLYFILLED_FEATURES` so the shapes a hand copy corrupts survive.
-//
-// Three of those shapes are load-bearing. `Array.prototype.@@iterator` and
-// `String.prototype.@@iterator` carry a literal double at sign. `Number.EPSILON` and
-// `Number.Epsilon` are both present on purpose, upstream compensating for a real world misspelling,
-// so removing the duplicate would change behaviour. The `es5` through `es2019` aliases and `fetch`
-// are the only lowercase entries and matching is case-sensitive.
-//
-// eslint's copy of this list also carries `Object.hasOwn`; oxc's does not, and oxc is what the gate
-// compares against, so it is deliberately absent here rather than overlooked.
-var nextPolyfilledFeatures = map[string]struct{}{
-	"Array.from":                       {},
-	"Array.of":                         {},
-	"Array.prototype.@@iterator":       {},
-	"Array.prototype.at":               {},
-	"Array.prototype.copyWithin":       {},
-	"Array.prototype.fill":             {},
-	"Array.prototype.find":             {},
-	"Array.prototype.findIndex":        {},
-	"Array.prototype.flat":             {},
-	"Array.prototype.flatMap":          {},
-	"Array.prototype.includes":         {},
-	"Function.prototype.name":          {},
-	"Map":                              {},
-	"Number.EPSILON":                   {},
-	"Number.Epsilon":                   {},
-	"Number.MAX_SAFE_INTEGER":          {},
-	"Number.MIN_SAFE_INTEGER":          {},
-	"Number.isFinite":                  {},
-	"Number.isInteger":                 {},
-	"Number.isNaN":                     {},
-	"Number.isSafeInteger":             {},
-	"Number.parseFloat":                {},
-	"Number.parseInt":                  {},
-	"Object.assign":                    {},
-	"Object.entries":                   {},
-	"Object.fromEntries":               {},
-	"Object.getOwnPropertyDescriptor":  {},
-	"Object.getOwnPropertyDescriptors": {},
-	"Object.is":                        {},
-	"Object.keys":                      {},
-	"Object.values":                    {},
-	"Promise":                          {},
-	"Promise.prototype.finally":        {},
-	"Reflect":                          {},
-	"Set":                              {},
-	"String.fromCodePoint":             {},
-	"String.prototype.@@iterator":      {},
-	"String.prototype.codePointAt":     {},
-	"String.prototype.endsWith":        {},
-	"String.prototype.includes":        {},
-	"String.prototype.padEnd":          {},
-	"String.prototype.padStart":        {},
-	"String.prototype.repeat":          {},
-	"String.prototype.startsWith":      {},
-	"String.prototype.trimEnd":         {},
-	"String.prototype.trimStart":       {},
-	"String.raw":                       {},
-	"Symbol":                           {},
-	"Symbol.asyncIterator":             {},
-	"URL":                              {},
-	"URL.prototype.toJSON":             {},
-	"URLSearchParams":                  {},
-	"WeakMap":                          {},
-	"WeakSet":                          {},
-	"es2015":                           {},
-	"es2016":                           {},
-	"es2017":                           {},
-	"es2018":                           {},
-	"es2019":                           {},
-	"es5":                              {},
-	"es6":                              {},
-	"es7":                              {},
-	"fetch":                            {},
 }

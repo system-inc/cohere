@@ -175,7 +175,7 @@ var NoPageCustomFont = rule.Rule{
 //
 //   - an ancestor is a declaration carrying both `export` and `default`, which covers
 //     `export default function CustomDocument() {}` and, critically, the anonymous
-//     `export default function() {}` — that one is reached without ever resolving a name, and a
+//     `export default function() {}`. That one is reached without ever resolving a name, and a
 //     port that walks up looking for a named function and then consults an export table reports it
 //   - an ancestor is a function or class whose name is what a separate `export default <name>`
 //     statement exports

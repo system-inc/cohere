@@ -135,7 +135,7 @@ func buildNoHtmlLinkForPagesRouteModel(fileSystem vfs.FS, root string, settings 
 	var pageUrls []string
 	for _, directory := range foundPagesDirectories {
 		for _, url := range parseUrlForPages(fileSystem, "/", directory) {
-			normalized, _ := normalizeURL(url)
+			normalized, _ := normalizeUrl(url)
 			pageUrls = append(pageUrls, "^"+normalized+"$")
 		}
 	}
@@ -163,7 +163,7 @@ func existingDirectories(fileSystem vfs.FS, directories []string) []string {
 	return found
 }
 
-// pageFileExtension and the two leaf names are upstream's patterns, which its own TODO says should
+// pageFileExtension and the two leaf names are upstream's patterns, which its own `TODO` says should
 // account for every page extension and do not.
 var (
 	pageFileExtension = regexp.MustCompile(`\.[jt]sx?$`)
@@ -232,25 +232,25 @@ func parseUrlForAppDirectory(fileSystem vfs.FS, urlPrefix string, directory stri
 	return urls
 }
 
-// normalizeURL is upstream's `normalizeURL`. The second return is false where upstream returns
+// normalizeUrl is upstream's `normalizeURL`. The second return is false where upstream returns
 // undefined, for an empty url.
-func normalizeURL(url string) (string, bool) {
+func normalizeUrl(url string) (string, bool) {
 	if url == "" {
 		return "", false
 	}
-	url, _, _ = strings.Cut(url, "?")
-	url, _, _ = strings.Cut(url, "#")
-	if strings.HasSuffix(url, "/index.html") {
-		url = strings.TrimSuffix(url, "index.html")
+	normalized, _, _ := strings.Cut(url, "?")
+	normalized, _, _ = strings.Cut(normalized, "#")
+	if strings.HasSuffix(normalized, "/index.html") {
+		normalized = strings.TrimSuffix(normalized, "index.html")
 	}
 	// An href that was only a query or a fragment stays empty rather than becoming `/`.
-	if url == "" {
-		return url, true
+	if normalized == "" {
+		return normalized, true
 	}
-	if !strings.HasSuffix(url, "/") {
-		url += "/"
+	if !strings.HasSuffix(normalized, "/") {
+		normalized += "/"
 	}
-	return url, true
+	return normalized, true
 }
 
 // normalizeAppPath is upstream's `normalizeAppPath`: groups, parallel slots and a trailing `page` or
