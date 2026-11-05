@@ -62,8 +62,16 @@ public struct PackageModel: Equatable, Sendable {
         }
     }
 
+    /* What the model was read from: a SwiftPM package, or an Xcode project (`XcodeProject`) handed to the run in its shape. */
+    public enum ProjectKind: String, Equatable, Sendable {
+        case swiftPackage = "SwiftPackage"
+        case xcodeGen = "XcodeGen"
+        case xcodeProject = "XcodeProject"
+    }
+
     public var name: String
     public var root: URL
+    public var projectKind = ProjectKind.swiftPackage
     public var toolsVersion: String
     public var targets: [Target]
     /* Paths of the local packages this one depends on that sit inside its directory. */

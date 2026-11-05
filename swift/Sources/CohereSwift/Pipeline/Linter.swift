@@ -42,7 +42,12 @@ struct Linter {
                 continue
             }
             rulesRun += 1
-            for member in ownedPackages {
+            /*
+             Only SwiftPM packages: an Xcode project's settings come from configurations and files these rules do not
+             read yet (block D, #6vjs9n7), and a verdict from half its settings would be a guess. Offered no package,
+             each rule is listed as silent, so the run says it judged nothing there.
+             */
+            for member in ownedPackages where member.projectKind == .swiftPackage {
                 listening[rule.name, default: 0] += 1
                 let found = rule.findings(in: member, manifest: manifests[member.root.path]).map {
                     Self.applying(severity, to: $0)

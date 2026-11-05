@@ -27,7 +27,7 @@ public struct Pipeline {
      records, the build-input snapshot, the prune stamp), so a fresh one reads nothing a run before left and
      writes nothing to the project's `.cache`, as TypeScript's `--no-cache` promises.
      */
-    private let freshScratch: URL?
+    let freshScratch: URL?
 
     public init(
         options: CommandOptions,
@@ -88,18 +88,29 @@ public struct Pipeline {
         guard let root = options.root else {
             throw RunFailure(description: "no --root was given, so there is no package to check")
         }
-        guard FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path) else {
-            throw RunFailure(description: "\(root.path) holds no Package.swift, so there is no package to check")
+        /* A Package.swift wins over an Xcode project beside it, as it did before Xcode projects were checked at all. */
+        let xcodeSource: XcodeProject.Source?
+        if FileManager.default.fileExists(atPath: root.appendingPathComponent("Package.swift").path) {
+            xcodeSource = nil
+        }
+        else {
+            do {
+                xcodeSource = try XcodeProject.source(at: root)
+            }
+            catch let ambiguous as XcodeProject.AmbiguousRoot {
+                throw RunFailure(description: ambiguous.description)
+            }
+            guard xcodeSource != nil else {
+                throw RunFailure(
+                    description:
+                        "\(root.path) holds no Package.swift, project.yml or .xcodeproj, so there is nothing to check"
+                )
+            }
         }
 
         /* The packages a run here accounts for, from the same traversal the run uses: manifests only, no build. */
         if options.listCoveredPackages {
-            let package = try PackageModel.load(
-                root: root,
-                scratchPath: runScratch(for: root),
-                runner: runner,
-                toolchain: toolchain,
-            )
+            let package = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
             let inside = package.localPackages.filter { PackageModel.isInside($0.root, root) }
             let path = { (model: PackageModel) in model.root.standardizedFileURL.path }
             try writer.write(
@@ -135,12 +146,7 @@ public struct Pipeline {
         let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary)
 
         let describeStart = Date()
-        let package = try PackageModel.load(
-            root: root,
-            scratchPath: runScratch(for: root),
-            runner: runner,
-            toolchain: toolchain,
-        )
+        let package = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
         let fileSet = try FileSet.build(package: package)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
         /*
@@ -363,6 +369,11 @@ public struct Pipeline {
         if !options.runTypes {
             try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
         }
+        else if package.projectKind != .swiftPackage {
+            /* A gap, not a choice: the caller asked for types and got none, so the run is incomplete and says why. */
+            complete = false
+            try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: Self.xcodeTypesNotBuilt))
+        }
         else {
             /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
             var typesPhase = TypesPhase(
@@ -460,7 +471,10 @@ public struct Pipeline {
             }
         }
 
-        if options.unused {
+        if options.unused && package.projectKind != .swiftPackage {
+            try writer.write(PhaseRecord(name: .unused, outcome: .notReached, detail: Self.xcodeTypesNotBuilt))
+        }
+        else if options.unused {
             try await runUnused(package: package, root: root, fileSet: fileSet, parsed: parsed.files)
         }
         else {
@@ -470,6 +484,28 @@ public struct Pipeline {
     }
 
     static let unusedNotRequested = "not requested — this is a report, ask for it with --unused"
+
+    /* Why an Xcode project's types and index are not read yet, in the words the phase line prints. */
+    static let xcodeTypesNotBuilt =
+        "an Xcode project is not built yet, so its types and index were not checked (block B, #gg0x95n, builds it with xcodebuild)"
+
+    /* The run's project: SwiftPM's answer for a package, or an Xcode project read into the same model. */
+    private func loadProject(root: URL, xcodeSource: XcodeProject.Source?, toolchain: String) throws -> PackageModel {
+        if let xcodeSource {
+            return try XcodeProject.load(
+                source: xcodeSource,
+                root: root,
+                scratchPath: runScratch(for: root),
+                runner: runner,
+            )
+        }
+        return try PackageModel.load(
+            root: root,
+            scratchPath: runScratch(for: root),
+            runner: runner,
+            toolchain: toolchain,
+        )
+    }
 
     /* The unused phase of a run cut off before it: not reached when it was asked for, not requested otherwise. */
     private func unusedPhase(notReached reason: String) -> PhaseRecord {
@@ -611,6 +647,7 @@ public struct Pipeline {
                 }
             },
             excluded: fileSet.excluded,
+            projectKind: package.projectKind.rawValue,
         )
     }
 
@@ -669,6 +706,8 @@ public struct Pipeline {
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */
     private func manifests(of package: PackageModel) async -> [String: ParsedFile] {
+        /* An Xcode project has no manifest, and the package rules that would read one do not run on it (`Linter`). */
+        guard package.projectKind == .swiftPackage else { return [:] }
         let owned = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
         let files = owned.map {
             FileSet.OwnedFile(

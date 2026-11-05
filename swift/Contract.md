@@ -61,6 +61,12 @@ The front door resolves the project root (the nearest directory holding `Package
 cohere-swift --contract 2 --root <absolute package root> [flags] [paths]
 ```
 
+The root may also be an Xcode project's directory, one holding `project.yml` (an xcodegen spec) or
+exactly one `*.xcodeproj`, and no `Package.swift` (#ybspptb). A `Package.swift` beside them wins. The
+engine generates a spec's project into its own scratch, never beside the spec, and reads the targets and
+their Swift files from the project file. A root holding two projects, or a workspace and no project, is
+refused with exit 2 and a sentence, as is a spec xcodegen refuses and a machine without xcodegen.
+
 `--contract` is the version the front door speaks. An engine speaking a different version refuses
 the run, prints a sentence on stderr naming both versions, and exits 2. The first record the engine
 writes is `provenance`, which carries its own `contract` field. The front door refuses a mismatch
@@ -100,6 +106,15 @@ nothing else.
 - `elapsedMilliseconds` is the time spent describing the package. The accounting line bills it as
   the graph, because it is the step nothing can skip.
 - Written on every run that checks anything, since every such run describes the package first.
+- `projectKind` says what `package` was read from: `SwiftPackage`, `XcodeGen` (a spec, generated into the
+  engine's scratch) or `XcodeProject` (a committed project, read where it stands). It is additive within
+  contract 3, and an engine from before it writes none. For an Xcode project, `package` is the project's
+  name, and each native target's kind is Xcode's product type in SwiftPM's words: an app or an extension
+  is `application`, a unit-test or interface-test bundle `test`, a framework or library `library`, a
+  command-line tool `executable`.
+- An Xcode project is not built yet, so its `types` phase is `skipped` with a detail that names the gap
+  (never `not requested`), the run is incomplete, and `--unused` is `notReached`. The package rules, which
+  judge settings an Xcode project keeps elsewhere, are offered no package there and listed as silent.
 
 Rendered (whole package, then scoped):
 
@@ -388,7 +403,7 @@ it where a run that did not finish prints green.
 | `--format-only` | The fix phase narrowed to formatting, as TypeScript's `--format-only`: no rule is asked for a fix, and types, lint and unused are skipped as not requested, so nothing is compiled. With `--no-fix` it is the format gate: each file the formatter would change is a `format` finding, and nothing is written. `--format-all` widens it to every file. Named with `--fix`, `--types`, `--lint`, `--unused` or `--no-format`, the run is refused with exit 2. |
 | `--no-format` | Formatting left out of a bare run, `--fix` or `--no-fix`, as TypeScript's `--no-format`: the fixers run, types and lint run, and no file is formatted or reported unformatted. The `fix` record counts nothing formatted, and its `formatScope` says formatting was left out. Named with `--format`, `--format-all` or `--format-only`, the run is refused with exit 2. |
 | `--no-cache` | Every phase from source, as TypeScript's `--no-cache`. The run uses a scratch of its own in the system's temporary directory and removes it when it ends, so it reads no package description, build, compiler record or index a run before it left, and writes nothing to the project's `.cache`. Every cache the engine keeps lives under its scratch, so this is all of them. It costs a cold build. |
-| `--covered-packages` | Prints one `coveredPackages` record after `provenance` and exits 0, building nothing: `checked` is the root and each local package inside it whose files a run at this root checks, and `vendored` each local package under `Vendor/`, whose files the run lists as not checked. It comes from the run's own traversal (manifests only), so the front door can skip a nested package a run already covers (#sxs26s3). Paths are absolute, standardized as Foundation spells them; compare after resolving symlinks on both sides. |
+| `--covered-packages` | Prints one `coveredPackages` record after `provenance` and exits 0, building nothing: `checked` is the root and each local package inside it whose files a run at this root checks, and `vendored` each local package under `Vendor/`, whose files the run lists as not checked. It comes from the run's own traversal (manifests only), so the front door can skip a nested package a run already covers (#sxs26s3). At an Xcode root `checked` is the root alone: a local package the project links is outside it and runs as its own. Paths are absolute, standardized as Foundation spells them; compare after resolving symlinks on both sides. |
 | `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
 | `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
