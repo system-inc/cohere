@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -29,22 +31,37 @@ func contractFixture(test *testing.T, name string) []string {
 // renderRecords feeds records through a fresh renderer and ends the run the way the engine would.
 func renderRecords(test *testing.T, mode engineMode, lines []string, engineExit int) (string, int, error) {
 	test.Helper()
-	return renderRecordsIn(test, swiftLanguage, mode, lines, engineExit)
+	return renderRecordsIn(test, swiftLanguage, mode, lines, engineExit, nil)
 }
 
-// renderRecordsIn is renderRecords in the words of any engine, so one helper renders every engine's
-// stream the way runEngineBinaryUntil would.
+// renderRecordsYielding is renderRecords for a run that yields directories, resolved, to the Swift projects
+// below it, as runSwiftEngine hands them over.
+func renderRecordsYielding(
+	test *testing.T,
+	mode engineMode,
+	lines []string,
+	engineExit int,
+	yieldedDirectories []string,
+) (string, int, error) {
+	test.Helper()
+	return renderRecordsIn(test, swiftLanguage, mode, lines, engineExit, yieldedDirectories)
+}
+
+// renderRecordsIn is renderRecords in the words of any engine, yielding the directories given, so one
+// helper renders every engine's stream the way runEngineBinaryUntil would.
 func renderRecordsIn(
 	test *testing.T,
 	language engineLanguage,
 	mode engineMode,
 	lines []string,
 	engineExit int,
+	yieldedDirectories []string,
 ) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
 	run := newEngineRun(stream, mode, language, "", time.Now())
+	run.yieldedDirectories = yieldedDirectories
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
 			run.writeUnfinished(language.theEngine() + " broke its contract")
@@ -107,7 +124,7 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 			"coverage: 4 rules = 4 ran and found nothing\n",
 			"  0 files crashed · details: cohere --coverage\n",
 			"  config: no CohereSettings.json beside Package.swift, so every house rule ran at error",
-			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
+			"  not checked: /project/Sources/Example/Generated.swift (ignored by git)\n",
 			"phases: fix ran in 31ms · types ran in 820ms · lint reused the fix phase's walk (nothing was rewritten) · unused skipped",
 			": package 412ms",
 		)
@@ -204,7 +221,7 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		}
 		requireLines(test, output,
 			"  not checked: /project/Sources/Example/Latin1.swift (could not be read: it is not valid UTF-8 or could not be opened (Foundation could not decode it as UTF-8))\n",
-			"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
+			"  not checked: /project/Sources/Example/Generated.swift (ignored by git)\n",
 			"  this run did not check everything: the notes above name the files nothing checked\n",
 		)
 	})
@@ -531,9 +548,240 @@ func TestSwiftRunGroupsExcludedFiles(test *testing.T) {
 	}
 	requireLines(test, output,
 		"  not checked: 6 files (vendored under Vendor/)\n",
-		"  not checked: /project/Sources/Example/Generated.swift (marked // @generated)\n",
+		"  not checked: /project/Sources/Example/Generated.swift (ignored by git)\n",
 	)
 	forbidLines(test, output, "/project/Vendor/Fa.swift")
+}
+
+// excludedFile is one file a project record lists as not checked, and why.
+type excludedFile struct {
+	file   string
+	reason string
+}
+
+// projectRecordAt is a contract fixture's project record moved to root, its excluded files replaced, so a
+// test can state which files the engine left out and why.
+func projectRecordAt(test *testing.T, record string, root string, excluded []excludedFile) string {
+	test.Helper()
+	var fields map[string]any
+	if decodeError := json.Unmarshal([]byte(record), &fields); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	if fields["kind"] != "project" {
+		test.Fatalf("not a project record: %s", record)
+	}
+	entries := make([]map[string]string, 0, len(excluded))
+	for _, entry := range excluded {
+		entries = append(entries, map[string]string{"file": entry.file, "reason": entry.reason})
+	}
+	fields["root"], fields["excluded"] = root, entries
+	encoded, encodeError := json.Marshal(fields)
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	return string(encoded)
+}
+
+// A Swift run that yields a directory to the Swift project below it, an Xcode project or a nested package
+// running on its own, leaves every excluded file under it out of its notes, whatever the reason, since that
+// project's run accounts for them; the engine spells the path as Foundation does, `/tmp` where this process
+// holds `/private/tmp`, so both sides are resolved. What remains is the gap, counted for the footer, unless its
+// reason is one the engine gives for files nobody expects checked; a reason it has never given before counts,
+// so a reworded sentence makes the gap louder. A file the engine could not read is this run's own and is never
+// left out. None of it moves the exit code (#ybspptb).
+// Not parallel: it renders check runs through engineRun, whose record acceptors set the package-level
+// activeSummary, which it reads back
+func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
+	resolvedRoot, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
+	}
+	alias := filepath.Join(test.TempDir(), "alias")
+	if symlinkError := os.Symlink(resolvedRoot, alias); symlinkError != nil {
+		test.Fatal(symlinkError)
+	}
+	// The engine's spellings of the same directory: through a symbolic link on any platform, and on macOS,
+	// where the temporary directory is under /private, the spelling Foundation gives it without the prefix.
+	spellings := map[string]string{"through a symbolic link": alias}
+	if trimmed, isPrivate := strings.CutPrefix(resolvedRoot, "/private/"); isPrivate {
+		spellings["as /tmp is spelled for /private/tmp"] = "/" + trimmed
+	}
+	writeTree(test, resolvedRoot, map[string]string{
+		"CapturePhone/App/App.swift": "let app = 1\n",
+		"Tools/Sim/Package.swift":    discoveryPackage,
+		"Tools/Sim/Broken.swift":     "let broken = 1\n",
+	})
+	yielded := []string{filepath.Join(resolvedRoot, "CapturePhone"), filepath.Join(resolvedRoot, "Tools", "Sim")}
+
+	for name, engineRoot := range spellings {
+		excluded := []excludedFile{
+			{engineRoot + "/CapturePhone/App/App.swift", "no target of this package compiles it"},
+			{engineRoot + "/Tools/Sim/Package.swift", "a package manifest"},
+			{engineRoot + "/Scripts/build.swift", "no target of this package compiles it"},
+			{engineRoot + "/Scripts/odd.swift", "a reason no engine has given yet"},
+			{engineRoot + "/Package.swift", "a package manifest"},
+			{engineRoot + "/Vendor/Kit/Kit.swift", "vendored under Vendor/"},
+			{engineRoot + "/Scratch.swift", "ignored by git"},
+		}
+
+		// Not parallel: it renders a check run through engineRun and reads back the package-level activeSummary
+		test.Run(name, func(test *testing.T) {
+			clean := contractFixture(test, "Clean.jsonl")
+			clean[1] = projectRecordAt(test, clean[1], engineRoot, excluded)
+
+			activeSummary = runSummary{}
+			output, exitCode, renderRecordsError := renderRecordsYielding(test, engineModeCheck, clean, 0, yielded)
+			if renderRecordsError != nil || exitCode != 0 {
+				test.Fatalf(
+					"a clean run with a gap exited %d, err %v, want the 0 it exits without one:\n%s",
+					exitCode,
+					renderRecordsError,
+					output,
+				)
+			}
+			forbidLines(test, output, "CapturePhone/App/App.swift", "Tools/Sim/Package.swift")
+			requireLines(test, output,
+				"  not checked: "+engineRoot+"/Scripts/build.swift (no target of this package compiles it)\n",
+				"  not checked: "+engineRoot+"/Scripts/odd.swift (a reason no engine has given yet)\n",
+				"  not checked: "+engineRoot+"/Package.swift (a package manifest)\n",
+				"  not checked: "+engineRoot+"/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
+				"  not checked: "+engineRoot+"/Scratch.swift (ignored by git)\n",
+			)
+			wantGap := []uncheckedSwiftFile{
+				{engineRoot + "/Scripts/build.swift", "no target of this package compiles it"},
+				{engineRoot + "/Scripts/odd.swift", "a reason no engine has given yet"},
+			}
+			if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, wantGap) {
+				test.Errorf("the gap is %v, want %v: build.swift and odd.swift, and none of the three expected reasons",
+					activeSummary.Gaps.UncheckedSwift, wantGap)
+			}
+			if markers := uncheckedMarkers(activeSummary); !slices.Contains(markers, "⚠ 2 Swift files not checked") {
+				test.Errorf("the footer's markers are %q, want the gap among them", markers)
+			}
+
+			// The control: the same stream yielding nothing names every file, so what was left out above was
+			// the yield at work.
+			activeSummary = runSummary{}
+			output, _, renderRecordsError = renderRecordsYielding(test, engineModeCheck, clean, 0, nil)
+			if renderRecordsError != nil {
+				test.Fatal(renderRecordsError)
+			}
+			requireLines(test, output,
+				"  not checked: "+engineRoot+"/CapturePhone/App/App.swift (no target of this package compiles it)\n",
+				"  not checked: "+engineRoot+"/Tools/Sim/Package.swift (a package manifest)\n",
+			)
+			if len(activeSummary.Gaps.UncheckedSwift) != 3 {
+				test.Errorf("yielding nothing listed %v as not checked, want 3 files", activeSummary.Gaps.UncheckedSwift)
+			}
+
+			// A file the engine could not read under a yielded directory is still named, and the run is
+			// incomplete with the exit 1 it gives without the yield.
+			unreadable := contractFixture(test, "Unreadable.jsonl")
+			unreadable[1] = projectRecordAt(test, unreadable[1], engineRoot, excluded)
+			unreadable[2] = strings.Replace(
+				unreadable[2],
+				"/project/Sources/Example/Latin1.swift",
+				engineRoot+"/Tools/Sim/Broken.swift",
+				1,
+			)
+			activeSummary = runSummary{}
+			output, exitCode, renderRecordsError = renderRecordsYielding(test, engineModeCheck, unreadable, 1, yielded)
+			if renderRecordsError != nil || exitCode != 1 {
+				test.Fatalf("an unreadable file exited %d, err %v, want 1:\n%s", exitCode, renderRecordsError, output)
+			}
+			requireLines(test, output, "  not checked: "+engineRoot+"/Tools/Sim/Broken.swift (could not be read: ")
+			forbidLines(test, output, "CapturePhone/App/App.swift")
+		})
+	}
+}
+
+// The contract's clean fixture leaves its one file out for a reason the engine gives today, `ignored by git`,
+// which nobody expects a run to check, so a stand-in run on it is clean with no gap. It carried `marked //
+// @generated`, which the engine stopped giving at d3bd032b, and every stand-in run on it showed one Swift file
+// not checked (#zskc1pa). A reason the engine has never given is still a gap: see
+// TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap.
+// Not parallel: it renders a check run through engineRun and reads back the package-level activeSummary
+func TestSwiftRunFindsNoGapInTheCleanFixture(test *testing.T) {
+	activeSummary = runSummary{}
+	output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
+	if renderRecordsError != nil || exitCode != 0 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
+	}
+	if len(activeSummary.Gaps.UncheckedSwift) != 0 {
+		test.Errorf("the clean fixture's gap is %v, want none", activeSummary.Gaps.UncheckedSwift)
+	}
+	for _, marker := range uncheckedMarkers(activeSummary) {
+		if strings.Contains(marker, "Swift file") {
+			test.Errorf("the footer marks %q for the clean fixture, which leaves out only what git ignores", marker)
+		}
+	}
+}
+
+// A gap is named file by file, however many files share its reason, in the account `--verbose` prints and in
+// the list `--json` writes, while a reason nobody expects checked still collapses to a count past the limit. A
+// file of the gap's reason under a yielded directory is in neither, since the run there accounts for it.
+// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+// activeSummary, which it reads back
+func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
+	excluded := []excludedFile{{"/project/App/Main.swift", "no target of this package compiles it"}}
+	wantGap := []uncheckedSwiftFile{}
+	for index := range excludedNamedLimit + 1 {
+		letter := string(rune('a' + index))
+		excluded = append(excluded,
+			excludedFile{"/project/Scripts/S" + letter + ".swift", "no target of this package compiles it"},
+			excludedFile{"/project/Vendor/V" + letter + ".swift", "vendored under Vendor/"},
+		)
+		wantGap = append(
+			wantGap,
+			uncheckedSwiftFile{"/project/Scripts/S" + letter + ".swift", "no target of this package compiles it"},
+		)
+	}
+	clean := contractFixture(test, "Clean.jsonl")
+	clean[1] = projectRecordAt(test, clean[1], "/project", excluded)
+
+	activeSummary = runSummary{}
+	output, exitCode, renderRecordsError := renderRecordsYielding(test, engineModeCheck, clean, 0, []string{"/project/App"})
+	if renderRecordsError != nil || exitCode != 0 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
+	}
+	for _, file := range wantGap {
+		requireLines(test, output, "  not checked: "+file.File+" ("+file.Reason+")\n")
+	}
+	requireLines(test, output, "  not checked: 6 files (vendored under Vendor/)\n")
+	forbidLines(
+		test,
+		output,
+		"files (no target of this package compiles it)",
+		"/project/Vendor/Va.swift",
+		"/project/App/Main.swift",
+	)
+	if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, wantGap) {
+		test.Errorf("the gap is %v, want %v", activeSummary.Gaps.UncheckedSwift, wantGap)
+	}
+	if markers := uncheckedMarkers(activeSummary); !slices.Contains(markers, "⚠ 6 Swift files not checked") {
+		test.Errorf("the footer's markers are %q, want the six files of the gap counted", markers)
+	}
+
+	// The list as `--json` writes it: each file with its reason, under the key the schema names.
+	encoded, encodeError := json.Marshal(summaryAsJSON(activeSummary))
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	var decoded struct {
+		Gaps struct {
+			UncheckedSwift []map[string]string `json:"uncheckedSwift"`
+		} `json:"gaps"`
+	}
+	if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	wantJSON := []map[string]string{}
+	for _, file := range wantGap {
+		wantJSON = append(wantJSON, map[string]string{"file": file.File, "reason": file.Reason})
+	}
+	if !reflect.DeepEqual(decoded.Gaps.UncheckedSwift, wantJSON) {
+		test.Errorf("under --json the gap is %v, want %v:\n%s", decoded.Gaps.UncheckedSwift, wantJSON, encoded)
+	}
 }
 
 // TestSwiftRunBelievesAnEngineThatFellShort holds the allowed direction of the completeness check: an
@@ -783,8 +1031,9 @@ func TestSwiftRunListsTheFilesItRewrote(test *testing.T) {
 // Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
 // activeSummary
 func TestEngineRunRendersAGoStreamInGoWords(test *testing.T) {
+	activeSummary = runSummary{}
 	output, exitCode, renderRecordsInError := renderRecordsIn(test, goLanguage("module"), engineModeCheck,
-		contractFixture(test, "GoClean.jsonl"), 0)
+		contractFixture(test, "GoClean.jsonl"), 0, nil)
 	if renderRecordsInError != nil || exitCode != 0 {
 		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsInError, output)
 	}
@@ -796,6 +1045,11 @@ func TestEngineRunRendersAGoStreamInGoWords(test *testing.T) {
 		" module 96ms",
 	)
 	forbidLines(test, output, "Swift", "swift", "package")
+	// The Go engine's left-out files are no unchecked-Swift gap, whatever their reason: the expected reasons
+	// and the gap's words are Swift's (engineLanguage.ExpectedExclusionReasons).
+	if len(activeSummary.Gaps.UncheckedSwift) != 0 {
+		test.Errorf("a Go run kept the unchecked-Swift gap %v", activeSummary.Gaps.UncheckedSwift)
+	}
 }
 
 // TestEngineRunLabelsAGoCompilerFindingGo holds that a compiler finding with no group of its own carries
@@ -856,4 +1110,51 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 		"go engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n",
 		"  the Go engine was built from a modified tree, so no commit reproduces it\n",
 	)
+}
+
+// TestASwiftRunUnderNoCacheSaysItsCacheWasOff: a Swift run under `--no-cache` says so in its summary's
+// `cache.off` and in the verbose account, as a TypeScript run does, and a run with its cache on says neither.
+// Every Swift summary once said the cache was on under `--no-cache`, because only the TypeScript pipeline set it.
+// Not parallel: it sets the package-level cacheOff and activeOutput, which every run reads.
+func TestASwiftRunUnderNoCacheSaysItsCacheWasOff(test *testing.T) {
+	savedCacheOff, savedOutput := cacheOff, activeOutput
+	defer func() { cacheOff, activeOutput = savedCacheOff, savedOutput }()
+	for _, off := range []bool{true, false} {
+		cacheOff = off
+		activeOutput = outputSettings{Mode: outputJSON}
+		output, _, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
+		if renderRecordsError != nil {
+			test.Fatalf("rendering under cacheOff %t: %v", off, renderRecordsError)
+		}
+		summaryLine := ""
+		for _, line := range strings.Split(output, "\n") {
+			if strings.Contains(line, `"kind":"summary"`) {
+				summaryLine = line
+			}
+		}
+		var summary struct {
+			Cache struct {
+				Off bool `json:"off"`
+			} `json:"cache"`
+		}
+		if decodeError := json.Unmarshal([]byte(summaryLine), &summary); decodeError != nil {
+			test.Fatalf("no summary record under cacheOff %t: %v\n%s", off, decodeError, output)
+		}
+		if summary.Cache.Off != off {
+			test.Errorf("the summary's cache.off is %t under cacheOff %t", summary.Cache.Off, off)
+		}
+
+		activeOutput = outputSettings{Mode: outputVerbose}
+		output, _, renderRecordsError = renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
+		if renderRecordsError != nil {
+			test.Fatalf("rendering verbose under cacheOff %t: %v", off, renderRecordsError)
+		}
+		said := strings.Contains(
+			output,
+			"  cache: off, by --no-cache: nothing was read from or written to this package's cache",
+		)
+		if said != off {
+			test.Errorf("the account said the cache was off %t under cacheOff %t:\n%s", said, off, output)
+		}
+	}
 }

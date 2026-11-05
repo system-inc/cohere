@@ -114,9 +114,9 @@ func loadLintPackages(overlay map[string][]byte) ([]*gotypes.Package, string) {
 	}
 	// Every package read from source, a dependency of the rule packages too: one that does not type-check
 	// would hand the scans a partial tree.
-	for _, pkg := range loaded.Source {
-		if len(pkg.Errors) > 0 {
-			return nil, fmt.Sprintf("loading %s: %v", pkg.ImportPath, pkg.Errors[0])
+	for _, sourcePackage := range loaded.Source {
+		if len(sourcePackage.Errors) > 0 {
+			return nil, fmt.Sprintf("loading %s: %v", sourcePackage.ImportPath, sourcePackage.Errors[0])
 		}
 	}
 	return loaded.Roots, ""

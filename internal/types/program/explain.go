@@ -76,7 +76,7 @@ type Explanation struct {
 // A separate path from Walk rather than a flag on it. Walk is the hot path across thousands of
 // files and must stay free of per-rule bookkeeping; this runs once, on one file, where the overhead
 // is irrelevant and completeness matters more than speed.
-func (graph *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rules []rule.Rule) (*Explanation, error) {
+func (graph *Graph) Explain(callerContext context.Context, sourceFile *ast.SourceFile, rules []rule.Rule) (*Explanation, error) {
 	if sourceFile == nil {
 		return nil, fmt.Errorf("no file to explain")
 	}
@@ -98,7 +98,7 @@ func (graph *Graph) Explain(ctx context.Context, sourceFile *ast.SourceFile, rul
 
 	directives := suppression.Build(sourceFile.Text())
 
-	fileChecker, release := graph.CheckerForFile(ctx, sourceFile)
+	fileChecker, release := graph.CheckerForFile(callerContext, sourceFile)
 	defer release()
 
 	fileCache := rule.NewFileCache()

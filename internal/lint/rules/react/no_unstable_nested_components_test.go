@@ -12,7 +12,7 @@ import (
 // upstreamMessage builds the exact text upstream produces, so the assertions below compare against
 // a measured string rather than a paraphrase. Copied from the installed 7.37.5 build's output on
 // 2026-08-27 rather than retyped from the rule source.
-func upstreamMessage(parentName string, asProps bool) string {
+func upstreamMessage(parentName string, asProperties bool) string {
 	name := " "
 	if parentName != "" {
 		name = " “" + parentName + "” "
@@ -21,7 +21,7 @@ func upstreamMessage(parentName string, asProps bool) string {
 		"every render and destroy the entire subtree’s DOM nodes and state " +
 		"(https://reactjs.org/docs/reconciliation.html#elements-of-different-types). Instead, " +
 		"move this component definition out of the parent component" + name + "and pass data as props."
-	if asProps {
+	if asProperties {
 		message += " If you want to allow component creation in props, set allowAsProps option to true."
 	}
 	return message

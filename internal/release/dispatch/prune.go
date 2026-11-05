@@ -321,9 +321,9 @@ func RecordPrune(paths Paths, plan PrunePlan, removed []PrunedFile, now time.Tim
 		fmt.Fprintf(&entry, "  kept unrecognised %s\n", name)
 	}
 
-	log, err := os.OpenFile(paths.PruneLogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return fmt.Errorf("opening the prune log: %w", err)
+	log, openError := os.OpenFile(paths.PruneLogPath(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if openError != nil {
+		return fmt.Errorf("opening the prune log: %w", openError)
 	}
 	_, writeError := log.WriteString(entry.String())
 	closeError := log.Close()

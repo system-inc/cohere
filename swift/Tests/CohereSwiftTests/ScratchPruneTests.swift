@@ -118,7 +118,7 @@ struct ScratchPruneTests {
             )
             try #require(built.succeeded, "the fixture package must build: \(built.standardError)")
         }
-        let storePath = IndexStore.storePath(scratchPath: scratch)
+        let storePath = IndexStore.storePath(layout: .swiftPackage(scratchPath: scratch))
         return (
             scratch, try IndexStore(libraryPath: IndexStore.toolchainLibraryPath(), storePath: storePath), storePath,
         )

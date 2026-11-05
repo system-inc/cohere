@@ -6,7 +6,10 @@ import SwiftSyntax
 
  The question is narrow because `MemberImportVisibility` is on for every target we check: each file must
  import the modules whose members it uses, so a file's imports are its own and an import is used exactly when
- something written in that file resolves into the module or into a module it re-exports. The index answers
+ something written in that file resolves into the module or into a module it re-exports. An Xcode target need
+ not turn it on (CapturePhone compiles in Swift 5 without it), and there a member is visible through an import
+ anywhere in the module, so an import no name in the file resolves into still goes without breaking the build:
+ measured 2026-11-05, 9 of 9 on a CapturePhone copy, each removed alone and all together. The index answers
  both halves. Each file's unit lists the modules the file imports; each module's records declare its symbols,
  so a symbol a file refers to is placed in the module that declares it.
 

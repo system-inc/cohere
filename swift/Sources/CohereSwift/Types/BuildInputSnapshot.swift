@@ -14,6 +14,8 @@ import Foundation
    exactly as safe as the build it replaces, and it catches what a source-only walk would miss: a header
    outside a target, a resource, `Packages/` from `swift package edit`;
  - the root's `Package.resolved` by content, which pins every remote dependency's checkout;
+ - any other file a build reads that is rewritten whatever it says, by content, since its time would change on
+   every run: an Xcode project xcodegen generates into the scratch afresh each run (`XcodeTypesPhase`);
  - the toolchain and the build's own arguments, so a toolchain change or `--no-fix`'s disabled resolution is
    a different build.
 
@@ -25,7 +27,7 @@ import Foundation
  */
 struct BuildInputSnapshot: Equatable, Codable {
     let fingerprint: String
-    /* The toolchain, the build's arguments and the resolved pins, one line each. */
+    /* The toolchain, the build's arguments, the resolved pins and each file taken by content, one line each. */
     let settings: [String]
     /* Every file the build reads, by path, to its size and modification time. */
     let files: [String: String]
@@ -41,11 +43,18 @@ struct BuildInputSnapshot: Equatable, Codable {
         left.fingerprint == right.fingerprint
     }
 
-    static func take(roots: [URL], resolved: URL, toolchain: String, arguments: [String]) -> BuildInputSnapshot {
-        let settings = [
-            "toolchain\t\(toolchain)", "arguments\t\(arguments.joined(separator: " "))",
-            "resolved\t\(PackageDescriptionCache.fingerprint(of: resolved))",
-        ]
+    static func take(
+        roots: [URL],
+        resolved: URL,
+        toolchain: String,
+        arguments: [String],
+        contents: [URL] = [],
+    ) -> BuildInputSnapshot {
+        let settings =
+            [
+                "toolchain\t\(toolchain)", "arguments\t\(arguments.joined(separator: " "))",
+                "resolved\t\(PackageDescriptionCache.fingerprint(of: resolved))",
+            ] + contents.map { "content\t\($0.path)\t\(PackageDescriptionCache.fingerprint(of: $0))" }
         var files: [String: String] = [:]
         let keys: [URLResourceKey] = [.isDirectoryKey, .fileSizeKey, .contentModificationDateKey]
         for root in roots {

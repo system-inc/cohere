@@ -167,6 +167,9 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 			!summary.Gaps.NothingToCheck && summary.Gaps.Unread == ""
 	}
 	recordRunSummary(summary)
+	// After the record, since it is what this invocation's discovery found and not part of the run: Swift
+	// added or given a package since would otherwise be said, or left out, by every replay.
+	summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
 
 	switch activeOutput.Mode {
 	case outputVerbose:
@@ -225,18 +228,18 @@ func printChangedFiles(out *bufio.Writer, changed []changedFile) {
 }
 
 // unusedDisableSeverity is shared by rendering and check-only fixes, including nil-config harnesses.
-func unusedDisableSeverity(config *configuration.Config, path string) configuration.Severity {
+func unusedDisableSeverity(lintConfiguration *configuration.Config, path string) configuration.Severity {
 	resolved := configuration.Resolved{}
-	if config != nil {
-		resolved = config.Resolve(path)
+	if lintConfiguration != nil {
+		resolved = lintConfiguration.Resolve(path)
 	}
 	return resolved.UnusedDisableSeverity()
 }
 
-func lintWarningCount(diagnostics []rule.Diagnostic, config *configuration.Config) int {
+func lintWarningCount(diagnostics []rule.Diagnostic, lintConfiguration *configuration.Config) int {
 	warnings := 0
 	for _, diagnostic := range diagnostics {
-		if ruleFinding(diagnostic, config).Severity == "warn" {
+		if ruleFinding(diagnostic, lintConfiguration).Severity == "warn" {
 			warnings++
 		}
 	}

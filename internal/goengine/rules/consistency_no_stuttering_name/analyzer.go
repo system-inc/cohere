@@ -86,8 +86,8 @@ func run(pass *analysis.Pass) (any, error) {
 			// method expression (data.Data on a type) are never judged: neither name is a placeholder for a value. And
 			// it must be one this package declared, outside a generated file: a dot-imported variable is another
 			// package's name, reached bare.
-			variable, isVar := pass.TypesInfo.Uses[base].(*types.Var)
-			if !isVar || variable.Pkg() != pass.Pkg || generatedFiles[pass.Fset.File(variable.Pos())] {
+			variable, isVariable := pass.TypesInfo.Uses[base].(*types.Var)
+			if !isVariable || variable.Pkg() != pass.Pkg || generatedFiles[pass.Fset.File(variable.Pos())] {
 				return true
 			}
 			pass.Report(analysis.Diagnostic{

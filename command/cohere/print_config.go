@@ -35,12 +35,12 @@ type printedDeparture struct {
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
 func writeResolvedConfig(
 	out *bufio.Writer,
-	config *configuration.Config,
+	lintConfiguration *configuration.Config,
 	resolved configuration.Resolved,
 	location projectLocation,
 	path string,
 ) error {
-	base := optionsBase(config, location.Root)
+	base := optionsBase(lintConfiguration, location.Root)
 	if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
 		return fmt.Errorf("validating the lint config: %w", checkSettingsError)
 	}
@@ -55,7 +55,7 @@ func writeResolvedConfig(
 		return err
 	}
 	if !tspath.IsRootedDiskPath(path) {
-		path = absoluteFrom(config.Root, path)
+		path = absoluteFrom(lintConfiguration.Root, path)
 	}
 	source := graph.Program.GetSourceFile(tspath.RootedFilePath(path))
 	if source == nil {
@@ -86,7 +86,7 @@ func writeResolvedConfig(
 	}
 	overrides := []printedOverride{}
 	for _, index := range resolved.MatchedOverrideIndices() {
-		override := config.Overrides[index]
+		override := lintConfiguration.Overrides[index]
 		rules := map[string][]json.RawMessage{}
 		for name, setting := range override.Rules {
 			rules[name] = append(
@@ -103,7 +103,7 @@ func writeResolvedConfig(
 		})
 	}
 	departures := map[string]printedDeparture{}
-	for name, departure := range config.Departures {
+	for name, departure := range lintConfiguration.Departures {
 		departures[name] = printedDeparture{File: departure.File, Reason: departure.Reason}
 	}
 	// Struct field order fixes the public top-level order; encoding/json sorts every map's keys.

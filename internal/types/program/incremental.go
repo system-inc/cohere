@@ -75,21 +75,21 @@ func (graph *Graph) NewIncrementalSession() *IncrementalSession {
 //
 // The program is still built either way. A build info can skip checking the graph, never
 // constructing it, so the caller has already paid the graph phase before calling this.
-func (session *IncrementalSession) Diagnostics(ctx context.Context) []*ast.Diagnostic {
-	return session.DiagnosticParts(ctx).All()
+func (session *IncrementalSession) Diagnostics(callerContext context.Context) []*ast.Diagnostic {
+	return session.DiagnosticParts(callerContext).All()
 }
 
 // DiagnosticParts is Diagnostics with its parts kept apart. See TypeDiagnosticParts.
-func (session *IncrementalSession) DiagnosticParts(ctx context.Context) TypeDiagnosticParts {
+func (session *IncrementalSession) DiagnosticParts(callerContext context.Context) TypeDiagnosticParts {
 	// Syntactic first, and bail on failure, for the same reason AllDiagnostics does: a file
 	// that does not parse produces cascading nonsense from the later phases.
-	syntactic := session.graph.Program.GetSyntacticDiagnostics(ctx, nil)
+	syntactic := session.graph.Program.GetSyntacticDiagnostics(callerContext, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
 	return TypeDiagnosticParts{
-		Bind:     session.graph.Program.GetBindDiagnostics(ctx, nil),
-		Semantic: session.program.GetSemanticDiagnostics(ctx, nil),
+		Bind:     session.graph.Program.GetBindDiagnostics(callerContext, nil),
+		Semantic: session.program.GetSemanticDiagnostics(callerContext, nil),
 	}
 }
 
@@ -127,8 +127,8 @@ func (session *IncrementalSession) DiagnosticParts(ctx context.Context) TypeDiag
 // Returns any diagnostics from the write itself. A failed write must not pass silently: the
 // next run would be cold while this one reported success, and the symptom is a saving that
 // never appears rather than an error anyone can see.
-func (session *IncrementalSession) Write(ctx context.Context) []*ast.Diagnostic {
-	result := incremental.EmitBuildInfo(ctx, session.program)
+func (session *IncrementalSession) Write(callerContext context.Context) []*ast.Diagnostic {
+	result := incremental.EmitBuildInfo(callerContext, session.program)
 	if result == nil {
 		return nil
 	}
@@ -141,12 +141,12 @@ func (session *IncrementalSession) Write(ctx context.Context) []*ast.Diagnostic 
 // Prefer this at a call site that just wants the findings. Use NewIncrementalSession directly
 // when the caller needs to decide whether to write, for example when it is about to report a
 // failure and would rather not persist state from a run it is discarding.
-func (graph *Graph) IncrementalDiagnostics(ctx context.Context) []*ast.Diagnostic {
+func (graph *Graph) IncrementalDiagnostics(callerContext context.Context) []*ast.Diagnostic {
 	session := graph.NewIncrementalSession()
 	if session == nil {
-		return graph.AllDiagnostics(ctx)
+		return graph.AllDiagnostics(callerContext)
 	}
-	diagnostics := session.Diagnostics(ctx)
-	session.Write(ctx)
+	diagnostics := session.Diagnostics(callerContext)
+	session.Write(callerContext)
 	return diagnostics
 }

@@ -73,8 +73,8 @@ plain-scalar(is-flow, min)
 */
 
 // isEmpty: undefined (-1), space, newline, carriage return or tab.
-func isEmpty(ch int) bool {
-	switch ch {
+func isEmpty(character int) bool {
+	switch character {
 	case -1, ' ', '\n', '\r', '\t':
 		return true
 	default:
@@ -83,12 +83,12 @@ func isEmpty(ch int) bool {
 }
 
 // inSet is upstream's `set.has(ch)` over a set of ASCII characters; undefined is in no set.
-func inSet(set string, ch int) bool {
-	if ch < 0 || ch >= 0x80 {
+func inSet(set string, character int) bool {
+	if character < 0 || character >= 0x80 {
 		return false
 	}
 	for index := 0; index < len(set); index++ {
-		if int(set[index]) == ch {
+		if int(set[index]) == character {
 			return true
 		}
 	}
@@ -101,7 +101,9 @@ const flowIndicatorChars = ",[]{}"
 const invalidAnchorChars = " ,[]{}\n\r\t"
 
 // isNotAnchorChar is `!ch || invalidAnchorChars.has(ch)`.
-func isNotAnchorChar(ch int) bool { return ch == -1 || inSet(invalidAnchorChars, ch) }
+func isNotAnchorChar(character int) bool {
+	return character == -1 || inSet(invalidAnchorChars, character)
+}
 
 // Lexer splits an input string into lexical tokens, i.e. smaller strings that are easily identifiable by
 // TokenType.
@@ -194,15 +196,15 @@ func (lexer *Lexer) Lex(source []uint16, incomplete bool) iter.Seq[[]uint16] {
 
 func (lexer *Lexer) atLineEnd() bool {
 	i := lexer.pos
-	ch := characterAt(lexer.buffer, i)
-	for ch == ' ' || ch == '\t' {
+	character := characterAt(lexer.buffer, i)
+	for character == ' ' || character == '\t' {
 		i++
-		ch = characterAt(lexer.buffer, i)
+		character = characterAt(lexer.buffer, i)
 	}
-	if ch == -1 || ch == '#' || ch == '\n' {
+	if character == -1 || character == '#' || character == '\n' {
 		return true
 	}
-	if ch == '\r' {
+	if character == '\r' {
 		return characterAt(lexer.buffer, i+1) == '\n'
 	}
 	return false
@@ -213,25 +215,25 @@ func (lexer *Lexer) charAt(n int) int {
 }
 
 func (lexer *Lexer) continueScalar(offset int) int {
-	ch := characterAt(lexer.buffer, offset)
+	character := characterAt(lexer.buffer, offset)
 	if lexer.indentNext > 0 {
 		indent := 0
-		for ch == ' ' {
+		for character == ' ' {
 			indent++
-			ch = characterAt(lexer.buffer, indent+offset)
+			character = characterAt(lexer.buffer, indent+offset)
 		}
-		if ch == '\r' {
+		if character == '\r' {
 			next := characterAt(lexer.buffer, indent+offset+1)
 			if next == '\n' || (next == -1 && !lexer.atEnd) {
 				return offset + indent + 1
 			}
 		}
-		if ch == '\n' || indent >= lexer.indentNext || (ch == -1 && !lexer.atEnd) {
+		if character == '\n' || indent >= lexer.indentNext || (character == -1 && !lexer.atEnd) {
 			return offset + indent
 		}
 		return -1
 	}
-	if ch == '-' || ch == '.' {
+	if character == '-' || character == '.' {
 		dt := substr(lexer.buffer, offset, 3)
 		if (equals(dt, "---") || equals(dt, "...")) && isEmpty(characterAt(lexer.buffer, offset+3)) {
 			return -1
@@ -313,8 +315,8 @@ func (lexer *Lexer) parseStream() string {
 		dirEnd := len(line)
 		cs := indexOf(line, '#', 0)
 		for cs != -1 {
-			ch := characterAt(line, cs-1)
-			if ch == ' ' || ch == '\t' {
+			character := characterAt(line, cs-1)
+			if character == ' ' || character == '\t' {
 				dirEnd = cs - 1
 				break
 			} else {
@@ -322,8 +324,8 @@ func (lexer *Lexer) parseStream() string {
 			}
 		}
 		for {
-			ch := characterAt(line, dirEnd-1)
-			if ch == ' ' || ch == '\t' {
+			character := characterAt(line, dirEnd-1)
+			if character == ' ' || character == '\t' {
 				dirEnd--
 			} else {
 				break
@@ -346,11 +348,11 @@ func (lexer *Lexer) parseStream() string {
 }
 
 func (lexer *Lexer) parseLineStart() string {
-	ch := lexer.charAt(0)
-	if ch == -1 && !lexer.atEnd {
+	character := lexer.charAt(0)
+	if character == -1 && !lexer.atEnd {
 		return lexer.setNext("line-start")
 	}
-	if ch == '-' || ch == '.' {
+	if character == '-' || character == '.' {
 		if !lexer.atEnd && !lexer.hasChars(4) {
 			return lexer.setNext("line-start")
 		}
@@ -586,29 +588,29 @@ func (lexer *Lexer) parseBlockScalarHeader() int {
 	i := lexer.pos
 	for {
 		i++
-		ch := characterAt(lexer.buffer, i)
-		if ch == '+' {
+		character := characterAt(lexer.buffer, i)
+		if character == '+' {
 			lexer.blockScalarKeep = true
-		} else if ch > '0' && ch <= '9' {
-			lexer.blockScalarIndent = ch - '0' - 1
-		} else if ch != '-' {
+		} else if character > '0' && character <= '9' {
+			lexer.blockScalarIndent = character - '0' - 1
+		} else if character != '-' {
 			break
 		}
 	}
-	return lexer.pushUntil(func(ch int) bool { return isEmpty(ch) || ch == '#' })
+	return lexer.pushUntil(func(character int) bool { return isEmpty(character) || character == '#' })
 }
 
 func (lexer *Lexer) parseBlockScalar() string {
 	nl := lexer.pos - 1 // may be -1 if this.pos === 0
 	indent := 0
-	var ch int
+	var character int
 loop:
 	for i := lexer.pos; ; i++ {
-		ch = characterAt(lexer.buffer, i)
-		if ch == -1 {
+		character = characterAt(lexer.buffer, i)
+		if character == -1 {
 			break
 		}
-		switch ch {
+		switch character {
 		case ' ':
 			indent++
 		case '\n':
@@ -628,7 +630,7 @@ loop:
 			break loop
 		}
 	}
-	if ch == -1 && !lexer.atEnd {
+	if character == -1 && !lexer.atEnd {
 		return lexer.setNext("block-scalar")
 	}
 	if indent >= lexer.indentNext {
@@ -661,31 +663,31 @@ loop:
 	// Trailing insufficiently indented tabs are invalid.
 	// To catch that during parsing, we include them in the block scalar value.
 	i := nl + 1
-	ch = characterAt(lexer.buffer, i)
-	for ch == ' ' {
+	character = characterAt(lexer.buffer, i)
+	for character == ' ' {
 		i++
-		ch = characterAt(lexer.buffer, i)
+		character = characterAt(lexer.buffer, i)
 	}
-	if ch == '\t' {
-		for ch == '\t' || ch == ' ' || ch == '\r' || ch == '\n' {
+	if character == '\t' {
+		for character == '\t' || character == ' ' || character == '\r' || character == '\n' {
 			i++
-			ch = characterAt(lexer.buffer, i)
+			character = characterAt(lexer.buffer, i)
 		}
 		nl = i - 1
 	} else if !lexer.blockScalarKeep {
 		for {
 			i := nl - 1
-			ch := characterAt(lexer.buffer, i)
-			if ch == '\r' {
+			character := characterAt(lexer.buffer, i)
+			if character == '\r' {
 				i--
-				ch = characterAt(lexer.buffer, i)
+				character = characterAt(lexer.buffer, i)
 			}
 			lastCharacter := i // Drop the line if last char not more indented
-			for ch == ' ' {
+			for character == ' ' {
 				i--
-				ch = characterAt(lexer.buffer, i)
+				character = characterAt(lexer.buffer, i)
 			}
-			if ch == '\n' && i >= lexer.pos && i+1+indent > lastCharacter {
+			if character == '\n' && i >= lexer.pos && i+1+indent > lastCharacter {
 				nl = i
 			} else {
 				break
@@ -701,25 +703,25 @@ func (lexer *Lexer) parsePlainScalar() string {
 	inFlow := lexer.flowLevel > 0
 	end := lexer.pos - 1
 	i := lexer.pos - 1
-	var ch int
+	var character int
 	for {
 		i++
-		ch = characterAt(lexer.buffer, i)
-		if ch == -1 {
+		character = characterAt(lexer.buffer, i)
+		if character == -1 {
 			break
 		}
-		if ch == ':' {
+		if character == ':' {
 			next := characterAt(lexer.buffer, i+1)
 			if isEmpty(next) || (inFlow && inSet(flowIndicatorChars, next)) {
 				break
 			}
 			end = i
-		} else if isEmpty(ch) {
+		} else if isEmpty(character) {
 			next := characterAt(lexer.buffer, i+1)
-			if ch == '\r' {
+			if character == '\r' {
 				if next == '\n' {
 					i++
-					ch = '\n'
+					character = '\n'
 					next = characterAt(lexer.buffer, i+1)
 				} else {
 					end = i
@@ -728,7 +730,7 @@ func (lexer *Lexer) parsePlainScalar() string {
 			if next == '#' || (inFlow && inSet(flowIndicatorChars, next)) {
 				break
 			}
-			if ch == '\n' {
+			if character == '\n' {
 				cs := lexer.continueScalar(i + 1)
 				if cs == -1 {
 					break
@@ -736,13 +738,13 @@ func (lexer *Lexer) parsePlainScalar() string {
 				i = max(i, cs-2) // to advance, but still account for ' #'
 			}
 		} else {
-			if inFlow && inSet(flowIndicatorChars, ch) {
+			if inFlow && inSet(flowIndicatorChars, character) {
 				break
 			}
 			end = i
 		}
 	}
-	if ch == -1 && !lexer.atEnd {
+	if character == -1 && !lexer.atEnd {
 		return lexer.setNext("plain-scalar")
 	}
 	lexer.emit([]uint16{Scalar})
@@ -813,27 +815,27 @@ loop:
 func (lexer *Lexer) pushTag() int {
 	if lexer.charAt(1) == '<' {
 		i := lexer.pos + 2
-		ch := characterAt(lexer.buffer, i)
-		for !isEmpty(ch) && ch != '>' {
+		character := characterAt(lexer.buffer, i)
+		for !isEmpty(character) && character != '>' {
 			i++
-			ch = characterAt(lexer.buffer, i)
+			character = characterAt(lexer.buffer, i)
 		}
-		if ch == '>' {
+		if character == '>' {
 			return lexer.pushToIndex(i+1, false)
 		}
 		return lexer.pushToIndex(i, false)
 	}
 	i := lexer.pos + 1
-	ch := characterAt(lexer.buffer, i)
-	for ch != -1 {
-		if inSet(tagChars, ch) {
+	character := characterAt(lexer.buffer, i)
+	for character != -1 {
+		if inSet(tagChars, character) {
 			i++
-			ch = characterAt(lexer.buffer, i)
-		} else if ch == '%' &&
+			character = characterAt(lexer.buffer, i)
+		} else if character == '%' &&
 			inSet(hexDigits, characterAt(lexer.buffer, i+1)) &&
 			inSet(hexDigits, characterAt(lexer.buffer, i+2)) {
 			i += 3
-			ch = characterAt(lexer.buffer, i)
+			character = characterAt(lexer.buffer, i)
 		} else {
 			break
 		}
@@ -842,10 +844,10 @@ func (lexer *Lexer) pushTag() int {
 }
 
 func (lexer *Lexer) pushNewline() int {
-	ch := characterAt(lexer.buffer, lexer.pos)
-	if ch == '\n' {
+	character := characterAt(lexer.buffer, lexer.pos)
+	if character == '\n' {
 		return lexer.pushCount(1)
-	} else if ch == '\r' && lexer.charAt(1) == '\n' {
+	} else if character == '\r' && lexer.charAt(1) == '\n' {
 		return lexer.pushCount(2)
 	}
 	return 0
@@ -853,11 +855,11 @@ func (lexer *Lexer) pushNewline() int {
 
 func (lexer *Lexer) pushSpaces(allowTabs bool) int {
 	i := lexer.pos - 1
-	var ch int
+	var character int
 	for {
 		i++
-		ch = characterAt(lexer.buffer, i)
-		if !(ch == ' ' || (allowTabs && ch == '\t')) {
+		character = characterAt(lexer.buffer, i)
+		if !(character == ' ' || (allowTabs && character == '\t')) {
 			break
 		}
 	}
@@ -869,12 +871,12 @@ func (lexer *Lexer) pushSpaces(allowTabs bool) int {
 	return n
 }
 
-func (lexer *Lexer) pushUntil(test func(ch int) bool) int {
+func (lexer *Lexer) pushUntil(test func(character int) bool) int {
 	i := lexer.pos
-	ch := characterAt(lexer.buffer, i)
-	for !test(ch) {
+	character := characterAt(lexer.buffer, i)
+	for !test(character) {
 		i++
-		ch = characterAt(lexer.buffer, i)
+		character = characterAt(lexer.buffer, i)
 	}
 	return lexer.pushToIndex(i, false)
 }

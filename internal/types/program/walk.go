@@ -221,7 +221,7 @@ type RuleNotes map[string]map[string]int
 //
 // Files are walked in parallel, one goroutine per checker, because a file must be visited by the
 // checker that owns it and there is no use in more workers than there are checkers.
-func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.Rule) (Result, error) {
+func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile, rules []rule.Rule) (Result, error) {
 	if len(files) == 0 {
 		return Result{}, fmt.Errorf(
 			"nothing to walk: the file set is empty (the program holds %d files)",
@@ -292,7 +292,7 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 	// and walkQueue.
 	// A fused check needs each worker on one checker's files whether or not a rule reads one.
 	needsCheckers := anyRuleNeedsTypeChecker(rules) || graph.FusedCheck != nil
-	assignments := graph.assignFilesToWorkers(ctx, files, workers, needsCheckers)
+	assignments := graph.assignFilesToWorkers(callerContext, files, workers, needsCheckers)
 	queues := make([]*walkQueue, workers)
 	homeFiles := make([]*ast.SourceFile, workers)
 	for worker, indices := range assignments {
@@ -365,7 +365,7 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 				// The type check first, on the checker the file is walked on, before this worker takes a checker
 				// for the rules: the check takes that lock itself. See FusedCheck.
 				if graph.FusedCheck != nil {
-					graph.FusedCheck.checkFile(ctx, graph, sourceFile, checkerFile)
+					graph.FusedCheck.checkFile(callerContext, graph, sourceFile, checkerFile)
 				}
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
@@ -541,7 +541,7 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 					// Nothing to release: no rule here asked for a checker, so none was acquired.
 				}
 				if anyRuleNeedsTypeChecker(walkRules) {
-					fileChecker, release = graph.CheckerForFile(ctx, checkerFile)
+					fileChecker, release = graph.CheckerForFile(callerContext, checkerFile)
 				}
 
 				// A rule's Report closure belongs to the rule's slot, so a rule cannot report under another
@@ -1394,7 +1394,7 @@ func optionsKey(elements []json.RawMessage) string {
 // A walk with no rule that reads a checker strides instead: asking which checker owns a file creates every
 // checker, which such a walk never needs.
 func (graph *Graph) assignFilesToWorkers(
-	ctx context.Context,
+	callerContext context.Context,
 	files []*ast.SourceFile,
 	workers int,
 	needsCheckers bool,
@@ -1408,7 +1408,7 @@ func (graph *Graph) assignFilesToWorkers(
 	}
 	slots := map[*checker.Checker]int{}
 	for index, sourceFile := range files {
-		owner, release := graph.Program.GetTypeCheckerForFile(ctx, sourceFile)
+		owner, release := graph.Program.GetTypeCheckerForFile(callerContext, sourceFile)
 		release()
 		slot, seen := slots[owner]
 		if !seen {

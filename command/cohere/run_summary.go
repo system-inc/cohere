@@ -204,6 +204,11 @@ type runGaps struct {
 	// RuleCrashes is each rule that crashed on a file, leaving its verdict there missing. Like a crashed
 	// file it fails the run: see runCrash.
 	RuleCrashes int `json:"ruleCrashes"`
+	// Crashes is each crash the two counts above count, named: the file, the rule for a rule crash, and the
+	// cause, a panic in a TypeScript run and the engine's own sentence in an engine's. A count with no reason
+	// is a gap nobody can act on, so the list is always as long as the two counts together, and it is the
+	// same record `--json` prints as a `crash` line.
+	Crashes []runCrash `json:"crashes,omitempty"`
 	// RulesSkippingEverything is the rules that declined every file they were offered.
 	RulesSkippingEverything int  `json:"rulesSkippingEverything"`
 	FormattingNotChecked    bool `json:"formattingNotChecked"`
@@ -221,6 +226,22 @@ type runGaps struct {
 	// FixesHeld is a run whose lint fixes were held because a generated file is missing (#46ern7e): none was
 	// proposed or written, and formatting ran alone.
 	FixesHeld bool `json:"fixesHeld,omitempty"`
+	// UnclaimedSwift is the directories of Swift files no package holds that discovery found beside the one
+	// project it ran here (#ybspptb). Nothing checked them, and the run neither fails nor passes on them. It
+	// is this invocation's walk, never recorded, so a replay says what its own walk found.
+	UnclaimedSwift []unclaimedSwiftDirectory `json:"unclaimedSwift,omitempty"`
+	// UncheckedSwift is the Swift files a Swift run's engine listed as not checked for a reason other than
+	// git ignoring them, Vendor/ or being a manifest, which today means no target of the package compiles
+	// them, less those the runs of the Swift projects below it account for (#ybspptb). A gap, not a failure.
+	// Each is named, never only counted: a gap nobody can find is half a gap.
+	UncheckedSwift []uncheckedSwiftFile `json:"uncheckedSwift,omitempty"`
+}
+
+// uncheckedSwiftFile is one Swift file of a run's gap: the file as the engine names it, and the engine's reason
+// for leaving it out.
+type uncheckedSwiftFile struct {
+	File   string `json:"file"`
+	Reason string `json:"reason"`
 }
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings

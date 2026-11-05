@@ -196,18 +196,18 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		opts, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
+		settings, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
 		if !ok {
-			opts = SwitchExhaustivenessCheckOptions{}
+			settings = SwitchExhaustivenessCheckOptions{}
 		}
-		if opts.AllowDefaultCaseForExhaustiveSwitch == nil {
-			opts.AllowDefaultCaseForExhaustiveSwitch = type_checking.Ref(true)
+		if settings.AllowDefaultCaseForExhaustiveSwitch == nil {
+			settings.AllowDefaultCaseForExhaustiveSwitch = type_checking.Ref(true)
 		}
-		if opts.ConsiderDefaultExhaustiveForUnions == nil {
-			opts.ConsiderDefaultExhaustiveForUnions = type_checking.Ref(false)
+		if settings.ConsiderDefaultExhaustiveForUnions == nil {
+			settings.ConsiderDefaultExhaustiveForUnions = type_checking.Ref(false)
 		}
-		if opts.RequireDefaultForNonUnion == nil {
-			opts.RequireDefaultForNonUnion = type_checking.Ref(false)
+		if settings.RequireDefaultForNonUnion == nil {
+			settings.RequireDefaultForNonUnion = type_checking.Ref(false)
 		}
 		// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
 		// when the rule is created. Here it matches no comment, which leaves the real default clause
@@ -215,9 +215,9 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		// read as JavaScript reads it, so a lookaround or a backreference its user wrote compiles, and
 		// `\s` and `\b` mean what they mean upstream (#7mztrdd).
 		commentPattern := defaultCaseCommentPattern
-		if opts.DefaultCaseCommentPattern != nil {
+		if settings.DefaultCaseCommentPattern != nil {
 			// Ignored: an invalid pattern compiles to nil, and a nil pattern matches no comment, as above.
-			commentPattern, _ = esregexp.Compile(*opts.DefaultCaseCommentPattern, "u")
+			commentPattern, _ = esregexp.Compile(*settings.DefaultCaseCommentPattern, "u")
 		}
 
 		isLiteralLikeType := func(t *checker.Type) bool {
@@ -313,7 +313,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		checkSwitchExhaustive := func(node *ast.SwitchStatement, metadata *switchMetadata) {
 			// If considerDefaultExhaustiveForUnions is enabled, the presence of a default case
 			// always makes the switch exhaustive.
-			if *opts.ConsiderDefaultExhaustiveForUnions && metadata.hasDefaultCase() {
+			if *settings.ConsiderDefaultExhaustiveForUnions && metadata.hasDefaultCase() {
 				return
 			}
 
@@ -324,7 +324,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		}
 
 		checkSwitchUnnecessaryDefaultCase := func(metadata *switchMetadata) {
-			if *opts.AllowDefaultCaseForExhaustiveSwitch {
+			if *settings.AllowDefaultCaseForExhaustiveSwitch {
 				return
 			}
 
@@ -341,7 +341,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			}
 		}
 		checkSwitchNoUnionDefaultCase := func(node *ast.SwitchStatement, metadata *switchMetadata) {
-			if !*opts.RequireDefaultForNonUnion {
+			if !*settings.RequireDefaultForNonUnion {
 				return
 			}
 

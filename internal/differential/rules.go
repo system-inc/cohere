@@ -51,11 +51,11 @@ var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules?
 // the question, just less directly. Both are asked of the binary rather than derived from the
 // registry linked into this harness, which is the entire point: when the two builds differ, a
 // classification read from the wrong registry describes the wrong tool and says so confidently.
-func CompiledRulesOf(ctx context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
-	if names, rulesFromRulesFlagError := rulesFromRulesFlag(ctx, command); rulesFromRulesFlagError == nil {
+func CompiledRulesOf(callerContext context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
+	if names, rulesFromRulesFlagError := rulesFromRulesFlag(callerContext, command); rulesFromRulesFlagError == nil {
 		return names, nil
 	}
-	return rulesFromExplain(ctx, command, explainFile)
+	return rulesFromExplain(callerContext, command, explainFile)
 }
 
 // rulesFromRulesFlag reads `cohere -rules`, which prints one rule name per line.
@@ -64,11 +64,11 @@ func CompiledRulesOf(ctx context.Context, command GateCommand, explainFile strin
 // harness believing cohere implements no rules at all, under which every gate finding classifies
 // not-ported and every real disagreement is excused. That is the vacuous pass this package exists
 // to refuse, arriving through the door meant to prevent it.
-func rulesFromRulesFlag(ctx context.Context, command GateCommand) (map[string]bool, error) {
+func rulesFromRulesFlag(callerContext context.Context, command GateCommand) (map[string]bool, error) {
 	probe := command
 	probe.Arguments = []string{"-rules"}
 
-	output, err := runGate(ctx, probe)
+	output, err := runGate(callerContext, probe)
 	if err != nil {
 		return nil, fmt.Errorf("%s does not answer -rules: %w", command.Program, err)
 	}
@@ -115,11 +115,11 @@ func namesFromRuleLines(output string) (map[string]bool, error) {
 // `-explain` names all three states a compiled rule can be in: it listened, it declined the file,
 // or the config never enabled it. Their sum is checked against the coverage line's own count, so a
 // parse that silently captured a subset fails loudly instead of producing a plausible short list.
-func rulesFromExplain(ctx context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
+func rulesFromExplain(callerContext context.Context, command GateCommand, explainFile string) (map[string]bool, error) {
 	probe := command
 	probe.Arguments = []string{"-explain", explainFile}
 
-	output, runGateError := runGate(ctx, probe)
+	output, runGateError := runGate(callerContext, probe)
 	if runGateError != nil {
 		// A binary predating `-explain` cannot answer, and that is a real state rather than a
 		// broken one: the harness is measuring an older build. It is an error rather than a silent

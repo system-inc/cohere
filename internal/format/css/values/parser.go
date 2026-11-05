@@ -237,12 +237,12 @@ func (parser *parser) parseTokens() {
 
 func (parser *parser) parenOpen() {
 	unbalancedCount := 1
-	pos := parser.position + 1
+	nextPosition := parser.position + 1
 	token := parser.currToken()
 
 	// check for balanced parens
-	for pos < len(parser.tokens) && unbalancedCount != 0 {
-		tkn := &parser.tokens[pos]
+	for nextPosition < len(parser.tokens) && unbalancedCount != 0 {
+		tkn := &parser.tokens[nextPosition]
 
 		if tkn.kind == "(" {
 			unbalancedCount++
@@ -250,7 +250,7 @@ func (parser *parser) parenOpen() {
 		if tkn.kind == ")" {
 			unbalancedCount--
 		}
-		pos++
+		nextPosition++
 	}
 
 	if unbalancedCount != 0 {

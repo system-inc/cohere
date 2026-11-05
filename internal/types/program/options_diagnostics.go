@@ -79,8 +79,8 @@ var configParsingOptionCodes = map[int32]string{
 // source: a code from either list, located in no file or in one outside this program.
 func (graph *Graph) IsOptionsDiagnostic(diagnostic *ast.Diagnostic) bool {
 	_, raisedByProgram := optionsDiagnosticCodes[diagnostic.Code()]
-	_, raisedByConfig := configParsingOptionCodes[diagnostic.Code()]
-	if !raisedByProgram && !raisedByConfig {
+	_, raisedByConfiguration := configParsingOptionCodes[diagnostic.Code()]
+	if !raisedByProgram && !raisedByConfiguration {
 		return false
 	}
 	sourceFile := diagnostic.File()

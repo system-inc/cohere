@@ -22,10 +22,10 @@ import (
 // person — "what did I write that is not doing anything" — while being two analyses with different
 // evidence behind them. The report keeps them in separate sections precisely so the reader can trust
 // them differently, which is the honest presentation of two claims of unequal strength.
-func Run(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, deep bool) (*Report, error) {
+func Run(callerContext context.Context, graph *program.Graph, files []*ast.SourceFile, deep bool) (*Report, error) {
 	roots := module_roots.Build(files)
 
-	report, findUnreferencedError := FindUnreferenced(ctx, graph, files, roots, deep)
+	report, findUnreferencedError := FindUnreferenced(callerContext, graph, files, roots, deep)
 	if findUnreferencedError != nil {
 		return nil, findUnreferencedError
 	}

@@ -467,9 +467,9 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		ce = fc.End[0]
 		ee = append(ee, fc.End[1:]...)
 	}
-	cePos := offset
+	cePosition := offset
 	if ce != nil && equalsASCII(ce.Source, expectedEnd) {
-		cePos = ce.Offset + len(ce.Source)
+		cePosition = ce.Offset + len(ce.Source)
 	} else {
 		name := strings.ToUpper(fcName[:1]) + fcName[1:]
 		code := "BAD_INDENT"
@@ -484,7 +484,7 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 		}
 	}
 	if len(ee) > 0 {
-		end := resolveEnd(ee, cePos, composition.options.Strict, onError)
+		end := resolveEnd(ee, cePosition, composition.options.Strict, onError)
 		if end.comment != "" {
 			if coll.Comment != "" {
 				coll.Comment += "\n" + end.comment
@@ -492,9 +492,9 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 				coll.Comment = end.comment
 			}
 		}
-		coll.Range = []int{fc.Offset, cePos, end.offset}
+		coll.Range = []int{fc.Offset, cePosition, end.offset}
 	} else {
-		coll.Range = []int{fc.Offset, cePos, cePos}
+		coll.Range = []int{fc.Offset, cePosition, cePosition}
 	}
 	return coll
 }

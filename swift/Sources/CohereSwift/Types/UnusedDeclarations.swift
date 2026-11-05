@@ -7,7 +7,9 @@ import SwiftSyntax
  A declaration `private` or `fileprivate`, or inside a type or extension that is, can be named only in its own
  file, so the file's own index record holds every reference it will ever have. Any other declaration is judged
  against every record of the package, its tests included, and one public in a library product (or in a target
- a product re-exports) is API that someone this build never sees may use. A declaration is used when a record
+ a product re-exports) is API that someone this build never sees may use. In an Xcode project the library products
+ are its framework and library targets, and any of a product type this engine does not know (`XcodeProject.isAPI`
+ says why). A declaration is used when a record
  holds a reference to it from outside its own text (a function calling itself, or a type naming itself in its
  body, is not a use), or when another declaration overrides or witnesses it, which removing it would break. A
  property wrapped by an attribute is also used when its `$name` or `_name` is, since `$flag` passed as a binding
@@ -100,11 +102,18 @@ struct UnusedDeclarations {
     static let foreignStorage =
         "a stored property of a type that inherits from or conforms to another package's type, which may read it by reflection (MLX's Module does)"
 
+    /* The words for public API in an Xcode target whose product type this engine does not know, which fails closed. */
+    static func unknownProductAPI(_ productType: String) -> String {
+        "public in a target whose product type (\(productType)) this engine does not know, so taken as API that code outside the build may use"
+    }
+
     let stores: [IndexStore]
     /* The library products' targets, as `packageRoot|target`: their public declarations are API. */
     let apiTargets: Set<String>
-    /* The modules this package owns, vendored packages left out. */
-    let ownedModules: Set<String>
+    /* Those of an Xcode project whose product type is unknown, as `packageRoot|target`, to the type. */
+    let unknownProductTypes: [String: String]
+    /* The modules this package owns, vendored packages left out. An Xcode root adds the ones its compiles name (`Pipeline.compiledModules`). */
+    var ownedModules: Set<String>
 
     init(stores: [IndexStore], package: PackageModel? = nil) {
         self.stores = stores
@@ -113,6 +122,13 @@ struct UnusedDeclarations {
                 member.libraryProductTargets.map { Self.targetKey(root: member.root, target: $0) }
             }
         )
+        var unknownProductTypes: [String: String] = [:]
+        for member in package?.allPackages ?? [] {
+            for (target, productType) in member.unknownProductTypes {
+                unknownProductTypes[Self.targetKey(root: member.root, target: target)] = productType
+            }
+        }
+        self.unknownProductTypes = unknownProductTypes
         self.ownedModules = package.map(Pipeline.ownedModules) ?? []
     }
 
@@ -256,7 +272,9 @@ struct UnusedDeclarations {
         for occurrence in occurrences where occurrence.isDeclaration && !occurrence.isImplicit {
             definitions[Place(line: occurrence.line, column: occurrence.column), default: []].append(occurrence)
         }
-        let isAPITarget = apiTargets.contains(Self.targetKey(root: file.packageRoot, target: file.targetName))
+        let targetKey = Self.targetKey(root: file.packageRoot, target: file.targetName)
+        let isAPITarget = apiTargets.contains(targetKey)
+        let apiReason = unknownProductTypes[targetKey].map(Self.unknownProductAPI) ?? Self.publicAPI
 
         var collector = Collector(tree: file.tree)
         collector.collect()
@@ -273,7 +291,7 @@ struct UnusedDeclarations {
                 continue
             }
             if candidate.reach == .api && isAPITarget {
-                result.skipped[Self.publicAPI, default: 0] += 1
+                result.skipped[apiReason, default: 0] += 1
                 continue
             }
             if placed.contains(where: { $0.roles & IndexStore.overrideOfRole != 0 }) || candidate.isOverride {

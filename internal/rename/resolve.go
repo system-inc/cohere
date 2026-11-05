@@ -17,7 +17,7 @@ import (
 // way a cursor does in an editor. Taking the outermost would resolve `foo.bar` to `foo` when the
 // user pointed at `bar`.
 func resolveAnchor(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	files []*ast.SourceFile,
 	at Position,
@@ -45,7 +45,7 @@ func resolveAnchor(
 		)
 	}
 
-	fileChecker, release := graph.CheckerForFile(ctx, target)
+	fileChecker, release := graph.CheckerForFile(callerContext, target)
 	if fileChecker == nil {
 		release()
 		return nil, nil, fmt.Errorf("no checker for %s", at.FileName)
@@ -127,7 +127,7 @@ func resolveAnchor(
 // a loud error rather than a fallback, because the gate this replaces printed green over zero files
 // after falling through to a guess.
 func ResolveBareName(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	name string,
 ) ([]Candidate, []*ast.Symbol, error) {
@@ -142,7 +142,7 @@ func ResolveBareName(
 		if !containsWord(text, name) {
 			continue
 		}
-		fileChecker, release := graph.CheckerForFile(ctx, file)
+		fileChecker, release := graph.CheckerForFile(callerContext, file)
 		if fileChecker == nil {
 			release()
 			continue

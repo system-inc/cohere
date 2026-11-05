@@ -203,12 +203,12 @@ func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(test *testing.T) {
 		test.Fatalf("build: %v", buildError)
 	}
 	present, absent, probed := recorder.Inputs()
-	pkg := filepath.Join(root, "node_modules", "pkg")
-	if !slices.Contains(present, filepath.Join(pkg, "package.json")) {
+	packagePath := filepath.Join(root, "node_modules", "pkg")
+	if !slices.Contains(present, filepath.Join(packagePath, "package.json")) {
 		test.Fatal("the package's package.json was not recorded, so nothing below is about what it covers")
 	}
-	if slices.Contains(probed, pkg) {
-		test.Errorf("%s has a recorded path beneath it and was still recorded as a probe", pkg)
+	if slices.Contains(probed, packagePath) {
+		test.Errorf("%s has a recorded path beneath it and was still recorded as a probe", packagePath)
 	}
 	cache, recordRunCacheError := program.RecordRunCache("k", present, nil, absent, probed, nil, 0, time.Time{})
 	if recordRunCacheError != nil {
@@ -217,7 +217,7 @@ func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(test *testing.T) {
 	if checkError := cache.Check("k"); checkError != nil {
 		test.Fatalf("the untouched tree missed: %v", checkError)
 	}
-	if renameError := os.Rename(pkg, pkg+"-moved"); renameError != nil {
+	if renameError := os.Rename(packagePath, packagePath+"-moved"); renameError != nil {
 		test.Fatal(renameError)
 	}
 	if checkError := cache.Check("k"); checkError == nil {

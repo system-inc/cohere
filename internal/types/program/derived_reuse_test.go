@@ -323,7 +323,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 					Options:  []json.RawMessage{json.RawMessage(`"` + marker + `"`)},
 				}
 			}
-			config := &configuration.Config{
+			lintConfiguration := &configuration.Config{
 				Root:  root,
 				Rules: map[string]configuration.RuleSetting{"test-derived-options": setting("red-marker.ts")},
 				Overrides: []configuration.Override{{Files: []string{"blues/**"},
@@ -355,7 +355,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 						graph.Workers(),
 					)
 				}
-				graph.LintConfig, graph.RuleOptions = config, registry
+				graph.LintConfig, graph.RuleOptions = lintConfiguration, registry
 				runs := &sync.Map{}
 				var reuse *program.FindingsReuse
 				if cached {
