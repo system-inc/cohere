@@ -16,7 +16,8 @@ type Statement struct {
 	// QuotedSpans are the holes inside a single-quoted string whose opening quote stands where a value goes, by
 	// the index of the text before each.
 	QuotedSpans []int
-	// BareSpans are the holes outside any string, right after a comparison, by the index of the text before each.
+	// BareSpans are the holes outside any string, right after a comparison and not qualifying a column with `.`, by
+	// the index of the text before each.
 	BareSpans []int
 	// KeywordCount is how many uppercase SQL keywords stand outside the statement's strings and comments. A reader
 	// that has to decide whether text is SQL at all counts on it; one that already knows can ignore it.
@@ -205,7 +206,9 @@ func ReadStatement(texts []string) (Statement, bool) {
 				statement.QuotedSpans = append(statement.QuotedSpans, textIndex)
 			}
 		case inCode:
-			if comparisons[previousToken] {
+			// A hole the next text continues with `.` qualifies a column, `= ${table}.id`, so it is a table's name,
+			// which no placeholder can stand for, and not a value compared.
+			if comparisons[previousToken] && !strings.HasPrefix(texts[textIndex+1], ".") {
 				statement.BareSpans = append(statement.BareSpans, textIndex)
 			}
 			previousToken = "${}"

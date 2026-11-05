@@ -23,31 +23,45 @@ import (
 	"github.com/system-inc/cohere/internal/goengine/contract"
 	"github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/internal/goengine/rules"
+	"github.com/system-inc/cohere/internal/goengine/rules/concurrency_require_escape_hatch_reason"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_ambiguous_identifier"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_any"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_boolean_outcome"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_console"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_dash_punctuation"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_else_return"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_empty_function"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_grouped_var"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_label"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_lone_block"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_lonely_if"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_long_file"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_parameter_reassignment"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_property_alias"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_redundant_import_alias"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_screaming_snake_case"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_shouting"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_stuttering_name"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_undefined_initializer"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_uppercase_initialism"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_use_before_define"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_useless_concatenation"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_utils_folder"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_warning_comment"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_default_last"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_matching_file_name"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_octal_prefix"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_one_type_per_file"
+	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_operator_assignment"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_caller_data_mutation"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_identical_branches"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_process_exit_after_output"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_write_only_collection"
+	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_response_status_check"
+	"github.com/system-inc/cohere/internal/goengine/rules/security_no_interpolated_shell_command"
+	"github.com/system-inc/cohere/internal/goengine/rules/security_no_interpolated_sql_string"
 )
 
 var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from the engine")
@@ -90,31 +104,45 @@ var everyFileRule = rule.Rule{
 // not run them yet. The generated-rules-withheld case runs them over a generated file that breaks each one, so a rule
 // that skips such a file itself drops out of the lint record's withheld count and fails the case.
 var generatedFileRules = []rule.Rule{
+	concurrency_require_escape_hatch_reason.Rule,
 	consistency_no_abbreviated_identifier.Rule,
 	consistency_no_ambiguous_identifier.Rule,
 	consistency_no_any.Rule,
+	consistency_no_boolean_outcome.Rule,
+	consistency_no_console.Rule,
 	consistency_no_dash_punctuation.Rule,
 	consistency_no_else_return.Rule,
 	consistency_no_empty_function.Rule,
 	consistency_no_grouped_var.Rule,
 	consistency_no_label.Rule,
+	consistency_no_lone_block.Rule,
+	consistency_no_lonely_if.Rule,
 	consistency_no_long_file.Rule,
 	consistency_no_long_line.Rule,
 	consistency_no_parameter_reassignment.Rule,
 	consistency_no_property_alias.Rule,
+	consistency_no_redundant_import_alias.Rule,
 	consistency_no_screaming_snake_case.Rule,
 	consistency_no_shouting.Rule,
 	consistency_no_stuttering_name.Rule,
+	consistency_no_undefined_initializer.Rule,
 	consistency_no_uppercase_initialism.Rule,
 	consistency_no_use_before_define.Rule,
+	consistency_no_useless_concatenation.Rule,
 	consistency_no_utils_folder.Rule,
 	consistency_no_warning_comment.Rule,
 	consistency_require_default_last.Rule,
 	consistency_require_matching_file_name.Rule,
 	consistency_require_octal_prefix.Rule,
 	consistency_require_one_type_per_file.Rule,
+	consistency_require_operator_assignment.Rule,
+	correctness_no_caller_data_mutation.Rule,
 	correctness_no_identical_branches.Rule,
+	correctness_no_process_exit_after_output.Rule,
 	correctness_no_write_only_collection.Rule,
+	correctness_require_response_status_check.Rule,
+	security_no_interpolated_shell_command.Rule,
+	security_no_interpolated_sql_string.Rule,
 }
 
 // limitRule is a planted rule with an option, which reports the value it read, so a run shows the option the
