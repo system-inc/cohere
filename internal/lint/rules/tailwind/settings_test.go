@@ -139,7 +139,11 @@ func TestSettingsReachOnlyTheRulesThatDeclareThem(test *testing.T) {
 	if err != nil {
 		test.Fatalf("no-duplicate-classes read a key it does not declare instead of leaving it to its sibling: %v", err)
 	}
-	if callees := legacyNames(decoded.(NoDuplicateClassesOptions).Callees); callees != "a,b" {
+	duplicateOptions, isDuplicateOptions := decoded.(NoDuplicateClassesOptions)
+	if !isDuplicateOptions {
+		test.Fatalf("no-duplicate-classes decoded %T, want NoDuplicateClassesOptions", decoded)
+	}
+	if callees := legacyNames(duplicateOptions.Callees); callees != "a,b" {
 		test.Fatalf("no-duplicate-classes' callees = %v, want settings' [a b]", callees)
 	}
 
@@ -147,7 +151,10 @@ func TestSettingsReachOnlyTheRulesThatDeclareThem(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	options := ordered.(EnforceConsistentClassOrderOptions)
+	options, isOrderOptions := ordered.(EnforceConsistentClassOrderOptions)
+	if !isOrderOptions {
+		test.Fatalf("enforce-consistent-class-order decoded %T, want EnforceConsistentClassOrderOptions", ordered)
+	}
 	if options.Order != "desc" || legacyNames(options.Callees) != "c" {
 		test.Fatalf("class order decoded order %q and callees %v, want settings' desc and options' [c] alone",
 			options.Order, options.Callees)

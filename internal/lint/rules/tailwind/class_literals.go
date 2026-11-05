@@ -235,8 +235,13 @@ func (group *selectorGroup) answer(memo *sync.Map, name string, patternsOf func(
 	if group.lowercase {
 		key = strings.ToLower(name)
 	}
-	if answer, isAnswered := memo.Load(key); isAnswered {
-		return answer.([]int)
+	if remembered, isAnswered := memo.Load(key); isAnswered {
+		indices, isIndices := remembered.([]int)
+		if !isIndices {
+			// Invariant: a selector group's memos are written only below, and only with an []int.
+			panic(fmt.Sprintf("tailwind: the selector memo for %q holds %T, not []int", key, remembered))
+		}
+		return indices
 	}
 	var answer []int
 	for index, selector := range group.selectors {
@@ -317,13 +322,24 @@ var compiledClassLiteralSurfaces sync.Map
 func ClassLiteralSurfacesFor(settings ClassLiteralSettings) *ClassLiteralSurfaces {
 	key := settings.key()
 	if existing, isCompiled := compiledClassLiteralSurfaces.Load(key); isCompiled {
-		return existing.(*ClassLiteralSurfaces)
+		return storedClassLiteralSurfaces(key, existing)
 	}
 	compiled, _ := compiledClassLiteralSurfaces.LoadOrStore(key, &ClassLiteralSurfaces{
 		compiled: NewClassLiteralReader(settings),
 		cacheKey: "tailwind.classValues:" + key,
 	})
-	return compiled.(*ClassLiteralSurfaces)
+	return storedClassLiteralSurfaces(key, compiled)
+}
+
+// storedClassLiteralSurfaces is an entry of compiledClassLiteralSurfaces as the surfaces it holds.
+func storedClassLiteralSurfaces(key string, stored any) *ClassLiteralSurfaces {
+	surfaces, isSurfaces := stored.(*ClassLiteralSurfaces)
+	if !isSurfaces {
+		// Invariant: ClassLiteralSurfacesFor is the one writer of compiledClassLiteralSurfaces, and it stores only
+		// a *ClassLiteralSurfaces.
+		panic(fmt.Sprintf("tailwind: the surfaces for %q are %T, not *ClassLiteralSurfaces", key, stored))
+	}
+	return surfaces
 }
 
 // DefaultClassLiteralSurfaces is DefaultClassLiteralSettings compiled, once for the process, for a rule

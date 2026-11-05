@@ -176,10 +176,9 @@ func reportTemplateDuplicates(ctx rule.Context, segments []ClassSegment) {
 	}
 
 	type repeat struct {
-		segment  ClassSegment
-		fixes    []rule.Fix
-		fixable  bool
-		reported bool
+		segment ClassSegment
+		fixes   []rule.Fix
+		fixable bool
 	}
 	repeats := map[string]*repeat{}
 	order := []string{}
