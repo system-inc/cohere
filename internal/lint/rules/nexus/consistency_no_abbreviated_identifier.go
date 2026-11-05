@@ -1,7 +1,6 @@
 package nexus
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -42,21 +41,6 @@ type ConsistencyNoAbbreviatedIdentifierOptions struct {
 	FrameworkParameterScopeSuffixes []string `json:"frameworkParameterScopeSuffixes"`
 }
 
-// millisecondSegmentPattern matches a millisecond unit written as a camelCase word.
-//
-// Go's regexp has no lookahead, so where the TypeScript wrote `[a-z]Ms(?=$|[A-Z])` this captures the
-// character after instead and puts it back in the replacement. The distinction the pattern is making
-// is unchanged: a lowercase letter before, and either the end of the name or the start of the next
-// word after.
-var millisecondSegmentPattern = regexp.MustCompile(`([a-z])Ms($|[A-Z])`)
-
-// wordSegmentPatterns are the two shapes a mid-name segment can take, plus the replacement form.
-type wordSegmentPatterns struct {
-	boundary *regexp.Regexp
-	camel    *regexp.Regexp
-	replace  *regexp.Regexp
-}
-
 // The rule's four messages, one per shape a finding takes, whose wording lives in
 // `policy/messages/consistency-no-abbreviated-identifier.json`. The reasoning they share is written
 // once there as the `reasoning` phrase, because it is the same argument every time. The id names the
@@ -67,20 +51,6 @@ var (
 	millisecondSuffixText      = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "millisecondSuffix")
 	abbreviatedWordSegmentText = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedWordSegment")
 )
-
-func messageNoMsSuffix(name string, suggestion string) rule.Message {
-	return rule.Message{
-		Id:          millisecondSuffixText.Id,
-		Description: millisecondSuffixText.Render(map[string]string{"name": name, "suggestion": suggestion}),
-	}
-}
-
-func messageNoWordSegment(name string, word string, suggestion string) rule.Message {
-	return rule.Message{
-		Id:          abbreviatedWordSegmentText.Id,
-		Description: abbreviatedWordSegmentText.Render(map[string]string{"name": name, "word": word, "suggestion": suggestion}),
-	}
-}
 
 // ConsistencyNoAbbreviatedIdentifier rejects abbreviated identifier names in favor of full words.
 //
@@ -183,7 +153,7 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 
 			// The vocabulary says what the word is; policy/Abbreviations.json holds it, and Swift
 			// compiles in the same file. What follows is policy, which stays here.
-			finding, found := vocabulary.find(name)
+			finding, found := findAbbreviation(name)
 			if !found {
 				return
 			}
@@ -246,20 +216,6 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 		}
 		return rule.Listeners{ast.KindIdentifier: judge, ast.KindStringLiteral: judge, ast.KindPrivateIdentifier: judge}
 	},
-}
-
-// replaceFirst replaces only the first match, which is what JavaScript's non-global String.replace
-// does and what every suggestion in this rule means.
-//
-// Go's ReplaceAllString would rewrite every occurrence, so `variablesForVars` would come back
-// double-renamed while the original renamed one segment and left the reader to judge the rest.
-func replaceFirst(pattern *regexp.Regexp, text string, replacement string) string {
-	location := pattern.FindStringSubmatchIndex(text)
-	if location == nil {
-		return text
-	}
-	expanded := pattern.ExpandString(nil, replacement, text, location)
-	return text[:location[0]] + string(expanded) + text[location[1]:]
 }
 
 // matchesAnyFilePattern reports whether the linted file matches any caller-supplied path substring.
