@@ -200,9 +200,9 @@ func TestNoExtendNativeDecodesItsOptions(test *testing.T) {
 
 	decode := rule.DecodeOptionsInto[NoExtendNativeOptions]()
 
-	decoded, err := decode(json.RawMessage(`{"exceptions": ["Object"]}`))
-	if err != nil {
-		test.Fatalf("decoding failed: %v", err)
+	decoded, decodeError := decode(json.RawMessage(`{"exceptions": ["Object"]}`))
+	if decodeError != nil {
+		test.Fatalf("decoding failed: %v", decodeError)
 	}
 	settings, ok := decoded.(NoExtendNativeOptions)
 	if !ok {

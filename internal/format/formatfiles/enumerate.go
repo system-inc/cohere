@@ -163,9 +163,9 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 		DeclinedExtensions: map[string]int{},
 	}
 
-	resolution, err := formatoptions.Resolve(root)
-	if err != nil {
-		return enumeration, err
+	resolution, resolveError := formatoptions.Resolve(root)
+	if resolveError != nil {
+		return enumeration, resolveError
 	}
 	leftover := filepath.Join(root, ".prettierignore")
 	if _, statError := os.Lstat(leftover); statError == nil {
@@ -177,9 +177,9 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 		)
 	}
 
-	matcher, err := gitignore.New(root)
-	if err != nil {
-		return enumeration, err
+	matcher, newGitignoreError := gitignore.New(root)
+	if newGitignoreError != nil {
+		return enumeration, newGitignoreError
 	}
 	if listing != nil {
 		matcher = matcher.WithListing(listing)
@@ -219,8 +219,8 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 	if listing != nil {
 		walk = func(root string, walkFn filepath.WalkFunc) error { return walkListed(root, listing, walkFn) }
 	}
-	walkError := walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	walkError := walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		relative, relativeError := filepath.Rel(root, path)
@@ -350,8 +350,8 @@ func walkListedFrom(path string, information os.FileInfo, listing gitignore.List
 	} else {
 		entries, readError = lstatEntries(path)
 	}
-	if err := walkFn(path, information, readError); readError != nil || err != nil {
-		return err
+	if walkError := walkFn(path, information, readError); readError != nil || walkError != nil {
+		return walkError
 	}
 	for _, entry := range entries {
 		if entry == nil {
@@ -397,14 +397,14 @@ func listedEntries(directory string, listing gitignore.Listing) ([]os.FileInfo, 
 // lstat'd. An entry gone between the two is nil, and skipped, where Walk tells its callback of the error, which
 // this walk's callback ignores.
 func lstatEntries(directory string) ([]os.FileInfo, error) {
-	opened, err := os.Open(directory)
-	if err != nil {
-		return nil, err
+	opened, openError := os.Open(directory)
+	if openError != nil {
+		return nil, openError
 	}
-	names, err := opened.Readdirnames(-1)
+	names, readdirnamesError := opened.Readdirnames(-1)
 	opened.Close()
-	if err != nil {
-		return nil, err
+	if readdirnamesError != nil {
+		return nil, readdirnamesError
 	}
 	sort.Strings(names)
 	information := make([]os.FileInfo, len(names))
@@ -481,8 +481,8 @@ func NestedRepositoriesBelow(root string) ([]string, error) {
 	}
 	scopes := map[string]*gitignore.Matcher{"": matcher}
 	var nested []string
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || !entry.IsDir() {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || !entry.IsDir() {
 			return nil
 		}
 		relative, relativeError := filepath.Rel(root, path)
@@ -501,9 +501,9 @@ func NestedRepositoriesBelow(root string) ([]string, error) {
 		if ignored, _ := scope.Ignored(relative, true); ignored {
 			return filepath.SkipDir
 		}
-		entered, err := scope.Enter(relative)
-		if err != nil {
-			return err
+		entered, enterError := scope.Enter(relative)
+		if enterError != nil {
+			return enterError
 		}
 		scopes[relative] = entered
 		return nil

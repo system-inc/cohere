@@ -66,49 +66,49 @@ func MarkEvaluationOrder(function *Function) {
 }
 
 func setTerminalOrder(terminal Terminal, order static_single_assignment.EvaluationOrder) {
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *Return:
-		t.Order = order
+		typed.Order = order
 	case *Throw:
-		t.Order = order
+		typed.Order = order
 	case *Unreachable:
-		t.Order = order
+		typed.Order = order
 	case *Unsupported:
-		t.Order = order
+		typed.Order = order
 	case *Goto:
-		t.Order = order
+		typed.Order = order
 	case *If:
-		t.Order = order
+		typed.Order = order
 	case *Branch:
-		t.Order = order
+		typed.Order = order
 	case *Switch:
-		t.Order = order
+		typed.Order = order
 	case *While:
-		t.Order = order
+		typed.Order = order
 	case *DoWhile:
-		t.Order = order
+		typed.Order = order
 	case *For:
-		t.Order = order
+		typed.Order = order
 	case *ForOf:
-		t.Order = order
+		typed.Order = order
 	case *ForIn:
-		t.Order = order
+		typed.Order = order
 	case *Logical:
-		t.Order = order
+		typed.Order = order
 	case *Ternary:
-		t.Order = order
+		typed.Order = order
 	case *Optional:
-		t.Order = order
+		typed.Order = order
 	case *Sequence:
-		t.Order = order
+		typed.Order = order
 	case *Label:
-		t.Order = order
+		typed.Order = order
 	case *Try:
-		t.Order = order
+		typed.Order = order
 	case *MaybeThrow:
-		t.Order = order
+		typed.Order = order
 	case *Scope:
-		t.Order = order
+		typed.Order = order
 	}
 }
 

@@ -202,7 +202,7 @@ func symbolOfDeclaration(node *ast.Node) *ast.Symbol {
 // symbols. Pointer identity is what makes a reference in one file and a declaration in another the
 // same fact.
 func FindUnreferenced(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	files []*ast.SourceFile,
 	roots *module_roots.Set,
@@ -230,7 +230,7 @@ func FindUnreferenced(
 	}
 
 	for _, file := range files {
-		checker, release := graph.CheckerForFile(ctx, file)
+		checker, release := graph.CheckerForFile(callerContext, file)
 		if checker == nil {
 			release()
 			continue
@@ -282,7 +282,7 @@ func FindUnreferenced(
 			continue
 		}
 
-		checker, release := graph.CheckerForFile(ctx, file)
+		checker, release := graph.CheckerForFile(callerContext, file)
 		if checker == nil {
 			release()
 			continue

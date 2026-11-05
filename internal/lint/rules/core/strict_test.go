@@ -41,13 +41,13 @@ func runStrictIn(test *testing.T, fileName string, testCase strictCase) rule_tes
 	if testCase.options == nil {
 		return rule_testing.Run(test, Strict, fileName, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.options)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeStrictOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeStrictOptionsError := DecodeStrictOptions(encoded)
+	if decodeStrictOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeStrictOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, Strict, fileName, testCase.sourceText, decoded)
 }

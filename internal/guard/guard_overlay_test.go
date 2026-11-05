@@ -161,14 +161,14 @@ func writeOverlay(test *testing.T, target string, contents string) string {
 func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	path := filepath.Join(root, "internal/lint/rules/typescript/no_shadow.go")
-	original, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatal(err)
+	original, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	planted := strings.Replace(string(original), "range node.Locals()", "range ast.GetLocals(node)", 1)
 	if planted == string(original) {
@@ -185,9 +185,9 @@ func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
 func TestTheTypeReachGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	baseline := scanTypeReach(test, nil)
 	claimed := map[string]bool{}
@@ -207,13 +207,13 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	slices.Sort(candidates)
 	target := candidates[0]
 	file := filepath.Join(root, "internal/lint/rules", baseline.reason[target])
-	original, err := os.ReadFile(file)
-	if err != nil {
-		test.Fatal(err)
+	original, readError := os.ReadFile(file)
+	if readError != nil {
+		test.Fatal(readError)
 	}
-	planted, err := plantShapesClaim(original)
-	if err != nil {
-		test.Fatalf("%s: %v", file, err)
+	planted, plantShapesClaimError := plantShapesClaim(original)
+	if plantShapesClaimError != nil {
+		test.Fatalf("%s: %v", file, plantShapesClaimError)
 	}
 	scan := scanTypeReach(test, guardOverlayFrom(test, "-overlay="+writeOverlay(test, file, string(planted))))
 	caught := false
@@ -278,39 +278,39 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 func TestAShapesClaimPlantsIntoEveryRuleFile(test *testing.T) {
 	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	files, err := filepath.Glob(filepath.Join(root, "internal/lint/rules/*/*.go"))
-	if err != nil {
-		test.Fatal(err)
+	files, globError := filepath.Glob(filepath.Join(root, "internal/lint/rules/*/*.go"))
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	planted := 0
 	for _, path := range files {
 		if strings.HasSuffix(path, "_test.go") {
 			continue
 		}
-		original, err := os.ReadFile(path)
-		if err != nil {
-			test.Fatal(err)
+		original, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
-		parsed, err := parser.ParseFile(token.NewFileSet(), path, original, 0)
-		if err != nil {
-			test.Fatal(err)
+		parsed, parseFileError := parser.ParseFile(token.NewFileSet(), path, original, 0)
+		if parseFileError != nil {
+			test.Fatal(parseFileError)
 		}
 		name, _ := ruleLiteralTypeReach(parsed)
 		if name == "" {
 			continue
 		}
-		result, err := plantShapesClaim(original)
-		if err != nil {
-			test.Errorf("%s: %v", path, err)
+		result, plantShapesClaimError := plantShapesClaim(original)
+		if plantShapesClaimError != nil {
+			test.Errorf("%s: %v", path, plantShapesClaimError)
 			continue
 		}
-		reparsed, err := parser.ParseFile(token.NewFileSet(), path, result, 0)
-		if err != nil {
-			test.Errorf("%s: the planted file does not parse: %v", path, err)
+		reparsed, parseFileError := parser.ParseFile(token.NewFileSet(), path, result, 0)
+		if parseFileError != nil {
+			test.Errorf("%s: the planted file does not parse: %v", path, parseFileError)
 			continue
 		}
 		if plantedName, claims := ruleLiteralTypeReach(reparsed); plantedName != name || !claims {
@@ -364,14 +364,14 @@ var reactPragmaOwnFileCall = regexp.MustCompile(`rule\.IsReactPragmaBinding\([A-
 // identifier checks alone cannot establish that argument at a call site; the scan must check it too.
 func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(test *testing.T) {
 	test.Parallel()
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	target := filepath.Join(root, "internal/lint/rules/react/checked_requires_onchange_or_readonly.go")
-	original, err := os.ReadFile(target)
-	if err != nil {
-		test.Fatal(err)
+	original, readError := os.ReadFile(target)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	matches := reactPragmaOwnFileCall.FindAllString(string(original), -1)
 	if len(matches) != 1 {

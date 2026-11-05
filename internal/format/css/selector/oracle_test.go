@@ -343,9 +343,9 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 				return filepath.SkipDir
@@ -353,9 +353,9 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			if entry.IsDir() || filepath.Ext(path) != ".css" {
 				return nil
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -663,17 +663,17 @@ func TestParseAgreesOnRandomSelectors(test *testing.T) {
 // both sides compare as the same Go values. sourceIndex stays in bytes; oracleInBytes converts the
 // library's side.
 func dumpSelector(text string) (any, error) {
-	root, err := Parse(text)
-	if err != nil {
-		return nil, err
+	root, parseError := Parse(text)
+	if parseError != nil {
+		return nil, parseError
 	}
-	encoded, err := json.Marshal(dumpSelectorValue(root))
-	if err != nil {
-		return nil, err
+	encoded, encodeError := json.Marshal(dumpSelectorValue(root))
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	var result any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	decodeError := json.Unmarshal(encoded, &result)
+	return result, decodeError
 }
 
 func dumpSelectorValue(value any) any {

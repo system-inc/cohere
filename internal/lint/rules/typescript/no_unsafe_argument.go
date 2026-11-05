@@ -260,34 +260,34 @@ func checkUnsafeSpreadArgument(
 // word `any` and a message saying "of type `any`" about a type the checker could not resolve sends
 // the reader hunting an `any` that is not written anywhere. The backticks around a real type name
 // are upstream's message text rather than markup added here.
-func describeUnsafeArgumentType(ruleContext rule.Context, t *checker.Type) string {
-	if type_checking.IsIntrinsicErrorType(t) {
+func describeUnsafeArgumentType(ruleContext rule.Context, subjectType *checker.Type) string {
+	if type_checking.IsIntrinsicErrorType(subjectType) {
 		return "error typed"
 	}
-	return "`" + ruleContext.TypeChecker.TypeToString(t) + "`"
+	return "`" + ruleContext.TypeChecker.TypeToString(subjectType) + "`"
 }
 
 // describeUnsafeSpreadType is upstream's `describeTypeForSpread`, which differs from the plain one
 // in exactly one place: an array of the error type renders as the bare word `error`, so the message
 // reads "Unsafe spread of an error array type" rather than naming the array.
-func describeUnsafeSpreadType(ruleContext rule.Context, t *checker.Type) string {
-	if checker.Checker_isArrayType(ruleContext.TypeChecker, t) {
-		typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, t)
+func describeUnsafeSpreadType(ruleContext rule.Context, subjectType *checker.Type) string {
+	if checker.Checker_isArrayType(ruleContext.TypeChecker, subjectType) {
+		typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subjectType)
 		if len(typeArguments) > 0 && type_checking.IsIntrinsicErrorType(typeArguments[0]) {
 			return "error"
 		}
 	}
-	return describeUnsafeArgumentType(ruleContext, t)
+	return describeUnsafeArgumentType(ruleContext, subjectType)
 }
 
 // describeUnsafeTupleType is upstream's `describeTypeForTuple`. The difference from the plain one is
 // the words rather than the type: this slot sits after "The argument is", so a resolved type reads
 // "of type `X`" while the error type reads "error typed" with no preposition.
-func describeUnsafeTupleType(ruleContext rule.Context, t *checker.Type) string {
-	if type_checking.IsIntrinsicErrorType(t) {
+func describeUnsafeTupleType(ruleContext rule.Context, subjectType *checker.Type) string {
+	if type_checking.IsIntrinsicErrorType(subjectType) {
 		return "error typed"
 	}
-	return "of type `" + ruleContext.TypeChecker.TypeToString(t) + "`"
+	return "of type `" + ruleContext.TypeChecker.TypeToString(subjectType) + "`"
 }
 
 // unsafeArgumentSignature tracks which parameter the next argument lands on.

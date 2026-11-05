@@ -252,8 +252,8 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(test *testing.T) {
 		test.Fatalf("Signature_parameters returned %d parameters (%v) rather than %d.%s",
 			len(parameterNames), parameterNames, len(wantParameterNames), layoutDriftAdvice)
 	}
-	for i, want := range wantParameterNames {
-		if parameterNames[i] != want {
+	for index, want := range wantParameterNames {
+		if parameterNames[index] != want {
 			test.Fatalf("Signature_parameters returned %v rather than %v.%s",
 				parameterNames, wantParameterNames, layoutDriftAdvice)
 		}

@@ -635,9 +635,9 @@ func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
 	// directory and is never absent. It used to be read from five directories up, outside the repository,
 	// where it never was, so every test that asked for it skipped on every machine (#sycrdr6).
 	source := filepath.Join("tools", "generate_descriptor_base", "testdata", "independent_theme.css")
-	contents, err := os.ReadFile(source)
-	if err != nil {
-		test.Fatalf("reading the independent theme: %v", err)
+	contents, readError := os.ReadFile(source)
+	if readError != nil {
+		test.Fatalf("reading the independent theme: %v", readError)
 	}
 
 	packageRoot := unknownFixturePackageRoot()
@@ -665,12 +665,12 @@ func independentLiveSystem(test *testing.T) *tailwindengine.LoadedDesignSystem {
 		test.Fatalf("staging the independent stylesheet: %v", writeError)
 	}
 
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: findTailwindPackageRoot(staging, diskFileExists),
 	})
-	if err != nil {
-		test.Fatalf("loading the independent design system: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the independent design system: %v", loadDesignSystemError)
 	}
 	return system
 }

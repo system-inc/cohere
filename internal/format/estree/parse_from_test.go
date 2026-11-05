@@ -114,9 +114,9 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 func convertedDump(test *testing.T, fileName string, sourceFile *ast.SourceFile) string {
 	test.Helper()
 	text := sourceFile.Text()
-	program, comments, _, err := convertTypeScript(sourceFile, text, nil)
-	if err != nil {
-		return "error: " + err.Error()
+	program, comments, _, convertTypeScriptError := convertTypeScript(sourceFile, text, nil)
+	if convertTypeScriptError != nil {
+		return "error: " + convertTypeScriptError.Error()
 	}
 	offsets := make([]int, len(text)+1)
 	for index := range offsets {
@@ -126,9 +126,9 @@ func convertedDump(test *testing.T, fileName string, sourceFile *ast.SourceFile)
 	for index, comment := range comments {
 		dumped[index] = map[string]any{"type": comment.Type(), "range": comment.Range, "value": comment.String("value")}
 	}
-	encoded, err := json.Marshal(map[string]any{"ast": dumpValue(program, offsets), "comments": dumped})
-	if err != nil {
-		test.Fatalf("%s: %v", fileName, err)
+	encoded, encodeError := json.Marshal(map[string]any{"ast": dumpValue(program, offsets), "comments": dumped})
+	if encodeError != nil {
+		test.Fatalf("%s: %v", fileName, encodeError)
 	}
 	return string(encoded)
 }
@@ -166,8 +166,8 @@ func typeScriptFiles(roots []string) []string {
 	}
 	var files []string
 	for _, root := range roots {
-		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
+		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
 				return nil
 			}
 			if entry.IsDir() {

@@ -67,12 +67,12 @@ func rangeOfName(test *testing.T, function *Function, name string) mutation_alia
 		if identifier == nil || identifier.Name != name {
 			continue
 		}
-		r := ranges.Get(identifier.Id)
-		if !r.IsSet() {
+		mutableRange := ranges.Get(identifier.Id)
+		if !mutableRange.IsSet() {
 			continue
 		}
-		if !found || r.Start > best.Start {
-			best = r
+		if !found || mutableRange.Start > best.Start {
+			best = mutableRange
 			found = true
 		}
 	}
@@ -96,13 +96,13 @@ export function f() {
 	if ranges.Len() == 0 {
 		test.Fatal("no value got a range, so this pass is inert rather than correctly silent")
 	}
-	r := rangeOfName(test, function, "a")
-	if !r.IsSet() {
+	mutableRange := rangeOfName(test, function, "a")
+	if !mutableRange.IsSet() {
 		test.Fatal("`a` has no range")
 	}
-	if r.End != r.Start+1 {
+	if mutableRange.End != mutableRange.Start+1 {
 		test.Errorf("a value defined once and never mutated should span exactly one instruction, "+
-			"got [%d,%d)", r.Start, r.End)
+			"got [%d,%d)", mutableRange.Start, mutableRange.End)
 	}
 }
 
@@ -114,14 +114,14 @@ export function f() {
 func TestRangesAreHalfOpen(test *testing.T) {
 	test.Parallel()
 
-	r := mutation_aliasing.MutableRange{Start: 3, End: 6}
+	mutableRange := mutation_aliasing.MutableRange{Start: 3, End: 6}
 	for _, order := range []static_single_assignment.EvaluationOrder{3, 4, 5} {
-		if !r.Contains(order) {
+		if !mutableRange.Contains(order) {
 			test.Errorf("[3,6) should contain %d", order)
 		}
 	}
 	for _, order := range []static_single_assignment.EvaluationOrder{2, 6, 7} {
-		if r.Contains(order) {
+		if mutableRange.Contains(order) {
 			test.Errorf("[3,6) should not contain %d; the end is exclusive, which is React's inRange", order)
 		}
 	}
@@ -147,18 +147,18 @@ func TestRangesSpanTheGapBetweenDisjointWrites(test *testing.T) {
 
 	// Written at 3, written again at 20, nothing between. Upstream's end is one past the last
 	// write.
-	r := mutation_aliasing.MutableRange{Start: 3, End: 21}
+	mutableRange := mutation_aliasing.MutableRange{Start: 3, End: 21}
 
-	if !r.Contains(10) {
+	if !mutableRange.Contains(10) {
 		test.Error("an instruction in the GAP between two writes must be inside the range: upstream " +
 			"represents this as one interval, so a reactive scope covering the value covers " +
 			"everything between its writes. A set of write positions would answer false here and " +
 			"would pass every straight-line test in this file")
 	}
-	if !r.Contains(3) || !r.Contains(20) {
+	if !mutableRange.Contains(3) || !mutableRange.Contains(20) {
 		test.Error("both write positions must be inside the range")
 	}
-	if r.Contains(21) {
+	if mutableRange.Contains(21) {
 		test.Error("the end stays exclusive even for a widened range")
 	}
 }
@@ -169,16 +169,16 @@ func TestRangesRejectAnInvalidInterval(test *testing.T) {
 	test.Parallel()
 
 	valid := []mutation_aliasing.MutableRange{{}, {Start: 1, End: 2}, {Start: 5, End: 100}}
-	for _, r := range valid {
-		if !r.IsValid() {
-			test.Errorf("[%d,%d) should be valid", r.Start, r.End)
+	for _, mutableRange := range valid {
+		if !mutableRange.IsValid() {
+			test.Errorf("[%d,%d) should be valid", mutableRange.Start, mutableRange.End)
 		}
 	}
 	invalid := []mutation_aliasing.MutableRange{{Start: 3, End: 3}, {Start: 5, End: 2}, {Start: 4, End: 0}}
-	for _, r := range invalid {
-		if r.IsValid() {
+	for _, mutableRange := range invalid {
+		if mutableRange.IsValid() {
 			test.Errorf("[%d,%d) should be invalid: upstream asserts (start==0 && end==0) || end>start",
-				r.Start, r.End)
+				mutableRange.Start, mutableRange.End)
 		}
 	}
 }
@@ -233,11 +233,11 @@ export function outer() {
 
 	var stores int
 	var walk func(*Function)
-	walk = func(f *Function) {
-		ranges := InferMutableRanges(f)
-		for _, block := range f.Blocks {
+	walk = func(function *Function) {
+		ranges := InferMutableRanges(function)
+		for _, block := range function.Blocks {
 			for _, instructionId := range block.Instructions {
-				instruction := f.Instructions[instructionId]
+				instruction := function.Instructions[instructionId]
 				if instruction == nil {
 					continue
 				}
@@ -246,15 +246,15 @@ export function outer() {
 					continue
 				}
 				stores++
-				r := ranges.Get(store.Value.Identifier)
-				if !r.Contains(instruction.Order) {
+				mutableRange := ranges.Get(store.Value.Identifier)
+				if !mutableRange.Contains(instruction.Order) {
 					test.Errorf("the value stored into a captured binding at order %d is not inside "+
 						"its own range [%d,%d); the StoreContext widening did not fire",
-						instruction.Order, r.Start, r.End)
+						instruction.Order, mutableRange.Start, mutableRange.End)
 				}
 			}
 		}
-		for _, nested := range f.Functions {
+		for _, nested := range function.Functions {
 			walk(nested)
 		}
 	}
@@ -929,15 +929,15 @@ export function f() {
   return o;
 }
 `)
-	r := rangeOfName(test, function, "o")
-	if !r.IsSet() {
+	mutableRange := rangeOfName(test, function, "o")
+	if !mutableRange.IsSet() {
 		test.Fatal("`o` has no range at all, so this measured nothing")
 	}
-	if r.End <= r.Start+1 {
+	if mutableRange.End <= mutableRange.Start+1 {
 		test.Errorf("`o`'s range is [%d,%d), which closes at its definition point. The call to "+
 			"`mutate` carries a mutation effect naming `o`, so the widening should have extended "+
 			"the end past it; a range of width 1 here means the alias graph never reached the value",
-			r.Start, r.End)
+			mutableRange.Start, mutableRange.End)
 	}
 }
 
@@ -991,14 +991,14 @@ export function f() {
 		if identifier == nil {
 			continue
 		}
-		r := ranges.Get(identifier.Id)
-		if !r.IsSet() {
+		mutableRange := ranges.Get(identifier.Id)
+		if !mutableRange.IsSet() {
 			continue
 		}
-		if r.End > r.Start+1 {
+		if mutableRange.End > mutableRange.Start+1 {
 			test.Errorf("value %d has range [%d,%d) but the function carries no mutation effect at "+
 				"all; a widening that fires here is firing on instruction shape rather than on an "+
-				"effect", identifier.Id, r.Start, r.End)
+				"effect", identifier.Id, mutableRange.Start, mutableRange.End)
 		}
 	}
 }
@@ -1081,10 +1081,10 @@ export function f(p: number) {
 			continue
 		}
 		checked++
-		if r := ranges.Get(identifier.Id); r.IsSet() {
+		if mutableRange := ranges.Get(identifier.Id); mutableRange.IsSet() {
 			test.Errorf("parameter `p` (value %d) carries range [%d,%d); upstream opens a range only "+
 				"at an instruction lvalue, and a parameter is defined by the call rather than by "+
-				"any instruction in this function", identifier.Id, r.Start, r.End)
+				"any instruction in this function", identifier.Id, mutableRange.Start, mutableRange.End)
 		}
 	}
 	if checked == 0 {
@@ -1230,9 +1230,9 @@ export function f(items: number[][]) {
 `)
 	if invalid := mutation_aliasing.ValidateMutableRanges(ranges); len(invalid) != 0 {
 		for _, id := range invalid {
-			r := ranges.Get(id)
+			mutableRange := ranges.Get(id)
 			test.Errorf("value %d has the invalid range [%d,%d); a loop-carried value whose end was "+
-				"widened below its own definition point must still come out non-empty", id, r.Start, r.End)
+				"widened below its own definition point must still come out non-empty", id, mutableRange.Start, mutableRange.End)
 		}
 	}
 
@@ -1243,8 +1243,8 @@ export function f(items: number[][]) {
 		if identifier == nil {
 			continue
 		}
-		if r := ranges.Get(identifier.Id); r.IsSet() && r.End-r.Start > widest {
-			widest = r.End - r.Start
+		if mutableRange := ranges.Get(identifier.Id); mutableRange.IsSet() && mutableRange.End-mutableRange.Start > widest {
+			widest = mutableRange.End - mutableRange.Start
 		}
 	}
 	if widest <= 1 {
@@ -1287,12 +1287,12 @@ export function f(items: number[][]) {
 		if identifier == nil || identifier.Name != "i" {
 			continue
 		}
-		r := ranges.Get(identifier.Id)
-		if !r.IsSet() {
+		mutableRange := ranges.Get(identifier.Id)
+		if !mutableRange.IsSet() {
 			continue
 		}
 		sawCounter = true
-		if r.End-r.Start >= 10 {
+		if mutableRange.End-mutableRange.Start >= 10 {
 			wideCounters++
 		}
 	}
@@ -1352,19 +1352,19 @@ export function f(p: number[]) {
 		test.Fatal("the parameter `p` was not found among the function's params, so this measured nothing")
 	}
 
-	r := ranges.Get(parameter)
-	if !r.IsSet() {
+	mutableRange := ranges.Get(parameter)
+	if !mutableRange.IsSet() {
 		test.Fatalf("the parameter `p` carries no range. Its end was widened by the mutation but only "+
 			"the third loop can give a parameter a start, because a parameter is never an "+
-			"instruction lvalue; without that loop the range stays [0,%d) and reads as unset", r.End)
+			"instruction lvalue; without that loop the range stays [0,%d) and reads as unset", mutableRange.End)
 	}
-	if r.Start == 0 {
+	if mutableRange.Start == 0 {
 		test.Errorf("`p`'s range is [%d,%d) with an unopened start, which is exactly the state the "+
-			"third loop exists to repair", r.Start, r.End)
+			"third loop exists to repair", mutableRange.Start, mutableRange.End)
 	}
-	if r.End <= r.Start+1 {
+	if mutableRange.End <= mutableRange.Start+1 {
 		test.Errorf("`p`'s range is [%d,%d), so it was never widened and this test would pass without "+
-			"the third loop doing anything", r.Start, r.End)
+			"the third loop doing anything", mutableRange.Start, mutableRange.End)
 	}
 }
 
@@ -1480,8 +1480,8 @@ export function f(seed: number[]) {
 		test.Fatal("the parameter `seed` was not found, so this measured nothing")
 	}
 
-	r := ranges.Get(seed)
-	if !r.IsSet() {
+	mutableRange := ranges.Get(seed)
+	if !mutableRange.IsSet() {
 		test.Fatal("`seed` carries no range, so the capture edge never reached it and this test " +
 			"cannot see the guard it exists for")
 	}
@@ -1489,9 +1489,9 @@ export function f(seed: number[]) {
 	// The later `arr.push` mutates a value `seed` was captured into, non-transitively. A walk that
 	// followed the capture edge backwards anyway would carry that mutation back to `seed`.
 	const wantEnd = 15
-	if r.End != wantEnd {
+	if mutableRange.End != wantEnd {
 		test.Errorf("`seed`'s range is [%d,%d), want an end of %d. A larger end means the walk "+
 			"followed a capture edge backwards for a NON-transitive mutation, which widens a "+
-			"contained value on a mutation of its container", r.Start, r.End, wantEnd)
+			"contained value on a mutation of its container", mutableRange.Start, mutableRange.End, wantEnd)
 	}
 }

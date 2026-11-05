@@ -31,9 +31,9 @@ func TestALoadReadsTheOverlayInPlaceOfTheFile(test *testing.T) {
 	test.Parallel()
 
 	directory, file := loadFixture(test)
-	clean, err := Load(Config{Directory: directory}, ".")
-	if err != nil {
-		test.Fatal(err)
+	clean, loadError := Load(Config{Directory: directory}, ".")
+	if loadError != nil {
+		test.Fatal(loadError)
 	}
 	if len(clean.Roots) != 1 || len(clean.Roots[0].Errors) > 0 || clean.Roots[0].TypesInfo == nil {
 		test.Fatalf("the fixture did not load clean from disk: %+v", clean.Roots)
@@ -42,12 +42,12 @@ func TestALoadReadsTheOverlayInPlaceOfTheFile(test *testing.T) {
 		test.Fatal("the fixture's Count was not in its types")
 	}
 
-	planted, err := Load(Config{
+	planted, loadError := Load(Config{
 		Directory: directory,
 		Overlay:   map[string][]byte{file: []byte("package fixture\n\nvar Count int = \"text\"\n")},
 	}, ".")
-	if err != nil {
-		test.Fatal(err)
+	if loadError != nil {
+		test.Fatal(loadError)
 	}
 	if problems := planted.ErrorsAnywhere(); len(problems) != 1 ||
 		!strings.Contains(problems[0].Error(), "fixture.go") {

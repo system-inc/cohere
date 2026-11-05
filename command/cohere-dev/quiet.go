@@ -47,16 +47,16 @@ func quietPath(directory string) string {
 
 // readQuiet reads the marker, if there is one. Its first line is when it ends, and its second who opened it.
 func readQuiet(directory string) (quietWindow, bool, error) {
-	contents, err := os.ReadFile(quietPath(directory))
-	if os.IsNotExist(err) {
+	contents, readError := os.ReadFile(quietPath(directory))
+	if os.IsNotExist(readError) {
 		return quietWindow{}, false, nil
 	}
-	if err != nil {
-		return quietWindow{}, false, err
+	if readError != nil {
+		return quietWindow{}, false, readError
 	}
 	until, holder, _ := strings.Cut(strings.TrimSpace(string(contents)), "\n")
-	ends, err := time.Parse(time.RFC3339, strings.TrimSpace(until))
-	if err != nil {
+	ends, parseError := time.Parse(time.RFC3339, strings.TrimSpace(until))
+	if parseError != nil {
 		return quietWindow{}, false, fmt.Errorf(
 			"the quiet window marker %s does not start with when it ends: %q",
 			quietPath(directory),

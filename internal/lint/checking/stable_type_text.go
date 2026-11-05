@@ -34,11 +34,11 @@ import (
  * about the whole program's check order). So it is for messages that answer to nobody else's text: the adamic
  * rules. A ported rule's message is held to ESLint's, which prints the checker's own order.
  */
-func StableTypeText(typeChecker *checker.Checker, t *checker.Type) string {
+func StableTypeText(typeChecker *checker.Checker, subjectType *checker.Type) string {
 	var text string
 	for _, limit := range stableTypeLimits {
 		printer := stableTypePrinter{typeChecker: typeChecker, maximumMembers: limit.members, maximumDepth: limit.depth}
-		if text = printer.print(t, 0); len(text) <= stableTypeTextBudget {
+		if text = printer.print(subjectType, 0); len(text) <= stableTypeTextBudget {
 			break
 		}
 	}
@@ -66,57 +66,57 @@ type stableTypePrinter struct {
 	stack []*checker.Type
 }
 
-func (printer *stableTypePrinter) print(t *checker.Type, depth int) string {
-	if t == nil {
+func (printer *stableTypePrinter) print(subjectType *checker.Type, depth int) string {
+	if subjectType == nil {
 		return "unknown"
 	}
-	if alias := t.Alias(); alias != nil && alias.Symbol() != nil {
+	if alias := subjectType.Alias(); alias != nil && alias.Symbol() != nil {
 		return printer.named(alias.Symbol().Name, alias.TypeArguments(), depth)
 	}
 	switch {
-	case t.Flags()&checker.TypeFlagsUnion != 0:
-		return printer.union(t, depth)
-	case t.Flags()&checker.TypeFlagsIntersection != 0:
-		return printer.joined(t.Types(), " & ", depth)
-	case t.Flags()&checker.TypeFlagsObject == 0:
+	case subjectType.Flags()&checker.TypeFlagsUnion != 0:
+		return printer.union(subjectType, depth)
+	case subjectType.Flags()&checker.TypeFlagsIntersection != 0:
+		return printer.joined(subjectType.Types(), " & ", depth)
+	case subjectType.Flags()&checker.TypeFlagsObject == 0:
 		// Primitives, literals, enums, type parameters and the rest print a name of their own, which no other
 		// type's order reaches.
-		return printer.typeChecker.TypeToString(t)
+		return printer.typeChecker.TypeToString(subjectType)
 	}
-	if slices.Contains(printer.stack, t) || depth > printer.maximumDepth {
-		if symbol := t.Symbol(); symbol != nil && t.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 {
+	if slices.Contains(printer.stack, subjectType) || depth > printer.maximumDepth {
+		if symbol := subjectType.Symbol(); symbol != nil && subjectType.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 {
 			return symbol.Name
 		}
 		return "..."
 	}
-	printer.stack = append(printer.stack, t)
+	printer.stack = append(printer.stack, subjectType)
 	defer func() { printer.stack = printer.stack[:len(printer.stack)-1] }()
 
-	if checker.Checker_isArrayType(printer.typeChecker, t) {
-		arguments := printer.typeChecker.GetTypeArguments(t)
+	if checker.Checker_isArrayType(printer.typeChecker, subjectType) {
+		arguments := printer.typeChecker.GetTypeArguments(subjectType)
 		element := "unknown"
 		if len(arguments) > 0 {
 			element = printer.operand(arguments[0], depth+1)
 		}
-		if t.Target() != nil && t.Target().Symbol() != nil && t.Target().Symbol().Name == "ReadonlyArray" {
+		if subjectType.Target() != nil && subjectType.Target().Symbol() != nil && subjectType.Target().Symbol().Name == "ReadonlyArray" {
 			return "readonly " + element + "[]"
 		}
 		return element + "[]"
 	}
-	if checker.IsTupleType(t) {
-		return printer.tuple(t, depth)
+	if checker.IsTupleType(subjectType) {
+		return printer.tuple(subjectType, depth)
 	}
-	if t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil && t.Target().Symbol() != nil {
-		arguments := printer.typeChecker.GetTypeArguments(t)
-		if target := t.Target().TargetInterfaceType(); target != nil && len(target.TypeParameters()) <= len(arguments) {
+	if subjectType.ObjectFlags()&checker.ObjectFlagsReference != 0 && subjectType.Target() != nil && subjectType.Target().Symbol() != nil {
+		arguments := printer.typeChecker.GetTypeArguments(subjectType)
+		if target := subjectType.Target().TargetInterfaceType(); target != nil && len(target.TypeParameters()) <= len(arguments) {
 			arguments = arguments[:len(target.TypeParameters())]
 		}
-		return printer.named(t.Target().Symbol().Name, arguments, depth)
+		return printer.named(subjectType.Target().Symbol().Name, arguments, depth)
 	}
-	if t.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 && t.Symbol() != nil {
-		return printer.typeChecker.TypeToString(t)
+	if subjectType.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 && subjectType.Symbol() != nil {
+		return printer.typeChecker.TypeToString(subjectType)
 	}
-	return printer.anonymous(t, depth)
+	return printer.anonymous(subjectType, depth)
 }
 
 // named prints a name with its type arguments, each by these rules.
@@ -133,20 +133,20 @@ func (printer *stableTypePrinter) named(name string, arguments []*checker.Type, 
 
 // operand is a type printed where an operator follows it, `T[]`: a union, an intersection or a function is
 // parenthesized, as TypeScript prints it.
-func (printer *stableTypePrinter) operand(t *checker.Type, depth int) string {
-	text := printer.print(t, depth)
-	if t.Alias() == nil &&
-		(t.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 || strings.Contains(text, "=>")) {
+func (printer *stableTypePrinter) operand(subjectType *checker.Type, depth int) string {
+	text := printer.print(subjectType, depth)
+	if subjectType.Alias() == nil &&
+		(subjectType.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 || strings.Contains(text, "=>")) {
 		return "(" + text + ")"
 	}
 	return text
 }
 
 // union prints a union's members in their stable order. `true | false` is `boolean`, as TypeScript prints it.
-func (printer *stableTypePrinter) union(t *checker.Type, depth int) string {
+func (printer *stableTypePrinter) union(subjectType *checker.Type, depth int) string {
 	var printed []string
 	var booleans []*checker.Type
-	for _, member := range t.Types() {
+	for _, member := range subjectType.Types() {
 		if member.Flags()&checker.TypeFlagsBooleanLiteral != 0 {
 			booleans = append(booleans, member)
 			continue
@@ -187,11 +187,11 @@ func (printer *stableTypePrinter) sortedJoin(printed []string, separator string)
 		}
 		return 0
 	}
-	slices.SortStableFunc(printed, func(a, b string) int {
-		if rank(a) != rank(b) {
-			return rank(a) - rank(b)
+	slices.SortStableFunc(printed, func(left, right string) int {
+		if rank(left) != rank(right) {
+			return rank(left) - rank(right)
 		}
-		return strings.Compare(a, b)
+		return strings.Compare(left, right)
 	})
 	if len(printed) > printer.maximumMembers {
 		more := len(printed) - printer.maximumMembers + 1
@@ -201,9 +201,9 @@ func (printer *stableTypePrinter) sortedJoin(printed []string, separator string)
 }
 
 // tuple prints a tuple's elements in their positions, which no checker reorders.
-func (printer *stableTypePrinter) tuple(t *checker.Type, depth int) string {
-	arguments := printer.typeChecker.GetTypeArguments(t)
-	tuple := t.TargetTupleType()
+func (printer *stableTypePrinter) tuple(subjectType *checker.Type, depth int) string {
+	arguments := printer.typeChecker.GetTypeArguments(subjectType)
+	tuple := subjectType.TargetTupleType()
 	flags := tuple.ElementFlags()
 	printed := make([]string, 0, len(flags))
 	for index := range flags {
@@ -228,11 +228,11 @@ func (printer *stableTypePrinter) tuple(t *checker.Type, depth int) string {
 
 // anonymous prints an object type that has no name: a function as `(p: T) => R`, and anything else as its
 // signatures, index signatures and members in braces.
-func (printer *stableTypePrinter) anonymous(t *checker.Type, depth int) string {
-	calls := printer.typeChecker.GetSignaturesOfType(t, checker.SignatureKindCall)
-	constructs := printer.typeChecker.GetSignaturesOfType(t, checker.SignatureKindConstruct)
-	indexes := printer.typeChecker.GetIndexInfosOfType(t)
-	properties := printer.members(t)
+func (printer *stableTypePrinter) anonymous(subjectType *checker.Type, depth int) string {
+	calls := printer.typeChecker.GetSignaturesOfType(subjectType, checker.SignatureKindCall)
+	constructs := printer.typeChecker.GetSignaturesOfType(subjectType, checker.SignatureKindConstruct)
+	indexes := printer.typeChecker.GetIndexInfosOfType(subjectType)
+	properties := printer.members(subjectType)
 	if len(calls) == 1 && len(constructs) == 0 && len(indexes) == 0 && len(properties) == 0 {
 		return printer.signature(calls[0], " => ", depth)
 	}
@@ -274,10 +274,10 @@ func (printer *stableTypePrinter) anonymous(t *checker.Type, depth int) string {
 // nested inside this one, inside its range but not among its members, and then whether it read as own was the
 // checker's history again, as a spread of a nested literal's member was on www-phi-health. memberHome is exact for
 // every container measured there: object literals, type literals, a class's static side, namespaces and files.
-func (printer *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
-	properties := slices.Clone(printer.typeChecker.GetPropertiesOfType(t))
+func (printer *stableTypePrinter) members(subjectType *checker.Type) []*ast.Symbol {
+	properties := slices.Clone(printer.typeChecker.GetPropertiesOfType(subjectType))
 	var container *ast.Node
-	if symbol := t.Symbol(); symbol != nil && len(symbol.Declarations) > 0 {
+	if symbol := subjectType.Symbol(); symbol != nil && len(symbol.Declarations) > 0 {
 		container = symbol.Declarations[0]
 	}
 	own := func(property *ast.Symbol) (int, bool) {
@@ -286,9 +286,9 @@ func (printer *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
 		}
 		return property.Declarations[0].Pos(), true
 	}
-	slices.SortStableFunc(properties, func(a, b *ast.Symbol) int {
-		positionA, ownA := own(a)
-		positionB, ownB := own(b)
+	slices.SortStableFunc(properties, func(left, right *ast.Symbol) int {
+		positionA, ownA := own(left)
+		positionB, ownB := own(right)
 		switch {
 		case ownA && ownB:
 			return positionA - positionB
@@ -297,7 +297,7 @@ func (printer *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
 		case ownB:
 			return 1
 		}
-		return strings.Compare(a.Name, b.Name)
+		return strings.Compare(left.Name, right.Name)
 	})
 	return properties
 }

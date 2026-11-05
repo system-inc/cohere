@@ -81,9 +81,9 @@ func DecodeRestrictTemplateExpressionsOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 
-	decoded, err := rule.DecodeOptionsInto[restrictTemplateExpressionsRawOptions]()(raw)
-	if err != nil {
-		return options, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[restrictTemplateExpressionsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return options, decodeOptionsError
 	}
 	wire, _ := decoded.(restrictTemplateExpressionsRawOptions)
 

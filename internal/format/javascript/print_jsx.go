@@ -89,7 +89,7 @@ func printJsxAttribute(path *Path, options *Options, print PrintFunc) Doc {
 	parts := []any{print("name", nil)}
 
 	if current.Child("value") != nil {
-		var res Doc
+		var result Doc
 		if isStringLiteral(current.Child("value")) {
 			raw := getRaw(current.Child("value"))
 			// Remove enclosing quotes and unescape
@@ -103,7 +103,7 @@ func printJsxAttribute(path *Path, options *Options, print PrintFunc) Doc {
 			} else {
 				final = strings.ReplaceAll(final, "'", "&apos;")
 			}
-			res = call(path, func(path *Path) Doc {
+			result = call(path, func(path *Path) Doc {
 				return printing.PrintComments(
 					path,
 					doc.ReplaceEndOfLine(doc.Text(quote+final+quote), nil),
@@ -112,9 +112,9 @@ func printJsxAttribute(path *Path, options *Options, print PrintFunc) Doc {
 				)
 			}, "value")
 		} else {
-			res = print("value", nil)
+			result = print("value", nil)
 		}
-		parts = append(parts, "=", res)
+		parts = append(parts, "=", result)
 	}
 
 	return concatIn(path, parts...)

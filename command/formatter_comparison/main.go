@@ -63,8 +63,8 @@ func main() {
 	examples := map[string][]string{}
 
 	for _, file := range files {
-		raw, readErr := os.ReadFile(file)
-		if readErr != nil {
+		raw, readError := os.ReadFile(file)
+		if readError != nil {
 			continue
 		}
 		text := string(raw)
@@ -126,7 +126,7 @@ func main() {
 	for kind := range kinds {
 		ordered = append(ordered, kind)
 	}
-	sort.Slice(ordered, func(a, b int) bool { return kinds[ordered[a]] > kinds[ordered[b]] })
+	sort.Slice(ordered, func(left, right int) bool { return kinds[ordered[left]] > kinds[ordered[right]] })
 	for _, kind := range ordered {
 		fmt.Fprintf(report, "\n  %-28s %5d files\n", kind, kinds[kind])
 		for _, example := range examples[kind] {
@@ -157,24 +157,24 @@ func classify(before string, after string) map[string]string {
 	}
 
 	for index := range beforeLines {
-		b, a := beforeLines[index], afterLines[index]
-		if b == a {
+		beforeLine, afterLine := beforeLines[index], afterLines[index]
+		if beforeLine == afterLine {
 			continue
 		}
 
 		lineNumber := index + 1
-		bIndent := len(b) - len(strings.TrimLeft(b, " \t"))
-		aIndent := len(a) - len(strings.TrimLeft(a, " \t"))
+		bIndent := len(beforeLine) - len(strings.TrimLeft(beforeLine, " \t"))
+		aIndent := len(afterLine) - len(strings.TrimLeft(afterLine, " \t"))
 
 		switch {
 		case bIndent != aIndent:
 			record(found, "indentation", fmt.Sprintf("line %d: indent %d -> %d", lineNumber, bIndent, aIndent))
-		case strings.TrimRight(b, " \t") == strings.TrimRight(a, " \t"):
+		case strings.TrimRight(beforeLine, " \t") == strings.TrimRight(afterLine, " \t"):
 			record(found, "trailing-whitespace", fmt.Sprintf("line %d", lineNumber))
-		case collapse(b) == collapse(a):
-			record(found, "interior-spacing", fmt.Sprintf("line %d: %s", lineNumber, trim(a)))
+		case collapse(beforeLine) == collapse(afterLine):
+			record(found, "interior-spacing", fmt.Sprintf("line %d: %s", lineNumber, trim(afterLine)))
 		default:
-			record(found, "other", fmt.Sprintf("line %d: %s  ->  %s", lineNumber, trim(b), trim(a)))
+			record(found, "other", fmt.Sprintf("line %d: %s  ->  %s", lineNumber, trim(beforeLine), trim(afterLine)))
 		}
 	}
 	return found
@@ -248,8 +248,8 @@ func collect(root string, limit int) ([]string, error) {
 		"dist": true, "build": true, "out": true,
 	}
 
-	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil {
 			return nil
 		}
 		if info.IsDir() {

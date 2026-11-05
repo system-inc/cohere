@@ -196,18 +196,18 @@ var SwitchExhaustivenessCheck = rule.Rule{
 	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		opts, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
+		settings, ok := rule.OptionsAs[SwitchExhaustivenessCheckOptions](options)
 		if !ok {
-			opts = SwitchExhaustivenessCheckOptions{}
+			settings = SwitchExhaustivenessCheckOptions{}
 		}
-		if opts.AllowDefaultCaseForExhaustiveSwitch == nil {
-			opts.AllowDefaultCaseForExhaustiveSwitch = type_checking.Ref(true)
+		if settings.AllowDefaultCaseForExhaustiveSwitch == nil {
+			settings.AllowDefaultCaseForExhaustiveSwitch = type_checking.Ref(true)
 		}
-		if opts.ConsiderDefaultExhaustiveForUnions == nil {
-			opts.ConsiderDefaultExhaustiveForUnions = type_checking.Ref(false)
+		if settings.ConsiderDefaultExhaustiveForUnions == nil {
+			settings.ConsiderDefaultExhaustiveForUnions = type_checking.Ref(false)
 		}
-		if opts.RequireDefaultForNonUnion == nil {
-			opts.RequireDefaultForNonUnion = type_checking.Ref(false)
+		if settings.RequireDefaultForNonUnion == nil {
+			settings.RequireDefaultForNonUnion = type_checking.Ref(false)
 		}
 		// Upstream compiles the pattern with `new RegExp(pattern, 'u')`, so an invalid one throws
 		// when the rule is created. Here it matches no comment, which leaves the real default clause
@@ -215,14 +215,14 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		// read as JavaScript reads it, so a lookaround or a backreference its user wrote compiles, and
 		// `\s` and `\b` mean what they mean upstream (#7mztrdd).
 		commentPattern := defaultCaseCommentPattern
-		if opts.DefaultCaseCommentPattern != nil {
+		if settings.DefaultCaseCommentPattern != nil {
 			// Ignored: an invalid pattern compiles to nil, and a nil pattern matches no comment, as above.
-			commentPattern, _ = esregexp.Compile(*opts.DefaultCaseCommentPattern, "u")
+			commentPattern, _ = esregexp.Compile(*settings.DefaultCaseCommentPattern, "u")
 		}
 
-		isLiteralLikeType := func(t *checker.Type) bool {
+		isLiteralLikeType := func(subjectType *checker.Type) bool {
 			return type_checking.IsTypeFlagSet(
-				t,
+				subjectType,
 				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|
 					checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
@@ -237,14 +237,14 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		 *
 		 * Default cases are never superfluous in switches with non-literal types.
 		 */
-		doesTypeContainNonLiteralType := func(t *checker.Type) bool {
+		doesTypeContainNonLiteralType := func(subjectType *checker.Type) bool {
 			return type_checking.Some(
-				type_checking.UnionTypeParts(t),
-				func(t *checker.Type) bool {
+				type_checking.UnionTypeParts(subjectType),
+				func(part *checker.Type) bool {
 					return type_checking.Every(
-						type_checking.IntersectionTypeParts(t),
-						func(t *checker.Type) bool {
-							return !isLiteralLikeType(t)
+						type_checking.IntersectionTypeParts(part),
+						func(part *checker.Type) bool {
+							return !isLiteralLikeType(part)
 						},
 					)
 				},
@@ -264,34 +264,34 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			discriminantType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node.Expression)
 
 			caseTypes := make([]*checker.Type, 0, len(cases))
-			for _, c := range cases {
-				if c.Kind == ast.KindDefaultClause {
+			for _, node := range cases {
+				if node.Kind == ast.KindDefaultClause {
 					continue
 				}
 
 				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(
 					ruleContext.TypeChecker,
-					c.AsCaseOrDefaultClause().Expression,
+					node.AsCaseOrDefaultClause().Expression,
 				))
 			}
 
 			containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
 
 			missingLiteralBranchTypes := make([]*checker.Type, 0, 10)
-			type_checking.TypeRecurser(discriminantType, func(t *checker.Type) bool {
-				if slices.Contains(caseTypes, t) || !isLiteralLikeType(t) {
+			type_checking.TypeRecurser(discriminantType, func(subjectType *checker.Type) bool {
+				if slices.Contains(caseTypes, subjectType) || !isLiteralLikeType(subjectType) {
 					return false
 				}
 
 				// "missing", "optional" and "undefined" types are different runtime objects,
 				// but all of them have TypeFlags.Undefined type flag
-				if slices.ContainsFunc(caseTypes, func(t *checker.Type) bool {
-					return type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
-				}) && type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
+				if slices.ContainsFunc(caseTypes, func(caseType *checker.Type) bool {
+					return type_checking.IsTypeFlagSet(caseType, checker.TypeFlagsUndefined)
+				}) && type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsUndefined) {
 					return false
 				}
 
-				missingLiteralBranchTypes = append(missingLiteralBranchTypes, t)
+				missingLiteralBranchTypes = append(missingLiteralBranchTypes, subjectType)
 
 				return false
 			})
@@ -314,7 +314,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		checkSwitchExhaustive := func(node *ast.SwitchStatement, metadata *switchMetadata) {
 			// If considerDefaultExhaustiveForUnions is enabled, the presence of a default case
 			// always makes the switch exhaustive.
-			if *opts.ConsiderDefaultExhaustiveForUnions && metadata.hasDefaultCase() {
+			if *settings.ConsiderDefaultExhaustiveForUnions && metadata.hasDefaultCase() {
 				return
 			}
 
@@ -325,7 +325,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		}
 
 		checkSwitchUnnecessaryDefaultCase := func(metadata *switchMetadata) {
-			if *opts.AllowDefaultCaseForExhaustiveSwitch {
+			if *settings.AllowDefaultCaseForExhaustiveSwitch {
 				return
 			}
 
@@ -342,7 +342,7 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			}
 		}
 		checkSwitchNoUnionDefaultCase := func(node *ast.SwitchStatement, metadata *switchMetadata) {
-			if !*opts.RequireDefaultForNonUnion {
+			if !*settings.RequireDefaultForNonUnion {
 				return
 			}
 

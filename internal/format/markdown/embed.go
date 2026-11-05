@@ -92,9 +92,9 @@ func embed(path *astPath, _ *options) embedPrint {
 			parserOrFile = "dummy.tsx"
 		}
 
-		embedded, err := textToDoc(node.Value, parserOrFile)
-		if err != nil {
-			return nil, err
+		embedded, textToDocError := textToDoc(node.Value, parserOrFile)
+		if textToDocError != nil {
+			return nil, textToDocError
 		}
 
 		style := fenceStyle(node.Value)
@@ -136,9 +136,9 @@ func embedFrontMatter(node *Node) embedPrint {
 			if parser == "" {
 				return nil, nil
 			}
-			formatted, err := textToDoc(value, parser)
-			if err != nil {
-				return nil, err
+			formatted, textToDocError := textToDoc(value, parser)
+			if textToDocError != nil {
+				return nil, textToDocError
 			}
 			embedded = formatted
 		}

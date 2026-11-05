@@ -225,18 +225,18 @@ func printChangedFiles(out *bufio.Writer, changed []changedFile) {
 }
 
 // unusedDisableSeverity is shared by rendering and check-only fixes, including nil-config harnesses.
-func unusedDisableSeverity(config *configuration.Config, path string) configuration.Severity {
+func unusedDisableSeverity(lintConfiguration *configuration.Config, path string) configuration.Severity {
 	resolved := configuration.Resolved{}
-	if config != nil {
-		resolved = config.Resolve(path)
+	if lintConfiguration != nil {
+		resolved = lintConfiguration.Resolve(path)
 	}
 	return resolved.UnusedDisableSeverity()
 }
 
-func lintWarningCount(diagnostics []rule.Diagnostic, config *configuration.Config) int {
+func lintWarningCount(diagnostics []rule.Diagnostic, lintConfiguration *configuration.Config) int {
 	warnings := 0
 	for _, diagnostic := range diagnostics {
-		if ruleFinding(diagnostic, config).Severity == "warn" {
+		if ruleFinding(diagnostic, lintConfiguration).Severity == "warn" {
 			warnings++
 		}
 	}

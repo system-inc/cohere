@@ -36,7 +36,7 @@ func TestControlDominatorsFindsTheDecidingBranch(test *testing.T) {
 			freeBlocks = append(freeBlocks, block.Id)
 		}
 	}
-	sort.Slice(controlledBlocks, func(a, b int) bool { return controlledBlocks[a] < controlledBlocks[b] })
+	sort.Slice(controlledBlocks, func(left, right int) bool { return controlledBlocks[left] < controlledBlocks[right] })
 
 	if len(controlledBlocks) == 0 {
 		test.Fatal("no block is control dependent on the `if`, so the frontier found nothing")

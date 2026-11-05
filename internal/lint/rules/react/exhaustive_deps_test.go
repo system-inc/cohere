@@ -1137,10 +1137,10 @@ func TestExhaustiveDepsAdditionalHooks(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(
+			decoded, decodeOptionsError := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(
 				json.RawMessage(testCase.optionsJson))
-			if err != nil {
-				test.Fatalf("the decoder refused %s: %v", testCase.optionsJson, err)
+			if decodeOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.optionsJson, decodeOptionsError)
 			}
 			result := rule_testing.RunTypedWithOptions(test, ExhaustiveDeps, exhaustiveDepsFile,
 				testCase.sourceText, decoded)
@@ -1425,9 +1425,9 @@ func TestExhaustiveDepsNonEffectRebuildsTheArray(test *testing.T) {
 // exhaustiveDepsWithOptions runs a fixture through the registered decoder with the given options.
 func exhaustiveDepsWithOptions(test *testing.T, optionsJson string, sourceText string) rule_testing.Result {
 	test.Helper()
-	decoded, err := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[ExhaustiveDepsOptions]()(json.RawMessage(optionsJson))
+	if decodeOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeOptionsError)
 	}
 	return rule_testing.RunTypedWithOptions(test, ExhaustiveDeps, exhaustiveDepsFile, sourceText, decoded)
 }

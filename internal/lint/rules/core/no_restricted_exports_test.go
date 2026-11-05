@@ -29,13 +29,13 @@ type noRestrictedExportsCase struct {
 func runNoRestrictedExports(test *testing.T, testCase noRestrictedExportsCase) rule_testing.Result {
 	test.Helper()
 
-	encoded, err := json.Marshal(testCase.options)
-	if err != nil {
-		test.Fatalf("could not encode options: %v", err)
+	encoded, encodeError := json.Marshal(testCase.options)
+	if encodeError != nil {
+		test.Fatalf("could not encode options: %v", encodeError)
 	}
-	decoded, err := DecodeNoRestrictedExportsOptions(encoded)
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeNoRestrictedExportsOptionsError := DecodeNoRestrictedExportsOptions(encoded)
+	if decodeNoRestrictedExportsOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoRestrictedExportsOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, NoRestrictedExports, noRestrictedExportsFile,
 		testCase.sourceText, decoded)

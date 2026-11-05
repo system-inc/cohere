@@ -453,10 +453,10 @@ func consistentTypeDefinitionsKeywordRange(
 }
 
 // consistentTypeDefinitionsIsWordByte answers whether a byte can appear inside an identifier.
-func consistentTypeDefinitionsIsWordByte(b byte) bool {
-	return b == '_' || b == '$' ||
-		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') ||
-		b >= 0x80
+func consistentTypeDefinitionsIsWordByte(character byte) bool {
+	return character == '_' || character == '$' ||
+		(character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') ||
+		character >= 0x80
 }
 
 // consistentTypeDefinitionsEqualsBefore finds the `=` that introduces an alias's body.
@@ -491,8 +491,8 @@ func consistentTypeDefinitionsEndOfPreviousToken(text string, lowerBound int, be
 }
 
 // consistentTypeDefinitionsIsSpaceByte answers whether a byte is ASCII whitespace.
-func consistentTypeDefinitionsIsSpaceByte(b byte) bool {
-	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\v' || b == '\f'
+func consistentTypeDefinitionsIsSpaceByte(character byte) bool {
+	return character == ' ' || character == '\t' || character == '\n' || character == '\r' || character == '\v' || character == '\f'
 }
 
 // consistentTypeDefinitionsCloseAngleAfter finds the `>` closing a type parameter list.

@@ -222,11 +222,11 @@ func (node *Node) hasAllNullValues(allowScalar bool) bool {
 		if !IsPair(item) {
 			return false
 		}
-		n := item.Value
+		node := item.Value
 		// `n == null || (allowScalar && isScalar(n) && n.value == null && !n.commentBefore &&
 		// !n.comment && !n.tag)`
-		if !(n == nil || allowScalar && IsScalar(n) && n.ScalarValue == nil && n.CommentBefore == "" &&
-			n.Comment == "" && n.Tag == "") {
+		if !(node == nil || allowScalar && IsScalar(node) && node.ScalarValue == nil && node.CommentBefore == "" &&
+			node.Comment == "" && node.Tag == "") {
 			return false
 		}
 	}

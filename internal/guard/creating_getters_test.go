@@ -44,12 +44,12 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 
 	found := map[string]bool{}
 	calls := []string{}
-	for _, pkg := range loaded {
-		if len(pkg.Errors) > 0 {
-			test.Fatalf("loading %s: %v", pkg.ImportPath, pkg.Errors[0])
+	for _, loadedPackage := range loaded {
+		if len(loadedPackage.Errors) > 0 {
+			test.Fatalf("loading %s: %v", loadedPackage.ImportPath, loadedPackage.Errors[0])
 		}
-		for _, file := range pkg.Syntax {
-			path := pkg.Fset.Position(file.Pos()).Filename
+		for _, file := range loadedPackage.Syntax {
+			path := loadedPackage.Fset.Position(file.Pos()).Filename
 			if strings.HasSuffix(path, "_test.go") {
 				continue
 			}
@@ -58,12 +58,12 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 				if !ok {
 					return true
 				}
-				function, ok := pkg.TypesInfo.Uses[selector.Sel].(*types.Func)
+				function, ok := loadedPackage.TypesInfo.Uses[selector.Sel].(*types.Func)
 				if !ok || function.Pkg() == nil || !strings.Contains(function.Pkg().Path(), "TypeScript/tsc") {
 					return true
 				}
 				if creatingGetters[function.Name()] {
-					position := pkg.Fset.Position(selector.Pos())
+					position := loadedPackage.Fset.Position(selector.Pos())
 					calls = append(
 						calls,
 						filepath.Base(filepath.Dir(position.Filename))+"/"+filepath.Base(position.Filename)+
@@ -86,14 +86,14 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 func TestTheCreatingGetterScanSeesAPlantedCall(test *testing.T) {
 	test.Parallel()
 
-	root, err := filepath.Abs("../..")
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs("../..")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	path := filepath.Join(root, "internal/lint/rules/typescript/no_shadow.go")
-	original, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatal(err)
+	original, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	planted := strings.Replace(string(original), "range node.Locals()", "range ast.GetLocals(node)", 1)
 	if planted == string(original) {

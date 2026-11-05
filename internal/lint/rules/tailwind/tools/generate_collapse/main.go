@@ -286,10 +286,10 @@ func main() {
 		os.Exit(2)
 	}
 
-	result, err := enumerate(*entryPoint, *resolveRoot)
-	if err != nil {
+	result, enumerateError := enumerate(*entryPoint, *resolveRoot)
+	if enumerateError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
@@ -433,17 +433,17 @@ func main() {
 	}
 	result.VerifiedAgainst = verifiedAgainst
 
-	rendered, err := render(result)
-	if err != nil {
+	rendered, renderError := render(result)
+	if renderError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", renderError)
 		os.Exit(1)
 	}
 
-	orderRendered, err := renderOrder(result)
-	if err != nil {
+	orderRendered, renderOrderError := renderOrder(result)
+	if renderOrderError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_collapse: %v\n", renderOrderError)
 		os.Exit(1)
 	}
 	orderPath := filepath.Join(filepath.Dir(*output), "property_order_table.go")
@@ -561,17 +561,17 @@ func main() {
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.
 func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
-	absoluteEntryPoint, err := filepath.Abs(entryPoint)
-	if err != nil {
-		return nil, fmt.Errorf("resolving %s: %w", entryPoint, err)
+	absoluteEntryPoint, absolutePathError := filepath.Abs(entryPoint)
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving %s: %w", entryPoint, absolutePathError)
 	}
 	if _, statError := os.Stat(absoluteEntryPoint); statError != nil {
 		return nil, fmt.Errorf("entry point %s is not readable: %w", absoluteEntryPoint, statError)
 	}
 
-	scriptPath, err := scriptBesideThisTool()
-	if err != nil {
-		return nil, err
+	scriptPath, scriptBesideThisToolError := scriptBesideThisTool()
+	if scriptBesideThisToolError != nil {
+		return nil, scriptBesideThisToolError
 	}
 
 	// The resolve root defaults to the entry point's directory, which is what every repository
@@ -597,9 +597,9 @@ func enumerate(entryPoint string, resolveRoot string) (*enumeration, error) {
 	command := exec.Command("node", arguments...)
 	command.Stderr = os.Stderr
 
-	stdout, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("running the enumeration: %w", err)
+	stdout, outputError := command.Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("running the enumeration: %w", outputError)
 	}
 
 	var result enumeration

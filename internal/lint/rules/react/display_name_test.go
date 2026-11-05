@@ -1108,7 +1108,7 @@ func TestDecodeDisplayNameOptions(test *testing.T) {
 		raw              string
 		wantIgnore       bool
 		wantCheckContext bool
-		wantErr          bool
+		wantError        bool
 	}{
 		{name: "empty input is the bare error configuration", raw: ""},
 		{name: "empty object keeps both defaults", raw: `{}`},
@@ -1121,14 +1121,14 @@ func TestDecodeDisplayNameOptions(test *testing.T) {
 			wantCheckContext: true,
 		},
 		{name: "explicit false is the default", raw: `{"ignoreTranspilerName": false}`},
-		{name: "wrong type is an error", raw: `{"ignoreTranspilerName": "yes"}`, wantErr: true},
+		{name: "wrong type is an error", raw: `{"ignoreTranspilerName": "yes"}`, wantError: true},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			decoded, decodeDisplayNameOptionsError := DecodeDisplayNameOptions([]byte(testCase.raw))
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodeDisplayNameOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}

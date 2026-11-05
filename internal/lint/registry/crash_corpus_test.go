@@ -171,15 +171,15 @@ func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(test *testing.T) {
 		}
 	}
 
-	graph, err := program.Build(
+	graph, buildError := program.Build(
 		program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory},
 	)
-	if err != nil {
-		test.Fatalf("building the corpus program: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the corpus program: %v", buildError)
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatalf("walking the corpus: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
 	}
 
 	// Every type-aware rule must have been handed a file, or this proved nothing about it.

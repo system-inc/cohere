@@ -564,8 +564,8 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 	skipWithoutCorpus(test)
 
 	var files []string
-	filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
+	filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, pathError error) error {
+		if pathError != nil || info.IsDir() {
 			return nil
 		}
 		if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".tsx") {
@@ -583,8 +583,8 @@ func TestDependencyDistributionIsReal(test *testing.T) {
 
 	scopes, withDependencies, withoutDependencies, totalDependencies := 0, 0, 0, 0
 	for _, path := range files {
-		contents, readErr := os.ReadFile(path)
-		if readErr != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)

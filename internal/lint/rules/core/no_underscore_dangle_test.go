@@ -611,10 +611,10 @@ func TestNoUnderscoreDangleFires(test *testing.T) {
 func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
-		name    string
-		raw     string
-		check   func(*testing.T, NoUnderscoreDangleOptions)
-		wantErr bool
+		name      string
+		raw       string
+		check     func(*testing.T, NoUnderscoreDangleOptions)
+		wantError bool
 	}{
 		{
 			name: "absent options, which is what a bare \"error\" delivers",
@@ -669,24 +669,24 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 		},
 		{name: "an empty object exempts nothing", raw: `{}`},
 		{
-			name:    "a shape that is neither must error rather than decode to a default",
-			raw:     `"allowAfterThis"`,
-			wantErr: true,
+			name:      "a shape that is neither must error rather than decode to a default",
+			raw:       `"allowAfterThis"`,
+			wantError: true,
 		},
 		{
-			name:    "upstream's variadic spelling is not one this layer delivers",
-			raw:     `[{"allowAfterThis":true}]`,
-			wantErr: true,
+			name:      "upstream's variadic spelling is not one this layer delivers",
+			raw:       `[{"allowAfterThis":true}]`,
+			wantError: true,
 		},
 		{
-			name:    "an unknown key is refused, matching upstream's additionalProperties:false",
-			raw:     `{"allowInMethodNames":true}`,
-			wantErr: true,
+			name:      "an unknown key is refused, matching upstream's additionalProperties:false",
+			raw:       `{"allowInMethodNames":true}`,
+			wantError: true,
 		},
 		{
-			name:    "a misspelled known key is refused rather than silently ignored",
-			raw:     `{"allowAfterThat":true}`,
-			wantErr: true,
+			name:      "a misspelled known key is refused rather than silently ignored",
+			raw:       `{"allowAfterThat":true}`,
+			wantError: true,
 		},
 	}
 
@@ -696,7 +696,7 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 			decoded, decodeNoUnderscoreDangleOptionsError := DecodeNoUnderscoreDangleOptions(
 				json.RawMessage(testCase.raw),
 			)
-			if testCase.wantErr {
+			if testCase.wantError {
 				if decodeNoUnderscoreDangleOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}

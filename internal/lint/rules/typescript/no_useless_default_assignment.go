@@ -41,9 +41,9 @@ type noUselessDefaultAssignmentRawOptions struct {
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
 func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noUselessDefaultAssignmentRawOptions]()(raw)
-	if err != nil {
-		return DefaultNoUselessDefaultAssignmentSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noUselessDefaultAssignmentRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultNoUselessDefaultAssignmentSettings(), decodeOptionsError
 	}
 
 	wire, _ := decoded.(noUselessDefaultAssignmentRawOptions)

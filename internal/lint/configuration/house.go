@@ -128,9 +128,9 @@ func OwnSettingsOf(path string) (map[string]json.RawMessage, error) {
 // which is what parity, coverage and selector validation read. Resolve answers per file from the
 // variant that file gets.
 func LoadHouse(path string, registeredNames []string, detection HouseDetection) (*Config, error) {
-	root, err := filepath.Abs(filepath.Dir(path))
-	if err != nil {
-		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, err)
+	root, absolutePathError := filepath.Abs(filepath.Dir(path))
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
 	}
 	var ownLayers []configLayer
 	if _, err := os.Stat(path); err == nil {
@@ -141,9 +141,9 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 	}
 
 	tailwind := detection.TailwindEntryPoint != ""
-	whole, err := loadHouseVariant(ownLayers, root, registeredNames, houseVariant{react: true, next: true}, true)
-	if err != nil {
-		return nil, err
+	whole, loadHouseVariantError := loadHouseVariant(ownLayers, root, registeredNames, houseVariant{react: true, next: true}, true)
+	if loadHouseVariantError != nil {
+		return nil, loadHouseVariantError
 	}
 	house := &houseSets{
 		detection:    detection,
@@ -280,17 +280,17 @@ func loadHouseVariant(
 
 // Applied is the house sets a zero-config run applied, and the ones it looked for and did not, with
 // the evidence for each. Nil for a configuration that names its sets.
-func (c *Config) Applied() []AppliedSet {
-	if c == nil || c.house == nil {
+func (configuration *Config) Applied() []AppliedSet {
+	if configuration == nil || configuration.house == nil {
 		return nil
 	}
-	return c.house.applied
+	return configuration.house.applied
 }
 
 // SetsLine is the run's first line under zero config: each house set and why it applies or does not.
 // Empty for a configuration that names its own sets, since its file already says.
-func (c *Config) SetsLine() string {
-	applied := c.Applied()
+func (configuration *Config) SetsLine() string {
+	applied := configuration.Applied()
 	if len(applied) == 0 {
 		return ""
 	}
@@ -308,12 +308,12 @@ func (c *Config) SetsLine() string {
 // DetectionFingerprint is a digest of which files each per-file set applied to and the Tailwind entry,
 // for a cache keyed on what decides which rules run: a file can change sets without its own bytes
 // changing, when another file starts importing next. Empty for a configuration that names its sets.
-func (c *Config) DetectionFingerprint() string {
-	if c == nil || c.house == nil {
+func (configuration *Config) DetectionFingerprint() string {
+	if configuration == nil || configuration.house == nil {
 		return ""
 	}
 	digest := sha256.New()
-	for _, files := range []map[string]bool{c.house.detection.ReactFiles, c.house.detection.NextFiles} {
+	for _, files := range []map[string]bool{configuration.house.detection.ReactFiles, configuration.house.detection.NextFiles} {
 		names := make([]string, 0, len(files))
 		for name := range files {
 			names = append(names, name)
@@ -321,7 +321,7 @@ func (c *Config) DetectionFingerprint() string {
 		sort.Strings(names)
 		fmt.Fprintf(digest, "%d\n%s\n", len(names), strings.Join(names, "\n"))
 	}
-	fmt.Fprintf(digest, "tailwind %s\n", c.house.detection.TailwindEntryPoint)
+	fmt.Fprintf(digest, "tailwind %s\n", configuration.house.detection.TailwindEntryPoint)
 	return fmt.Sprintf("%x", digest.Sum(nil))
 }
 

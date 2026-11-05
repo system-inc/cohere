@@ -236,10 +236,10 @@ func writeAdamicRangesCase(out *strings.Builder, name string, function *Function
 	for id := range values {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	sort.Slice(ids, func(left, right int) bool { return ids[left] < ids[right] })
 	for _, id := range ids {
-		if r := ranges.Get(id); r.IsSet() {
-			fmt.Fprintf(out, "expect %d %d %d\n", id, r.Start, r.End)
+		if mutableRange := ranges.Get(id); mutableRange.IsSet() {
+			fmt.Fprintf(out, "expect %d %d %d\n", id, mutableRange.Start, mutableRange.End)
 		}
 	}
 	fmt.Fprintf(out, "expect-length %d\n", ranges.Len())

@@ -103,14 +103,14 @@ func livePlacementSystem(test *testing.T, spelling string) DesignSystemResult {
 	entryPoint := corpus.Resolve(test, spelling)
 	packageRoot := findTailwindPackageRoot(filepath.Dir(entryPoint), diskFileExists)
 	if packageRoot == "" {
-		return DesignSystemResult{Err: os.ErrNotExist}
+		return DesignSystemResult{Error: os.ErrNotExist}
 	}
 	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint:          entryPoint,
 		TailwindPackageRoot: packageRoot,
 	})
 	if loadDesignSystemError != nil {
-		return DesignSystemResult{Err: loadDesignSystemError}
+		return DesignSystemResult{Error: loadDesignSystemError}
 	}
 	return loadedDesignSystemResult(system, entryPoint)
 }
@@ -135,7 +135,7 @@ func TestUnknownClassesPlacesEveryCorpusClass(test *testing.T) {
 
 	for entryPoint, lists := range literals {
 		designSystem := livePlacementSystem(test, entryPoint)
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			continue
 		}
 		for _, classes := range lists {
@@ -213,7 +213,7 @@ func TestCanonicalClassesPlacementIsAccountedFor(test *testing.T) {
 
 	for entryPoint, lists := range literals {
 		designSystem := livePlacementSystem(test, entryPoint)
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			continue
 		}
 		for _, classes := range lists {
@@ -356,7 +356,7 @@ func TestConflictingClassesPlacementIsAccountedFor(test *testing.T) {
 
 	for entryPoint, lists := range literals {
 		designSystem := livePlacementSystem(test, entryPoint)
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			continue
 		}
 		for _, classes := range lists {
@@ -449,7 +449,7 @@ func TestConflictingClassesPerRepositoryPlacement(test *testing.T) {
 
 	for entryPoint, lists := range literals {
 		designSystem := livePlacementSystem(test, entryPoint)
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			continue
 		}
 		counts := byRepository[entryPoint]
@@ -537,7 +537,7 @@ func TestRepositoryColorTokensReadAsColors(test *testing.T) {
 
 	for entryPoint := range livePlacementLiterals(test) {
 		designSystem := livePlacementSystem(test, entryPoint)
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			continue
 		}
 		checkedRepositories++

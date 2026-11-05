@@ -20,7 +20,7 @@ import (
 // through its typescript-eslint twin's key.
 func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 	t.Parallel()
-	config := &configuration.Config{
+	lintConfiguration := &configuration.Config{
 		Root: "/repository",
 		Rules: map[string]configuration.RuleSetting{
 			"max-classes-per-file": {
@@ -37,7 +37,7 @@ func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 	}
 
 	printed := func(path string) map[string][]json.RawMessage {
-		return resolvedConfigRules(config.Resolve(path))
+		return resolvedConfigRules(lintConfiguration.Resolve(path))
 	}
 
 	source := printed("/repository/source/Thing.ts")
@@ -95,9 +95,9 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		command.Dir = root
 		return command.CombinedOutput()
 	}
-	output, err := run("Thing.ts")
-	if err != nil {
-		test.Fatalf("print-config: %v\n%s", err, output)
+	output, runError := run("Thing.ts")
+	if runError != nil {
+		test.Fatalf("print-config: %v\n%s", runError, output)
 	}
 	var doc map[string]json.RawMessage
 	if decodeError := json.Unmarshal(output, &doc); decodeError != nil {
@@ -208,12 +208,12 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	if got := rules["no-var"]; len(got) != 1 || string(got[0]) != "0" {
 		test.Errorf("resolved no-var = %s", got)
 	}
-	if again, err := run("Thing.ts"); err != nil || !bytes.Equal(output, again) {
-		test.Errorf("unstable repeat: %v", err)
+	if again, runError := run("Thing.ts"); runError != nil || !bytes.Equal(output, again) {
+		test.Errorf("unstable repeat: %v", runError)
 	}
-	other, err := run("Other.ts")
-	if err != nil {
-		test.Fatalf("other file: %v\n%s", err, other)
+	other, runError := run("Other.ts")
+	if runError != nil {
+		test.Fatalf("other file: %v\n%s", runError, other)
 	}
 	var otherDoc struct {
 		Settings        map[string]json.RawMessage
@@ -238,8 +238,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	if writeError := os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(bad), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if output, err := run("Thing.ts"); err == nil || !bytes.Contains(output, []byte(`"react"`)) {
-		test.Errorf("unread React settings were not refused: %v\n%s", err, output)
+	if output, runError := run("Thing.ts"); runError == nil || !bytes.Contains(output, []byte(`"react"`)) {
+		test.Errorf("unread React settings were not refused: %v\n%s", runError, output)
 	}
 }
 
@@ -268,17 +268,17 @@ func TestPrintConfigSettingsReaders(test *testing.T) {
 		"future/read": {Severity: configuration.SeverityWarn},
 		"future/off":  {Severity: configuration.SeverityOff},
 	}}
-	settings, err := settingsForFile(base, resolved, registrations)
-	if err != nil {
-		test.Fatal(err)
+	settings, settingsForFileError := settingsForFile(base, resolved, registrations)
+	if settingsForFileError != nil {
+		test.Fatal(settingsForFileError)
 	}
 	if len(settings) != 1 || string(settings["future-plugin"]) != `{"read":"yes"}` {
 		test.Errorf("registered settings = %s", settings)
 	}
 	resolved.Rules["future/read"] = configuration.RuleSetting{Severity: configuration.SeverityOff}
-	settings, err = settingsForFile(base, resolved, registrations)
-	if err != nil || len(settings) != 0 {
-		test.Errorf("settings without a reader = %s, %v", settings, err)
+	settings, settingsForFileError = settingsForFile(base, resolved, registrations)
+	if settingsForFileError != nil || len(settings) != 0 {
+		test.Errorf("settings without a reader = %s, %v", settings, settingsForFileError)
 	}
 }
 

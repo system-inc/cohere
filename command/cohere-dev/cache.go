@@ -59,8 +59,8 @@ const cacheTrimPoll = 250 * time.Millisecond
 // trimCacheVerb runs cohere-dev as the background trim. It is what startCacheTrim starts.
 const trimCacheVerb = "trim-cache"
 
-// errPoolNeverEmpty is holdThePool's answer when every look found a token in use.
-var errPoolNeverEmpty = errors.New("the pool was never empty")
+// errorPoolNeverEmpty is holdThePool's answer when every look found a token in use.
+var errorPoolNeverEmpty = errors.New("the pool was never empty")
 
 func cacheCapBytes() (int64, error) {
 	value := os.Getenv(cacheCapVariable)
@@ -122,18 +122,18 @@ func outsideAToken(environment []string) []string {
 
 // trimCache is the background trim's whole run: measure, and when over the cap, hold the pool and trim.
 func trimCache() int {
-	directory, err := poolDirectory()
-	if err != nil {
+	directory, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
 		return 1
 	}
-	capBytes, err := cacheCapBytes()
-	if err != nil {
-		recordCacheLook(directory, err.Error())
+	capBytes, cacheCapBytesError := cacheCapBytes()
+	if cacheCapBytesError != nil {
+		recordCacheLook(directory, cacheCapBytesError.Error())
 		return 2
 	}
 	// One trim at a time, however many were started.
-	lock, err := os.OpenFile(filepath.Join(directory, "gocache-trim.lock"), os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
+	lock, openError := os.OpenFile(filepath.Join(directory, "gocache-trim.lock"), os.O_CREATE|os.O_RDWR, 0o644)
+	if openError != nil {
 		return 1
 	}
 	// Ignored: the trim lock is never written, and its lock goes with the descriptor.
@@ -153,9 +153,9 @@ func trimCache() int {
 		recordCacheLook(directory, quietLine)
 	}
 
-	cache, err := goCacheDirectory()
-	if err != nil {
-		recordCacheLook(directory, err.Error())
+	cache, goCacheDirectoryError := goCacheDirectory()
+	if goCacheDirectoryError != nil {
+		recordCacheLook(directory, goCacheDirectoryError.Error())
 		return 1
 	}
 	if poolGuardsError := poolGuards(cache); poolGuardsError != nil {
@@ -163,9 +163,9 @@ func trimCache() int {
 		return 2
 	}
 	// Measured first, removing nothing, so a cache under its cap costs no one a token.
-	measured, err := gocache.Trim(cache, gocache.Limit{Cap: math.MaxInt64}, time.Now())
-	if err != nil {
-		recordCacheLook(directory, err.Error())
+	measured, trimError := gocache.Trim(cache, gocache.Limit{Cap: math.MaxInt64}, time.Now())
+	if trimError != nil {
+		recordCacheLook(directory, trimError.Error())
 		return 1
 	}
 	if measured.Before <= capBytes {
@@ -173,20 +173,20 @@ func trimCache() int {
 		return 0
 	}
 
-	shape, err := readPoolShape()
-	if err != nil {
-		recordCacheLook(directory, err.Error())
+	shape, readPoolShapeError := readPoolShape()
+	if readPoolShapeError != nil {
+		recordCacheLook(directory, readPoolShapeError.Error())
 		return 2
 	}
-	release, err := holdThePool(directory, shape.tokens, fmt.Sprintf("trimming the Go build cache, %s over the %s cap",
+	release, holdThePoolError := holdThePool(directory, shape.tokens, fmt.Sprintf("trimming the Go build cache, %s over the %s cap",
 		gigabytes(measured.Before), gigabytes(capBytes)), cacheTrimPatience)
-	if errors.Is(err, errPoolNeverEmpty) {
+	if errors.Is(holdThePoolError, errorPoolNeverEmpty) {
 		recordCacheLook(directory, fmt.Sprintf("%s over the %s cap, not trimmed: the pool was never empty for %s, "+
 			"and the next look tries again", gigabytes(measured.Before), gigabytes(capBytes), cacheTrimPatience))
 		return 0
 	}
-	if err != nil {
-		recordCacheLook(directory, "holding the pool to trim: "+err.Error())
+	if holdThePoolError != nil {
+		recordCacheLook(directory, "holding the pool to trim: "+holdThePoolError.Error())
 		return 1
 	}
 	// A window opened while the trim waited for an empty pool holds too: the wait can be minutes.
@@ -201,14 +201,14 @@ func trimCache() int {
 		return 0
 	}
 	started := time.Now()
-	trimmed, err := gocache.Trim(
+	trimmed, trimError := gocache.Trim(
 		cache,
 		gocache.Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: cacheTrimSpare},
 		started,
 	)
 	release()
-	if err != nil {
-		recordCacheLook(directory, err.Error())
+	if trimError != nil {
+		recordCacheLook(directory, trimError.Error())
 		return 1
 	}
 	recordCacheLook(
@@ -254,7 +254,7 @@ func holdThePool(directory string, tokens int, why string, patience time.Duratio
 			}, nil
 		}
 		if time.Now().After(deadline) {
-			return nil, errPoolNeverEmpty
+			return nil, errorPoolNeverEmpty
 		}
 		time.Sleep(cacheTrimPoll)
 	}
@@ -271,16 +271,16 @@ func takeEveryToken(directory string, tokens int) ([]*os.File, error) {
 		}
 	}
 	for token := 1; token <= tokens; token++ {
-		lock, err := os.OpenFile(lockPath(directory, token), os.O_CREATE|os.O_RDWR, 0o644)
-		if err != nil {
+		lock, openError := os.OpenFile(lockPath(directory, token), os.O_CREATE|os.O_RDWR, 0o644)
+		if openError != nil {
 			letGo()
-			return nil, err
+			return nil, openError
 		}
-		taken, err := tryLockFile(lock)
-		if err != nil || !taken {
+		taken, tryLockFileError := tryLockFile(lock)
+		if tryLockFileError != nil || !taken {
 			_ = lock.Close() // Ignored: never written, and the lock's error, if any, is the one returned.
 			letGo()
-			return nil, err
+			return nil, tryLockFileError
 		}
 		held = append(held, lock)
 	}
@@ -299,9 +299,9 @@ func poolGuards(cache string) error {
 		return fmt.Errorf("not trimmed: %w", poolHomeError)
 	}
 	root := userCacheDirectoryIn(home)
-	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
-	resolvedCache, cacheErr := filepath.EvalSymlinks(cache)
-	if rootErr == nil && cacheErr == nil {
+	resolvedRoot, rootError := filepath.EvalSymlinks(root)
+	resolvedCache, cacheError := filepath.EvalSymlinks(cache)
+	if rootError == nil && cacheError == nil {
 		if relative, relativePathError := filepath.Rel(
 			resolvedRoot,
 			resolvedCache,

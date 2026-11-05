@@ -130,16 +130,16 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 		}
 
 		tableBody := []*jestEachTableRow{{hasLineBreak: false, cells: nil}}
-		for i := 1; i < len(quasis); i++ {
+		for index := 1; index < len(quasis); index++ {
 			row := tableBody[len(tableBody)-1]
-			correspondingExpression := stringifiedExpressions[i-1]
+			correspondingExpression := stringifiedExpressions[index-1]
 
 			row.cells = append(row.cells, correspondingExpression)
 			if strings.Contains(correspondingExpression, "\n") {
 				row.hasLineBreak = true
 			}
 
-			if strings.Contains(templateElementRaw(quasis[i]), "\n") {
+			if strings.Contains(templateElementRaw(quasis[index]), "\n") {
 				tableBody = append(tableBody, &jestEachTableRow{hasLineBreak: false, cells: nil})
 			}
 		}

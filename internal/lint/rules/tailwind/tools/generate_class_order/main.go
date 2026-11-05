@@ -70,10 +70,10 @@ func main() {
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
-	toolDirectory, err := toolDirectory()
-	if err != nil {
+	toolDirectory, toolDirectoryError := toolDirectory()
+	if toolDirectoryError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "locating this tool: %v\n", err)
+		fmt.Fprintf(os.Stderr, "locating this tool: %v\n", toolDirectoryError)
 		os.Exit(1)
 	}
 	systemsPath := *systems
@@ -81,10 +81,10 @@ func main() {
 		systemsPath = filepath.Join(toolDirectory, "systems.json")
 	}
 
-	generated, summary, err := build(toolDirectory, systemsPath)
-	if err != nil {
+	generated, summary, buildError := build(toolDirectory, systemsPath)
+	if buildError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "build: %v\n", err)
+		fmt.Fprintf(os.Stderr, "build: %v\n", buildError)
 		os.Exit(1)
 	}
 
@@ -211,9 +211,9 @@ type registration struct {
 
 // build runs the three scripts per design system and folds the results into one fixture.
 func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
-	definitionBytes, err := os.ReadFile(systemsPath)
-	if err != nil {
-		return nil, fixture{}, fmt.Errorf("read %s: %w", systemsPath, err)
+	definitionBytes, readError := os.ReadFile(systemsPath)
+	if readError != nil {
+		return nil, fixture{}, fmt.Errorf("read %s: %w", systemsPath, readError)
 	}
 	var definitions []systemDefinition
 	if decodeError := json.Unmarshal(definitionBytes, &definitions); decodeError != nil {
@@ -231,9 +231,9 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 
 	// The populations, the registration tables and the cross-system divergence, in one pass so that
 	// both systems are read from the same process and cannot drift between two.
-	enumerated, err := runNode(filepath.Join(toolDirectory, "enumerate.mjs"), systemsPath)
-	if err != nil {
-		return nil, fixture{}, err
+	enumerated, runNodeError := runNode(filepath.Join(toolDirectory, "enumerate.mjs"), systemsPath)
+	if runNodeError != nil {
+		return nil, fixture{}, runNodeError
 	}
 	var built fixture
 	if decodeError := json.Unmarshal(enumerated, &built); decodeError != nil {
@@ -270,30 +270,30 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 		); runNodeError != nil {
 			return nil, fixture{}, fmt.Errorf("descriptor table for %s: %w", system.Name, runNodeError)
 		}
-		descriptorTable, err := os.ReadFile(descriptorTablePath)
-		if err != nil {
-			return nil, fixture{}, fmt.Errorf("read descriptor table for %s: %w", system.Name, err)
+		descriptorTable, readError := os.ReadFile(descriptorTablePath)
+		if readError != nil {
+			return nil, fixture{}, fmt.Errorf("read descriptor table for %s: %w", system.Name, readError)
 		}
 		if removeError := os.Remove(descriptorTablePath); removeError != nil {
 			return nil, fixture{}, fmt.Errorf("remove %s: %w", descriptorTablePath, removeError)
 		}
 		system.DescriptorTable = json.RawMessage(descriptorTable)
 
-		context, err := runNode(
+		context, runNodeError := runNode(
 			filepath.Join(toolsDirectory, "generate_descriptor_table", "context.mjs"),
 			system.EntryPoint,
 		)
-		if err != nil {
-			return nil, fixture{}, fmt.Errorf("context for %s: %w", system.Name, err)
+		if runNodeError != nil {
+			return nil, fixture{}, fmt.Errorf("context for %s: %w", system.Name, runNodeError)
 		}
 		system.Context = json.RawMessage(context)
 	}
 
 	// Re-marshalled rather than passed through, so the committed fixture has one canonical shape and
 	// `-check` compares bytes that only change when an answer changed.
-	encoded, err := json.Marshal(built)
-	if err != nil {
-		return nil, fixture{}, fmt.Errorf("encode fixture: %w", err)
+	encoded, encodeError := json.Marshal(built)
+	if encodeError != nil {
+		return nil, fixture{}, fmt.Errorf("encode fixture: %w", encodeError)
 	}
 	return append(encoded, '\n'), built, nil
 }

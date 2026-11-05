@@ -111,11 +111,11 @@ func foldedLine(diagnostics []*ast.Diagnostic) string {
 	for code := range byCode {
 		codes = append(codes, code)
 	}
-	sort.Slice(codes, func(i, j int) bool {
-		if byCode[codes[i]] != byCode[codes[j]] {
-			return byCode[codes[i]] > byCode[codes[j]]
+	sort.Slice(codes, func(left, right int) bool {
+		if byCode[codes[left]] != byCode[codes[right]] {
+			return byCode[codes[left]] > byCode[codes[right]]
 		}
-		return codes[i] < codes[j]
+		return codes[left] < codes[right]
 	})
 	parts := make([]string, 0, len(codes))
 	for _, code := range codes {

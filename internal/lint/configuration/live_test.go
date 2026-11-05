@@ -129,9 +129,9 @@ func TestAgainstTheLiveConfig(test *testing.T) {
 // match, so the difference is visible instead of blocking or being smoothed away.
 func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
 	test.Parallel()
-	asWritten, err := Load(liveConfigPath(test))
-	if err != nil {
-		test.Fatalf("loading the live config: %v", err)
+	asWritten, loadError := Load(liveConfigPath(test))
+	if loadError != nil {
+		test.Fatalf("loading the live config: %v", loadError)
 	}
 
 	// Every plugin-default rule must be reachable through the declaration alone.
@@ -146,9 +146,9 @@ func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
 	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
 	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
 	// merged map made this guard pass on a config with three lines deliberately removed.
-	namedInFile, err := ruleNamesInChain(liveConfigPath(test))
-	if err != nil {
-		test.Fatalf("reading the rules block: %v", err)
+	namedInFile, ruleNamesInChainError := ruleNamesInChain(liveConfigPath(test))
+	if ruleNamesInChainError != nil {
+		test.Fatalf("reading the rules block: %v", ruleNamesInChainError)
 	}
 
 	missingByHand, severityDiffers := 0, 0
@@ -206,13 +206,13 @@ func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
 	}
 	named := map[string]RuleSetting{}
 	for index := len(sources) - 1; index >= 0; index-- {
-		contents, err := SourceContents(sources[index])
-		if err != nil {
-			return nil, err
+		contents, sourceContentsError := SourceContents(sources[index])
+		if sourceContentsError != nil {
+			return nil, sourceContentsError
 		}
-		layer, err := ruleNamesInContents(contents)
-		if err != nil {
-			return nil, fmt.Errorf("reading the rules block of %s: %w", sources[index], err)
+		layer, ruleNamesInContentsError := ruleNamesInContents(contents)
+		if ruleNamesInContentsError != nil {
+			return nil, fmt.Errorf("reading the rules block of %s: %w", sources[index], ruleNamesInContentsError)
 		}
 		for name, setting := range layer {
 			named[name] = setting

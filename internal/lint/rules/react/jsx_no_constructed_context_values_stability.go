@@ -289,15 +289,15 @@ func (evaluation jsxNoConstructedContextValuesEvaluation) combine(
 // isPrimitive reports whether every part of a node's type compares by value, so a fresh computation
 // of it is still equal to the last one.
 func (walk *jsxNoConstructedContextValuesStabilityWalk) isPrimitive(node *ast.Node) bool {
-	t := walk.ctx.TypeChecker.GetTypeAtLocation(node)
-	if t == nil {
+	subjectType := walk.ctx.TypeChecker.GetTypeAtLocation(node)
+	if subjectType == nil {
 		return false
 	}
 	const primitive = checker.TypeFlagsStringLike | checker.TypeFlagsNumberLike |
 		checker.TypeFlagsBigIntLike | checker.TypeFlagsBooleanLike | checker.TypeFlagsEnumLike |
 		checker.TypeFlagsESSymbolLike | checker.TypeFlagsNull | checker.TypeFlagsUndefined |
 		checker.TypeFlagsVoid
-	for part := range type_checking.UnionTypePartsSeq(t) {
+	for part := range type_checking.UnionTypePartsSeq(subjectType) {
 		if !type_checking.IsTypeFlagSet(part, primitive) {
 			return false
 		}

@@ -43,9 +43,9 @@ func DefaultReturnAwaitSettings() ReturnAwaitOptions {
 // string once cohere's config layer strips the severity. An unrecognised value keeps the default
 // rather than silently selecting a mode nobody asked for.
 func DecodeReturnAwaitOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[string]()(raw)
-	if err != nil {
-		return DefaultReturnAwaitSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[string]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultReturnAwaitSettings(), decodeOptionsError
 	}
 
 	wire, _ := decoded.(string)

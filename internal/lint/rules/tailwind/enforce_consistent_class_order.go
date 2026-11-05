@@ -189,13 +189,13 @@ var EnforceConsistentClassOrder = rule.Rule{
 		// rule reporting zero findings over unreadable CSS is indistinguishable from a clean tree
 		// and that is the one failure cohere exists to remove.
 		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
-		if designSystem.Err != nil {
+		if designSystem.Error != nil {
 			if ruleContext.Program == nil {
 				return nil
 			}
 			// No Tailwind entry point is silence with nothing wrong in a project without Tailwind, and
 			// a skip --coverage names, so a project that enables this rule without one can see it (#pa7k7zv).
-			if skipWithoutTailwind(ruleContext, designSystem.Err) {
+			if skipWithoutTailwind(ruleContext, designSystem.Error) {
 				return nil
 			}
 			return declineListeners(ruleContext, "enforce-consistent-class-order", designSystem)

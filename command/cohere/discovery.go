@@ -247,11 +247,11 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	reading := make(chan struct{}, discoveryParallelism)
 	var firstError error
 	var workspaces []string
-	fail := func(err error) {
+	fail := func(sourceError error) {
 		lock.Lock()
 		defer lock.Unlock()
 		if firstError == nil {
-			firstError = err
+			firstError = sourceError
 		}
 	}
 	// visit reads one directory. Below the root, a directory holding a .git is a repository of its own and

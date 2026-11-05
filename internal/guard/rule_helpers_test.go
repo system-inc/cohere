@@ -141,13 +141,13 @@ func ruleLocalFunctionNames(test *testing.T) []ruleLocalFunction {
 func exportedUtilityNames(test *testing.T) map[string]string {
 	test.Helper()
 
-	files, err := filepath.Glob("../lint/ecmascript/*/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing utility files: %v", err)
+	files, globError := filepath.Glob("../lint/ecmascript/*/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing utility files: %v", globError)
 	}
-	nested, err := filepath.Glob("../lint/ecmascript/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing utility files: %v", err)
+	nested, globError := filepath.Glob("../lint/ecmascript/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing utility files: %v", globError)
 	}
 	files = append(files, nested...)
 	if len(files) == 0 {

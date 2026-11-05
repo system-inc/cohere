@@ -109,24 +109,24 @@ func TestASecondElementOnASingleElementRuleIsRefused(test *testing.T) {
 	test.Parallel()
 	registry := OptionsRegistry{"tunable": {Decode: DecodeInto[tuningOptions]()}}
 
-	_, err := registry.Decode("tunable", []json.RawMessage{
+	_, decodeError := registry.Decode("tunable", []json.RawMessage{
 		json.RawMessage(`{"maximumLineCount": 3}`),
 		json.RawMessage(`{"enforceForRenamedProperties": true}`),
 	})
-	if err == nil {
+	if decodeError == nil {
 		test.Fatal("a second option element was accepted by a rule that reads one, so it was dropped in silence")
 	}
 	for _, want := range []string{"tunable", `element 2 {"enforceForRenamedProperties": true}`} {
-		if !strings.Contains(err.Error(), want) {
-			test.Errorf("the refusal does not name %q: %v", want, err)
+		if !strings.Contains(decodeError.Error(), want) {
+			test.Errorf("the refusal does not name %q: %v", want, decodeError)
 		}
 	}
 
 	// The control: the same rule with only its first element decodes, so the refusal above is about
 	// the count and not about the first element.
-	decoded, err := registry.Decode("tunable", []json.RawMessage{json.RawMessage(`{"maximumLineCount": 3}`)})
-	if err != nil {
-		test.Fatalf("one element on a one-element rule was refused: %v", err)
+	decoded, decodeError := registry.Decode("tunable", []json.RawMessage{json.RawMessage(`{"maximumLineCount": 3}`)})
+	if decodeError != nil {
+		test.Fatalf("one element on a one-element rule was refused: %v", decodeError)
 	}
 	if decoded.(tuningOptions).MaximumLineCount != 3 {
 		test.Fatalf("the single element did not reach the decoder: %+v", decoded)

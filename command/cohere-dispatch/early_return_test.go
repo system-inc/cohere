@@ -194,43 +194,43 @@ func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(test *testing.T) {
 		// Output to a file rather than a buffer, as a terminal takes it: a buffer is fed through a pipe the
 		// engine holds open, so the test would wait for the engine to exit and see a whole profile whenever
 		// it was written.
-		output, err := os.Create(filepath.Join(test.TempDir(), "output"))
-		if err != nil {
-			test.Fatal(err)
+		output, createError := os.Create(filepath.Join(test.TempDir(), "output"))
+		if createError != nil {
+			test.Fatal(createError)
 		}
 		command := earlyReturnCommand(dispatcher, engine, root, "--no-fix", "--profile", profilePath)
 		command.Stdout, command.Stderr = output, output
-		err = command.Run()
+		runError := command.Run()
 		closeError := output.Close()
-		if err != nil {
+		if runError != nil {
 			// Ignored: the run already failed, and that is what fails the test; its output is only context.
 			written, _ := os.ReadFile(output.Name())
-			test.Fatalf("round %d: the profiled run failed: %v\n%s", round, err, written)
+			test.Fatalf("round %d: the profiled run failed: %v\n%s", round, runError, written)
 		}
 		if closeError != nil {
 			test.Fatalf("round %d: closing the run's output: %v", round, closeError)
 		}
-		file, err := os.Open(profilePath)
-		if err != nil {
-			test.Fatalf("round %d: no profile when the caller had its answer: %v", round, err)
+		file, openError := os.Open(profilePath)
+		if openError != nil {
+			test.Fatalf("round %d: no profile when the caller had its answer: %v", round, openError)
 		}
-		reader, err := gzip.NewReader(file)
-		if err != nil {
+		reader, gzipError := gzip.NewReader(file)
+		if gzipError != nil {
 			_ = file.Close() // Ignored: a profile only read, and the test fails on what the read found.
 			test.Fatalf(
 				"round %d: the profile is not a whole gzip stream when the caller had its answer: %v",
 				round,
-				err,
+				gzipError,
 			)
 		}
-		read, err := io.Copy(io.Discard, reader)
+		read, copyError := io.Copy(io.Discard, reader)
 		_ = file.Close() // Ignored: a profile only read, to its end.
-		if err != nil || read == 0 {
+		if copyError != nil || read == 0 {
 			test.Fatalf(
 				"round %d: the profile read %d bytes and then %v when the caller had its answer",
 				round,
 				read,
-				err,
+				copyError,
 			)
 		}
 	}

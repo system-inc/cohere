@@ -105,9 +105,9 @@ func reactCompilerFixtures(test *testing.T) []reactCompilerFixture {
 	test.Helper()
 	root := filepath.Join("..", "..", "rules", "react", "conformance", "testdata", "fixtures")
 	var paths []string
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if !entry.IsDir() && !strings.HasSuffix(path, ".md") {
 			paths = append(paths, path)
@@ -120,17 +120,17 @@ func reactCompilerFixtures(test *testing.T) []reactCompilerFixture {
 	sort.Strings(paths)
 	var fixtures []reactCompilerFixture
 	for _, path := range paths {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			test.Fatal(err)
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		source := string(contents)
 		if strings.Contains(source, "@flow") {
 			continue
 		}
-		name, err := filepath.Rel(root, path)
-		if err != nil {
-			test.Fatal(err)
+		name, relativePathError := filepath.Rel(root, path)
+		if relativePathError != nil {
+			test.Fatal(relativePathError)
 		}
 		fixtures = append(
 			fixtures,

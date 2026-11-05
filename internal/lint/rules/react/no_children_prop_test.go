@@ -385,9 +385,9 @@ func TestNoChildrenPropSurvivesDegenerateInput(test *testing.T) {
 func TestNoChildrenPropAllowFunctions(test *testing.T) {
 	test.Parallel()
 
-	allowed, err := rule.DecodeOptionsInto[NoChildrenPropOptions]()([]byte(`{"allowFunctions": true}`))
-	if err != nil {
-		test.Fatalf("decoding allowFunctions: %v", err)
+	allowed, decodeOptionsError := rule.DecodeOptionsInto[NoChildrenPropOptions]()([]byte(`{"allowFunctions": true}`))
+	if decodeOptionsError != nil {
+		test.Fatalf("decoding allowFunctions: %v", decodeOptionsError)
 	}
 	functions := []string{"() => {}", "function() {}", "async function() {}", "function* () {}"}
 

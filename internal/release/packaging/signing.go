@@ -114,18 +114,18 @@ func Sign(binaryPath string, signing Signing) error {
 func VerifySignature(binaryPath string) error {
 	command := exec.Command("codesign", "--verify", "--strict", "--verbose=2", binaryPath)
 
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("the signature on %s did not verify: %w\n%s", binaryPath, err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		return fmt.Errorf("the signature on %s did not verify: %w\n%s", binaryPath, outputError, output)
 	}
 
 	// An ad-hoc signature verifies successfully and is worth nothing to Gatekeeper. Go's linker
 	// applies one to every arm64 binary, so a signing step that silently did nothing leaves a
 	// binary that passes `codesign --verify` and is still killed on a quarantined launch. Checking
 	// for it is what separates "verified" from "verified as actually signed by us".
-	details, err := exec.Command("codesign", "--display", "--verbose=2", binaryPath).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("reading the signature on %s: %w", binaryPath, err)
+	details, outputError := exec.Command("codesign", "--display", "--verbose=2", binaryPath).CombinedOutput()
+	if outputError != nil {
+		return fmt.Errorf("reading the signature on %s: %w", binaryPath, outputError)
 	}
 	if strings.Contains(string(details), "Signature=adhoc") {
 		return fmt.Errorf(
@@ -155,9 +155,9 @@ func Notarize(binaryPath string, signing Signing) error {
 		return fmt.Errorf("no notarytool keychain profile configured")
 	}
 
-	directory, err := os.MkdirTemp("", "cohere-notarize-")
-	if err != nil {
-		return fmt.Errorf("making a directory for the notary archive: %w", err)
+	directory, temporaryDirectoryError := os.MkdirTemp("", "cohere-notarize-")
+	if temporaryDirectoryError != nil {
+		return fmt.Errorf("making a directory for the notary archive: %w", temporaryDirectoryError)
 	}
 	defer os.RemoveAll(directory)
 	zipPath := filepath.Join(directory, filepath.Base(binaryPath)+".zip")
@@ -182,14 +182,14 @@ func Notarize(binaryPath string, signing Signing) error {
 	arguments = append(arguments, "--wait", "--output-format", "json")
 	command := exec.Command("xcrun", arguments...)
 	command.Stderr = os.Stderr
-	output, err := command.Output()
-	if err != nil {
-		return fmt.Errorf("notarizing %s: %w\n%s", binaryPath, err, output)
+	output, outputError := command.Output()
+	if outputError != nil {
+		return fmt.Errorf("notarizing %s: %w\n%s", binaryPath, outputError, output)
 	}
 
-	verdict, err := readNotaryVerdict(output)
-	if err != nil {
-		return fmt.Errorf("notarizing %s: %w", binaryPath, err)
+	verdict, readNotaryVerdictError := readNotaryVerdict(output)
+	if readNotaryVerdictError != nil {
+		return fmt.Errorf("notarizing %s: %w", binaryPath, readNotaryVerdictError)
 	}
 	if verdict.Status != "Accepted" {
 		// Apple's log names each problem by file and reason, which is the only place the cause is.

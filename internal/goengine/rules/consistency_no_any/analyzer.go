@@ -245,8 +245,8 @@ func (flows *flowAnalysis) recordAssignment(assignment *ast.AssignStmt) {
 func (flows *flowAnalysis) recordValueSpec(spec *ast.ValueSpec) {
 	values := flows.valuesOf(spec.Values, len(spec.Names))
 	for index, name := range spec.Names {
-		variable, isVar := flows.pass.TypesInfo.Defs[name].(*types.Var)
-		if !isVar || index >= len(values) {
+		variable, isVariable := flows.pass.TypesInfo.Defs[name].(*types.Var)
+		if !isVariable || index >= len(values) {
 			continue
 		}
 		if spec.Type == nil {

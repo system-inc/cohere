@@ -565,15 +565,15 @@ func TestThemeLoaderReportsSkippedDirectives(test *testing.T) {
 // written, and the theme beside them still loads.
 func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(test *testing.T) {
 	test.Parallel()
-	entryPoint, err := filepath.Abs(filepath.Join("testdata", "directives_theme", "theme.css"))
-	if err != nil {
-		test.Fatal(err)
+	entryPoint, absolutePathError := filepath.Abs(filepath.Join("testdata", "directives_theme", "theme.css"))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
-	system, err := LoadDesignSystem(
+	system, loadDesignSystemError := LoadDesignSystem(
 		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()},
 	)
-	if err != nil {
-		test.Fatalf("loading the directives theme: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the directives theme: %v", loadDesignSystemError)
 	}
 
 	var names []string

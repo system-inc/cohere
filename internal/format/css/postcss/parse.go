@@ -37,33 +37,33 @@ func Parse(text string) (*estree.Node, error) {
 
 // parseWith runs a parser, postcss's or postcss-scss's, over the text: new Input(text), new Parser(input),
 // parser.parse(), parser.root.
-func parseWith(text string, construct func(in *input) *parser) (root *estree.Node, err error) {
+func parseWith(text string, construct func(in *input) *parser) (root *estree.Node, parseWithError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			root = nil
 			if syntaxError, isSyntaxError := recovered.(*CssSyntaxError); isSyntaxError {
 				// Marked as a parse failure, so the format phase skips the file rather than reporting a
 				// broken formatter.
-				err = printing.Syntax(syntaxError)
+				parseWithError = printing.Syntax(syntaxError)
 				return
 			}
 			if typeError, isTypeError := recovered.(*TypeError); isTypeError {
 				// postcss-scss reaching past its tokens, a TypeError upstream that Prettier lets escape: the
 				// file does not parse, so it is marked the same way.
-				err = printing.Syntax(typeError)
+				parseWithError = printing.Syntax(typeError)
 				return
 			}
 			// Anything else is a bug in the port, where upstream would have thrown a TypeError; it is
 			// reported, not marked as a syntax error, and never escapes as a panic.
-			err = errors.New(fmt.Sprint("postcss: ", recovered))
+			parseWithError = errors.New(fmt.Sprint("postcss: ", recovered))
 		}
 	}()
 
 	in := newInput(text)
-	p := construct(in)
-	p.parse()
+	parser := construct(in)
+	parser.parse()
 
-	return toEstree(p.root, in), nil
+	return toEstree(parser.root, in), nil
 }
 
 // toEstree hands a node out as an estree.Node, offsets crossing from UTF-16 units to bytes.

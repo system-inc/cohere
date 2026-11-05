@@ -157,14 +157,14 @@ func TestNothingIsBorrowedWithAWaiterOrOneFreeToken(test *testing.T) {
 	shape := poolShape{tokens: 4, packages: 2, threads: 2}
 
 	waiting := test.TempDir()
-	own, err := takeSlot(waiting, 4, "the run that would borrow")
-	if err != nil || own == nil {
-		test.Fatalf("taking a token: %v", err)
+	own, takeSlotError := takeSlot(waiting, 4, "the run that would borrow")
+	if takeSlotError != nil || own == nil {
+		test.Fatalf("taking a token: %v", takeSlotError)
 	}
 	defer own.release()
-	ticket, err := joinQueue(waiting)
-	if err != nil {
-		test.Fatal(err)
+	ticket, joinQueueError := joinQueue(waiting)
+	if joinQueueError != nil {
+		test.Fatal(joinQueueError)
 	}
 	defer ticket.leave()
 	if borrowed := borrowTokens(waiting, shape, own.number, "a run"); len(borrowed) != 0 {

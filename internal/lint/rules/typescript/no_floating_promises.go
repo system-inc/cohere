@@ -281,23 +281,23 @@ var NoFloatingPromises = rule.Rule{
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		opts, ok := rule.OptionsAs[NoFloatingPromisesOptions](options)
+		settings, ok := rule.OptionsAs[NoFloatingPromisesOptions](options)
 		if !ok {
-			opts = NoFloatingPromisesOptions{
+			settings = NoFloatingPromisesOptions{
 				AllowForKnownSafeCalls:          []type_checking.TypeOrValueSpecifier{},
 				AllowForKnownSafeCallsInline:    []string{},
 				AllowForKnownSafePromises:       []type_checking.TypeOrValueSpecifier{},
 				AllowForKnownSafePromisesInline: []string{},
 			}
 		}
-		if opts.CheckThenables == nil {
-			opts.CheckThenables = type_checking.Ref(false)
+		if settings.CheckThenables == nil {
+			settings.CheckThenables = type_checking.Ref(false)
 		}
-		if opts.IgnoreIIFE == nil {
-			opts.IgnoreIIFE = type_checking.Ref(false)
+		if settings.IgnoreIIFE == nil {
+			settings.IgnoreIIFE = type_checking.Ref(false)
 		}
-		if opts.IgnoreVoid == nil {
-			opts.IgnoreVoid = type_checking.Ref(true)
+		if settings.IgnoreVoid == nil {
+			settings.IgnoreVoid = type_checking.Ref(true)
 		}
 
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
@@ -327,10 +327,10 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		hasMatchingSignature := func(
-			t *checker.Type,
+			subjectType *checker.Type,
 			matcher func(signature *checker.Signature) bool,
 		) bool {
-			for part := range type_checking.UnionTypePartsSeq(t) {
+			for part := range type_checking.UnionTypePartsSeq(subjectType) {
 				if type_checking.Some(type_checking.GetCallSignatures(ruleContext.TypeChecker, part), matcher) {
 					return true
 				}
@@ -339,16 +339,16 @@ var NoFloatingPromises = rule.Rule{
 			return false
 		}
 
-		isFunctionParam := func(
+		isFunctionParameter := func(
 			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(
+			subjectType := checker.Checker_getApparentType(
 				ruleContext.TypeChecker,
 				ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node),
 			)
 
-			for part := range type_checking.UnionTypePartsSeq(t) {
+			for part := range type_checking.UnionTypePartsSeq(subjectType) {
 				if len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0 {
 					return true
 				}
@@ -365,8 +365,8 @@ var NoFloatingPromises = rule.Rule{
 			// The highest priority is to allow anything allowlisted
 			if type_checking.TypeMatchesSomeSpecifier(
 				subjectType,
-				opts.AllowForKnownSafePromises,
-				opts.AllowForKnownSafePromisesInline,
+				settings.AllowForKnownSafePromises,
+				settings.AllowForKnownSafePromisesInline,
 				ruleContext.Program,
 			) {
 				return false
@@ -383,7 +383,7 @@ var NoFloatingPromises = rule.Rule{
 			}
 
 			// ...and only check all Thenables if explicitly told to
-			if !*opts.CheckThenables {
+			if !*settings.CheckThenables {
 				return false
 			}
 
@@ -403,8 +403,8 @@ var NoFloatingPromises = rule.Rule{
 					func(signature *checker.Signature) bool {
 						parameters := checker.Signature_parameters(signature)
 						return len(parameters) >= 2 &&
-							isFunctionParam(parameters[0], node) &&
-							isFunctionParam(parameters[1], node)
+							isFunctionParameter(parameters[0], node) &&
+							isFunctionParameter(parameters[1], node)
 					}) {
 					return true
 				}
@@ -413,8 +413,8 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isPromiseArray := func(node *ast.Node) bool {
-			t := ruleContext.TypeChecker.GetTypeAtLocation(node)
-			for typePart := range type_checking.UnionTypePartsSeq(t) {
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node)
+			for typePart := range type_checking.UnionTypePartsSeq(subjectType) {
 				apparent := checker.Checker_getApparentType(ruleContext.TypeChecker, typePart)
 
 				if checker.Checker_isArrayType(ruleContext.TypeChecker, apparent) {
@@ -443,12 +443,12 @@ var NoFloatingPromises = rule.Rule{
 				return false
 			}
 
-			t := ruleContext.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
 
 			return type_checking.TypeMatchesSomeSpecifier(
-				t,
-				opts.AllowForKnownSafeCalls,
-				opts.AllowForKnownSafeCallsInline,
+				subjectType,
+				settings.AllowForKnownSafeCalls,
+				settings.AllowForKnownSafeCallsInline,
 				ruleContext.Program,
 			)
 		}
@@ -501,7 +501,7 @@ var NoFloatingPromises = rule.Rule{
 				return isUnhandledPromise(expr.Right)
 			}
 
-			if !*opts.IgnoreVoid && ast.IsVoidExpression(node) {
+			if !*settings.IgnoreVoid && ast.IsVoidExpression(node) {
 				// Similarly, a `void` expression always returns undefined, so we need to
 				// see what's inside it without checking the type of the overall expression.
 				return isUnhandledPromise(node.Expression())
@@ -595,7 +595,7 @@ var NoFloatingPromises = rule.Rule{
 
 				exprStatement := node.AsExpressionStatement()
 
-				if *opts.IgnoreIIFE && isAsyncIife(exprStatement) {
+				if *settings.IgnoreIIFE && isAsyncIife(exprStatement) {
 					return
 				}
 
@@ -612,13 +612,13 @@ var NoFloatingPromises = rule.Rule{
 				}
 				if promiseArray {
 					var message rule.Message
-					if *opts.IgnoreVoid {
+					if *settings.IgnoreVoid {
 						message = buildFloatingPromiseArrayVoidMessage()
 					} else {
 						message = buildFloatingPromiseArrayMessage()
 					}
 					ruleContext.ReportNode(node, message)
-				} else if *opts.IgnoreVoid {
+				} else if *settings.IgnoreVoid {
 					var message rule.Message
 					if nonFunctionHandler {
 						message = buildFloatingUselessRejectionHandlerVoidMessage()
@@ -759,9 +759,9 @@ func specifiersFrom(raw []noFloatingPromisesRawSpecifier) ([]type_checking.TypeO
 // That matters most for `ignoreVoid`, whose default is true: binding it to a plain bool would make
 // an unconfigured rule behave as though it had been explicitly turned off.
 func DecodeNoFloatingPromisesOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[noFloatingPromisesRawOptions]()(raw)
-	if err != nil {
-		return NoFloatingPromisesOptions{}, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[noFloatingPromisesRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return NoFloatingPromisesOptions{}, decodeOptionsError
 	}
 
 	wire, _ := decoded.(noFloatingPromisesRawOptions)

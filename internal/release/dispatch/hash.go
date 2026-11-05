@@ -98,19 +98,19 @@ func (inputs Inputs) Compute() (string, error) {
 // think of and include files that never compile in, and either error produces a hash that is wrong
 // in a way nothing would catch.
 func CollectInputs(moduleDirectory string, packagePath string, buildFlags []string) (Inputs, error) {
-	goVersion, err := goEnvironment(moduleDirectory)
-	if err != nil {
-		return Inputs{}, err
+	goVersion, goEnvironmentError := goEnvironment(moduleDirectory)
+	if goEnvironmentError != nil {
+		return Inputs{}, goEnvironmentError
 	}
 
-	commit, err := typeScriptCommit(moduleDirectory)
-	if err != nil {
-		return Inputs{}, err
+	commit, typeScriptCommitError := typeScriptCommit(moduleDirectory)
+	if typeScriptCommitError != nil {
+		return Inputs{}, typeScriptCommitError
 	}
 
-	sourceFiles, err := listSourceFiles(moduleDirectory, packagePath)
-	if err != nil {
-		return Inputs{}, err
+	sourceFiles, listSourceFilesError := listSourceFiles(moduleDirectory, packagePath)
+	if listSourceFilesError != nil {
+		return Inputs{}, listSourceFilesError
 	}
 	if len(sourceFiles) == 0 {
 		// An empty input set hashes to a perfectly stable digest for a tree containing nothing,

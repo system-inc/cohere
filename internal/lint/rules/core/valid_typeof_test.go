@@ -207,9 +207,9 @@ func TestValidTypeofOptionsDecode(test *testing.T) {
 	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[ValidTypeofOptions]()
-	decoded, err := decode([]byte(`{}`))
-	if err != nil {
-		test.Fatalf("an empty object should decode: %v", err)
+	decoded, decodeError := decode([]byte(`{}`))
+	if decodeError != nil {
+		test.Fatalf("an empty object should decode: %v", decodeError)
 	}
 	options, ok := decoded.(ValidTypeofOptions)
 	if !ok {
@@ -218,15 +218,15 @@ func TestValidTypeofOptionsDecode(test *testing.T) {
 	if options.RequireStringLiterals {
 		test.Fatalf("requireStringLiterals should default to false")
 	}
-	decoded, err = decode([]byte(`{"requireStringLiterals": true}`))
+	decoded, decodeError = decode([]byte(`{"requireStringLiterals": true}`))
 	options, ok = decoded.(ValidTypeofOptions)
-	if err != nil || !ok || !options.RequireStringLiterals {
-		test.Fatalf("requireStringLiterals should decode true, got %v, %v", decoded, err)
+	if decodeError != nil || !ok || !options.RequireStringLiterals {
+		test.Fatalf("requireStringLiterals should decode true, got %v, %v", decoded, decodeError)
 	}
-	if _, err := decode([]byte(`{"requireStringLiteral": true}`)); err == nil {
+	if _, decodeError := decode([]byte(`{"requireStringLiteral": true}`)); decodeError == nil {
 		test.Fatalf("an unknown key should be refused")
 	}
-	if _, err := decode([]byte(`{"RequireStringLiterals": true}`)); err == nil {
+	if _, decodeError := decode([]byte(`{"RequireStringLiterals": true}`)); decodeError == nil {
 		test.Fatalf("a key spelled in a different case should be refused")
 	}
 }

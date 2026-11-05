@@ -218,8 +218,8 @@ func TestDesignSystemIsBuiltOncePerProgram(test *testing.T) {
 	// Same value on every file, not merely the same count. A cache that built once and then handed
 	// out copies would pass the count and still break the immutability the parallel walk depends on.
 	first := probe.results[0]
-	if first.Err != nil {
-		test.Fatalf("the fixture project should produce a design system and produced: %v", first.Err)
+	if first.Error != nil {
+		test.Fatalf("the fixture project should produce a design system and produced: %v", first.Error)
 	}
 	for index, result := range probe.results {
 		if result.System != first.System {
@@ -357,9 +357,9 @@ func TestDesignSystemDeclinesRatherThanReportingClean(test *testing.T) {
 		test.Fatal("a project with no stylesheet produced a design system, which means rules would " +
 			"silently lint against an empty theme and report a clean tree")
 	}
-	if !errors.Is(result.Err, ErrNoTailwindEntryPoint) {
+	if !errors.Is(result.Error, ErrNoTailwindEntryPoint) {
 		test.Fatalf("expected ErrNoTailwindEntryPoint so a caller can tell 'no Tailwind here' from "+
-			"'the CSS would not parse'; got %v", result.Err)
+			"'the CSS would not parse'; got %v", result.Error)
 	}
 
 	message := DesignSystemDeclineMessage("tailwind-enforce-consistent-class-order", result)
@@ -404,7 +404,7 @@ func TestDesignSystemFailedBuildIsCachedToo(test *testing.T) {
 	}
 	first := probe.results[0]
 	for index, result := range probe.results {
-		if result.Err != first.Err {
+		if result.Error != first.Error {
 			test.Fatalf("file %d received a freshly-built error rather than the cached one, so "+
 				"discovery is running per file", index)
 		}
@@ -426,8 +426,8 @@ func TestDesignSystemComposesTheRepositorysOwnContributions(test *testing.T) {
 	designSystemWalk(test, root, probe.rule())
 
 	result := probe.results[0]
-	if result.Err != nil {
-		test.Fatalf("the fixture project should build: %v", result.Err)
+	if result.Error != nil {
+		test.Fatalf("the fixture project should build: %v", result.Error)
 	}
 	system := result.System
 

@@ -285,7 +285,7 @@ func (set *DisjointSet) Sets() [][]static_single_assignment.IdentifierId {
 	for item := range set.parent {
 		members = append(members, item)
 	}
-	sort.Slice(members, func(i, j int) bool { return members[i] < members[j] })
+	sort.Slice(members, func(left, right int) bool { return members[left] < members[right] })
 
 	grouped := map[static_single_assignment.IdentifierId][]static_single_assignment.IdentifierId{}
 	var order []static_single_assignment.IdentifierId
@@ -659,21 +659,21 @@ func taggedTemplateCalleeSyntaxName(instruction *Instruction) string {
 // rebinding. Nested patterns are walked, because `const {a: {...rest}} = o` allocates just as much
 // as the flat form does.
 func patternContainsSpread(pattern Pattern) bool {
-	switch p := pattern.(type) {
+	switch typed := pattern.(type) {
 	case *ObjectPattern:
-		if p.Rest != nil {
+		if typed.Rest != nil {
 			return true
 		}
-		for _, property := range p.Properties {
+		for _, property := range typed.Properties {
 			if patternContainsSpread(property.Value) {
 				return true
 			}
 		}
 	case *ArrayPattern:
-		if p.Rest != nil {
+		if typed.Rest != nil {
 			return true
 		}
-		for _, element := range p.Elements {
+		for _, element := range typed.Elements {
 			if patternContainsSpread(element.Value) {
 				return true
 			}

@@ -60,10 +60,10 @@ func (parser *scssParser) comment(commentToken token) {
 		node := newComment()
 		parser.init(node, commentToken.start)
 		node.raws["inline"] = true
-		pos := parser.input.fromOffset(commentToken.end)
+		lineAndColumn := parser.input.fromOffset(commentToken.end)
 		node.source.end = &position{
-			column: pos.column,
-			line:   pos.line,
+			column: lineAndColumn.column,
+			line:   lineAndColumn.line,
 			offset: commentToken.end + 1,
 		}
 
@@ -97,12 +97,12 @@ func (parser *scssParser) raw(each *node, property string, tokens []token, custo
 	if raws, isRaw := each.raws[property].(*rawValue); isRaw {
 		scss := raws.raw
 		var all strings.Builder
-		for _, i := range tokens {
-			if i.kind == "comment" && i.inline {
-				text := replaceCommentDelimiters(i.value[2:])
+		for _, token := range tokens {
+			if token.kind == "comment" && token.inline {
+				text := replaceCommentDelimiters(token.value[2:])
 				all.WriteString("/*" + text + "*/")
 			} else {
-				all.WriteString(i.value)
+				all.WriteString(token.value)
 			}
 		}
 		raws.raw = all.String()
@@ -117,18 +117,18 @@ func (parser *scssParser) rule(tokens []token) {
 	withColon := false
 	brackets := 0
 	value := ""
-	for _, i := range tokens {
+	for _, token := range tokens {
 		if withColon {
-			if i.kind != "comment" && i.kind != "{" {
-				value += i.value
+			if token.kind != "comment" && token.kind != "{" {
+				value += token.value
 			}
-		} else if i.kind == "space" && strings.Contains(i.value, "\n") {
+		} else if token.kind == "space" && strings.Contains(token.value, "\n") {
 			break
-		} else if i.kind == "(" {
+		} else if token.kind == "(" {
 			brackets += 1
-		} else if i.kind == ")" {
+		} else if token.kind == ")" {
 			brackets -= 1
-		} else if brackets == 0 && i.kind == ":" {
+		} else if brackets == 0 && token.kind == ":" {
 			withColon = true
 		}
 	}
@@ -142,25 +142,25 @@ func (parser *scssParser) rule(tokens []token) {
 
 		// The last token that is not a space; there is one, the colon.
 		var last token
-		for i := len(tokens) - 1; i >= 0; i-- {
-			if tokens[i].kind != "space" {
-				last = tokens[i]
+		for index := len(tokens) - 1; index >= 0; index-- {
+			if tokens[index].kind != "space" {
+				last = tokens[index]
 				break
 			}
 		}
 		// `if (last[3])`: an end of 0, or none, falls to the start.
 		if last.end > 0 {
-			pos := parser.input.fromOffset(last.end)
+			lineAndColumn := parser.input.fromOffset(last.end)
 			node.source.end = &position{
-				column: pos.column,
-				line:   pos.line,
+				column: lineAndColumn.column,
+				line:   lineAndColumn.line,
 				offset: last.end + 1,
 			}
 		} else {
-			pos := parser.input.fromOffset(last.start)
+			lineAndColumn := parser.input.fromOffset(last.start)
 			node.source.end = &position{
-				column: pos.column,
-				line:   pos.line,
+				column: lineAndColumn.column,
+				line:   lineAndColumn.line,
 				offset: last.start + 1,
 			}
 		}
@@ -179,10 +179,10 @@ func (parser *scssParser) rule(tokens []token) {
 
 		// `if (tokens[0][2])`: a start of 0 keeps the one init set, which is the same offset.
 		if tokens[0].start > 0 {
-			pos := parser.input.fromOffset(tokens[0].start)
+			lineAndColumn := parser.input.fromOffset(tokens[0].start)
 			node.source.start = &position{
-				column: pos.column,
-				line:   pos.line,
+				column: lineAndColumn.column,
+				line:   lineAndColumn.line,
 				offset: tokens[0].start,
 			}
 		}
@@ -233,19 +233,19 @@ func (parser *scssParser) rule(tokens []token) {
 				break
 			} else if each.value == "important" {
 				cache := copyTokens(tokens, 0, len(tokens))
-				str := ""
+				text := ""
 				for j := i; j > 0; j-- {
 					kind := cache[j].kind
-					if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") && kind != "space" {
+					if strings.HasPrefix(strings.TrimFunc(text, ecmascripttext.IsWhitespace), "!") && kind != "space" {
 						break
 					}
-					str = cache[len(cache)-1].value + str
+					text = cache[len(cache)-1].value + text
 					cache = cache[:len(cache)-1]
 				}
-				if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") {
+				if strings.HasPrefix(strings.TrimFunc(text, ecmascripttext.IsWhitespace), "!") {
 					node.important = true
 					node.mark("important")
-					node.raws["important"] = str
+					node.raws["important"] = text
 					tokens = cache
 				}
 			}

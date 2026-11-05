@@ -71,13 +71,13 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 	command := exec.Command("go", "list", "-deps", "-f", template, formatterPackage)
 	command.Dir = moduleDirectory
 	command.Env = append(os.Environ(), environment...)
-	output, err := command.Output()
-	if err != nil {
+	output, outputError := command.Output()
+	if outputError != nil {
 		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			return nil, fmt.Errorf("listing the formatter's inputs: %w\n%s", err, exitError.Stderr)
+		if errors.As(outputError, &exitError) {
+			return nil, fmt.Errorf("listing the formatter's inputs: %w\n%s", outputError, exitError.Stderr)
 		}
-		return nil, fmt.Errorf("listing the formatter's inputs: %w", err)
+		return nil, fmt.Errorf("listing the formatter's inputs: %w", outputError)
 	}
 
 	inputs := []FormatterInput{}
@@ -102,9 +102,9 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 		)
 	}
 
-	sum, err := fileSum(filepath.Join(moduleDirectory, FormatterPassLoop))
-	if err != nil {
-		return nil, err
+	sum, fileSumError := fileSum(filepath.Join(moduleDirectory, FormatterPassLoop))
+	if fileSumError != nil {
+		return nil, fileSumError
 	}
 	return append(inputs, FormatterInput{Name: FormatterPassLoop, Sum: sum}), nil
 }

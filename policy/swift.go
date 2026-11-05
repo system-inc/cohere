@@ -52,9 +52,9 @@ var swiftPolicyFiles = []struct {
 func SwiftFiles() ([]SwiftFile, error) {
 	files := make([]SwiftFile, 0, len(swiftPolicyFiles))
 	for _, policyFile := range swiftPolicyFiles {
-		contents, err := policyFile.generate()
-		if err != nil {
-			return nil, fmt.Errorf("policy/%s: %w", policyFile.source, err)
+		contents, generateError := policyFile.generate()
+		if generateError != nil {
+			return nil, fmt.Errorf("policy/%s: %w", policyFile.source, generateError)
 		}
 		files = append(
 			files,

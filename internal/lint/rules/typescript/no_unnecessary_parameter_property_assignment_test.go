@@ -446,14 +446,14 @@ func applyEveryParameterPropertySuggestion(test *testing.T, source string, resul
 		}
 	}
 
-	sort.Slice(edits, func(a, b int) bool { return edits[a].start > edits[b].start })
+	sort.Slice(edits, func(left, right int) bool { return edits[left].start > edits[right].start })
 
 	edited := source
-	for _, e := range edits {
-		if e.start < 0 || e.end > len(edited) || e.start > e.end {
-			test.Fatalf("suggestion range [%d,%d) is outside the source of length %d", e.start, e.end, len(edited))
+	for _, edit := range edits {
+		if edit.start < 0 || edit.end > len(edited) || edit.start > edit.end {
+			test.Fatalf("suggestion range [%d,%d) is outside the source of length %d", edit.start, edit.end, len(edited))
 		}
-		edited = edited[:e.start] + e.text + edited[e.end:]
+		edited = edited[:edit.start] + edit.text + edited[edit.end:]
 	}
 
 	return edited

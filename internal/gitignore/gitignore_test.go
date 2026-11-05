@@ -224,9 +224,9 @@ func TestAListingAnswersOnlyForWhatItShowsAbsent(test *testing.T) {
 	listings[filepath.Join(root, "source")] = nil
 	listings[filepath.Join(root, "vendor")] = nil
 	listings[filepath.Join(root, "plain", "deep")] = nil
-	plain, err := New(root)
-	if err != nil {
-		test.Fatal(err)
+	plain, newGitignoreError := New(root)
+	if newGitignoreError != nil {
+		test.Fatal(newGitignoreError)
 	}
 	listed := plain.WithListing(func(directory string) ([]os.DirEntry, bool) {
 		entries, present := listings[directory]
@@ -255,9 +255,9 @@ func TestAListingAnswersOnlyForWhatItShowsAbsent(test *testing.T) {
 		}
 	}
 	// A matcher Enter makes keeps the listing: plain/deep's `.gitignore` is on disk, and its listing shows none.
-	scope, err := listed.Enter("plain")
-	if err != nil {
-		test.Fatal(err)
+	scope, enterError := listed.Enter("plain")
+	if enterError != nil {
+		test.Fatal(enterError)
 	}
 	if ignored, _ := decide(test, scope, "plain/deep/x", true); ignored {
 		test.Error("a matcher Enter made dropped the listing: plain/deep/.gitignore was read from the disk")

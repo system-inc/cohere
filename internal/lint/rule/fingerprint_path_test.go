@@ -78,9 +78,9 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(test *testing.T) {
 	insensitive := directoryProgram{directory: directory, caseSensitive: false}
 	compared := 0
 	sliced := 0
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && (entry.Name() == ".git" || entry.Name() == "TypeScript" || entry.Name() == "node_modules") {
 			return filepath.SkipDir

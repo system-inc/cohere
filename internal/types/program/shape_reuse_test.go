@@ -57,9 +57,9 @@ func shapeWalk(
 	previousShapes map[string]program.SignatureEntry,
 ) (program.Result, *program.LintCache, map[string]program.SignatureEntry) {
 	test.Helper()
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("build: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	// A first walk has its signatures computed, as a project with build info does, so the tests below are
 	// about shapes rather than about a first run's content-keyed fallback.
@@ -70,9 +70,9 @@ func shapeWalk(
 	graph.Shapes = shapes
 	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 	graph.FindingsReuse = reuse
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatalf("walk: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	return result, reuse.Recorded(), shapes
 }

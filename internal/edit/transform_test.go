@@ -30,14 +30,14 @@ func TestTransformRunsAfterFixesAndSeesTheFixedText(test *testing.T) {
 		return strings.ReplaceAll(text, "const", "export const"), nil
 	}
 
-	result, err := FixAndTransformFile(
+	result, fixAndTransformFileError := FixAndTransformFile(
 		fileName,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		transform,
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	if fixAndTransformFileError != nil {
+		test.Fatalf("unexpected error: %v", fixAndTransformFileError)
 	}
 
 	if sawByTransform != "const a = 'new';\n" {
@@ -47,9 +47,9 @@ func TestTransformRunsAfterFixesAndSeesTheFixedText(test *testing.T) {
 		test.Fatalf("the transform changed the text but was not reported as having done so")
 	}
 
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != "export const a = 'new';\n" {
 		test.Fatalf("wrong contents on disk: %q", onDisk)
@@ -71,14 +71,14 @@ func TestATransformProducingInvalidSyntaxIsRefused(test *testing.T) {
 		return text + "function unclosed() {\n", nil
 	}
 
-	result, err := FixAndTransformFile(
+	result, fixAndTransformFileError := FixAndTransformFile(
 		fileName,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		breaking,
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	if fixAndTransformFileError != nil {
+		test.Fatalf("unexpected error: %v", fixAndTransformFileError)
 	}
 
 	if result.Transformed {
@@ -86,9 +86,9 @@ func TestATransformProducingInvalidSyntaxIsRefused(test *testing.T) {
 	}
 
 	// The fix survives; only the transform is discarded.
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != "const a = 'new';\n" {
 		test.Fatalf("expected the fix to land and the transform to be refused, got %q", onDisk)
@@ -120,19 +120,19 @@ func TestATransformThatErrorsDoesNotBlockFixes(test *testing.T) {
 		return "", errors.New("the formatter fell over")
 	}
 
-	result, err := FixAndTransformFile(
+	result, fixAndTransformFileError := FixAndTransformFile(
 		fileName,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		failing,
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatalf("a transform error must not fail the whole file: %v", err)
+	if fixAndTransformFileError != nil {
+		test.Fatalf("a transform error must not fail the whole file: %v", fixAndTransformFileError)
 	}
 
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != "const a = 'new';\n" {
 		test.Fatalf("the fix did not land when the transform failed: %q", onDisk)
@@ -163,7 +163,7 @@ func TestTransformRunsWhenNoFixLanded(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixAndTransformFile(
+	result, fixAndTransformFileError := FixAndTransformFile(
 		fileName,
 		proposeOnce(),
 		func(_ string, text string, _ *ast.SourceFile) (string, error) {
@@ -171,17 +171,17 @@ func TestTransformRunsWhenNoFixLanded(test *testing.T) {
 		},
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	if fixAndTransformFileError != nil {
+		test.Fatalf("unexpected error: %v", fixAndTransformFileError)
 	}
 
 	if !result.Transformed || !result.Changed {
 		test.Fatalf("the transform did not run on a file with no fixes: %+v", result)
 	}
 
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != "export const a = 1;\n" {
 		test.Fatalf("wrong contents: %q", onDisk)
@@ -199,12 +199,12 @@ func TestAnIdentityTransformDoesNotTouchTheFile(test *testing.T) {
 	if writeError := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	before, err := os.Stat(fileName)
-	if err != nil {
-		test.Fatal(err)
+	before, statError := os.Stat(fileName)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 
-	result, err := FixAndTransformFile(
+	result, fixAndTransformFileError := FixAndTransformFile(
 		fileName,
 		proposeOnce(),
 		func(_ string, text string, _ *ast.SourceFile) (string, error) {
@@ -212,16 +212,16 @@ func TestAnIdentityTransformDoesNotTouchTheFile(test *testing.T) {
 		},
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	if fixAndTransformFileError != nil {
+		test.Fatalf("unexpected error: %v", fixAndTransformFileError)
 	}
 	if result.Changed || result.Transformed {
 		test.Fatalf("an identity transform reported a change: %+v", result)
 	}
 
-	after, err := os.Stat(fileName)
-	if err != nil {
-		test.Fatal(err)
+	after, statError := os.Stat(fileName)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	if !after.ModTime().Equal(before.ModTime()) {
 		test.Fatalf("a file needing no transform was rewritten")
@@ -245,13 +245,13 @@ func TestTransformIdempotenceIsCheckable(test *testing.T) {
 	stable := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return strings.ReplaceAll(text, "const", "let"), nil
 	}
-	first, err := stable("f.ts", source, nil)
-	if err != nil {
-		test.Fatal(err)
+	first, stableError := stable("f.ts", source, nil)
+	if stableError != nil {
+		test.Fatal(stableError)
 	}
-	second, err := stable("f.ts", first, nil)
-	if err != nil {
-		test.Fatal(err)
+	second, stableError := stable("f.ts", first, nil)
+	if stableError != nil {
+		test.Fatal(stableError)
 	}
 	if first != second {
 		test.Fatalf("expected the stable transform to be idempotent: %q then %q", first, second)
@@ -262,13 +262,13 @@ func TestTransformIdempotenceIsCheckable(test *testing.T) {
 	unstable := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		return "// pass\n" + text, nil
 	}
-	firstUnstable, err := unstable("f.ts", source, nil)
-	if err != nil {
-		test.Fatal(err)
+	firstUnstable, unstableError := unstable("f.ts", source, nil)
+	if unstableError != nil {
+		test.Fatal(unstableError)
 	}
-	secondUnstable, err := unstable("f.ts", firstUnstable, nil)
-	if err != nil {
-		test.Fatal(err)
+	secondUnstable, unstableError := unstable("f.ts", firstUnstable, nil)
+	if unstableError != nil {
+		test.Fatal(unstableError)
 	}
 	if firstUnstable == secondUnstable {
 		test.Fatalf("the idempotence check cannot detect a non-idempotent transform")
@@ -291,18 +291,18 @@ func TestFixFileIsFixAndTransformWithNoTransform(test *testing.T) {
 		}
 	}
 
-	firstResult, err := FixFile(withFixFile, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
-	if err != nil {
-		test.Fatal(err)
+	firstResult, fixFileError := FixFile(withFixFile, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
+	if fixFileError != nil {
+		test.Fatal(fixFileError)
 	}
-	secondResult, err := FixAndTransformFile(
+	secondResult, fixAndTransformFileError := FixAndTransformFile(
 		withNilTransform,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		nil,
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if fixAndTransformFileError != nil {
+		test.Fatal(fixAndTransformFileError)
 	}
 
 	if firstResult.Text != secondResult.Text || firstResult.Changed != secondResult.Changed {
@@ -345,18 +345,18 @@ func TestATransformCanSkipAFileAndTheSkipIsRecorded(test *testing.T) {
 	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	before, err := os.Stat(fileName)
-	if err != nil {
-		test.Fatal(err)
+	before, statError := os.Stat(fileName)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 
 	skipping := func(_ string, _ string, _ *ast.SourceFile) (string, error) {
 		return "", fmt.Errorf("%w: markdown doubles a standalone tilde", ErrSkipped)
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeOnce(), skipping, DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("a skip must not be an error: %v", err)
+	result, fixAndTransformFileError := FixAndTransformFile(fileName, proposeOnce(), skipping, DefaultMaxPasses)
+	if fixAndTransformFileError != nil {
+		test.Fatalf("a skip must not be an error: %v", fixAndTransformFileError)
 	}
 
 	if !result.TransformSkipped {
@@ -376,9 +376,9 @@ func TestATransformCanSkipAFileAndTheSkipIsRecorded(test *testing.T) {
 		}
 	}
 
-	after, err := os.Stat(fileName)
-	if err != nil {
-		test.Fatal(err)
+	after, statError := os.Stat(fileName)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	if !after.ModTime().Equal(before.ModTime()) {
 		test.Fatalf("a skipped file was rewritten")
@@ -568,23 +568,23 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(test *testing.T) {
 		return strings.ReplaceAll(text, "const", "export const"), nil
 	}
 
-	checkResult, err := CheckFile(
+	checkResult, checkFileError := CheckFile(
 		checked,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		transform,
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if checkFileError != nil {
+		test.Fatal(checkFileError)
 	}
-	writeResult, err := FixAndTransformFile(
+	writeResult, fixAndTransformFileError := FixAndTransformFile(
 		written,
 		proposeWhileContains("'old'", "'new'", "renamer"),
 		transform,
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if fixAndTransformFileError != nil {
+		test.Fatal(fixAndTransformFileError)
 	}
 
 	if contents, _ := os.ReadFile(checked); string(contents) != original {

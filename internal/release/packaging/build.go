@@ -109,9 +109,9 @@ func Build(options Options) (Result, error) {
 		return Result{}, requireReleaseVersionError
 	}
 
-	scratch, err := swiftScratchDirectory(options)
-	if err != nil {
-		return Result{}, err
+	scratch, swiftScratchDirectoryError := swiftScratchDirectory(options)
+	if swiftScratchDirectoryError != nil {
+		return Result{}, swiftScratchDirectoryError
 	}
 	options.SwiftScratchDirectory = scratch
 
@@ -119,9 +119,9 @@ func Build(options Options) (Result, error) {
 	// pin a compiler and cannot contain MinimumReleaseCommit. In the other order no test could reach
 	// this refusal through Build, and a test that drives readCompilerPin directly passes with the call
 	// deleted from here.
-	pin, err := readCompilerPin(options.ModuleDirectory)
-	if err != nil {
-		return Result{}, err
+	pin, readCompilerPinError := readCompilerPin(options.ModuleDirectory)
+	if readCompilerPinError != nil {
+		return Result{}, readCompilerPinError
 	}
 
 	if requireAncestorError := requireAncestor(
@@ -137,9 +137,9 @@ func Build(options Options) (Result, error) {
 		targets = Targets
 	}
 
-	goToolchain, err := readGoToolchain(options.ModuleDirectory)
-	if err != nil {
-		return Result{}, err
+	goToolchain, readGoToolchainError := readGoToolchain(options.ModuleDirectory)
+	if readGoToolchainError != nil {
+		return Result{}, readGoToolchainError
 	}
 
 	result := Result{}
@@ -157,9 +157,9 @@ func Build(options Options) (Result, error) {
 	// After every platform package is signed, so the sums describe the bytes that ship. One rendering is
 	// written twice, into the dispatcher and beside the packages for the GitHub release, so the copy a
 	// reader downloads and the copy the launcher checks cannot disagree.
-	checksums, err := Checksums(options.OutputDirectory, packageDirectoryNames)
-	if err != nil {
-		return Result{}, err
+	checksums, checksumsError := Checksums(options.OutputDirectory, packageDirectoryNames)
+	if checksumsError != nil {
+		return Result{}, checksumsError
 	}
 	if writeError := os.WriteFile(
 		filepath.Join(options.OutputDirectory, ChecksumsFileName),
@@ -169,9 +169,9 @@ func Build(options Options) (Result, error) {
 		return Result{}, fmt.Errorf("writing %s: %w", ChecksumsFileName, writeError)
 	}
 
-	dispatcher, err := buildDispatcherPackage(options, checksums)
-	if err != nil {
-		return Result{}, fmt.Errorf("building the dispatcher package: %w", err)
+	dispatcher, buildDispatcherPackageError := buildDispatcherPackage(options, checksums)
+	if buildDispatcherPackageError != nil {
+		return Result{}, fmt.Errorf("building the dispatcher package: %w", buildDispatcherPackageError)
 	}
 	result.Packages = append(result.Packages, dispatcher)
 
@@ -416,13 +416,13 @@ func swiftScratchDirectory(options Options) (string, error) {
 		}
 		scratch = filepath.Join(cache, "cohere", "release-swift-build")
 	}
-	scratch, err := filepath.Abs(scratch)
-	if err != nil {
-		return "", err
+	scratch, absolutePathError := filepath.Abs(scratch)
+	if absolutePathError != nil {
+		return "", absolutePathError
 	}
-	output, err := filepath.Abs(options.OutputDirectory)
-	if err != nil {
-		return "", err
+	output, absolutePathError := filepath.Abs(options.OutputDirectory)
+	if absolutePathError != nil {
+		return "", absolutePathError
 	}
 	if relative, relativePathError := filepath.Rel(
 		output,
@@ -648,14 +648,14 @@ type compilerPin struct {
 // change files in the checkout without moving its `HEAD`, so a tree comparison would refuse every
 // patched release, which is every correct one.
 func readCompilerPin(moduleDirectory string) (compilerPin, error) {
-	recorded, err := PinnedCompilerCommit(moduleDirectory, "HEAD")
-	if err != nil {
-		return compilerPin{}, err
+	recorded, pinnedCompilerCommitError := PinnedCompilerCommit(moduleDirectory, "HEAD")
+	if pinnedCompilerCommitError != nil {
+		return compilerPin{}, pinnedCompilerCommitError
 	}
 
-	checkedOut, err := checkedOutCompilerCommit(moduleDirectory)
-	if err != nil {
-		return compilerPin{}, err
+	checkedOut, checkedOutCompilerCommitError := checkedOutCompilerCommit(moduleDirectory)
+	if checkedOutCompilerCommitError != nil {
+		return compilerPin{}, checkedOutCompilerCommitError
 	}
 
 	if checkedOut != recorded {

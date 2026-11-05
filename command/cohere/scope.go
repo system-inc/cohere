@@ -433,12 +433,12 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 		}
 		path = filepath.Clean(path)
 
-		information, err := os.Stat(path)
-		if err != nil {
+		information, statError := os.Stat(path)
+		if statError != nil {
 			// A path that does not exist is a loud failure rather than an empty scope. Silently
 			// checking nothing because of a typo is the green-over-zero-files defect, and it is the
 			// one this binary exists to have stopped making.
-			return formatScope{}, fmt.Errorf("resolving %s: %w", name, err)
+			return formatScope{}, fmt.Errorf("resolving %s: %w", name, statError)
 		}
 
 		if !information.IsDir() {
@@ -450,7 +450,7 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 			return wholeTreeScope(), nil
 		}
 
-		err = filepath.WalkDir(path, func(entry string, directoryEntry fs.DirEntry, walkError error) error {
+		walkError := filepath.WalkDir(path, func(entry string, directoryEntry fs.DirEntry, walkError error) error {
 			if walkError != nil {
 				return walkError
 			}
@@ -460,8 +460,8 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 			absolute = append(absolute, filepath.Clean(entry))
 			return nil
 		})
-		if err != nil {
-			return formatScope{}, fmt.Errorf("walking %s: %w", name, err)
+		if walkError != nil {
+			return formatScope{}, fmt.Errorf("walking %s: %w", name, walkError)
 		}
 	}
 

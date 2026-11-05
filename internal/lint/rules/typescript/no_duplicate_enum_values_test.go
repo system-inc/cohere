@@ -73,8 +73,8 @@ func TestNoDuplicateEnumValuesFires(test *testing.T) {
 		test.Run(fmt.Sprintf("upstream fail %d", index), func(test *testing.T) {
 			test.Parallel()
 			wantIds := make([]string, testCase.findings)
-			for i := range wantIds {
-				wantIds[i] = "noDuplicateEnumValues"
+			for index := range wantIds {
+				wantIds[index] = "noDuplicateEnumValues"
 			}
 			rule_testing.ExpectFindings(
 				test,

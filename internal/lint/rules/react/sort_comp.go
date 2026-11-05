@@ -611,8 +611,8 @@ func sortCompComparePropsOrder(
 	indexA int,
 	indexB int,
 ) sortCompComparison {
-	refIndexesA := sortCompRefIndexes(methodsOrder, members[indexA])
-	refIndexesB := sortCompRefIndexes(methodsOrder, members[indexB])
+	referenceIndexesA := sortCompRefIndexes(methodsOrder, members[indexA])
+	referenceIndexesB := sortCompRefIndexes(methodsOrder, members[indexB])
 
 	// Upstream computes these with `propertiesInfos.indexOf(propA)`, an identity lookup that returns
 	// the first structurally-equal element in some engines' terms but is reference equality here.
@@ -622,13 +622,13 @@ func sortCompComparePropsOrder(
 
 	lastRefIndexA := 0
 	lastRefIndexB := 0
-	for _, refIndexA := range refIndexesA {
-		lastRefIndexA = refIndexA
-		for _, refIndexB := range refIndexesB {
-			lastRefIndexB = refIndexB
-			if refIndexA == refIndexB ||
-				(refIndexA < refIndexB && classIndexA < classIndexB) ||
-				(refIndexA > refIndexB && classIndexA > classIndexB) {
+	for _, referenceIndexA := range referenceIndexesA {
+		lastRefIndexA = referenceIndexA
+		for _, referenceIndexB := range referenceIndexesB {
+			lastRefIndexB = referenceIndexB
+			if referenceIndexA == referenceIndexB ||
+				(referenceIndexA < referenceIndexB && classIndexA < classIndexB) ||
+				(referenceIndexA > referenceIndexB && classIndexA > classIndexB) {
 				return sortCompComparison{correct: true, indexA: classIndexA, indexB: classIndexB}
 			}
 		}

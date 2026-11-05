@@ -205,16 +205,16 @@ func TestEveryLicenseTextIsUsedAndEveryReferenceExists(test *testing.T) {
 		named[license.File] = true
 	}
 	present := map[string]bool{}
-	walkDirectoryError := fs.WalkDir(licenseTexts, "licenses", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() {
-			return err
+	walkDirectoryError := fs.WalkDir(licenseTexts, "licenses", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() {
+			return pathError
 		}
 		present[filepath.Base(path)] = true
-		contents, err := licenseTexts.ReadFile(path)
-		if err == nil && len(bytes.TrimSpace(contents)) == 0 {
+		contents, readFileError := licenseTexts.ReadFile(path)
+		if readFileError == nil && len(bytes.TrimSpace(contents)) == 0 {
 			test.Errorf("%s is empty", path)
 		}
-		return err
+		return readFileError
 	})
 	if walkDirectoryError != nil {
 		test.Fatal(walkDirectoryError)

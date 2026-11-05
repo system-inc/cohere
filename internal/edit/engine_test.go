@@ -225,34 +225,34 @@ func TestFixFileWritesAtomicallyAndKeepsMode(test *testing.T) {
 		test.Fatal(changeModeError)
 	}
 
-	result, err := FixFile(fileName, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixFileError := FixFile(fileName, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
+	if fixFileError != nil {
+		test.Fatalf("unexpected error: %v", fixFileError)
 	}
 	if !result.Changed {
 		test.Fatalf("expected the file to change")
 	}
 
-	written, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	written, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(written) != "const a = 'new';\n" {
 		test.Fatalf("wrong contents on disk: %q", written)
 	}
 
-	info, err := os.Stat(fileName)
-	if err != nil {
-		test.Fatal(err)
+	info, statError := os.Stat(fileName)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	if info.Mode().Perm() != sourceMode {
 		test.Fatalf("mode changed from %v to %v", sourceMode, info.Mode().Perm())
 	}
 
 	// No temp file may survive a successful write.
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		test.Fatal(err)
+	entries, readDirectoryError := os.ReadDir(directory)
+	if readDirectoryError != nil {
+		test.Fatal(readDirectoryError)
 	}
 	if len(entries) != 1 {
 		names := []string{}
@@ -274,22 +274,22 @@ func TestFixFileDoesNotTouchAnUnchangedFile(test *testing.T) {
 	if writeError := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	before, err := os.Stat(fileName)
-	if err != nil {
-		test.Fatal(err)
+	before, statError := os.Stat(fileName)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 
-	result, err := FixFile(fileName, proposeOnce(), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixFileError := FixFile(fileName, proposeOnce(), DefaultMaxPasses)
+	if fixFileError != nil {
+		test.Fatalf("unexpected error: %v", fixFileError)
 	}
 	if result.Changed {
 		test.Fatalf("reported a change on a file with no proposals")
 	}
 
-	after, err := os.Stat(fileName)
-	if err != nil {
-		test.Fatal(err)
+	after, statError := os.Stat(fileName)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	if !after.ModTime().Equal(before.ModTime()) {
 		test.Fatalf("an unchanged file was rewritten (mtime moved)")
@@ -308,21 +308,21 @@ func TestFixFileLeavesTheFileUntouchedOnRefusal(test *testing.T) {
 	}
 
 	closingBrace := strings.LastIndex(source, "}")
-	result, err := FixFile(
+	result, fixFileError := FixFile(
 		fileName,
 		proposeOnce(proposal("brace-eater", closingBrace, closingBrace+1, "")),
 		DefaultMaxPasses,
 	)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	if fixFileError != nil {
+		test.Fatalf("unexpected error: %v", fixFileError)
 	}
 	if result.Changed {
 		test.Fatalf("reported a change despite the refusal")
 	}
 
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != source {
 		test.Fatalf("the file on disk was modified:\n  want %q\n  got  %q", source, onDisk)

@@ -185,16 +185,16 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 		onError(errorSource, "TAG_RESOLVE_FAILED", "tag.resolve is not a function", false)
 		scalar = composition.newScalar(unitsToString(value))
 	} else {
-		res, err := tag.resolveScalar(value, func(message string) {
+		result, resolveScalarError := tag.resolveScalar(value, func(message string) {
 			onError(errorSource, "TAG_RESOLVE_FAILED", message, false)
 		}, composition.options)
-		if err != nil {
-			onError(errorSource, "TAG_RESOLVE_FAILED", err.Error(), false)
+		if resolveScalarError != nil {
+			onError(errorSource, "TAG_RESOLVE_FAILED", resolveScalarError.Error(), false)
 			scalar = composition.newScalar(unitsToString(value))
-		} else if node, isNode := res.(*Node); isNode && IsScalar(node) {
+		} else if node, isNode := result.(*Node); isNode && IsScalar(node) {
 			scalar = node
 		} else {
-			scalar = composition.newScalar(res)
+			scalar = composition.newScalar(result)
 		}
 	}
 	scalar.Range = resolved.valueRange

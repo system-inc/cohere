@@ -452,9 +452,9 @@ type banTsCommentRawOptions struct {
 // against typescript-eslint's schema before this runs, so the first two refusals are this
 // decoder's own guard for a caller that reaches it directly.
 func DecodeBanTsCommentOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[banTsCommentRawOptions]()(raw)
-	if err != nil {
-		return DefaultBanTsCommentOptions(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[banTsCommentRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultBanTsCommentOptions(), decodeOptionsError
 	}
 
 	wire, _ := decoded.(banTsCommentRawOptions)

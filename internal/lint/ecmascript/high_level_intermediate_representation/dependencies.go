@@ -122,12 +122,12 @@ type ReactiveScopeDependency struct {
 // Compares `Optional` as well as `Property`, which is what makes `a?.b` and `a.b` distinct. A plain
 // property-name comparison passes every fixture built from unguarded accesses and silently merges
 // the guarded ones, so the flag is compared here rather than at the call site.
-func equalPaths(a, b []DependencyPathEntry) bool {
-	if len(a) != len(b) {
+func equalPaths(left, right []DependencyPathEntry) bool {
+	if len(left) != len(right) {
 		return false
 	}
-	for index := range a {
-		if a[index].Property != b[index].Property || a[index].Optional != b[index].Optional {
+	for index := range left {
+		if left[index].Property != right[index].Property || left[index].Optional != right[index].Optional {
 			return false
 		}
 	}
@@ -395,9 +395,9 @@ func isDependencyAccess(access propertyAccessType) bool {
 // as a dependency on either path, it is one. "Unconditional" is an intersection expressed by De
 // Morgan -- the result is optional only when both readings were optional, so a value read once
 // guarded and once unguarded is unguarded, because the unguarded read already happened.
-func mergeAccess(a, b propertyAccessType) propertyAccessType {
-	unconditional := !(isOptionalAccess(a) && isOptionalAccess(b))
-	dependency := isDependencyAccess(a) || isDependencyAccess(b)
+func mergeAccess(left, right propertyAccessType) propertyAccessType {
+	unconditional := !(isOptionalAccess(left) && isOptionalAccess(right))
+	dependency := isDependencyAccess(left) || isDependencyAccess(right)
 	switch {
 	case unconditional && dependency:
 		return unconditionalDependency
@@ -1427,8 +1427,8 @@ func (collector *dependencyCollector) visitNestedFunction(id FunctionId, capture
 
 	// Inner identifier -> the place in this function naming the same binding.
 	translate := map[static_single_assignment.IdentifierId]Place{}
-	for i := range captures {
-		translate[nested.Context[i].Identifier] = captures[i]
+	for index := range captures {
+		translate[nested.Context[index].Identifier] = captures[index]
 	}
 
 	// The nested function's own temporaries, which `collectTemporariesInto` builds and discards.
@@ -1553,8 +1553,8 @@ func nestedAccessesByBlock(function *Function, temps temporaries) ([]ReactiveSco
 					continue
 				}
 				translate := map[static_single_assignment.IdentifierId]Place{}
-				for i := range value.Captures {
-					translate[inner.Context[i].Identifier] = value.Captures[i]
+				for index := range value.Captures {
+					translate[inner.Context[index].Identifier] = value.Captures[index]
 				}
 				innerTemporaries := temporaries{}
 				collectTemporariesInto(inner, map[static_single_assignment.DeclarationId]bool{}, innerTemporaries)

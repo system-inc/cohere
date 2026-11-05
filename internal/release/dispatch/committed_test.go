@@ -20,9 +20,9 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(test *te
 
 	fixture := newCommittedFixture(test)
 
-	first, firstCommit, built, err := ResolveCommitted(fixture.paths, "./command/cohere")
-	if err != nil {
-		test.Fatalf("building from the first commit: %v", err)
+	first, firstCommit, built, resolveCommittedError := ResolveCommitted(fixture.paths, "./command/cohere")
+	if resolveCommittedError != nil {
+		test.Fatalf("building from the first commit: %v", resolveCommittedError)
 	}
 	if !built {
 		test.Fatal("an empty cache reported no build, so the binary came from somewhere other than this resolve")
@@ -45,9 +45,9 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(test *te
 	writeFile(test, filepath.Join(fixture.superproject, "TypeScript", "tsc", "checker", "checker.go"),
 		"package checker\n\nfunc Value() string { return \"uncommitted\" }\n")
 
-	again, _, built, err := ResolveCommitted(fixture.paths, "./command/cohere")
-	if err != nil {
-		test.Fatalf("resolving with uncommitted edits on disk: %v", err)
+	again, _, built, resolveCommittedError := ResolveCommitted(fixture.paths, "./command/cohere")
+	if resolveCommittedError != nil {
+		test.Fatalf("resolving with uncommitted edits on disk: %v", resolveCommittedError)
 	}
 	if built || again != first {
 		test.Fatalf(
@@ -77,9 +77,9 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(test *te
 		"package rules\n\nconst Value = \"uncommitted\"\n",
 	)
 
-	second, secondCommit, built, err := ResolveCommitted(fixture.paths, "./command/cohere")
-	if err != nil {
-		test.Fatalf("building from the second commit: %v", err)
+	second, secondCommit, built, resolveCommittedError := ResolveCommitted(fixture.paths, "./command/cohere")
+	if resolveCommittedError != nil {
+		test.Fatalf("building from the second commit: %v", resolveCommittedError)
 	}
 	if !built || second == first {
 		test.Fatalf("a new commit did not produce a new binary (built=%v, %s)", built, second)

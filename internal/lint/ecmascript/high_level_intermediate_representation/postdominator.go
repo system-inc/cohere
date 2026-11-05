@@ -154,22 +154,22 @@ func computePostDominance(function *Function) *postDominanceTree {
 
 	// The two pointers walk toward the root, which sits at position zero, so the larger position is
 	// always the one further from it and is the one that steps.
-	intersect := func(a, b int) int {
-		for a != b {
-			for a > b {
-				if immediate[a] == -1 || immediate[a] == a {
-					return b
+	intersect := func(left, right int) int {
+		for left != right {
+			for left > right {
+				if immediate[left] == -1 || immediate[left] == left {
+					return right
 				}
-				a = immediate[a]
+				left = immediate[left]
 			}
-			for b > a {
-				if immediate[b] == -1 || immediate[b] == b {
-					return a
+			for right > left {
+				if immediate[right] == -1 || immediate[right] == right {
+					return left
 				}
-				b = immediate[b]
+				right = immediate[right]
 			}
 		}
-		return a
+		return left
 	}
 
 	// Predecessors in the reversed graph, which the fixed point reads.

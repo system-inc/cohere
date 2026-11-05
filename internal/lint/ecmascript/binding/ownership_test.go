@@ -57,22 +57,22 @@ func TestForeignPositions(test *testing.T) {
 	// The two type positions declare the name first, so the use is the occurrence under test. The
 	// declaration is this file's own and correctly answers owned, which is what the index picks
 	// apart here rather than asserting on whichever occurrence came first.
-	for _, c := range []struct {
+	for _, testCase := range []struct {
 		source string
 		use    int
 	}{
 		{"declare namespace A { type name = string }\ndeclare const v: A.name;", 1},
 		{"type name = string;\ndeclare const v: name;", 1},
 	} {
-		got := answersFor(test, c.source, "name")
-		if len(got) <= c.use {
-			test.Fatalf("%q: expected at least %d occurrences, got %d", c.source, c.use+1, len(got))
+		got := answersFor(test, testCase.source, "name")
+		if len(got) <= testCase.use {
+			test.Fatalf("%q: expected at least %d occurrences, got %d", testCase.source, testCase.use+1, len(got))
 		}
 		if got[0] {
-			test.Errorf("%q: the declaration answered foreign, want owned", c.source)
+			test.Errorf("%q: the declaration answered foreign, want owned", testCase.source)
 		}
-		if !got[c.use] {
-			test.Errorf("%q: the use answered owned, want foreign", c.source)
+		if !got[testCase.use] {
+			test.Errorf("%q: the use answered owned, want foreign", testCase.source)
 		}
 	}
 }

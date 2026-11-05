@@ -69,9 +69,9 @@ func ReadCaptures(directory string) ([]capture.Record, error) {
 	sort.Strings(paths)
 	var records []capture.Record
 	for _, path := range paths {
-		file, err := os.Open(path)
-		if err != nil {
-			return nil, err
+		file, openError := os.Open(path)
+		if openError != nil {
+			return nil, openError
 		}
 		scanner := bufio.NewScanner(file)
 		scanner.Buffer(make([]byte, 0, 1<<20), 1<<28)
@@ -83,10 +83,10 @@ func ReadCaptures(directory string) ([]capture.Record, error) {
 			}
 			records = append(records, record)
 		}
-		err = scanner.Err()
+		scanError := scanner.Err()
 		file.Close() // Ignored: the file was only read, and everything it held was already scanned.
-		if err != nil {
-			return nil, fmt.Errorf("docsdata: %s: %w", path, err)
+		if scanError != nil {
+			return nil, fmt.Errorf("docsdata: %s: %w", path, scanError)
 		}
 	}
 	return records, nil
@@ -193,16 +193,16 @@ func shortest(candidates []capture.Record) *Example {
 func ReadCommittedExamples(root string) (map[string]Examples, error) {
 	examples := map[string]Examples{}
 	directory := filepath.Join(root, ExamplesDirectory)
-	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
-		if os.IsNotExist(err) && path == directory {
+	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, pathError error) error {
+		if os.IsNotExist(pathError) && path == directory {
 			return filepath.SkipDir
 		}
-		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
-			return err
+		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
+			return pathError
 		}
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		var example Examples
 		if decodeError := json.Unmarshal(contents, &example); decodeError != nil {

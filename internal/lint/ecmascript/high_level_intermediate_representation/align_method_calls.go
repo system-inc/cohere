@@ -176,8 +176,8 @@ func rebuildWithAlignedMethodCalls(
 		rebuilt.members[scope] = append(rebuilt.members[scope], identifier)
 	}
 	for scope := range rebuilt.members {
-		sort.Slice(rebuilt.members[scope], func(a, b int) bool {
-			return rebuilt.members[scope][a] < rebuilt.members[scope][b]
+		sort.Slice(rebuilt.members[scope], func(left, right int) bool {
+			return rebuilt.members[scope][left] < rebuilt.members[scope][right]
 		})
 	}
 	return rebuilt

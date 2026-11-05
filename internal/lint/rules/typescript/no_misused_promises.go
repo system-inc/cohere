@@ -341,51 +341,51 @@ var NoMisusedPromises = rule.Rule{
 			return nil
 		}
 
-		opts, ok := rule.OptionsAs[NoMisusedPromisesOptions](options)
+		settings, ok := rule.OptionsAs[NoMisusedPromisesOptions](options)
 		if !ok {
-			opts = NoMisusedPromisesOptions{}
+			settings = NoMisusedPromisesOptions{}
 		}
-		if opts.ChecksConditionals == nil {
-			opts.ChecksConditionals = type_checking.Ref(true)
+		if settings.ChecksConditionals == nil {
+			settings.ChecksConditionals = type_checking.Ref(true)
 		}
-		if opts.ChecksConditionalsFlagUnions == "" {
-			opts.ChecksConditionalsFlagUnions = "none"
+		if settings.ChecksConditionalsFlagUnions == "" {
+			settings.ChecksConditionalsFlagUnions = "none"
 		}
-		if opts.ChecksSpreads == nil {
-			opts.ChecksSpreads = type_checking.Ref(true)
+		if settings.ChecksSpreads == nil {
+			settings.ChecksSpreads = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturn == nil {
-			opts.ChecksVoidReturn = type_checking.Ref(true)
+		if settings.ChecksVoidReturn == nil {
+			settings.ChecksVoidReturn = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts == nil {
-			opts.ChecksVoidReturnOpts = type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{})
+		if settings.ChecksVoidReturnOpts == nil {
+			settings.ChecksVoidReturnOpts = type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{})
 		}
-		if opts.ChecksVoidReturnOpts.Arguments == nil {
-			opts.ChecksVoidReturnOpts.Arguments = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Arguments == nil {
+			settings.ChecksVoidReturnOpts.Arguments = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Attributes == nil {
-			opts.ChecksVoidReturnOpts.Attributes = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Attributes == nil {
+			settings.ChecksVoidReturnOpts.Attributes = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.InheritedMethods == nil {
-			opts.ChecksVoidReturnOpts.InheritedMethods = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.InheritedMethods == nil {
+			settings.ChecksVoidReturnOpts.InheritedMethods = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Properties == nil {
-			opts.ChecksVoidReturnOpts.Properties = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Properties == nil {
+			settings.ChecksVoidReturnOpts.Properties = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Returns == nil {
-			opts.ChecksVoidReturnOpts.Returns = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Returns == nil {
+			settings.ChecksVoidReturnOpts.Returns = type_checking.Ref(true)
 		}
-		if opts.ChecksVoidReturnOpts.Variables == nil {
-			opts.ChecksVoidReturnOpts.Variables = type_checking.Ref(true)
+		if settings.ChecksVoidReturnOpts.Variables == nil {
+			settings.ChecksVoidReturnOpts.Variables = type_checking.Ref(true)
 		}
 
 		anySignatureIsThenableType := func(
 			node *ast.Node,
-			t *checker.Type,
+			subjectType *checker.Type,
 		) bool {
 			return type_checking.Some(type_checking.GetCallSignatures(
 				ruleContext.TypeChecker,
-				t,
+				subjectType,
 			), func(sig *checker.Signature) bool {
 				return type_checking.IsThenableType(
 					ruleContext.TypeChecker,
@@ -396,12 +396,12 @@ var NoMisusedPromises = rule.Rule{
 		}
 
 		returnsThenable := func(node *ast.Node) bool {
-			t := checker.Checker_getApparentType(
+			subjectType := checker.Checker_getApparentType(
 				ruleContext.TypeChecker,
 				ruleContext.TypeChecker.GetTypeAtLocation(node),
 			)
-			return type_checking.Some(type_checking.UnionTypeParts(t), func(t *checker.Type) bool {
-				return anySignatureIsThenableType(node, t)
+			return type_checking.Some(type_checking.UnionTypeParts(subjectType), func(part *checker.Type) bool {
+				return anySignatureIsThenableType(node, part)
 			})
 		}
 
@@ -426,19 +426,19 @@ var NoMisusedPromises = rule.Rule{
 			}
 		}
 
-		isFunctionParam := func(
+		isFunctionParameter := func(
 			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(
+			subjectType := checker.Checker_getApparentType(
 				ruleContext.TypeChecker,
 				ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node),
 			)
-			if t == nil {
+			if subjectType == nil {
 				return false
 			}
-			return type_checking.Some(type_checking.UnionTypeParts(t), func(t *checker.Type) bool {
-				return len(type_checking.GetCallSignatures(ruleContext.TypeChecker, t)) != 0
+			return type_checking.Some(type_checking.UnionTypeParts(subjectType), func(part *checker.Type) bool {
+				return len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0
 			})
 		}
 
@@ -447,10 +447,10 @@ var NoMisusedPromises = rule.Rule{
 		// check if something is defined or undefined and get caught because one of the
 		// branches is thenable.
 		isAlwaysThenable := func(node *ast.Node) bool {
-			t := ruleContext.TypeChecker.GetTypeAtLocation(node)
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 
 			for subType := range type_checking.UnionTypePartsSeq(
-				checker.Checker_getApparentType(ruleContext.TypeChecker, t),
+				checker.Checker_getApparentType(ruleContext.TypeChecker, subjectType),
 			) {
 				thenProperty := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, subType, "then")
 
@@ -468,7 +468,7 @@ var NoMisusedPromises = rule.Rule{
 				for subType := range type_checking.UnionTypePartsSeq(thenType) {
 					for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, subType) {
 						parameters := checker.Signature_parameters(signature)
-						if len(parameters) != 0 && isFunctionParam(parameters[0], node) {
+						if len(parameters) != 0 && isFunctionParameter(parameters[0], node) {
 							hasThenableSignature = true
 						}
 					}
@@ -533,7 +533,7 @@ var NoMisusedPromises = rule.Rule{
 
 			// flagUnions widens the check to a union holding a thenable: every one under "all", and
 			// under "strict" only one whose awaited half is the rest, as in `Promise<T> | T`.
-			switch opts.ChecksConditionalsFlagUnions {
+			switch settings.ChecksConditionalsFlagUnions {
 			case "all":
 				if isSometimesThenable(ruleContext.TypeChecker, unparenthesized) {
 					ruleContext.ReportNode(unparenthesized, buildConditionalMessage())
@@ -546,12 +546,12 @@ var NoMisusedPromises = rule.Rule{
 		}
 
 		getMemberIfExists := func(
-			t *checker.Type,
+			subjectType *checker.Type,
 			memberName string,
 		) *ast.Symbol {
 			// Upstream escapes the name first, with `ts.escapeLeadingUnderscores`. This port does not, a gap
 			// carried from the Go port it came from (see the doc above).
-			symbol := checker.Type_symbol(t)
+			symbol := checker.Type_symbol(subjectType)
 			if symbol != nil {
 				symbol = symbol.Members[memberName]
 			}
@@ -559,16 +559,16 @@ var NoMisusedPromises = rule.Rule{
 				return symbol
 			}
 
-			return checker.Checker_getPropertyOfType(ruleContext.TypeChecker, t, memberName)
+			return checker.Checker_getPropertyOfType(ruleContext.TypeChecker, subjectType, memberName)
 		}
 
 		isVoidReturningFunctionType := func(
 			node *ast.Node,
-			t *checker.Type,
+			subjectType *checker.Type,
 		) bool {
 			hadVoidReturn := false
-			for t := range type_checking.UnionTypePartsSeq(t) {
-				for _, sig := range type_checking.GetCallSignatures(ruleContext.TypeChecker, t) {
+			for part := range type_checking.UnionTypePartsSeq(subjectType) {
+				for _, sig := range type_checking.GetCallSignatures(ruleContext.TypeChecker, part) {
 					returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, sig)
 					// If a certain positional argument accepts both thenable and void returns,
 					// a promise-returning function is valid
@@ -643,30 +643,30 @@ var NoMisusedPromises = rule.Rule{
 
 		isThenableReturningFunctionType := func(
 			node *ast.Node,
-			t *checker.Type,
+			subjectType *checker.Type,
 		) bool {
-			return type_checking.Some(type_checking.UnionTypeParts(t), func(t *checker.Type) bool {
-				return anySignatureIsThenableType(node, t)
+			return type_checking.Some(type_checking.UnionTypeParts(subjectType), func(part *checker.Type) bool {
+				return anySignatureIsThenableType(node, part)
 			})
 		}
 
 		var checkThenableOrVoidArgument func(
 			node *ast.Expression,
-			t *checker.Type,
+			subjectType *checker.Type,
 			index int,
 			thenableReturnIndices *[]int,
 			voidReturnIndices *[]int,
 		)
 		checkThenableOrVoidArgument = func(
 			node *ast.Expression,
-			t *checker.Type,
+			subjectType *checker.Type,
 			index int,
 			thenableReturnIndices *[]int,
 			voidReturnIndices *[]int,
 		) {
-			if isThenableReturningFunctionType(node.Expression(), t) {
+			if isThenableReturningFunctionType(node.Expression(), subjectType) {
 				(*thenableReturnIndices) = append(*thenableReturnIndices, index)
-			} else if isVoidReturningFunctionType(node.Expression(), t) &&
+			} else if isVoidReturningFunctionType(node.Expression(), subjectType) &&
 				// If a certain argument accepts both thenable and void returns,
 				// a promise-returning function is valid
 				!slices.Contains(*thenableReturnIndices, index) {
@@ -675,7 +675,7 @@ var NoMisusedPromises = rule.Rule{
 			}
 			contextualType := checker.Checker_getContextualTypeForArgumentAtIndex(ruleContext.TypeChecker, node, index)
 
-			if contextualType != t {
+			if contextualType != subjectType {
 				checkThenableOrVoidArgument(
 					node,
 					contextualType,
@@ -702,12 +702,12 @@ var NoMisusedPromises = rule.Rule{
 			}
 			thenableReturnIndices := []int{}
 			voidReturnIndices := []int{}
-			t := ruleContext.TypeChecker.GetTypeAtLocation(node.Expression())
+			subjectType := ruleContext.TypeChecker.GetTypeAtLocation(node.Expression())
 
 			// We can't use checker.getResolvedSignature because it prefers an early '() => void' over a later '() =>
 			// Promise<void>' See https://github.com/microsoft/TypeScript/issues/48077
 
-			for subType := range type_checking.UnionTypePartsSeq(t) {
+			for subType := range type_checking.UnionTypePartsSeq(subjectType) {
 				// Standard function calls and `new` have two different types of signatures
 				var signatures []*checker.Signature
 				if ast.IsCallExpression(node) {
@@ -718,29 +718,29 @@ var NoMisusedPromises = rule.Rule{
 				for _, signature := range signatures {
 					for index, parameter := range checker.Signature_parameters(signature) {
 						decl := parameter.ValueDeclaration
-						t := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node.Expression())
+						subjectType := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node.Expression())
 
 						// If this is a array 'rest' parameter, check all of the argument indices
 						// from the current argument to the end.
 						if decl != nil && type_checking.IsRestParameterDeclaration(decl) {
-							if checker.Checker_isArrayType(ruleContext.TypeChecker, t) {
+							if checker.Checker_isArrayType(ruleContext.TypeChecker, subjectType) {
 								// Unwrap 'Array<MaybeVoidFunction>' to 'MaybeVoidFunction',
 								// so that we'll handle it in the same way as a non-rest
 								// 'param: MaybeVoidFunction'
-								t = checker.Checker_getTypeArguments(ruleContext.TypeChecker, t)[0]
+								subjectType = checker.Checker_getTypeArguments(ruleContext.TypeChecker, subjectType)[0]
 								for i := index; i < len(node.Arguments()); i++ {
 									checkThenableOrVoidArgument(
 										node,
-										t,
+										subjectType,
 										i,
 										&thenableReturnIndices,
 										&voidReturnIndices,
 									)
 								}
-							} else if checker.IsTupleType(t) {
+							} else if checker.IsTupleType(subjectType) {
 								// Check each type in the tuple - for example, [boolean, () => void] would
 								// add the index of the second tuple parameter to 'voidReturnIndices'
-								typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, t)
+								typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subjectType)
 								for i := index; i < len(node.Arguments()) && i-index < len(typeArguments); i++ {
 									checkThenableOrVoidArgument(
 										node,
@@ -754,7 +754,7 @@ var NoMisusedPromises = rule.Rule{
 						} else {
 							checkThenableOrVoidArgument(
 								node,
-								t,
+								subjectType,
 								index,
 								&thenableReturnIndices,
 								&voidReturnIndices,
@@ -814,9 +814,9 @@ var NoMisusedPromises = rule.Rule{
 			}
 
 			heritageTypes := type_checking.Flatten(
-				type_checking.Map(heritageClauses.Nodes, func(h *ast.Node) []*checker.Type {
-					return type_checking.Map(h.AsHeritageClause().Types.Nodes, func(n *ast.Node) *checker.Type {
-						return ruleContext.TypeChecker.GetTypeAtLocation(n)
+				type_checking.Map(heritageClauses.Nodes, func(heritageClause *ast.Node) []*checker.Type {
+					return type_checking.Map(heritageClause.AsHeritageClause().Types.Nodes, func(node *ast.Node) *checker.Type {
+						return ruleContext.TypeChecker.GetTypeAtLocation(node)
 					})
 				}),
 			)
@@ -1087,18 +1087,18 @@ var NoMisusedPromises = rule.Rule{
 
 		listeners := rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
-				if *opts.ChecksConditionals {
+				if *settings.ChecksConditionals {
 					checkConditional(node, false)
 				}
 
-				if *opts.ChecksVoidReturn &&
-					*opts.ChecksVoidReturnOpts.Variables &&
+				if *settings.ChecksVoidReturn &&
+					*settings.ChecksVoidReturnOpts.Variables &&
 					ast.IsAssignmentExpression(node, false) {
 					checkAssignment(node.AsBinaryExpression())
 				}
 			},
 		}
-		if *opts.ChecksConditionals {
+		if *settings.ChecksConditionals {
 			listeners[ast.KindPropertyAccessExpression] = checkArrayPredicates
 			listeners[ast.KindElementAccessExpression] = checkArrayPredicates
 
@@ -1124,32 +1124,32 @@ var NoMisusedPromises = rule.Rule{
 			listeners[ast.KindIfStatement] = func(node *ast.Node) { checkConditional(node.Expression(), true) }
 		}
 
-		if *opts.ChecksVoidReturn {
-			if *opts.ChecksVoidReturnOpts.Arguments {
+		if *settings.ChecksVoidReturn {
+			if *settings.ChecksVoidReturnOpts.Arguments {
 				listeners[ast.KindCallExpression] = checkArguments
 				listeners[ast.KindNewExpression] = checkArguments
 			}
-			if *opts.ChecksVoidReturnOpts.Attributes {
+			if *settings.ChecksVoidReturnOpts.Attributes {
 				listeners[ast.KindJsxAttribute] = func(node *ast.Node) { checkJSXAttribute(node.AsJsxAttribute()) }
 			}
-			if *opts.ChecksVoidReturnOpts.InheritedMethods {
+			if *settings.ChecksVoidReturnOpts.InheritedMethods {
 				listeners[ast.KindClassDeclaration] = checkClassLikeOrInterfaceNode
 				listeners[ast.KindClassExpression] = checkClassLikeOrInterfaceNode
 				listeners[ast.KindInterfaceDeclaration] = checkClassLikeOrInterfaceNode
 			}
-			if *opts.ChecksVoidReturnOpts.Properties {
+			if *settings.ChecksVoidReturnOpts.Properties {
 				listeners[ast.KindPropertyAssignment] = checkProperty
 				listeners[ast.KindMethodDeclaration] = checkProperty
 				listeners[ast.KindShorthandPropertyAssignment] = checkProperty
 			}
-			if *opts.ChecksVoidReturnOpts.Returns {
+			if *settings.ChecksVoidReturnOpts.Returns {
 				listeners[ast.KindReturnStatement] = func(
 					node *ast.Node,
 				) {
 					checkReturnStatement(node.AsReturnStatement())
 				}
 			}
-			if *opts.ChecksVoidReturnOpts.Variables {
+			if *settings.ChecksVoidReturnOpts.Variables {
 				listeners[ast.KindVariableDeclaration] = func(
 					node *ast.Node,
 				) {
@@ -1158,7 +1158,7 @@ var NoMisusedPromises = rule.Rule{
 			}
 
 		}
-		if *opts.ChecksSpreads {
+		if *settings.ChecksSpreads {
 			listeners[ast.KindSpreadElement] = checkSpread
 			listeners[ast.KindSpreadAssignment] = checkSpread
 		}

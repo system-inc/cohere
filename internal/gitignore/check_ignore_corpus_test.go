@@ -26,17 +26,17 @@ import (
 func TestGitCheckIgnoreCorpus(test *testing.T) {
 	test.Parallel()
 	source := gitSource(test)
-	contents, err := os.ReadFile(filepath.Join(source, "t", "t0008-ignores.sh"))
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(filepath.Join(source, "t", "t0008-ignores.sh"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	script := strings.Split(string(contents), "\n")
 
 	root := test.TempDir()
 	buildCheckIgnoreFixture(test, root, script)
-	matcher, err := New(root)
-	if err != nil {
-		test.Fatal(err)
+	matcher, newGitignoreError := New(root)
+	if newGitignoreError != nil {
+		test.Fatal(newGitignoreError)
 	}
 
 	asserted, skippedGlobal, skippedIndex := 0, 0, 0

@@ -65,9 +65,9 @@ func decideMemoryPolicy(lookupEnvironment func(string) (string, bool), available
 	if len(set) > 0 {
 		return memoryPolicy{environment: strings.Join(set, " ")}
 	}
-	bytes, err := available()
-	if err != nil {
-		return memoryPolicy{unreadable: err}
+	bytes, availableError := available()
+	if availableError != nil {
+		return memoryPolicy{unreadable: availableError}
 	}
 	if bytes == 0 {
 		return memoryPolicy{unreadable: fmt.Errorf("it read as zero")}

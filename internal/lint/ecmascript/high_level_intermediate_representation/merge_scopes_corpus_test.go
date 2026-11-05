@@ -72,7 +72,7 @@ func scopeNestingItems(ranges map[ScopeId]mutation_aliasing.MutableRange) []nest
 	for id := range ranges {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	sort.Slice(ids, func(left, right int) bool { return ids[left] < ids[right] })
 
 	items := make([]nestingItem, 0, len(ids))
 	for _, id := range ids {
@@ -132,25 +132,25 @@ func blockNestingViolations(scopes, blocks []nestingItem) int {
 
 	// Upstream's `rangePreOrderComparator`: earlier start first, then the longer item first, so an
 	// enclosing item is entered before the items it encloses.
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].start != items[j].start {
-			return items[i].start < items[j].start
+	sort.SliceStable(items, func(left, right int) bool {
+		if items[left].start != items[right].start {
+			return items[left].start < items[right].start
 		}
-		return items[i].end > items[j].end
+		return items[left].end > items[right].end
 	})
 
 	violations := 0
 	var active []nestingItem
 	for _, current := range items {
-		for i := len(active) - 1; i >= 0; i-- {
-			parent := active[i]
+		for index := len(active) - 1; index >= 0; index-- {
+			parent := active[index]
 			disjoint := current.start >= parent.end
 			nested := current.end <= parent.end
 			if !disjoint && !nested {
 				violations++
 			}
 			if disjoint {
-				active = active[:i]
+				active = active[:index]
 			} else {
 				break
 			}

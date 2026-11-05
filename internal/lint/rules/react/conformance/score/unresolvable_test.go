@@ -30,8 +30,8 @@ func TestUnresolvableTypesIsEarnedNotAssumed(test *testing.T) {
 	subject := Rules["set-state-in-render"]
 	moved, stayedSilent := 0, 0
 	for _, fixture := range SelectFixtures(fixtures, "set-state-in-render") {
-		result, analyzeErr := Analyze(subject, fixture, test.TempDir())
-		verdict := react_conformance.Classify(fixture, result, analyzeErr)
+		result, analyzeError := Analyze(subject, fixture, test.TempDir())
+		verdict := react_conformance.Classify(fixture, result, analyzeError)
 		if verdict.Verdict != react_conformance.VerdictUnresolvableTypes {
 			continue
 		}

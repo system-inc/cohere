@@ -514,10 +514,10 @@ func descendingByPosition(sets map[static_single_assignment.EvaluationOrder]map[
 		for scope := range set {
 			list = append(list, scope)
 		}
-		sort.Slice(list, func(i, j int) bool { return list[i] < list[j] })
+		sort.Slice(list, func(left, right int) bool { return list[left] < list[right] })
 		out = append(out, scopesAtPosition{position: position, scopes: list})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].position > out[j].position })
+	sort.Slice(out, func(left, right int) bool { return out[left].position > out[right].position })
 	return out
 }
 
@@ -598,8 +598,8 @@ func (state *mergeSweepState) visitInstructionId(id static_single_assignment.Eva
 		//
 		// Kept rather than deleted because it is upstream's and because the subsumption argument
 		// rests on the end branch's ordering, which the same alignment pass could also change.
-		for i := 1; i < len(opening); i++ {
-			previous, current := opening[i-1], opening[i]
+		for index := 1; index < len(opening); index++ {
+			previous, current := opening[index-1], opening[index]
 			if state.rangeOf(previous).End == state.rangeOf(current).End {
 				state.joined.union([]ScopeId{previous, current})
 			}
@@ -719,7 +719,7 @@ func (state *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 
 	for _, group := range result.order {
 		members := result.members[group]
-		sort.Slice(members, func(i, j int) bool { return members[i] < members[j] })
+		sort.Slice(members, func(left, right int) bool { return members[left] < members[right] })
 		result.members[group] = members
 	}
 
@@ -757,13 +757,13 @@ func (state *mergeSweepState) apply(scopes *ReactiveScopes) *MergedScopes {
 // `TestAlignVoidsTheMergesComparatorVerdicts` runs that comparison with the unaligned table as its
 // control, where the two spellings still agree on every function.
 func sortByStartDescending(scopes []ScopeId, rangeOf func(ScopeId) mutation_aliasing.MutableRange) {
-	sort.SliceStable(scopes, func(i, j int) bool {
-		return rangeOf(scopes[i]).Start > rangeOf(scopes[j]).Start
+	sort.SliceStable(scopes, func(left, right int) bool {
+		return rangeOf(scopes[left]).Start > rangeOf(scopes[right]).Start
 	})
 }
 
 func sortByEndDescending(scopes []ScopeId, rangeOf func(ScopeId) mutation_aliasing.MutableRange) {
-	sort.SliceStable(scopes, func(i, j int) bool {
-		return rangeOf(scopes[i]).End > rangeOf(scopes[j]).End
+	sort.SliceStable(scopes, func(left, right int) bool {
+		return rangeOf(scopes[left]).End > rangeOf(scopes[right]).End
 	})
 }

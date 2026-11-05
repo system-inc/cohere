@@ -623,8 +623,8 @@ func propagateNonNull(function *Function, blocks map[static_single_assignment.Bl
 		}
 	}
 	for predecessor := range successors {
-		sort.Slice(successors[predecessor], func(i, j int) bool {
-			return successors[predecessor][i] < successors[predecessor][j]
+		sort.Slice(successors[predecessor], func(left, right int) bool {
+			return successors[predecessor][left] < successors[predecessor][right]
 		})
 	}
 
@@ -820,12 +820,12 @@ func blockById(function *Function, id static_single_assignment.BlockId) *BasicBl
 }
 
 // sameNodeSet reports whether two node sets hold exactly the same members.
-func sameNodeSet(a, b map[int]bool) bool {
-	if len(a) != len(b) {
+func sameNodeSet(left, right map[int]bool) bool {
+	if len(left) != len(right) {
 		return false
 	}
-	for index := range a {
-		if !b[index] {
+	for index := range left {
+		if !right[index] {
 			return false
 		}
 	}

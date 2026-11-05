@@ -60,9 +60,9 @@ func TestClassLiteralsAgreeWithUpstream(test *testing.T) {
 			if testCase.Settings != nil {
 				base = settingsBase(string(testCase.Settings))
 			}
-			decoded, err := decode(raw, base)
-			if err != nil {
-				test.Fatalf("decoding the case's options: %v", err)
+			decoded, decodeError := decode(raw, base)
+			if decodeError != nil {
+				test.Fatalf("decoding the case's options: %v", decodeError)
 			}
 			reader := surfacesOf(test, decoded).compiled
 

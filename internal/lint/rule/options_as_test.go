@@ -24,9 +24,9 @@ func TestOptionsAsGivesZeroAndFalseForNoOptions(test *testing.T) {
 func TestOptionsAsReadsTheDecodedValue(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeOptionsInto[optionsAsTestOptions]()([]byte(`{"enabled": true}`))
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeOptionsError := DecodeOptionsInto[optionsAsTestOptions]()([]byte(`{"enabled": true}`))
+	if decodeOptionsError != nil {
+		test.Fatal(decodeOptionsError)
 	}
 	settings, ok := OptionsAs[optionsAsTestOptions](decoded)
 	if !ok || !settings.Enabled {
@@ -39,9 +39,9 @@ func TestOptionsAsReadsTheDecodedValue(test *testing.T) {
 func TestOptionsAsPanicsWhenTheDecoderAndTheRuleDisagree(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeOptionsInto[optionsAsTestOptions]()([]byte(`{"enabled": true}`))
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeOptionsError := DecodeOptionsInto[optionsAsTestOptions]()([]byte(`{"enabled": true}`))
+	if decodeOptionsError != nil {
+		test.Fatal(decodeOptionsError)
 	}
 	defer func() {
 		recovered := recover()

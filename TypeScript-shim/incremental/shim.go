@@ -105,6 +105,6 @@ func NewProgram(program *compiler.Program, oldProgram *Program, host Host) *Prog
 // Returns the emit result so a caller can surface diagnostics from the write itself; a failed
 // build-info write must not pass silently, since the next run would then be cold while
 // reporting success.
-func EmitBuildInfo(ctx context.Context, program *Program) *compiler.EmitResult {
-	return program.Emit(ctx, compiler.EmitOptions{})
+func EmitBuildInfo(callerContext context.Context, program *Program) *compiler.EmitResult {
+	return program.Emit(callerContext, compiler.EmitOptions{})
 }

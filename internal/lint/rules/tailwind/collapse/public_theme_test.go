@@ -15,15 +15,15 @@ import (
 // publicThemeSystem is testdata/public_theme's design system, over the vendored tailwindcss.
 func publicThemeSystem(test *testing.T) *LoadedDesignSystem {
 	test.Helper()
-	entryPoint, err := filepath.Abs(filepath.Join("testdata", "public_theme", "theme.css"))
-	if err != nil {
-		test.Fatalf("resolving the public theme: %v", err)
+	entryPoint, absolutePathError := filepath.Abs(filepath.Join("testdata", "public_theme", "theme.css"))
+	if absolutePathError != nil {
+		test.Fatalf("resolving the public theme: %v", absolutePathError)
 	}
-	system, err := LoadDesignSystem(
+	system, loadDesignSystemError := LoadDesignSystem(
 		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()},
 	)
-	if err != nil {
-		test.Fatalf("loading the public theme: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the public theme: %v", loadDesignSystemError)
 	}
 	return system
 }

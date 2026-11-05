@@ -61,13 +61,13 @@ type schemaNode struct {
 
 // Build renders every generated file, keyed by its path relative to the module root.
 func Build(ruleNames []string) (map[string][]byte, error) {
-	project, err := document(ruleNames, false)
-	if err != nil {
-		return nil, err
+	project, documentError := document(ruleNames, false)
+	if documentError != nil {
+		return nil, documentError
 	}
-	nexus, err := document(ruleNames, true)
-	if err != nil {
-		return nil, err
+	nexus, documentError := document(ruleNames, true)
+	if documentError != nil {
+		return nil, documentError
 	}
 	files := map[string][]byte{}
 	for path, schema := range map[string]*schemaNode{ProjectSchemaPath: project, NexusSchemaPath: nexus} {

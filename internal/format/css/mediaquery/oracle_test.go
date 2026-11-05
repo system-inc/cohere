@@ -238,9 +238,9 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 				return filepath.SkipDir
@@ -248,9 +248,9 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			if entry.IsDir() || filepath.Ext(path) != ".css" {
 				return nil
 			}
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
@@ -312,8 +312,8 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	}
 	for _, want := range records {
 		name, nameIsString := want["name"].(string)
-		parameters, paramsIsString := want["params"].(string)
-		if !nameIsString || !paramsIsString {
+		parameters, parametersIsString := want["params"].(string)
+		if !nameIsString || !parametersIsString {
 			test.Fatalf("the oracle printed a record without a name and params: %v", want)
 		}
 		wantError, oracleRefused := want["error"].(string)
@@ -384,17 +384,17 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 // dumpMediaQuery parses params and renders the tree the way the oracle script does, through JSON, so
 // both sides compare as the same Go values.
 func dumpMediaQuery(parameters string) (any, error) {
-	tree, err := Parse(parameters)
-	if err != nil {
-		return nil, err
+	tree, parseError := Parse(parameters)
+	if parseError != nil {
+		return nil, parseError
 	}
-	encoded, err := json.Marshal(dumpMediaQueryValue(tree, utf16OffsetsOf(parameters)))
-	if err != nil {
-		return nil, err
+	encoded, encodeError := json.Marshal(dumpMediaQueryValue(tree, utf16OffsetsOf(parameters)))
+	if encodeError != nil {
+		return nil, encodeError
 	}
 	var result any
-	err = json.Unmarshal(encoded, &result)
-	return result, err
+	decodeError := json.Unmarshal(encoded, &result)
+	return result, decodeError
 }
 
 func dumpMediaQueryValue(value any, offsets []int) any {

@@ -293,7 +293,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// The root resolved, and the files below it from it, so a run through another spelling of the same
 	// directory has the same key (#547dhjz).
 	anchor := program.NewPathAnchor(location.Root)
-	keyParts, err := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(),
+	keyParts, runCacheKeyPartsOfError := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(),
 		"root="+anchor.Resolved(),
 		"tsconfig="+anchor.Stable(location.ConfigFileName),
 		"lint-config="+anchor.Stable(location.LintConfigFileName),
@@ -302,7 +302,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		// arguments do not show. See ownership.go.
 		"yield="+activeProjectYieldFingerprint(),
 	)
-	if err != nil {
+	if runCacheKeyPartsOfError != nil {
 		return nil
 	}
 	key := keyParts.Key()
@@ -318,7 +318,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// This invocation's run first and alone: a replay needs nothing else, and the run is a sixth of the
 	// table's bytes where the whole table was all of them (#45ekc65).
 	invocation := program.CacheTableInvocation(os.Args[1:])
-	table, err := program.ReadCacheTable(
+	table, readCacheTableError := program.ReadCacheTable(
 		directory,
 		identity,
 		program.CacheTableSections{Runs: []string{invocation}},
@@ -337,7 +337,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		program.CacheTableSections{Findings: true, Signatures: true, Types: true}, anchor)
 	release()
 	table.Findings, table.Signatures, table.Types = sections.Findings, sections.Signatures, sections.Types
-	for _, readError := range []error{err, sectionsError} {
+	for _, readError := range []error{readCacheTableError, sectionsError} {
 		if errors.Is(readError, program.ErrCacheTableUnreadable) ||
 			errors.Is(readError, program.ErrCacheTablePartlyKept) {
 			// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
@@ -357,7 +357,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		table:      table,
 		key:        key,
 		keyParts:   keyParts,
-		missed:     runCacheMiss(stored, checked, keyParts, err),
+		missed:     runCacheMiss(stored, checked, keyParts, readCacheTableError),
 		anchor:     anchor,
 		recorder:   program.NewInputRecorder(),
 		// See startRunCacheClock: before discovery reads anything, after the cache directory exists.
@@ -1270,13 +1270,13 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) (program.R
 // binary, the project root, and the compiler options, as the bytes of the tsconfig and every file it extends.
 // The lint config and the rules are left out, since the compiler reads neither.
 func typesCacheKey(graph *program.Graph, location projectLocation) ([sha256.Size]byte, error) {
-	facts, err := compilerOptionsFacts(graph, location)
-	if err != nil {
-		return [sha256.Size]byte{}, err
+	facts, compilerOptionsFactsError := compilerOptionsFacts(graph, location)
+	if compilerOptionsFactsError != nil {
+		return [sha256.Size]byte{}, compilerOptionsFactsError
 	}
-	key, err := program.RunCacheKey(nil, program.NewPathAnchor(location.Root).Resolved(), facts...)
-	if err != nil {
-		return [sha256.Size]byte{}, err
+	key, runCacheKeyError := program.RunCacheKey(nil, program.NewPathAnchor(location.Root).Resolved(), facts...)
+	if runCacheKeyError != nil {
+		return [sha256.Size]byte{}, runCacheKeyError
 	}
 	return sha256.Sum256([]byte(key)), nil
 }
@@ -1294,13 +1294,13 @@ func compilerOptionsFacts(graph *program.Graph, location projectLocation) ([]str
 		facts = append(facts, fmt.Sprintf("%s %s=%x", label, anchor.Stable(path), sha256.Sum256(contents)))
 		return nil
 	}
-	if err := fileFact("tsconfig", location.ConfigFileName); err != nil {
-		return nil, err
+	if fileFactError := fileFact("tsconfig", location.ConfigFileName); fileFactError != nil {
+		return nil, fileFactError
 	}
 	if graph.Config != nil {
 		for _, extended := range graph.Config.ExtendedSourceFiles() {
-			if err := fileFact("extends", extended.AsString()); err != nil {
-				return nil, err
+			if fileFactError := fileFact("extends", extended.AsString()); fileFactError != nil {
+				return nil, fileFactError
 			}
 		}
 	}

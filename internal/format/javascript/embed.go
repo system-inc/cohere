@@ -100,9 +100,9 @@ func holdsTemplateLiteral(node *estree.Node) bool {
 // an embed, which print/call-arguments.js and print/arrow-function.js read.
 func createTemplateLiteralPrint(print embedPrint) embedPrint {
 	return func(textToDoc printing.TextToDoc, printFunction PrintFunc, path *Path, options *Options) (Doc, error) {
-		printed, err := print(textToDoc, printFunction, path, options)
-		if err != nil || printed == nil {
-			return nil, err
+		printed, printError := print(textToDoc, printFunction, path, options)
+		if printError != nil || printed == nil {
+			return nil, printError
 		}
 		return label("embed", printed), nil
 	}
@@ -121,13 +121,13 @@ func hasInvalidCookedValue(node Node) bool {
 // template prints as written, as upstream does when an embedded format throws.
 func printEmbedUnsupported(language string) embedPrint {
 	return func(textToDoc printing.TextToDoc, _ PrintFunc, _ *Path, _ *Options) (Doc, error) {
-		return nil, errUnsupportedEmbed(language)
+		return nil, unsupportedEmbedError(language)
 	}
 }
 
-type errUnsupportedEmbed string
+type unsupportedEmbedError string
 
-func (language errUnsupportedEmbed) Error() string {
+func (language unsupportedEmbedError) Error() string {
 	return "no native printer embeds " + string(language) + " in a template literal yet"
 }
 
@@ -227,19 +227,19 @@ func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, op
 		}
 		text.WriteString(templateElementRaw(quasi))
 	}
-	quasisDoc, err := textToDoc(text.String(), "scss")
-	if err != nil {
-		return nil, err
+	quasisDoc, textToDocError := textToDoc(text.String(), "scss")
+	if textToDocError != nil {
+		return nil, textToDocError
 	}
 	expressionDocs := printTemplateExpressions(path, options, print)
 	newDoc := replacePlaceholders(quasisDoc, expressionDocs)
 	if newDoc == nil {
-		return nil, errCouldNotInsertExpressions
+		return nil, errorCouldNotInsertExpressions
 	}
 	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, newDoc)), softline, "`"), nil
 }
 
-var errCouldNotInsertExpressions = errors.New("Couldn't insert all the expressions")
+var errorCouldNotInsertExpressions = errors.New("Couldn't insert all the expressions")
 
 var placeholderPattern = regexp.MustCompile(`@prettier-placeholder-(\d+)-id`)
 
@@ -445,9 +445,9 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		if commentsAndWhitespaceOnly {
 			printed = printGraphqlComments(lines)
 		} else {
-			var err error
-			if printed, err = textToDoc(text, "graphql"); err != nil {
-				return nil, err
+			var textToDocError error
+			if printed, textToDocError = textToDoc(text, "graphql"); textToDocError != nil {
+				return nil, textToDocError
 			}
 		}
 

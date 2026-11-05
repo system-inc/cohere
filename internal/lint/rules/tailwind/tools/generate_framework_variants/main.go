@@ -274,10 +274,10 @@ func main() {
 		os.Exit(2)
 	}
 
-	result, err := enumerate(*packageRoot, *designSystem)
-	if err != nil {
+	result, enumerateError := enumerate(*packageRoot, *designSystem)
+	if enumerateError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", enumerateError)
 		os.Exit(1)
 	}
 
@@ -337,10 +337,10 @@ func main() {
 	}
 	result.VerifiedAgainst = verifiedAgainst
 
-	rendered, err := render(result)
-	if err != nil {
+	rendered, renderError := render(result)
+	if renderError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
+		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", renderError)
 		os.Exit(1)
 	}
 
@@ -668,9 +668,9 @@ var FrameworkVariantComparisonGroups = []FrameworkVariantComparisonGroup{
 // Node's stderr is passed through rather than captured, so a resolution failure inside the script
 // reaches the operator instead of being swallowed into a parse error about empty input.
 func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
-	absolutePackageRoot, err := filepath.Abs(packageRoot)
-	if err != nil {
-		return nil, fmt.Errorf("resolving %s: %w", packageRoot, err)
+	absolutePackageRoot, absolutePathError := filepath.Abs(packageRoot)
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolving %s: %w", packageRoot, absolutePathError)
 	}
 	if _, statError := os.Stat(filepath.Join(absolutePackageRoot, "package.json")); statError != nil {
 		return nil, fmt.Errorf("%s does not look like a tailwindcss package root: %w", absolutePackageRoot, statError)
@@ -680,9 +680,9 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	if !ok {
 		return nil, fmt.Errorf("cannot locate this tool's directory, so enumerate.mjs cannot be found")
 	}
-	directory, err := tooldirectory.Of(thisFile)
-	if err != nil {
-		return nil, err
+	directory, toolDirectoryOfError := tooldirectory.Of(thisFile)
+	if toolDirectoryOfError != nil {
+		return nil, toolDirectoryOfError
 	}
 	script := filepath.Join(directory, "enumerate.mjs")
 

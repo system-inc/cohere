@@ -64,16 +64,16 @@ func TestASameSizeEditUnderARestoredModificationTimeIsAMiss(test *testing.T) {
 	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	cache, err := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
-	if err != nil {
-		test.Fatal(err)
+	cache, recordRunCacheError := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatal(recordRunCacheError)
 	}
 	if checkError := cache.Check("key"); checkError != nil {
 		test.Fatalf("an untouched file missed, so the miss below proves nothing: %v", checkError)
 	}
-	information, err := os.Stat(file)
-	if err != nil {
-		test.Fatal(err)
+	information, statError := os.Stat(file)
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	time.Sleep(10 * time.Millisecond)
 	if writeError := os.WriteFile(file, []byte("export const a = 9;\n"), 0o644); writeError != nil {

@@ -94,11 +94,11 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 func TestDecodeOptionsIntoIsStrict(test *testing.T) {
 	test.Parallel()
 	decode := DecodeOptionsInto[strictOptions]()
-	if _, err := decode([]byte(`{"enforceForTSTypes": true}`)); err != nil {
-		test.Fatalf("baseline: %v", err)
+	if _, decodeError := decode([]byte(`{"enforceForTSTypes": true}`)); decodeError != nil {
+		test.Fatalf("baseline: %v", decodeError)
 	}
-	_, err := decode([]byte(`{"enforceForTsTypes": true}`))
-	if err == nil || !strings.Contains(err.Error(), "rule.strictOptions") {
-		test.Fatalf("want a refusal naming the options type, got %v", err)
+	_, decodeError := decode([]byte(`{"enforceForTsTypes": true}`))
+	if decodeError == nil || !strings.Contains(decodeError.Error(), "rule.strictOptions") {
+		test.Fatalf("want a refusal naming the options type, got %v", decodeError)
 	}
 }

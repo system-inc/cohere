@@ -268,7 +268,7 @@ func TestNoNonNullAssertionWithholdsSuggestionsOutsideTheObjectPosition(test *te
 func applyFixes(sourceText string, fixes []rule.Fix) string {
 	ordered := make([]rule.Fix, len(fixes))
 	copy(ordered, fixes)
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Range.Pos() > ordered[j].Range.Pos() })
+	sort.Slice(ordered, func(left, right int) bool { return ordered[left].Range.Pos() > ordered[right].Range.Pos() })
 	edited := sourceText
 	for _, fix := range ordered {
 		edited = edited[:fix.Range.Pos()] + fix.Text + edited[fix.Range.End():]

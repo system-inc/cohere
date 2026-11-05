@@ -92,22 +92,22 @@ func (paths Paths) CompilerDirectory() string {
 //
 // The returned string is the commit the binary was built from, so the caller can say which one ran,
 // and the boolean reports whether a build happened.
-func ResolveCommitted(paths Paths, packagePath string) (binaryPath string, commit string, built bool, err error) {
-	build, err := readCommittedBuild(paths.ModuleDirectory)
-	if err != nil {
-		return "", "", false, err
+func ResolveCommitted(paths Paths, packagePath string) (binaryPath string, commit string, built bool, resolveCommittedError error) {
+	build, resolveCommittedError := readCommittedBuild(paths.ModuleDirectory)
+	if resolveCommittedError != nil {
+		return "", "", false, resolveCommittedError
 	}
 
 	binaryPath = paths.BinaryPath(build.hash())
-	if _, statErr := os.Stat(binaryPath); statErr == nil {
+	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, build.Commit, false, nil
 	}
 
 	// Asked only for a build. The commit already decides the binary's name, the pin included, so a run
 	// that finds its binary has no use for it, and reading a tree is the one question that needs git.
-	build.CompilerCommit, err = release.PinnedCompilerCommit(paths.ModuleDirectory, build.Commit)
-	if err != nil {
-		return "", "", false, err
+	build.CompilerCommit, resolveCommittedError = release.PinnedCompilerCommit(paths.ModuleDirectory, build.Commit)
+	if resolveCommittedError != nil {
+		return "", "", false, resolveCommittedError
 	}
 	if buildCommittedError := buildCommitted(paths, packagePath, build, binaryPath); buildCommittedError != nil {
 		return "", "", false, buildCommittedError
@@ -118,14 +118,14 @@ func ResolveCommitted(paths Paths, packagePath string) (binaryPath string, commi
 // readCommittedBuild reads `HEAD` and the toolchain, which is everything a binary's name depends on. The
 // compiler commit `HEAD` pins is read only when a build needs it; see ResolveCommitted.
 func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
-	commit, err := readHead(moduleDirectory)
-	if err != nil {
-		return committedBuild{}, fmt.Errorf("reading the commit to build cohere from: %w", err)
+	commit, readHeadError := readHead(moduleDirectory)
+	if readHeadError != nil {
+		return committedBuild{}, fmt.Errorf("reading the commit to build cohere from: %w", readHeadError)
 	}
 
-	goVersion, err := goEnvironment(moduleDirectory)
-	if err != nil {
-		return committedBuild{}, err
+	goVersion, goEnvironmentError := goEnvironment(moduleDirectory)
+	if goEnvironmentError != nil {
+		return committedBuild{}, goEnvironmentError
 	}
 
 	return committedBuild{Commit: commit, GoVersion: goVersion}, nil
@@ -142,9 +142,9 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	Report.Step("cohere: building from commit %s, its committed tree only", release.ShortCommit(build.Commit))
 
 	// A directory of its own, so two runs building at once never extract over each other.
-	created, err := os.MkdirTemp(paths.SnapshotDirectory(), release.ShortCommit(build.Commit)+"-*")
-	if err != nil {
-		return fmt.Errorf("creating a snapshot directory: %w", err)
+	created, temporaryDirectoryError := os.MkdirTemp(paths.SnapshotDirectory(), release.ShortCommit(build.Commit)+"-*")
+	if temporaryDirectoryError != nil {
+		return fmt.Errorf("creating a snapshot directory: %w", temporaryDirectoryError)
 	}
 	defer os.RemoveAll(created)
 
@@ -152,9 +152,9 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	// symlink and compares it with the workspace file's location, so a snapshot named through a link
 	// (macOS's `/var` is one, to `/private/var`) is reported as outside its own workspace and fails to
 	// build. Found by the test fixture, which lives under `/var`.
-	snapshot, err := filepath.EvalSymlinks(created)
-	if err != nil {
-		return fmt.Errorf("resolving the snapshot directory: %w", err)
+	snapshot, resolveSymlinksError := filepath.EvalSymlinks(created)
+	if resolveSymlinksError != nil {
+		return fmt.Errorf("resolving the snapshot directory: %w", resolveSymlinksError)
 	}
 
 	if extractGitArchiveError := extractGitArchive(
@@ -166,9 +166,9 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 		return fmt.Errorf("extracting commit %s: %w", release.ShortCommit(build.Commit), extractGitArchiveError)
 	}
 
-	compiler, err := ensureCompiler(paths, build.CompilerCommit)
-	if err != nil {
-		return err
+	compiler, ensureCompilerError := ensureCompiler(paths, build.CompilerCommit)
+	if ensureCompilerError != nil {
+		return ensureCompilerError
 	}
 
 	// `git archive` writes the submodule as an empty directory. The compiler goes in its place
@@ -223,7 +223,7 @@ func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 		Report.Fail("cohere: the cache was not pruned: %v", planPruneError)
 		return
 	}
-	removed, applyErr := ApplyPrune(paths, plan)
+	removed, applyError := ApplyPrune(paths, plan)
 	if recordPruneError := RecordPrune(paths, plan, removed, now); recordPruneError != nil {
 		Report.Fail("cohere: the prune log was not written: %v", recordPruneError)
 	}
@@ -235,8 +235,8 @@ func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 		Report.Note("cohere: pruned %d cached binaries and extractions (%.1f GB) unused for over an hour; names in %s",
 			len(removed), float64(bytes)/1e9, paths.PruneLogPath())
 	}
-	if applyErr != nil {
-		Report.Fail("cohere: the prune stopped part way: %v", applyErr)
+	if applyError != nil {
+		Report.Fail("cohere: the prune stopped part way: %v", applyError)
 	}
 }
 
@@ -292,7 +292,7 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 	if renameError := os.Rename(partial, compiler); renameError != nil {
 		// Another run finished the same extraction first. Its directory is identical by construction,
 		// so it is used and this one is discarded.
-		if _, statErr := os.Stat(compiler); statErr == nil {
+		if _, statError := os.Stat(compiler); statError == nil {
 			return compiler, nil
 		}
 		return "", fmt.Errorf("moving the compiler into the cache: %w", renameError)
@@ -421,16 +421,16 @@ func extractGitArchive(repository string, commit string, subdirectory string, de
 		return startError
 	}
 
-	written, extractErr := extractTar(stream, destination)
+	written, extractError := extractTar(stream, destination)
 	// Drained so git is never blocked writing into a pipe nobody reads after an extraction error.
 	_, _ = io.Copy(io.Discard, stream)
-	waitErr := command.Wait()
+	waitError := command.Wait()
 
-	if extractErr != nil {
-		return extractErr
+	if extractError != nil {
+		return extractError
 	}
-	if waitErr != nil {
-		return fmt.Errorf("git archive: %w: %s", waitErr, strings.TrimSpace(standardError.String()))
+	if waitError != nil {
+		return fmt.Errorf("git archive: %w: %s", waitError, strings.TrimSpace(standardError.String()))
 	}
 	if written == 0 {
 		// An empty extraction builds into nothing that runs, or worse, into something that runs and

@@ -90,18 +90,18 @@ func TestARealRuleFixLandsCorrectly(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixFileError := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+	if fixFileError != nil {
+		test.Fatalf("unexpected error: %v", fixFileError)
 	}
 
 	if !result.Changed {
 		test.Fatalf("the rule proposes fixes for three bare specifiers and none landed: %+v", result)
 	}
 
-	written, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	written, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	got := string(written)
 
@@ -228,17 +228,17 @@ func TestAFindingWithNoFixChangesNothing(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixFileError := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+	if fixFileError != nil {
+		test.Fatalf("unexpected error: %v", fixFileError)
 	}
 	if result.Changed {
 		test.Fatalf("a finding with no fix caused a rewrite")
 	}
 
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != source {
 		test.Fatalf("the file changed:\n  want %q\n  got  %q", source, onDisk)
@@ -281,17 +281,17 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(breakingRule), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixFileError := FixFile(fileName, proposeFromRules(breakingRule), DefaultMaxPasses)
+	if fixFileError != nil {
+		test.Fatalf("unexpected error: %v", fixFileError)
 	}
 	if result.Changed {
 		test.Fatalf("a syntax-breaking fix from a real rule was written")
 	}
 
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != source {
 		test.Fatalf("the file was modified:\n  want %q\n  got  %q", source, onDisk)
@@ -365,9 +365,9 @@ func TestAFileThatDoesNotConvergeIsNotWritten(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixFile(fileName, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixFileError := FixFile(fileName, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
+	if fixFileError != nil {
+		test.Fatalf("unexpected error: %v", fixFileError)
 	}
 
 	if result.Converged {
@@ -380,9 +380,9 @@ func TestAFileThatDoesNotConvergeIsNotWritten(test *testing.T) {
 		test.Fatalf("fixes from a discarded run were reported as applied: %d", len(result.Applied))
 	}
 
-	onDisk, err := os.ReadFile(fileName)
-	if err != nil {
-		test.Fatal(err)
+	onDisk, readError := os.ReadFile(fileName)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if string(onDisk) != source {
 		test.Fatalf("the file was rewritten:\n  want %q\n  got  %q", source, string(onDisk))

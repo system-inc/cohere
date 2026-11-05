@@ -43,10 +43,10 @@ process.stdout.write(JSON.stringify(out));`
 
 func propertyPoints(rs []inventoryRange) []rune {
 	points := []rune{0, 0x10ffff, 0xD7ff, 0xD800, 0xDfff, 0xE000, 0xB5, 0x3BC}
-	for _, r := range rs {
-		for _, c := range []rune{r.Lo - 1, r.Lo, r.Hi, r.Hi + 1} {
-			if c >= 0 && c <= 0x10ffff {
-				points = append(points, c)
+	for _, inventoryRange := range rs {
+		for _, character := range []rune{inventoryRange.Lo - 1, inventoryRange.Lo, inventoryRange.Hi, inventoryRange.Hi + 1} {
+			if character >= 0 && character <= 0x10ffff {
+				points = append(points, character)
 			}
 		}
 	}
@@ -69,21 +69,21 @@ func propertySource(name, escape string, shape int) string {
 }
 func oracleProperties(test *testing.T, probes []propertyProbe) []propertyAnswer {
 	test.Helper()
-	input, err := json.Marshal(probes)
-	if err != nil {
-		test.Fatal(err)
+	input, encodeError := json.Marshal(probes)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "-e", propertyOracle)
 	command.Stdin = bytes.NewReader(input)
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
-	output, err := command.Output()
-	if err != nil {
-		test.Fatalf("Node oracle: %v: %s", err, stderr.String())
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("Node oracle: %v: %s", outputError, stderr.String())
 	}
 	var answers []propertyAnswer
-	if err = json.Unmarshal(output, &answers); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &answers); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	return answers
 }
@@ -97,20 +97,20 @@ func compareProperty(name string, points []rune, bits []string) (int, string) {
 				if compileError != nil {
 					return count, fmt.Sprintf("%s /%s: %v", source, flags, compileError)
 				}
-				for j, c := range points {
-					match, matchRunesError := re.Unwrap().MatchRunes([]rune{c})
+				for pointIndex, point := range points {
+					match, matchRunesError := re.Unwrap().MatchRunes([]rune{point})
 					count++
 					if matchRunesError != nil {
 						return count, matchRunesError.Error()
 					}
-					if match != (bits[index][j] == '1') {
+					if match != (bits[index][pointIndex] == '1') {
 						return count, fmt.Sprintf(
 							"%s /%s U+%04X: Go=%t Node=%t",
 							source,
 							flags,
-							c,
+							point,
 							match,
-							bits[index][j] == '1',
+							bits[index][pointIndex] == '1',
 						)
 					}
 				}
@@ -139,23 +139,23 @@ func TestUnicodePropertiesNode(test *testing.T) {
 
 	probes := []propertyProbe{}
 	for _, name := range names {
-		p, _ := unicodeproperties.Lookup(name)
-		rs := make([]inventoryRange, len(p.Ranges))
-		for i, r := range p.Ranges {
-			rs[i] = inventoryRange{r.Lo, r.Hi}
+		property, _ := unicodeproperties.Lookup(name)
+		rs := make([]inventoryRange, len(property.Ranges))
+		for index, span := range property.Ranges {
+			rs[index] = inventoryRange{span.Lo, span.Hi}
 		}
 		probes = append(probes, propertyProbe{name, propertyPoints(rs)})
 	}
 	answers := oracleProperties(test, probes)
 	checks, tested := 0, 0
-	for i, a := range answers {
+	for index, answer := range answers {
 		// Not parallel: each subtest updates counts that the parent logs after the loop.
-		test.Run(a.Name, func(test *testing.T) {
+		test.Run(answer.Name, func(test *testing.T) {
 			tested++
-			if !a.Accepted {
+			if !answer.Accepted {
 				test.Fatal("table admits a property Node rejects")
 			}
-			n, why := compareProperty(a.Name, probes[i].Points, a.Bits)
+			n, why := compareProperty(answer.Name, probes[index].Points, answer.Bits)
 			checks += n
 			if why != "" {
 				test.Fatal(why)
@@ -236,12 +236,12 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 		"p{Script=Greek}",
 		`\p{Script=Greek}`,
 	}
-	input, err := json.Marshal(struct {
+	input, encodeError := json.Marshal(struct {
 		Fixtures []fixture
 		Subjects []string
 	}{fixtures, subjects})
-	if err != nil {
-		test.Fatal(err)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command(
 		"node",
@@ -249,33 +249,33 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 		`const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`,
 	)
 	command.Stdin = bytes.NewReader(input)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		test.Fatalf("Node: %v: %s", err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("Node: %v: %s", outputError, output)
 	}
 	var answers []struct {
 		Accepted bool
 		Bits     []bool
 	}
-	if err = json.Unmarshal(output, &answers); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &answers); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	checks := 0
-	for i, f := range fixtures {
+	for fixtureIndex, fixture := range fixtures {
 		// Not parallel: each subtest updates the membership count that the parent logs after the loop.
-		test.Run(fmt.Sprintf("%d", i), func(test *testing.T) {
-			re, compileError := Compile(f.Source, f.Flags)
-			if (compileError == nil) != answers[i].Accepted {
-				test.Fatalf("/%s/%s compile=%v Node accepted=%t", f.Source, f.Flags, compileError, answers[i].Accepted)
+		test.Run(fmt.Sprintf("%d", fixtureIndex), func(test *testing.T) {
+			re, compileError := Compile(fixture.Source, fixture.Flags)
+			if (compileError == nil) != answers[fixtureIndex].Accepted {
+				test.Fatalf("/%s/%s compile=%v Node accepted=%t", fixture.Source, fixture.Flags, compileError, answers[fixtureIndex].Accepted)
 			}
 			if compileError != nil {
 				return
 			}
-			for j, subject := range subjects {
+			for subjectIndex, subject := range subjects {
 				got := re.Test(subject)
 				checks++
-				if got != answers[i].Bits[j] {
-					test.Fatalf("/%s/%s vs %q: Go=%t Node=%t", f.Source, f.Flags, subject, got, answers[i].Bits[j])
+				if got != answers[fixtureIndex].Bits[subjectIndex] {
+					test.Fatalf("/%s/%s vs %q: Go=%t Node=%t", fixture.Source, fixture.Flags, subject, got, answers[fixtureIndex].Bits[subjectIndex])
 				}
 			}
 		})

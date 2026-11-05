@@ -73,18 +73,18 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 		"c.ts":          "export function g(y: number): boolean {\n  // cohere-disable-next-line no-self-compare\n  return y === y;\n}\n",
 		"d.ts":          "export function h(): void {\n  debugger;\n}\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("build: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	files := graph.ProjectFiles()
 	rules := findingsReuseRules(test)
 	backgroundContext := context.Background()
 	key := program.HashRuleSet([]string{"fixture"})
 
-	plain, err := graph.Walk(backgroundContext, files, rules)
-	if err != nil {
-		test.Fatalf("plain walk: %v", err)
+	plain, walkError := graph.Walk(backgroundContext, files, rules)
+	if walkError != nil {
+		test.Fatalf("plain walk: %v", walkError)
 	}
 
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
@@ -95,9 +95,9 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 	recorded := recording.Recorded()
 
 	graph.FindingsReuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
-	replayed, err := graph.Walk(backgroundContext, files, rules)
-	if err != nil {
-		test.Fatalf("replaying walk: %v", err)
+	replayed, walkError := graph.Walk(backgroundContext, files, rules)
+	if walkError != nil {
+		test.Fatalf("replaying walk: %v", walkError)
 	}
 
 	byFile := map[string]program.LintCacheEntry{}
@@ -164,9 +164,9 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 	first := build()
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	first.FindingsReuse = recording
-	before, err := first.Walk(backgroundContext, first.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatal(err)
+	before, walkError := first.Walk(backgroundContext, first.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if len(before.Diagnostics) == 0 {
 		test.Fatal("a.ts produced no finding before the edit, so its disappearance would prove nothing")
@@ -182,9 +182,9 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 	}
 	second := build()
 	second.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
-	after, err := second.Walk(backgroundContext, second.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatal(err)
+	after, walkError := second.Walk(backgroundContext, second.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if len(after.Diagnostics) != 0 {
 		test.Errorf("the edited file's old finding was replayed: %v", diagnosticKeys(after.Diagnostics))
@@ -199,9 +199,9 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 func TestAFindingsCacheUnderAnotherKeyServesNothing(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "b.ts": "export const b = 1;\n"})
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	rules := findingsReuseRules(test)
 	recording := program.NewFindingsReuse(program.HashRuleSet([]string{"old"}), nil, program.PathAnchor{})
@@ -217,9 +217,9 @@ func TestAFindingsCacheUnderAnotherKeyServesNothing(test *testing.T) {
 		recording.Recorded(),
 		program.PathAnchor{},
 	)
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatal(err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if result.FilesReplayed != 0 {
 		test.Errorf("replayed %d files from a cache recorded under another key", result.FilesReplayed)
@@ -245,9 +245,9 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 		"a.ts":          "export function f(x: number): boolean {\n  return x === x;\n}\n",
 		"b.ts":          "export const b = 1;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	var pure []rule.Rule
 	for _, subject := range findingsReuseRules(test) {
@@ -259,9 +259,9 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 	key := program.HashRuleSet([]string{"fixture"})
 	files := graph.ProjectFiles()
 
-	plain, err := graph.Walk(backgroundContext, files, pure)
-	if err != nil {
-		test.Fatal(err)
+	plain, walkError := graph.Walk(backgroundContext, files, pure)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	recording := program.NewFindingsReuse(key, nil, program.PathAnchor{})
 	graph.FindingsReuse = recording
@@ -269,9 +269,9 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 		test.Fatal(walkError)
 	}
 	graph.FindingsReuse = program.NewFindingsReuse(key, recording.Recorded(), program.PathAnchor{})
-	replayed, err := graph.Walk(backgroundContext, files, pure)
-	if err != nil {
-		test.Fatal(err)
+	replayed, walkError := graph.Walk(backgroundContext, files, pure)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if replayed.FilesReplayed != len(files) {
 		test.Fatalf(
@@ -369,28 +369,28 @@ func walkAndRecord(
 	previous *program.LintCache,
 ) (program.Result, *program.LintCache) {
 	test.Helper()
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("build: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 	graph.FindingsReuse = reuse
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatalf("walk: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	return result, reuse.Recorded()
 }
 
 func plainWalk(test *testing.T, root string, rules []rule.Rule) program.Result {
 	test.Helper()
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("build: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatalf("walk: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	return result
 }

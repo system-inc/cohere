@@ -15,17 +15,17 @@ const uselessRenameFile = "/repository/source/UselessRename.ts"
 func uselessRenameOptions(test *testing.T, ignoreDestructuring bool, ignoreImport bool,
 	ignoreExport bool) any {
 	test.Helper()
-	raw, err := json.Marshal(map[string]bool{
+	raw, encodeError := json.Marshal(map[string]bool{
 		"ignoreDestructuring": ignoreDestructuring,
 		"ignoreImport":        ignoreImport,
 		"ignoreExport":        ignoreExport,
 	})
-	if err != nil {
-		test.Fatalf("could not marshal the options: %v", err)
+	if encodeError != nil {
+		test.Fatalf("could not marshal the options: %v", encodeError)
 	}
-	decoded, err := DecodeNoUselessRenameOptions(raw)
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeNoUselessRenameOptionsError := DecodeNoUselessRenameOptions(raw)
+	if decodeNoUselessRenameOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoUselessRenameOptionsError)
 	}
 	return decoded
 }

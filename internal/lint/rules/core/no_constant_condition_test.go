@@ -176,9 +176,9 @@ func TestNoConstantConditionCheckLoops(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.raw, err)
+			decoded, decodeOptionsError := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(testCase.raw))
+			if decodeOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.raw, decodeOptionsError)
 			}
 			for _, loop := range []struct {
 				sourceText string
@@ -211,7 +211,7 @@ func TestNoConstantConditionCheckLoops(test *testing.T) {
 	} {
 		test.Run(raw+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, err := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(raw)); err == nil {
+			if _, decodeOptionsError := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(raw)); decodeOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", raw)
 			}
 		})

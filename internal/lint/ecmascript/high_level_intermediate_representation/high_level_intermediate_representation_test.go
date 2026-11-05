@@ -252,18 +252,18 @@ func typeSwitchCases(test *testing.T, fileName, functionName string) map[string]
 // that does not exist and every test built on it failed on a machine that builds with -trimpath.
 func forEachPackageFile(test *testing.T, visit func(*ast.File)) {
 	test.Helper()
-	directory, err := os.Getwd()
-	if err != nil {
-		test.Fatalf("cannot locate the package source: %v", err)
+	directory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatalf("cannot locate the package source: %v", workingDirectoryError)
 	}
 
 	fileSet := token.NewFileSet()
-	packages, err := goparser.ParseDir(fileSet, directory, nil, 0)
-	if err != nil {
-		test.Fatalf("parsing the package source: %v", err)
+	packages, parseDirectoryError := goparser.ParseDir(fileSet, directory, nil, 0)
+	if parseDirectoryError != nil {
+		test.Fatalf("parsing the package source: %v", parseDirectoryError)
 	}
-	for _, pkg := range packages {
-		for _, file := range pkg.Files {
+	for _, goPackage := range packages {
+		for _, file := range goPackage.Files {
 			visit(file)
 		}
 	}

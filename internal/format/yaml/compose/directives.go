@@ -104,16 +104,16 @@ func (directives *Directives) add(line []uint16, onError func(offset int, messag
 func splitSpaceOrTab(text []uint16) [][]uint16 {
 	parts := [][]uint16{}
 	start := 0
-	for i := 0; i < len(text); {
-		if text[i] == ' ' || text[i] == '\t' {
-			parts = append(parts, text[start:i:i])
-			for i < len(text) && (text[i] == ' ' || text[i] == '\t') {
-				i++
+	for index := 0; index < len(text); {
+		if text[index] == ' ' || text[index] == '\t' {
+			parts = append(parts, text[start:index:index])
+			for index < len(text) && (text[index] == ' ' || text[index] == '\t') {
+				index++
 			}
-			start = i
+			start = index
 			continue
 		}
-		i++
+		index++
 	}
 	return append(parts, text[start:len(text):len(text)])
 }
@@ -197,18 +197,18 @@ func decodeURIComponent(text []uint16) (decoded []uint16, ok bool) {
 			continue
 		}
 		// The number of leading 1 bits is the sequence's length; 1 or more than 4 is malformed.
-		n := 0
-		for first<<n&0x80 != 0 {
-			n++
+		count := 0
+		for first<<count&0x80 != 0 {
+			count++
 		}
-		if n == 1 || n > 4 {
+		if count == 1 || count > 4 {
 			return nil, false
 		}
 		octets := []byte{first}
-		if k+3*(n-1) >= len(text) {
+		if k+3*(count-1) >= len(text) {
 			return nil, false
 		}
-		for j := 1; j < n; j++ {
+		for j := 1; j < count; j++ {
 			k++
 			octet, isOctet := hexByte(k)
 			if !isOctet || octet&0xC0 != 0x80 {

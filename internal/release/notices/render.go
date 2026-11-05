@@ -78,9 +78,9 @@ func renderThirdPartyNotices(
 	builder.WriteString("## Compiled into cohere\n\n")
 	builder.WriteString("In the `cohere` binary every platform package ships.\n\n")
 
-	goLicense, err := licenseTexts.ReadFile("licenses/go.txt")
-	if err != nil {
-		return nil, err
+	goLicense, readFileError := licenseTexts.ReadFile("licenses/go.txt")
+	if readFileError != nil {
+		return nil, readFileError
 	}
 	writeEntry(
 		&builder,
@@ -88,9 +88,9 @@ func renderThirdPartyNotices(
 			Carries: "The runtime and standard library linked into every Go binary.", Text: string(goLicense)},
 	)
 
-	compilerLicense, err := os.ReadFile(filepath.Join(moduleDirectory, "TypeScript", "LICENSE.txt"))
-	if err != nil {
-		return nil, fmt.Errorf("reading the TypeScript compiler's license: %w", err)
+	compilerLicense, readError := os.ReadFile(filepath.Join(moduleDirectory, "TypeScript", "LICENSE.txt"))
+	if readError != nil {
+		return nil, fmt.Errorf("reading the TypeScript compiler's license: %w", readError)
 	}
 	writeEntry(&builder, entry{
 		Name:    "TypeScript (typescript-go)",

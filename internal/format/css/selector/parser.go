@@ -76,17 +76,17 @@ func (parser *parser) append(container *estree.Node, selector *estree.Node) *est
 var attributeOperator = regexp.MustCompile(`([*~^$|]?=)([\s\S]*)`)
 
 func (parser *parser) attribute() {
-	str := ""
+	text := ""
 	startingToken := parser.currToken()
 	parser.position++
 	for parser.position < len(parser.tokens) && parser.currToken().kind != "]" {
-		str += parser.tokens[parser.position].value
+		text += parser.tokens[parser.position].value
 		parser.position++
 	}
-	if parser.position == len(parser.tokens) && !strings.Contains(str, "]") {
+	if parser.position == len(parser.tokens) && !strings.Contains(text, "]") {
 		parser.error("Expected a closing square bracket.")
 	}
-	parts := splitAttribute(str)
+	parts := splitAttribute(text)
 	namespace := splitNamespace(parts[0])
 	if parser.currToken() == nil {
 		// end: {line: this.currToken[2], ...} when the brackets closed inside a string token.
@@ -409,13 +409,13 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 		hasID = filtered
 	}
 	indices := sortAscending(uniq(flatten([]int{0}, hasClass, hasID)))
-	for i, ind := range indices {
+	for indexIndex, ind := range indices {
 		index := len(units)
-		if i+1 < len(indices) && indices[i+1] != 0 {
-			index = indices[i+1]
+		if indexIndex+1 < len(indices) && indices[indexIndex+1] != 0 {
+			index = indices[indexIndex+1]
 		}
 		value := units[ind:index]
-		if i == 0 && firstCallback != nil {
+		if indexIndex == 0 && firstCallback != nil {
 			firstCallback(unitsToWTF8(value), len(indices))
 			continue
 		}
@@ -431,19 +431,19 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 			node = newSelectorNode(typeClass,
 				"value", unitsToWTF8(value[1:]),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[i]),
+				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		} else if containsInt(hasID, ind) {
 			node = newSelectorNode(typeID,
 				"value", unitsToWTF8(value[1:]),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[i]),
+				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		} else {
 			node = newSelectorNode(typeTag,
 				"value", unitsToWTF8(value),
 				"source", nodeSource,
-				"sourceIndex", jsAdd(currToken.loose(6), indices[i]),
+				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		}
 		parser.newNode(node, namespace)
@@ -563,17 +563,17 @@ func (parser *parser) tokenAt(index int) *token {
 
 // splitAttribute is str.split(/((?:[*~^$|]?=))([^]*)/): [str] without an operator, else the text
 // before it, the operator, the rest, and the empty text after the rest.
-func splitAttribute(str string) []string {
-	match := attributeOperator.FindStringSubmatchIndex(str)
+func splitAttribute(text string) []string {
+	match := attributeOperator.FindStringSubmatchIndex(text)
 	if match == nil {
-		return []string{str}
+		return []string{text}
 	}
-	return []string{str[:match[0]], str[match[2]:match[3]], str[match[4]:match[5]], str[match[1]:]}
+	return []string{text[:match[0]], text[match[2]:match[3]], text[match[4]:match[5]], text[match[1]:]}
 }
 
 // splitNamespace is str.split(/(\|)/g): the pieces between bars with the bars kept between them.
-func splitNamespace(str string) []string {
-	pieces := strings.Split(str, "|")
+func splitNamespace(text string) []string {
+	pieces := strings.Split(text, "|")
 	result := []string{pieces[0]}
 	for _, piece := range pieces[1:] {
 		result = append(result, "|", piece)
@@ -585,30 +585,30 @@ func splitNamespace(str string) []string {
 // optional whitespace, else the text before that whitespace, the rest, and "". The leftmost match
 // starts at the first of the whitespace run before the final i. \s is JavaScript's, Unicode's. It walks
 // back by character over the WTF-8 text, where a surrogate's bytes decode as no whitespace.
-func splitInsensitive(str string) []string {
-	end := len(str)
+func splitInsensitive(text string) []string {
+	end := len(text)
 	for end > 0 {
-		character, size := utf8.DecodeLastRuneInString(str[:end])
+		character, size := utf8.DecodeLastRuneInString(text[:end])
 		if !jsIsWhitespace(character) {
 			break
 		}
 		end -= size
 	}
-	if end == 0 || str[end-1] != 'i' {
-		return []string{str}
+	if end == 0 || text[end-1] != 'i' {
+		return []string{text}
 	}
 	start := end - 1
 	for start > 0 {
-		character, size := utf8.DecodeLastRuneInString(str[:start])
+		character, size := utf8.DecodeLastRuneInString(text[:start])
 		if !jsIsWhitespace(character) {
 			break
 		}
 		start -= size
 	}
 	if start == end-1 {
-		return []string{str}
+		return []string{text}
 	}
-	return []string{str[:start], str[start:], ""}
+	return []string{text[:start], text[start:], ""}
 }
 
 // partAt is parts[index], nil where JavaScript reads undefined past the end.
@@ -629,14 +629,14 @@ func jsIsWhitespace(character rune) bool {
 }
 
 // jsTrim is String.prototype.trim.
-func jsTrim(str string) string {
-	return strings.TrimFunc(str, jsIsWhitespace)
+func jsTrim(text string) string {
+	return strings.TrimFunc(text, jsIsWhitespace)
 }
 
 // jsSliceOneFromEach is str.slice(1, -1), in UTF-16 units, which can cut a non-BMP last character in
 // half (a lone surrogate, kept as WTF-8 until wellFormed).
-func jsSliceOneFromEach(str string) string {
-	units := wtf8ToUnits(str)
+func jsSliceOneFromEach(text string) string {
+	units := wtf8ToUnits(text)
 	if len(units) < 2 {
 		return ""
 	}

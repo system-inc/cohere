@@ -15,9 +15,9 @@ import (
 // point and missed it changes when that file is created (#pyhm2t2).
 func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(test *testing.T) {
 	test.Parallel()
-	root, err := filepath.EvalSymlinks(test.TempDir())
-	if err != nil {
-		test.Fatal(err)
+	root, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	project := filepath.ToSlash(filepath.Join(root, "project"))
 	if createDirectoryError := os.MkdirAll(project+"/source", 0o755); createDirectoryError != nil {
@@ -58,9 +58,9 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(test *testing.T) {
 
 	// A present file keeps the size and modification time it had when read, so a cache hashing it
 	// later can tell it moved in between; an absent one has neither.
-	info, err := os.Stat(project + "/source/theme.css")
-	if err != nil {
-		test.Fatal(err)
+	info, statError := os.Stat(project + "/source/theme.css")
+	if statError != nil {
+		test.Fatal(statError)
 	}
 	for _, read := range recording.Reads() {
 		switch {

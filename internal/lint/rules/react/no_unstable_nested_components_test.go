@@ -1417,7 +1417,7 @@ func TestNoUnstableNestedComponentsFires(test *testing.T) {
 // upstreamMessage builds the exact text upstream produces, so the assertions below compare against
 // a measured string rather than a paraphrase. Copied from the installed 7.37.5 build's output on
 // 2026-08-27 rather than retyped from the rule source.
-func upstreamMessage(parentName string, asProps bool) string {
+func upstreamMessage(parentName string, asProperties bool) string {
 	name := " "
 	if parentName != "" {
 		name = " “" + parentName + "” "
@@ -1426,7 +1426,7 @@ func upstreamMessage(parentName string, asProps bool) string {
 		"every render and destroy the entire subtree’s DOM nodes and state " +
 		"(https://reactjs.org/docs/reconciliation.html#elements-of-different-types). Instead, " +
 		"move this component definition out of the parent component" + name + "and pass data as props."
-	if asProps {
+	if asProperties {
 		message += " If you want to allow component creation in props, set allowAsProps option to true."
 	}
 	return message
@@ -1622,9 +1622,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	test.Parallel()
 
 	// A bare "error" arrives as empty input and must land on the documented defaults.
-	decoded, err := DecodeNoUnstableNestedComponentsOptions(nil)
-	if err != nil {
-		test.Fatalf("decoding empty input: %v", err)
+	decoded, decodeNoUnstableNestedComponentsOptionsError := DecodeNoUnstableNestedComponentsOptions(nil)
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding empty input: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	options, ok := decoded.(NoUnstableNestedComponentsOptions)
 	if !ok {
@@ -1638,9 +1638,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	}
 
 	// An explicit pattern replaces the default.
-	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
-	if err != nil {
-		test.Fatalf("decoding a pattern: %v", err)
+	decoded, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding a pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	options, ok = decoded.(NoUnstableNestedComponentsOptions)
 	if !ok {
@@ -1652,9 +1652,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 
 	// An explicit empty pattern folds back onto the default, matching upstream's `|| 'render*'`,
 	// where the empty string is falsy.
-	decoded, err = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
-	if err != nil {
-		test.Fatalf("decoding an empty pattern: %v", err)
+	decoded, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
+	if decodeNoUnstableNestedComponentsOptionsError != nil {
+		test.Fatalf("decoding an empty pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 	options, ok = decoded.(NoUnstableNestedComponentsOptions)
 	if !ok {

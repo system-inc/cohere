@@ -76,8 +76,8 @@ func containsName(names []string, name string) bool {
 	return false
 }
 
-// errMemoryFSReadOnly is every write's answer.
-var errMemoryFSReadOnly = errors.New("program: the memory filesystem is read-only")
+// errorMemoryFsReadOnly is every write's answer.
+var errorMemoryFsReadOnly = errors.New("program: the memory filesystem is read-only")
 
 func (fileSystem *MemoryFS) CaseSensitivity() tspath.CaseSensitivity { return tspath.CaseSensitive }
 
@@ -100,40 +100,40 @@ func (fileSystem *MemoryFS) ReadFile(fileName tspath.RootedFilePath) (string, bo
 // on-disk read goes through and which the shim cannot reach: UTF-16 in either byte order behind its byte
 // order mark is decoded, and a UTF-8 byte order mark is dropped. Copied rather than approximated, and held
 // to the disk byte for byte by TestMemoryFSReadsBytesAsTheDiskDoes, which is where a change upstream shows.
-func decodeLikeDisk(s string) string {
-	if len(s) >= 2 {
-		switch [2]byte{s[0], s[1]} {
+func decodeLikeDisk(text string) string {
+	if len(text) >= 2 {
+		switch [2]byte{text[0], text[1]} {
 		case [2]byte{0xFF, 0xFE}:
-			return decodeUtf16LikeDisk(s[2:], binary.LittleEndian)
+			return decodeUtf16LikeDisk(text[2:], binary.LittleEndian)
 		case [2]byte{0xFE, 0xFF}:
-			return decodeUtf16LikeDisk(s[2:], binary.BigEndian)
+			return decodeUtf16LikeDisk(text[2:], binary.BigEndian)
 		}
 	}
-	if len(s) >= 3 && s[0] == 0xEF && s[1] == 0xBB && s[2] == 0xBF {
-		s = s[3:]
+	if len(text) >= 3 && text[0] == 0xEF && text[1] == 0xBB && text[2] == 0xBF {
+		text = text[3:]
 	}
-	return s
+	return text
 }
 
 // decodeUtf16LikeDisk is typescript-go's decodeUtf16, beside decodeBytes: a trailing odd byte is dropped, as
 // binary.Read into len/2 code units leaves it unread.
-func decodeUtf16LikeDisk(s string, order binary.ByteOrder) string {
-	ints := make([]uint16, len(s)/2)
-	if readError := binary.Read(strings.NewReader(s), order, &ints); readError != nil {
+func decodeUtf16LikeDisk(text string, order binary.ByteOrder) string {
+	ints := make([]uint16, len(text)/2)
+	if readError := binary.Read(strings.NewReader(text), order, &ints); readError != nil {
 		return ""
 	}
 	return string(utf16.Decode(ints))
 }
 
 func (fileSystem *MemoryFS) WriteFile(tspath.RootedFilePath, string) error {
-	return errMemoryFSReadOnly
+	return errorMemoryFsReadOnly
 }
 func (fileSystem *MemoryFS) AppendFile(tspath.RootedFilePath, string) error {
-	return errMemoryFSReadOnly
+	return errorMemoryFsReadOnly
 }
-func (fileSystem *MemoryFS) Remove(tspath.RootedPath) error { return errMemoryFSReadOnly }
+func (fileSystem *MemoryFS) Remove(tspath.RootedPath) error { return errorMemoryFsReadOnly }
 func (fileSystem *MemoryFS) Chtimes(tspath.RootedPath, time.Time, time.Time) error {
-	return errMemoryFSReadOnly
+	return errorMemoryFsReadOnly
 }
 func (fileSystem *MemoryFS) Realpath(fileName tspath.RootedPath) tspath.RootedPath {
 	return tspath.RootedPath(path.Clean(fileName.AsString()))

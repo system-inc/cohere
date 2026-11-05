@@ -24,13 +24,13 @@ const modulePath = "github.com/system-inc/cohere"
 // TailwindPackageRoot is the snapshot's directory, the root a node_modules/tailwindcss would be.
 func TailwindPackageRoot() string {
 	_, file, _, _ := runtime.Caller(0)
-	working, err := os.Getwd()
-	if err != nil {
-		panic(fmt.Sprintf("locating the tailwindcss snapshot: %v", err))
+	working, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		panic(fmt.Sprintf("locating the tailwindcss snapshot: %v", workingDirectoryError))
 	}
-	directory, err := sourceDirectory(file, working)
-	if err != nil {
-		panic(fmt.Sprintf("locating the tailwindcss snapshot: %v", err))
+	directory, sourceDirectoryError := sourceDirectory(file, working)
+	if sourceDirectoryError != nil {
+		panic(fmt.Sprintf("locating the tailwindcss snapshot: %v", sourceDirectoryError))
 	}
 	return filepath.Join(directory, "testdata", "tailwindcss")
 }

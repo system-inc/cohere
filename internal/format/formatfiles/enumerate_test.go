@@ -507,9 +507,9 @@ func TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats(test *testin
 		"projects/ignored-repo/.git":      "gitdir: elsewhere\n",
 		"projects/scratch/deep/.git/HEAD": "ref: refs/heads/main\n",
 	})
-	nested, err := NestedRepositoriesBelow(root)
-	if err != nil {
-		test.Fatal(err)
+	nested, nestedRepositoriesBelowError := NestedRepositoriesBelow(root)
+	if nestedRepositoriesBelowError != nil {
+		test.Fatal(nestedRepositoriesBelowError)
 	}
 	sort.Strings(nested)
 	if strings.Join(nested, ",") != "projects/ignored-repo,projects/listed" {
@@ -520,9 +520,9 @@ func TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats(test *testin
 	}
 
 	// The host's own walk still offers nothing under projects/, and finds no repository there either.
-	enumeration, err := Enumerate(root, handlesEveryLanguage)
-	if err != nil {
-		test.Fatal(err)
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
 	}
 	for _, file := range enumeration.Files {
 		if strings.Contains(filepath.ToSlash(file), "/projects/") {

@@ -198,13 +198,13 @@ func TestNoRedeclareScopesUpstreamNeverExamines(test *testing.T) {
 // so a zero-valued struct silently turns the merge exemptions off and every merge case starts
 // reporting.
 func redeclareOptions(ignoreDeclarationMerge bool) any {
-	raw, err := json.Marshal(map[string]bool{"ignoreDeclarationMerge": ignoreDeclarationMerge})
-	if err != nil {
-		panic(err)
+	raw, encodeError := json.Marshal(map[string]bool{"ignoreDeclarationMerge": ignoreDeclarationMerge})
+	if encodeError != nil {
+		panic(encodeError)
 	}
-	decoded, err := DecodeNoRedeclareOptions(raw)
-	if err != nil {
-		panic(err)
+	decoded, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(raw)
+	if decodeNoRedeclareOptionsError != nil {
+		panic(decodeNoRedeclareOptionsError)
 	}
 	return decoded
 }
@@ -246,24 +246,24 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(test *testing.T) {
 		return options
 	}
 
-	decoded, err := DecodeNoRedeclareOptions(nil)
-	if err != nil {
-		test.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", err)
+	decoded, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(nil)
+	if decodeNoRedeclareOptionsError != nil {
+		test.Fatalf("DecodeNoRedeclareOptions(nil) errored: %v", decodeNoRedeclareOptionsError)
 	}
 	if got := asOptions(decoded); !got.IgnoreDeclarationMerge || !got.BuiltinGlobals {
 		test.Errorf("absent options: %+v, want both true", got)
 	}
-	builtinsOff, err := DecodeNoRedeclareOptions(json.RawMessage(`{"builtinGlobals":false}`))
-	if err != nil {
-		test.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
+	builtinsOff, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(json.RawMessage(`{"builtinGlobals":false}`))
+	if decodeNoRedeclareOptionsError != nil {
+		test.Fatalf("DecodeNoRedeclareOptions errored: %v", decodeNoRedeclareOptionsError)
 	}
 	if got := asOptions(builtinsOff); got.BuiltinGlobals || !got.IgnoreDeclarationMerge {
 		test.Errorf("builtinGlobals false: %+v, want it off and the merge exemption still on", got)
 	}
 
-	explicit, err := DecodeNoRedeclareOptions(json.RawMessage(`{"ignoreDeclarationMerge":false}`))
-	if err != nil {
-		test.Fatalf("DecodeNoRedeclareOptions errored: %v", err)
+	explicit, decodeNoRedeclareOptionsError := DecodeNoRedeclareOptions(json.RawMessage(`{"ignoreDeclarationMerge":false}`))
+	if decodeNoRedeclareOptionsError != nil {
+		test.Fatalf("DecodeNoRedeclareOptions errored: %v", decodeNoRedeclareOptionsError)
 	}
 	if got := asOptions(explicit); got.IgnoreDeclarationMerge {
 		test.Errorf("explicit false: IgnoreDeclarationMerge = true, want false")

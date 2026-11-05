@@ -54,7 +54,7 @@ const slowFixNotice = 30 * time.Second
 // Unused-disable warnings are advisory: a check reports them without proposing their repairs,
 // while a writing run applies them. Otherwise their would-change finding would defeat warn.
 func applyProposedFixes(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
 	rules []rule.Rule,
@@ -131,7 +131,7 @@ func applyProposedFixes(
 
 	var result program.Result
 	if len(projectFiles) > 0 {
-		walked, walkError := graph.Walk(ctx, projectFiles, rules)
+		walked, walkError := graph.Walk(callerContext, projectFiles, rules)
 		if walkError != nil {
 			if early != nil {
 				speculation = early.speculationOf()
@@ -297,7 +297,7 @@ func applyProposedFixes(
 			if fixesWithheld {
 				return nil, nil
 			}
-			proposals, err := relint(fileName, text)
+			proposals, relintError := relint(fileName, text)
 			if !write && unusedDisableSeverity(graph.LintConfig, fileName) == configuration.SeverityWarn {
 				kept := proposals[:0]
 				for _, proposal := range proposals {
@@ -307,7 +307,7 @@ func applyProposedFixes(
 				}
 				proposals = kept
 			}
-			return proposals, err
+			return proposals, relintError
 		}
 	}
 	serially := func(fileName string, text string) ([]edit.Proposal, error) {
@@ -388,13 +388,13 @@ func watchedFile(
 	return process()
 }
 
-// errRelintRefused is what the parallel format pass's proposer answers when a file would need its
+// errorRelintRefused is what the parallel format pass's proposer answers when a file would need its
 // rules run again, which sends the file back to the serial path.
-var errRelintRefused = errors.New("re-linting is left to the serial path")
+var errorRelintRefused = errors.New("re-linting is left to the serial path")
 
 // refuseToRelint is the parallel pass's answer to a later fix pass: no rule runs off the serial path.
 func refuseToRelint(string, string) ([]edit.Proposal, error) {
-	return nil, errRelintRefused
+	return nil, errorRelintRefused
 }
 
 // parallelFormatWorkers is how many files the parallel pass formats at once. A variable so a test can
@@ -447,11 +447,11 @@ func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal,
 		go func() {
 			defer workers.Done()
 			for index := range next {
-				result, err := process(fileNames[index])
-				if errors.Is(err, errRelintRefused) {
+				result, processError := process(fileNames[index])
+				if errors.Is(processError, errorRelintRefused) {
 					continue
 				}
-				attempts[index] = formatAttempt{result: result, err: err, done: true}
+				attempts[index] = formatAttempt{result: result, err: processError, done: true}
 			}
 		}()
 	}
@@ -861,7 +861,7 @@ func speculateFormatOn(
 				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
 				// the printer changed comes back changed rather than refused, and keeping it would report a
 				// rewrite that this check, which writes nothing, never made.
-				if errors.Is(err, errRelintRefused) || err == nil && result.Changed {
+				if errors.Is(err, errorRelintRefused) || err == nil && result.Changed {
 					continue
 				}
 				mutex.Lock()

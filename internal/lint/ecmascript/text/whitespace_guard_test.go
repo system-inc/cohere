@@ -129,22 +129,22 @@ func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
 		walkError := filepath.WalkDir(filepath.Join(
 			moduleRoot,
 			directory,
-		), func(path string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
+		), func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
 			fileSet := token.NewFileSet()
-			file, err := parser.ParseFile(fileSet, path, nil, parser.ParseComments)
-			if err != nil {
-				return err
+			file, parseFileError := parser.ParseFile(fileSet, path, nil, parser.ParseComments)
+			if parseFileError != nil {
+				return parseFileError
 			}
 			files++
-			relative, err := filepath.Rel(moduleRoot, path)
-			if err != nil {
-				return err
+			relative, relativePathError := filepath.Rel(moduleRoot, path)
+			if relativePathError != nil {
+				return relativePathError
 			}
 			found = append(found, goWhitespaceSitesIn(fileSet, file, filepath.ToSlash(relative))...)
 			return nil

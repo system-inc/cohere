@@ -43,9 +43,9 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(test *testing.T) {
 	test.Parallel()
 	baseline, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";`)
 
-	baselineSystem, err := LoadDesignSystem(LoadOptions{EntryPoint: baseline, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading the baseline: %v", err)
+	baselineSystem, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: baseline, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the baseline: %v", loadDesignSystemError)
 	}
 
 	// A repository that redefines a framework variant and adds two of its own, which is the shape
@@ -59,9 +59,9 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(test *testing.T) {
 		test.Fatalf("write: %v", writeError)
 	}
 
-	redefiningSystem, err := LoadDesignSystem(LoadOptions{EntryPoint: redefining, TailwindPackageRoot: packageRoot})
-	if err != nil {
-		test.Fatalf("loading the redefining system: %v", err)
+	redefiningSystem, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: redefining, TailwindPackageRoot: packageRoot})
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading the redefining system: %v", loadDesignSystemError)
 	}
 
 	baselineOrders := make(map[string]int)

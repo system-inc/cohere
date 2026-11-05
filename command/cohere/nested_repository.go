@@ -195,15 +195,15 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 		}
 		check.Repositories++
 
-		inner, err := declaredBelow(root, relative)
-		if err != nil {
-			return check, err
+		inner, declaredBelowError := declaredBelow(root, relative)
+		if declaredBelowError != nil {
+			return check, declaredBelowError
 		}
 		pending = append(pending, inner...)
 
-		enumeration, err := engine.Enumerate(repositoryRoot)
-		if err != nil {
-			return check, fmt.Errorf("reading nested repository %s: %w", relative, err)
+		enumeration, enumerateError := engine.Enumerate(repositoryRoot)
+		if enumerateError != nil {
+			return check, fmt.Errorf("reading nested repository %s: %w", relative, enumerateError)
 		}
 		check.Walks = append(check.Walks, enumeration)
 		check.Files += len(enumeration.Files)
@@ -306,19 +306,19 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 		go func() {
 			defer workers.Done()
 			for index := range next {
-				contents, err := os.ReadFile(fileNames[index])
-				if err != nil {
-					outcomes[index] = nestedOutcome{err: err}
+				contents, readError := os.ReadFile(fileNames[index])
+				if readError != nil {
+					outcomes[index] = nestedOutcome{err: readError}
 					continue
 				}
-				formatted, err := transform(fileNames[index], string(contents), nil)
+				formatted, transformError := transform(fileNames[index], string(contents), nil)
 				switch {
-				case errors.Is(err, edit.ErrSkipped):
+				case errors.Is(transformError, edit.ErrSkipped):
 					outcomes[index] = nestedOutcome{
-						unchecked: strings.TrimPrefix(err.Error(), edit.ErrSkipped.Error()+": "),
+						unchecked: strings.TrimPrefix(transformError.Error(), edit.ErrSkipped.Error()+": "),
 					}
-				case err != nil:
-					outcomes[index] = nestedOutcome{err: err}
+				case transformError != nil:
+					outcomes[index] = nestedOutcome{err: transformError}
 				default:
 					outcomes[index] = nestedOutcome{drifted: formatted != string(contents)}
 				}

@@ -44,12 +44,12 @@ func mergeWithReversedEndOrder(function *Function, scopes *ReactiveScopes) *Merg
 			state.starts = state.starts[:len(state.starts)-1]
 			opening := append([]ScopeId(nil), top.scopes...)
 			// The one differing line: ascending rather than descending by end.
-			sort.SliceStable(opening, func(i, j int) bool {
-				return state.rangeOf(opening[i]).End < state.rangeOf(opening[j]).End
+			sort.SliceStable(opening, func(left, right int) bool {
+				return state.rangeOf(opening[left]).End < state.rangeOf(opening[right]).End
 			})
 			state.activeScopes = append(state.activeScopes, opening...)
-			for i := 1; i < len(opening); i++ {
-				previous, current := opening[i-1], opening[i]
+			for index := 1; index < len(opening); index++ {
+				previous, current := opening[index-1], opening[index]
 				if state.rangeOf(previous).End == state.rangeOf(current).End {
 					state.joined.union([]ScopeId{previous, current})
 				}

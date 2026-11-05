@@ -268,9 +268,9 @@ const (
 // four flavors of an empty result, because the whole point of this package is that a run which
 // checked nothing must not be able to look like a run that found nothing.
 func Build(options Options) (*Graph, error) {
-	graph, err := buildOnce(options)
-	if err != nil {
-		return nil, err
+	graph, buildOnceError := buildOnce(options)
+	if buildOnceError != nil {
+		return nil, buildOnceError
 	}
 
 	// The config's file list and the program's loaded files are two reads of the tree, a moment
@@ -281,9 +281,9 @@ func Build(options Options) (*Graph, error) {
 	// panicked and blamed path casing.
 	verdict, missing := graph.timedVerify(options)
 	if verdict == rootsMoved {
-		graph, err = buildOnce(options)
-		if err != nil {
-			return nil, err
+		graph, buildOnceError = buildOnce(options)
+		if buildOnceError != nil {
+			return nil, buildOnceError
 		}
 		verdict, missing = graph.timedVerify(options)
 		if verdict == rootsMoved {
@@ -497,7 +497,7 @@ func buildOnce(options Options) (*Graph, error) {
 
 	// A nil extended-config cache is supported upstream and correct for a one-shot build: the cache
 	// only pays off across repeated parses of the same `extends` chain within one process.
-	config, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
+	parsedCommandLine, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
 		tspath.RootedFilePath(configurationFileName),
 		&core.CompilerOptions{},
 		nil,
@@ -507,7 +507,7 @@ func buildOnce(options Options) (*Graph, error) {
 	if len(configurationErrors) > 0 {
 		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationErrors))
 	}
-	if config == nil {
+	if parsedCommandLine == nil {
 		return nil, fmt.Errorf("reading %s: the config parsed to nothing", configurationFileName)
 	}
 
@@ -520,7 +520,7 @@ func buildOnce(options Options) (*Graph, error) {
 	// Except a diagnostic about one option's name or value, an option TypeScript 7 no longer knows above
 	// all: the graph builds over it, and it is reported with the program's own diagnostics (they include
 	// the config's), so the options are never silently wrong. See configParsingOptionCodes.
-	if configurationFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(
+	if configurationFileDiagnostics := parsedCommandLine.GetConfigFileParsingDiagnostics(); len(
 		configurationFileDiagnostics,
 	) > 0 && !onlyOptionValueDiagnostics(configurationFileDiagnostics) {
 		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationFileDiagnostics))
@@ -529,7 +529,7 @@ func buildOnce(options Options) (*Graph, error) {
 	// The config resolving to zero files is a configuration error, not a clean tree. Catching it here
 	// means the caller never has to distinguish "nothing to check" from "nothing was checked", which
 	// is the distinction every silent-green failure in this project's history collapsed.
-	if len(config.FileNames()) == 0 {
+	if len(parsedCommandLine.FileNames()) == 0 {
 		return nil, fmt.Errorf("%s matched no files: check its include, files, and exclude", configurationFileName)
 	}
 	if options.Timing != nil {
@@ -562,7 +562,7 @@ func buildOnce(options Options) (*Graph, error) {
 	if checkerCount <= 0 {
 		checkerCount = defaultCheckerCount()
 	}
-	config.CompilerOptions().Checkers = &checkerCount
+	parsedCommandLine.CompilerOptions().Checkers = &checkerCount
 
 	// The lib files TypeScript ships are never type-checked here, whatever the tsconfig says. A diagnostic
 	// in one is never reported, since a run reports the files the tsconfig names and those are never
@@ -574,7 +574,7 @@ func buildOnce(options Options) (*Graph, error) {
 	// The incremental build info compares the option only to decide whether the lib files' diagnostics
 	// can be copied, so a project's own tsc or tsgo sharing that build info rechecks the lib files after a
 	// cohere run and nothing else.
-	config.CompilerOptions().SkipDefaultLibCheck = core.TSTrue
+	parsedCommandLine.CompilerOptions().SkipDefaultLibCheck = core.TSTrue
 
 	// JSDocParsingMode used to be set here to parse JSDoc only where it can carry types. The option
 	// was removed from ProgramOptions in the move to `microsoft/TypeScript` (the compiler now decides
@@ -596,7 +596,7 @@ func buildOnce(options Options) (*Graph, error) {
 	}
 	programStarted := time.Now()
 	builtProgram := compiler.NewProgram(compiler.ProgramOptions{
-		Config:         config,
+		Config:         parsedCommandLine,
 		Host:           programHost,
 		SingleThreaded: singleThreaded,
 	})
@@ -624,7 +624,7 @@ func buildOnce(options Options) (*Graph, error) {
 
 	return &Graph{
 		Program:        builtProgram,
-		Config:         config,
+		Config:         parsedCommandLine,
 		ConfigFileName: configurationFileName,
 		CompilerHost:   compilerHost,
 		Anchor:         NewPathAnchor(currentDirectory),
@@ -712,8 +712,8 @@ func projectFilesMismatchMessage(named int, matched int) string {
 // meaningless, which is the worst failure shape available here.
 //
 // The release function must be called, conventionally by defer.
-func (graph *Graph) CheckerForFile(ctx context.Context, sourceFile *ast.SourceFile) (*checker.Checker, func()) {
-	return graph.Program.GetTypeCheckerForFileExclusive(ctx, sourceFile)
+func (graph *Graph) CheckerForFile(callerContext context.Context, sourceFile *ast.SourceFile) (*checker.Checker, func()) {
+	return graph.Program.GetTypeCheckerForFileExclusive(callerContext, sourceFile)
 }
 
 // Diagnostics returns TypeScript's own findings for one file: syntax, then binding, then semantics.
@@ -724,14 +724,14 @@ func (graph *Graph) CheckerForFile(ctx context.Context, sourceFile *ast.SourceFi
 //
 // Prefer AllDiagnostics for a whole-program check. Calling this in a loop over every file is more
 // than three times slower for a reason that is invisible at the call site. See the note there.
-func (graph *Graph) Diagnostics(ctx context.Context, sourceFile *ast.SourceFile) []*ast.Diagnostic {
-	syntactic := graph.Program.GetSyntacticDiagnostics(ctx, sourceFile)
+func (graph *Graph) Diagnostics(callerContext context.Context, sourceFile *ast.SourceFile) []*ast.Diagnostic {
+	syntactic := graph.Program.GetSyntacticDiagnostics(callerContext, sourceFile)
 	if len(syntactic) > 0 {
 		return syntactic
 	}
 
-	diagnostics := graph.Program.GetBindDiagnostics(ctx, sourceFile)
-	return append(diagnostics, graph.Program.GetSemanticDiagnostics(ctx, sourceFile)...)
+	diagnostics := graph.Program.GetBindDiagnostics(callerContext, sourceFile)
+	return append(diagnostics, graph.Program.GetSemanticDiagnostics(callerContext, sourceFile)...)
 }
 
 // AllDiagnostics returns TypeScript's findings for the whole program.
@@ -745,31 +745,31 @@ func (graph *Graph) Diagnostics(ctx context.Context, sourceFile *ast.SourceFile)
 //
 // The findings are identical either way. Only the wall clock differs, which is exactly what makes
 // this the kind of mistake that survives review.
-func (graph *Graph) AllDiagnostics(ctx context.Context) []*ast.Diagnostic {
-	return graph.AllDiagnosticParts(ctx).All()
+func (graph *Graph) AllDiagnostics(callerContext context.Context) []*ast.Diagnostic {
+	return graph.AllDiagnosticParts(callerContext).All()
 }
 
 // AllDiagnosticParts is AllDiagnostics with its parts kept apart. See TypeDiagnosticParts.
-func (graph *Graph) AllDiagnosticParts(ctx context.Context) TypeDiagnosticParts {
-	syntactic := graph.Program.GetSyntacticDiagnostics(ctx, nil)
+func (graph *Graph) AllDiagnosticParts(callerContext context.Context) TypeDiagnosticParts {
+	syntactic := graph.Program.GetSyntacticDiagnostics(callerContext, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
 	return TypeDiagnosticParts{
-		Bind:     graph.Program.GetBindDiagnostics(ctx, nil),
-		Semantic: graph.Program.GetSemanticDiagnostics(ctx, nil),
+		Bind:     graph.Program.GetBindDiagnostics(callerContext, nil),
+		Semantic: graph.Program.GetSemanticDiagnostics(callerContext, nil),
 	}
 }
 
 // ConfigDiagnostics returns findings about the configuration itself rather than about any file:
 // contradictory options, an unreachable lib, a target that does not exist.
-func (graph *Graph) ConfigDiagnostics(ctx context.Context) []*ast.Diagnostic {
+func (graph *Graph) ConfigDiagnostics(callerContext context.Context) []*ast.Diagnostic {
 	// GetOptionsDiagnostics was folded into GetProgramDiagnostics upstream: an option that contradicts
 	// another is now reported with the rest of the program's own findings rather than through its own
 	// accessor. The set is the same; only the door changed.
 	diagnostics := graph.Program.GetConfigFileParsingDiagnostics()
 	diagnostics = append(diagnostics, graph.Program.GetProgramDiagnostics()...)
-	diagnostics = append(diagnostics, graph.Program.GetGlobalDiagnostics(ctx)...)
+	diagnostics = append(diagnostics, graph.Program.GetGlobalDiagnostics(callerContext)...)
 	return diagnostics
 }
 

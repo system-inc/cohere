@@ -147,7 +147,7 @@ func tokenize(input []uint16, options Options) []token {
 	line := 1
 	position := 0
 	parentCount := 0
-	isURLArg := false
+	isUrlArgument := false
 
 	var code int
 	next := undefinedNext
@@ -156,7 +156,7 @@ func tokenize(input []uint16, options Options) []token {
 	var escapePosition int
 
 	// charCodeAt is css.charCodeAt: -1 stands in for NaN past either end, equal to no code.
-	charCodeAt := func(index int) int {
+	characterCodeAt := func(index int) int {
 		if index < 0 || index >= length {
 			return -1
 		}
@@ -215,7 +215,7 @@ func tokenize(input []uint16, options Options) []token {
 	}
 
 	for position < length {
-		code = charCodeAt(position)
+		code = characterCodeAt(position)
 
 		if code == newline {
 			offset = position
@@ -227,7 +227,7 @@ func tokenize(input []uint16, options Options) []token {
 			next = position
 			for {
 				next += 1
-				code = charCodeAt(next)
+				code = characterCodeAt(next)
 				if code == newline {
 					offset = next
 					line += 1
@@ -261,7 +261,7 @@ func tokenize(input []uint16, options Options) []token {
 
 		case openParen:
 			parentCount++
-			isURLArg = !isURLArg && parentCount == 1 &&
+			isUrlArgument = !isUrlArgument && parentCount == 1 &&
 				len(tokens) > 0 &&
 				tokens[len(tokens)-1].kind == "word" &&
 				string(utf16Decode(tokens[len(tokens)-1].value)) == "url"
@@ -269,7 +269,7 @@ func tokenize(input []uint16, options Options) []token {
 
 		case closeParen:
 			parentCount--
-			isURLArg = isURLArg && parentCount > 0
+			isUrlArgument = isUrlArgument && parentCount > 0
 			pushStale(")")
 
 		case singleQuote, doubleQuote:
@@ -286,7 +286,7 @@ func tokenize(input []uint16, options Options) []token {
 					unclosed("quote")
 				}
 				escapePosition = next
-				for charCodeAt(escapePosition-1) == backslash {
+				for characterCodeAt(escapePosition-1) == backslash {
 					escapePosition -= 1
 					escaped = !escaped
 				}
@@ -327,7 +327,7 @@ func tokenize(input []uint16, options Options) []token {
 
 		case plus, minus, asterisk:
 			next = position + 1
-			nextCharacter := charCodeAt(position + 1)
+			nextCharacter := characterCodeAt(position + 1)
 
 			// Upstream also computes a prevChar here that it never reads.
 
@@ -349,9 +349,9 @@ func tokenize(input []uint16, options Options) []token {
 			position = next - 1
 
 		default:
-			if code == slash && (charCodeAt(position+1) == asterisk ||
-				(options.Loose && !isURLArg && charCodeAt(position+1) == slash)) {
-				isStandardComment := charCodeAt(position+1) == asterisk
+			if code == slash && (characterCodeAt(position+1) == asterisk ||
+				(options.Loose && !isUrlArgument && characterCodeAt(position+1) == slash)) {
+				isStandardComment := characterCodeAt(position+1) == asterisk
 
 				if isStandardComment {
 					next = indexOfUnits(css, []uint16{'*', '/'}, position+2) + 1
@@ -400,7 +400,7 @@ func tokenize(input []uint16, options Options) []token {
 				push("#", slice(position, next), line, position-offset, line, next-offset, position)
 
 				position = next - 1
-			} else if (code == lowerU || code == upperU) && charCodeAt(position+1) == plus {
+			} else if (code == lowerU || code == upperU) && characterCodeAt(position+1) == plus {
 				next = position + 2
 
 				// Upstream also reads each code here, which the loop test and everything after never read.
@@ -422,13 +422,13 @@ func tokenize(input []uint16, options Options) []token {
 				position = next - 1
 			} else {
 				regex := wordEnd
-				isWordEndNum := false
+				isWordEndNumber := false
 
 				// we're dealing with a word that starts with a number
 				// those get treated differently
 				if code >= digit0 && code <= digit9 {
 					regex = wordEndNum
-					isWordEndNum = true
+					isWordEndNumber = true
 				}
 
 				lastIndex := regexLastIndex(css, position+1, regex)
@@ -440,10 +440,10 @@ func tokenize(input []uint16, options Options) []token {
 				}
 
 				// Exponential number notation with minus or plus: 1e-10, 1e+10
-				if isWordEndNum || code == period {
-					ncode := charCodeAt(next)
-					ncode1 := charCodeAt(next + 1)
-					ncode2 := charCodeAt(next + 2)
+				if isWordEndNumber || code == period {
+					ncode := characterCodeAt(next)
+					ncode1 := characterCodeAt(next + 1)
+					ncode2 := characterCodeAt(next + 2)
 
 					if (ncode == lowerE || ncode == upperE) &&
 						(ncode1 == minus || ncode1 == plus) &&

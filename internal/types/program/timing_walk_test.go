@@ -80,9 +80,9 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 		files[fmt.Sprintf("file%02d.ts", index)] = fmt.Sprintf("export const value%d = %d;\n", index, index)
 	}
 	root := writeProject(test, files)
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("build: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 
 	// The walk locks each worker to its thread for the walk, so a listener's own reads of the thread
@@ -111,9 +111,9 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	}
 
 	graph.CollectTimings = true
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{sleeper, spinner})
-	if err != nil {
-		test.Fatalf("walk: %v", err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{sleeper, spinner})
+	if walkError != nil {
+		test.Fatalf("walk: %v", walkError)
 	}
 	if result.Timings.Account.Unavailable != "" {
 		test.Fatalf("the walk was not measured, so this proves nothing: %s", result.Timings.Account.Unavailable)

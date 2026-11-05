@@ -181,10 +181,10 @@ func printDocFile(
 	proseWrap string,
 	textToDoc printing.TextToDoc,
 	nodeCount int,
-) (document doc.Doc, err error) {
+) (document doc.Doc, printDocFileError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			document, err = nil, fmt.Errorf("yaml: %v", recovered)
+			document, printDocFileError = nil, fmt.Errorf("yaml: %v", recovered)
 		}
 	}()
 
@@ -638,9 +638,9 @@ func embed(path *astPath, options *options) embedPrint {
 			_ *astPath,
 			_ *printing.Options[*unist.Node],
 		) (doc.Doc, error) {
-			embedded, err := textToDoc(options.OriginalText, "json")
-			if err != nil {
-				return nil, err
+			embedded, textToDocError := textToDoc(options.OriginalText, "json")
+			if textToDocError != nil {
+				return nil, textToDocError
 			}
 			// doc ? [doc, hardline] : undefined
 			if text, isText := embedded.(doc.Text); embedded == nil || (isText && text == "") {

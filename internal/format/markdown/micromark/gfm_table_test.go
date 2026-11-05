@@ -169,15 +169,15 @@ func TestGfmTableAlignMatchesUpstream(test *testing.T) {
 	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	encoded, err := json.Marshal(gfmTableFixtures)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(gfmTableFixtures)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", script)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		test.Fatal(err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatal(outputError)
 	}
 	var expected [][]string
 	if decodeError := json.Unmarshal(output, &expected); decodeError != nil {

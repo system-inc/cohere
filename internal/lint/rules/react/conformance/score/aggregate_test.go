@@ -57,14 +57,14 @@ func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 	if testing.Short() {
 		test.Skip("builds a TypeScript program per fixture")
 	}
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
-	report, err := react_conformance.Aggregate(fixtures, engineImplementation{t: test})
-	if err != nil {
-		test.Fatalf("aggregating: %v", err)
+	report, aggregateError := react_conformance.Aggregate(fixtures, engineImplementation{t: test})
+	if aggregateError != nil {
+		test.Fatalf("aggregating: %v", aggregateError)
 	}
 
 	test.Logf("\n%s", report.Summary())

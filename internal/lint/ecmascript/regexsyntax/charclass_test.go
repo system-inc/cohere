@@ -39,18 +39,18 @@ func TestIterateRegexCharacterClasses_Basic(test *testing.T) {
 		// Escaped `[` outside class
 		{`\[abc\]`, RegexFlags{}, nil},
 	}
-	for _, c := range cases {
-		test.Run(c.pattern, func(test *testing.T) {
+	for _, testCase := range cases {
+		test.Run(testCase.pattern, func(test *testing.T) {
 			test.Parallel()
 			var got [][2]int
-			ok := IterateRegexCharacterClasses(c.pattern, c.flags, func(s, e int) {
-				got = append(got, [2]int{s, e})
+			ok := IterateRegexCharacterClasses(testCase.pattern, testCase.flags, func(start, end int) {
+				got = append(got, [2]int{start, end})
 			})
 			if !ok {
-				test.Fatalf("scan failed for %q", c.pattern)
+				test.Fatalf("scan failed for %q", testCase.pattern)
 			}
-			if !reflect.DeepEqual(got, c.want) {
-				test.Errorf("%q: got %v, want %v", c.pattern, got, c.want)
+			if !reflect.DeepEqual(got, testCase.want) {
+				test.Errorf("%q: got %v, want %v", testCase.pattern, got, testCase.want)
 			}
 		})
 	}
@@ -61,8 +61,8 @@ func TestIterateRegexCharacterClasses_EscapedBracketsInVFlag(test *testing.T) {
 	// v flag + `\]` inside nested class: the escape must not close the outer
 	// class prematurely.
 	var got [][2]int
-	ok := IterateRegexCharacterClasses(`[[\]]]`, RegexFlags{UnicodeSets: true}, func(s, e int) {
-		got = append(got, [2]int{s, e})
+	ok := IterateRegexCharacterClasses(`[[\]]]`, RegexFlags{UnicodeSets: true}, func(start, end int) {
+		got = append(got, [2]int{start, end})
 	})
 	if !ok {
 		test.Fatal("scan failed")
@@ -77,8 +77,8 @@ func TestIterateRegexCharacterClasses_DeepNesting(test *testing.T) {
 	test.Parallel()
 	// Five levels of nesting under v flag.
 	var got [][2]int
-	ok := IterateRegexCharacterClasses(`[[[[[x]]]]]`, RegexFlags{UnicodeSets: true}, func(s, e int) {
-		got = append(got, [2]int{s, e})
+	ok := IterateRegexCharacterClasses(`[[[[[x]]]]]`, RegexFlags{UnicodeSets: true}, func(start, end int) {
+		got = append(got, [2]int{start, end})
 	})
 	if !ok {
 		test.Fatal("scan failed")
@@ -95,8 +95,8 @@ func TestIterateRegexCharacterClasses_QBraceContainsBracket(test *testing.T) {
 	// `\q{ab|c]d}` inside v class: the `]` inside `\q{}` is literal and
 	// must not close the outer class.
 	var got [][2]int
-	ok := IterateRegexCharacterClasses(`[\q{ab|c]d}]`, RegexFlags{UnicodeSets: true}, func(s, e int) {
-		got = append(got, [2]int{s, e})
+	ok := IterateRegexCharacterClasses(`[\q{ab|c]d}]`, RegexFlags{UnicodeSets: true}, func(start, end int) {
+		got = append(got, [2]int{start, end})
 	})
 	if !ok {
 		test.Fatal("scan failed")
@@ -112,8 +112,8 @@ func TestIterateRegexCharacterClasses_PropertyEscapeContainsBracket(test *testin
 	// `\p{...}` can't contain `]` in practice (property names don't), but
 	// exercise the general skip behavior with an adjacent class.
 	var got [][2]int
-	ok := IterateRegexCharacterClasses(`\p{Letter}[a]`, RegexFlags{Unicode: true}, func(s, e int) {
-		got = append(got, [2]int{s, e})
+	ok := IterateRegexCharacterClasses(`\p{Letter}[a]`, RegexFlags{Unicode: true}, func(start, end int) {
+		got = append(got, [2]int{start, end})
 	})
 	if !ok {
 		test.Fatal("scan failed")
@@ -155,9 +155,9 @@ func TestParseRegexCharacterClass_MultipleRangesAndSets(test *testing.T) {
 	if len(els) != len(wantKinds) {
 		test.Fatalf("len=%d, want %d (got %+v)", len(els), len(wantKinds), els)
 	}
-	for i, k := range wantKinds {
-		if els[i].Kind != k {
-			test.Errorf("[%d].Kind = %v, want %v", i, els[i].Kind, k)
+	for index, wantKind := range wantKinds {
+		if els[index].Kind != wantKind {
+			test.Errorf("[%d].Kind = %v, want %v", index, els[index].Kind, wantKind)
 		}
 	}
 }
@@ -181,18 +181,18 @@ func TestIterateRegexCharacterClasses_VFlagNested(test *testing.T) {
 		// With \q{}
 		{`[a\q{xy}]`, [][2]int{{0, 9}}},
 	}
-	for _, c := range cases {
-		test.Run(c.pattern, func(test *testing.T) {
+	for _, testCase := range cases {
+		test.Run(testCase.pattern, func(test *testing.T) {
 			test.Parallel()
 			var got [][2]int
-			ok := IterateRegexCharacterClasses(c.pattern, RegexFlags{UnicodeSets: true}, func(s, e int) {
-				got = append(got, [2]int{s, e})
+			ok := IterateRegexCharacterClasses(testCase.pattern, RegexFlags{UnicodeSets: true}, func(start, end int) {
+				got = append(got, [2]int{start, end})
 			})
 			if !ok {
-				test.Fatalf("scan failed for %q", c.pattern)
+				test.Fatalf("scan failed for %q", testCase.pattern)
 			}
-			if !reflect.DeepEqual(got, c.want) {
-				test.Errorf("%q: got %v, want %v", c.pattern, got, c.want)
+			if !reflect.DeepEqual(got, testCase.want) {
+				test.Errorf("%q: got %v, want %v", testCase.pattern, got, testCase.want)
 			}
 		})
 	}
@@ -222,18 +222,18 @@ func TestIterateRegexCharacterClasses_EscapeBoundaries(test *testing.T) {
 		// `\d` inside group then class
 		{`(\d)[ab]`, RegexFlags{}, [][2]int{{4, 8}}},
 	}
-	for _, c := range cases {
-		test.Run(c.pattern, func(test *testing.T) {
+	for _, testCase := range cases {
+		test.Run(testCase.pattern, func(test *testing.T) {
 			test.Parallel()
 			var got [][2]int
-			ok := IterateRegexCharacterClasses(c.pattern, c.flags, func(s, e int) {
-				got = append(got, [2]int{s, e})
+			ok := IterateRegexCharacterClasses(testCase.pattern, testCase.flags, func(start, end int) {
+				got = append(got, [2]int{start, end})
 			})
 			if !ok {
-				test.Fatalf("scan failed for %q", c.pattern)
+				test.Fatalf("scan failed for %q", testCase.pattern)
 			}
-			if !reflect.DeepEqual(got, c.want) {
-				test.Errorf("%q: got %v, want %v", c.pattern, got, c.want)
+			if !reflect.DeepEqual(got, testCase.want) {
+				test.Errorf("%q: got %v, want %v", testCase.pattern, got, testCase.want)
 			}
 		})
 	}
@@ -243,7 +243,7 @@ func TestIterateRegexCharacterClasses_Malformed(test *testing.T) {
 	test.Parallel()
 	// Unterminated class at EOF
 	for _, p := range []string{"[abc", "[", `[\`, `\`} {
-		ok := IterateRegexCharacterClasses(p, RegexFlags{}, func(s, e int) {})
+		ok := IterateRegexCharacterClasses(p, RegexFlags{}, func(start, end int) {})
 		if ok {
 			test.Errorf("expected ok=false for %q", p)
 		}
@@ -269,9 +269,9 @@ func TestParseRegexCharacterClass_BasicChars(test *testing.T) {
 	if len(els) != 3 {
 		test.Fatalf("len=%d, want 3", len(els))
 	}
-	for i, want := range []uint32{'a', 'b', 'c'} {
-		if els[i].Kind != RegexCharSingle || els[i].Value != want {
-			test.Errorf("[%d] = %+v", i, els[i])
+	for index, want := range []uint32{'a', 'b', 'c'} {
+		if els[index].Kind != RegexCharSingle || els[index].Value != want {
+			test.Errorf("[%d] = %+v", index, els[index])
 		}
 	}
 }
@@ -302,12 +302,12 @@ func TestParseRegexCharacterClass_Range(test *testing.T) {
 	if len(els) != 1 {
 		test.Fatalf("len=%d, want 1", len(els))
 	}
-	r := els[0]
-	if r.Kind != RegexCharRange || r.Value != 'a' || r.Max != 'z' {
-		test.Errorf("range = %+v", r)
+	element := els[0]
+	if element.Kind != RegexCharRange || element.Value != 'a' || element.Max != 'z' {
+		test.Errorf("range = %+v", element)
 	}
-	if r.Start != 1 || r.End != 4 {
-		test.Errorf("source span = %d..%d, want 1..4", r.Start, r.End)
+	if element.Start != 1 || element.End != 4 {
+		test.Errorf("source span = %d..%d, want 1..4", element.Start, element.End)
 	}
 }
 
@@ -344,9 +344,9 @@ func TestParseRegexCharacterClass_HexEscapes(test *testing.T) {
 	if len(els) != len(wants) {
 		test.Fatalf("len=%d, want %d (got %+v)", len(els), len(wants), els)
 	}
-	for i, w := range wants {
-		if els[i].Value != w {
-			test.Errorf("[%d] value=%x want %x", i, els[i].Value, w)
+	for index, want := range wants {
+		if els[index].Value != want {
+			test.Errorf("[%d] value=%x want %x", index, els[index].Value, want)
 		}
 	}
 }
@@ -407,9 +407,9 @@ func TestParseRegexCharacterClass_CharacterSetBreaker(test *testing.T) {
 	if len(els) != len(wantKinds) {
 		test.Fatalf("len=%d, want %d", len(els), len(wantKinds))
 	}
-	for i, k := range wantKinds {
-		if els[i].Kind != k {
-			test.Errorf("[%d].Kind = %v, want %v", i, els[i].Kind, k)
+	for index, wantKind := range wantKinds {
+		if els[index].Kind != wantKind {
+			test.Errorf("[%d].Kind = %v, want %v", index, els[index].Kind, wantKind)
 		}
 	}
 }
@@ -442,9 +442,9 @@ func TestParseRegexCharacterClass_VFlagSetOperator(test *testing.T) {
 	if len(els) != len(wantKinds) {
 		test.Fatalf("len=%d, want %d (got %+v)", len(els), len(wantKinds), els)
 	}
-	for i, k := range wantKinds {
-		if els[i].Kind != k {
-			test.Errorf("[%d].Kind = %v want %v", i, els[i].Kind, k)
+	for index, wantKind := range wantKinds {
+		if els[index].Kind != wantKind {
+			test.Errorf("[%d].Kind = %v want %v", index, els[index].Kind, wantKind)
 		}
 	}
 

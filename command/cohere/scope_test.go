@@ -31,23 +31,23 @@ func TestAScopedTransformFormatsOnlyWhatIsInScope(test *testing.T) {
 
 	transform := scopedTransform(inner, scope)
 
-	formatted, err := transform("/repo/in.ts", "hello\n", nil)
-	if err != nil {
-		test.Fatalf("a file in scope was not formatted: %v", err)
+	formatted, transformError := transform("/repo/in.ts", "hello\n", nil)
+	if transformError != nil {
+		test.Fatalf("a file in scope was not formatted: %v", transformError)
 	}
 	if formatted != "HELLO\n" {
 		test.Fatalf("the inner transform did not run: %q", formatted)
 	}
 
-	_, err = transform("/repo/out.ts", "hello\n", nil)
-	if !errors.Is(err, edit.ErrSkipped) {
-		test.Fatalf("a file outside scope should skip, got %v", err)
+	_, transformError = transform("/repo/out.ts", "hello\n", nil)
+	if !errors.Is(transformError, edit.ErrSkipped) {
+		test.Fatalf("a file outside scope should skip, got %v", transformError)
 	}
-	if !strings.Contains(err.Error(), "outside the format scope") {
-		test.Fatalf("the skip did not say it was a scope decision: %v", err)
+	if !strings.Contains(transformError.Error(), "outside the format scope") {
+		test.Fatalf("the skip did not say it was a scope decision: %v", transformError)
 	}
-	if !strings.Contains(err.Error(), scope.Description) {
-		test.Fatalf("the skip did not carry the scope description: %v", err)
+	if !strings.Contains(transformError.Error(), scope.Description) {
+		test.Fatalf("the skip did not carry the scope description: %v", transformError)
 	}
 }
 
@@ -60,9 +60,9 @@ func TestAWholeTreeScopeDoesNotFilter(test *testing.T) {
 	}, wholeTreeScope())
 
 	for _, fileName := range []string{"/anywhere/a.ts", "/elsewhere/b.tsx", "/deep/c.md"} {
-		formatted, err := transform(fileName, "x", nil)
-		if err != nil {
-			test.Fatalf("a whole-tree scope skipped %s: %v", fileName, err)
+		formatted, transformError := transform(fileName, "x", nil)
+		if transformError != nil {
+			test.Fatalf("a whole-tree scope skipped %s: %v", fileName, transformError)
 		}
 		if formatted != "x!" {
 			test.Fatalf("the inner transform did not run for %s", fileName)
@@ -95,12 +95,12 @@ func TestAnEmptyScopeSkipsEverythingAndSaysWhy(test *testing.T) {
 		return text, nil
 	}, formatScope{Description: "nothing (could not enumerate the tree: the walk failed)"})
 
-	_, err := transform("/repo/a.ts", "x", nil)
-	if !errors.Is(err, edit.ErrSkipped) {
-		test.Fatalf("expected a skip, got %v", err)
+	_, transformError := transform("/repo/a.ts", "x", nil)
+	if !errors.Is(transformError, edit.ErrSkipped) {
+		test.Fatalf("expected a skip, got %v", transformError)
 	}
-	if !strings.Contains(err.Error(), "could not enumerate the tree") {
-		test.Fatalf("the reason did not survive: %v", err)
+	if !strings.Contains(transformError.Error(), "could not enumerate the tree") {
+		test.Fatalf("the reason did not survive: %v", transformError)
 	}
 }
 
@@ -135,9 +135,9 @@ func TestAWholeTreeScopeBypassesTheFilterEntirely(test *testing.T) {
 	scope := wholeTreeScope()
 	scope.index = map[string]struct{}{"/some/other/file.ts": {}}
 
-	formatted, err := scopedTransform(inner, scope)("/not/in/the/index.ts", "x", nil)
-	if err != nil {
-		test.Fatalf("a whole-tree scope consulted its index: %v", err)
+	formatted, scopedTransformError := scopedTransform(inner, scope)("/not/in/the/index.ts", "x", nil)
+	if scopedTransformError != nil {
+		test.Fatalf("a whole-tree scope consulted its index: %v", scopedTransformError)
 	}
 	if formatted != "x!" {
 		test.Fatalf("the inner transform did not run: %q", formatted)

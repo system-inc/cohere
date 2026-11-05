@@ -65,8 +65,8 @@ func Settings(newLine string) format.FormatCodeSettings {
 func Apply(text string, changes []core.TextChange) string {
 	ordered := make([]core.TextChange, len(changes))
 	copy(ordered, changes)
-	sort.SliceStable(ordered, func(a, b int) bool {
-		return ordered[a].TextRange.Pos() > ordered[b].TextRange.Pos()
+	sort.SliceStable(ordered, func(left, right int) bool {
+		return ordered[left].TextRange.Pos() > ordered[right].TextRange.Pos()
 	})
 
 	var builder strings.Builder
@@ -116,7 +116,7 @@ func FormatFile(fileName string, text string) (formatted string, ok bool, panick
 		return "", false, false, ""
 	}
 
-	ctx := format.WithFormatCodeSettings(context.Background(), Settings("\n"), "\n")
+	settingsContext := format.WithFormatCodeSettings(context.Background(), Settings("\n"), "\n")
 
 	// The formatter panics on some real files: its semicolon-insertion check walks to the next
 	// token and asserts on the position it finds, and that assertion does not hold everywhere.
@@ -129,5 +129,5 @@ func FormatFile(fileName string, text string) (formatted string, ok bool, panick
 		}
 	}()
 
-	return Apply(text, format.FormatDocument(ctx, sourceFile)), true, false, ""
+	return Apply(text, format.FormatDocument(settingsContext, sourceFile)), true, false, ""
 }

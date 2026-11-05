@@ -20,16 +20,16 @@ import (
 // it: the first spawn proves that, which is what makes the second one's answer mean something.
 // Not parallel: it sets the verdict variable with test.Setenv, which a parallel test may not
 func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		test.Fatal(err)
+	reader, writer, pipeError := os.Pipe()
+	if pipeError != nil {
+		test.Fatal(pipeError)
 	}
 	// Ignored: a pipe made only so there is a descriptor to name, and nothing is written through it.
 	defer reader.Close()
 	defer writer.Close() // Ignored: as the reader's, above.
-	descriptor, err := syscall.Dup(int(writer.Fd()))
-	if err != nil {
-		test.Fatal(err)
+	descriptor, duplicateError := syscall.Dup(int(writer.Fd()))
+	if duplicateError != nil {
+		test.Fatal(duplicateError)
 	}
 	probe := func() string {
 		script := fmt.Sprintf(
@@ -69,9 +69,9 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 // Not parallel: it sets the verdict variable with test.Setenv and assigns the package-level verdictFile
 func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 	logPath := test.TempDir() + "/log"
-	log, err := os.Create(logPath)
-	if err != nil {
-		test.Fatal(err)
+	log, createError := os.Create(logPath)
+	if createError != nil {
+		test.Fatal(createError)
 	}
 	// Ignored: written unbuffered, and read back by name before this close.
 	defer log.Close()
@@ -94,9 +94,9 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 		test.Errorf("the regular file holds %q, want only what its owner wrote", contents)
 	}
 
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		test.Fatal(err)
+	reader, writer, pipeError := os.Pipe()
+	if pipeError != nil {
+		test.Fatal(pipeError)
 	}
 	// Ignored: a pipe made only so there is a descriptor to name, and nothing is written through it.
 	defer reader.Close()
@@ -105,9 +105,9 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 	// second *os.File around one descriptor, whose finalizer closes that number again after the writer
 	// has, by then most likely another test's pipe: a command's output read end closed out from under the
 	// poller hangs its Wait forever (#zqsdzbq, reproduced at round 145 of a stress loop).
-	descriptor, err := syscall.Dup(int(writer.Fd()))
-	if err != nil {
-		test.Fatal(err)
+	descriptor, duplicateError := syscall.Dup(int(writer.Fd()))
+	if duplicateError != nil {
+		test.Fatal(duplicateError)
 	}
 	test.Setenv(VerdictVariable, strconv.Itoa(descriptor))
 	file := takeVerdictFile()

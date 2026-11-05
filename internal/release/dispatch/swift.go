@@ -72,18 +72,18 @@ func (paths Paths) SwiftEngineBinaryPath(hash string) string {
 //
 // The returned boolean reports whether a build ran.
 func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool, error) {
-	toolchain, err := swiftToolchain()
-	if err != nil {
-		return "", false, err
+	toolchain, swiftToolchainError := swiftToolchain()
+	if swiftToolchainError != nil {
+		return "", false, swiftToolchainError
 	}
 
 	if commit != "" {
 		return resolveCommittedSwiftEngine(paths, commit, toolchain, contract)
 	}
 
-	hash, err := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain)
-	if err != nil {
-		return "", false, err
+	hash, swiftEngineHashError := swiftEngineHash(paths.SwiftEngineDirectory(), toolchain)
+	if swiftEngineHashError != nil {
+		return "", false, swiftEngineHashError
 	}
 
 	binaryPath := paths.SwiftEngineBinaryPath(hash)
@@ -91,8 +91,8 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool,
 		return binaryPath, false, nil
 	}
 
-	if err := buildSwiftProduct(paths.SwiftEngineDirectory(), paths.SwiftBuildDirectory(), binaryPath); err != nil {
-		return "", false, err
+	if buildSwiftProductError := buildSwiftProduct(paths.SwiftEngineDirectory(), paths.SwiftBuildDirectory(), binaryPath); buildSwiftProductError != nil {
+		return "", false, buildSwiftProductError
 	}
 	return binaryPath, true, nil
 }
@@ -131,17 +131,17 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 	}
 
 	sources := filepath.Join(engineDirectory, "Sources")
-	walkErr := filepath.WalkDir(sources, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(sources, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.Type().IsRegular() {
 			files = append(files, path)
 		}
 		return nil
 	})
-	if walkErr != nil {
-		return "", fmt.Errorf("listing the Swift engine's sources under %s: %w", sources, walkErr)
+	if walkError != nil {
+		return "", fmt.Errorf("listing the Swift engine's sources under %s: %w", sources, walkError)
 	}
 	if len(files) == 2 {
 		// The same guard CollectInputs keeps: an empty source set hashes to a stable digest for a tree
@@ -154,16 +154,16 @@ func swiftEngineHash(engineDirectory string, toolchain string) (string, error) {
 	fmt.Fprintf(digest, "toolchain\x00%s\x00", toolchain)
 	fmt.Fprintf(digest, "platform\x00%s/%s\x00", runtime.GOOS, runtime.GOARCH)
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return "", fmt.Errorf("reading Swift engine input %s: %w", path, err)
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return "", fmt.Errorf("reading Swift engine input %s: %w", path, readError)
 		}
 		// The path relative to the package, rather than the base name Inputs.Compute uses: two files
 		// named `Rule.swift` in different directories are different inputs, and moving one between
 		// targets changes the binary.
-		relative, err := filepath.Rel(engineDirectory, path)
-		if err != nil {
-			return "", err
+		relative, relativePathError := filepath.Rel(engineDirectory, path)
+		if relativePathError != nil {
+			return "", relativePathError
 		}
 		fmt.Fprintf(digest, "file\x00%s\x00%d\x00", filepath.ToSlash(relative), len(contents))
 		digest.Write(contents)
@@ -303,15 +303,15 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 // copyExecutable copies a file to a new path through a temporary name in the same directory, so a
 // concurrent run never sees, and execs, a half-written binary.
 func copyExecutable(source string, destination string) error {
-	input, err := os.Open(source)
-	if err != nil {
-		return err
+	input, openError := os.Open(source)
+	if openError != nil {
+		return openError
 	}
 	defer input.Close()
 
-	temporary, err := os.CreateTemp(filepath.Dir(destination), filepath.Base(destination)+".partial-*")
-	if err != nil {
-		return err
+	temporary, temporaryFileError := os.CreateTemp(filepath.Dir(destination), filepath.Base(destination)+".partial-*")
+	if temporaryFileError != nil {
+		return temporaryFileError
 	}
 	// Removed on every failure path below. After the rename the name no longer exists and the call
 	// does nothing.

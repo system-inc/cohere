@@ -494,11 +494,11 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(test *testing.T) {
 			if len(result.Diagnostics) != len(testCase.want) {
 				test.Fatalf("want %d diagnostics, got %d", len(testCase.want), len(result.Diagnostics))
 			}
-			for i, want := range testCase.want {
-				diagnostic := result.Diagnostics[i]
+			for index, want := range testCase.want {
+				diagnostic := result.Diagnostics[index]
 				got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if got != want {
-					test.Errorf("diagnostic %d span = %q, want %q", i, got, want)
+					test.Errorf("diagnostic %d span = %q, want %q", index, got, want)
 				}
 			}
 		})

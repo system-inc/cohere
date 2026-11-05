@@ -108,20 +108,20 @@ func upstreamOutputs(test *testing.T, inputs []oracleInput) []string {
 
 func runOracle(test *testing.T, script string, inputs []oracleInput) []string {
 	test.Helper()
-	encoded, err := json.Marshal(inputs)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(inputs)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	timeoutContext, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	command := exec.CommandContext(timeoutContext, "node", script)
 	command.Stdin = strings.NewReader(string(encoded))
-	output, err := command.Output()
-	if err != nil {
-		if exitError, isExit := err.(*exec.ExitError); isExit {
-			test.Fatalf("the CST oracle failed: %v\n%s", err, exitError.Stderr)
+	output, outputError := command.Output()
+	if outputError != nil {
+		if exitError, isExit := outputError.(*exec.ExitError); isExit {
+			test.Fatalf("the CST oracle failed: %v\n%s", outputError, exitError.Stderr)
 		}
-		test.Fatal(err)
+		test.Fatal(outputError)
 	}
 	var outputs []string
 	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
@@ -154,8 +154,8 @@ func portOutput(input oracleInput) (output string) {
 			tokens = append(tokens, token)
 		}
 	} else {
-		for i := 0; i < len(text); i += input.Chunk {
-			for token := range parser.Parse(slice(text, i, i+input.Chunk), true) {
+		for index := 0; index < len(text); index += input.Chunk {
+			for token := range parser.Parse(slice(text, index, index+input.Chunk), true) {
 				tokens = append(tokens, token)
 			}
 		}
@@ -301,8 +301,8 @@ func writeItem(builder *strings.Builder, item *CollectionItem) {
 // surrogates as \udxxx, everything else as itself.
 func writeString(builder *strings.Builder, units []uint16) {
 	builder.WriteByte('"')
-	for i := 0; i < len(units); i++ {
-		unit := units[i]
+	for index := 0; index < len(units); index++ {
+		unit := units[index]
 		switch {
 		case unit == '"':
 			builder.WriteString(`\"`)
@@ -320,9 +320,9 @@ func writeString(builder *strings.Builder, units []uint16) {
 			builder.WriteString(`\t`)
 		case unit < 0x20:
 			fmt.Fprintf(builder, `\u%04x`, unit)
-		case isHighSurrogate(unit) && i+1 < len(units) && isLowSurrogate(units[i+1]):
-			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[i+1])))
-			i++
+		case isHighSurrogate(unit) && index+1 < len(units) && isLowSurrogate(units[index+1]):
+			builder.WriteRune(utf16.DecodeRune(rune(unit), rune(units[index+1])))
+			index++
 		case isHighSurrogate(unit) || isLowSurrogate(unit):
 			fmt.Fprintf(builder, `\u%04x`, unit)
 		default:
@@ -480,9 +480,9 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 	}
 	var paths []string
 	var inputs []oracleInput
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git") {
 			return filepath.SkipDir

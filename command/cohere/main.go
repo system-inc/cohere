@@ -267,9 +267,9 @@ func run() error {
 	//
 	// Decided before the listings rather than after them, because inside a Swift package every one of
 	// them is the Swift engine's question: `cohere --rules` there lists the rules that would run there.
-	workingDirectory, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("resolving the working directory: %w", err)
+	workingDirectory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return fmt.Errorf("resolving the working directory: %w", workingDirectoryError)
 	}
 	given := map[string]bool{}
 	flag.Visit(func(set *flag.Flag) { given[set.Name] = true })
@@ -375,7 +375,7 @@ func run() error {
 			lintConfigPath = absoluteFrom(absoluteFrom(workingDirectory, *directory), *lintConfigFileName)
 		}
 		if locateError == nil && usesHouseSets(location) {
-			return errHouseSetsPerFile
+			return errorHouseSetsPerFile
 		}
 		lintConfiguration, loadForError := configuration.LoadFor(lintConfigPath, registeredRuleNames())
 		if loadForError != nil {
@@ -569,7 +569,7 @@ func run() error {
 		// is the file's text. --fix is required rather than implied, so the command line says what the
 		// output means.
 		if !*fixOnly || *noFix || *typesOnly || *lintOnly || len(flag.Args()) > 0 {
-			return errStdinNeedsFix
+			return errorStdinNeedsFix
 		}
 		return runStdin(backgroundContext, stdinRequest{
 			Location:         location,
@@ -582,9 +582,9 @@ func run() error {
 	}
 
 	// The repository's own way of printing, from its settings, under whatever the command line named.
-	block, err := readOutputBlock(location.LintConfigFileName)
-	if err != nil {
-		return err
+	block, readOutputBlockError := readOutputBlock(location.LintConfigFileName)
+	if readOutputBlockError != nil {
+		return readOutputBlockError
 	}
 	if block.Phases != nil && !given["phases"] {
 		activeOutput.Phases = *block.Phases
@@ -631,9 +631,9 @@ func run() error {
 	}
 
 	// What this run leaves to nearer projects, when it is one project of several (see ownership.go).
-	yield, err := activeProjectYield()
-	if err != nil {
-		return err
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil {
+		return activeProjectYieldError
 	}
 
 	// Under --timing the build says what it was made of, not only how long it took (#cazsft3).
@@ -1411,7 +1411,7 @@ func run() error {
 			// the walk's bare "the file set is empty", which could not say that the file was left out
 			// by the tsconfig or ignored by git. See explainNamedPathsOutsideProgram.
 			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 {
-				return errNamedPathsOutsideProgram(location, flag.Args())
+				return namedPathsOutsideProgramError(location, flag.Args())
 			}
 			walked, walkError := graph.Walk(backgroundContext, projectFiles, rules)
 			if walkError != nil {
@@ -1700,13 +1700,13 @@ func optionsBase(lintConfiguration *configuration.Config, projectRoot string) ru
 // else; reading costs nothing the promise forbids, and refusing to read would make every CI run cold
 // for no reason.
 func collectTypeDiagnostics(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	files []*ast.SourceFile,
 	incremental bool,
 	persist bool,
 ) []*ast.Diagnostic {
-	return finishTypeCheck(ctx, startTypeCheck(ctx, graph, incremental), files, persist)
+	return finishTypeCheck(callerContext, startTypeCheck(callerContext, graph, incremental), files, persist)
 }
 
 // typeCheck is TypeScript's own checking of a graph, under way or done.
@@ -1748,8 +1748,8 @@ var (
 // sees its context end marks itself cancelled and the compiler hands it the next file anyway, where it
 // panics on a goroutine nothing here can recover. A check whose graph is replaced is retired instead (see
 // program.Graph.Retire), left to finish, and its result dropped.
-func startTypeCheck(ctx context.Context, graph *program.Graph, incremental bool) *typeCheck {
-	checkContext := ctx
+func startTypeCheck(callerContext context.Context, graph *program.Graph, incremental bool) *typeCheck {
+	checkContext := callerContext
 	check := &typeCheck{graph: graph, done: make(chan struct{}), reuse: activeTypesReuse()}
 	// One session across check-then-write. The build info has to be emitted from the same
 	// incremental program that did the checking: that program's snapshot is what records which
@@ -1803,12 +1803,12 @@ func releaseEarlyTypeCheck() {
 
 // finishTypeCheck waits for the check, writes the build info if asked, and returns the diagnostics that
 // belong to files, plus the program's own.
-func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
+func finishTypeCheck(callerContext context.Context, check *typeCheck, files []*ast.SourceFile, persist bool) []*ast.Diagnostic {
 	<-check.done
 
 	// The read already happened when the session began; only the write is conditional.
 	if check.session != nil && persist {
-		if writeDiagnostics := check.session.Write(ctx); len(writeDiagnostics) > 0 {
+		if writeDiagnostics := check.session.Write(callerContext); len(writeDiagnostics) > 0 {
 			// A failed build-info write must not pass silently. The next run would be cold while
 			// this one reported success, and the symptom is a saving that quietly never appears.
 			for _, diagnostic := range writeDiagnostics {
@@ -1823,9 +1823,9 @@ func finishTypeCheck(ctx context.Context, check *typeCheck, files []*ast.SourceF
 	for _, sourceFile := range files {
 		ours[sourceFile] = struct{}{}
 	}
-	diagnostics := check.graph.ConfigDiagnostics(ctx)
+	diagnostics := check.graph.ConfigDiagnostics(callerContext)
 	if check.reuse != nil {
-		check.reuse.FinishGlobals(len(check.graph.Program.GetGlobalDiagnostics(ctx)) == 0)
+		check.reuse.FinishGlobals(len(check.graph.Program.GetGlobalDiagnostics(callerContext)) == 0)
 	}
 	for _, diagnostic := range check.checked {
 		// A diagnostic with no file is about the program rather than about any one file, so it is ours
@@ -1963,8 +1963,8 @@ func lintConfigSources(path string) []string {
 // Keys naming a rule cohere has not ported yet are the expected case and not an error: a decision
 // recorded ahead of the rule is how this migration is supposed to work. They are counted and named
 // separately so the two are never confused.
-func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, config *configuration.Config) {
-	if config == nil {
+func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, lintConfiguration *configuration.Config) {
+	if lintConfiguration == nil {
 		return
 	}
 
@@ -1989,7 +1989,7 @@ func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, config *confi
 	}
 
 	orphaned := make([]string, 0)
-	for key := range config.Rules {
+	for key := range lintConfiguration.Rules {
 		if !resolves(key) {
 			orphaned = append(orphaned, key)
 		}
@@ -1997,7 +1997,7 @@ func writeOrphanedConfigKeys(out *bufio.Writer, rules []rule.Rule, config *confi
 	sort.Strings(orphaned)
 
 	for _, key := range orphaned {
-		setting := config.Rules[key]
+		setting := lintConfiguration.Rules[key]
 		fmt.Fprintf(out,
 			"  config: key %q matches no registered rule, so its %s never applies: either the rule is not ported yet, or the key is spelled for an older name\n",
 			key, setting.Severity,

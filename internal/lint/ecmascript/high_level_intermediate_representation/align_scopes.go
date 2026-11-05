@@ -332,8 +332,8 @@ func AlignReactiveScopesToBlockScopes(function *Function, scopes *ReactiveScopes
 		state.ranges[id] = scopes.RangeOf(id)
 	}
 	before := make(map[ScopeId]mutation_aliasing.MutableRange, len(state.ranges))
-	for id, r := range state.ranges {
-		before[id] = r
+	for id, value := range state.ranges {
+		before[id] = value
 	}
 
 	byId := map[static_single_assignment.BlockId]*BasicBlock{}
@@ -510,9 +510,9 @@ func (state *alignSweepState) visitBlock(function *Function, byId map[static_sin
 		// The `start !== activeBlockFallthroughRanges.at(-1)` test is upstream's: when the target is
 		// the innermost open construct, the pop above will handle it on the next block.
 		index := -1
-		for i, candidate := range state.activeFallthroughs {
+		for activeFallthroughIndex, candidate := range state.activeFallthroughs {
 			if candidate.fallthrough_ == gotoTerminal.Block {
-				index = i
+				index = activeFallthroughIndex
 				break
 			}
 		}

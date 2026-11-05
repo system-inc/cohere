@@ -32,17 +32,17 @@ func fixturePath(test *testing.T, name string) string {
 func runFixture(test *testing.T, deep bool) *Report {
 	test.Helper()
 	islandFixture := fixturePath(test, "island")
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   islandFixture + "/tsconfig.json",
 		CurrentDirectory: islandFixture,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the fixture program: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the fixture program: %v", buildError)
 	}
-	report, err := Run(context.Background(), graph, graph.ProjectFiles(), deep)
-	if err != nil {
-		test.Fatalf("running the report: %v", err)
+	report, runError := Run(context.Background(), graph, graph.ProjectFiles(), deep)
+	if runError != nil {
+		test.Fatalf("running the report: %v", runError)
 	}
 	return report
 }
@@ -195,17 +195,17 @@ func TestReExportIsAPassThrough(test *testing.T) {
 	test.Parallel()
 	// One export reachable only through a re-export, and a barrel nothing imports.
 	barrelFixture := fixturePath(test, "barrel")
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   barrelFixture + "/tsconfig.json",
 		CurrentDirectory: barrelFixture,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the barrel fixture: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the barrel fixture: %v", buildError)
 	}
-	report, err := Run(context.Background(), graph, graph.ProjectFiles(), true)
-	if err != nil {
-		test.Fatalf("running the report: %v", err)
+	report, runError := Run(context.Background(), graph, graph.ProjectFiles(), true)
+	if runError != nil {
+		test.Fatalf("running the report: %v", runError)
 	}
 
 	found := false
@@ -250,17 +250,17 @@ func TestReExportIsAPassThrough(test *testing.T) {
 func TestDeadCodeReferenceStillCountsAsAUse(test *testing.T) {
 	test.Parallel()
 	deadrefFixture := fixturePath(test, "deadref")
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   deadrefFixture + "/tsconfig.json",
 		CurrentDirectory: deadrefFixture,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the deadref fixture: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the deadref fixture: %v", buildError)
 	}
-	report, err := Run(context.Background(), graph, graph.ProjectFiles(), true)
-	if err != nil {
-		test.Fatalf("running the report: %v", err)
+	report, runError := Run(context.Background(), graph, graph.ProjectFiles(), true)
+	if runError != nil {
+		test.Fatalf("running the report: %v", runError)
 	}
 
 	reported := map[string]bool{}

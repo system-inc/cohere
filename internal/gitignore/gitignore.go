@@ -375,12 +375,12 @@ func readTreeFile(root string, directory string) ([]rule, error) {
 // readIgnoreFile returns a file's contents, or nil when it does not exist. follow says whether a symbolic
 // link is read through: git follows one for info/exclude and not for a `.gitignore` in the tree.
 func readIgnoreFile(filePath string, follow bool) ([]byte, error) {
-	info, err := os.Lstat(filePath)
-	if errors.Is(err, fs.ErrNotExist) {
+	info, statError := os.Lstat(filePath)
+	if errors.Is(statError, fs.ErrNotExist) {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, fmt.Errorf("gitignore: reading %s: %w", filePath, err)
+	if statError != nil {
+		return nil, fmt.Errorf("gitignore: reading %s: %w", filePath, statError)
 	}
 	if info.Mode()&fs.ModeSymlink != 0 {
 		if !follow {
@@ -389,10 +389,10 @@ func readIgnoreFile(filePath string, follow bool) ([]byte, error) {
 				filePath,
 			)
 		}
-		if info, err = os.Stat(filePath); errors.Is(err, fs.ErrNotExist) {
+		if info, statError = os.Stat(filePath); errors.Is(statError, fs.ErrNotExist) {
 			return nil, nil
-		} else if err != nil {
-			return nil, fmt.Errorf("gitignore: reading %s: %w", filePath, err)
+		} else if statError != nil {
+			return nil, fmt.Errorf("gitignore: reading %s: %w", filePath, statError)
 		}
 	}
 	if !info.Mode().IsRegular() {
@@ -404,9 +404,9 @@ func readIgnoreFile(filePath string, follow bool) ([]byte, error) {
 			filePath,
 		)
 	}
-	contents, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("gitignore: reading %s: %w", filePath, err)
+	contents, readError := os.ReadFile(filePath)
+	if readError != nil {
+		return nil, fmt.Errorf("gitignore: reading %s: %w", filePath, readError)
 	}
 	return contents, nil
 }

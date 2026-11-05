@@ -122,9 +122,9 @@ func heldOutputReport(stack string, waited time.Duration) string {
 // far end of a pipe this process has open past its standard streams, leaving out this process's own running children: a
 // command another test is still running holds its pipe as it should, and so does the lsof asking.
 func pipeHolders() ([]string, error) {
-	own, err := exec.Command("lsof", "-n", "-P", "-F", "pftdn", "-p", strconv.Itoa(os.Getpid())).Output()
-	if err != nil {
-		return nil, fmt.Errorf("lsof on this process: %w", err)
+	own, outputError := exec.Command("lsof", "-n", "-P", "-F", "pftdn", "-p", strconv.Itoa(os.Getpid())).Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("lsof on this process: %w", outputError)
 	}
 	farEnds := map[string]bool{}
 	for _, open := range lsofFiles(own) {
@@ -139,9 +139,9 @@ func pipeHolders() ([]string, error) {
 	if len(farEnds) == 0 {
 		return nil, nil
 	}
-	everyone, err := exec.Command("lsof", "-n", "-P", "-F", "pcftdn").Output()
-	if err != nil && len(everyone) == 0 {
-		return nil, fmt.Errorf("lsof on every process: %w", err)
+	everyone, outputError := exec.Command("lsof", "-n", "-P", "-F", "pcftdn").Output()
+	if outputError != nil && len(everyone) == 0 {
+		return nil, fmt.Errorf("lsof on every process: %w", outputError)
 	}
 	self := strconv.Itoa(os.Getpid())
 	seen := map[string]bool{}
@@ -240,16 +240,16 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 
 	helper := exec.Command(os.Args[0], "-test.run=^TestAHeldOutputNamesItsHolder$", "-test.count=1")
 	helper.Env = append(os.Environ(), "COHERE_HELD_OUTPUT_HELPER=1")
-	outputFile, err := os.Create(test.TempDir() + "/output")
-	if err != nil {
-		test.Fatal(err)
+	outputFile, createError := os.Create(test.TempDir() + "/output")
+	if createError != nil {
+		test.Fatal(createError)
 	}
 	// Ignored: the helper writes it, through descriptors of its own, and this one is never written.
 	defer outputFile.Close()
 	// A file, not a buffer: the helper's sleep inherits whatever the helper writes to, and a buffer's pipe
 	// would hang this test on the same sleep.
 	helper.Stdout, helper.Stderr = outputFile, outputFile
-	err = helper.Run()
+	runError := helper.Run()
 	output, readError := os.ReadFile(outputFile.Name())
 	if readError != nil {
 		test.Fatal(readError)
@@ -262,7 +262,7 @@ func TestAHeldOutputNamesItsHolder(test *testing.T) {
 			}
 		}
 	}
-	if err == nil {
+	if runError == nil {
 		test.Fatalf("the helper passed, so the watch never fired:\n%s", output)
 	}
 	for _, want := range []string{"held output: a command exited", "TestAHeldOutputNamesItsHolder", "sleep 100000"} {

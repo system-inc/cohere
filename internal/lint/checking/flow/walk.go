@@ -247,8 +247,8 @@ func (walker *Walker) IsAssignable(source *checker.Type, target *checker.Type) b
 
 // WidenedType is the checker's getWidenedType: a fresh literal's type without its freshness or its literal
 // property types.
-func (walker *Walker) WidenedType(t *checker.Type) *checker.Type {
-	return checker.Checker_getWidenedType(walker.typeChecker, t)
+func (walker *Walker) WidenedType(subjectType *checker.Type) *checker.Type {
+	return checker.Checker_getWidenedType(walker.typeChecker, subjectType)
 }
 
 // meet records that the walk has met key, and says whether it had met it before.
@@ -403,8 +403,8 @@ func (walker *Walker) relate(pair Pair, depth int) (Pair, bool) {
 
 // hasPrimitiveMember is an intersection with a member that is no object: `string & { readonly [brand]?: X }`,
 // whose object member is a phantom the value never holds.
-func hasPrimitiveMember(t *checker.Type) bool {
-	for _, member := range t.Types() {
+func hasPrimitiveMember(subjectType *checker.Type) bool {
+	for _, member := range subjectType.Types() {
 		if member.Flags()&(checker.TypeFlagsObject|checker.TypeFlagsTypeParameter|checker.TypeFlagsIntersection) == 0 {
 			return true
 		}
@@ -414,24 +414,24 @@ func hasPrimitiveMember(t *checker.Type) bool {
 
 // IsClassInstance is the instance side of a class, generic or not: `Box<Dog>`, `Shelter`. The class's own
 // constructor type (`typeof Shelter`) carries the class's symbol too, and is not one.
-func IsClassInstance(t *checker.Type) bool {
-	if t == nil || t.Flags()&checker.TypeFlagsObject == 0 {
+func IsClassInstance(subjectType *checker.Type) bool {
+	if subjectType == nil || subjectType.Flags()&checker.TypeFlagsObject == 0 {
 		return false
 	}
-	if t.ObjectFlags()&checker.ObjectFlagsClass != 0 {
+	if subjectType.ObjectFlags()&checker.ObjectFlagsClass != 0 {
 		return true
 	}
-	return t.ObjectFlags()&checker.ObjectFlagsReference != 0 && t.Target() != nil &&
-		t.Target().ObjectFlags()&checker.ObjectFlagsClass != 0
+	return subjectType.ObjectFlags()&checker.ObjectFlagsReference != 0 && subjectType.Target() != nil &&
+		subjectType.Target().ObjectFlags()&checker.ObjectFlagsClass != 0
 }
 
 // isSlotContainer is an array, a tuple or a library container: the slots the walk pairs by position or by
 // type argument, as opposed to by property name.
-func (walker *Walker) isSlotContainer(t *checker.Type) bool {
-	if IsArrayLike(walker.typeChecker, t) {
+func (walker *Walker) isSlotContainer(subjectType *checker.Type) bool {
+	if IsArrayLike(walker.typeChecker, subjectType) {
 		return true
 	}
-	_, _, isContainer := containerOf(t)
+	_, _, isContainer := containerOf(subjectType)
 	return isContainer
 }
 
@@ -566,44 +566,44 @@ func (walker *Walker) narrowableFields(pair Pair, depth int) (Pair, bool) {
  * contents of a mutable container, or a property that is not readonly (methods aside, as in parts), at any
  * depth below a readonly one, since `readonly items: Animal[]` still holds a mutable array.
  */
-func (walker *Walker) hasWritableSlot(t *checker.Type, depth int) bool {
-	if t == nil || depth > maximumDepth {
+func (walker *Walker) hasWritableSlot(subjectType *checker.Type, depth int) bool {
+	if subjectType == nil || depth > maximumDepth {
 		return false
 	}
-	if t.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 {
-		for _, member := range t.Types() {
+	if subjectType.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 {
+		for _, member := range subjectType.Types() {
 			if walker.hasWritableSlot(member, depth+1) {
 				return true
 			}
 		}
 		return false
 	}
-	if checker.Checker_isArrayType(walker.typeChecker, t) {
-		return !isNamed(t, "ReadonlyArray") || walker.hasWritableSlot(walker.typeArgument(t, 0), depth+1)
+	if checker.Checker_isArrayType(walker.typeChecker, subjectType) {
+		return !isNamed(subjectType, "ReadonlyArray") || walker.hasWritableSlot(walker.typeArgument(subjectType, 0), depth+1)
 	}
-	if checker.IsTupleType(t) {
-		if !t.TargetTupleType().IsReadonly() {
+	if checker.IsTupleType(subjectType) {
+		if !subjectType.TargetTupleType().IsReadonly() {
 			return true
 		}
 		return slices.ContainsFunc(checker.Checker_getTypeArguments(
 			walker.typeChecker,
-			t,
+			subjectType,
 		), func(element *checker.Type) bool {
 			return walker.hasWritableSlot(element, depth+1)
 		})
 	}
-	if _, readonly, isContainer := containerOf(t); isContainer {
+	if _, readonly, isContainer := containerOf(subjectType); isContainer {
 		return !readonly || slices.ContainsFunc(checker.Checker_getTypeArguments(
 			walker.typeChecker,
-			t,
+			subjectType,
 		), func(argument *checker.Type) bool {
 			return walker.hasWritableSlot(argument, depth+1)
 		})
 	}
-	if t.Flags()&checker.TypeFlagsObject == 0 {
+	if subjectType.Flags()&checker.TypeFlagsObject == 0 {
 		return false
 	}
-	for _, property := range checker.Checker_getPropertiesOfType(walker.typeChecker, t) {
+	for _, property := range checker.Checker_getPropertiesOfType(walker.typeChecker, subjectType) {
 		if property.Flags&ast.SymbolFlagsMethod != 0 {
 			continue
 		}
@@ -825,8 +825,8 @@ func (walker *Walker) inContextOf(
 	return checker.Checker_instantiateSignatureInContextOf(walker.typeChecker, source, target, nil, nil), target
 }
 
-func (walker *Walker) typeArgument(t *checker.Type, index int) *checker.Type {
-	arguments := checker.Checker_getTypeArguments(walker.typeChecker, t)
+func (walker *Walker) typeArgument(subjectType *checker.Type, index int) *checker.Type {
+	arguments := checker.Checker_getTypeArguments(walker.typeChecker, subjectType)
 	if index >= len(arguments) {
 		return nil
 	}
@@ -839,14 +839,14 @@ var containers = map[string]bool{
 	"ReadonlyMap": true, "ReadonlySet": true,
 }
 
-// containerOf names t's container and whether it is read-only, when t is a reference to one declared in a
+// containerOf names `subjectType`'s container and whether it is read-only, when `subjectType` is a reference to one declared in a
 // declaration file. The file test stands in for "the library": Adamic ships its own `.d.ts` under noLib,
 // so asking whether the symbol came from TypeScript's default library would miss Adamic's own Map.
-func containerOf(t *checker.Type) (string, bool, bool) {
-	if t.ObjectFlags()&checker.ObjectFlagsReference == 0 || t.Target() == nil {
+func containerOf(subjectType *checker.Type) (string, bool, bool) {
+	if subjectType.ObjectFlags()&checker.ObjectFlagsReference == 0 || subjectType.Target() == nil {
 		return "", false, false
 	}
-	symbol := t.Target().Symbol()
+	symbol := subjectType.Target().Symbol()
 	if symbol == nil {
 		return "", false, false
 	}
@@ -858,11 +858,11 @@ func containerOf(t *checker.Type) (string, bool, bool) {
 }
 
 // isNamed is a type reference whose generic target is the library type of that name.
-func isNamed(t *checker.Type, name string) bool {
-	if t.ObjectFlags()&checker.ObjectFlagsReference == 0 || t.Target() == nil {
+func isNamed(subjectType *checker.Type, name string) bool {
+	if subjectType.ObjectFlags()&checker.ObjectFlagsReference == 0 || subjectType.Target() == nil {
 		return false
 	}
-	symbol := t.Target().Symbol()
+	symbol := subjectType.Target().Symbol()
 	return symbol != nil && symbol.Name == name && declaredInDeclarationFile(symbol)
 }
 
@@ -1140,8 +1140,8 @@ func isRestParameter(parameter *ast.Symbol) bool {
 }
 
 // IsArrayLike is an array or a tuple, read-only or not.
-func IsArrayLike(typeChecker *checker.Checker, t *checker.Type) bool {
-	return checker.Checker_isArrayType(typeChecker, t) || checker.IsTupleType(t)
+func IsArrayLike(typeChecker *checker.Checker, subjectType *checker.Type) bool {
+	return checker.Checker_isArrayType(typeChecker, subjectType) || checker.IsTupleType(subjectType)
 }
 
 // PathText is a path as a reader follows it from the whole value: `.pets[]`, `<Map value>`, `()`.
@@ -1190,18 +1190,18 @@ func containerArgumentName(container string, index int) string {
 
 // IsTypeParameterIndexedAccess recognizes T[K] and nested accesses such as T['inner']['value'].
 // It does not expand constraints: other relations retaining a parameter need their own Node probe.
-func IsTypeParameterIndexedAccess(t *checker.Type) bool {
-	if t == nil || t.Flags()&checker.TypeFlagsIndexedAccess == 0 {
+func IsTypeParameterIndexedAccess(subjectType *checker.Type) bool {
+	if subjectType == nil || subjectType.Flags()&checker.TypeFlagsIndexedAccess == 0 {
 		return false
 	}
 	for depth := 0; depth <= maximumDepth; depth++ {
-		if t.Flags()&checker.TypeFlagsTypeParameter != 0 {
+		if subjectType.Flags()&checker.TypeFlagsTypeParameter != 0 {
 			return true
 		}
-		if t.Flags()&checker.TypeFlagsIndexedAccess == 0 {
+		if subjectType.Flags()&checker.TypeFlagsIndexedAccess == 0 {
 			return false
 		}
-		t = t.AsIndexedAccessType().ObjectType()
+		subjectType = subjectType.AsIndexedAccessType().ObjectType()
 	}
 	return false
 }

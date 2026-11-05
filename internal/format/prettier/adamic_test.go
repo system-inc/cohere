@@ -17,13 +17,13 @@ func TestTheEngineFormatsAnAdamicFileAsTypeScript(test *testing.T) {
 		"interface Shape{width:number;height:number}\nexport function area(shape:Shape):number{return shape.width*shape.height}\n",
 	}
 	for _, source := range sources {
-		asTypeScript, err := engine.Format("/repo/Dog.ts", source)
-		if err != nil {
-			test.Fatalf("as .ts: %v", err)
+		asTypeScript, formatError := engine.Format("/repo/Dog.ts", source)
+		if formatError != nil {
+			test.Fatalf("as .ts: %v", formatError)
 		}
-		asAdamic, err := engine.Format("/repo/Dog.a", source)
-		if err != nil {
-			test.Fatalf("as .a: %v", err)
+		asAdamic, formatError := engine.Format("/repo/Dog.a", source)
+		if formatError != nil {
+			test.Fatalf("as .a: %v", formatError)
 		}
 		if asAdamic != asTypeScript {
 			test.Errorf("%q formats as .a to\n%s\nand as .ts to\n%s", source, asAdamic, asTypeScript)

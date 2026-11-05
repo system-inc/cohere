@@ -207,13 +207,13 @@ func waitForFile(test *testing.T, path string) {
 // orphan is reaped by launchd or init a moment after it dies, so it is given two seconds.
 func requireProcessEnded(test *testing.T, path string) {
 	test.Helper()
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("the stand-in engine never wrote its child's id: %v", err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("the stand-in engine never wrote its child's id: %v", readError)
 	}
-	child, err := strconv.Atoi(strings.TrimSpace(string(contents)))
-	if err != nil {
-		test.Fatalf("the child id %q is not a number: %v", contents, err)
+	child, parseError := strconv.Atoi(strings.TrimSpace(string(contents)))
+	if parseError != nil {
+		test.Fatalf("the child id %q is not a number: %v", contents, parseError)
 	}
 	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
 		if syscall.Kill(child, 0) == syscall.ESRCH {
@@ -275,6 +275,8 @@ func TestAStandInEnginesChildIsKilledWhenItsTestEnds(test *testing.T) {
 		close(ended)
 	}()
 	// The subtest stands for a stand-in engine test that leaves its child running; its cleanups run as it ends.
+	// Not parallel: the wait below needs its cleanup to have killed the child, and a parallel subtest would not
+	// start until this test returned
 	test.Run("a test that leaves its child running", func(test *testing.T) {
 		killChildAtCleanup(test, childFile)
 	})

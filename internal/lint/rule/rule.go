@@ -416,9 +416,9 @@ type Rule struct {
 // Note records one occurrence of a fact the rule wants counted rather than reported: an exemption it
 // applied, say, so that a tag silencing writes shows up as a number someone reads instead of as nothing.
 // A note is not a finding and fails nothing. The walk counts notes per file, per rule and per key.
-func (c Context) Note(key string) {
-	if c.RecordNote != nil {
-		c.RecordNote(key)
+func (ruleContext Context) Note(key string) {
+	if ruleContext.RecordNote != nil {
+		ruleContext.RecordNote(key)
 	}
 }
 
@@ -431,8 +431,8 @@ const SkippedNotePrefix = "skipped: "
 // way otherwise reads exactly like a rule that looked and found nothing: no-useless-default-assignment
 // declined every file in ahra and www while every run read green (#6ar414z, #pa7k7zv). It is not for a
 // file the rule is simply not about, a `.d.ts` or a file outside its directory, which is its scope.
-func (c Context) Skip(reason string) {
-	c.Note(SkippedNotePrefix + reason)
+func (ruleContext Context) Skip(reason string) {
+	ruleContext.Note(SkippedNotePrefix + reason)
 }
 
 // Cover is another check that reports what a rule declined to, named so a run can tell whether it ran.
@@ -449,15 +449,15 @@ const CoveredSkipNotePrefix = "skipped, covered by "
 // names that check. A skip whose cover ran this run left nothing unchecked, so the footer does not mark it;
 // one whose cover did not run (`--lint`, or a types phase that bailed) is a gap like any other skip. A rule
 // declining for any other reason calls Skip: choosing between the two is how a skip says which it is.
-func (c Context) SkipCovered(cover Cover, reason string) {
-	c.Note(CoveredSkipNotePrefix + string(cover) + ": " + reason)
+func (ruleContext Context) SkipCovered(cover Cover, reason string) {
+	ruleContext.Note(CoveredSkipNotePrefix + string(cover) + ": " + reason)
 }
 
-func (c Context) ReportNode(node *ast.Node, message Message) {
-	c.Report(Diagnostic{
-		Range:      TokenRange(c.SourceFile, node),
+func (ruleContext Context) ReportNode(node *ast.Node, message Message) {
+	ruleContext.Report(Diagnostic{
+		Range:      TokenRange(ruleContext.SourceFile, node),
 		Message:    message,
-		SourceFile: c.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 	})
 }
 
@@ -466,32 +466,32 @@ func (c Context) ReportNode(node *ast.Node, message Message) {
 // Anchored on the node's own text, for the reason spelled out on ReportNode. This one matters twice
 // over: a finding reported at the wrong line while carrying a fix means the fix is applied at a
 // location the reader was never shown.
-func (c Context) ReportNodeWithFixes(node *ast.Node, message Message, fixes ...Fix) {
-	c.Report(Diagnostic{
-		Range:      TokenRange(c.SourceFile, node),
+func (ruleContext Context) ReportNodeWithFixes(node *ast.Node, message Message, fixes ...Fix) {
+	ruleContext.Report(Diagnostic{
+		Range:      TokenRange(ruleContext.SourceFile, node),
 		Message:    message,
-		SourceFile: c.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 		Fixes:      fixes,
 	})
 }
 
 // ReportNodeWithSuggestions reports a node and offers repairs that need a human to choose them.
-func (c Context) ReportNodeWithSuggestions(node *ast.Node, message Message, suggestions ...Suggestion) {
-	c.Report(Diagnostic{
-		Range:       TokenRange(c.SourceFile, node),
+func (ruleContext Context) ReportNodeWithSuggestions(node *ast.Node, message Message, suggestions ...Suggestion) {
+	ruleContext.Report(Diagnostic{
+		Range:       TokenRange(ruleContext.SourceFile, node),
 		Message:     message,
-		SourceFile:  c.SourceFile,
+		SourceFile:  ruleContext.SourceFile,
 		Suggestions: suggestions,
 	})
 }
 
 // ReportRange reports a span that is not exactly one node: a portion of a string literal, or the
 // gap between two tokens.
-func (c Context) ReportRange(textRange core.TextRange, message Message) {
-	c.Report(Diagnostic{
+func (ruleContext Context) ReportRange(textRange core.TextRange, message Message) {
+	ruleContext.Report(Diagnostic{
 		Range:      textRange,
 		Message:    message,
-		SourceFile: c.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 	})
 }
 
@@ -506,11 +506,11 @@ func (c Context) ReportRange(textRange core.TextRange, message Message) {
 // The shape was already settled elsewhere. The tsgolint adapter has exactly this method, because an
 // adapted rule needed it first. Native rules simply did not have it, which is the kind of asymmetry
 // that is invisible until someone writes the rule that falls in the gap.
-func (c Context) ReportRangeWithSuggestions(textRange core.TextRange, message Message, suggestions ...Suggestion) {
-	c.Report(Diagnostic{
+func (ruleContext Context) ReportRangeWithSuggestions(textRange core.TextRange, message Message, suggestions ...Suggestion) {
+	ruleContext.Report(Diagnostic{
 		Range:       textRange,
 		Message:     message,
-		SourceFile:  c.SourceFile,
+		SourceFile:  ruleContext.SourceFile,
 		Suggestions: suggestions,
 	})
 }
@@ -530,11 +530,11 @@ func (c Context) ReportRangeWithSuggestions(textRange core.TextRange, message Me
 // matches on `ReportRangeWithFixes` alongside `ReportNodeWithFixes` when deciding whether a rule
 // proposes a fix. A rule reporting a computed span with a fix through a hand-built Diagnostic would
 // have read to that guard as proposing nothing.
-func (c Context) ReportRangeWithFixes(textRange core.TextRange, message Message, fixes ...Fix) {
-	c.Report(Diagnostic{
+func (ruleContext Context) ReportRangeWithFixes(textRange core.TextRange, message Message, fixes ...Fix) {
+	ruleContext.Report(Diagnostic{
 		Range:      textRange,
 		Message:    message,
-		SourceFile: c.SourceFile,
+		SourceFile: ruleContext.SourceFile,
 		Fixes:      fixes,
 	})
 }
@@ -618,9 +618,9 @@ func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 // A method on the context, reading the context's own file, rather than a function taking a file: the
 // type-reach guard counts text read out of any other file as descending into an imported body, so the
 // only spelling offered is the one that cannot (internal/guard/type_reach_test.go).
-func (c Context) NodeText(node *ast.Node) string {
-	span := TokenRange(c.SourceFile, node)
-	return c.SourceFile.Text()[span.Pos():span.End()]
+func (ruleContext Context) NodeText(node *ast.Node) string {
+	span := TokenRange(ruleContext.SourceFile, node)
+	return ruleContext.SourceFile.Text()[span.Pos():span.End()]
 }
 
 // The fix helpers come in two families, and picking the wrong one is the most common way a correct
@@ -667,8 +667,8 @@ func (c Context) NodeText(node *ast.Node) string {
 // the rule's own fix silences the finding that would have reported the rest of the work.
 
 // ReplaceNode proposes replacing a node's own text, leaving the trivia before it untouched.
-func (c Context) ReplaceNode(node *ast.Node, text string) Fix {
-	return Fix{Range: TokenRange(c.SourceFile, node), Text: text}
+func (ruleContext Context) ReplaceNode(node *ast.Node, text string) Fix {
+	return Fix{Range: TokenRange(ruleContext.SourceFile, node), Text: text}
 }
 
 // RemoveNode proposes deleting a node's own text.
@@ -677,8 +677,8 @@ func (c Context) ReplaceNode(node *ast.Node, text string) Fix {
 // and removing the blank line above it are different intentions, and a helper that guessed would
 // be wrong half the time. A rule wanting the surrounding whitespace gone should say so with
 // ReplaceRange over a range it computed itself.
-func (c Context) RemoveNode(node *ast.Node) Fix {
-	return Fix{Range: TokenRange(c.SourceFile, node), Text: ""}
+func (ruleContext Context) RemoveNode(node *ast.Node) Fix {
+	return Fix{Range: TokenRange(ruleContext.SourceFile, node), Text: ""}
 }
 
 // InsertBefore proposes inserting text immediately before a node's own text.
@@ -686,8 +686,8 @@ func (c Context) RemoveNode(node *ast.Node) Fix {
 // Before the token rather than before its trivia, which is almost always what a rule means: adding
 // a modifier to a declaration should land next to the declaration, not above the comment that
 // documents it.
-func (c Context) InsertBefore(node *ast.Node, text string) Fix {
-	tokenRange := TokenRange(c.SourceFile, node)
+func (ruleContext Context) InsertBefore(node *ast.Node, text string) Fix {
+	tokenRange := TokenRange(ruleContext.SourceFile, node)
 	return Fix{Range: tokenRange.WithEnd(tokenRange.Pos()), Text: text}
 }
 
@@ -695,7 +695,7 @@ func (c Context) InsertBefore(node *ast.Node, text string) Fix {
 //
 // No trimming needed: a node's End is already past its own text, and trailing trivia belongs to
 // whatever comes next.
-func (c Context) InsertAfter(node *ast.Node, text string) Fix {
+func (ruleContext Context) InsertAfter(node *ast.Node, text string) Fix {
 	return Fix{Range: node.Loc.WithPos(node.End()), Text: text}
 }
 

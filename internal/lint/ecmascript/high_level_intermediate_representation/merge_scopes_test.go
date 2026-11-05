@@ -478,7 +478,7 @@ func countNonNestedPairs(ranges map[ScopeId]mutation_aliasing.MutableRange) int 
 	for id := range ranges {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	sort.Slice(ids, func(left, right int) bool { return ids[left] < ids[right] })
 
 	count := 0
 	for i := 0; i < len(ids); i++ {

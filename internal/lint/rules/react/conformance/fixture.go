@@ -150,9 +150,9 @@ type ReportedError struct {
 // run, which is the failure this package exists to make impossible.
 func Load(root string) ([]Fixture, error) {
 	var inputPaths []string
-	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() || strings.HasSuffix(path, ".expect.md") {
 			return nil
@@ -412,8 +412,8 @@ func parseLocation(line string) (file string, lineNumber int, column int, ok boo
 	if lastColon < 0 {
 		return "", 0, 0, false
 	}
-	column, err := strconv.Atoi(line[lastColon+1:])
-	if err != nil {
+	column, parseError := strconv.Atoi(line[lastColon+1:])
+	if parseError != nil {
 		return "", 0, 0, false
 	}
 	rest := line[:lastColon]
@@ -421,8 +421,8 @@ func parseLocation(line string) (file string, lineNumber int, column int, ok boo
 	if secondColon < 0 {
 		return "", 0, 0, false
 	}
-	lineNumber, err = strconv.Atoi(rest[secondColon+1:])
-	if err != nil {
+	lineNumber, parseError = strconv.Atoi(rest[secondColon+1:])
+	if parseError != nil {
 		return "", 0, 0, false
 	}
 	file = rest[:secondColon]

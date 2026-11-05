@@ -296,11 +296,11 @@ func (ranges *MutableRanges) Contains(
 }
 
 // Set writes a range, creating the table lazily.
-func (ranges *MutableRanges) Set(id static_single_assignment.IdentifierId, r MutableRange) {
+func (ranges *MutableRanges) Set(id static_single_assignment.IdentifierId, mutableRange MutableRange) {
 	if ranges.ranges == nil {
 		ranges.ranges = map[static_single_assignment.IdentifierId]MutableRange{}
 	}
-	ranges.ranges[id] = r
+	ranges.ranges[id] = mutableRange
 }
 
 // InferMutableRanges computes the mutable range of every value in function, returning them as a
@@ -581,12 +581,12 @@ func ValidateMutableRanges(ranges *MutableRanges) []static_single_assignment.Ide
 		return nil
 	}
 	var invalid []static_single_assignment.IdentifierId
-	for id, r := range ranges.ranges {
-		if !r.IsValid() {
+	for id, value := range ranges.ranges {
+		if !value.IsValid() {
 			invalid = append(invalid, id)
 		}
 	}
-	sort.Slice(invalid, func(i, j int) bool { return invalid[i] < invalid[j] })
+	sort.Slice(invalid, func(left, right int) bool { return invalid[left] < invalid[right] })
 	return invalid
 }
 
@@ -663,11 +663,11 @@ func BlockFirstOrder[G Graph[F, B, P], F any, B comparable, P any](
 // Upstream writes `Math.max(instr.id + 1, existing)` inside a branch that has just tested the
 // existing value is zero, so the max is redundant there. It is reproduced rather than simplified
 // because the redundancy is upstream's and a later widening rule reaching this line would need it.
-func maxOrder(a, b static_single_assignment.EvaluationOrder) static_single_assignment.EvaluationOrder {
-	if a > b {
-		return a
+func maxOrder(left, right static_single_assignment.EvaluationOrder) static_single_assignment.EvaluationOrder {
+	if left > right {
+		return left
 	}
-	return b
+	return right
 }
 
 // =============================================================================
@@ -938,7 +938,7 @@ func (state *aliasingState) deriveImmutable(
 // A function rather than a method, since it reads the phi's places through the IR's Graph. Operands
 // are sorted by predecessor with one entry each, so ranging them is PhiOperandsInOrder's order.
 func derivePhiImmutable[G Graph[F, B, P], F any, B comparable, P any](
-	s *aliasingState,
+	state *aliasingState,
 	graph G,
 	phi *static_single_assignment.Phi[P],
 	seenBlocks map[static_single_assignment.BlockId]bool,
@@ -952,7 +952,7 @@ func derivePhiImmutable[G Graph[F, B, P], F any, B comparable, P any](
 		if !seenBlocks[operand.Predecessor] {
 			return
 		}
-		operandKind, present := s.immutable[graph.IdentifierOf(operand.Place)]
+		operandKind, present := state.immutable[graph.IdentifierOf(operand.Place)]
 		if !present {
 			hasMutable = true
 			continue
@@ -971,7 +971,7 @@ func derivePhiImmutable[G Graph[F, B, P], F any, B comparable, P any](
 		}
 		kind = EffectValueMaybeFrozen
 	}
-	s.markImmutable(graph.IdentifierOf(phi.Place), kind)
+	state.markImmutable(graph.IdentifierOf(phi.Place), kind)
 }
 
 // create makes a node, replacing any existing one.

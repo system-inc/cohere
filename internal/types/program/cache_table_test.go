@@ -339,9 +339,9 @@ func TestCacheTableSurvivesDisk(test *testing.T) {
 	); writeCacheTableError != nil {
 		test.Fatalf("writing: %v", writeCacheTableError)
 	}
-	read, err := readEverySection(test, directory, testIdentity)
-	if err != nil {
-		test.Fatalf("reading back: %v", err)
+	read, readEverySectionError := readEverySection(test, directory, testIdentity)
+	if readEverySectionError != nil {
+		test.Fatalf("reading back: %v", readEverySectionError)
 	}
 
 	// The interpolated description is the one thing in a finding nothing can rebuild, so it is the one
@@ -358,9 +358,9 @@ func TestCacheTableSurvivesDisk(test *testing.T) {
 		test.Error("the run did not survive disk")
 	}
 
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		test.Fatal(err)
+	entries, readDirectoryError := os.ReadDir(directory)
+	if readDirectoryError != nil {
+		test.Fatal(readDirectoryError)
 	}
 	names := []string{}
 	for _, entry := range entries {

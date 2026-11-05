@@ -904,9 +904,9 @@ func consistentTypeImportsWordList(names []string) string {
 func DecodeConsistentTypeImportsOptions(raw []byte) (any, error) {
 	options := DefaultConsistentTypeImportsOptions()
 
-	decoded, err := rule.DecodeOptionsInto[consistentTypeImportsRawOptions]()(raw)
-	if err != nil {
-		return options, err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[consistentTypeImportsRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return options, decodeOptionsError
 	}
 	wire, _ := decoded.(consistentTypeImportsRawOptions)
 

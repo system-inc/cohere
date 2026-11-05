@@ -33,9 +33,9 @@ func TestVerifySignatureRefusesAnAdHocSignature(test *testing.T) {
 		test.Skip("codesign exists only on macOS")
 	}
 
-	original, err := os.ReadFile("/usr/bin/true")
-	if err != nil {
-		test.Fatal(err)
+	original, readError := os.ReadFile("/usr/bin/true")
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	binaryPath := filepath.Join(test.TempDir(), "true")
 	if writeError := os.WriteFile(binaryPath, original, 0o755); writeError != nil {
@@ -53,12 +53,12 @@ func TestVerifySignatureRefusesAnAdHocSignature(test *testing.T) {
 		test.Fatalf("signing the copy ad hoc: %v\n%s", outputError, output)
 	}
 
-	err = VerifySignature(binaryPath)
-	if err == nil {
+	verifySignatureError := VerifySignature(binaryPath)
+	if verifySignatureError == nil {
 		test.Fatal("an ad hoc signature was accepted")
 	}
-	if !strings.Contains(err.Error(), "ad-hoc signature") {
-		test.Fatalf("refused, but not as ad hoc, so the check never read the signature: %v", err)
+	if !strings.Contains(verifySignatureError.Error(), "ad-hoc signature") {
+		test.Fatalf("refused, but not as ad hoc, so the check never read the signature: %v", verifySignatureError)
 	}
 }
 
@@ -68,18 +68,18 @@ func TestVerifySignatureRefusesAnAdHocSignature(test *testing.T) {
 func TestReadNotaryVerdictReadsTheStatus(test *testing.T) {
 	test.Parallel()
 
-	accepted, err := readNotaryVerdict(
+	accepted, readNotaryVerdictError := readNotaryVerdict(
 		[]byte(`{"id":"2efe2717-52ef-43a5-96dc-0797e4ca1041","message":"Processing complete","status":"Accepted"}`),
 	)
-	if err != nil || accepted.Status != "Accepted" || accepted.Identifier != "2efe2717-52ef-43a5-96dc-0797e4ca1041" {
-		test.Fatalf("an Accepted answer read as %+v, %v", accepted, err)
+	if readNotaryVerdictError != nil || accepted.Status != "Accepted" || accepted.Identifier != "2efe2717-52ef-43a5-96dc-0797e4ca1041" {
+		test.Fatalf("an Accepted answer read as %+v, %v", accepted, readNotaryVerdictError)
 	}
 
-	invalid, err := readNotaryVerdict(
+	invalid, readNotaryVerdictError := readNotaryVerdict(
 		[]byte(`{"id":"8f1c2c55-0f5b-4a4e-9a9d-3d1f2b6a7e10","message":"Processing complete","status":"Invalid"}`),
 	)
-	if err != nil || invalid.Status != "Invalid" {
-		test.Fatalf("an Invalid answer read as %+v, %v", invalid, err)
+	if readNotaryVerdictError != nil || invalid.Status != "Invalid" {
+		test.Fatalf("an Invalid answer read as %+v, %v", invalid, readNotaryVerdictError)
 	}
 
 	for _, output := range []string{``, `not json`, `{"id":"8f1c2c55-0f5b-4a4e-9a9d-3d1f2b6a7e10"}`} {

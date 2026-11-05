@@ -16,8 +16,8 @@ import (
 )
 
 // FromError is the sentence a person reads for an error chain.
-func FromError(err error) string {
-	return Of(err.Error())
+func FromError(sourceError error) string {
+	return Of(sourceError.Error())
 }
 
 // Of is a clause as a sentence: its first letter capitalized when its first word is an ordinary word,

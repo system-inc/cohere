@@ -772,10 +772,10 @@ func TestNoConfusingVoidExpressionFires(test *testing.T) {
 			if testCase.fixedSource == nil {
 				// Upstream's `output: null`: reported and deliberately not repaired. Reproducing
 				// the decline is the assertion.
-				for i, diagnostic := range result.Diagnostics {
+				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
 						test.Errorf("finding %d proposes %d fixes; upstream declines this case",
-							i, len(diagnostic.Fixes))
+							index, len(diagnostic.Fixes))
 					}
 				}
 				return
@@ -909,10 +909,10 @@ func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(test *testing.T) 
 				noConfusingVoidExpressionFile,
 				noConfusingVoidExpressionAmbientGlobals+testCase.source, nil)
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
-			for i, diagnostic := range result.Diagnostics {
+			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
 					test.Errorf("finding %d proposes %d fixes; the repair would delete the comment "+
-						"sitting inside the range it replaces", i, len(diagnostic.Fixes))
+						"sitting inside the range it replaces", index, len(diagnostic.Fixes))
 				}
 			}
 		})

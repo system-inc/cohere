@@ -58,27 +58,27 @@ var swiftEngineInputs = []string{"swift/Package.swift", "swift/Package.resolved"
 
 // resolveCommittedSwiftEngine returns the engine for commit, building it when the cache has none.
 func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, contract int) (string, bool, error) {
-	hash, err := committedSwiftEngineHash(paths, commit, toolchain)
-	if err != nil {
-		return "", false, err
+	hash, committedSwiftEngineHashError := committedSwiftEngineHash(paths, commit, toolchain)
+	if committedSwiftEngineHashError != nil {
+		return "", false, committedSwiftEngineHashError
 	}
 	binaryPath := paths.SwiftEngineBinaryPath(hash)
-	if _, statErr := os.Stat(binaryPath); statErr == nil {
+	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
 	}
 
 	if createDirectoryError := os.MkdirAll(paths.CacheDirectory, 0o755); createDirectoryError != nil {
 		return "", false, fmt.Errorf("creating %s: %w", paths.CacheDirectory, createDirectoryError)
 	}
-	unlock, err := lockExclusive(paths.swiftSourceLock())
-	if err != nil {
-		return "", false, err
+	unlock, lockExclusiveError := lockExclusive(paths.swiftSourceLock())
+	if lockExclusiveError != nil {
+		return "", false, lockExclusiveError
 	}
 	defer unlock()
 
 	// Asked again under the lock: a run waiting here behind another that built this same engine finds
 	// it, and does not move the worktree or build again.
-	if _, statErr := os.Stat(binaryPath); statErr == nil {
+	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
 	}
 
@@ -96,12 +96,12 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	temporary := binaryPath + fmt.Sprintf(".partial-%d", os.Getpid())
 	defer os.Remove(temporary)
 
-	if err := buildSwiftProduct(
+	if buildSwiftProductError := buildSwiftProduct(
 		filepath.Join(worktree, "swift"),
 		paths.SwiftCommittedBuildDirectory(),
 		temporary,
-	); err != nil {
-		return "", false, err
+	); buildSwiftProductError != nil {
+		return "", false, buildSwiftProductError
 	}
 	if proveCommittedSwiftEngineError := proveCommittedSwiftEngine(
 		temporary,
@@ -187,9 +187,9 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 	// keep it costs the next run one git call, so it is not an error.
 	if createDirectoryError := os.MkdirAll(filepath.Dir(kept), 0o755); createDirectoryError == nil {
 		if temporary, temporaryFileError := os.CreateTemp(filepath.Dir(kept), ".inputs-*"); temporaryFileError == nil {
-			_, writeErr := temporary.WriteString(strings.Join(objects, "\n") + "\n")
-			closeErr := temporary.Close()
-			if writeErr != nil || closeErr != nil || os.Rename(temporary.Name(), kept) != nil {
+			_, writeError := temporary.WriteString(strings.Join(objects, "\n") + "\n")
+			closeError := temporary.Close()
+			if writeError != nil || closeError != nil || os.Rename(temporary.Name(), kept) != nil {
 				os.Remove(temporary.Name())
 			}
 		}

@@ -69,9 +69,9 @@ func underscoredInternalPackageNames(test *testing.T) map[string]bool {
 	test.Helper()
 
 	names := map[string]bool{}
-	walkError := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	walkError := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
 		}
 		if entry.IsDir() && entry.Name() == "testdata" {
 			return filepath.SkipDir
@@ -108,9 +108,9 @@ func ruleMessageDescriptionsOnDisk(test *testing.T) []messageDescription {
 
 	var found []messageDescription
 	fileSet := token.NewFileSet()
-	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
+	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, walkError error) error {
+		if walkError != nil {
+			return walkError
 		}
 		if entry.IsDir() && entry.Name() == "testdata" {
 			return filepath.SkipDir
@@ -119,9 +119,9 @@ func ruleMessageDescriptionsOnDisk(test *testing.T) []messageDescription {
 			return nil
 		}
 
-		parsed, parseErr := parser.ParseFile(fileSet, path, nil, 0)
-		if parseErr != nil {
-			test.Fatalf("parsing %s: %v", path, parseErr)
+		parsed, parseError := parser.ParseFile(fileSet, path, nil, 0)
+		if parseError != nil {
+			test.Fatalf("parsing %s: %v", path, parseError)
 		}
 
 		ast.Inspect(parsed, func(node ast.Node) bool {

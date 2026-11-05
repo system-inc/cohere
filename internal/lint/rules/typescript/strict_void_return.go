@@ -31,9 +31,9 @@ type strictVoidReturnRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple, so the bare object arrives.
 func DecodeStrictVoidReturnOptions(raw []byte) (any, error) {
-	decoded, err := rule.DecodeOptionsInto[strictVoidReturnRawOptions]()(raw)
-	if err != nil {
-		return DefaultStrictVoidReturnSettings(), err
+	decoded, decodeOptionsError := rule.DecodeOptionsInto[strictVoidReturnRawOptions]()(raw)
+	if decodeOptionsError != nil {
+		return DefaultStrictVoidReturnSettings(), decodeOptionsError
 	}
 	wire, _ := decoded.(strictVoidReturnRawOptions)
 	options := DefaultStrictVoidReturnSettings()

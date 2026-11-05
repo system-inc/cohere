@@ -67,7 +67,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 	atKey := composition.atKey
 	spaceBefore, comment, anchor, tag := properties.spaceBefore, properties.comment, properties.anchor, properties.tag
 	var node *Node
-	isSrcToken := true
+	isSourceToken := true
 	switch token.Type {
 	case "alias":
 		node = composeAlias(composition, token, onError)
@@ -87,7 +87,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 			message = token.Message
 		}
 		onError(token, "UNEXPECTED_TOKEN", message, false)
-		isSrcToken = false
+		isSourceToken = false
 	}
 	if node == nil {
 		node = composeEmptyNode(composition, token.Offset, nil, properties, onError)
@@ -115,7 +115,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 			node.CommentBefore = comment
 		}
 	}
-	if composition.options.KeepSourceTokens && isSrcToken {
+	if composition.options.KeepSourceTokens && isSourceToken {
 		node.SrcToken = token
 	}
 	return node
@@ -209,8 +209,8 @@ func composeAlias(composition *composeContext, token *cst.Token, onError onError
 func emptyScalarPosition(offset int, before []*cst.Token) int {
 	if before != nil {
 		position := len(before)
-		for i := position - 1; i >= 0; i-- {
-			st := before[i]
+		for index := position - 1; index >= 0; index-- {
+			st := before[index]
 			switch st.Type {
 			case "space", "comment", "newline":
 				offset -= len(st.Source)
@@ -218,10 +218,10 @@ func emptyScalarPosition(offset int, before []*cst.Token) int {
 			}
 			// Technically, an empty scalar is immediately after the last non-empty
 			// node, but it's more useful to place it after any whitespace.
-			i++
-			for i < len(before) && before[i].Type == "space" {
-				offset += len(before[i].Source)
-				i++
+			index++
+			for index < len(before) && before[index].Type == "space" {
+				offset += len(before[index].Source)
+				index++
 			}
 			break
 		}

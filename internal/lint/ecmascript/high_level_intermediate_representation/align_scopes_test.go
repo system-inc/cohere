@@ -49,23 +49,23 @@ func alignedRangeMap(aligned *AlignedScopes) map[ScopeId]mutation_aliasing.Mutab
 // delete scopes to reach its target.
 func violationsByKind(scopes, blocks []nestingItem) (scopeInBlock, blockInScope, blockInBlock int) {
 	items := make([]tagged, 0, len(scopes)+len(blocks))
-	for _, s := range scopes {
-		items = append(items, tagged{s, true})
+	for _, scope := range scopes {
+		items = append(items, tagged{scope, true})
 	}
-	for _, b := range blocks {
-		items = append(items, tagged{b, false})
+	for _, block := range blocks {
+		items = append(items, tagged{block, false})
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].item.start != items[j].item.start {
-			return items[i].item.start < items[j].item.start
+	sort.SliceStable(items, func(left, right int) bool {
+		if items[left].item.start != items[right].item.start {
+			return items[left].item.start < items[right].item.start
 		}
-		return items[i].item.end > items[j].item.end
+		return items[left].item.end > items[right].item.end
 	})
 
 	var active []tagged
 	for _, current := range items {
-		for i := len(active) - 1; i >= 0; i-- {
-			parent := active[i]
+		for index := len(active) - 1; index >= 0; index-- {
+			parent := active[index]
 			disjoint := current.item.start >= parent.item.end
 			nested := current.item.end <= parent.item.end
 			if !disjoint && !nested {
@@ -79,7 +79,7 @@ func violationsByKind(scopes, blocks []nestingItem) (scopeInBlock, blockInScope,
 				}
 			}
 			if disjoint {
-				active = active[:i]
+				active = active[:index]
 			} else {
 				break
 			}
@@ -761,12 +761,12 @@ func TestAlignVoidsTheMergesComparatorVerdicts(test *testing.T) {
 	sharedStarts, widestStart, coincidentPairs := 0, 0, 0
 	alignedDiffering, unalignedDiffering := 0, 0
 
-	differs := func(a, b *MergedScopes) bool {
-		if a.Unions() != b.Unions() || a.Len() != b.Len() {
+	differs := func(left, right *MergedScopes) bool {
+		if left.Unions() != right.Unions() || left.Len() != right.Len() {
 			return true
 		}
-		for _, id := range a.Ids() {
-			if a.RangeOf(id) != b.RangeOf(id) || a.GroupOf(id) != b.GroupOf(id) {
+		for _, id := range left.Ids() {
+			if left.RangeOf(id) != right.RangeOf(id) || left.GroupOf(id) != right.GroupOf(id) {
 				return true
 			}
 		}
@@ -797,8 +797,8 @@ func TestAlignVoidsTheMergesComparatorVerdicts(test *testing.T) {
 			if len(group.scopes) > widestStart {
 				widestStart = len(group.scopes)
 			}
-			for i := 1; i < len(group.scopes); i++ {
-				if widened.RangeOf(group.scopes[i-1]).End == widened.RangeOf(group.scopes[i]).End {
+			for index := 1; index < len(group.scopes); index++ {
+				if widened.RangeOf(group.scopes[index-1]).End == widened.RangeOf(group.scopes[index]).End {
 					coincidentPairs++
 				}
 			}

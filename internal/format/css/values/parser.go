@@ -237,12 +237,12 @@ func (parser *parser) parseTokens() {
 
 func (parser *parser) parenOpen() {
 	unbalancedCount := 1
-	pos := parser.position + 1
+	nextPosition := parser.position + 1
 	token := parser.currToken()
 
 	// check for balanced parens
-	for pos < len(parser.tokens) && unbalancedCount != 0 {
-		tkn := &parser.tokens[pos]
+	for nextPosition < len(parser.tokens) && unbalancedCount != 0 {
+		tkn := &parser.tokens[nextPosition]
 
 		if tkn.kind == "(" {
 			unbalancedCount++
@@ -250,7 +250,7 @@ func (parser *parser) parenOpen() {
 		if tkn.kind == ")" {
 			unbalancedCount--
 		}
-		pos++
+		nextPosition++
 	}
 
 	if unbalancedCount != 0 {
@@ -458,10 +458,10 @@ func (parser *parser) splitWord() {
 	}
 
 	currToken := parser.currToken()
-	for i, ind := range indices {
+	for indexIndex, ind := range indices {
 		index := len(word)
-		if i+1 < len(indices) && indices[i+1] != 0 {
-			index = indices[i+1]
+		if indexIndex+1 < len(indices) && indices[indexIndex+1] != 0 {
+			index = indices[indexIndex+1]
 		}
 		value := word[ind:index]
 		var node *estree.Node
@@ -470,7 +470,7 @@ func (parser *parser) splitWord() {
 			position(currToken.startLine, currToken.startColumn+ind),
 			position(currToken.endLine, currToken.startColumn+(index-1)),
 		)
-		nodeSourceIndex := parser.sourceIndex(currToken.index + indices[i])
+		nodeSourceIndex := parser.sourceIndex(currToken.index + indices[indexIndex])
 
 		if containsIndex(hasAt, ind) {
 			node = newAtWord(decode(value[1:]), nodeSource, nodeSourceIndex)

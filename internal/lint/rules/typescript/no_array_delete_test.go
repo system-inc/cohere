@@ -451,7 +451,7 @@ func TestNoArrayDeleteSuggestions(test *testing.T) {
 func applyNoArrayDeleteSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
-	sort.Slice(fixes, func(i, j int) bool { return fixes[i].Range.Pos() > fixes[j].Range.Pos() })
+	sort.Slice(fixes, func(left, right int) bool { return fixes[left].Range.Pos() > fixes[right].Range.Pos() })
 	edited := source
 	for _, fix := range fixes {
 		start, end := fix.Range.Pos(), fix.Range.End()

@@ -599,9 +599,9 @@ type stylesheetCollector struct {
 }
 
 func (collector *stylesheetCollector) loadFile(path string) error {
-	absolutePath, err := filepath.Abs(path)
-	if err != nil {
-		return fmt.Errorf("resolve %s: %w", path, err)
+	absolutePath, absolutePathError := filepath.Abs(path)
+	if absolutePathError != nil {
+		return fmt.Errorf("resolve %s: %w", path, absolutePathError)
 	}
 
 	if collector.visiting[absolutePath] {
@@ -610,14 +610,14 @@ func (collector *stylesheetCollector) loadFile(path string) error {
 	collector.visiting[absolutePath] = true
 	defer delete(collector.visiting, absolutePath)
 
-	content, err := os.ReadFile(absolutePath)
-	if err != nil {
-		return fmt.Errorf("read %s: %w", absolutePath, err)
+	content, readError := os.ReadFile(absolutePath)
+	if readError != nil {
+		return fmt.Errorf("read %s: %w", absolutePath, readError)
 	}
 
-	nodes, err := ParseCSS(string(content))
-	if err != nil {
-		return fmt.Errorf("parse %s: %w", absolutePath, err)
+	nodes, parseCssError := ParseCSS(string(content))
+	if parseCssError != nil {
+		return fmt.Errorf("parse %s: %w", absolutePath, parseCssError)
 	}
 
 	collector.stylesheets = append(collector.stylesheets, absolutePath)
@@ -713,9 +713,9 @@ func (collector *stylesheetCollector) resolveImport(node *Node, path string) (st
 		)
 	}
 
-	resolved, err := collector.resolve(specifier, filepath.Dir(path))
-	if err != nil {
-		return "", fmt.Errorf("%s: resolve @import %q: %w", path, specifier, err)
+	resolved, resolveError := collector.resolve(specifier, filepath.Dir(path))
+	if resolveError != nil {
+		return "", fmt.Errorf("%s: resolve @import %q: %w", path, specifier, resolveError)
 	}
 	return resolved, nil
 }
@@ -738,7 +738,7 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 		collector.theme.Prefix = prefix
 	}
 
-	var walkErr error
+	var walkError error
 	Walk(node.Nodes, func(child *Node) WalkAction {
 		if child.Kind == KindAtRule && child.Name == "@keyframes" {
 			return WalkSkip
@@ -752,7 +752,7 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 				child.Value,
 				options,
 			); addError != nil {
-				walkErr = fmt.Errorf("%s: %w", path, addError)
+				walkError = fmt.Errorf("%s: %w", path, addError)
 				return WalkStop
 			}
 			return WalkContinue
@@ -761,14 +761,14 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 			return WalkContinue
 		}
 
-		walkErr = fmt.Errorf(
+		walkError = fmt.Errorf(
 			"%s: `@theme` blocks must only contain custom properties or `@keyframes`, found %s %q",
 			path, child.Kind, child.Property,
 		)
 		return WalkStop
 	})
 
-	return walkErr
+	return walkError
 }
 
 // ingestUtilityBlock records one `@utility` block as a definition the evaluator can compile.

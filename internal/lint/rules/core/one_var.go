@@ -159,9 +159,9 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 	// decode as an object, so trying it costs nothing and cannot misfire.
 	var wire string
 	if decodeError := json.Unmarshal(raw, &wire); decodeError == nil {
-		mode, modeErr := oneVarModeFromWire(wire)
-		if modeErr != nil {
-			return DefaultOneVarSettings(), modeErr
+		mode, modeError := oneVarModeFromWire(wire)
+		if modeError != nil {
+			return DefaultOneVarSettings(), modeError
 		}
 		group := oneVarGroup{Uninitialized: &mode, Initialized: &mode}
 		return OneVarSettings{Var: group, Let: group, Const: group, Using: group, AwaitUsing: group}, nil
@@ -215,8 +215,8 @@ func DecodeOneVarOptions(raw []byte) (any, error) {
 		{object.Using, &settings.Using},
 		{object.AwaitUsing, &settings.AwaitUsing},
 	} {
-		if err := assignKind(pair.wire, pair.group); err != nil {
-			return DefaultOneVarSettings(), err
+		if assignKindError := assignKind(pair.wire, pair.group); assignKindError != nil {
+			return DefaultOneVarSettings(), assignKindError
 		}
 	}
 

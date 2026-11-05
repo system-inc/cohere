@@ -24,12 +24,12 @@ import (
 // not have (`**/*.generated.*`), not paths in this one, so a project with no generated file is not a
 // broken config, and refusing it would make every outsider's zero-config run fail on the house's
 // patterns rather than its own.
-func (c *Config) ValidateSelectors(fileNames []string) error {
+func (configuration *Config) ValidateSelectors(fileNames []string) error {
 	// Each file split once and each pattern compiled once, rather than both on every pairing (#hsd2dfb).
-	globs := c.globs()
+	globs := configuration.globs()
 	lintable := make([][]string, 0, len(fileNames))
 	for _, fileName := range fileNames {
-		segments := splitPath(c.relativePath(fileName))
+		segments := splitPath(configuration.relativePath(fileName))
 		if matchesAny(globs.ignore, segments) {
 			continue
 		}
@@ -42,7 +42,7 @@ func (c *Config) ValidateSelectors(fileNames []string) error {
 		empty    bool
 	}
 	var misses []miss
-	for overrideIndex, override := range c.Overrides {
+	for overrideIndex, override := range configuration.Overrides {
 		if IsSet(override.File) {
 			continue
 		}

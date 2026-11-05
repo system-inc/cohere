@@ -55,25 +55,25 @@ func TestAProductKeysTheSameFromAnotherCheckoutPath(test *testing.T) {
 
 	product := Product{Name: "fixture", Patterns: []string{"./..."}}
 	first, second := test.TempDir(), test.TempDir()
-	firstKey, firstDescription, err := productKey(
+	firstKey, firstDescription, productKeyError := productKey(
 		product,
 		first,
 		keyEnvironment,
 		keyFixture(test, first, "package ast\n"),
 		everyPackage,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if productKeyError != nil {
+		test.Fatal(productKeyError)
 	}
-	secondKey, secondDescription, err := productKey(
+	secondKey, secondDescription, productKeyError := productKey(
 		product,
 		second,
 		keyEnvironment,
 		keyFixture(test, second, "package ast\n"),
 		everyPackage,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if productKeyError != nil {
+		test.Fatal(productKeyError)
 	}
 	if firstKey != secondKey || firstDescription != secondDescription {
 		test.Fatalf(
@@ -96,27 +96,27 @@ func TestAProductKeyMovesWithWhatChangesItsExportData(test *testing.T) {
 
 	product := Product{Name: "fixture", Patterns: []string{"./..."}}
 	root := test.TempDir()
-	baseKey, baseDescription, err := productKey(
+	baseKey, baseDescription, productKeyError := productKey(
 		product,
 		root,
 		keyEnvironment,
 		keyFixture(test, root, "package ast\n"),
 		everyPackage,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if productKeyError != nil {
+		test.Fatal(productKeyError)
 	}
 
 	edited := test.TempDir()
-	editedKey, editedDescription, err := productKey(
+	editedKey, editedDescription, productKeyError := productKey(
 		product,
 		edited,
 		keyEnvironment,
 		keyFixture(test, edited, "package ast\n\nvar Planted int\n"),
 		everyPackage,
 	)
-	if err != nil {
-		test.Fatal(err)
+	if productKeyError != nil {
+		test.Fatal(productKeyError)
 	}
 	if editedKey == baseKey {
 		test.Error("an edited repository file kept the product's key")

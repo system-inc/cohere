@@ -182,7 +182,7 @@ func (parts TypeDiagnosticParts) All() []*ast.Diagnostic {
 // much changed that the full check, which spreads every checker over every file, is the faster way.
 //
 // Mutates: reuse records what was replayed and the section to save for the next run, unless the graph was retired
-func (graph *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
+func (graph *Graph) CheckReusing(callerContext context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
 	stored := reuse.stored
 	if stored == nil ||
 		stored.Version != typesSectionVersion ||
@@ -191,7 +191,7 @@ func (graph *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReus
 		graph.Shapes == nil {
 		return TypeDiagnosticParts{}, false
 	}
-	syntactic := graph.Program.GetSyntacticDiagnostics(ctx, nil)
+	syntactic := graph.Program.GetSyntacticDiagnostics(callerContext, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}, true
 	}
@@ -218,8 +218,8 @@ func (graph *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReus
 		return TypeDiagnosticParts{}, false
 	}
 
-	bind := graph.Program.GetBindDiagnostics(ctx, nil)
-	checked := graph.semanticDiagnosticsOf(ctx, toCheck)
+	bind := graph.Program.GetBindDiagnostics(callerContext, nil)
+	checked := graph.semanticDiagnosticsOf(callerContext, toCheck)
 	semantic := replayed
 	for index, sourceFile := range toCheck {
 		semantic = append(semantic, checked[index]...)
@@ -240,7 +240,7 @@ func (graph *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReus
 	if !graph.Retired() {
 		reuse.replayed, reuse.replayedFiles = len(replayedFiles), replayedFiles
 	}
-	if ctx.Err() == nil && !graph.Retired() {
+	if callerContext.Err() == nil && !graph.Retired() {
 		reuse.recorded = &TypesSection{Version: typesSectionVersion, Key: reuse.key, Entries: entries}
 	}
 	reuse.mutex.Unlock()
@@ -250,8 +250,8 @@ func (graph *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReus
 // RecordFull records a full check's semantic diagnostics per project file, for the next run to replay.
 //
 // Mutates: reuse records the section to save for the next run, unless the graph was retired
-func (graph *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse, parts TypeDiagnosticParts) {
-	if len(parts.Syntactic) > 0 || graph.Shapes == nil || ctx.Err() != nil {
+func (graph *Graph) RecordFull(callerContext context.Context, reuse *TypeDiagnosticsReuse, parts TypeDiagnosticParts) {
+	if len(parts.Syntactic) > 0 || graph.Shapes == nil || callerContext.Err() != nil {
 		return
 	}
 	fingerprints := graph.SignatureFingerprints(graph.Shapes)
@@ -279,11 +279,11 @@ func (graph *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse,
 
 // semanticDiagnosticsOf checks each file on the checker that owns it, a goroutine per checker, so a handful
 // of files costs a handful of checks and many files still spread across every checker.
-func (graph *Graph) semanticDiagnosticsOf(ctx context.Context, files []*ast.SourceFile) [][]*ast.Diagnostic {
+func (graph *Graph) semanticDiagnosticsOf(callerContext context.Context, files []*ast.SourceFile) [][]*ast.Diagnostic {
 	results := make([][]*ast.Diagnostic, len(files))
 	groups := map[*checker.Checker][]int{}
 	for index, sourceFile := range files {
-		owner, release := graph.Program.GetTypeCheckerForFile(ctx, sourceFile)
+		owner, release := graph.Program.GetTypeCheckerForFile(callerContext, sourceFile)
 		release()
 		groups[owner] = append(groups[owner], index)
 	}
@@ -293,7 +293,7 @@ func (graph *Graph) semanticDiagnosticsOf(ctx context.Context, files []*ast.Sour
 		go func() {
 			defer waitGroup.Done()
 			for _, index := range indices {
-				results[index] = graph.Program.GetSemanticDiagnostics(ctx, files[index])
+				results[index] = graph.Program.GetSemanticDiagnostics(callerContext, files[index])
 			}
 		}()
 	}

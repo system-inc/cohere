@@ -128,9 +128,9 @@ func checkerDeclarationsOnDisk(test *testing.T) []checkerDeclaration {
 			continue
 		}
 
-		parsed, parseErr := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-		if parseErr != nil {
-			test.Fatalf("parsing %s: %v", path, parseErr)
+		parsed, parseError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if parseError != nil {
+			test.Fatalf("parsing %s: %v", path, parseError)
 		}
 
 		name, named := ruleNameDeclaredIn(parsed)

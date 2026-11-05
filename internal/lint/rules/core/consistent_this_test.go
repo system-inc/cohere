@@ -18,13 +18,13 @@ const consistentThisFile = "/repository/source/ConsistentThis.ts"
 // every fixture while an inverted default ships.
 func consistentThisOptions(test *testing.T, aliases ...string) any {
 	test.Helper()
-	raw, err := json.Marshal(aliases)
-	if err != nil {
-		test.Fatalf("could not marshal the alias list: %v", err)
+	raw, encodeError := json.Marshal(aliases)
+	if encodeError != nil {
+		test.Fatalf("could not marshal the alias list: %v", encodeError)
 	}
-	decoded, err := DecodeConsistentThisOptions(raw)
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(raw)
+	if decodeConsistentThisOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeConsistentThisOptionsError)
 	}
 	return decoded
 }

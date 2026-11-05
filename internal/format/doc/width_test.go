@@ -153,21 +153,21 @@ func nonASCIILines(test *testing.T, root string, seen map[string]bool) []string 
 		pending = pending[1:]
 		// Nested repositories regardless of current's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path current never formats is still a corpus.
-		nestedRepositories, err := formatfiles.NestedRepositoriesBelow(current)
-		if err != nil {
-			test.Fatalf("finding the repositories nested in %s: %v", current, err)
+		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(current)
+		if nestedRepositoriesBelowError != nil {
+			test.Fatalf("finding the repositories nested in %s: %v", current, nestedRepositoriesBelowError)
 		}
 		for _, nested := range nestedRepositories {
 			pending = append(pending, filepath.Join(current, nested))
 		}
 
-		enumeration, err := engine.Enumerate(current)
-		if errors.Is(err, formatoptions.ErrPrettierConfigRemains) {
-			test.Logf("skipping %s, not yet adopted: %v", current, err)
+		enumeration, enumerateError := engine.Enumerate(current)
+		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+			test.Logf("skipping %s, not yet adopted: %v", current, enumerateError)
 			continue
 		}
-		if err != nil {
-			test.Fatalf("enumerating %s: %v", current, err)
+		if enumerateError != nil {
+			test.Fatalf("enumerating %s: %v", current, enumerateError)
 		}
 		measured = append(measured, fmt.Sprintf("%s (%d)", current, len(enumeration.Files)))
 		for _, path := range enumeration.Files {

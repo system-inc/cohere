@@ -337,32 +337,32 @@ const (
 //
 // Every edge was checked against React's own executable with the compilation gate held constant.
 // The rows are in the rule comment.
-func immutabilityMergeKinds(a, b immutabilityValueKind) immutabilityValueKind {
-	if a == b {
-		return a
+func immutabilityMergeKinds(left, right immutabilityValueKind) immutabilityValueKind {
+	if left == right {
+		return left
 	}
-	if a == immutabilityMaybeFrozen || b == immutabilityMaybeFrozen {
+	if left == immutabilityMaybeFrozen || right == immutabilityMaybeFrozen {
 		return immutabilityMaybeFrozen
 	}
-	if a == immutabilityMutable || b == immutabilityMutable {
-		if a == immutabilityFrozen || b == immutabilityFrozen {
+	if left == immutabilityMutable || right == immutabilityMutable {
+		if left == immutabilityFrozen || right == immutabilityFrozen {
 			return immutabilityMaybeFrozen
 		}
-		if a == immutabilityContext || b == immutabilityContext {
+		if left == immutabilityContext || right == immutabilityContext {
 			return immutabilityContext
 		}
 		return immutabilityMutable
 	}
-	if a == immutabilityContext || b == immutabilityContext {
-		if a == immutabilityFrozen || b == immutabilityFrozen {
+	if left == immutabilityContext || right == immutabilityContext {
+		if left == immutabilityFrozen || right == immutabilityFrozen {
 			return immutabilityMaybeFrozen
 		}
 		return immutabilityContext
 	}
-	if a == immutabilityFrozen || b == immutabilityFrozen {
+	if left == immutabilityFrozen || right == immutabilityFrozen {
 		return immutabilityFrozen
 	}
-	if a == immutabilityGlobal || b == immutabilityGlobal {
+	if left == immutabilityGlobal || right == immutabilityGlobal {
 		return immutabilityGlobal
 	}
 	return immutabilityPrimitive
@@ -399,10 +399,10 @@ type immutabilityAbstractValue struct {
 }
 
 // immutabilityMergeValues joins two abstract values.
-func immutabilityMergeValues(a, b immutabilityAbstractValue) immutabilityAbstractValue {
+func immutabilityMergeValues(left, right immutabilityAbstractValue) immutabilityAbstractValue {
 	return immutabilityAbstractValue{
-		Kind:    immutabilityMergeKinds(a.Kind, b.Kind),
-		Reasons: a.Reasons | b.Reasons,
+		Kind:    immutabilityMergeKinds(left.Kind, right.Kind),
+		Reasons: left.Reasons | right.Reasons,
 	}
 }
 
