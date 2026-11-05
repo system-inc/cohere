@@ -275,14 +275,21 @@ func (engine *pipeline) compilerFinding(diagnostic load.Diagnostic) contract.Fin
 	}
 }
 
-// filesWithoutRecord are the files in scope that the project record called ours and nothing type-checked: the
-// load's Unseen, which no package holds though the constraints would build them, and, as a guard, any file the
-// load excluded that the project record did not name, since the two judging a file differently must show as a
-// gap rather than leave the file seen by nothing and reported by nobody.
+// filesWithoutRecord are the files in scope that the project record called ours and nothing type-checked, each
+// once and sorted, from three sources that each catch what the others may not: the load's Unseen, which no package
+// holds though the constraints would build them; any file the load excluded that the project record did not name,
+// since the two judging a file differently must show as a gap; and any readable file in scope that no analyzed
+// package holds, the engine's own check, which needs nothing from the load but its packages.
 func (engine *pipeline) filesWithoutRecord(loaded *load.Loaded) []string {
 	named := map[string]bool{}
 	for _, excluded := range engine.described.record.Excluded {
 		named[excluded.File] = true
+	}
+	held := map[string]bool{}
+	for _, analyzedPackage := range loaded.Packages {
+		for _, file := range analyzedPackage.GoFiles {
+			held[file] = true
+		}
 	}
 	candidates := slices.Clone(loaded.Unseen)
 	for _, excluded := range loaded.Excluded {
@@ -290,14 +297,19 @@ func (engine *pipeline) filesWithoutRecord(loaded *load.Loaded) []string {
 			candidates = append(candidates, excluded.File)
 		}
 	}
+	for _, file := range engine.described.readable() {
+		if !held[file] {
+			candidates = append(candidates, file)
+		}
+	}
 	withoutRecord := []string{}
 	for _, file := range candidates {
-		if engine.described.inScopeSet[file] && !slices.Contains(withoutRecord, file) {
+		if engine.described.inScopeSet[file] {
 			withoutRecord = append(withoutRecord, file)
 		}
 	}
 	slices.Sort(withoutRecord)
-	return withoutRecord
+	return slices.Compact(withoutRecord)
 }
 
 // oneLine is an error on one line, for a phase record's detail, which prints inside one line.
