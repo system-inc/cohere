@@ -71,20 +71,24 @@ struct XcodeProjectPipelineTests {
 
         """
 
-    /*
-     Line 3 holds a result nobody uses, which the compiler warns about and lint does not. It holds no `=` and no `:`,
-     so no typed rule asks for symbols, which an Xcode build does not give them until block C (#9ktapz2): a typed rule
-     that applied would be a lint crash, and the run incomplete for a reason this file is not about.
-     */
+    /* Line 3 holds a variable that is never mutated, which the compiler warns about and lint does not. */
     static let warningSource = """
         struct Counter {
-            func doubled() -> Int {
-                "unused".uppercased()
-                return 2
+            func doubled(_ value: Int) -> Int {
+                var neverMutated = value
+                return neverMutated * 2
             }
         }
 
         """
+
+    /*
+     What lint says of a file a typed rule applies to at an Xcode root, until block C (#9ktapz2) reads an Xcode
+     build's index: it cannot vouch for it, so the file is a lint crash and the run is incomplete. The warning source
+     holds a `:` and an `=`, so `redundant-type-annotation` applies to it.
+     */
+    static let typedRulesUnread =
+        "the typed rules could not read what its names resolve to: the build's index does not describe it as it stands, and no build recorded how to compile it"
 
     static let cleanCounter = cleanSource.replacingOccurrences(of: "Greeter", with: "Counter")
 
@@ -139,6 +143,13 @@ struct XcodeProjectPipelineTests {
 
         var complete: Bool? {
             of("summary").first?["complete"] as? Bool
+        }
+
+        /* Each lint crash as `<file name>: <error>`. */
+        var lintCrashes: [String] {
+            (of("lint").first?["crashes"] as? [[String: Any]] ?? []).map {
+                "\(URL(fileURLWithPath: $0["file"] as? String ?? "").lastPathComponent): \($0["error"] as? String ?? "")"
+            }
         }
     }
 
@@ -307,7 +318,11 @@ struct XcodeProjectPipelineTests {
         #expect(run.exitCode == 1)
     }
 
-    /* A warning is a finding, but the code still means what it says, so lint runs. */
+    /*
+     A warning is a finding, but the code still means what it says, so lint runs. The types phase vouches for every
+     file; the run is incomplete for one reason only, the typed rules' crash on Counter.swift, which block C removes.
+     When it does, this test goes red, and its last expectations become a complete run with no crash.
+     */
     @Test func aCompilerWarningIsAFindingAndLintStillRuns() async throws {
         try Self.requireXcodegen()
         let fixture = try Self.fixture(counter: Self.warningSource)
@@ -316,8 +331,10 @@ struct XcodeProjectPipelineTests {
         let run = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
 
         #expect(run.compilerFindings == ["Counter.swift:3:warning"])
+        #expect(run.filesWithoutRecord.isEmpty)
         #expect(run.phase("lint")?.outcome == "ran")
-        #expect(run.complete == true)
+        #expect(run.lintCrashes == ["Counter.swift: \(Self.typedRulesUnread)"])
+        #expect(run.complete == false)
         #expect(run.exitCode == 1)
     }
 
@@ -340,7 +357,7 @@ struct XcodeProjectPipelineTests {
                 == "no input changed since the last successful xcodebuild, so its compiler records were read without building"
         )
         #expect(warm.compilerFindings == ["Counter.swift:3:warning"])
-        #expect(warm.complete == true)
+        #expect(warm.filesWithoutRecord.isEmpty)
 
         try Self.typeErrorSource.write(
             to: fixture.root.appendingPathComponent("Sources/Counter.swift"),
