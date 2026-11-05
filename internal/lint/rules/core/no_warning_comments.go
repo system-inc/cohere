@@ -72,7 +72,7 @@ type NoWarningCommentsOptions struct {
 	// Decoration are single characters allowed to precede the term under Start, so a banner
 	// comment still matches. Each entry must be exactly one non-whitespace character.
 	//
-	// Absent is NOT the same as empty: with no decoration configured, `/** TODO */` is clean
+	// Absent is not the same as empty: with no decoration configured, `/** TODO */` is clean
 	// because the asterisk blocks the anchor, and configuring `["*"]` makes it report. Measured.
 	Decoration []string `json:"decoration"`
 }
@@ -118,11 +118,11 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 // # What it is for, and why the default is Start
 //
 // A `TODO` is a note to a future reader that the code is knowingly incomplete, and the rule exists
-// so those notes are counted rather than accumulating unread. Matching only at the START of a
+// so those notes are counted rather than accumulating unread. Matching only at the start of a
 // comment is deliberate: a comment whose first word is `TODO` is a marker, while one that merely
 // mentions the word in prose is usually describing something rather than deferring it.
 //
-// # The comment VALUE, not its source text
+// # The comment value, not its source text
 //
 // Upstream matches against `node.value`, which is the comment body with the delimiters removed and
 // nothing else stripped. That is the whole reason `/** TODO */` is clean by default while
@@ -142,7 +142,7 @@ func DecodeNoWarningCommentsOptions(raw []byte) (any, error) {
 //
 // Upstream rebuilds the quoted text word by word and stops before exceeding forty characters,
 // appending an ellipsis when it stopped early. So the quote never splits a word, and a comment whose
-// FIRST word already exceeds the limit quotes as nothing but the ellipsis. Reproduced exactly,
+// first word already exceeds the limit quotes as nothing but the ellipsis. Reproduced exactly,
 // because the quoted text is the part of the message a reader scans.
 var NoWarningComments = rule.Rule{
 	Name: "no-warning-comments",
@@ -178,7 +178,7 @@ var NoWarningComments = rule.Rule{
 
 // noWarningCommentsCache holds the compiled matchers for each configuration seen.
 //
-// `Run` is called ONCE PER FILE, so compiling the patterns there compiled them 3,516 times on this
+// `Run` is called once per file, so compiling the patterns there compiled them 3,516 times on this
 // tree: measured at 235ms total, against 27ms for the two comparable comment-reading rules already
 // shipped. The patterns depend only on the configuration, which is the same for every file in a
 // run, so they are built once and reused.
@@ -345,7 +345,7 @@ func checkNoWarningComments(ruleContext rule.Context, compiled noWarningComments
 				continue
 			}
 			if !selfDirectiveChecked {
-				// A directive comment configuring THIS rule is exempt, so `/* eslint
+				// A directive comment configuring this rule is exempt, so `/* eslint
 				// no-warning-comments: "error" */` does not report itself. Upstream tests the
 				// directive shape and the rule's own name together, and both halves matter: an
 				// ordinary comment mentioning the rule name is not exempt.
@@ -371,7 +371,7 @@ func checkNoWarningComments(ruleContext rule.Context, compiled noWarningComments
 // noWarningCommentsValueOf returns the comment body with its delimiters removed.
 //
 // Upstream's `node.value`. A line comment loses its two slashes; a block comment loses `/*` and
-// `*/` and NOTHING else, which is why an inner asterisk survives into the match and blocks the
+// `*/` and nothing else, which is why an inner asterisk survives into the match and blocks the
 // Start anchor for `/** TODO */`.
 func noWarningCommentsValueOf(comment comments.Comment) string {
 	text := comment.Text
@@ -389,7 +389,7 @@ var noWarningCommentsSelfDirective = regexp.MustCompile(`\bno-warning-comments\b
 // noWarningCommentsDirectivePrefixes are the words that make a comment a directive to the linter.
 //
 // Upstream's `isDirectiveComment` also accepts `globals`, `exported` and the `eslint-*` family. The
-// exemption only fires when the comment ALSO names this rule, so the list only has to be wide
+// exemption only fires when the comment also names this rule, so the list only has to be wide
 // enough to cover the shapes that can configure it.
 var noWarningCommentsDirectivePrefixes = []string{
 	"eslint", "eslint-disable", "eslint-enable", "eslint-disable-line",
@@ -480,8 +480,8 @@ func noWarningCommentsEndsWithWordCharacter(term string) bool {
 // noWarningCommentsIsWordCharacter is the ASCII `\w` class.
 //
 // Byte-wise rather than rune-wise on purpose. JavaScript's `\w` is ASCII even under the `u` flag,
-// so a term beginning with a non-ASCII letter gets NO word boundary asserted, and testing the first
-// RUNE against a Unicode letter class would add one. Measured: `ТODO` spelled with a Cyrillic Te is
+// so a term beginning with a non-ASCII letter gets no word boundary asserted, and testing the first
+// rune against a Unicode letter class would add one. Measured: `ТODO` spelled with a Cyrillic Te is
 // clean upstream, which is only true if the boundary is ASCII on both sides.
 func noWarningCommentsIsWordCharacter(character byte) bool {
 	switch {

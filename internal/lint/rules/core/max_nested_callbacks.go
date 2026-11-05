@@ -73,14 +73,14 @@ type maxNestedCallbacksObjectShape struct {
 // default is not the zero value, and the two spellings of the limit interact in a way no struct tag
 // can express.
 //
-// The value may be a bare INTEGER: cohere's config layer strips the severity tuple, so a config
+// The value may be a bare integer: cohere's config layer strips the severity tuple, so a config
 // writing `["error", 3]` hands this the JSON `3`, which no struct can unmarshal.
 //
-// An ABSENT value must mean 10 rather than 0. A rule configured as a bare `"error"` reaches the
+// An absent value must mean 10 rather than 0. A rule configured as a bare `"error"` reaches the
 // decoder with empty input, and a plain int field would read that as a limit of zero, reporting
 // every callback in the tree. That is the live config's own shape, so it is the ordinary path.
 //
-// An object with NEITHER key must also mean 10. Upstream reaches the object arm only when
+// An object with neither key must also mean 10. Upstream reaches the object arm only when
 // `Object.hasOwn(option, "maximum") || Object.hasOwn(option, "max")`, so `{}` and
 // `{checkConstructorCallCallbacks: true}` both leave the limit at ten. Measured against the
 // installed build at 10.8.1: `[{}]` is clean on a two-deep nest that `[{max: 1}]` reports.
@@ -88,7 +88,7 @@ type maxNestedCallbacksObjectShape struct {
 // # An upstream defect this reproduces
 //
 // Upstream resolves the two spellings with `option.maximum || option.max`, which is a truthiness
-// test rather than a presence test, so a `maximum` of ZERO falls through to `max`. Measured:
+// test rather than a presence test, so a `maximum` of zero falls through to `max`. Measured:
 //
 //	[{maximum: 0, max: 5}]   clean on a one-deep callback, so the limit in force is 5
 //	[{maximum: 5, max: 1}]   clean on a two-deep nest, so the limit in force is 5
@@ -156,12 +156,12 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 //
 // # What counts, and what the depth is counted over
 //
-// Only a function that is an ARGUMENT to a call counts. A function that is the callee does not, so
+// Only a function that is an argument to a call counts. A function that is the callee does not, so
 // an immediately invoked expression is clean at a limit of zero, and neither does a function stored
 // in a variable, held in an object property, or used as a method body. Those all appear in the
 // corpus and each one is a class of false positive a looser reading would ship.
 //
-// The count is the depth of the callback CHAIN rather than the number of callbacks in the file.
+// The count is the depth of the callback chain rather than the number of callbacks in the file.
 // Upstream pushes on entering such a function and pops on leaving it, so two callbacks side by side
 // at the same level each reach depth one. Three of upstream's invalid cases exist only to pin this:
 // each writes a function declaration or an unrelated callback beside the nest and asserts a single
@@ -178,7 +178,7 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 //
 // # Where a finding points
 //
-// At the function HEAD rather than the whole function, which upstream gets from
+// At the function head rather than the whole function, which upstream gets from
 // `astUtils.getFunctionHeadLoc`. That helper has three branches and only two are reachable here:
 //
 //	an arrow                     the `=>` token alone, so `async () => {}` reports on the arrow
@@ -201,7 +201,7 @@ var MaxNestedCallbacks = rule.Rule{
 		// A rule configured as a bare severity is handed nil, and the zero value of the struct
 		// carries a nil Maximum, so the default has to be restored somewhere.
 		//
-		// It is restored in BOTH places on purpose, and the two are mutually redundant: mutating
+		// It is restored in both places on purpose, and the two are mutually redundant: mutating
 		// either one alone leaves every fixture green because the other still supplies the ten,
 		// and mutating both at once fails four. That pair is invisible to a sweep that changes one
 		// site at a time, so it is recorded here rather than left looking like two guards where one
@@ -245,7 +245,7 @@ var MaxNestedCallbacks = rule.Rule{
 // argument to a call, which is the only thing the depth counts.
 //
 // The callee test is upstream's `parent.callee === node` and it is not redundant with the argument
-// test. An immediately invoked function is the CHILD of a call expression, so a check that only
+// test. An immediately invoked function is the child of a call expression, so a check that only
 // asked about the parent's kind would count `(function() {})()` and report it at a limit of zero,
 // which upstream's corpus writes as a passing case twice.
 func maxNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCallbacks bool) bool {

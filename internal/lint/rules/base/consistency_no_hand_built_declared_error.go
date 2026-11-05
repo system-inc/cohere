@@ -125,7 +125,7 @@ func isNoHandBuiltDeclaredErrorExemptFile(fileName string) bool {
 // objectLiteralNamesIdentifier answers whether an options object has an `identifier` property.
 //
 // The original tests `property.type === 'Property' && property.key.type === 'Identifier' &&
-// property.key.name === 'identifier'`, so three shapes it does NOT count are reproduced here: a
+// property.key.name === 'identifier'`, so three shapes it does not count are reproduced here: a
 // spread carrying the option, a computed key, and a string-literal key. Each is a place the rule
 // knowingly misses, and widening any of them would report inputs the original is silent on.
 func objectLiteralNamesIdentifier(options *ast.Node) bool {
@@ -134,7 +134,7 @@ func objectLiteralNamesIdentifier(options *ast.Node) bool {
 		return false
 	}
 	for _, property := range properties.Nodes {
-		// A shorthand `{ identifier }` is a different node kind here and IS counted, because in
+		// A shorthand `{ identifier }` is a different node kind here and is counted, because in
 		// estree it is a `Property` whose key is an Identifier named `identifier`, exactly what the
 		// original tests. Our parser splits the two spellings across two kinds.
 		switch property.Kind {

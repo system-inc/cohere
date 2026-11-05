@@ -101,7 +101,7 @@ var ConsistencyNoScreamingSnakeCase = rule.Rule{
 // isScreamingSnakeCase reports the shouting shape: uppercase letters, digits, and underscores, with
 // at least one underscore.
 //
-// The underscore is required on purpose. A single all-caps word like RED is a different naming
+// The underscore is required on purpose. A single all-caps word like `RED` is a different naming
 // choice, and flagging it here would put this rule in an argument it was not written to have.
 func isScreamingSnakeCase(name string) bool {
 	if !strings.Contains(name, "_") {

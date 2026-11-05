@@ -1,6 +1,7 @@
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-unused-vars/*.test.ts and edge rows. DO NOT EDIT.
+
 package core
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-unused-vars/*.test.ts and edge rows. DO NOT EDIT BY HAND.
 //
 // The 26 upstream rows are every row in the three test files whose options set ignoreClassWithStaticInitBlock, ignoreUsingDeclarations, reportUsedIgnorePattern:
 // 10 valid and 16 invalid, extracted by loading the files with RuleTester stubbed. 17 edge rows were added for

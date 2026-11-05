@@ -38,7 +38,7 @@ func noImplicitCoercionSuggestionMessage(recommendation string) rule.Message {
 
 // NoImplicitCoercionOptions carries upstream's five options.
 //
-// Three of the four booleans default to TRUE, which is the trap this project has been bitten by:
+// Three of the four booleans default to `true`, which is the trap this project has been bitten by:
 // `rule.DecodeOptionsInto` on a default-true option yields a zero-value struct that silently turns
 // the rule off, and every fixture built from a struct rather than routed through the decoder passes
 // anyway. Pointers keep an absent key distinguishable from an explicit false.
@@ -150,7 +150,7 @@ func noImplicitCoercionAllows(settings NoImplicitCoercionOptions, operator strin
 // Upstream asks its scope manager whether `Boolean` has any declaration in source, and withholds
 // the fix when it does, because `Boolean(foo)` would then call something else. Measured here
 // through `ResolveName`: a `var`, `let`, parameter, function or class named `Boolean` each withdraw
-// the fix, while a shadow in a SIBLING scope does not.
+// the fix, while a shadow in a sibling scope does not.
 //
 // Upstream's corpus writes the same input twice with opposite verdicts, separated only by
 // `languageOptions.globals.Boolean = "off"`, which is the same question asked from the other side:
@@ -161,7 +161,7 @@ func noImplicitCoercionAllows(settings NoImplicitCoercionOptions, operator strin
 //
 // `~n` is falsy exactly when `n` is `-1`, which is what makes `~foo.indexOf(bar)` a membership test.
 // The recommendation depends on whether the call is optionally chained, and this is not cosmetic:
-// `foo?.indexOf(bar)` yields `undefined` when `foo` is nullish, and `undefined !== -1` is TRUE,
+// `foo?.indexOf(bar)` yields `undefined` when `foo` is nullish, and `undefined !== -1` is `true`,
 // which would invert the test. So upstream recommends `>= 0` for the chained form and `!== -1`
 // otherwise, and offers neither as a fix nor as a suggestion because the reader has to choose.
 //
@@ -653,7 +653,7 @@ func noImplicitCoercionCheckBinary(ruleContext rule.Context, node *ast.Node, set
 // some receiver, and whether that call is optionally chained.
 //
 // Upstream's `isBinaryNegatingOfIndexOf` skips a chain expression and then asks
-// `isSpecificMemberAccess(callee, null, /^(?:i|lastI)ndexOf$/)`. The `null` receiver means ANY
+// `isSpecificMemberAccess(callee, null, /^(?:i|lastI)ndexOf$/)`. The `null` receiver means any
 // object, and the static-key requirement is why `foo['indexOf'](x)` reports and `foo[indexOf](x)`
 // does not.
 func noImplicitCoercionIndexOfCall(node *ast.Node) (call *ast.Node, chained bool, ok bool) {
@@ -663,7 +663,7 @@ func noImplicitCoercionIndexOfCall(node *ast.Node) (call *ast.Node, chained bool
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return nil, false, false
 	}
-	// The chain flag is read from the callee BEFORE unwrapping, and the name after. Parenthesizing
+	// The chain flag is read from the callee before unwrapping, and the name after. Parenthesizing
 	// a callee ends the optional chain, so `(foo?.indexOf)(1)` is not short-circuited and upstream
 	// recommends `!== -1` for it while recommending `>= 0` for `foo?.indexOf(1)`. Measured against
 	// the installed build; the two spellings differ only by those parentheses.
@@ -779,7 +779,7 @@ func noImplicitCoercionIsAlready(ruleContext rule.Context, operand *ast.Node, ki
 // noImplicitCoercionIsEmptyString is upstream's `isEmptyString`.
 //
 // An empty string literal, or a template literal with no substitutions and empty text. Upstream
-// tests the COOKED value, which `Text()` already holds.
+// tests the cooked value, which `Text()` already holds.
 func noImplicitCoercionIsEmptyString(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -855,13 +855,13 @@ func noImplicitCoercionIsMultiplyByFractionOfOne(node *ast.Node) bool {
 
 // noImplicitCoercionNonNumericOperand is upstream's `getNonNumericOperand`.
 //
-// Upstream checks the RIGHT operand first, which decides which one is named in the recommendation
+// Upstream checks the right operand first, which decides which one is named in the recommendation
 // when neither is numeric.
 func noImplicitCoercionNonNumericOperand(binary *ast.BinaryExpression) *ast.Node {
-	// Both operands are unwrapped before the KIND test, which is the parser difference rather than
+	// Both operands are unwrapped before the kind test, which is the parser difference rather than
 	// a convenience. Upstream skips an operand that is itself a `BinaryExpression`, because
 	// `a * b * 1` should name the whole product rather than one factor. ESTree folds parentheses
-	// away, so `(index + 1) * 1` reaches that test AS a binary expression and is declined; ours
+	// away, so `(index + 1) * 1` reaches that test as a binary expression and is declined; ours
 	// wraps it, so without the unwrap the kind test missed it and the rule reported a site the
 	// installed build leaves alone. Found on the real tree rather than in the corpus, which writes
 	// no parenthesized operand here.
@@ -881,7 +881,7 @@ func noImplicitCoercionNonNumericOperand(binary *ast.BinaryExpression) *ast.Node
 // Our parser puts three ESTree node types under one kind, and the difference decides this rule:
 // ESTree's `BinaryExpression` covers the arithmetic and comparison operators, while `&& || ??` are
 // a `LogicalExpression` and the comma operator is a `SequenceExpression`. Measured against the
-// installed build, `(a || b) * 1` and `(a, b) * 1` both REPORT while `(i + 1) * 1` is clean, so
+// installed build, `(a || b) * 1` and `(a, b) * 1` both report while `(i + 1) * 1` is clean, so
 // testing the kind alone is wrong in both directions.
 func noImplicitCoercionIsEstreeBinary(node *ast.Node) bool {
 	if node.Kind != ast.KindBinaryExpression {

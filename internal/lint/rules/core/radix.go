@@ -106,16 +106,16 @@ var messageRadixAddRadixParameter10 = rule.Message{
 // # A spread before the radix abandons the call
 //
 // `parseInt(...args)` could be any number of arguments, so nothing can be said about where the radix
-// is, and upstream declines. A spread AFTER the first two positions does not hide anything, which is
+// is, and upstream declines. A spread after the first two positions does not hide anything, which is
 // why `parseInt("10", 1, ...args)` still reports an invalid radix. The index test is upstream's and
 // the boundary is exact.
 //
 // # Shadowing, and where this port is more precise than upstream
 //
 // A local `parseInt` is not the global one, so the rule has nothing to say about it. Upstream asks
-// eslint-scope for the PROGRAM scope's variable and checks whether anything defines it, which makes
+// eslint-scope for the program scope's variable and checks whether anything defines it, which makes
 // its answer whole-file: measured against the installed rule, `{ let parseInt; } parseInt("10");`
-// is CLEAN upstream even though the block-scoped binding cannot reach the call.
+// is clean upstream even though the block-scoped binding cannot reach the call.
 //
 // This port resolves each call site instead, through `resolvesToAGlobal`, so that input reports
 // here. The divergence is deliberate and it is in the direction of reporting a real defect that
@@ -198,7 +198,7 @@ func isAParseIntCallee(ruleContext rule.Context, callee *ast.Node) bool {
 		// A private name is not a property of `Number`, and `Number.#parseInt()` is one of
 		// upstream's passing cases.
 		//
-		// The KIND half of this guard is EQUIVALENT rather than load bearing, and it is kept
+		// The kind half of this guard is equivalent rather than load bearing, and it is kept
 		// because it states the intent where a reader looks for it and because it does not depend
 		// on how a private name renders. Our parser gives a private identifier a Text() of
 		// `#parseInt`, hash included, so the string comparison below already declines every one of
@@ -230,7 +230,7 @@ func isTheGlobalNumber(ruleContext rule.Context, receiver *ast.Node) bool {
 // isTheLiteralText says whether a computed key is a string literal spelling the given name.
 //
 // A template with no substitutions counts, because Number[`parseInt`] is the same call and upstream
-// treats it as one. A template WITH substitutions does not, since its value is not known here.
+// treats it as one. A template with substitutions does not, since its value is not known here.
 func isTheLiteralText(key *ast.Node, name string) bool {
 	if key == nil {
 		return false
@@ -317,14 +317,14 @@ func isAValidRadix(ruleContext rule.Context, radix *ast.Node) bool {
 		// really is the global one rather than a shadowing parameter. Its own passing case
 		// `function foo(undefined) { parseInt("10", undefined); }` is what says so.
 		//
-		// `resolvesToAGlobal` is deliberately NOT used, and this is the one place in this file
+		// `resolvesToAGlobal` is deliberately not used, and this is the one place in this file
 		// where it would be wrong. It answers false when a symbol carries zero declarations, and
 		// the real global `undefined` has exactly that shape, so it answers false on every input
 		// this arm must report. Probed: a bare `undefined` resolves to a symbol with 0
 		// declarations, while the shadowing parameter resolves to a symbol with 1, declared in
 		// source.
 		//
-		// So the predicate is the complement -- ask whether the name is declared in SOURCE, and
+		// So the predicate is the complement -- ask whether the name is declared in source, and
 		// treat "not declared in source" as the global. Written this way round, a name with no
 		// symbol at all also reads as the global, which is the correct answer for `undefined` in a
 		// file the checker cannot fully resolve.

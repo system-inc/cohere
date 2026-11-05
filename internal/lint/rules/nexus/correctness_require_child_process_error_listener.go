@@ -40,7 +40,7 @@ func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
 //
 // `modules/os/sensation/AhraOsMonitors.ts:140` in ahra: the `prCheckStream` monitor source spawns
 // `gh pr checks --watch` and listens for stdout, stderr and `'exit'`, never `'error'`. With `gh` off
-// the daemon's PATH, or an EAGAIN when the process table is full, node emits `'error'` on the next
+// the daemon's PATH, or an `EAGAIN` when the process table is full, node emits `'error'` on the next
 // tick, nothing listens, and the throw takes down the whole sensation daemon. Found by the
 // cross-language pass of the new-rules sweep (`#tevhg3f`, after clippy's `zombie_processes`), built
 // as task `#8gcxzsw`.

@@ -443,7 +443,7 @@ export function Widget() {
 //
 // It exists because of a real difference between two binaries rather than to fake one.
 // `rule.Registered()` returns what the linked binary registered, and this package's test binary
-// links only `structure` rules, none of which declare the flag. The rules that DO declare it —
+// links only `structure` rules, none of which declare the flag. The rules that do declare it —
 // `set-state-in-render` and `set-state-in-effect` — live in `internal/rules/react`, and importing
 // that package here would both create a dependency this package does not want and be refused by the
 // leaf guard's spirit. So the branch is proven with a stand-in, and the empty branch is proven
@@ -593,7 +593,7 @@ export function Widget() {
 // It has to be direct, and the reason is a reachability limit rather than a preference. The joiner's
 // three-or-more arm can only be exercised by a catalog holding three rules that declare
 // `ResolvesReactValueTypes`, and today the tree holds two. Reached through the rule, that arm is
-// unreachable, and a mutation removing its `and` separator SURVIVED the entire suite for exactly
+// unreachable, and a mutation removing its `and` separator survived the entire suite for exactly
 // that reason — not because the fixtures were blind, but because no input could reach the code.
 //
 // A third such rule is expected rather than hypothetical, which is what makes testing the arm now
@@ -629,14 +629,14 @@ func TestReactHookAnyTypeJoinRendersEveryArity(test *testing.T) {
 // The whole rule turns on `shimchecker.Type_flags`, which is not a method call: it casts a
 // `*checker.Type` to a hand-mirrored struct in `shim/checker/shim.go` and reads a field by offset.
 // That is correct only while the mirror reproduces upstream's layout exactly, and it does not fail
-// loudly when it stops. `Checker_numberType` once returned the NULL type because a substituted
+// loudly when it stops. `Checker_numberType` once returned the null type because a substituted
 // stand-in was 24 bytes short at field 99 of 319, and every package compiled and every test passed;
 // the only symptom was `no-for-in-array` silently declining its entire corpus.
 //
 // Two properties of that defect set the bar this test has to clear. A nil check cannot see it,
 // because the wrong value was non-nil and a perfectly valid value of the right Go type. And a
 // field-name comparison cannot see it either, because all 319 names aligned and only a type was
-// wrong. So this asserts what the value IS: for every subject the flag read is compared against the
+// wrong. So this asserts what the value is: for every subject the flag read is compared against the
 // checker's own name for the same type, which is derived through a completely different path
 // (`TypeToString`, a linkname to an upstream method, no offset arithmetic anywhere).
 //

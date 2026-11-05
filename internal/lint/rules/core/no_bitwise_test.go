@@ -32,7 +32,7 @@ type noBitwiseCase struct {
 	reason      string
 }
 
-// decodeNoBitwiseOptionsForTest routes a case's options through the SHIPPED decoder.
+// decodeNoBitwiseOptionsForTest routes a case's options through the shipped decoder.
 //
 // Not a hand-built options struct. A fixture constructing the options directly never exercises the
 // decoder, so a decoder wrong about the shape the config layer delivers passes every fixture.
@@ -183,11 +183,11 @@ func TestNoBitwiseInt32HintEdges(test *testing.T) {
 
 // TestNoBitwiseParenthesizedZeroDivergesFromUpstream records a divergence rather than hiding it.
 //
-// `x|(0)` is EXEMPT upstream, measured against the installed build, because its parser folds the
+// `x|(0)` is exempt upstream, measured against the installed build, because its parser folds the
 // parentheses away before `node.right.type === "Literal"` is tested. Ours keeps a
 // `KindParenthesizedExpression`, so the kind guard declines and the finding is reported.
 //
-// Not corrected, and the direction is why. This arm is an EXEMPTION: unwrapping here would make the
+// Not corrected, and the direction is why. This arm is an exemption: unwrapping here would make the
 // rule report less, on a shape upstream's corpus never writes and so never blessed. Reporting a
 // bitwise `|` that a reader wrote with redundant parentheses is the safe side of the divergence, and
 // the alternative is silently widening an exemption. The sibling `no-negated-condition` in this
@@ -202,7 +202,7 @@ func TestNoBitwiseParenthesizedZeroDivergesFromUpstream(test *testing.T) {
 // TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the config boundary.
 //
 // Every fixture above reaches the decoder with bytes this test file built; the config layer builds
-// different bytes. `meta.schema` declares ONE element here, so the cohere spelling and upstream's
+// different bytes. `meta.schema` declares one element here, so the cohere spelling and upstream's
 // coincide, and that is the fact being pinned rather than assumed.
 func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
 	test.Parallel()
@@ -281,7 +281,7 @@ func TestNoBitwiseAllowActuallyReachesTheRule(test *testing.T) {
 		test.Errorf("with `~` allowed the rule must be silent, got %v", allowed.MessageIds())
 	}
 
-	// The control, and it is the load-bearing half: an allow list for a DIFFERENT operator must not
+	// The control, and it is the load-bearing half: an allow list for a different operator must not
 	// exempt this one, which separates "the list was read" from "the list was read correctly".
 	other := runNoBitwise(test, noBitwiseCase{source: `~a`, optionsJson: `{"allow":["|"]}`})
 	rule_testing.ExpectFindings(test, other, messageNoBitwise.Id)
@@ -423,7 +423,7 @@ var noBitwiseReportingCases = []noBitwiseCase{
 //
 // The decoder decides which spellings a project may write in `allow`; the operator map decides which
 // operators the rule can act on. Nothing structural forced those to agree while they were two
-// literals, and a mutation changing one spelling in the decoder's list SURVIVED the entire fixture
+// literals, and a mutation changing one spelling in the decoder's list survived the entire fixture
 // set — because each side is internally consistent and every fixture exercises one side or the
 // other.
 //

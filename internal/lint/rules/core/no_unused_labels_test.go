@@ -517,9 +517,9 @@ func TestNoUnusedLabelsMarksOnlyTheNearestMatchingLabel(test *testing.T) {
 	}
 }
 
-// A safe token before the label defeats the ASI hazard, even when the body opens unsafely.
+// A safe token before the label defeats the automatic semicolon insertion hazard, even when the body opens unsafely.
 //
-// Written for a surviving mutant: dropping the half of the ASI test that asks whether the preceding
+// Written for a surviving mutant: dropping the half of the semicolon-insertion test that asks whether the preceding
 // token already terminates a statement changed no fixture. The imported corpus never pairs a safe
 // preceding token with an unsafe body opener, so every fix case it carries has a body starting with
 // an ordinary token and the preceding-token half is never consulted.

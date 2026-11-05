@@ -93,7 +93,7 @@ var consistencyRequireMatchingReturnTypeVoidReasons = map[consistencyRequireMatc
 //
 // A contextual type that is `any`, `unknown`, `never`, or an uninstantiated type parameter says
 // nothing about the callback's returns (an event listener typed `=> any`), so it is passed over and
-// the inferred type decides. A DECLARED `any` or `unknown` is the author's statement and is not
+// the inferred type decides. A declared `any` or `unknown` is the author's statement and is not
 // passed over: the rule cannot know which spelling is meant and reports nothing.
 //
 // A contextual or inferred type of exactly `undefined` is unknowable. Both are usually the function's
@@ -343,7 +343,7 @@ func consistencyRequireMatchingReturnTypeJudge(ruleContext rule.Context, functio
 // expects, or nil when it has none or more than one call signature could apply.
 //
 // The checker's own `getContextualSignature` is not reachable through the shim, so this rebuilds it
-// from the contextual TYPE: the apparent type's single call signature, or, for a union, each member's
+// from the contextual type: the apparent type's single call signature, or, for a union, each member's
 // single signature with members that have none skipped, their return types unioned.
 func consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext rule.Context, function *ast.Node) *checker.Type {
 	var contextual *checker.Type
@@ -351,7 +351,7 @@ func consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext rule.C
 	case function.Kind == ast.KindFunctionExpression, function.Kind == ast.KindArrowFunction:
 		contextual = checker.Checker_getContextualType(ruleContext.TypeChecker, function, checker.ContextFlagsSignature)
 	case ast.IsObjectLiteralMethod(function):
-		// Not `getContextualType`, which dispatches on the node's PARENT and has no arm for a method
+		// Not `getContextualType`, which dispatches on the node's parent and has no arm for a method
 		// whose parent is the object literal itself. Measured: through that call the method's
 		// contextual `() => void` went unread, and only a fixture whose inferred type disagrees with
 		// its context could see it. The checker's own path for a method is this one.
@@ -426,7 +426,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 		return unknown
 	}
 
-	// The union's constituents OR'd, not the type's own flags: `string | void` is a union whose own
+	// The union's constituents `OR`'d, not the type's own flags: `string | void` is a union whose own
 	// flags carry no Void bit, and the shelf's `IsTypeFlagSet` would answer false for it.
 	var combined checker.TypeFlags
 	for part := range type_checking.UnionTypePartsSeq(returnType) {
@@ -449,14 +449,14 @@ func consistencyRequireMatchingReturnTypeClassify(
 	// resolves to `undefined`) is the same circle one call away. Such a type cannot say which kind of
 	// function this is, and both readings are wrong somewhere on ahra:
 	//
-	//   - read as a VALUE, it asked for `return undefined;` in 27 exits of one CLI dispatcher whose
+	//   - read as a value, it asked for `return undefined;` in 27 exits of one CLI dispatcher whose
 	//     `return void console.log(...)` made its inferred type `Promise<undefined>`, and in a
 	//     `forEachChild` visitor: 28 of the first 36 findings, all noise;
-	//   - read as VOID, it asked for `return;` in `Array.from({ length }, function() { return
+	//   - read as `void`, it asked for `return;` in `Array.from({ length }, function() { return
 	//     undefined; })` and in stub objects standing in for `() => X | undefined` methods, where
-	//     `undefined` IS the value, and the fix would retype each as `void` and break its consumer.
+	//     `undefined` is the value, and the fix would retype each as `void` and break its consumer.
 	//
-	// So it reports nothing. A DECLARED `(): undefined` is the author saying `undefined` is the value,
+	// So it reports nothing. A declared `(): undefined` is the author saying `undefined` is the value,
 	// and stays a value.
 	if !declared && flags == checker.TypeFlagsUndefined {
 		return unknown

@@ -131,7 +131,7 @@ func TestConsistencyOrganizeImportsStaysSilent(test *testing.T) {
 			source: "// Dependencies - Frameworks\nimport React from 'react';\nimport a from 'next/link';\n\nexport const X = 1;\n",
 		},
 		{
-			// Two imports in ONE group, already ascending. Every other clean case here holds at most
+			// Two imports in one group, already ascending. Every other clean case here holds at most
 			// one import per group, so the comparison inside a group is never exercised by them and
 			// a mutation flipping it to descending changed no verdict at all. Measured on the
 			// original: this input is clean.
@@ -139,14 +139,14 @@ func TestConsistencyOrganizeImportsStaysSilent(test *testing.T) {
 			source: "// Dependencies - Third-party\nimport a from 'alpha';\nimport z from 'zebra';\n\nexport const X = 1;\n",
 		},
 		{
-			// use server takes its OWN comment, not the client one. Nothing else here can see the
+			// use server takes its own comment, not the client one. Nothing else here can see the
 			// two directives being told apart: the reporting cases pass through a directive with no
 			// comment at all, which reports whichever text the rule would have written.
 			name:   "use server already carrying the server comment",
 			source: "'use server'; // Uses server-only features\n\n// Dependencies - Frameworks\nimport React from 'react';\n\nexport const X = 1;\n",
 		},
 		{
-			// Only the FIRST statement is a directive, which is what the language says too. A
+			// Only the first statement is a directive, which is what the language says too. A
 			// string expression written below the imports is an ordinary statement, so it is not
 			// re-emitted with a comment and its presence does not make the file unorganized.
 			name:   "a directive-shaped string below the imports is not a directive",

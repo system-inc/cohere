@@ -24,7 +24,7 @@ var reactHookNoAnyTypeMessageId = "reactHookNoAnyType"
 //
 // For every call expression whose callee is either a bare identifier matching React's own hook
 // pattern `/^use[A-Z0-9]/`, or a property access `React.<thatPattern>` — the two spellings a hook
-// can have in this codebase — the rule asks the checker for the type of THE CALL, meaning the value
+// can have in this codebase — the rule asks the checker for the type of the call, meaning the value
 // the call produces, and reports when that type carries `TypeFlagsAny`.
 //
 // It checks the call's result and deliberately not the callee's type, and the difference is the
@@ -46,13 +46,13 @@ var reactHookNoAnyTypeMessageId = "reactHookNoAnyType"
 // a comment. More importantly the import shape is a proxy pointing the wrong way in both
 // directions: `declare global`, a re-export, a monorepo path mapping and an ambient declaration all
 // produce real types with no local import statement and are legitimate, while a plain missing
-// import is a `tsc` error that never reaches production. The cases that DO reach production are the
+// import is a `tsc` error that never reaches production. The cases that do reach production are the
 // ones that satisfy `tsc` — a stale `@types` package, a path mapping that half-resolves, a shim
 // somebody wrote to unblock a build — and every one of those has a resolvable-looking import.
 //
 // `structure/import-require-react-namespace` is the neighbouring rule and the two do not overlap.
-// That one polices HOW a name is imported, and the input above has no import statement at all for
-// it to see. This one polices WHETHER the types behind the name are real. Neither substitutes.
+// That one polices how a name is imported, and the input above has no import statement at all for
+// it to see. This one polices whether the types behind the name are real. Neither substitutes.
 //
 // # Why only `any`, and what else was probed
 //
@@ -129,7 +129,7 @@ var ReactHookNoAnyType = rule.Rule{
 		return rule.Listeners{
 			// No second nil-checker guard here, and the absence is measured rather than an
 			// oversight. Two guards were written, one at Run and one at the top of this listener,
-			// and each SURVIVED its own mutation while neutralizing both together was caught: the
+			// and each survived its own mutation while neutralizing both together was caught: the
 			// listener is only reached through a Run that already declined a nil checker, so the
 			// inner test could not answer any input the outer one had not. Mutual subsumption, so
 			// the reachable one stays and the unreachable one is gone rather than tested.
@@ -145,17 +145,17 @@ var ReactHookNoAnyType = rule.Rule{
 					return
 				}
 
-				// The CALL's type, not the callee's. See the rule comment: an ambient shim
+				// The call's type, not the callee's. See the rule comment: an ambient shim
 				// declaring `useState<T>(initial: T): any` gives a perfectly typed callee.
 				resultType := ruleContext.TypeChecker.GetTypeAtLocation(node)
 
-				// Crash protection rather than a behavioural filter, and it is a SURVIVING mutant
+				// Crash protection rather than a behavioural filter, and it is a surviving mutant
 				// recorded as such rather than argued into equivalence. `shimchecker.Type_flags`
 				// casts through an unsafe pointer with no nil test of its own, so a nil here is a
 				// segfault rather than a wrong answer, and no `ExpectFindings` fixture can see a
-				// panic — the sweep reports SURVIVED identically whether this line matters or not.
+				// panic — the sweep reports survived identically whether this line matters or not.
 				//
-				// Whether a nil is reachable at all is NOT established. Five shapes were probed
+				// Whether a nil is reachable at all is not established. Five shapes were probed
 				// looking for one — a member call on an `any`, an optional call, a comma-sequence
 				// callee, an unterminated call that error recovery synthesizes, and a spread
 				// argument — and every one came back with a real type. That is evidence the branch
@@ -262,7 +262,7 @@ func reactHookNoAnyTypeCalleeName(callee *ast.Node) string {
 // This is the part that was measured rather than assumed, and the obvious answer is wrong.
 //
 // Forty-one registered rules declare `NeedsTypeChecker`. Only two of them go blind here. The other
-// thirty-nine ask `GetSymbolAtLocation`, which resolves a BINDING, and a binding survives a
+// thirty-nine ask `GetSymbolAtLocation`, which resolves a binding, and a binding survives a
 // degraded type completely. Probed on the same file, twice, on the same call:
 //
 //	declare function useState<T>(initial: T): any;
@@ -280,7 +280,7 @@ func reactHookNoAnyTypeCalleeName(callee *ast.Node) string {
 //
 // # The one honest limitation, stated because it is invisible otherwise
 //
-// `rule.Registered()` returns what the LINKED BINARY registered. In `cmd/cohere` every rule package
+// `rule.Registered()` returns what the linked binary registered. In `cmd/cohere` every rule package
 // is imported, so this sees all of them. In this package's own test binary only `structure` rules
 // are linked, so it sees zero — which would make a fixture assert a sentence the real tool never
 // prints. That is not a fallback to paper over; it is a real difference between two binaries, so the

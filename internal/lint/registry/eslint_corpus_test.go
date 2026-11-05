@@ -57,6 +57,7 @@ type eslintCorpusRow struct {
 
 // key names a row by its code and options, so the gaps list survives a re-extract that reorders rows
 func (row eslintCorpusRow) key() string {
+	// Ignored: the options were decoded from the corpus file as raw JSON, so encoding them again cannot fail.
 	options, _ := json.Marshal(row.Options)
 	sum := sha256.Sum256([]byte(row.Code + "\x00" + string(options)))
 	return hex.EncodeToString(sum[:6])
@@ -68,7 +69,11 @@ func decodeCorpusOptions(registration rule.Registration, options []json.RawMessa
 	case registration.DecodeOptionList != nil:
 		var list []byte
 		if len(options) > 0 {
-			list, _ = json.Marshal(options)
+			var encodeError error
+			list, encodeError = json.Marshal(options)
+			if encodeError != nil {
+				return nil, "options did not encode: " + encodeError.Error()
+			}
 		}
 		decoded, err := registration.DecodeOptionList(list)
 		if err != nil {
@@ -323,7 +328,10 @@ func TestCohereAgreesWithESLintsCoreCorpus(test *testing.T) {
 				delete(found, name)
 			}
 		}
-		encoded, _ := json.MarshalIndent(found, "", "    ")
+		encoded, encodeError := json.MarshalIndent(found, "", "    ")
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
 		if writeError := os.WriteFile(eslintCorpusGapsFile, append(encoded, '\n'), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}

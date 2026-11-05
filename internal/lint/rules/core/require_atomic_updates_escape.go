@@ -21,19 +21,19 @@ type deferredAtomicEvent struct {
 //
 // # The suspension
 //
-// An await or a yield makes every variable read BEFORE it stale, and upstream runs `makeOutdated` at
+// An await or a yield makes every variable read before it stale, and upstream runs `makeOutdated` at
 // the expression's `:exit`. The Expression hook is pre-order and it is the only hook the graph offers
 // for these nodes, so the marker is emitted before the operand and has to move past it.
 //
-// The corpus pins both directions and they are one token apart: `foo = await foo` REPORTS, because
+// The corpus pins both directions and they are one token apart: `foo = await foo` reports, because
 // the read inside the awaited operand is made stale by that very await, and `foo = await bar + foo`
-// is CLEAN, because the read outside it evaluates afterwards.
+// is clean, because the read outside it evaluates afterwards.
 //
 // # The property store
 //
-// The graph's Write hook fires where a BINDING is stored into, and `foo.bar = x` stores into a
+// The graph's Write hook fires where a binding is stored into, and `foo.bar = x` stores into a
 // property, so `foo` is only ever read there and no Write event exists. Upstream resolves the same
-// asymmetry in `getWriteExpr`, walking UP from a read reference through enclosing member expressions
+// asymmetry in `getWriteExpr`, walking up from a read reference through enclosing member expressions
 // to an assignment the chain is the left side of. The read is the anchor in both implementations.
 //
 // The store is judged once the right-hand side has evaluated, which is upstream's deferral to
@@ -127,13 +127,13 @@ func placeDeferredEvents(
 			continue
 		}
 
-		// Two phases, because a property store belongs after EVERYTHING in its assignment and a
+		// Two phases, because a property store belongs after everything in its assignment and a
 		// suspension inside the right-hand side is part of that. Placing both against the same
 		// stream leaves a store that has no contained event of its own ahead of the suspension that
 		// stales it, and the property arm goes largely silent: measured, 17 of upstream's 37
 		// findings.
 		//
-		// The ORDER of the two phases is NOT load-bearing, which was measured rather than assumed
+		// The order of the two phases is not load-bearing, which was measured rather than assumed
 		// after a mutant swapping them survived. Each key is containment against a different range,
 		// and an assignment contains its own await, so a store placed first still ends up after the
 		// suspension once that suspension is placed. Four property shapes, including the doubled
@@ -177,8 +177,8 @@ func placeDeferrals(kept []atomicEvent, deferrals []deferredAtomicEvent) []atomi
 // chain that is the target of an assignment, and returns that assignment.
 //
 // This is upstream's `getWriteExpr` loop transcribed: from the identifier, climb while the node is
-// the OBJECT of a member expression, and stop at an assignment whose left side the chain is. Being
-// the object is the load-bearing half. In `bar.foo = 1` the identifier `foo` is the member NAME, not
+// the object of a member expression, and stop at an assignment whose left side the chain is. Being
+// the object is the load-bearing half. In `bar.foo = 1` the identifier `foo` is the member name, not
 // the object, so it heads nothing and the chain is `bar`'s.
 //
 // Both member forms are accepted because both occur in the corpus: `foo.bar` is a property access
@@ -187,7 +187,7 @@ func placeDeferrals(kept []atomicEvent, deferrals []deferredAtomicEvent) []atomi
 // # The object-position tests are unreachable through the graph, and are kept anyway
 //
 // A mutant dropping the property-access object test survived the whole corpus, and the reason is the
-// graph rather than the fixtures: `controlflow`'s Read hook fires on the OBJECT of a member
+// graph rather than the fixtures: `controlflow`'s Read hook fires on the object of a member
 // expression and never on its name. Measured directly on
 // `const a = {}; const foo = {}; async function x() { a.foo = a.foo + await baz; }`, chosen because
 // a variable and a member share the spelling `foo`, the hook produced reads for `a` at 50, `a` at 58
@@ -246,7 +246,7 @@ func propertyAssignmentHeadedBy(identifier *ast.Node) (*ast.Node, bool) {
 // binding, and therefore whether a race on it is possible at all.
 //
 // This is upstream's `isLocalVariableWithoutEscape`, inverted so the name states the condition under
-// which the rule REPORTS. Upstream:
+// which the rule reports. Upstream:
 //
 //	if (!variable) return false;                                   an unresolved global escapes
 //	if (isMemberAccess && defs.some(Parameter)) return false;       a parameter's object escapes
@@ -262,7 +262,7 @@ func propertyAssignmentHeadedBy(identifier *ast.Node) (*ast.Node, bool) {
 // reference can be called during the suspension. Upstream's `every` fails on the closure's own
 // reference, whose `from.variableScope` is the closure.
 //
-// **A parameter escapes for the PROPERTY question only.** The object a parameter names was
+// **A parameter escapes for the property question only.** The object a parameter names was
 // constructed by the caller and the caller still holds it, so a property write on it is observable
 // outside regardless of what this function does with the binding. The binding itself is a fresh
 // local slot. Upstream returns false early for exactly this pair, which is why the predicate answers
@@ -295,7 +295,7 @@ func escapesEnclosingFunction(
 
 	if isMemberAccess && symbolIsParameter(symbol) {
 		// The early return that makes a parameter answer differently on the two arms. It is checked
-		// BEFORE the memo, because the memo is keyed by symbol alone and this answer depends on
+		// before the memo, because the memo is keyed by symbol alone and this answer depends on
 		// which arm is asking.
 		return true
 	}

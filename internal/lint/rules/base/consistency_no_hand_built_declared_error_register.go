@@ -7,7 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // Its own file rather than a line in a shared register.go, so two ports landing at once do not
 // conflict on a file neither is really changing.
 //
-// The rule is registered and DELIBERATELY NOT ENABLED. api-phi-health has no CohereSettings.json of
+// The rule is registered and deliberately not enabled. api-phi-health has no CohereSettings.json of
 // its own, and ahra's config carries no `base/` keys because base is that project's layer rather
 // than ahra's, so where this gets enabled is a decision rather than an omission.
 //

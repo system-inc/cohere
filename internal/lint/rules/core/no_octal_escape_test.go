@@ -280,7 +280,7 @@ func TestNoOctalEscapeReportsTheWholeLiteral(test *testing.T) {
 // TestNoOctalEscapeReportsOncePerLiteral pins the count and which escape wins.
 //
 // The corpus states this for four inputs and they are the sharpest cases in it: `'\01\02'` names
-// `01` and `'\02\01'` names `02`, so the finding is the FIRST escape rather than the widest or the
+// `01` and `'\02\01'` names `02`, so the finding is the first escape rather than the widest or the
 // last. Those two are already above; these add the cases upstream has no equivalent of, where three
 // escapes appear and where two literals in one file each report.
 //

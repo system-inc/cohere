@@ -118,7 +118,7 @@ var NoOctalEscape = rule.Rule{
 // wins. Order is load bearing rather than a tidy way to write four independent tests: `0` is in
 // range for the first production, so `\08` would be taken as a one-digit `[0-3][0-7]{1,2}` match if
 // that production could accept a single digit. It cannot, since `{1,2}` demands at least one digit
-// AFTER the leading one, which is why `\0` alone is clean and why the `0(?=[89])` production has to
+// after the leading one, which is why `\0` alone is clean and why the `0(?=[89])` production has to
 // exist separately.
 func firstOctalEscapeSequence(raw string) (string, bool) {
 	for index := 0; index < len(raw); {

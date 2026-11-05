@@ -198,14 +198,14 @@ func TestConsistencyNoMultilineArrowFunctionFixes(test *testing.T) {
 			"const f = function() {\n    return import.meta.url;\n};\n",
 		},
 		{
-			// DIVERGES from the original, which emits `async function async(value)`, a function
+			// Diverges from the original, which emits `async function async(value)`, a function
 			// named async, because it strips `async ` by text and this one has no space.
 			"async with no space before the parameters", arrowFile,
 			"const f = async(value) => {\n    await value;\n};\n",
 			"const f = async function(value) {\n    await value;\n};\n",
 		},
 		{
-			// DIVERGES from the original, which emits `async function<T>(value(: T))`, a parse
+			// Diverges from the original, which emits `async function<T>(value(: T))`, a parse
 			// error, because it slices the type parameters at an offset that still counts `async `.
 			"an async arrow with type parameters", arrowPlainFile,
 			"const f = async <T>(value: T) => {\n    await value;\n};\n",

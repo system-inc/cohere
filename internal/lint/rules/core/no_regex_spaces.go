@@ -33,7 +33,7 @@ var messageRegexSpaces = rule.Message{
 //
 // Three things about this rule are easy to get backwards, and each is a real defect if you do.
 //
-// **At most one finding per regex, and it is the FIRST qualifying run, not the last.** Upstream's
+// **At most one finding per regex, and it is the first qualifying run, not the last.** Upstream's
 // accumulator is named `last_space_span` and does not hold the last run: once a run of two or more
 // has latched, every later run is discarded, and the single space bookkeeping exists only to step
 // past lone spaces on the way to the first real one. So `/  foo   /` reports the leading pair and
@@ -46,7 +46,7 @@ var messageRegexSpaces = rule.Message{
 // one space repeated and `/[  ]/` is a set that happens to name the space twice. The walk carries
 // both depths so this rule can skip either, which is the case `regexpattern` was built for.
 //
-// **The constructor path parses the COOKED string but reports RAW offsets, and it needs both.** For
+// **The constructor path parses the cooked string but reports raw offsets, and it needs both.** For
 // a regex literal the two texts are the same and none of this arises. For the constructor they are
 // not, and each half is load bearing in a different direction.
 //
@@ -155,7 +155,7 @@ var NoRegexSpaces = rule.Rule{
 			rawBody := raw[1 : len(raw)-1]
 			cooked := patternNode.AsStringLiteral().Text
 
-			// The gate runs on the RAW body, so a pattern whose adjacent spaces are only spelled
+			// The gate runs on the raw body, so a pattern whose adjacent spaces are only spelled
 			// out never reaches the parse. See the doc comment.
 			if !strings.Contains(rawBody, "  ") {
 				return

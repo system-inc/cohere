@@ -107,7 +107,7 @@ func TestVerifyArrayParityFires(test *testing.T) {
 			// it falls through all three branches: it neither arms the finding nor suppresses it,
 			// and a value-level rule beside it still reports. The fixture originally asserted the
 			// opposite, on the plausible reasoning that a custom rule might be array-level, and
-			// only driving the real ESLint rule settled it. An UNRECOGNISED name does suppress;
+			// only driving the real ESLint rule settled it. An unrecognised name does suppress;
 			// `VerifyBy` is recognised, and that is the whole difference between the two sets.
 			source:   "class Entity { @VerifyBy(() => true) @VerifyIsString() names: string[]; }",
 			reported: "names",
@@ -126,7 +126,7 @@ func TestVerifyArrayParityFires(test *testing.T) {
 			result := rule_testing.RunTyped(test, CorrectnessRequireVerifyArrayParity, correctnessRequireVerifyArrayParityFile, source)
 			rule_testing.ExpectFindings(test, result, "missingArrayRule")
 
-			// The span: the original reports the property's KEY, so a port pointing at the whole
+			// The span: the original reports the property's key, so a port pointing at the whole
 			// declaration would pass the id assertion and send the reader to the wrong column.
 			onDisk := strings.TrimSpace(source) + "\n"
 			reported := onDisk[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]

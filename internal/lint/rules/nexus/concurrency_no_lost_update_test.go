@@ -59,7 +59,7 @@ var concurrencyNoLostUpdatePrelude = strings.Join([]string{
 }, "\n")
 
 // concurrencyNoLostUpdatePhiSocialTerminal is `withPhiStdoutFilter` from
-// `modules/phi/social/PhiSocialTerminal.ts:430` at HEAD on 2026-10-01, verbatim apart from the
+// `modules/phi/social/PhiSocialTerminal.ts:430` at `HEAD` on 2026-10-01, verbatim apart from the
 // declarations its imports supply. `ArtTerminal.ts` carries the same function. It reported three times
 // before the save-and-restore condition, once per restored handler, and must stay silent.
 var concurrencyNoLostUpdatePhiSocialTerminal = strings.Join([]string{

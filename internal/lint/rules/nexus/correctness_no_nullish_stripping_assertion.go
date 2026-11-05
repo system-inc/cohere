@@ -52,7 +52,7 @@ func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 // the same cast, so the decline is that rule's own predicate, copied here verbatim
 // (`isSameTypeWithoutNullish` in `rules/typescript/non_nullable_type_assertion_style.go`, which is
 // unexported): every asserted constituent is a non-nullish constituent of the original by type
-// IDENTITY, and every non-nullish original constituent is asserted. Anything this rule reports fails
+// identity, and every non-nullish original constituent is asserted. Anything this rule reports fails
 // that predicate, so the style rule declines it; anything the style rule reports passes it, so this
 // rule declines it. The fixtures assert both directions by running both rules on the same cast.
 //
@@ -74,7 +74,7 @@ func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 // # What counts as stripping
 //
 // The original (the expression's type at the assertion, after narrowing) must be a union holding at
-// least one constituent flagged Null or Undefined AND at least one that is not. The asserted type must
+// least one constituent flagged Null or Undefined and at least one that is not. The asserted type must
 // have no constituent that could be nullish:
 //
 //   - **`any`, `unknown` on either side decline.** Asserting from `unknown` is a parse at a boundary,

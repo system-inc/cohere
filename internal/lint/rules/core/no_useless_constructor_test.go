@@ -187,7 +187,7 @@ func TestNoUselessConstructorSpansTheHead(test *testing.T) {
 // corpus covers only partly.
 //
 // `private` and `protected` always make a constructor useful, because they restrict who may
-// construct. `public` is useful ONLY on a subclass, where it widens the visibility the parent
+// construct. `public` is useful only on a subclass, where it widens the visibility the parent
 // declared; on a base class it says what was already true. All four measured against the
 // installed build.
 func TestNoUselessConstructorAccessibility(test *testing.T) {
@@ -238,9 +238,9 @@ func TestNoUselessConstructorMessages(test *testing.T) {
 // Forwarding shapes that look like a pass-through and are not.
 //
 // Two mutants survived the whole imported corpus here. Dropping the test that a rest parameter must
-// be met by a SPREAD left `constructor(...args) { super(args); }` reading as useless, and it is not:
+// be met by a spread left `constructor(...args) { super(args); }` reading as useless, and it is not:
 // `super(args)` passes the array itself where `super(...args)` passes its elements, so the two calls
-// do different things. Dropping the comparison of argument NAMES left `super(y)` forwarding `x`.
+// do different things. Dropping the comparison of argument names left `super(y)` forwarding `x`.
 //
 // Upstream's corpus writes neither, because both are mistakes nobody makes on purpose. All five rows
 // measured against the installed eslint at 10.8.1.
@@ -253,7 +253,7 @@ func TestNoUselessConstructorForwardingMustMatchExactly(test *testing.T) {
 	}{
 		// A rest met by a bare identifier passes the array, not its elements.
 		{"class A extends B { constructor(...args) { super(args); } }", false},
-		// The same shape with the spread IS a pass-through, and is the control: without it the four
+		// The same shape with the spread is a pass-through, and is the control: without it the four
 		// clean rows could pass for a rule that never reports a rest at all.
 		{"class A extends B { constructor(...args) { super(...args); } }", true},
 		// A different name forwarded.
@@ -295,7 +295,7 @@ func TestNoUselessConstructorHeritageAndSoleStatement(test *testing.T) {
 	}{
 		// Implements is not extends, so this is judged as a base class: an empty body is useless.
 		{"class A implements I { constructor() {} }", true},
-		// And by the same token a `super()` here is NOT a pass-through, it is a statement in a base
+		// And by the same token a `super()` here is not a pass-through, it is a statement in a base
 		// class constructor, which makes the constructor do something.
 		{"class A implements I { constructor() { super(); } }", false},
 		// Both clauses together: the extends is what counts, so this is the subclass rule again.

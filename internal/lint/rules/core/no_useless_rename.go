@@ -14,7 +14,7 @@ var messageUnnecessarilyRenamed = rule.Message{
 
 // NoUselessRenameSettings is the decoded option surface.
 //
-// All three options default to FALSE, so the zero value is correct here and the default-inversion
+// All three options default to false, so the zero value is correct here and the default-inversion
 // hazard does not apply. They are decoded through pointers anyway so an explicit false stays
 // distinguishable from an absent key, which keeps the shape right if a default ever moves.
 type NoUselessRenameSettings struct {
@@ -85,7 +85,7 @@ func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
 // # A string key counts, and an escape does not change the name
 //
 // `let {'foo': foo} = obj` is a rename to the same name and reports, because a string key and an
-// identifier name compare by VALUE. That is also why `let {a: a} = obj` reports: the escape is
+// identifier name compare by value. That is also why `let {a: a} = obj` reports: the escape is
 // spelling rather than identity, and both sides are the name `a`. Our parser hands back the cooked
 // text for both, so the comparison needs no unescaping here, and the corpus carries five escape
 // cases that would fail loudly if it did.
@@ -99,8 +99,8 @@ func DecodeNoUselessRenameOptions(raw []byte) (any, error) {
 // in a shorthand property. Twenty one of upstream's 107 failing cases carry `output: null` for one
 // of those two reasons, and both are ported.
 //
-// The comment test is a COUNT rather than a presence test, which matters: a comment inside the part
-// being KEPT survives the rewrite, so `({foo: foo /**/} = {})` still fixes while
+// The comment test is a count rather than a presence test, which matters: a comment inside the part
+// being kept survives the rewrite, so `({foo: foo /**/} = {})` still fixes while
 // `({foo /**/: foo} = {})` does not. Upstream compares the comments inside the whole node against
 // those inside the replacement, and that comparison is what draws the line.
 var NoUselessRename = rule.Rule{
@@ -118,7 +118,7 @@ var NoUselessRename = rule.Rule{
 				}
 				checkUselessRenameInBindingPattern(ruleContext, node)
 			},
-			// A destructuring ASSIGNMENT rather than a declaration reaches the parser as an object
+			// A destructuring assignment rather than a declaration reaches the parser as an object
 			// literal on the left of an `=`, so its properties are property assignments rather than
 			// binding elements. Upstream sees one ObjectPattern for both because its parser
 			// reinterprets; ours does not, so both shapes are visited.
@@ -148,7 +148,7 @@ var NoUselessRename = rule.Rule{
 				if specifier == nil {
 					return
 				}
-				// An export keeps its local name too, and in an export that is the name BEFORE
+				// An export keeps its local name too, and in an export that is the name before
 				// `as`, which the parser stores as the property name.
 				checkUselessRenameSpecifier(ruleContext, node, specifier.PropertyName, specifier.Name(),
 					specifier.PropertyName)
@@ -159,7 +159,7 @@ var NoUselessRename = rule.Rule{
 
 // isADestructuringTarget says whether an object literal is really a destructuring pattern.
 //
-// The parser produces an object LITERAL for `({foo: foo} = obj)` and only the surrounding assignment
+// The parser produces an object literal for `({foo: foo} = obj)` and only the surrounding assignment
 // says it is a pattern. Without this test the rule would report an ordinary object literal
 // `({foo: foo})`, which upstream leaves alone: its parser never calls that an ObjectPattern, so no
 // listener of its fires. That input is a clean case in its corpus.
@@ -200,7 +200,7 @@ func checkUselessRenameInBindingPattern(ruleContext rule.Context, node *ast.Node
 		}
 		// A computed key is not known until run time, so upstream declines rather than guessing.
 		//
-		// SUBSUMED rather than load bearing, and kept because it states the reason where a reader
+		// Subsumed rather than load bearing, and kept because it states the reason where a reader
 		// looks for it. `nameTextOf` answers the empty string for any kind that is not an
 		// identifier or a string, and a computed property name is neither, so the comparison below
 		// already declines every one of them. Measured over five shapes including a computed key
@@ -283,8 +283,8 @@ func localNameOfDestructuringValue(value *ast.Node) *ast.Node {
 // is no rename; ours leaves the property name nil, which asks the question more directly.
 //
 // The `keep` argument is which of the two names the repair writes, and the two sites differ. An
-// import keeps its LOCAL name, so `import {'foo' as foo}` becomes `import {foo}`. An export keeps
-// its local name too, which is the FIRST one written, so `export {foo as 'foo'}` becomes
+// import keeps its local name, so `import {'foo' as foo}` becomes `import {foo}`. An export keeps
+// its local name too, which is the first one written, so `export {foo as 'foo'}` becomes
 // `export {foo}` while `export {'foo' as foo}` becomes `export {'foo'}`.
 //
 // That asymmetry looks like an inconsistency and is not: in both cases upstream writes the text of
@@ -304,7 +304,7 @@ func checkUselessRenameSpecifier(ruleContext rule.Context, node *ast.Node, prope
 
 // nameTextOf reads a name's value, whether it is written as an identifier or as a string.
 //
-// A string key and an identifier compare by VALUE rather than by spelling, which is why
+// A string key and an identifier compare by value rather than by spelling, which is why
 // `let {'foo': foo} = obj` reports. The same applies to an escape: our parser hands back the cooked
 // text, so `a` and `a` are one name here without any unescaping, and upstream's five escape
 // cases are what pin it.
@@ -328,9 +328,9 @@ func reportUselessRename(ruleContext rule.Context, node *ast.Node, kept textSpan
 
 	// A comment in the discarded part would be deleted by the rewrite, so the repair is withheld and
 	// the finding still fires. Counted rather than merely detected: a comment inside the part being
-	// KEPT survives, so `({foo: foo /**/} = {})` still fixes.
-	// The node's span starts at its first TOKEN rather than at Pos(), because Pos() reaches back
-	// over leading trivia and would count a comment written BEFORE the specifier as being inside
+	// kept survives, so `({foo: foo /**/} = {})` still fixes.
+	// The node's span starts at its first token rather than at Pos(), because Pos() reaches back
+	// over leading trivia and would count a comment written before the specifier as being inside
 	// it. Upstream's getCommentsInside asks about the node's own range, where a leading comment is
 	// not inside, so `import {/* comment */foo as foo}` still fixes. Seven of upstream's fix
 	// vectors are that shape and every one of them was a withheld repair here first.
@@ -395,7 +395,7 @@ func valueRangeOfPropertyAssignment(ruleContext rule.Context, assignment *ast.Pr
 	// A bare parenthesized local is unwrapped, so `({foo: (foo)} = obj)` repairs to `({foo} = obj)`
 	// rather than to `({(foo)} = obj)`, which is not legal shorthand. Upstream reaches the same
 	// place from the other side: its parser hands the rule the identifier and it writes that node's
-	// text. A parenthesized DEFAULT is refused above rather than unwrapped, because the parentheses
+	// text. A parenthesized default is refused above rather than unwrapped, because the parentheses
 	// there may be load bearing for precedence.
 	kept := value
 	for kept.Kind == ast.KindParenthesizedExpression {

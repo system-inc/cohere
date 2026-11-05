@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand rolled because two of upstream's defaults are non-zero -- a minimum of 2 and
 // properties "always" -- so a zero-value struct would be a different rule rather than a weaker one.
 //
-// `RequiresOptions` is deliberately NOT set: upstream's default is a minimum length of 2, so an
+// `RequiresOptions` is deliberately not set: upstream's default is a minimum length of 2, so an
 // unconfigured rule enforces that rather than doing nothing.
 func init() {
 	rule.Register(rule.Registration{

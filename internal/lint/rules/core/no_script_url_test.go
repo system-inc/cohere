@@ -71,7 +71,7 @@ func TestNoScriptUrlStaysSilent(test *testing.T) {
 // TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent is the sharpest case in this file.
 //
 // Upstream declines a template whose immediate `parent` is a `TaggedTemplateExpression`, and
-// nothing wider. So a template nested inside a tagged template's interpolation is NOT exempt: its
+// nothing wider. So a template nested inside a tagged template's interpolation is not exempt: its
 // parent is the enclosing template, not the tagged expression. Measured against the installed
 // ESLint build (version 10.8.1, driven through the Linter API), a template written
 // foo`x${`javascript:`}y` reports at the inner template.
@@ -121,7 +121,7 @@ func TestNoScriptUrlTaggedTemplateExemptionIsTheDirectParent(test *testing.T) {
 //
 // The fold group pins that the comparison ignores case across every letter rather than the one
 // capital `S` the corpus happens to write. It also pins the boundary: the fold is ASCII, so the
-// long s (U+017F) does NOT match, which is where Go's `strings.EqualFold` and JavaScript's
+// long s (U+017F) does not match, which is where Go's `strings.EqualFold` and JavaScript's
 // `toLowerCase` disagree. Measured against the installed build, the long s spelling is clean and
 // the plain one beside it reports. Writing this rule with `EqualFold` would ship a false positive
 // that no imported fixture could see.

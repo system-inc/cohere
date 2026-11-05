@@ -21,7 +21,7 @@ import (
  * true}]` loaded clean and reported 0 where the option exists to report 1, while every
  * prefer-destructuring fixture stayed green. PortingARule.md section 7c is that blindness.
  *
- * So every row here starts from config TEXT: it is written to a CohereSettings.json, loaded by
+ * So every row here starts from config text: it is written to a CohereSettings.json, loaded by
  * `configuration.Load`, resolved, handed through `Options().Decode` exactly as the lint walk does,
  * and the decoded value runs the rule. Each row is a pair. The control writes the rule without the
  * element under test, the treatment writes upstream's spelling with it, and the two must disagree.

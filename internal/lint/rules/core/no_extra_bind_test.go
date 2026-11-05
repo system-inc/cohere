@@ -76,7 +76,7 @@ func TestNoExtraBindFires(test *testing.T) {
 		// A getter and a setter, which are the two accessor shapes and neither is a corpus case.
 		{"var a = function() { var o = { get x() { return this; } }; }.bind(b)", 61, 65, "var a = function() { var o = { get x() { return this; } }; }"},
 
-		// A `this` inside a nested arrow does NOT save the outer function, so this reports while the
+		// A `this` inside a nested arrow does not save the outer function, so this reports while the
 		// corpus's `function() { return () => this; }` is clean. The difference is which function the
 		// arrow is written inside: here it is a nested function, so its `this` is that function's.
 		{"var a = function() { function c() { return () => this; } }.bind(b)", 59, 63, "var a = function() { function c() { return () => this; } }"},
@@ -92,7 +92,7 @@ func TestNoExtraBindFires(test *testing.T) {
 		{"var a = function() {}.bind(true)", 22, 26, "var a = function() {}"},
 		{"var a = function() {}.bind('s')", 22, 26, "var a = function() {}"},
 
-		// Three shapes that report and are NOT repaired, because upstream's allowed set is estree's
+		// Three shapes that report and are not repaired, because upstream's allowed set is estree's
 		// `Literal` and these are outside it. Each is inside the intuitive reading of the set and
 		// outside the real one, which is why all three are measured against the installed rule
 		// rather than reasoned about, and why the corpus -- which writes no literal argument at all
@@ -168,7 +168,7 @@ func TestNoExtraBindStaysSilent(test *testing.T) {
 		// substitution is the empty string and the text still is not statically `bind`.
 		{"var a = function() { return 1; }[`bind${x}`](b)"},
 
-		// A subscript that IS a static string and is not `bind`. The corpus separates a static
+		// A subscript that is a static string and is not `bind`. The corpus separates a static
 		// subscript from a dynamic one and never separates a static subscript from a static one
 		// naming something else, so a rule reading only the node kind passes every imported case.
 		// Found by a mutant that let the string arm accept any text; measured silent upstream.
@@ -181,11 +181,11 @@ func TestNoExtraBindStaysSilent(test *testing.T) {
 		{"var a = function() { return 1; }.bind()"},
 		{"var a = function() { return 1; }.bind(b, c, d)"},
 
-		// The receiver is not the function. `bind` called ON something else, with a function as its
+		// The receiver is not the function. `bind` called on something else, with a function as its
 		// argument, is a different expression entirely.
 		{"var a = b.bind(function() { return 1; })"},
 
-		// The `*.bind` access is an ARGUMENT of a call rather than its callee, so nothing is being
+		// The `*.bind` access is an argument of a call rather than its callee, so nothing is being
 		// bound. One argument, so the argument-count check cannot cover for the callee check that
 		// actually declines it; found by a mutant that dropped the callee identity comparison and
 		// survived every other fixture. Measured silent upstream.

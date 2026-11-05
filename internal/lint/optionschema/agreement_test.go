@@ -56,7 +56,10 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 			test.Fatalf("%s has a sample and no schema", sample.Rule)
 		}
 		violation := schema.Validate(sample.Elements)
-		encoded, _ := json.Marshal(sample.Elements)
+		encoded, encodeError := json.Marshal(sample.Elements)
+		if encodeError != nil {
+			test.Fatalf("%s: %v", sample.Rule, encodeError)
+		}
 		switch sample.ESLint {
 		case "accepts":
 			accepted++
@@ -106,7 +109,10 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 				continue
 			}
 			if violation := schema.Validate(row.Options); violation != nil {
-				encoded, _ := json.Marshal(row.Options)
+				encoded, encodeError := json.Marshal(row.Options)
+				if encodeError != nil {
+					test.Fatalf("%s: %v", ruleName, encodeError)
+				}
 				falseRefusals = append(falseRefusals, fmt.Sprintf("%s corpus row %s: %v", ruleName, encoded, violation))
 			}
 		}
@@ -235,7 +241,11 @@ func TestExtensionsAreExactlyTheDeclaredOnes(test *testing.T) {
 		if extension.Reason == "" {
 			test.Errorf("%s's extension %q carries no reason", extension.Rule, extension.Key)
 		}
-		if _, found, _ := For(extension.Rule); !found {
+		_, found, optionSchemaForError := For(extension.Rule)
+		if optionSchemaForError != nil {
+			test.Fatalf("%s: %v", extension.Rule, optionSchemaForError)
+		}
+		if !found {
 			test.Errorf("%s has an extension and no schema", extension.Rule)
 		}
 	}
@@ -250,7 +260,13 @@ func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(test *testing.T) {
 	if checkError := Check("boundaries/dependencies", withElements); checkError != nil {
 		test.Errorf("elements are refused: %v", checkError)
 	}
-	schema, _, _ := For("boundaries/dependencies")
+	schema, found, optionSchemaForError := For("boundaries/dependencies")
+	if optionSchemaForError != nil {
+		test.Fatal(optionSchemaForError)
+	}
+	if !found {
+		test.Fatal("boundaries/dependencies has no schema")
+	}
 	if validateError := schema.Validate(withElements); validateError == nil {
 		test.Errorf("upstream's schema accepts elements without the extension, so the extension is not needed")
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// byteOrderMark is U+FEFF, which opens a file legitimately and is a stray character anywhere else.
+// byteOrderMark is `U+FEFF`, which opens a file legitimately and is a stray character anywhere else.
 const byteOrderMark = 0xFEFF
 
 // lineSeparator and paragraphSeparator, U+2028 and U+2029, end a line, so each is a finding of its own
@@ -139,7 +139,7 @@ type skippedRegion struct {
 //
 // # The byte order mark
 //
-// A U+FEFF at offset zero is a byte order mark rather than a stray character, and is not reported.
+// A `U+FEFF` at offset zero is a byte order mark rather than a stray character, and is not reported.
 // Anywhere else in the file it is reported like any other member of the set. oxc carries this
 // carve-out and ESLint does not, and oxc's corpus pins it with a passing case.
 //

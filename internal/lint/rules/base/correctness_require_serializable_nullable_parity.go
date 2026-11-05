@@ -21,18 +21,18 @@ import (
 // produces `undefined` typed as non-null, and a non-optional field whose type admits undefined
 // passes validation for missing values that downstream code treats as required.
 //
-// # BOTH directions, unlike its ORM sibling
+// # Both directions, unlike its ORM sibling
 //
 // `orm-column-nullable-parity` checks one direction only, because the pre-insert pattern needs the
 // other. This one checks both, and the two rules sit beside each other in this package with that
 // difference being the whole distinction between them. Worth stating because they otherwise read as
 // the same rule with different decorator names.
 //
-// # An ABSENT `optional` is read as false, which is the row most likely to surprise
+// # An absent `optional` is read as false, which is the row most likely to surprise
 //
 // The source calls `getBooleanOption`, whose absent case returns `false` rather than a skip, and
 // then guards on `=== null` which absent does not satisfy. So a bare `@SerializableField()` on a
-// nullable property REPORTS:
+// nullable property reports:
 //
 //	@SerializableField() x?: string      REPORTS, typeOptionalButDecoratorNot
 //	@SerializableField() x!: string      clean
@@ -41,7 +41,7 @@ import (
 // it is not: absent and explicitly-false are the same claim here, and the shelf's three-value return
 // is what lets this file express that deliberately rather than by accident.
 //
-// A NON-BOOLEAN value is different and does skip: `optional: 'items'` is not a claim this rule can
+// A non-boolean value is different and does skip: `optional: 'items'` is not a claim this rule can
 // check, so it declines rather than reading it as false.
 //
 // # `defaultValue` suppresses the whole check
@@ -82,7 +82,7 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 					return
 				}
 
-				// A non-boolean `optional` is not this rule's question. An ABSENT one is: it means
+				// A non-boolean `optional` is not this rule's question. An absent one is: it means
 				// the same as an explicit false, which is why `found` is not tested here and is
 				// tested in the ORM sibling.
 				declaredOptional, skip, _ := decorators.BooleanOption(node, "optional")

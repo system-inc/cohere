@@ -30,8 +30,8 @@ import (
 //
 // # The block, not the scope
 //
-// The container is the nearest enclosing BLOCK-like node, which is a block statement, a loop, a
-// switch, a catch clause, a class static block, or the file itself. Notably NOT a function: a
+// The container is the nearest enclosing block-like node, which is a block statement, a loop, a
+// switch, a catch clause, a class static block, or the file itself. Notably not a function: a
 // function body is a block, so a `var` at the top of one is contained by that block and every use
 // inside the function is fine.
 //
@@ -42,7 +42,7 @@ import (
 // # Every declaration of a merged name is checked against every reference
 //
 // `if (a) { var x = 1; } else { var x = 2; }` declares one variable twice, and both spellings are
-// out of the other's block, so it reports FOUR times: each declaration name is itself a reference,
+// out of the other's block, so it reports four times: each declaration name is itself a reference,
 // and each is outside the other declaration's block. That reads like over-reporting and it is
 // upstream's behaviour, measured; a port checking only non-declaration references reports zero here,
 // on a case upstream reports six findings for at three branches.
@@ -66,7 +66,7 @@ var BlockScopedVar = rule.Rule{
 //
 // Collected rather than reported as they are found, because the gathering loop is nested
 // declaration-outer and reference-inner, which groups findings by declaration while upstream's come
-// out ordered by where the USE is. `blockScopedVarReport` restores that order.
+// out ordered by where the use is. `blockScopedVarReport` restores that order.
 type blockScopedVarFinding struct {
 	reference       *ast.Node
 	declarationName *ast.Node
@@ -142,11 +142,11 @@ func checkBlockScopedVar(ruleContext rule.Context, file *ast.Node) {
 	blockScopedVarReport(ruleContext, findings)
 }
 
-// blockScopedVarReport emits findings ordered by where the USE is, then by the declaration.
+// blockScopedVarReport emits findings ordered by where the use is, then by the declaration.
 //
 // The gathering loop is nested declaration-outer, reference-inner, which groups findings by
 // declaration. Upstream's emission order is the other way round: it reports at the reference, and
-// the engine orders findings by position, so all the findings AT one use come out together and are
+// the engine orders findings by position, so all the findings at one use come out together and are
 // tie-broken by the declaration each names.
 //
 // `if (foo) { var a = 1; } else if (bar) { var a = 2; } else { var a = 3; }` is what makes this
@@ -179,10 +179,10 @@ func blockScopedVarReport(ruleContext rule.Context, findings []blockScopedVarFin
 // blockScopedVarIsVarDeclaration reports whether a declaration was written with `var`.
 //
 // `let` and `const` are already block-scoped, so they are not this rule's business, and neither is
-// a `using` declaration. The flag lives on the declaration LIST rather than on the declaration, so
+// a `using` declaration. The flag lives on the declaration list rather than on the declaration, so
 // this reaches through the parent rather than asking the node itself.
 //
-// # This guard is SUBSUMED, and it is kept anyway
+// # This guard is subsumed, and it is kept anyway
 //
 // Forcing it to accept every declaration kind changes no verdict, and it was measured rather than
 // argued: the checker already enforces block scoping, so a reference to a `let` outside its block
@@ -191,7 +191,7 @@ func blockScopedVarReport(ruleContext rule.Context, findings []blockScopedVarFin
 // container test below can never see a block-scoped declaration to report.
 //
 // Kept because it says what the rule is about, and because the subsumption is a property of the
-// CHECKER rather than of this rule: a resolution that ever answered more broadly would turn every
+// checker rather than of this rule: a resolution that ever answered more broadly would turn every
 // `let` in the tree into a finding, and this line is the only thing that would still refuse. The
 // paired fixtures in `TestBlockScopedVarIgnoresBlockScopedDeclarations` pin the behaviour whichever
 // half is doing the work.
@@ -243,7 +243,7 @@ func blockScopedVarCollectBindingNames(name *ast.Node, into *[]*ast.Node) {
 // The file is the outermost container, so a top-level `var` is contained by everything.
 //
 // A function is deliberately absent from that list even though `var` is function-scoped. It does not
-// need to be there: a function body IS a block statement, so the block arm already stops the walk at
+// need to be there: a function body is a block statement, so the block arm already stops the walk at
 // the right place, and adding a function arm would change no answer while suggesting the rule is
 // about function scope, which is the thing it is arguing against.
 func blockScopedVarContainerOf(node *ast.Node, file *ast.Node) *ast.Node {

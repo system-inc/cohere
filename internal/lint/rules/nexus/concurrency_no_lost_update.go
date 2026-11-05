@@ -90,7 +90,7 @@ func concurrencyNoLostUpdateStoreMessage(read string) rule.Message {
 //     (`x = x + await y`, with the compound form's implicit read counting as first), or reached
 //     through a `const` of this function whose initializer read it (`const old = s.count; await f();
 //     s.count = old + 1`), through any chain of such consts.
-//  6. The value is MODIFIED rather than copied, and computed HERE. `console.log = original` writes back exactly the value
+//  6. The value is modified rather than copied, and computed here. `console.log = original` writes back exactly the value
 //     it saved, which is a restore, and restoring a saved handler in `finally` is the pattern the
 //     upstream rule reported most on this tree. Any operation on the value (arithmetic, a call, a
 //     member read, a spread into a new literal) makes it a modification. Two things are not:
@@ -814,7 +814,7 @@ func (evaluator concurrencyNoLostUpdateEvaluator) evaluate(node *ast.Node, suspe
 		// response, and carrying the argument through the call reported both as computed from the old
 		// token. Awaiting a value that is not a call (`await count`) still carries it.
 		producedByCallee := false
-		// An awaited read of the target store is the exception: the callee's answer IS the entry. It
+		// An awaited read of the target store is the exception: the callee's answer is the entry. It
 		// is read as the promise settles, so this await does not stale it; a later one does.
 		readOfTarget := false
 		switch skipped := concurrencyNoLostUpdateSkipTransparent(operand); {
@@ -1059,7 +1059,7 @@ search:
 					stopped = true
 				}
 			case concurrencyNoLostUpdateDeclarationStart:
-				// A const anchor is its declaration's START. A suspension inside its own initializer
+				// A const anchor is its declaration's start. A suspension inside its own initializer
 				// is the evaluator's to judge, path by path, because the initializer can fork.
 				if event.node == anchor && suspended {
 					answer = true

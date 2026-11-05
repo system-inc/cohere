@@ -51,7 +51,10 @@ func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(test *testing.T) {
 
 	want := map[string]bool{"source/Imports.tsx": true, "source/Dom.ts": true, "source/JsxOnly.tsx": true}
 	for _, file := range graph.ProjectFiles() {
-		relative, _ := filepath.Rel(root, file.FileName().AsString())
+		relative, relativeError := filepath.Rel(root, file.FileName().AsString())
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
 		if detection.ReactFiles[file.FileName().AsString()] != want[relative] {
 			test.Errorf("%s: react=%v, want %v", relative, detection.ReactFiles[file.FileName().AsString()], want[relative])
 		}
@@ -79,7 +82,10 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(test *testing
 	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
 	want := map[string]bool{"app/layout.tsx": true, "app/page.tsx": true, "app/api/health/route.ts": true, "middleware.ts": true, "source/Link.tsx": true}
 	for _, file := range graph.ProjectFiles() {
-		relative, _ := filepath.Rel(root, file.FileName().AsString())
+		relative, relativeError := filepath.Rel(root, file.FileName().AsString())
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
 		if strings.HasPrefix(relative, "node_modules") {
 			continue
 		}

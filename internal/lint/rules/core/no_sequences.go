@@ -17,7 +17,7 @@ var messageUnexpectedCommaExpression = rule.Message{
 
 // NoSequencesOptions configures whether an explicitly parenthesized sequence is excused.
 type NoSequencesOptions struct {
-	// AllowInParentheses is upstream's only option and it defaults to TRUE, which is why it is a
+	// AllowInParentheses is upstream's only option and it defaults to `true`, which is why it is a
 	// pointer rather than a bool.
 	//
 	// A zero-value struct would read as `false` and silently invert the rule: every `var foo = (1,
@@ -99,7 +99,7 @@ func (options NoSequencesOptions) allowInParentheses() bool {
 // Under `allowInParentheses: false` a nested pair like `(a, b), c` reports twice, and upstream emits
 // the inner finding before the outer one while this emits the outer first. Both walks are pre-order;
 // what differs is which node is outer. Upstream's outer node is the flattened sequence whose reported
-// comma is the LATER one, and its inner node is the parenthesized child whose comma is earlier, so
+// comma is the later one, and its inner node is the parenthesized child whose comma is earlier, so
 // pre-order and source order happen to agree there and disagree here.
 //
 // Five of 264 differential rows differ this way and no row differs in content: same count, same
@@ -136,7 +136,7 @@ var NoSequences = rule.Rule{
 					return
 				}
 
-				// One report per chain, taken at the OUTERMOST node. `a, b, c` is one node upstream
+				// One report per chain, taken at the outermost node. `a, b, c` is one node upstream
 				// and two here, and it is the outermost of ours that occupies the position
 				// upstream's flattened node occupies -- which is what every check below reads. A
 				// parenthesized inner sequence is a separate node upstream as well, so a
@@ -149,9 +149,9 @@ var NoSequences = rule.Rule{
 				// against the installed rule, that spelling reports five inputs upstream is silent
 				// on, including `for (a, b, c;;)` and `(a, b, c);`. Found by a mutation sweep and by
 				// nothing in the imported corpus, which never writes a three-element chain.
-				// No check for WHICH side of the parent this is, and that omission is measured. A
+				// No check for which side of the parent this is, and that omission is measured. A
 				// mutant weakening it to a tautology survived every fixture, so the question was
-				// whether a comma expression can be the direct RIGHT operand of another. It cannot:
+				// whether a comma expression can be the direct right operand of another. It cannot:
 				// comma is left-associative, so `a, b, c` parses as `(a, b), c` and reaching the
 				// right side needs parentheses, which interpose a node and end the chain. Probed
 				// over 17 shapes including assignments, ternaries, `yield`, and five-element chains,
@@ -185,7 +185,7 @@ var NoSequences = rule.Rule{
 //
 // The climb through parentheses is not a convenience. Upstream compares `node === node.parent.init`
 // on a tree where parentheses are not nodes, so its comparison sees through any number of them, and
-// it makes that comparison BEFORE the paren allowance rather than after. Two of upstream's own clean
+// it makes that comparison before the paren allowance rather than after. Two of upstream's own clean
 // cases turn on exactly that ordering, and both are written with `allowInParentheses: false` so the
 // allowance cannot be what excuses them:
 //
@@ -245,7 +245,7 @@ func parenthesizedEnough(node *ast.Node) bool {
 //
 // No `Body == node` comparison, and that omission is measured rather than assumed. A mutant that
 // weakened the comparison to a tautology survived every fixture, so the question was whether a
-// PARENTHESIZED EXPRESSION whose parent is an arrow can ever be something other than that arrow's
+// parenthesized expression whose parent is an arrow can ever be something other than that arrow's
 // body. Probed over 21 shapes -- parenthesized and destructured and defaulted parameters, generics,
 // `async`, a parenthesized return type, an arrow inside a default value, an arrow as a class
 // property -- and it cannot. An arrow's parameters parse as `KindParameter` and their parentheses

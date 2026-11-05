@@ -327,7 +327,7 @@ func TestInlineScriptIdSeesAnImportWrittenAfterTheJsx(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "inlineScriptId")
 }
 
-// A parenthesized object spread that does NOT supply an id, which is the only shape that separates
+// A parenthesized object spread that does not supply an id, which is the only shape that separates
 // reading through the parentheses from treating them as opaque.
 //
 // The obvious fixture for `without_parentheses` is a parenthesized spread that supplies the id, and

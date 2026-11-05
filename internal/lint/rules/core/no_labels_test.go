@@ -13,7 +13,7 @@ const noLabelsFile = "/repository/source/NoLabels.ts"
 // The corpus is ESLint's own, copied rather than rewritten.
 //
 // Verbatim from `eslint/tests/lib/rules/no-labels.js`, extracted by loading that file with the rule
-// tester stubbed out. 8 valid and 21 invalid. Several invalid cases name TWO
+// tester stubbed out. 8 valid and 21 invalid. Several invalid cases name two
 // message ids and one names three, so the per-input finding count is stated by the corpus rather
 // than assumed, and a fixture asserting one finding per input would be wrong for most of them.
 
@@ -102,7 +102,7 @@ func TestNoLabelsFires(test *testing.T) {
 // stayed green. Measured against the installed eslint 10.8.1 build, whose columns are 1-based and
 // whose end column is exclusive, so `[1,1,1,23]` on a 22-character input is the whole statement.
 //
-// A label reports on the WHOLE labeled statement, not on the label identifier: `A: if (a) { break
+// A label reports on the whole labeled statement, not on the label identifier: `A: if (a) { break
 // A; }` spans all 22 characters. `no-unused-labels` in this same package reports on the identifier
 // instead, so a port taking its shape from that neighbour would anchor wrong and pass every id
 // fixture. That is exactly the "read siblings for shape, never for semantics" trap.
@@ -157,7 +157,7 @@ func TestNoLabelsSpansAContinue(test *testing.T) {
 	}
 }
 
-// The nil-options path, which every fixture above reaches THROUGH the decoder and therefore cannot
+// The nil-options path, which every fixture above reaches through the decoder and therefore cannot
 // see.
 //
 // A rule configured as a bare `"error"` is handed nil rather than a decoded struct: the decoder
@@ -210,7 +210,7 @@ func TestNoLabelsDecodesItsOptionNames(test *testing.T) {
 	}
 }
 
-// The permission is decided by what the label WRAPS, not by what the jump sits inside.
+// The permission is decided by what the label wraps, not by what the jump sits inside.
 //
 // Both rows measured against the installed build. They are the same shape with the same nesting and
 // opposite verdicts, and the only difference is which option is set, which is what makes them the
@@ -243,13 +243,13 @@ func TestNoLabelsDoesNotSeeThroughANestedLabel(test *testing.T) {
 		"A: B: while (a) { break A; }", NoLabelsOptions{AllowLoop: true}),
 		"unexpectedLabel", "unexpectedLabelInBreak")
 
-	// Naming the INNER label instead leaves only the outer label's own finding, which shows the
+	// Naming the inner label instead leaves only the outer label's own finding, which shows the
 	// jump resolved through the stack rather than through its ancestors.
 	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: B: while (a) { break B; }", NoLabelsOptions{AllowLoop: true}), "unexpectedLabel")
 }
 
-// Two shapes ESLint refuses at PARSE time and our parser recovers from, so the rule has to answer
+// Two shapes ESLint refuses at parse time and our parser recovers from, so the rule has to answer
 // them and no imported fixture can say what the answer should be.
 //
 // Both were found as surviving mutants, and reading upstream did not settle either one: driving the
@@ -308,7 +308,7 @@ func TestNoLabelsAnswersShapesEslintRefusesToParse(test *testing.T) {
 	}
 }
 
-// The label stack has to POP when a label's scope ends, and this is the input that shows it.
+// The label stack has to pop when a label's scope ends, and this is the input that shows it.
 //
 // Found as a surviving mutant: deleting the pop entirely left all 29 corpus cases green, because
 // upstream's corpus never writes two labels in sequence -- only nested ones, where a stale entry is
@@ -316,12 +316,12 @@ func TestNoLabelsAnswersShapesEslintRefusesToParse(test *testing.T) {
 //
 //	A: while(a) {} A: while(b) { break A; }
 //
-// Two SEQUENTIAL labels sharing a name, which is legal (unlike the nested duplicate above, which is
+// Two sequential labels sharing a name, which is legal (unlike the nested duplicate above, which is
 // a parse error in both engines' grammars) and which eslint 10.8.1 accepts with no fatal and
 // reports clean under allowLoop. Without the pop, the first `A` is still on the stack when the
 // second is pushed, so a search finding the stale entry first would answer about the wrong label.
 // Both labels here wrap loops so the verdict is the same either way; what the case actually pins is
-// that the stack does not GROW without bound across siblings, which is what the second assertion
+// that the stack does not grow without bound across siblings, which is what the second assertion
 // measures.
 func TestNoLabelsPopsTheStackWhenScopeEnds(test *testing.T) {
 	test.Parallel()
@@ -331,14 +331,14 @@ func TestNoLabelsPopsTheStackWhenScopeEnds(test *testing.T) {
 	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: while(a) {} A: while(b) { break A; }", NoLabelsOptions{AllowLoop: true}))
 
-	// The measurement that needs the pop: a label wrapping a SWITCH, followed by a sibling label of
+	// The measurement that needs the pop: a label wrapping a switch, followed by a sibling label of
 	// the same name wrapping a loop. If the first entry survives into the second label's subtree, a
 	// stack search reaches a switch-bodied `A` and `allowLoop` stops exempting the break.
 	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
 		"A: switch(a) {} A: while(b) { break A; }", NoLabelsOptions{AllowLoop: true}),
 		"unexpectedLabel")
 
-	// The control for the row above, showing the finding is the SWITCH label rather than the break:
+	// The control for the row above, showing the finding is the switch label rather than the break:
 	// under allowSwitch the switch label is exempt and the loop label reports instead, and the
 	// break stays clean under both because innermost-first resolution reaches the loop.
 	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,

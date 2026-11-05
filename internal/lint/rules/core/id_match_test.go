@@ -33,22 +33,22 @@ func idMatchOf(pattern string, flags map[string]bool) any {
 }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/id-match.js by RUNNING that file with RuleTester
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/id-match.js by running that file with RuleTester
 // intercepted, so upstream's own cases produced the fixtures rather than a parser of mine. 100 cases
 // were captured from the single RuleTester.run call, and every one is a distinct (source, options)
 // pair -- no case in this corpus carries contradictory verdicts under different parser settings.
 //
-// Every expectation below is what the INSTALLED ESLint 10.8.1 core rule answered when driven over
+// Every expectation below is what the installed ESLint 10.8.1 core rule answered when driven over
 // that case through the Linter interface under `sourceType: module` with the typescript-eslint
 // parser, which is the only configuration cohere has. The 10.10.0 clone and the 10.8.1 installed
-// build are BYTE-IDENTICAL for this rule:
+// build are byte-identical for this rule:
 //
 //	diff /tmp/lint-sources-fresh/eslint/lib/rules/id-match.js \
 //	     /Users/kirkouimet/Projects/ahra/node_modules/eslint/lib/rules/id-match.js
 //
 // The oracle reproduced all 100 of the corpus's own declared verdicts under upstream's own
 // languageOptions, which is the control that says it was measuring the rule rather than an
-// unconfigured Linter. And unlike id-denylist, ZERO cases change verdict between upstream's
+// unconfigured Linter. And unlike id-denylist, zero cases change verdict between upstream's
 // configuration and cohere's, so this table needs no divergence section: id-match's corpus carries
 // no `globals` languageOption and no /* global */ directive, so nothing in it depends on a surface
 // cohere lacks.
@@ -202,17 +202,17 @@ func TestIdMatchStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
-		// matches the CALL NAME: a test that asserts the same property by hand reads to it as a
+		// matches the call name: a test that asserts the same property by hand reads to it as a
 		// rule nothing proves can stay quiet.
 		rule_testing.ExpectClean(test, result)
 	}
 }
 
-// TestIdMatchSpansAndMessages asserts where each finding POINTS and what it says, which
+// TestIdMatchSpansAndMessages asserts where each finding points and what it says, which
 // TestIdMatchFires cannot: that test compares message ids and counts, so a rule anchored on the
 // wrong node or rendering the wrong name or pattern passes it completely.
 //
-// The message here carries TWO computed pieces, the name and the pattern, and the standard's rule
+// The message here carries two computed pieces, the name and the pattern, and the standard's rule
 // is that the text is where the computed half's bugs live. The private-name row earns its place
 // twice over: `Text()` already carries the `#`, so a port matching the config against the hashed
 // spelling would need `#foo` in the pattern to catch `foo`, while the message must print the hash
@@ -250,14 +250,14 @@ func TestIdMatchSpansAndMessages(test *testing.T) {
 			messages: []string{"Identifier 'no_under23' does not match the pattern '^[^_]+$'."},
 		},
 		{
-			// A destructuring rename: only the NEW name is reported, and the span must skip the key.
+			// A destructuring rename: only the new name is reported, and the span must skip the key.
 			source:   "var { category_id: category_alias } = query;",
 			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
 			spans:    []string{"category_alias"},
 			messages: []string{"Identifier 'category_alias' does not match the pattern '^[^_]+$'."},
 		},
 		{
-			// The span covers the hash and so does the message, while the PATTERN was matched
+			// The span covers the hash and so does the message, while the pattern was matched
 			// against the name without it.
 			source:   "class C { #no_under = 1; }",
 			settings: idMatchOf("^[^_]+$", map[string]bool{"classFields": true}),
@@ -353,9 +353,9 @@ func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 //
 // In `let { a: b } = x`, only `b` is a name this file chose; `a` is the source object's own
 // property and we did not name it. That exclusion survived a mutation sweep against all 100
-// imported fixtures, because every renaming case upstream writes has a key that PASSES the
+// imported fixtures, because every renaming case upstream writes has a key that passes the
 // pattern, so deleting the exclusion changes nothing any imported case can see. The distinguishing
-// shape is a key that FAILS while its binding passes, and upstream had no reason to write one.
+// shape is a key that fails while its binding passes, and upstream had no reason to write one.
 //
 // Every verdict is what the installed ESLint 10.8.1 rule answered:
 //
@@ -373,7 +373,7 @@ func TestIdMatchDestructuringKeysAreNeverChecked(test *testing.T) {
 		source   string
 		settings any
 		findings int
-		// reported names the identifier the single finding must cover, so a rule reporting the KEY
+		// reported names the identifier the single finding must cover, so a rule reporting the key
 		// instead of the binding fails even where the count would match.
 		reported string
 	}{
@@ -427,10 +427,10 @@ func TestIdMatchDestructuringKeysAreNeverChecked(test *testing.T) {
 // is a property, so `properties` governs it" -- is right for one arm and wrong for another. Four
 // mutations survived all 100 imported fixtures here, and the corpus cannot see them because it
 // never writes an assignment destructuring, a rest element, or an array pattern with the gating
-// option turned OFF.
+// option turned off.
 //
 // Every verdict is what the installed ESLint 10.8.1 rule answered, and the first block is what an
-// earlier draft of this rule got WRONG in all four rows:
+// earlier draft of this rule got wrong in all four rows:
 //
 //	({ no_under } = bar)          no options                  1 finding
 //	({ no_under } = bar)          properties: false           1 finding
@@ -439,7 +439,7 @@ func TestIdMatchDestructuringKeysAreNeverChecked(test *testing.T) {
 //	({ a: no_under } = bar)       ignoreDestructuring: true   1 finding -- a rename coins a name
 //	({ no_under: b } = bar)       properties: true            clean     -- the key is never ours
 //
-// So an ASSIGNMENT destructuring is gated by `ignoreDestructuring` alone, while a DECLARATION
+// So an assignment destructuring is gated by `ignoreDestructuring` alone, while a declaration
 // destructuring is additionally gated by `properties`. The cause is upstream's control flow: its
 // ObjectPattern block reports and falls through rather than returning, so a name it reported is
 // already reported by the time the `checkProperties` and `onlyDeclarations` gates below are
@@ -522,7 +522,7 @@ func TestIdMatchPrivateNamesAreMatchedWithoutTheHash(test *testing.T) {
 			len(result.Diagnostics), result.MessageIds())
 	}
 
-	// The control: a pattern REQUIRING `#` fails for both names, so the rule is not simply silent
+	// The control: a pattern requiring `#` fails for both names, so the rule is not simply silent
 	// on this source.
 	result = rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, "class Ok { #field = 1; }",
 		idMatchOf("^#", map[string]bool{"classFields": true}))
@@ -539,7 +539,7 @@ func TestIdMatchPrivateNamesAreMatchedWithoutTheHash(test *testing.T) {
 // TestIdMatchDecoderAcceptsTheConfigLayersShape pins the wire contract, which every other fixture
 // in this file bypasses.
 //
-// Fixtures reach the decoder with bytes the TEST built. The config layer hands a list rule every
+// Fixtures reach the decoder with bytes the test built. The config layer hands a list rule every
 // element after the severity, which for upstream's `["error", "^[a-z]+$", {...}]` is
 // `["^[a-z]+$", {...}]`. It used to hand over the bare pattern alone, so the rule ran with every
 // flag silently off: the "registered, plausible, and wrong" shape the standard warns about.

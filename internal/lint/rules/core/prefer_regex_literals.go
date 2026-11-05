@@ -105,7 +105,7 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 // The String.raw arm is the one that carries real weight, because it is the only shape whose
 // value differs from what `Text()` answers. `String.raw` + backtick + `\d` reads as a
 // two-character pattern, while the same characters in a plain template literal cook to a
-// single `\d` control character. The rule takes the RAW text there and the COOKED text
+// single `\d` control character. The rule takes the raw text there and the cooked text
 // everywhere else, and getting that backwards silently changes every backslash in the output.
 // Reached by slicing the source with the token range and stripping the backticks, since
 // `Text()` on a template literal is always cooked.
@@ -144,7 +144,7 @@ func messageReplaceWithIntendedLiteralAndFlags(flags string) rule.Message {
 //
 // # One divergence, measured, and it is about ecmaVersion
 //
-// Upstream withholds a suggestion when the pattern or flags are invalid AT THE CONFIGURED
+// Upstream withholds a suggestion when the pattern or flags are invalid at the configured
 // ecmaVersion, so `new RegExp('abc', 'd')` reports with no suggestion under ecmaVersion 2021
 // and with one under 2022. cohere has no per-file ecmaVersion: the program is compiled once
 // against one set of compiler options and a rule cannot ask what language edition a file
@@ -215,7 +215,7 @@ func staticStringValue(ruleContext rule.Context, node *ast.Node) (string, bool) 
 	}
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		// Cooked, which is what both of these evaluate to. A template literal WITH substitutions is
+		// Cooked, which is what both of these evaluate to. A template literal with substitutions is
 		// a different kind and never arrives here, which is upstream's `isStaticTemplateLiteral`
 		// answered by the parser instead of by a quasi count.
 		return node.Text(), true
@@ -243,7 +243,7 @@ func isStringRawTag(ruleContext rule.Context, tag *ast.Node) bool {
 	}
 	// Upstream runs the tag through `skipChainExpression` before testing it, which in ESTree strips
 	// the wrapper an optional chain puts around the whole expression. Our parser has no such
-	// wrapper, but it DOES keep parentheses as real nodes where upstream's has already folded them
+	// wrapper, but it does keep parentheses as real nodes where upstream's has already folded them
 	// away, so `(String?.raw)` arrives here as a parenthesized expression and would otherwise be
 	// declined. Unwrapped in a loop because `((String.raw))` nests.
 	//
@@ -428,7 +428,7 @@ func replacementFix(ruleContext rule.Context, node *ast.Node, text string) rule.
 //	a/RegExp(/foo/);      ->  a/ /foo/;    a `/` directly before would start a comment
 //	RegExp(/foo/)in a;    ->  /foo/ in a;  a word directly after would run into the flags
 //
-// Upstream also gates on the neighbour actually TOUCHING the node, `tokenBefore.range[1] ===
+// Upstream also gates on the neighbour actually touching the node, `tokenBefore.range[1] ===
 // node.range[0]`, so a space already in the source is not doubled. That gate is reproduced by
 // looking at the byte immediately outside the span rather than at the previous token.
 func padSoTokensStayApart(ruleContext rule.Context, span core.TextRange, text string) string {
@@ -437,9 +437,9 @@ func padSoTokensStayApart(ruleContext rule.Context, span core.TextRange, text st
 	}
 	source := ruleContext.SourceFile.Text()
 
-	// No hashbang arm here, deliberately. Upstream pads only when the neighbour actually TOUCHES
+	// No hashbang arm here, deliberately. Upstream pads only when the neighbour actually touches
 	// the node, `tokenBefore.range[1] === node.range[0]`, and a hashbang is a whole line above the
-	// call, so the newline already separates them. Only the ALLOWLIST gate in
+	// call, so the newline already separates them. Only the allowlist gate in
 	// `precedingTokenAllowsALiteral` needs to know a hashbang is one token; padding does not, and
 	// adding it there produced a leading space upstream's expected output does not carry.
 	if span.Pos() > 0 && span.Pos() <= len(source) && text[0] == '/' {
@@ -463,7 +463,7 @@ func padSoTokensStayApart(ruleContext rule.Context, span core.TextRange, text st
 
 // sourceStartsWithHashbangBefore reports whether everything before offset is a single hashbang line.
 //
-// Only the FIRST line can be a hashbang, and only when the file opens with `#!`, so this cannot
+// Only the first line can be a hashbang, and only when the file opens with `#!`, so this cannot
 // match a `#!` appearing anywhere else.
 func sourceStartsWithHashbangBefore(source string, offset int) bool {
 	if offset <= 0 || offset > len(source) || !strings.HasPrefix(source, "#!") {
@@ -504,7 +504,7 @@ func sortedFlags(flags string) string {
 	return string(runes)
 }
 
-// isRewritablePattern is upstream's printable allowlist, and it is a gate on the REWRITER rather
+// isRewritablePattern is upstream's printable allowlist, and it is a gate on the rewriter rather
 // than on the pattern's validity.
 //
 // Upstream spells it as a regular expression over the pattern text, and its effect is that anything
@@ -550,7 +550,7 @@ func isRewritableCharacter(character rune) bool {
 // literal, so it has to become the two characters backslash-n. Same for the other line and space
 // controls, and for `/`, which would otherwise close the literal early.
 //
-// Upstream walks the parsed regex and rewrites each CHARACTER node, which matters for a reason that
+// Upstream walks the parsed regex and rewrites each character node, which matters for a reason that
 // is not obvious: it means a control character reached through an identity escape, a backslash
 // directly before a real newline, collapses to the same two characters rather than becoming a
 // backslash followed by an escape. The walk here is `regexpattern.Walk`, which reports the same
@@ -619,7 +619,7 @@ func escapeSpelling(written string) (string, bool) {
 
 // validPrecedingTokens is upstream's allowlist of tokens a regex literal may sit directly after.
 //
-// Copied rather than re-derived, and the reason is that it is a list of JUDGMENTS rather than a
+// Copied rather than re-derived, and the reason is that it is a list of judgments rather than a
 // grammar. A `/` after an identifier or a closing paren is division, so the rewrite would silently
 // change meaning; a `/` after `(` or `=` or `return` can only open a literal. Upstream enumerates
 // the safe side and treats everything else as unsafe, which is the conservative direction, and it
@@ -697,11 +697,11 @@ func precedingTokenAllowsALiteral(ruleContext rule.Context, node *ast.Node) bool
 		return true
 	}
 
-	// A hashbang is ONE token to upstream's tokenizer, so the token before a call on the next line
+	// A hashbang is one token to upstream's tokenizer, so the token before a call on the next line
 	// is the whole `#!/usr/bin/sh` line rather than the `sh` this backwards scan would otherwise
 	// read. Reading `sh` puts an identifier in front of the call and the allowlist declines it,
 	// which withholds a suggestion upstream offers. Measured against eslint 10.8.1, which reports
-	// the case WITH a suggestion and pads it with a leading space.
+	// the case with a suggestion and pads it with a leading space.
 	if sourceStartsWithHashbangBefore(text, start) {
 		return true
 	}
@@ -817,10 +817,10 @@ func lineCommentContaining(text string, index int) int {
 // Upstream asks regexpp to validate at the configured ecmaVersion. There is no ecmaVersion here, so
 // this asks the same question at the latest edition, which is the divergence recorded on the rule.
 //
-// `esregexp.Compile` is deliberately NOT used, measured: it refuses the `v` flag outright and
+// `esregexp.Compile` is deliberately not used, measured: it refuses the `v` flag outright and
 // refuses `\p{Script=Greek}`, both of which are valid JavaScript that upstream accepts, and it
 // accepts a bare `]` under `u` which JavaScript rejects. It answers a different question, whether
-// the pattern can be EXECUTED by the vendored engine, and a rule deciding whether to offer a
+// the pattern can be executed by the vendored engine, and a rule deciding whether to offer a
 // rewrite must not withhold one because our engine cannot run the pattern.
 //
 // So validity is answered structurally by the pattern walk, which returns false on a construct the
@@ -876,7 +876,7 @@ func quantifiersAndGroupsBalance(pattern string, flags string) bool {
 		character := pattern[index]
 		switch character {
 		case '\\':
-			// `SkipPatternEscape` returns the escape's LENGTH in bytes, while `ClassEnd` below
+			// `SkipPatternEscape` returns the escape's length in bytes, while `ClassEnd` below
 			// returns an absolute index. Two helpers on the same shelf answering the same shape of
 			// question in different units, and conflating them here spun this loop forever on
 			// `RegExp('\\b')`: the length 2 was assigned as an index and the scan restarted at
@@ -924,7 +924,7 @@ func quantifiersAndGroupsBalance(pattern string, flags string) bool {
 				previousWasRepeatable = false
 				continue
 			}
-			// A `{` that opens no quantifier is a LITERAL brace under annex B and a syntax error
+			// A `{` that opens no quantifier is a literal brace under annex B and a syntax error
 			// under `u` or `v`, which drop annex B entirely. Upstream reaches the same split
 			// through regexpp's own unicode mode, and the corpus states it: `String.raw` + `\w{1, 2`
 			// under `u` withholds its suggestion because the pattern does not parse.

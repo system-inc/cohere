@@ -12,7 +12,7 @@ const correctnessRequireVerifyOptionalParityFile = "/repository/source/Entity.ts
 
 // verifyDecoratorPreamble declares the decorator factories the fixtures apply.
 //
-// Ambient declarations rather than real implementations, because the rule reads decorator NAMES and
+// Ambient declarations rather than real implementations, because the rule reads decorator names and
 // the property's type, and neither depends on what the factory returns. Written once here so a
 // fixture's source is only the shape under test.
 const verifyDecoratorPreamble = "declare function VerifyIsOptional(): PropertyDecorator & ParameterDecorator;\n" +
@@ -117,7 +117,7 @@ func TestVerifyOptionalParityFires(test *testing.T) {
 			result := rule_testing.RunTyped(test, CorrectnessRequireVerifyOptionalParity, correctnessRequireVerifyOptionalParityFile, source)
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
 
-			// The span. Upstream reports the property's KEY rather than the whole property, so a
+			// The span. Upstream reports the property's key rather than the whole property, so a
 			// port pointing at the declaration would pass every message-id assertion while sending
 			// the reader to the wrong column.
 			//

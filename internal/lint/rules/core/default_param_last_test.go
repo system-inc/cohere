@@ -14,7 +14,7 @@ const defaultParamLastFile = "/repository/source/Parameters.ts"
 // producing 52 findings.
 //
 // Every case was replayed through the installed eslint build before it was written here, and all 96
-// corpus cases agreed with the corpus on count and on span. The expectations are the SPAN TEXT
+// corpus cases agreed with the corpus on count and on span. The expectations are the span text
 // rather than a message id, because a message id cannot see where a finding points and this rule
 // carries no repair to check instead. Each span was sliced out of the source by the same script that
 // extracted the case, from the columns the installed rule reported.
@@ -153,7 +153,7 @@ func TestDefaultParamLastFires(test *testing.T) {
 			[]string{"a?: number"}},
 		// Cases the corpus does not write, pinning decisions measured against the installed build.
 		//
-		// A rest parameter before a required one is the ONE class where core and the shipped
+		// A rest parameter before a required one is the one class where core and the shipped
 		// @typescript-eslint sibling disagree. Core reports it; the sibling is silent. The source is
 		// illegal and reaches the rule only through parser error recovery.
 		{"a rest parameter before a required one reports",
@@ -165,7 +165,7 @@ func TestDefaultParamLastFires(test *testing.T) {
 		{"a default and a rest both report when a required parameter follows",
 			"function f(a = 1, ...b: number[], c: number) {}",
 			[]string{"a = 1", "...b: number[]"}},
-		// The accessor arms. A setter takes one parameter and a getter none in the GRAMMAR, but the
+		// The accessor arms. A setter takes one parameter and a getter none in the grammar, but the
 		// parser recovers from the illegal source and hands back the parameters anyway, and the
 		// installed build reports all four shapes.
 		{"a class setter with a recovered second parameter reports",
@@ -207,7 +207,7 @@ func TestDefaultParamLastFires(test *testing.T) {
 			"function f(a: number = 1, b: number) {}",
 			[]string{"a: number = 1"}},
 		// Findings come out in source order, which the corpus's multi-finding cases already pin.
-		// This one pins it across a wider gap, with a trailing default that must NOT report.
+		// This one pins it across a wider gap, with a trailing default that must not report.
 		{"three defaults straddling two required parameters, in source order",
 			"function f(a = 1, b: number, c = 2, d: number, e = 3) {}",
 			[]string{"a = 1", "c = 2"}},

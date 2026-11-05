@@ -19,7 +19,7 @@ type ArrayCallbackReturnOptions struct {
 	// `expectedReturnValue` arm; a callback with no return at all is still reported.
 	AllowImplicit bool `json:"allowImplicit"`
 
-	// CheckForEach turns the judgment around for `forEach`, which wants NO value returned.
+	// CheckForEach turns the judgment around for `forEach`, which wants no value returned.
 	//
 	// Off upstream, and it is the option that adds findings rather than removing them. With it on
 	// the rule reports a `forEach` callback that returns anything, because a value returned to
@@ -30,7 +30,7 @@ type ArrayCallbackReturnOptions struct {
 	// discarded" inside a checked `forEach`.
 	//
 	// Off upstream, and it only does anything while CheckForEach is on. It also changes what is
-	// OFFERED rather than only what is reported: with it on a concise arrow gets a second
+	// offered rather than only what is reported: with it on a concise arrow gets a second
 	// suggestion, prepending `void`, alongside wrapping in braces.
 	AllowVoid bool `json:"allowVoid"`
 }
@@ -134,14 +134,14 @@ var messageArrayCallbackPrependVoid = rule.Message{
 // # Suggestions, not fixes, and the two the corpus asserts
 //
 // `meta.hasSuggestions` is true and `meta.fixable` is null. That distinction is the port: a repair
-// here changes what the code MEANS, since wrapping a concise arrow's body in braces stops it
+// here changes what the code means, since wrapping a concise arrow's body in braces stops it
 // returning and prepending `void` discards its value. Neither may be applied unattended, and
 // upstream does not.
 //
 //	wrapBraces   offered on a concise arrow under checkForEach. `x => x` becomes `x => {x}`.
 //	prependVoid  offered as well when allowVoid is on, and on a `return expr;` under both options.
 //
-// # What this port does NOT reproduce
+// # What this port does not reproduce
 //
 // The `prependVoid` suggestion upstream computes a precedence test and a parenthesis test through
 // its token API, so `x => a, b` gets parentheses that `x => a` does not. That is reproduced for the
@@ -194,7 +194,7 @@ func checkArrayCallback(ruleContext rule.Context, node *ast.Node, settings Array
 		return
 	}
 
-	// The end-of-body judgment is emitted FIRST, and the order is upstream's rather than a choice.
+	// The end-of-body judgment is emitted first, and the order is upstream's rather than a choice.
 	//
 	// Upstream reports the function-level finding from `FunctionExpression:exit`, which ESLint runs
 	// after the whole body has been traversed, and the per-return findings from `ReturnStatement`
@@ -203,7 +203,7 @@ func checkArrayCallback(ruleContext rule.Context, node *ast.Node, settings Array
 	// `foo.every(function() { if (a) return; })` is the case that pins it: upstream orders it
 	// `expectedAtEnd` then `expectedReturnValue`, and emitting in traversal order gives the reverse.
 	//
-	// `ExpectFindings` asserts ids IN ORDER, so this is a real difference rather than a cosmetic one.
+	// `ExpectFindings` asserts ids in order, so this is a real difference rather than a cosmetic one.
 	//
 	// A concise arrow always produces a value, so only a braced body can run off its end. Upstream
 	// tests `node.body.type === "BlockStatement"` for the same reason.
@@ -251,7 +251,7 @@ func checkForEachCallback(
 		return
 	}
 
-	// A concise arrow's body IS the returned value, so the whole arrow is the finding and the
+	// A concise arrow's body is the returned value, so the whole arrow is the finding and the
 	// repair is structural. Upstream reports at the function head here.
 	body := node.Body()
 	if node.Kind == ast.KindArrowFunction && body != nil && body.Kind != ast.KindBlock {

@@ -20,7 +20,7 @@ type noInlineCommentsCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -384,12 +384,12 @@ func TestNoInlineCommentsStaysSilent(test *testing.T) {
 //	Block comment   /^(?:eslint[- ]|(?:globals?|exported) )/
 //
 // So a block `/* global foo */` is a directive and a line `// global foo` is not. Collapsing the two
-// into the block pattern SURVIVES the whole 49-case corpus, because it contains three block-form
-// `global`/`exported` cases and ZERO line-form ones. The corpus tests the shape it happens to use.
+// into the block pattern survives the whole 49-case corpus, because it contains three block-form
+// `global`/`exported` cases and zero line-form ones. The corpus tests the shape it happens to use.
 //
 // Measured on the installed rule with two controls that fire: `/* global foo */` is clean,
 // `// global foo` reports, `// exported a` reports, `// eslint-disable-line no-debugger` is clean,
-// and `// eslint disable` -- a SPACE where the line test requires a hyphen -- reports.
+// and `// eslint disable` -- a space where the line test requires a hyphen -- reports.
 func TestNoInlineCommentsDirectiveTestDiffersByCommentKind(test *testing.T) {
 	test.Parallel()
 

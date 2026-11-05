@@ -41,7 +41,7 @@ type MaxClassesPerFileOptions struct {
 	// Maximum is how many classes a file may hold. Upstream defaults it to 1.
 	Maximum *int
 
-	// IgnoreExpressions drops class EXPRESSIONS from the count, leaving only declarations.
+	// IgnoreExpressions drops class expressions from the count, leaving only declarations.
 	IgnoreExpressions *bool
 }
 
@@ -65,10 +65,10 @@ type maxClassesPerFileObjectShape struct {
 // default is not the zero value. Three things have to be right and none of them falls out of a
 // struct tag:
 //
-// The value may be a bare INTEGER. cohere's config layer strips the severity tuple, so a config
+// The value may be a bare integer. cohere's config layer strips the severity tuple, so a config
 // writing `["error", 2]` hands this the JSON `2`, which no struct can unmarshal.
 //
-// An ABSENT value must mean 1 rather than 0. The generic helper errors on empty input and the config
+// An absent value must mean 1 rather than 0. The generic helper errors on empty input and the config
 // layer turns that into nil, which a plain int field would read as 0, a maximum of zero, reporting
 // every file with a single class in it. That is the live config's own shape for a rule configured as
 // a bare severity, so it is the ordinary path rather than a corner.
@@ -140,13 +140,13 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (any, error) {
 // Upstream's own `ignoreExpressions` is the other half of the ruling, and it is configuration rather
 // than code here: ahra sets it, and so does the ESLint side, so expressions need no divergence.
 //
-// A class EXPRESSION counts too, and that is the half `ignoreExpressions` exists to turn off. The
+// A class expression counts too, and that is the half `ignoreExpressions` exists to turn off. The
 // option drops expressions from the count while leaving declarations, rather than lowering the
 // limit.
 //
 // # Where the finding points, which is not the node it is reported on
 //
-// Upstream reports on the program while overriding the location to span the program's BODY: the
+// Upstream reports on the program while overriding the location to span the program's body: the
 // start of the first statement to the end of the last. The difference is trivia. A file opening with
 // a comment has a program starting at position zero and a first statement starting after the
 // comment, and upstream's own last corpus case pins that distinction by asserting line 2 column 1

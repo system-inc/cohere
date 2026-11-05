@@ -115,7 +115,7 @@ var messageUseAnArrayLiteral = rule.Message{
 // output parses, so no syntax guard fires, and the meaning changed anyway. So the rewrite is offered
 // as a suggestion a human accepts rather than a fix applied unattended. That is not caution about
 // the common case, where `[]` is plainly right; it is that the rule cannot tell the common case from
-// the ASI case without asking what precedes the statement, and a rewrite that is right except when
+// the semicolon-insertion case without asking what precedes the statement, and a rewrite that is right except when
 // it silently is not belongs on the human side of that line.
 //
 // The replaced span runs from the first argument to one character before the call's end, which

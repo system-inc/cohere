@@ -36,7 +36,7 @@ var messageUnmodifiedLoopCondition = rule.Message{
 // # Groups, and why `foo < bar` is one judgment rather than two
 //
 // A reference inside a BinaryExpression belongs to that expression as a group, and a group is only
-// reported when EVERY member of it is unmodified. `while (foo < bar) { foo += 1; }` is clean in both
+// reported when every member of it is unmodified. `while (foo < bar) { foo += 1; }` is clean in both
 // names, because changing either one can change the comparison. When neither changes, both names are
 // reported, which is why that case carries two findings rather than one.
 //
@@ -53,7 +53,7 @@ var messageUnmodifiedLoopCondition = rule.Message{
 // # A modification counts when it can run in the loop, and that includes a called function
 //
 // A write inside the loop marks the condition modified. So does a write inside a named function
-// DECLARATION, when that function is itself referenced from inside the loop. This is the pair the
+// declaration, when that function is itself referenced from inside the loop. This is the pair the
 // corpus states twice, once each way:
 //
 //	while (foo) { update(); } function update() { ++foo; }         clean, update is called here
@@ -72,11 +72,11 @@ var messageUnmodifiedLoopCondition = rule.Message{
 // # Where the loop condition is, and the initializer that is not part of it
 //
 // Only `while`, `do`/`while` and `for` have a test. A `for...in` or `for...of` has no condition at
-// all and is never judged. For a `for`, a reference inside the INITIALIZER is not "in the loop",
+// all and is never judged. For a `for`, a reference inside the initializer is not "in the loop",
 // which is what makes `var foo = 0, bar = 0; for (bar; foo;) { ++foo }` clean while the same shape
 // with the write in the initializer is not.
 //
-// # This ports the INSTALLED build, and the clone has an option it does not
+// # This ports the installed build, and the clone has an option it does not
 //
 // The clone at 10.9.1 adds `checkConditionalExpressions`, which turns a ConditionalExpression from
 // a group into three separate judgments. The installed eslint 10.8.1 build this repository runs has
@@ -248,7 +248,7 @@ func unmodifiedLoopConditionFor(ruleContext rule.Context, identifier *ast.Node) 
 	// An initializer reference is never a condition read. `var foo = 0` is not the loop testing
 	// `foo`, and upstream returns null for it before anything else.
 	//
-	// SUBSUMED by the sentinel walk below, and kept as upstream's own first check. Deleting it
+	// Subsumed by the sentinel walk below, and kept as upstream's own first check. Deleting it
 	// leaves every fixture green: an initializer name's climb reaches a VariableStatement, which is
 	// a sentinel and is not a loop, or in a `for` head reaches the ForStatement whose Condition is
 	// a different slot than the Initializer the name sits in, so `test == child` fails either way.
@@ -289,7 +289,7 @@ func unmodifiedLoopConditionFor(ruleContext rule.Context, identifier *ast.Node) 
 // unmodifiedLoopIsGroupNode reports whether a node forms a group: an expression whose members are
 // judged together, so that a change to any one of them can change the whole answer.
 //
-// # `&&` is NOT a group, and our AST hides that behind one kind
+// # `&&` is not a group, and our AST hides that behind one kind
 //
 // Upstream tests `node.type === "BinaryExpression"`, and in the tree it walks, `&&`, `||` and `??`
 // are a LogicalExpression rather than a BinaryExpression. Ours calls all of them
@@ -337,7 +337,7 @@ func unmodifiedLoopIsGroupNode(node *ast.Node) bool {
 // The first version of this called `ast.IsStatement(node) || ast.IsDeclarationNode(node)` for the
 // "ends in Statement or Declaration" half. `IsDeclarationNode` is `DeclarationData() != nil`, which
 // is a question about how the node stores itself rather than about what it is, and measured on
-// `while (foo < bar)` it answers TRUE for the BinaryExpression. So the climb stopped on the group
+// `while (foo < bar)` it answers true for the BinaryExpression. So the climb stopped on the group
 // node itself, no reference ever reached its loop, and the rule went silent on every grouped case:
 // eight fixtures, which is what caught it.
 //
@@ -430,14 +430,14 @@ func unmodifiedLoopIsInitializerReference(identifier *ast.Node) bool {
 // unmodifiedLoopIsWriteReference reports whether an occurrence modifies the binding, in upstream's
 // sense rather than in the plain one.
 //
-// `isWriteReference` declines an initializer reference UNLESS the binding is a `var`.
+// `isWriteReference` declines an initializer reference unless the binding is a `var`.
 //
-// The shape that depends on that exception is a `var` initializer inside a loop BODY, where the
+// The shape that depends on that exception is a `var` initializer inside a loop body, where the
 // write counts as in the loop and makes the condition modified: `while (foo) { var foo = 0; }` is
 // clean, and the same source with `let` reports, because the `let` shadows rather than writing the
 // outer binding.
 //
-// It is NOT the corpus's own `for (var foo = 0; foo < 10; ) { } foo = 1;`, which reports whether or
+// It is not the corpus's own `for (var foo = 0; foo < 10; ) { } foo = 1;`, which reports whether or
 // not this exception fires, since the head's write sits in the loop's initializer and is excluded
 // from "in the loop" regardless. A mutant removing the exception survived that case, which is how
 // the misreading in the first version of this comment was caught.
@@ -459,7 +459,7 @@ func unmodifiedLoopIsWriteReference(identifier *ast.Node, declaration *ast.Node)
 // iteration.
 //
 // A ForStatement's initializer runs once, so a reference there is not in the loop. Upstream's
-// `isInLoop` table says exactly this and says nothing else: the test and the update ARE in the
+// `isInLoop` table says exactly this and says nothing else: the test and the update are in the
 // loop, and so is the body.
 func unmodifiedLoopIsInLoop(loop *ast.Node, identifier *ast.Node) bool {
 	if identifier.Pos() < loop.Pos() || identifier.End() > loop.End() {
@@ -477,7 +477,7 @@ func unmodifiedLoopIsInLoop(loop *ast.Node, identifier *ast.Node) bool {
 // unmodifiedLoopHasModifierInLoop reports whether a write can run inside the loop.
 //
 // Directly, when the write itself is in the loop. Indirectly, when the write is inside a named
-// function DECLARATION whose name is referenced from inside the loop, which is upstream's
+// function declaration whose name is referenced from inside the loop, which is upstream's
 // `hasModifierInLoop` reaching through a call.
 func unmodifiedLoopHasModifierInLoop(
 	ruleContext rule.Context,
@@ -643,7 +643,7 @@ func unmodifiedLoopSuspends(loop *ast.Node) bool {
 // unmodifiedLoopEnclosingFunctionDeclaration returns the nearest enclosing function declaration, or
 // nil.
 //
-// The climb stops at the FIRST function declaration rather than skipping past an unnamed one, which
+// The climb stops at the first function declaration rather than skipping past an unnamed one, which
 // is upstream's behaviour: it lands on whatever declaration encloses the write and does not keep
 // searching outward for one that happens to have a name.
 //
@@ -661,7 +661,7 @@ func unmodifiedLoopSuspends(loop *ast.Node) bool {
 //
 // Adding `&& current.Name() != nil` to the stop, so the climb skips an unnamed declaration and
 // keeps going outward, also survives. That is correct rather than a fixture gap: to distinguish the
-// two spellings you need an UNNAMED function declaration NESTED inside a named one, and the only
+// two spellings you need an unnamed function declaration nested inside a named one, and the only
 // unnamed declaration the grammar has is `export default function`, which may not appear inside a
 // function body.
 //

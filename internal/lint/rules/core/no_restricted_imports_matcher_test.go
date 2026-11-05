@@ -13,7 +13,7 @@ type noRestrictedImportsGlobCase struct {
 
 // TestNoRestrictedImportsGlobMatchesTheIgnorePackage is the differential this matcher exists to pass.
 //
-// The table is the CROSS PRODUCT of every `group` configuration in upstream's corpus with every
+// The table is the cross product of every `group` configuration in upstream's corpus with every
 // module specifier that appears in it, driven through the real `ignore` package at the version ESLint
 // 10.8.1 depends on. That is deliberately wider than the corpus itself: the corpus pairs each group
 // with the two or three specifiers its author was thinking about, and a matcher can pass all of those
@@ -51,12 +51,12 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(test *testing.T) {
 		noRestrictedImportsGlobCase{[]string{"types"}, false, "./types", true},
 		noRestrictedImportsGlobCase{[]string{"types"}, false, "types", true},
 		noRestrictedImportsGlobCase{[]string{"./types"}, false, "./types", true},
-		// `./types` as a PATTERN contains a slash, so it anchors and does not match bare `types`.
+		// `./types` as a pattern contains a slash, so it anchors and does not match bare `types`.
 		// Measured false. A trim on the pattern side made it true.
 		noRestrictedImportsGlobCase{[]string{"./types"}, false, "types", false},
 		noRestrictedImportsGlobCase{[]string{"./types"}, false, "a/types", false},
 		noRestrictedImportsGlobCase{[]string{"other"}, false, "./types", false},
-		// The asymmetry: an ANCHORED pattern does not absorb a `./` prefix, where an unanchored one
+		// The asymmetry: an anchored pattern does not absorb a `./` prefix, where an unanchored one
 		// does. All three of these were measured false against the installed `ignore`, and all three
 		// were true under a matcher that trimmed `./` off the candidate.
 		noRestrictedImportsGlobCase{[]string{"foo/bar"}, false, "./foo/bar", false},
@@ -64,7 +64,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(test *testing.T) {
 		noRestrictedImportsGlobCase{[]string{"a/b/c"}, false, "./a/b/c", false},
 		noRestrictedImportsGlobCase{[]string{"**/x"}, false, "./a/x", true},
 
-		// gitignore's comment and escape grammar. A bare `#` opens a COMMENT, so `#foo` is not a
+		// gitignore's comment and escape grammar. A bare `#` opens a comment, so `#foo` is not a
 		// pattern at all and matches nothing; `\#` and `\!` escape a leading `#` and `!` into
 		// literals. Upstream's corpus carries only `\#foo`, which a matcher can get right while
 		// treating a bare `#foo` as a literal too -- and then a project that wrote a comment gets a
@@ -83,7 +83,7 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(test *testing.T) {
 		noRestrictedImportsGlobCase{[]string{"   "}, false, "foo", false},
 	)
 
-	// A second, ADVERSARIAL table: the same 27 group configurations crossed with twenty specifiers
+	// A second, adversarial table: the same 27 group configurations crossed with twenty specifiers
 	// upstream's corpus never contains -- `./foo`, `../../foo`, `foo/`, `foo//bar`, a bare `.`, a
 	// leading `#`, a trailing dot, a case-flipped name. 540 more pairs, 76 of them matching.
 	//
@@ -96,8 +96,8 @@ func TestNoRestrictedImportsGlobMatchesTheIgnorePackage(test *testing.T) {
 	//	a `./` trim on the pattern        made ["./types"] match "types", which is false
 	//	`*` allowed to match nothing      made ["foo/*"] match "foo/" and "foo//bar"
 	//
-	// The third is the subtle one: `*` genuinely IS zero-or-more here -- `f*` matches bare `f` --
-	// so the constraint that fixed it is on the SEGMENT rather than on the wildcard.
+	// The third is the subtle one: `*` genuinely is zero-or-more here -- `f*` matches bare `f` --
+	// so the constraint that fixed it is on the segment rather than on the wildcard.
 	cases = append(cases,
 		noRestrictedImportsGlobCase{[]string{"foo/c*"}, false, "./types", false},
 		noRestrictedImportsGlobCase{[]string{"foo/c*"}, false, "./foo", false},
