@@ -6,6 +6,19 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// noUnsafeMemberAccessState is upstream's `State`.
+//
+// `Chained` is distinct from `Safe` on purpose and the difference is observable: a chained link is
+// skipped, while a safe one has been checked. Measured, `x?.a.b` with `allowOptionalChaining` still
+// reports on `.b`, which a port collapsing the two would miss.
+type noUnsafeMemberAccessState uint8
+
+const (
+	noUnsafeMemberAccessUnsafe noUnsafeMemberAccessState = iota + 1
+	noUnsafeMemberAccessSafe
+	noUnsafeMemberAccessChained
+)
+
 // NoUnsafeMemberAccess flags reading a property off a value typed `any`.
 //
 //	valid:   declare const x: { a: number }; x.a;
@@ -302,19 +315,6 @@ var NoUnsafeMemberAccess = rule.Rule{
 		}
 	},
 }
-
-// noUnsafeMemberAccessState is upstream's `State`.
-//
-// `Chained` is distinct from `Safe` on purpose and the difference is observable: a chained link is
-// skipped, while a safe one has been checked. Measured, `x?.a.b` with `allowOptionalChaining` still
-// reports on `.b`, which a port collapsing the two would miss.
-type noUnsafeMemberAccessState uint8
-
-const (
-	noUnsafeMemberAccessUnsafe noUnsafeMemberAccessState = iota + 1
-	noUnsafeMemberAccessSafe
-	noUnsafeMemberAccessChained
-)
 
 // noUnsafeMemberAccessParts splits an access into the pieces both anchors need.
 //

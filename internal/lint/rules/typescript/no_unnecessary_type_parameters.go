@@ -410,6 +410,10 @@ func yieldsNoValue(expression *ast.Node) bool {
 	}
 }
 
+// maximumSourcePosition stands in for upstream's `Infinity` cutoff. Any real position compares
+// below it, which is the only property the comparison needs.
+const maximumSourcePosition = int(^uint(0) >> 1)
+
 // usesCountedBefore is upstream's `node.body?.range[0] ?? node.returnType?.range[1]`.
 //
 // Returning the source file's end when there is neither a body nor a return annotation reproduces
@@ -423,10 +427,6 @@ func usesCountedBefore(node *ast.Node) int {
 	}
 	return maximumSourcePosition
 }
-
-// maximumSourcePosition stands in for upstream's `Infinity` cutoff. Any real position compares
-// below it, which is the only property the comparison needs.
-const maximumSourcePosition = int(^uint(0) >> 1)
 
 // isTypeParameterRepeatedInSyntax is upstream's `isTypeParameterRepeatedInAST`.
 //

@@ -187,6 +187,7 @@ var RestrictTemplateExpressions = rule.Rule{
 			// A rule configured as a bare severity reaches here with nil options, and the zero
 			// value of this struct is upstream's strict preset rather than its default. Routing
 			// through the decoder keeps `"error"` meaning what upstream means by it.
+			// Ignored: empty input returns the defaults before any decoding, so it has no error to return.
 			decoded, _ := DecodeRestrictTemplateExpressionsOptions(nil)
 			settings, _ = decoded.(RestrictTemplateExpressionsOptions)
 		}

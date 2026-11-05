@@ -7,6 +7,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+var preferNonNullAssertionMessage = rule.Message{
+	Id:          "preferNonNullAssertion",
+	Description: "Use a ! assertion to more succinctly remove null and undefined from the type.",
+}
+
 // NonNullableTypeAssertionStyle flags a type assertion whose only effect is removing null and
 // undefined, which a `!` says in one character.
 //
@@ -181,11 +186,6 @@ var NonNullableTypeAssertionStyle = rule.Rule{
 			},
 		}
 	},
-}
-
-var preferNonNullAssertionMessage = rule.Message{
-	Id:          "preferNonNullAssertion",
-	Description: "Use a ! assertion to more succinctly remove null and undefined from the type.",
 }
 
 // unionConstituentsIfNotLoose is upstream's `getTypesIfNotLoose`.

@@ -216,7 +216,6 @@ var AwaitThenable = rule.Rule{
 				}
 
 				declaration := node.AsVariableDeclarationList()
-			DeclaratorLoop:
 				for _, declarator := range declaration.Declarations.Nodes {
 					init := declarator.Initializer()
 					if init == nil {
@@ -227,10 +226,8 @@ var AwaitThenable = rule.Rule{
 						continue
 					}
 
-					for typePart := range type_checking.UnionTypePartsSeq(initType) {
-						if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncDispose", ruleContext.TypeChecker) != nil {
-							continue DeclaratorLoop
-						}
+					if awaitThenableIsAsyncDisposable(ruleContext, initType) {
+						continue
 					}
 
 					var suggestions []rule.Suggestion
@@ -337,6 +334,17 @@ func awaitThenableIsInvalidAggregatorInput(ruleContext rule.Context, node *ast.N
 			if awaitThenableContainsNonAwaitable(ruleContext, node, valueType) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// awaitThenableIsAsyncDisposable answers whether some union part carries `Symbol.asyncDispose`, which
+// is what lets an `await using` declarator through.
+func awaitThenableIsAsyncDisposable(ruleContext rule.Context, initializerType *checker.Type) bool {
+	for part := range type_checking.UnionTypePartsSeq(initializerType) {
+		if type_checking.GetWellKnownSymbolPropertyOfType(part, "asyncDispose", ruleContext.TypeChecker) != nil {
+			return true
 		}
 	}
 	return false

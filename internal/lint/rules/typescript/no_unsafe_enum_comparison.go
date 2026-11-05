@@ -244,6 +244,15 @@ func noUnsafeEnumComparisonIsMismatched(
 		noUnsafeEnumComparisonTypeViolates(rightTypeParts, leftType)
 }
 
+// noUnsafeEnumValueKind is what an enum member's value is, if the type is an enum at all.
+type noUnsafeEnumValueKind int
+
+const (
+	noUnsafeEnumValueNone noUnsafeEnumValueKind = iota
+	noUnsafeEnumValueNumber
+	noUnsafeEnumValueString
+)
+
 // noUnsafeEnumComparisonTypeViolates answers upstream's `typeViolates`.
 //
 // A number-valued enum on one side against a number-like type on the other, or the string pair.
@@ -307,15 +316,6 @@ func noUnsafeEnumComparisonIsPrimitiveLike(t *checker.Type, flag checker.TypeFla
 	}
 	return true
 }
-
-// noUnsafeEnumValueKind is what an enum member's value is, if the type is an enum at all.
-type noUnsafeEnumValueKind int
-
-const (
-	noUnsafeEnumValueNone noUnsafeEnumValueKind = iota
-	noUnsafeEnumValueNumber
-	noUnsafeEnumValueString
-)
 
 // noUnsafeEnumComparisonEnumValueKind answers upstream's `getEnumValueType`.
 //

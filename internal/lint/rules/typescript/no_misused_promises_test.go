@@ -22,7 +22,7 @@ const noMisusedPromisesFile = "noMisusedPromises.ts"
 //
 // Four are valid and three report `voidReturnAttribute`, and that message id is reachable through no
 // other extension: the attribute check anchors on `ast.KindJsxAttribute`, which a `.ts` file cannot
-// produce. Running those seven under the `.ts` name would not fail loudly — it would parse the JSX as
+// produce. Running those seven under the `.ts` name would not fail loudly: it would parse the JSX as
 // type assertions and comparisons, produce no attribute nodes, and leave three invalid cases silently
 // asserting the opposite of upstream while the whole suite stayed green.
 const noMisusedPromisesTsxFile = "noMisusedPromises.tsx"
@@ -36,7 +36,7 @@ const noMisusedPromisesTsxFile = "noMisusedPromises.tsx"
 // and every option expression below came out of that parse, and the extractor's counts were verified
 // against the upstream file independently (`grep -c 'Code:'` gives 213 against 123 valid plus 90
 // invalid, and `grep -c 'MessageId:'` gives 106 against 106 extracted diagnostics) so that an
-// extraction bug — which looks exactly like a port bug — could not hide.
+// extraction bug (which looks exactly like a port bug) could not hide.
 //
 // The options are half of what this table proves. Fifty-six of the two hundred and thirteen cases set
 // at least one option, and the same source text appears here as silent and in the Fires table as
@@ -2888,7 +2888,7 @@ const obj: O = {
 //
 // This is the one addition the absorption made to upstream's body, and it exists because the failure
 // it prevents is silent rather than loud. Our shim's type queries return nil instead of panicking, so
-// a rule that read a nil checker would not crash — it would report nothing, and every one of the one
+// a rule that read a nil checker would not crash: it would report nothing, and every one of the one
 // hundred and twenty-three clean cases above would pass having proven nothing at all. A vacuous green
 // suite is indistinguishable from a correct one from the outside, which is why this asserts the shape
 // directly rather than trusting the tables.
@@ -2943,8 +2943,8 @@ func TestNoMisusedPromisesDoesNotReadTheProgram(test *testing.T) {
 // English and it is reproduced rather than repaired, because oxlint runs tsgolint and the differential
 // harness compares against oxlint, so correcting it would read as a difference the harness can see.
 //
-// A message-id assertion cannot see this — every fixture above asserting "spread" stays green over
-// either wording — so without this test the divergence would be invisible in both directions: we
+// A message-id assertion cannot see this. Every fixture above asserting "spread" stays green over
+// either wording, so without this test the divergence would be invisible in both directions: we
 // could drift off upstream silently, and upstream could fix it without us noticing. The expected
 // string is typed here as a literal rather than compared against the rule's own message constant,
 // because a comparison against the constant moves with the constant and asserts nothing.
@@ -2972,9 +2972,9 @@ const obj = { ...promise };
 //
 // ExpectFindings asserts ids and count and nothing else, so a rule pointing at the wrong node passes
 // a complete fixture pair while being wrong. That is not hypothetical for this rule: several of its
-// report sites choose deliberately between a node and its type annotation — checkProperty reports the
-// return type when the initializer is function-like and has one, and the initializer otherwise — and
-// no id assertion can tell those apart.
+// report sites choose deliberately between a node and its type annotation (checkProperty reports the
+// return type when the initializer is function-like and has one, and the initializer otherwise),
+// and no id assertion can tell those apart.
 //
 // One case per message id the rule can emit, so every arm's anchor is pinned.
 func TestNoMisusedPromisesReportsTheRightSpans(test *testing.T) {
@@ -3099,8 +3099,8 @@ class Derived implements Base {
 // TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder routes configuration through the
 // rule's own decoder rather than building the options struct directly.
 //
-// That is what puts the pointer fields under test. Every option on this rule defaults to true — three
-// top-level checks and six void-return sub-flags, nine fields whose default is not the zero value —
+// That is what puts the pointer fields under test. Every option on this rule defaults to true: three
+// top-level checks and six void-return sub-flags, nine fields whose default is not the zero value,
 // so a plain bool anywhere in this surface could not tell "the user wrote false" from "the user wrote
 // nothing", and the whole defaulting block at the top of Run reads exactly that distinction. Handing
 // RunWithOptions a struct built here would leave the JSON binding itself untested, and the binding is
@@ -3202,8 +3202,8 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 // A rule configured as bare "error" is handed nil options rather than a zero struct, and
 // `options.(NoMisusedPromisesOptions)` on nil yields the zero value with every pointer nil. For a
 // rule whose nine options ALL default to true, getting that wrong would turn the entire rule off for
-// the most common way anyone configures it, while every fixture above — each of which reaches the
-// rule through an explicit options value — stayed green. This bypasses the decoder deliberately.
+// the most common way anyone configures it, while every fixture above (each of which reaches the
+// rule through an explicit options value) stayed green. This bypasses the decoder deliberately.
 func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(test *testing.T) {
 	test.Parallel()
 
@@ -3420,8 +3420,8 @@ f([async () => {}, async () => {}, async () => {}]);
 // Here it bites, and it costs findings rather than adding them. `setTimeout(async () => {})` is
 // silent under the bare fixture and reports `voidReturnArgument` once a declaration is supplied,
 // because voidFunctionArguments walks the callee's signatures to find which parameters take a void
-// return, and an unresolved callee has no signatures to walk. That is the safe direction — a missing
-// global costs a finding rather than inventing one — but it is worth pinning, because a future
+// return, and an unresolved callee has no signatures to walk. That is the safe direction (a missing
+// global costs a finding rather than inventing one), but it is worth pinning, because a future
 // fixture written against `setTimeout` would sit in the clean table asserting the opposite of
 // upstream while passing.
 //
@@ -3541,7 +3541,7 @@ f(async () => {}, async () => {});
 // checkProperty chooses between two anchors: when the initializer is function-like and carries an
 // explicit return type annotation it reports the annotation, and otherwise it reports the initializer.
 // Both produce `voidReturnProperty`, so every fixture asserting the id stayed green over a mutant that
-// collapsed the two branches into one. That is the "fixtures assert the wrong layer" failure — the
+// collapsed the two branches into one. That is the "fixtures assert the wrong layer" failure: the
 // case was covered, and every assertion over it was about which rule fired rather than where.
 //
 // Four shapes, because the choice turns on two independent things (is the initializer function-like,
@@ -3627,7 +3627,7 @@ const obj: O = {
 //
 // checkJSXAttribute requires the initializer's kind to be KindJsxExpression before calling
 // AsJsxExpression on it, and that call is an unchecked type assertion. Removing the kind check does
-// not merely widen the rule — it panics with `ast.nodeData is *ast.StringLiteral, not *ast.JsxExpression`
+// not merely widen the rule: it panics with `ast.nodeData is *ast.StringLiteral, not *ast.JsxExpression`
 // on the first string-valued attribute in the tree, which is to say on essentially any real JSX file.
 //
 // A mutant removing it survived all two hundred and twelve imported fixtures, because upstream's
@@ -3676,7 +3676,7 @@ const element = <Component onEvent />;
 // `voidReturnInheritedMethod` is built with Sprintf and carries the name of the extended or
 // implemented type that declared the void-returning member. An id assertion cannot see anything a
 // format string does, so a mutant replacing the interpolated type name with a constant survived all
-// two hundred and twelve imported fixtures and every span assertion — the finding count was right,
+// two hundred and twelve imported fixtures and every span assertion. The finding count was right,
 // the id was right, the anchor was right, and the sentence a user reads named the wrong type.
 //
 // Asserted as equality against a literal typed here rather than against the rule's own message
@@ -3730,4 +3730,24 @@ interface Child extends Parent {
 			}
 		})
 	}
+}
+
+// TestNoMisusedPromisesSkipsAReturnOutsideAnyFunction pins that a top-level `return` is passed over
+// rather than fatal.
+//
+// TypeScript parses `return` at the top of a file and leaves the complaint to the checker, so the
+// statement reaches checkReturnStatement with no enclosing function. Upstream throws there, through
+// `nullThrows` on the missing parent, and this port panicked the same way, which stopped the whole
+// lint run on one file the compiler already rejects. The returned function in a real function
+// alongside it is the control: it reports, so the clean top level is the guard and not a rule that
+// stopped running.
+func TestNoMisusedPromisesSkipsAReturnOutsideAnyFunction(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, `
+return async () => 0;
+function f(): () => void {
+  return async () => 0;
+}
+`)
+	rule_testing.ExpectFindings(test, result, "voidReturnReturnValue")
 }

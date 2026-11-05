@@ -95,55 +95,6 @@ func runConsistentReturn(test *testing.T, testCase consistentReturnCase) rule_te
 		testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 }
 
-// TestConsistentReturnStaysSilent runs upstream's whole `valid` list.
-//
-// Thirteen of these nineteen report under the bare core rule and are silent here, which is the whole
-// difference between the two rules. See the rule's doc comment for the measurement.
-func TestConsistentReturnStaysSilent(test *testing.T) {
-	test.Parallel()
-	for _, testCase := range consistentReturnCleanCases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			rule_testing.ExpectClean(test, runConsistentReturn(test, testCase))
-		})
-	}
-}
-
-// TestConsistentReturnFires runs upstream's whole `invalid` list and asserts every span it states.
-func TestConsistentReturnFires(test *testing.T) {
-	test.Parallel()
-	for _, testCase := range consistentReturnReportingCases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			result := runConsistentReturn(test, testCase)
-
-			// The message ids and the count through the harness, so the mechanical fixture-pair
-			// guard in `internal/lint/registry` can see that this rule is proven to fire. The spans
-			// below are the part that guard does not check and that this rule most needs: it
-			// computes a different report position per node kind, and upstream states all four
-			// coordinates on every one of these cases.
-			wantIds := make([]string, 0, len(testCase.findings))
-			for _, expected := range testCase.findings {
-				wantIds = append(wantIds, expected.id)
-			}
-			rule_testing.ExpectFindings(test, result, wantIds...)
-
-			for index, expected := range testCase.findings {
-				diagnostic := result.Diagnostics[index]
-				wantPos := consistentReturnOffsetOf(test, testCase.source, expected.line, expected.column)
-				wantEnd := consistentReturnOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
-				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					test.Errorf("finding %d: expected span [%d,%d) (%d:%d-%d:%d), got [%d,%d) %q",
-						index, wantPos, wantEnd,
-						expected.line, expected.column, expected.endLine, expected.endColumn,
-						diagnostic.Range.Pos(), diagnostic.Range.End(),
-						asTheTypedConsistentReturnHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
-				}
-			}
-		})
-	}
-}
-
 // consistentReturnCleanCases are upstream's `valid` list, verbatim.
 var consistentReturnCleanCases = []consistentReturnCase{
 	{
@@ -390,6 +341,20 @@ function foo(flag: boolean): undefined {
 	},
 }
 
+// TestConsistentReturnStaysSilent runs upstream's whole `valid` list.
+//
+// Thirteen of these nineteen report under the bare core rule and are silent here, which is the whole
+// difference between the two rules. See the rule's doc comment for the measurement.
+func TestConsistentReturnStaysSilent(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range consistentReturnCleanCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runConsistentReturn(test, testCase))
+		})
+	}
+}
+
 // consistentReturnReportingCases are upstream's `invalid` list, verbatim, with the spans it asserts.
 var consistentReturnReportingCases = []consistentReturnCase{
 	{
@@ -550,6 +515,41 @@ function foo(flag: boolean) {
 			{id: "unexpectedReturnValue", line: 7, column: 3, endLine: 7, endColumn: 21},
 		},
 	},
+}
+
+// TestConsistentReturnFires runs upstream's whole `invalid` list and asserts every span it states.
+func TestConsistentReturnFires(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range consistentReturnReportingCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentReturn(test, testCase)
+
+			// The message ids and the count through the harness, so the mechanical fixture-pair
+			// guard in `internal/lint/registry` can see that this rule is proven to fire. The spans
+			// below are the part that guard does not check and that this rule most needs: it
+			// computes a different report position per node kind, and upstream states all four
+			// coordinates on every one of these cases.
+			wantIds := make([]string, 0, len(testCase.findings))
+			for _, expected := range testCase.findings {
+				wantIds = append(wantIds, expected.id)
+			}
+			rule_testing.ExpectFindings(test, result, wantIds...)
+
+			for index, expected := range testCase.findings {
+				diagnostic := result.Diagnostics[index]
+				wantPos := consistentReturnOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := consistentReturnOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
+				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
+					test.Errorf("finding %d: expected span [%d,%d) (%d:%d-%d:%d), got [%d,%d) %q",
+						index, wantPos, wantEnd,
+						expected.line, expected.column, expected.endLine, expected.endColumn,
+						diagnostic.Range.Pos(), diagnostic.Range.End(),
+						asTheTypedConsistentReturnHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
+				}
+			}
+		})
+	}
 }
 
 // TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the config boundary.

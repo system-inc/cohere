@@ -334,7 +334,7 @@ func TestNoForInArrayMessageText(test *testing.T) {
 // reachable, so both halves are asserted here.
 //
 // The declaration is the half that matters for registration. The guard is the half that matters for
-// the harness path, where a Context can be built by hand — and it matters more than a crash would,
+// the harness path, where a Context can be built by hand, and it matters more than a crash would,
 // because the shim's type queries return nil rather than panicking. Without the guard this rule
 // would not crash under a nil checker, it would go silent, and every fixture above would pass having
 // proven nothing.

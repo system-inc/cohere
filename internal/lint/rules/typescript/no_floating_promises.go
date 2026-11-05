@@ -518,9 +518,9 @@ var NoFloatingPromises = rule.Rule{
 				callExpr := node.AsCallExpression()
 				callee := callExpr.Expression
 				if ast.IsAccessExpression(callee) {
-					// TODO(port): getStaticMemberAccessValue -> GetAccessedPropertyName is an
-					// enhancement, we should probably add tests for it
-					// const methodName = getStaticMemberAccessValue(callee, context);
+					// `@typescript-eslint` reads the name with `getStaticMemberAccessValue`. Upstream reads
+					// it with `Checker_getAccessedPropertyName`, which it calls an enhancement it has no
+					// tests for; the rule's doc names the input where the two disagree, and a test pins it.
 					methodName, _ := checker.Checker_getAccessedPropertyName(ruleContext.TypeChecker, callee)
 
 					if methodName == "catch" && len(callExpr.Arguments.Nodes) >= 1 {

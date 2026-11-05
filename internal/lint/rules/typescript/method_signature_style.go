@@ -38,6 +38,17 @@ func messageMethodSignatureStyleConvertToMethod() rule.Message {
 	}
 }
 
+// MethodSignatureStyleSetting is upstream's one option, `'method' | 'property'`.
+type MethodSignatureStyleSetting string
+
+const (
+	// MethodSignatureStyleProperty is `"property"`, upstream's default: a shorthand method reports.
+	MethodSignatureStyleProperty MethodSignatureStyleSetting = "property"
+
+	// MethodSignatureStyleMethod is `"method"`: a property holding a function type reports.
+	MethodSignatureStyleMethod MethodSignatureStyleSetting = "method"
+)
+
 // MethodSignatureStyle requires one spelling for a signature, a shorthand method or a property.
 //
 //	valid (property): interface I { m: (a: string) => void; }
@@ -561,17 +572,6 @@ func methodSignatureNodeText(ruleContext rule.Context, node *ast.Node) (string, 
 	}
 	return sourceText[trimmed.Pos():trimmed.End()], true
 }
-
-// MethodSignatureStyleSetting is upstream's one option, `'method' | 'property'`.
-type MethodSignatureStyleSetting string
-
-const (
-	// MethodSignatureStyleProperty is `"property"`, upstream's default: a shorthand method reports.
-	MethodSignatureStyleProperty MethodSignatureStyleSetting = "property"
-
-	// MethodSignatureStyleMethod is `"method"`: a property holding a function type reports.
-	MethodSignatureStyleMethod MethodSignatureStyleSetting = "method"
-)
 
 // MethodSignatureStyleOptions is the rule's configuration.
 //

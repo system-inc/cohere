@@ -188,6 +188,21 @@ var ArrayType = rule.Rule{
 	},
 }
 
+// ArrayTypeSetting is one of upstream's three spellings for one axis.
+type ArrayTypeSetting string
+
+const (
+	// ArrayTypeArray is `"array"`: always write the suffix form.
+	ArrayTypeArray ArrayTypeSetting = "array"
+
+	// ArrayTypeArraySimple is `"array-simple"`: write the suffix form for a simple element type and
+	// the generic form for anything else, so the brackets never trail a complicated type.
+	ArrayTypeArraySimple ArrayTypeSetting = "array-simple"
+
+	// ArrayTypeGeneric is `"generic"`: always write `Array<T>`.
+	ArrayTypeGeneric ArrayTypeSetting = "generic"
+)
+
 // reportArrayTypeSuffixForm is upstream's `TSArrayType` visitor.
 func reportArrayTypeSuffixForm(ruleContext rule.Context, node *ast.Node, options ArrayTypeOptions) {
 	elementType := node.AsArrayTypeNode().ElementType
@@ -562,21 +577,6 @@ func arrayTypeMessageType(ruleContext rule.Context, node *ast.Node) string {
 	trimmed := rule.TokenRange(ruleContext.SourceFile, node)
 	return ruleContext.SourceFile.Text()[trimmed.Pos():trimmed.End()]
 }
-
-// ArrayTypeSetting is one of upstream's three spellings for one axis.
-type ArrayTypeSetting string
-
-const (
-	// ArrayTypeArray is `"array"`: always write the suffix form.
-	ArrayTypeArray ArrayTypeSetting = "array"
-
-	// ArrayTypeArraySimple is `"array-simple"`: write the suffix form for a simple element type and
-	// the generic form for anything else, so the brackets never trail a complicated type.
-	ArrayTypeArraySimple ArrayTypeSetting = "array-simple"
-
-	// ArrayTypeGeneric is `"generic"`: always write `Array<T>`.
-	ArrayTypeGeneric ArrayTypeSetting = "generic"
-)
 
 // ArrayTypeOptions is the rule's configuration.
 //

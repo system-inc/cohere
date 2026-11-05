@@ -9,6 +9,14 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// globalCandidates are the receiver names a member access may carry and still be recognized as a
+// call to the global function. `self` is deliberately absent, which is upstream's list rather than
+// an oversight here; see the recognition note below.
+var globalCandidates = []string{"global", "globalThis", "window"}
+
+// evalLikeFunctions are the four names whose first argument must be a function.
+var evalLikeFunctions = []string{"execScript", "setImmediate", "setInterval", "setTimeout"}
+
 // NoImpliedEval flags the `eval()`-like calls: a non-function handed to `setTimeout`,
 // `setInterval`, `setImmediate` or `execScript`, and any use of the `Function` constructor.
 //
@@ -68,7 +76,7 @@ import (
 // Resolution enters exactly once, as a negative filter after the name has already matched: the
 // callee's symbol is resolved and the finding is withheld when any of that symbol's declarations
 // lives in the file being linted. So a local `function setTimeout() {}` exempts the whole file,
-// and so does `import { setTimeout } from './timers'` — the import declaration is in this file.
+// and so does `import { setTimeout } from './timers'`: the import declaration is in this file.
 //
 // That filter is file-scoped rather than lexically scoped, which is the surprising part and is
 // pinned by a fixture below: a `setTimeout` declared inside a nested block still exempts a call
@@ -95,7 +103,7 @@ import (
 // The `any` case deserves naming because it is the opposite of the usual hazard. Type-aware
 // rules in this family normally skip `any` to avoid false positives; this one reports it, since
 // an `any` has no call signature. So the standing warning that the fixture tsconfig's
-// `lib: ["ES2022"]` collapses out-of-lib types to the error type — whose flags report `any` —
+// `lib: ["ES2022"]` collapses out-of-lib types to the error type (whose flags report `any`)
 // would silently flip a verdict in most rules here and cannot do so in this one in the reporting
 // direction.
 //
@@ -104,7 +112,7 @@ import (
 // twice, once under the bare fixture tsconfig and once with a second file declaring
 // `setTimeout`, `setInterval`, `setImmediate`, `execScript` and `window`. No verdict moved.
 // The reason is that an unresolved global gets no symbol at all, and the same-file-declaration
-// filter treats a nil symbol as "not declared here" and lets the finding through — which is the
+// filter treats a nil symbol as "not declared here" and lets the finding through, which is the
 // same answer a properly resolved DOM global produces. So this rule is insensitive to the
 // missing DOM lib, unlike `await-thenable`, where three cases inverted.
 //
@@ -112,7 +120,7 @@ import (
 //
 // Both implementations register exactly two listeners (`CallExpression` and `NewExpression`),
 // carry the same two messages, ship `schema: []` so there are no options, and offer no fix and
-// no suggestion. Counted on both sides rather than assumed — this rule has no equivalent of the
+// no suggestion. Counted on both sides rather than assumed: this rule has no equivalent of the
 // fourth `await-thenable` arm that tsgolint lacks.
 //
 // They diverge on one axis, and it is a clean sweep rather than a single case. Measured by
@@ -139,7 +147,7 @@ import (
 // and is pinned by measured cases below.
 //
 // The argument side falls the other way and that asymmetry is real: `setTimeout(('x = 1'), 0)`
-// reports and `setTimeout((() => {}), 0)` is silent. Nothing skips the parens there either —
+// reports and `setTimeout((() => {}), 0)` is silent. Nothing skips the parens there either:
 // they simply do not need to be skipped, because `isFunction` reaches the checker for a
 // parenthesized expression and the checker sees straight through to the inner type. One rule,
 // two answers, and only measurement separates them.
@@ -181,7 +189,7 @@ import (
 // The guard matters more here than a crash-avoidance would suggest, and this rule is the sharpest
 // illustration in the family. `ctx.TypeChecker.GetSymbolAtLocation` and `GetTypeAtLocation` on this
 // shim return nil rather than panicking, and `isFunction` treats a type it cannot call as not a
-// function — so a checker-less run would not crash, it would report every `setTimeout(fn, 0)` in
+// function, so a checker-less run would not crash, it would report every `setTimeout(fn, 0)` in
 // the corpus while the same-file filter let each one through on a nil symbol. That is worse than a
 // vacuous green: it is a vacuous red, forty eight clean fixtures inverting at once. A test in this
 // package pins the declaration and the guard together so a later revert fails loudly.
@@ -308,14 +316,6 @@ var NoImpliedEval = rule.Rule{
 		}
 	},
 }
-
-// globalCandidates are the receiver names a member access may carry and still be recognized as a
-// call to the global function. `self` is deliberately absent, which is upstream's list rather than
-// an oversight here; see the recognition note above.
-var globalCandidates = []string{"global", "globalThis", "window"}
-
-// evalLikeFunctions are the four names whose first argument must be a function.
-var evalLikeFunctions = []string{"execScript", "setImmediate", "setInterval", "setTimeout"}
 
 // buildNoFunctionConstructorMessage is upstream's message, text unchanged.
 func buildNoFunctionConstructorMessage() rule.Message {

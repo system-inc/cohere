@@ -46,7 +46,7 @@ func TestPreferNullishCoalescingDefaultsMatchUpstream(test *testing.T) {
 // object form passes 110 cases and is wrong on the rest.
 //
 // Three rows are invisible to the corpus entirely. `{}` and the all-true object bracket the object
-// form from both ends, and `false` is refused by the schema rather than meaning "ignore nothing" —
+// form from both ends, and `false` is refused by the schema rather than meaning "ignore nothing",
 // the row a decoder would most naturally get wrong by accepting it and doing something reasonable.
 func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 	test.Parallel()
@@ -222,36 +222,6 @@ func runPreferNullishCoalescing(test *testing.T, testCase preferNullishCoalescin
 	}
 	return rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing,
 		preferNullishCoalescingFile, testCase.source, options)
-}
-
-// TestPreferNullishCoalescingStaysSilent runs upstream's whole `valid` list.
-//
-// All 275, across every reporting path: a valid case is a false positive this rule must not
-// produce, whichever path would have produced it.
-func TestPreferNullishCoalescingStaysSilent(test *testing.T) {
-	test.Parallel()
-	for _, testCase := range preferNullishCoalescingCleanCases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			rule_testing.ExpectClean(test, runPreferNullishCoalescing(test, testCase))
-		})
-	}
-}
-
-// TestPreferNullishCoalescingFires runs every invalid case whose findings are all preferNullishOverOr.
-func TestPreferNullishCoalescingFires(test *testing.T) {
-	test.Parallel()
-	for _, testCase := range preferNullishCoalescingOrCases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			result := runPreferNullishCoalescing(test, testCase)
-			wantIds := make([]string, 0, testCase.findings)
-			for range testCase.findings {
-				wantIds = append(wantIds, messagePreferNullishOverOr.Id)
-			}
-			rule_testing.ExpectFindings(test, result, wantIds...)
-		})
-	}
 }
 
 // preferNullishCoalescingCleanCases is upstream's whole `valid` list, verbatim.
@@ -1573,6 +1543,20 @@ const b = a || 'bar';
       `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": false, "number": false, "string": false}}`},
 }
 
+// TestPreferNullishCoalescingStaysSilent runs upstream's whole `valid` list.
+//
+// All 275, across every reporting path: a valid case is a false positive this rule must not
+// produce, whichever path would have produced it.
+func TestPreferNullishCoalescingStaysSilent(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range preferNullishCoalescingCleanCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runPreferNullishCoalescing(test, testCase))
+		})
+	}
+}
+
 // preferNullishCoalescingOrCases are the invalid cases whose findings are ALL preferNullishOverOr.
 //
 // The ternary and if-statement paths' 221 cases live in prefer_nullish_coalescing_ternary_test.go,
@@ -2211,6 +2195,22 @@ declare const x: unknown;
 declare const y: any;
 x || y;
       `, optionsJson: "", findings: 1},
+}
+
+// TestPreferNullishCoalescingFires runs every invalid case whose findings are all preferNullishOverOr.
+func TestPreferNullishCoalescingFires(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range preferNullishCoalescingOrCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runPreferNullishCoalescing(test, testCase)
+			wantIds := make([]string, 0, testCase.findings)
+			for range testCase.findings {
+				wantIds = append(wantIds, messagePreferNullishOverOr.Id)
+			}
+			rule_testing.ExpectFindings(test, result, wantIds...)
+		})
+	}
 }
 
 // preferNullishCoalescingRenderingCase is one shape with everything a message id cannot see.

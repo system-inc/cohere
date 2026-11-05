@@ -144,7 +144,7 @@ var NoUnnecessaryParameterPropertyAssignment = rule.Rule{
 						// This is crash protection rather than a behavioral filter, which is why a
 						// mutation removing it survived the whole fixture set: no `ExpectFindings`
 						// case can observe a panic. Measured directly on
-						// `constructor(public { a }: { a: string })` — the parameter carries
+						// `constructor(public { a }: { a: string })`: the parameter carries
 						// ModifierFlagsParameterPropertyModifier, its name is a
 						// KindObjectBindingPattern, and `Text()` panics with "Unhandled case in
 						// Node.Text: *ast.BindingPattern". That is a fourth panicking shape beside

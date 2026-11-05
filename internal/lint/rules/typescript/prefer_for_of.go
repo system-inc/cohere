@@ -5,6 +5,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+var preferForOfMessage = rule.Message{
+	Id:          "preferForOf",
+	Description: "Expected a `for-of` loop instead of a `for` loop with this simple iteration.",
+}
+
 // PreferForOf flags a counted `for` loop whose index is only ever used to index one array.
 //
 //	valid:   for (let i = 0; i < arr.length; i++) { doMath(i); }      the index itself is used
@@ -123,11 +128,6 @@ var PreferForOf = rule.Rule{
 			},
 		}
 	},
-}
-
-var preferForOfMessage = rule.Message{
-	Id:          "preferForOf",
-	Description: "Expected a `for-of` loop instead of a `for` loop with this simple iteration.",
 }
 
 // singleNonConstDeclarator is upstream's `isSingleVariableDeclaration` plus its declarator lookup.

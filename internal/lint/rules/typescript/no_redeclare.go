@@ -393,6 +393,37 @@ func survivingDeclarations(declarations []*ast.Node, settings NoRedeclareOptions
 	return considered
 }
 
+// mergeSets is upstream's three sets, in upstream's order.
+//
+// Order is load-bearing rather than incidental. A group of one class and one namespace is drawn
+// from the class set, and a group of one function and one namespace is drawn from the function set;
+// nothing is drawn from two, because each set's members differ past the shared namespace. Reading
+// them in a fixed order keeps the answer stable regardless.
+var mergeSets = []mergeSet{
+	{
+		primary: ast.KindClassDeclaration,
+		members: map[ast.Kind]bool{
+			ast.KindClassDeclaration:     true,
+			ast.KindInterfaceDeclaration: true,
+			ast.KindModuleDeclaration:    true,
+		},
+	},
+	{
+		primary: ast.KindFunctionDeclaration,
+		members: map[ast.Kind]bool{
+			ast.KindFunctionDeclaration: true,
+			ast.KindModuleDeclaration:   true,
+		},
+	},
+	{
+		primary: ast.KindEnumDeclaration,
+		members: map[ast.Kind]bool{
+			ast.KindEnumDeclaration:   true,
+			ast.KindModuleDeclaration: true,
+		},
+	},
+}
+
 // mergeExemption reports whether a group is one of TypeScript's legitimate declaration merges, and
 // when the group holds more than one declaration of the merging kind, which ones those are.
 //
@@ -439,37 +470,6 @@ func mergeExemption(declarations []*ast.Node) (bool, []*ast.Node) {
 type mergeSet struct {
 	primary ast.Kind
 	members map[ast.Kind]bool
-}
-
-// mergeSets is upstream's three sets, in upstream's order.
-//
-// Order is load-bearing rather than incidental. A group of one class and one namespace is drawn
-// from the class set, and a group of one function and one namespace is drawn from the function set;
-// nothing is drawn from two, because each set's members differ past the shared namespace. Reading
-// them in a fixed order keeps the answer stable regardless.
-var mergeSets = []mergeSet{
-	{
-		primary: ast.KindClassDeclaration,
-		members: map[ast.Kind]bool{
-			ast.KindClassDeclaration:     true,
-			ast.KindInterfaceDeclaration: true,
-			ast.KindModuleDeclaration:    true,
-		},
-	},
-	{
-		primary: ast.KindFunctionDeclaration,
-		members: map[ast.Kind]bool{
-			ast.KindFunctionDeclaration: true,
-			ast.KindModuleDeclaration:   true,
-		},
-	},
-	{
-		primary: ast.KindEnumDeclaration,
-		members: map[ast.Kind]bool{
-			ast.KindEnumDeclaration:   true,
-			ast.KindModuleDeclaration: true,
-		},
-	},
 }
 
 // redeclarableName returns the text of a declaration's name when the node binds that name into an

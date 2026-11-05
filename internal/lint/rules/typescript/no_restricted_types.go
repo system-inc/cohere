@@ -10,6 +10,25 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// noRestrictedTypesKeywordKinds is upstream's `TYPE_KEYWORDS`, mapping a configurable spelling onto
+// the node kind that spelling parses to.
+//
+// These are separate from the type-reference handler because a keyword is not a reference: `string`
+// parses as its own kind and has no name node to read.
+var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
+	"bigint":    ast.KindBigIntKeyword,
+	"boolean":   ast.KindBooleanKeyword,
+	"never":     ast.KindNeverKeyword,
+	"null":      ast.KindNullKeyword,
+	"number":    ast.KindNumberKeyword,
+	"object":    ast.KindObjectKeyword,
+	"string":    ast.KindStringKeyword,
+	"symbol":    ast.KindSymbolKeyword,
+	"undefined": ast.KindUndefinedKeyword,
+	"unknown":   ast.KindUnknownKeyword,
+	"void":      ast.KindVoidKeyword,
+}
+
 // NoRestrictedTypes flags types a project has decided not to use, named in configuration.
 //
 //	valid:   let value: string;                       with no types configured
@@ -195,25 +214,6 @@ var NoRestrictedTypes = rule.Rule{
 
 		return listeners
 	},
-}
-
-// noRestrictedTypesKeywordKinds is upstream's `TYPE_KEYWORDS`, mapping a configurable spelling onto
-// the node kind that spelling parses to.
-//
-// These are separate from the type-reference handler because a keyword is not a reference: `string`
-// parses as its own kind and has no name node to read.
-var noRestrictedTypesKeywordKinds = map[string]ast.Kind{
-	"bigint":    ast.KindBigIntKeyword,
-	"boolean":   ast.KindBooleanKeyword,
-	"never":     ast.KindNeverKeyword,
-	"null":      ast.KindNullKeyword,
-	"number":    ast.KindNumberKeyword,
-	"object":    ast.KindObjectKeyword,
-	"string":    ast.KindStringKeyword,
-	"symbol":    ast.KindSymbolKeyword,
-	"undefined": ast.KindUndefinedKeyword,
-	"unknown":   ast.KindUnknownKeyword,
-	"void":      ast.KindVoidKeyword,
 }
 
 // noRestrictedTypesNameOf reads a node's source text with every whitespace character removed.

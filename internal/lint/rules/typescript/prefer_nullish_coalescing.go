@@ -385,7 +385,9 @@ func preferNullishCoalescingJudge(ruleContext rule.Context, node *ast.Node,
 	settings PreferNullishCoalescingOptions) (preferNullishCoalescingFinding, bool) {
 
 	expression := node.AsBinaryExpression()
-	var operator, replacement, kind string
+	var operator string
+	var replacement string
+	var kind string
 	switch expression.OperatorToken.Kind {
 	case ast.KindBarBarToken:
 		operator, replacement, kind = "||", "??", "or"
