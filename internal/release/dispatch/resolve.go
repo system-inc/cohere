@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// ReleaseBuildFlags strip the symbol table and DWARF from the binary.
+// ReleaseBuildFlags strip the symbol table and `DWARF` from the binary.
 //
 // Measured on typescript-go, a comparable binary: these make the link marginally faster (0.92s
 // against 1.06s) and cut the binary by 29%, so there is no tradeoff to weigh. They are fixed rather
@@ -18,7 +18,7 @@ import (
 // would pay that repeatedly, so the flags are constant for every build this package performs.
 //
 // The builds share the Go cache every other `go` command on the machine uses rather than keeping one of
-// their own (#3kr3x59): the house sets GOFLAGS=-trimpath, so a member's `go build` and `go test` compile
+// their own (#3kr3x59): the house sets `GOFLAGS=-trimpath`, so a member's `go build` and `go test` compile
 // the same packages the launcher does, and the launcher's builds reuse them. A private cache held 40 GB,
 // largely the same packages stored twice.
 var ReleaseBuildFlags = []string{"-trimpath", "-ldflags=-s -w"}

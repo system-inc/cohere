@@ -63,7 +63,7 @@ func isAlwaysTruthyTest(node *ast.Node) bool {
 		// and reads `.Text == "0"` the same way.
 		return node.AsNumericLiteral().Text != "0"
 	case ast.KindBigIntLiteral:
-		// A BigInt literal is NOT normalized the way a numeric one is, which is the asymmetry that
+		// A BigInt literal is not normalized the way a numeric one is, which is the asymmetry that
 		// makes this branch load-bearing rather than redundant. Probed on our parser: `0n` arrives
 		// as "0n" and `0x0n` as "0x0n" — the `n` suffix survives, and a hex or binary spelling
 		// survives with it, though `0b0n` and `0o0n` do arrive as "0n". So a bare `.Text != "0"`

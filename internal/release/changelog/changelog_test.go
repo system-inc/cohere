@@ -179,7 +179,7 @@ func TestRenderNamesEverySetThatChanged(test *testing.T) {
 }
 
 // The sets read from a commit are the sets the working tree holds when nothing is uncommitted: the same
-// names and the same bytes, so a diff between HEAD and the tree is empty.
+// names and the same bytes, so a diff between `HEAD` and the tree is empty.
 func TestSetsAtACommitMatchTheTree(test *testing.T) {
 	test.Parallel()
 	module, err := filepath.Abs(filepath.Join("..", "..", ".."))

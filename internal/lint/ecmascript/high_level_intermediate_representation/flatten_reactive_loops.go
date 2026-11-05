@@ -12,7 +12,7 @@
 // integrate more deeply into the runtime so that we can do a single level of reconciliation, but
 // for now we've found it's sufficient to memoize *around* the loop."
 //
-// So a pruned scope here is a POLICY decision rather than a failure. That distinction is the whole
+// So a pruned scope here is a policy decision rather than a failure. That distinction is the whole
 // reason this pass has to exist separately from the prunes that run later, and it is what the
 // memoization validator reads: `visitFinishMemoize` skips a marker whose scope was pruned, because
 // a memoization the compiler deliberately declined is not a memoization the developer lost.

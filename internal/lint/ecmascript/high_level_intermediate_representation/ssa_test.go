@@ -2,7 +2,7 @@
 //
 // # Why these lower through a real program rather than a bare parse
 //
-// `lowerSource` in lower_test.go parses and nothing more, which is right for testing the SHAPE of a
+// `lowerSource` in lower_test.go parses and nothing more, which is right for testing the shape of a
 // lowered graph. It is wrong for testing SSA, and the reason is the whole point of this file: with
 // no checker, every variable reference lowers to `LoadGlobal`, there is nothing to rename, and
 // construction places zero phis while every structural assertion still passes. A suite built on
@@ -199,7 +199,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 	})
 
 	// 4. Read a value before it is defined within one block. Rather than hunting for an existing
-	// use, rewrite the FIRST instruction's value to a LoadLocal of the LAST instruction's result,
+	// use, rewrite the first instruction's value to a LoadLocal of the last instruction's result,
 	// which is unambiguously a backwards read inside one block.
 	test.Run("use before definition in the same block", func(test *testing.T) {
 		test.Parallel()
@@ -344,7 +344,7 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 		&JsxExpression{Props: []JsxAttribute{{Value: place(1)}}, Children: []Place{place(2)}},
 		&JsxFragment{Children: []Place{place(1)}},
 		&JsxText{},
-		// Both root kinds, because the walkers SKIP a global root (it carries a name, not a
+		// Both root kinds, because the walkers skip a global root (it carries a name, not a
 		// place) and a case listing only local roots would let a walker that skipped both pass.
 		&StartMemoize{Deps: []ManualMemoDependency{
 			{Root: ManualMemoRoot{Place: place(1)}, Path: []DependencyPathEntry{{Property: "a"}}},
@@ -413,7 +413,7 @@ func TestPhiOperandsAreDeterministic(test *testing.T) {
 
 // Construction reaches a fixpoint: running it twice produces what running it once produced.
 //
-// The pass APPENDS phis and cannot reconcile ones it did not mint, so a second run over a graph that
+// The pass appends phis and cannot reconcile ones it did not mint, so a second run over a graph that
 // already carries phis leaves the old ones in place beside new ones naming the same merge. Their
 // operands are identifiers from before the renumbering, so each defines a value nothing produces,
 // joins no class in the disjoint partition, and takes no scope.

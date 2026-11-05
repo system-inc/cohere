@@ -56,7 +56,7 @@ func CookedToRaw(raw string, cooked string) []int {
 	if cookedIndex != len(cooked) {
 		return nil
 	}
-	// Cooked finishing is necessary but not sufficient: the loop stops as soon as EITHER text runs
+	// Cooked finishing is necessary but not sufficient: the loop stops as soon as either text runs
 	// out, so a raw tail that produced no cooked characters at all is never compared against
 	// anything and slips through. `'a  b\<newline>'` cooks to `a  b`, and checking only the cooked
 	// side returns a complete, well formed mapping whose every offset past the run is wrong.

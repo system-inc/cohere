@@ -7,7 +7,7 @@
 // tests are needed.
 //
 // The format is this package's own, not upstream's. Matching upstream's printer would be a second
-// fidelity obligation with no oracle behind it: no fixture compares printed HIR, so the only reader
+// fidelity obligation with no oracle behind it: no fixture compares printed `HIR`, so the only reader
 // is us.
 package high_level_intermediate_representation
 

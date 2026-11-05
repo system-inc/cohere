@@ -14,7 +14,7 @@ import (
 
 // effectsFor lowers one function and returns its effect table plus the function.
 //
-// Runs through the TYPED harness even though this pass reads no types, because `Lower` refuses a
+// Runs through the typed harness even though this pass reads no types, because `Lower` refuses a
 // nil checker and would otherwise hand back nil, which reads as "the pass found nothing" rather
 // than "the pass never ran". The explicit fatal below is the guard the brief calls for: a typed
 // probe handed a nil checker passes vacuously, and vacuous green is more dangerous than a crash.
@@ -58,7 +58,7 @@ func effectsFor(test *testing.T, source string) (*Function, *AliasingEffects) {
 
 // effectsOn returns the sorted set of effect kinds naming one source binding, as strings.
 //
-// Keyed by the binding's DECLARATION rather than by IdentifierId or by name, and that distinction
+// Keyed by the binding's declaration rather than by IdentifierId or by name, and that distinction
 // cost the first version of this file every one of its assertions.
 //
 // Single-assignment form gives one source binding several numbered values, and only the value the
@@ -83,7 +83,7 @@ func effectsOn(function *Function, table *AliasingEffects, name string) []string
 	}
 
 	// Seed with every value carrying the binding's declaration, then follow assignment edges
-	// forward. A `LoadLocal` of `o` produces a FRESH temporary with its own DeclarationId, and it
+	// forward. A `LoadLocal` of `o` produces a fresh temporary with its own DeclarationId, and it
 	// is that temporary the property store mutates, so a set closed only over the declaration stops
 	// one hop short of every interesting effect. Closing over Assign edges is what makes "the
 	// effects on `o`" include what happens to the value just loaded out of it.
@@ -603,7 +603,7 @@ func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(test *testing.T) {
 // TestPropertyStoreMutatesItsObject is the single most load-bearing fact this pass produces.
 //
 // `o.a = 1` mutates `o`. Everything downstream -- a mutable range's extension, a frozen-value
-// violation, an escape verdict -- reads this one effect. Asserted on the SPECIFIC place rather than
+// violation, an escape verdict -- reads this one effect. Asserted on the specific place rather than
 // on a count, because the brief records a phi mutant that survived a name-keyed assertion while the
 // merge rule was dead.
 func TestPropertyStoreMutatesItsObject(test *testing.T) {
@@ -635,7 +635,7 @@ func TestPropertyStoreCapturesTheStoredValue(test *testing.T) {
 // TestUnknownCallConservativelyMutatesItsArguments is the 85.4% path and the safety property.
 //
 // A call with no signature must be assumed to mutate what it is handed. The direction matters more
-// than the specific variant: an unknown call that recorded NO mutation would make every consumer
+// than the specific variant: an unknown call that recorded no mutation would make every consumer
 // under-report, and an under-reporting escape analysis is unsound in the dangerous direction.
 func TestUnknownCallConservativelyMutatesItsArguments(test *testing.T) {
 	test.Parallel()
@@ -651,7 +651,7 @@ func TestUnknownCallConservativelyMutatesItsArguments(test *testing.T) {
 // TestKnownReadOnlySignatureDoesNotMutate is the other side of the same measurement.
 //
 // Two-sided against the test above: `includes` carries Effect::Read on its receiver upstream, so it
-// must NOT produce a mutation, while `unknownFunction` must. If the signature table were dead, both
+// must not produce a mutation, while `unknownFunction` must. If the signature table were dead, both
 // tests would still describe real behaviour and only this one would fail, which is why it exists
 // rather than a bare assertion that some call produced some effect.
 func TestKnownReadOnlySignatureDoesNotMutate(test *testing.T) {
@@ -685,7 +685,7 @@ func TestKnownMutatingSignatureMutatesItsReceiver(test *testing.T) {
 //
 // `sort` mutates its receiver in fact, and React does not report it, because it is not in
 // `globals.rs`. Measured on React's executable with a control in the same batch: a frozen array's
-// `push` REPORTS and the same array's `sort` is CLEAN.
+// `push` reports and the same array's `sort` is clean.
 //
 // This is the "do not silently improve on upstream" rule from the brief, pinned as a test so a
 // later reader who adds `sort` to the table sees this go red and reads why rather than discovering
@@ -741,7 +741,7 @@ func TestAwaitConditionallyMutatesTheAwaitedValue(test *testing.T) {
 // one of the 766 is an `UnsupportedNode`, which lowering documents as syntax it does not model. So
 // coverage is total over every shape the representation actually produces.
 //
-// The assertion is on the SHAPE rather than on the count, because a count would drift with the
+// The assertion is on the shape rather than on the count, because a count would drift with the
 // corpus while the invariant does not: any instruction value other than UnsupportedNode that
 // produces no effect is a hole in the switch.
 func TestEveryInstructionShapeProducesEffects(test *testing.T) {
@@ -844,7 +844,7 @@ declare function use(v: object): void;`
 // TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead pins the reason Place.Effect is not
 // written by this pass.
 //
-// The five aliasing variants all resolve their SOURCE to either Capture or Read, and the only
+// The five aliasing variants all resolve their source to either Capture or Read, and the only
 // discriminator is whether the target is still mutable after this point -- a fact that lives in the
 // mutable-range table, which Stage 2 owns. With a nil range table every aliasing edge reads as
 // Read, which under-approximates escape.
@@ -889,7 +889,7 @@ func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(test *testing.T) 
 // default. So the gaps are enumerable rather than only described, the way `ReactiveGaps` and
 // `RangeGaps` already are.
 //
-// This test goes RED if a gap is ever closed, which is deliberate: closing one should be a
+// This test goes red if a gap is ever closed, which is deliberate: closing one should be a
 // deliberate edit here rather than a silent change in what a consumer can trust.
 func TestEffectGapsAreNamedInTheApi(test *testing.T) {
 	test.Parallel()
@@ -915,8 +915,8 @@ func TestEffectGapsAreNamedInTheApi(test *testing.T) {
 // TestInterproceduralParametersAreNotInferred states the largest gap as a test rather than a hope.
 //
 // A local function that mutates its parameter is invisible to this pass. Measured against React's
-// executable, React is ALSO silent on the same input when the callee is reached by name --
-// `function m(x){x.a=1;} m(frozen)` is CLEAN upstream -- so the observable divergence on React's
+// executable, React is also silent on the same input when the callee is reached by name --
+// `function m(x){x.a=1;} m(frozen)` is clean upstream -- so the observable divergence on React's
 // own diagnostics is narrow even though the general capability is missing entirely.
 //
 // Pinned so that implementing it is a deliberate act: this test goes red the moment the effects of
@@ -936,7 +936,7 @@ function outer() {
 	effects := effectsOn(function, table, "value")
 
 	// The conservative default still records a mutation, which is the safe direction. What is
-	// missing is the PRECISE one: upstream would record `Mutate` from inner's own body, and this
+	// missing is the precise one: upstream would record `Mutate` from inner's own body, and this
 	// records only the unknown-callee `MutateTransitiveConditionally`.
 	if !hasEffect(effects, "mutate-transitive-conditionally:into") {
 		test.Fatalf("the conservative default must still fire for an un-inferred callee; got %v", effects)
@@ -966,19 +966,19 @@ func typeName(value InstructionValue) string {
 
 // TestCaptureReceiverIsAliasedExactlyOnce pins upstream's receiver-alias guard.
 //
-// `compute_effects_for_legacy_signature` aliases the receiver into the result UNLESS the receiver's
+// `compute_effects_for_legacy_signature` aliases the receiver into the result unless the receiver's
 // own signature effect is Capture. That is not "a Capture receiver is never aliased": it is
 // deduplication. A Capture receiver lands in the `captures` list and the reconciliation at the end
 // of the function emits `Alias{capture -> lvalue}` for it, so emitting the branch alias as well
-// would record the same edge TWICE.
+// would record the same edge twice.
 //
 // Added for a surviving mutant that inverted the guard, and the first fixture written for it was
-// WRONG even though the mutant was real: it asserted that a Capture receiver produces no Alias at
+// wrong even though the mutant was real: it asserted that a Capture receiver produces no Alias at
 // all, and the pass produces exactly one, from the reconciliation. The brief's rule applied
 // literally -- a fixture written for a survivor is a hypothesis, and a failing one means the
 // hypothesis needs replacing rather than the code.
 //
-// So the property is the COUNT. `map` has a Capture receiver and must yield exactly one Alias;
+// So the property is the count. `map` has a Capture receiver and must yield exactly one Alias;
 // `includes` has a Read receiver, never enters the captures list, and must also yield exactly one,
 // from the branch instead. The inverted mutant gives `map` two and `includes` zero.
 func TestCaptureReceiverIsAliasedExactlyOnce(test *testing.T) {
@@ -1021,12 +1021,12 @@ func TestCaptureReceiverIsAliasedExactlyOnce(test *testing.T) {
 
 // TestAnUnknownMethodCallDoesNotMutateTheMethodItself pins the mutatesCallee guard.
 //
-// Upstream's default path skips the mutation for an operand that IS the callee when the call does
+// Upstream's default path skips the mutation for an operand that is the callee when the call does
 // not mutate its function -- true for a method call and a construction, false for a plain call
 // (`infer_mutation_aliasing_effects.rs:1841-1848`). So `lib.doThing(v)` conservatively mutates
-// `lib` and `v`, and does NOT record that calling `doThing` mutated `doThing`.
+// `lib` and `v`, and does not record that calling `doThing` mutated `doThing`.
 //
-// Added for a surviving mutant that inverted the guard, and the distinguishing input is a METHOD
+// Added for a surviving mutant that inverted the guard, and the distinguishing input is a method
 // call specifically: for a plain call the receiver and the callee are one identifier and
 // mutatesCallee is true, so the guard never fires and both versions agree. The first hypothesis
 // reached for a plain call and would have been a fixture that could not see the mutation, which is

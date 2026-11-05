@@ -12,8 +12,8 @@ import (
 // `u` or `v`, and the two disagree:
 //
 //   - With one of those flags, ECMAScript folds by Unicode's simple case
-//     folding, so `k`, `K` and U+212A KELVIN SIGN are one character, as are
-//     `s`, `S` and U+017F LATIN SMALL LETTER LONG S.
+//     folding, so `k`, `K` and `U+212A KELVIN SIGN` are one character, as are
+//     `s`, `S` and `U+017F LATIN SMALL LETTER LONG S`.
 //   - Without, ECMAScript uppercases the character, with the one rule that a
 //     character outside ASCII never canonicalizes into ASCII. That splits the
 //     two groups above back apart, while leaving U+03A3 Σ, U+03C3 σ and
@@ -117,7 +117,7 @@ func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 	}
 	// Every character that canonicalizes onto another one has a case mapping,
 	// so the case ranges name them all. Folding reaches further than
-	// the uppercase mapping does, though — U+212A KELVIN SIGN joins `k` and
+	// the uppercase mapping does, though — `U+212A KELVIN SIGN` joins `k` and
 	// `K` without any of the three having the other as its uppercase — so each
 	// orbit is walked out rather than assumed to be a pair.
 	for _, caseRange := range unicode.CaseRanges {

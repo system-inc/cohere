@@ -25,13 +25,13 @@ import "github.com/system-inc/cohere/static_single_assignment"
 
 // AliasingEffectKind is what one effect does. These are React's `AliasingEffect` variants.
 //
-// This is the real output type of the effect inference and it is NOT `Effect`. See cohere's
-// effects.go: the two are different types, this one carries FROM and INTO places, and the scalar
+// This is the real output type of the effect inference and it is not `Effect`. See cohere's
+// effects.go: the two are different types, this one carries from and into places, and the scalar
 // `Effect` is a per-operand projection of a whole list of these, computed later from the ranges.
 //
 // The declaration order carries no meaning and there is no join over it. Unlike `ValueKind`, which
 // `immutability.go` merges with a real lattice operation, these are not merged at all: an
-// instruction produces a LIST of effects and they are all applied in order. A pass that tried to
+// instruction produces a list of effects and they are all applied in order. A pass that tried to
 // reduce the list to one element would lose the from/into pairing that is the entire content.
 type AliasingEffectKind uint8
 
@@ -57,7 +57,7 @@ const (
 	AliasingEffectMutateConditionally
 	// AliasingEffectMutateTransitive mutates the value and everything it transitively captured.
 	AliasingEffectMutateTransitive
-	// AliasingEffectMutateTransitiveConditionally is the conditional form, and is the DEFAULT
+	// AliasingEffectMutateTransitiveConditionally is the conditional form, and is the default
 	// applied to every operand of a call with no known signature.
 	AliasingEffectMutateTransitiveConditionally
 	// AliasingEffectFreeze marks the value and its direct aliases as frozen.
@@ -172,7 +172,7 @@ func MutationEffect[P any](kind AliasingEffectKind, value P) AliasingEffect[P] {
 
 // EffectValueKind is the abstract kind a Create effect produces.
 //
-// This is upstream's `ValueKind` and it is deliberately NOT the same type as the six-element
+// This is upstream's `ValueKind` and it is deliberately not the same type as the six-element
 // lattice cohere's `immutability.go` builds for itself. That rule's lattice is a private type with a
 // join (`immutabilityMergeKinds`) tuned to what it reports; this kind also feeds the range graph's
 // phi refinement. Sharing one type across the two would couple a rule's message selection to a

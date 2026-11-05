@@ -1,6 +1,6 @@
 package control_flow_graph
 
-// This file is a LOCAL ADDITION, not vendored. See the change list in cfg.go's header.
+// This file is a local addition, not vendored. See the change list in cfg.go's header.
 //
 // It is the monotone dataflow framework the graph never had. `no-useless-assignment` wrote its own
 // lattice, meet, and transfer inline and unexported inside `package core`, and two class rules
@@ -22,11 +22,11 @@ const (
 // Solution is the settled boundary values of one dataflow, indexed by Block.Index.
 type Solution[V any, E any] struct {
 
-	// entry[i] is the value flowing INTO block i in the analysis's own direction: on entry to the
+	// entry[i] is the value flowing into block i in the analysis's own direction: on entry to the
 	// block for a Forward analysis, on exit from it for a Backward one.
 	entry []V
 
-	// exit[i] is the value flowing OUT of block i in the analysis's own direction, which is
+	// exit[i] is the value flowing out of block i in the analysis's own direction, which is
 	// Transfer applied to entry[i].
 	exit []V
 
@@ -58,14 +58,14 @@ const maximumRounds = 10000
 // must be monotone: a higher input never produces a lower output. Together those are what make the
 // fixed point exist and be unique, and `Solve` cannot check any of them.
 //
-// What it CAN check is termination, and it does. A lattice whose values keep changing forever — the
+// What it can check is termination, and it does. A lattice whose values keep changing forever — the
 // usual causes are a Meet that is not idempotent, or an Equal comparing pointers where it should
 // compare contents — would make `Solve` iterate without end, so `Solve` bounds its rounds and
 // panics instead. A linter that stops and says why is debuggable; one that spins on one file in a
 // build is not. The bound is stated at `maximumRounds`.
 type LatticeOf[V any, E any] interface {
 	// Bottom is the value a block starts at before anything has flowed into it. For a "must"
-	// analysis whose meet is intersection this is the TOP of the lattice rather than its bottom,
+	// analysis whose meet is intersection this is the top of the lattice rather than its bottom,
 	// which is the standard confusion; what the framework needs is only that it is the identity for
 	// Meet, so meeting it with anything yields that thing.
 	Bottom() V
@@ -101,7 +101,7 @@ type LatticeOf[V any, E any] interface {
 // # Why this exists rather than each analysis writing its own loop
 //
 // `no-useless-assignment` wrote one, and its own doc comment names two things it settled for: it
-// iterates blocks by DESCENDING INDEX rather than reverse postorder, and it rebuilds each block's
+// iterates blocks by descending index rather than reverse postorder, and it rebuilds each block's
 // successor union from scratch every round. Both are consequences of the graph not exposing an
 // order or predecessor edges, and both are fixed here for every consumer at once rather than in
 // one rule.
@@ -174,7 +174,7 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 		//
 		// It does. Probed over `try { return 1; } finally {}`, the same with a `throw`, the same
 		// with a conditional return, a generator yielding inside a `try`, `try/catch/finally` with a
-		// return, and `for (;;)`, and every one reports ZERO reachable terminal blocks outside
+		// return, and `for (;;)`, and every one reports zero reachable terminal blocks outside
 		// FinalBlocks ∪ ThrownBlocks. `markFinal`/`markThrown` are called on the abrupt-path copy,
 		// which is what puts it in.
 		//

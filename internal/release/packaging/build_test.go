@@ -150,7 +150,7 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(test *testing.T) {
 	writeFile(test, filepath.Join(directory, "go.mod"), "module magiccheck\n\ngo 1.27\n")
 	writeFile(test, filepath.Join(directory, "main.go"), "package main\n\nfunc main() {}\n")
 
-	// One architecture per operating system: the magic is keyed by GOOS, and this asserts exactly
+	// One architecture per operating system: the magic is keyed by `GOOS`, and this asserts exactly
 	// that scope rather than implying it covers architecture too.
 	for _, target := range []Target{
 		{GoOperatingSystem: "darwin", GoArchitecture: "arm64"},

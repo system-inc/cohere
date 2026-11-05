@@ -52,7 +52,7 @@ func invokedFor(test *testing.T, source string) (*Function, AssumedInvokedFuncti
 //
 // # The arms overlap in this lowering, measured rather than assumed
 //
-// A mutation sweep removing any SINGLE arm leaves every case below passing, which reads as three
+// A mutation sweep removing any single arm leaves every case below passing, which reads as three
 // dead arms. It is not: removing the whole of `collectInvocations` fails all four positive cases, so
 // each is genuinely detected. What the sweep actually shows is that this lowering routes one source
 // shape through several arms -- `callback()` reaches the hook-argument arm as well as the direct-call
@@ -94,7 +94,7 @@ func TestAssumedInvokedFunctionsRecognisesEachCallShape(test *testing.T) {
 			want: 1,
 		},
 		{
-			// The callback reaches the hook as an argument and is NOT returned, so the hook arm is
+			// The callback reaches the hook as an argument and is not returned, so the hook arm is
 			// the only one that can admit it. Measured: a mutation removing that arm survives the
 			// `useMemo` case above, because there the callback is also the returned value.
 			name: "an argument to a hook, where nothing else could admit it",

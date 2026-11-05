@@ -36,7 +36,7 @@ import (
 // that no helper is called that way, any rule that reaches an interface method taking an *ast.Node fails:
 // a future visitor-style helper turns this red instead of blind.
 //
-// It reads the overlay GOFLAGS names, if any (guardOverlay), never the one `go test -overlay` names.
+// It reads the overlay `GOFLAGS` names, if any (guardOverlay), never the one `go test -overlay` names.
 func TestRulesClaimShapesOnlyWhereTheScanAllowsIt(test *testing.T) {
 	test.Parallel()
 

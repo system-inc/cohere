@@ -74,7 +74,7 @@ const (
 //
 // # The kind switch is load-bearing rather than defensive
 //
-// `Node.Text()` PANICS on a `KindComputedPropertyName` rather than returning empty, so a caller that
+// `Node.Text()` panics on a `KindComputedPropertyName` rather than returning empty, so a caller that
 // read the text first and filtered afterwards crashes the linter on `{[children]: 1}`. That is not
 // hypothetical: a probe written before `no-children-prop` existed hit exactly that panic, and three
 // of the six lifted implementations had no guard against it because their callers never met the

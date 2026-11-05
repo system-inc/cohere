@@ -80,7 +80,7 @@ type Node struct {
 	// Type is a Scalar's style: BlockFolded, BlockLiteral, Plain, QuoteDouble, QuoteSingle, or "" for
 	// the empty scalar of a block scalar without a header.
 	Type string
-	// Format is a Scalar's number format from its tag: EXP, OCT, HEX, BIN or TIME.
+	// Format is a Scalar's number format from its tag: `EXP`, `OCT`, HEX, `BIN` or `TIME`.
 	Format string
 	// MinFractionDigits is set by the float tags for a value written with trailing zeros, 1.50.
 	MinFractionDigits int

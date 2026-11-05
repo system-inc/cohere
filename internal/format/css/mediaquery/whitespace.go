@@ -7,7 +7,7 @@ import (
 
 // The library's whitespace is JavaScript's: the regular expression class \s, and String.prototype.trim,
 // which strip the same set (ECMAScript WhiteSpace and LineTerminator). It is not Go's unicode.IsSpace,
-// which takes U+0085 and leaves out U+FEFF. Every member is in the Basic Multilingual Plane, so one
+// which takes `U+0085` and leaves out `U+FEFF`. Every member is in the Basic Multilingual Plane, so one
 // UTF-16 unit in JavaScript is one rune here and testing runes answers as the library's unit tests do.
 
 // isWhitespace is `character.search(/\s/) !== -1` for one character.

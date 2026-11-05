@@ -1,4 +1,4 @@
-// Command notices writes NOTICE and THIRD_PARTY_NOTICES.md at the module root, from cohere's build graph
+// Command notices writes `NOTICE` and THIRD_PARTY_NOTICES.md at the module root, from cohere's build graph
 // and the curated upstreams in internal/release/notices.
 //
 //	go run ./internal/release/tools/notices

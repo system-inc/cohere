@@ -61,8 +61,8 @@
 // nothing on the path calls them (prettyToken only logs under LOG_TOKENS, which is not ported either).
 package cst
 
-// The control characters the lexer emits besides slices of the input, upstream's BOM, DOCUMENT, FLOW_END
-// and SCALAR.
+// The control characters the lexer emits besides slices of the input, upstream's `BOM`, `DOCUMENT`, `FLOW_END`
+// and `SCALAR`.
 const (
 	// BOM is the byte order mark.
 	BOM uint16 = 0xFEFF

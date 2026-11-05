@@ -77,7 +77,7 @@ func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should sto
 	}
 }
 
-// SUPER DIRTY HACK FOR OPTIONAL FIELDS :(
+// Super dirty hack for optional fields :(
 func Ref[T any](a T) *T {
 	return &a
 }

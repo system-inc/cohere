@@ -31,7 +31,7 @@ func committed(test *testing.T, name string) string {
 }
 
 // TestTheCommittedNoticesAreCurrent regenerates both files and requires the committed ones to match. It
-// is what fails when a dependency moves, the compiler's NOTICE.txt changes, the Swift engine resolves a
+// is what fails when a dependency moves, the compiler's `NOTICE.txt` changes, the Swift engine resolves a
 // new package or the curated list is edited, and the fix is always the same command.
 func TestTheCommittedNoticesAreCurrent(test *testing.T) {
 	test.Parallel()
@@ -48,7 +48,7 @@ func TestTheCommittedNoticesAreCurrent(test *testing.T) {
 			)
 		}
 		// The repository stores text as LF, so a CR written here is converted on commit, and the next
-		// clone fails the comparison above on bytes nobody changed. Microsoft's NOTICE.txt is CRLF.
+		// clone fails the comparison above on bytes nobody changed. Microsoft's `NOTICE.txt` is CRLF.
 		if bytes.ContainsRune(generated, '\r') {
 			test.Errorf("%s is generated with a carriage return, which git would convert to LF on commit", name)
 		}
@@ -233,7 +233,7 @@ func TestEveryLicenseTextIsUsedAndEveryReferenceExists(test *testing.T) {
 
 // TestNoGPLFileIsTracked holds the copyleft check the license survey came back clean on. git's own test
 // corpus, which is GPL, is read at test time from COHERE_GIT_SOURCE and must never be committed, and
-// nothing else GPL may be either. A tracked file holding a GNU license's title fails here by name.
+// nothing else GPL may be either. A tracked file holding a `GNU` license's title fails here by name.
 func TestNoGPLFileIsTracked(test *testing.T) {
 	test.Parallel()
 

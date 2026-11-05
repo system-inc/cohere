@@ -23,11 +23,11 @@ import (
 //	                              bytes, and parsing before writing turns that into a refusal
 //	                              instead of a corrupted file.
 //
-// The parse guard is necessary and NOT sufficient, and this is the one place in the tool where that
+// The parse guard is necessary and not sufficient, and this is the one place in the tool where that
 // gap is the whole risk rather than a footnote. `internal/rule/rule.go` states it exactly: anything
 // sayable in valid syntax about a name that no longer exists slips through, so a rename that
 // updates a usage and misses its declaration produces a file that parses and does not compile. That
-// is why every correctness question here is answered BEFORE this function, from the type graph, and
+// is why every correctness question here is answered before this function, from the type graph, and
 // why this function's job is only to refuse the mechanical failures.
 func Apply(plan *Plan) (int, error) {
 	if len(plan.Refusals) > 0 {
@@ -42,7 +42,7 @@ func Apply(plan *Plan) (int, error) {
 		byFile[edit.FileName] = append(byFile[edit.FileName], edit)
 	}
 
-	// Every file is rewritten in memory and checked before ANY file is written, so a plan that would
+	// Every file is rewritten in memory and checked before any file is written, so a plan that would
 	// corrupt its ninth file does not leave the first eight rewritten. A rename is one act and a
 	// partial one is the failure mode this whole verb exists to prevent.
 	rewritten := map[string]string{}
@@ -57,14 +57,14 @@ func Apply(plan *Plan) (int, error) {
 			return edits[first].Range.Pos() < edits[second].Range.Pos()
 		})
 
-		// This guard is SUBSUMED by the `edit.Range.Pos() < previous` bounds check in the apply loop
+		// This guard is subsumed by the `edit.Range.Pos() < previous` bounds check in the apply loop
 		// below, and it is kept anyway. Both facts are measured rather than assumed.
 		//
 		// A mutation disabling this condition survived the suite twice, including after a fixture was
 		// written specifically to kill it. The fixture passed both times because the overlapping input
 		// is rejected either way: with this guard gone, the second edit's Pos is still less than
 		// `previous`, so the loop below refuses it one step later with a different message. Enumerating
-		// every ordered pair of ranges over a twelve-position alphabet — 20,736 pairs — found ZERO
+		// every ordered pair of ranges over a twelve-position alphabet — 20,736 pairs — found zero
 		// inputs where the two conditions disagree about accepting or rejecting.
 		//
 		// So this cannot be pinned by a fixture and never will be, which is why there is no test

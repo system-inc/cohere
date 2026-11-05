@@ -389,7 +389,7 @@ func TestContextStoreReusesItsDefinition(test *testing.T) {
 // TestExceptionalEdgeIsAnEdge: MayThrow's handler is reached by an exceptional edge, which is a real
 // predecessor today, so the handler's read resolves through it.
 //
-// It resolves to the block's END: x$2, written by the throwing instruction itself, which never
+// It resolves to the block's end: x$2, written by the throwing instruction itself, which never
 // completed when the handler runs. That is #2yz9ra9. Its fix belongs in valueFromPredecessor, where
 // every lookup across an edge now goes, and flips the want below to the write before the throw.
 func TestExceptionalEdgeIsAnEdge(test *testing.T) {

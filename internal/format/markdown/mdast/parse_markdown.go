@@ -149,7 +149,7 @@ func replaceNonLineBreaksWithSpace(text string) string {
 }
 
 // trimJavaScriptWhitespace is String#trim, whose whitespace is ECMAScript's WhiteSpace and
-// LineTerminator: Go's TrimSpace differs on U+FEFF (JavaScript trims it) and U+0085 (Go trims it).
+// LineTerminator: Go's TrimSpace differs on `U+FEFF` (JavaScript trims it) and `U+0085` (Go trims it).
 func trimJavaScriptWhitespace(text string) string {
 	return strings.TrimFunc(text, ecmascripttext.IsWhitespace)
 }

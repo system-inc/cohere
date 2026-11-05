@@ -116,7 +116,7 @@ var formatFixtures = []string{
 	"[a]:\n  b\n  \"c\"",
 	"[a\\]b]: c\n\n[a\\]b]",
 	"[*a* b]\n\n[*a* b]: c",
-	// Headings, setext and ATX.
+	// Headings, setext and `ATX`.
 	"# a",
 	"# a #",
 	"a\n=",

@@ -103,7 +103,7 @@ func TestAgainstTheLiveConfig(test *testing.T) {
 // forty, and this is what shows it: the config is loaded as written, then loaded again with every
 // plugin-default line stripped, and the two results are compared rule by rule.
 //
-// Without this the removal IS the change, and a silent disagreement between the two paths looks
+// Without this the removal is the change, and a silent disagreement between the two paths looks
 // exactly like a successful migration.
 //
 // # This guard was vacuous once, and the reason generalises
@@ -119,7 +119,7 @@ func TestAgainstTheLiveConfig(test *testing.T) {
 //
 // # The severity difference, which is real and is the reason nothing is being removed yet
 //
-// The two paths agree on WHICH rules run and disagree on how loudly. The hand-written lines say
+// The two paths agree on which rules run and disagree on how loudly. The hand-written lines say
 // `error`; `warn_correctness` contributes `warn`, and the inventory records all forty as `warn`.
 // So the hand-written lines are not reproducing the gate's behaviour, they are strengthening it --
 // forty rules currently fail this build that only warn in the tool being replaced.
@@ -142,7 +142,7 @@ func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
 			len(fromPlugins), len(PluginDefaultRules))
 	}
 
-	// Read what the FILE names rather than what `Load` returned. `Load` merges the plugin defaults
+	// Read what the file names rather than what `Load` returned. `Load` merges the plugin defaults
 	// into `Rules`, so a rule arriving only through the declaration is indistinguishable there from
 	// one named by hand -- which is exactly the distinction this test exists to measure. Reading the
 	// merged map made this guard pass on a config with three lines deliberately removed.
@@ -223,7 +223,7 @@ func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
 
 // ruleNamesInContents is the same read, over bytes rather than a path.
 //
-// Split out so the guard above can be exercised against a modified config WITHOUT writing one. That
+// Split out so the guard above can be exercised against a modified config without writing one. That
 // matters more than it looks: the config this guards is untracked and shared, so any check needing a
 // mutated copy on disk would have to mutate the artifact it guards, or write one somewhere and hope
 // the two stay comparable.

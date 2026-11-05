@@ -363,7 +363,7 @@ func parseRegexCharacterClass(
 				out = append(out, el)
 				pendingIndex = len(out) - 1
 				// Under non-u/v mode, a raw astral character or a `\u{H}` with H>0xFFFF
-				// should emit TWO units. But class escapes only produce 1 unit per call;
+				// should emit two units. But class escapes only produce 1 unit per call;
 				// astral raw chars are handled in the `default` case below, and `\u{H}`
 				// under u/v produces the combined code point (one element). Under non-u,
 				// `\u{H}` is not recognized at all (treated as identity `u`).
@@ -436,7 +436,7 @@ func parseRegexCharacterClass(
 			if el.Kind == RegexCharSingle {
 				out = append(out, el)
 				pendingIndex = len(out) - 1
-				// Note: we do NOT split raw astrals into surrogate pairs here
+				// Note: we do not split raw astrals into surrogate pairs here
 				// — callers (e.g. the misleading-character-class rule) decide
 				// per-flag whether to expand them, based on the rule's own
 				// semantic needs. See IsLoneSurrogate on the element.
@@ -598,11 +598,11 @@ func readClassEscape(pattern string, i int, flags RegexFlags) (RegexCharElement,
 
 // readRawClassChar reads a non-`\`-prefixed character inside a class body
 // (i.e. a raw character at pattern[i]). Raw astral in non-u/v mode emits
-// the HIGH surrogate only — callers handle the low-surrogate companion by
+// the high surrogate only — callers handle the low-surrogate companion by
 // inspecting IsLoneSurrogate and stepping via a subsequent call.
 //
 // To keep the protocol simple, ParseRegexCharacterClass calls this once and
-// trusts the single element returned; we do NOT split raw astrals here. The
+// trusts the single element returned; we do not split raw astrals here. The
 // misleading-character-class rule accepts this because it gets raw astrals
 // only in string-literal contexts, where the layer-3 parser already does the
 // UTF-16 surrogate split.

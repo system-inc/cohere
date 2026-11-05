@@ -20,7 +20,7 @@ import (
 // `preserve-manual-memoization` compares what the compiler inferred as a scope's dependencies
 // against what the developer wrote in the memo block enclosing it. That comparison can only run on a
 // scope the walk reaches while the block is still open. A scope carrying dependencies that closes
-// OUTSIDE the marker pair is invisible to the rule no matter how correct the comparison is.
+// outside the marker pair is invisible to the rule no matter how correct the comparison is.
 //
 // Tracing one fixture by hand says whether that happened once. It cannot say whether the shape is
 // the common case or an idiosyncrasy of three fixtures, and that distinction decides whether the
@@ -41,7 +41,7 @@ import (
 //	emptyInside           those with none                              <- reachable but nothing to say
 //	carryingOutsideAfter  dependency-carrying scopes closing after `FinishMemoize`
 //
-// `carryingOutsideAfter` is deliberately NOT a defect count on its own, which took a wrong draft to
+// `carryingOutsideAfter` is deliberately not a defect count on its own, which took a wrong draft to
 // learn. The JSX consuming a memoized value legitimately closes after the block and legitimately
 // depends on it: `<button onClick={onClick} />` is a scope carrying `onClick`, outside the block,
 // and correct. Counting those as misplaced reported 3 of 4 fixtures broken when none of them were.
@@ -147,7 +147,7 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(test *testing.T) {
 	// dependency they carried was a value React guarantees is identity-stable -- a `useTransition`
 	// start function, a `useState` setter, a `useOptimistic` setter.
 	//
-	// An empty block is the RIGHT answer for those, and upstream's own output says so: both
+	// An empty block is the right answer for those, and upstream's own output says so: both
 	// `preserve-use-memo-transition.ts` and `preserve-use-callback-stable-built-ins.ts` compile to
 	// `if ($[0] === Symbol.for("react.memo_cache_sentinel"))`, which is the marker for a value
 	// memoized once with no dependencies at all. Neither expects an error.
@@ -173,7 +173,7 @@ func TestMemoBlockScopeRelationshipAcrossCorpus(test *testing.T) {
 	//
 	// Upstream carries zero scopes inside that memo block. Read at the same stage, its output is
 	// two scopes -- `SCOPE 1 decls=[52]` and `SCOPE 3 decls=[65]` -- with the memo markers sitting
-	// INSIDE scope 1 rather than wrapping a scope of their own, so there is no scope between them
+	// inside scope 1 rather than wrapping a scope of their own, so there is no scope between them
 	// to carry anything. Our widening produces that same shape.
 	//
 	// So this is the third lowering for the reason the paragraph above already records twice: the
@@ -364,7 +364,7 @@ func (observer *memoBlockObserver) walk(block ReactiveBlock) {
 
 		case *ReactiveScopeBlock:
 			observer.walk(shape.Instructions)
-			// Counted on scope EXIT, which is where the validator runs its comparison. A scope that
+			// Counted on scope exit, which is where the validator runs its comparison. A scope that
 			// opened inside a block and closes after it is not comparable, so open-time membership
 			// would count a population the rule cannot act on.
 			carrying := len(observer.dependencies.DependenciesOf(shape.Scope)) > 0

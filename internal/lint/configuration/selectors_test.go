@@ -8,7 +8,7 @@ import (
 // TestZeroMatchOverrideSelectorIsRefused is the failure this guard exists to expose.
 //
 // The valid selector beside the miss is load-bearing: a validator that checks the files array as a
-// single OR would see modules/** match and let the stale generated-code selector remain silent.
+// single or would see modules/** match and let the stale generated-code selector remain silent.
 func TestZeroMatchOverrideSelectorIsRefused(test *testing.T) {
 	test.Parallel()
 	configuration := &Config{

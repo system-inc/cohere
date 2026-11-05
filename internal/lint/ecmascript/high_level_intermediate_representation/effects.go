@@ -11,12 +11,12 @@
 // same table is what a rule needs to say that an object crossed an async boundary and was then
 // mutated, that a `readonly` was violated by a callee, or that a `const` is lying.
 //
-// # `Place.Effect` is NOT the output of this pass, and that is measured rather than argued
+// # `Place.Effect` is not the output of this pass, and that is measured rather than argued
 //
 // The task that commissioned this named `Place.Effect` as the thing to fill, and the `Effect` doc
-// comment in high_level_intermediate_representation.go warns at length that `Effect` is an OUTPUT of an abstract
+// comment in high_level_intermediate_representation.go warns at length that `Effect` is an output of an abstract
 // interpretation rather than a lattice to join over. Both are right about the second half and the first half is wrong
-// about WHICH pass writes it, so it is worth stating exactly, because the whole shape of this file
+// about which pass writes it, so it is worth stating exactly, because the whole shape of this file
 // follows from it.
 //
 // Every write to a `Place.effect` field in the entire oxc compiler crate, enumerated with
@@ -26,9 +26,9 @@
 //	infer_mutation_aliasing_ranges.rs   12 writes    the real assignment of every effect
 //	analyse_functions.rs                 2 writes    seeding a nested function's context operands
 //
-// So the 3,297-line pass this file ports writes `Place.Effect` exactly ONCE, and that one write is
+// So the 3,297-line pass this file ports writes `Place.Effect` exactly once, and that one write is
 // a correction (`Capture` downgraded to `Read` when the captured value turns out to be primitive,
-// frozen or global). The twelve real writes are in the RANGES pass, which is Stage 2, and they are
+// frozen or global). The twelve real writes are in the ranges pass, which is Stage 2, and they are
 // a projection: `operand_effects` is a `map[IdentifierId]Effect` built in one 40-line match over
 // the `AliasingEffect` list this pass produced, then splatted onto every operand of the
 // instruction. `infer_mutation_aliasing_ranges.rs:856-901` is the whole mapping.
@@ -41,7 +41,7 @@
 // `Effect` cannot be computed without `AliasingEffect`, and the arrow runs one way. That is why
 // this file produces `AliasingEffects` and exposes `ProjectEffects` for the scalar rather than
 // writing `Place.Effect` directly: writing the scalar here would reproduce neither implementation,
-// and would in particular write it BEFORE mutable ranges exist, which is the one input the
+// and would in particular write it before mutable ranges exist, which is the one input the
 // projection actually reads (`mutable_range.end > eval_order` decides Capture against Read on every
 // aliasing edge).
 //
@@ -54,7 +54,7 @@
 // `Effect` values enter the compiler from exactly one place: a hardcoded global signature table at
 // `react_compiler_hir/globals.rs`, 1,828 lines, holding 122 `Effect::` literals across 31
 // `positional_params` entries. Nothing infers an `Effect` from a callee's body for any callee that
-// is not a local function expression. `compute_effects_for_legacy_signature` READS
+// is not a local function expression. `compute_effects_for_legacy_signature` reads
 // `signature.positional_params[i]` and `signature.callee_effect`; it does not compute them.
 //
 // Measured against React's own executable, with a passing control and a two-sided split, one probe
@@ -77,8 +77,8 @@
 // it is the absence of an entry. A port that "improved" on this by reasoning about what the methods
 // really do would disagree with React on ordinary code.
 //
-// So the table is not an optimization in front of an inference engine. It IS the source of every
-// effect, and the inference engine's job is to PROPAGATE those seeded facts through aliasing,
+// So the table is not an optimization in front of an inference engine. It is the source of every
+// effect, and the inference engine's job is to propagate those seeded facts through aliasing,
 // capture and control flow.
 //
 // # What fraction of real calls hit a signature, measured on Kirk's tree
@@ -94,13 +94,13 @@
 //
 // Two-sided, and the control for the zero is the same probe reporting 88,089 named sites against
 // 791 anonymous ones, so a zero would have been a real absence rather than a filter that could not
-// match. The first run of that probe DID report a false zero -- `CALLEE_distinct 0` against
+// match. The first run of that probe did report a false zero -- `CALLEE_distinct 0` against
 // `calleeNamed 57,446` -- because a plain call's callee is a nameless temporary in this
 // representation and the name has to be recovered from the syntax. That is recorded because it is
 // the shape of a wrong measurement that looks like a finding.
 //
 // 57 distinct names cover 30.8% of all calls. The remaining 69.2% get the default, and the default
-// is NOT "no effect": it is `Create{Mutable}` on the result plus, for every operand,
+// is not "no effect": it is `Create{Mutable}` on the result plus, for every operand,
 // `MutateTransitiveConditionally` + `MaybeAlias` into the result + `Capture` into every other
 // operand (`infer_mutation_aliasing_effects.rs:1823-1892`). An unknown call is assumed to mutate
 // and capture everything handed to it. That is the conservative direction and it is why the table's
@@ -109,7 +109,7 @@
 // # The interprocedural half exists and is narrower than its name suggests
 //
 // There is real inference for locally-defined callees, at `infer_mutation_aliasing_effects.rs:1716`:
-// if the callee identifier `state.is_defined` and resolves to exactly ONE value which is a known
+// if the callee identifier `state.is_defined` and resolves to exactly one value which is a known
 // function expression, its own inferred effects are instantiated at the call site. Measured against
 // React's executable, this is much narrower than "interprocedural analysis" suggests, and the
 // asymmetry is sharp enough to be worth pinning:
@@ -121,16 +121,16 @@
 //	const o={a:0}; useFoo(o); const m=()=>{o.a=1;}; m();         REPORTS   closure capture, not a param
 //
 // Controls in the same batch: direct `props.a=1` reports, plain local mutation is clean. So effects
-// propagate out of a function expression through its CAPTURES (row 5) but not through its
-// PARAMETERS when the callee is reached by name (rows 2-4). Row 1 fires because the immediately
+// propagate out of a function expression through its captures (row 5) but not through its
+// parameters when the callee is reached by name (rows 2-4). Row 1 fires because the immediately
 // invoked arrow is its own callee value at the call site with no binding in between.
 //
-// That last distinction is the whole of the interprocedural half, and it is NOT implemented here.
+// That last distinction is the whole of the interprocedural half, and it is not implemented here.
 // See `EffectGapInterproceduralParameters` for why and what it costs.
 //
 // # What this pass computes, and the two-sided count on the real tree
 //
-// Everything upstream derives from the instruction SHAPE, plus the signature table, plus the
+// Everything upstream derives from the instruction shape, plus the signature table, plus the
 // conservative default. That is the majority of the 3,297 lines and it is all of the part that is
 // substrate rather than React.
 //
@@ -138,12 +138,12 @@
 //
 // `reactive.go` and `immutability.go` both carry a warning that convergence equality is not
 // identity equality and that a fixpoint comparing anything meaninglessly variable hangs silently.
-// That hazard does not arise in this file because this pass is NOT a fixpoint: upstream's
+// That hazard does not arise in this file because this pass is not a fixpoint: upstream's
 // `compute_signature_for_instruction` is a pure function of one instruction, and the fixpoint in
-// `infer_mutation_aliasing_effects.rs` is over the abstract STATE (`InferenceState`), which is the
+// `infer_mutation_aliasing_effects.rs` is over the abstract state (`InferenceState`), which is the
 // part `immutability.go` already implements for its own six-element lattice.
 //
-// This file computes the effect SIGNATURES, which upstream also computes without a fixpoint. That
+// This file computes the effect signatures, which upstream also computes without a fixpoint. That
 // split is upstream's own: `compute_signature_for_instruction` is called once per instruction and
 // its result is cached (`instruction_signature_cache`), while `apply_effect` runs inside the
 // worklist. Keeping the same split means this file has no convergence test to get wrong, and the
@@ -151,7 +151,7 @@
 //
 // # Nothing here reads phi operands
 //
-// This pass produces effects per INSTRUCTION and never walks a phi. Every place this file emits
+// This pass produces effects per instruction and never walks a phi. Every place this file emits
 // comes from an instruction's own operand list, which is a slice. `TestEffectsAreDeterministic`
 // runs the pass twice over the corpus and compares, so a later addition that brings in an order
 // varying between runs fails loudly.
@@ -209,16 +209,16 @@ type EffectGap uint8
 
 const (
 	// EffectGapInterproceduralParameters is an effect that would reach a call site from the body of
-	// a locally-defined callee reached BY NAME.
+	// a locally-defined callee reached by name.
 	//
 	// Upstream instantiates a function expression's own inferred effects at a call site when the
 	// callee identifier resolves to exactly one known function value
 	// (`infer_mutation_aliasing_effects.rs:1716-1764`). This pass does not, so a named local
 	// function that mutates its parameter is invisible.
 	//
-	// Measured against React's executable, this gap is NARROWER than it sounds, because React does
-	// not fire on those cases either: `function m(x){x.a=1;} m(frozenValue)` is CLEAN upstream, as
-	// is the `const m = (x) => {x.a=1;}` spelling. The cases where upstream DOES resolve a local
+	// Measured against React's executable, this gap is narrower than it sounds, because React does
+	// not fire on those cases either: `function m(x){x.a=1;} m(frozenValue)` is clean upstream, as
+	// is the `const m = (x) => {x.a=1;}` spelling. The cases where upstream does resolve a local
 	// callee and this does not are the immediately-invoked form and the deeper propagation the
 	// resolution feeds. So the observable cost of this gap on React's own diagnostics is small; the
 	// cost to a general consumer asking "does this callee mutate my argument" is total.
@@ -237,7 +237,7 @@ const (
 	// table, and 57 distinct names account for all of it.
 	EffectGapSignatureTable
 
-	// EffectGapTypeDirectedShapes is an effect upstream derives from a value's inferred SHAPE
+	// EffectGapTypeDirectedShapes is an effect upstream derives from a value's inferred shape
 	// rather than from the callee's name.
 	//
 	// Upstream's `Environment` carries a shape registry keyed by `TypeId`, so `props.items.push(x)`
@@ -276,7 +276,7 @@ func (gap EffectGap) String() string {
 // This is the shape of an entry in upstream's `globals.rs` table, reduced to the two fields that
 // carry every `Effect` literal in it: `callee_effect` and `positional_params`. The full upstream
 // struct also carries a return type, a return value kind, an impurity flag and an aliasing config;
-// those select the RESULT's kind rather than the operands' effects, and `immutabilityHookResultKind`
+// those select the result's kind rather than the operands' effects, and `immutabilityHookResultKind`
 // already covers the React-relevant half of that for the one rule that needs it.
 type effectSignature struct {
 	// Receiver is what calling this does to the object it is called on. Read for a pure method,
@@ -337,7 +337,7 @@ type aliasingSignatureEffect struct {
 
 // effectSignatures is the transcribed subset of upstream's global signature table.
 //
-// Transcribed from `react_compiler_hir/globals.rs` rather than invented, and deliberately a SUBSET
+// Transcribed from `react_compiler_hir/globals.rs` rather than invented, and deliberately a subset
 // rather than a guess at the whole: every entry here was read off a specific upstream
 // `MethodDef`/`FunctionDef`, and a name upstream carries that is not here falls to the conservative
 // default rather than to a made-up effect. `EffectGapSignatureTable` names that.
@@ -346,9 +346,9 @@ type aliasingSignatureEffect struct {
 // to bottom: these cover the mutating methods that actually appear. `push` alone is 2,202 call
 // sites, `set` 610, `add` and `pop` smaller. The read-only entries matter more than they look,
 // because without them a `map` or a `filter` falls to the default and is assumed to mutate its
-// receiver, which would make the table WORSE than empty for the most common calls in the tree.
+// receiver, which would make the table worse than empty for the most common calls in the tree.
 //
-// # This table is keyed by NAME and upstream keys by SHAPE
+// # This table is keyed by name and upstream keys by shape
 //
 // See `EffectGapTypeDirectedShapes`. A user-defined `push` on an unrelated class gets Array's
 // signature here and does not upstream. That is a real divergence and it is the same shape
@@ -359,8 +359,8 @@ type aliasingSignatureEffect struct {
 var effectSignatures = map[string]effectSignature{
 	// Array mutators. Every one of these carries Effect::Store as its callee_effect upstream, and
 	// the measured probe against React's executable confirms all four report a frozen-value
-	// mutation while the five array mutators ABSENT from upstream's table (sort, splice, shift,
-	// unshift, reverse) are all clean. Those five are deliberately NOT added here: adding them
+	// mutation while the five array mutators absent from upstream's table (sort, splice, shift,
+	// unshift, reverse) are all clean. Those five are deliberately not added here: adding them
 	// would be improving on upstream, which the brief names as a defect in a port.
 	"push": {Receiver: EffectStore, Rest: EffectCapture, HasRest: true, Result: mutation_aliasing.EffectValuePrimitive},
 	"pop":  {Receiver: EffectStore, Result: mutation_aliasing.EffectValueMutable},
@@ -461,10 +461,10 @@ var effectSignatures = map[string]effectSignature{
 
 // effectQualifiedMethods is the subset of upstream's table that only makes sense with a receiver.
 //
-// Keyed `Receiver.method`, and consulted BEFORE `effectSignatures`, because the bare-name table
+// Keyed `Receiver.method`, and consulted before `effectSignatures`, because the bare-name table
 // answers a different question for three of these names. `entries` is declared there as the Array
 // method, where the receiver is the collection being read and the call takes no arguments. On
-// `Object.entries(x)` the receiver is the `Object` global and the collection is a POSITIONAL
+// `Object.entries(x)` the receiver is the `Object` global and the collection is a positional
 // argument, so the bare-name lookup gives `x` no declared effect at all and the loop in
 // `effectsForCall` falls through to `EffectConditionallyMutate` for it.
 //
@@ -473,9 +473,9 @@ var effectSignatures = map[string]effectSignature{
 // meaning existing memoization couldn't be preserved."
 //
 // Transcribed from `HIR/Globals.ts:84-140` rather than reasoned about. Upstream keys its whole
-// registry by SHAPE, so a receiver named `Object` that is not the global resolves differently there
+// registry by shape, so a receiver named `Object` that is not the global resolves differently there
 // and identically here. That is `EffectGapTypeDirectedShapes` again, and the direction is the same:
-// this table applies a READ where the default applies a mutation, so a shadowed `Object` would be
+// this table applies a read where the default applies a mutation, so a shadowed `Object` would be
 // treated as less mutating than upstream treats it. Bounded by there being four entries, all on a
 // name that is a syntax error to declare as a local in strict-mode module scope.
 var effectQualifiedMethods = map[string]effectSignature{
@@ -494,7 +494,7 @@ var effectQualifiedMethods = map[string]effectSignature{
 			{Kind: mutation_aliasing.AliasingEffectImmutableCapture, From: aliasingParam0, Into: aliasingReturns},
 		},
 	},
-	// Effect.CAPTURE, `Globals.ts:177-183`, and not Read. The first spelling of this entry inferred
+	// `Effect.CAPTURE`, `Globals.ts:177-183`, and not Read. The first spelling of this entry inferred
 	// it from `keys` on the reasoning that the two are siblings returning an array, and that is
 	// wrong at the source: `values` returns the object's own values, so the result may alias them,
 	// exactly as `entries` does. `keys` returns fresh strings and captures nothing.
@@ -533,7 +533,7 @@ var effectQualifiedMethods = map[string]effectSignature{
 			{Kind: mutation_aliasing.AliasingEffectCapture, From: aliasingParam0, Into: aliasingReturns},
 		},
 	},
-	// Effect.ConditionallyMutate, `Globals.ts:98-113`. Upstream is deliberately WEAKER here than for
+	// Effect.ConditionallyMutate, `Globals.ts:98-113`. Upstream is deliberately weaker here than for
 	// the other three: `fromEntries` walks an iterable, and advancing an iterator can mutate it.
 	// Transcribed rather than strengthened to match its neighbours.
 	"Object.fromEntries": {
@@ -542,7 +542,7 @@ var effectQualifiedMethods = map[string]effectSignature{
 	},
 }
 
-// effectGlobalFunctions is the subset of upstream's global FUNCTION table, keyed by callee name.
+// effectGlobalFunctions is the subset of upstream's global function table, keyed by callee name.
 //
 // Separate from effectSignatures because these are reached as bare calls rather than as methods, so
 // there is no receiver to give an effect to. Upstream folds both into one `Global` registry; the
@@ -562,7 +562,7 @@ var effectGlobalFunctions = map[string]effectSignature{
 
 // InferAliasingEffects computes the aliasing effects of every instruction in function.
 //
-// Nested functions are NOT descended into: `Function.Functions` holds them and a caller that wants
+// Nested functions are not descended into: `Function.Functions` holds them and a caller that wants
 // their effects asks for each one. That matches `InferMutableRanges`, and it is what makes the
 // per-instruction result addressable, since InstructionIds are per-function and overlap between a
 // function and its children. `refs.go` measured that overlap as producing wrong findings rather
@@ -901,7 +901,7 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 	// --- JSX ---------------------------------------------------------------------------------
 
 	case *JsxExpression:
-		// Every value interpolated into JSX is FROZEN, which is the fact `immutability.go` reports
+		// Every value interpolated into JSX is frozen, which is the fact `immutability.go` reports
 		// on and the reason a value read by React cannot be written afterwards. This is the one
 		// React-flavoured effect in the set, and it generalises: Freeze means "must not be mutated
 		// past this point", which is also what a readonly type and Object.freeze mean.
@@ -1162,9 +1162,9 @@ func effectsForCall(
 
 // visitSignatureOperand is upstream's `visit` closure inside compute_effects_for_legacy_signature.
 //
-// It translates one scalar signature Effect into the AliasingEffect it implies. This is the ONE
+// It translates one scalar signature Effect into the AliasingEffect it implies. This is the one
 // place in this file where a scalar `Effect` is read rather than produced, and it reads it as an
-// INPUT off the signature table, which is exactly how upstream uses the type. See the package
+// input off the signature table, which is exactly how upstream uses the type. See the package
 // comment for why that direction matters.
 func visitSignatureOperand(
 	out []AliasingEffect,
@@ -1203,10 +1203,10 @@ func visitSignatureOperand(
 	return out
 }
 
-// effectsForUnknownCall is upstream's no-signature default, and it is NOT "no effect".
+// effectsForUnknownCall is upstream's no-signature default, and it is not "no effect".
 //
 // `infer_mutation_aliasing_effects.rs:1823-1892`. Every operand is conditionally mutated, maybe
-// aliases into the result, and captures into every OTHER operand. That last pairing is what makes
+// aliases into the result, and captures into every other operand. That last pairing is what makes
 // `foo(a, b)` record that `a` may now hold `b`, which is the escape half of the analysis.
 //
 // This is the path 69.2% of named call sites on Kirk's tree take, measured, so its shape matters
@@ -1230,7 +1230,7 @@ func effectsForUnknownCall(
 	}
 
 	for _, operand := range operands {
-		// Upstream compares by reference identity, so for a plain call where receiver IS the
+		// Upstream compares by reference identity, so for a plain call where receiver is the
 		// callee, both are skipped when the call does not mutate its function. Reproduced by
 		// comparing identifiers, which is the same decision in this representation because the two
 		// places are built from one identifier.
@@ -1348,7 +1348,7 @@ func receiverSyntaxName(instruction *Instruction) string {
 
 // calleeName recovers what the source calls this callee.
 //
-// A plain call's callee is a NAMELESS TEMPORARY in this representation, which is a substrate fact
+// A plain call's callee is a nameless temporary in this representation, which is a substrate fact
 // that cost a wrong measurement before it was noticed: a first probe reported zero distinct callee
 // names against 57,446 named call sites, which reads like a broken tally rather than like the
 // identifier space it actually is. So the value's own name is asked first and the syntax second.
@@ -1393,14 +1393,14 @@ func calleeSyntaxName(instruction *Instruction) string {
 // ProjectEffects computes the scalar `Effect` of every operand of one instruction.
 //
 // This is the bridge from this pass's real output to the `Place.Effect` field, and it is a faithful
-// port of `infer_mutation_aliasing_ranges.rs:856-901` -- which lives in the RANGES pass, not this
+// port of `infer_mutation_aliasing_ranges.rs:856-901` -- which lives in the ranges pass, not this
 // one. It is exposed here rather than there because the mapping is a property of the
 // `AliasingEffect` variants, which this file owns, and because a caller that has effects but no
 // ranges can still ask for the subset that does not depend on them.
 //
 // # It genuinely needs mutable ranges, and that is the reason Place.Effect is not written here
 //
-// The five aliasing variants all give the SOURCE either `EffectCapture` or `EffectRead`, and the
+// The five aliasing variants all give the source either `EffectCapture` or `EffectRead`, and the
 // discriminator is `env.identifiers[into.identifier].mutable_range.end > eval_order` -- whether the
 // target is still being written after this point. There is no way to answer that from the effect
 // list alone. Pass a nil `ranges` and every aliasing edge resolves to `EffectRead`, which is the
@@ -1408,7 +1408,7 @@ func calleeSyntaxName(instruction *Instruction) string {
 //
 // The direction of the error with nil ranges is stated because a consumer must know it: `EffectRead`
 // where upstream says `EffectCapture` means "not retained" where upstream says "retained", which
-// UNDER-reports escape. It never invents a capture upstream does not have.
+// under-reports escape. It never invents a capture upstream does not have.
 //
 // # This deliberately does not write into the graph
 //
@@ -1426,7 +1426,7 @@ func ProjectEffects(
 	for _, effect := range effects {
 		switch {
 		case effect.Kind.IsAliasing():
-			// Upstream sets BOTH sides here, and the target always gets Store regardless of the
+			// Upstream sets both sides here, and the target always gets Store regardless of the
 			// range test. Only the source's effect varies.
 			stillMutable := ranges != nil && ranges.Get(effect.Into.Identifier).End > order
 			if stillMutable {
@@ -1475,7 +1475,7 @@ func ProjectEffects(
 // at `:2580`. The caller then takes the legacy path, which is upstream's own fallback rather than a
 // softening of it.
 //
-// # What is NOT ported, and why it costs nothing here
+// # What is not ported, and why it costs nothing here
 //
 // Upstream also handles a rest parameter, spread arguments, signature temporaries, and a dynamic
 // context array for signatures built from function expressions. None of the transcribed entries uses
@@ -1548,11 +1548,11 @@ func effectsFromAliasingSignature(signature effectSignature, receiver Place, arg
 // declared function, we already know it's effects! We just have to substitute in the args for the
 // params".
 //
-// # This is the ONE consequence of that machinery, not the machinery
+// # This is the one consequence of that machinery, not the machinery
 //
 // The full port is a bottom-up effects pass plus a 194-line substitution engine, recorded as
 // `EffectGapInterproceduralParameters` and `#qgzpt6a`. What this does instead is answer one question
-// the whole corpus turns on: does an argument that IS a callback mutate the parameter it is handed?
+// the whole corpus turns on: does an argument that is a callback mutate the parameter it is handed?
 //
 // `values.map(value => { value.updated = true; })` is the shape. Upstream emits `Mutate` on a
 // temporary standing for the mapped element; this emits it on the receiver-adjacent argument the
@@ -1581,7 +1581,7 @@ func argumentMutationsFromCallbacks(function *Function, receiver Place,
 		if !mutatesOwnParameter(nested) {
 			continue
 		}
-		// A temporary standing for the element, created FROM the receiver and mutated.
+		// A temporary standing for the element, created from the receiver and mutated.
 		//
 		// Upstream's shape exactly, read off its own effect list for `values.map(cb)`:
 		//
@@ -1669,7 +1669,7 @@ func nestedFunctionHeldBy(function *Function, id static_single_assignment.Identi
 //
 // The capture half of `mutatesOwnParameter`, and the same shape: walk the function's own effects and
 // ask whether any mutation lands on something reachable from its `Context`. A function that only
-// READS its captures cannot invalidate them by being called, so calling it does not widen their
+// reads its captures cannot invalidate them by being called, so calling it does not widen their
 // ranges.
 func mutatesOwnCapture(nested *Function) bool {
 	if nested == nil || len(nested.Context) == 0 {

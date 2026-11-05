@@ -48,7 +48,7 @@ func (reachingNames) Equal(left, right map[string]bool) bool {
 	return true
 }
 
-// mustReachNames is the "must" counterpart: the names seen on EVERY path to this point. Meet is
+// mustReachNames is the "must" counterpart: the names seen on every path to this point. Meet is
 // intersection, so Bottom has to be the universe rather than the empty set, which is the case the
 // LatticeOf doc warns reads backward.
 type mustReachNames struct{ universe map[string]bool }
@@ -272,7 +272,7 @@ func TestBackwardAnalysis(test *testing.T) {
 			graph, locations := buildPathTestGraph(test, testCase.code)
 			solution := Solve[map[string]bool, string](graph, Backward, liveNames{})
 			block := locations[testCase.at][0]
-			// For a Backward analysis, In is the value on EXIT from the block: what is live after it.
+			// For a Backward analysis, In is the value on exit from the block: what is live after it.
 			outgoing, ok := solution.In(block)
 			if !ok {
 				test.Fatalf("block holding %q is not in the solution", testCase.at)
@@ -315,15 +315,15 @@ func TestSolveExcludesUnreachableBlocks(test *testing.T) {
 
 // TestSolveSeedsEveryTerminalBlockBackward pins the property `Solve`'s backward seeding rests on.
 //
-// `try { return 1; } finally { beta(); }` lays the `finally` out TWICE. One copy sits on the normal
-// path; the other sits on the abrupt path and is a TERMINAL block with no reachable successors. If
+// `try { return 1; } finally { beta(); }` lays the `finally` out twice. One copy sits on the normal
+// path; the other sits on the abrupt path and is a terminal block with no reachable successors. If
 // that copy were in neither FinalBlocks nor ThrownBlocks, a backward analysis seeding only from
 // those two sets would start it at Bottom rather than Entry and propagate a value nothing
 // established.
 //
-// Measured: it IS in an exit set, on this shape and on five others probed alongside it, so the
+// Measured: it is in an exit set, on this shape and on five others probed alongside it, so the
 // seeding is complete without a third clause. This asserts that rather than assuming it, because it
-// is a property of the BUILDER — if `markFinal`/`markThrown` ever stop being called on the abrupt
+// is a property of the builder — if `markFinal`/`markThrown` ever stop being called on the abrupt
 // copy, the gap opens silently in `Solve` and is named here instead.
 func TestSolveSeedsEveryTerminalBlockBackward(test *testing.T) {
 	test.Parallel()
@@ -386,15 +386,15 @@ func TestSolveSeedsEveryTerminalBlockBackward(test *testing.T) {
 }
 
 // TestSolveConvergesInFewRoundsOnAcyclicGraphs is the measurement that says the reverse-postorder
-// iteration is doing its job, in BOTH directions.
+// iteration is doing its job, in both directions.
 //
 // A forward analysis over an acyclic graph in reverse postorder settles in exactly two rounds: one
 // to propagate everything, one to observe nothing moved. A backward analysis over the same graph
-// settles in two rounds only if the order is reverse postorder REVERSED; walking it forward instead
+// settles in two rounds only if the order is reverse postorder reversed; walking it forward instead
 // still converges, because a fixed point does not depend on the order it is reached in, but it takes
 // an extra round per level of depth.
 //
-// The backward half is here because a mutation reversing that reversal SURVIVED every value
+// The backward half is here because a mutation reversing that reversal survived every value
 // assertion in this file. Measured: with the order un-reversed, `markBefore(); if (x) ... ` goes
 // 2 rounds to 3, `markBefore(); while (x) ...` goes 3 to 4, and a doubly-nested loop goes 4 to 6,
 // while the settled live sets are bit-for-bit identical in all three. The answer is genuinely

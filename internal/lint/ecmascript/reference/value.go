@@ -16,11 +16,11 @@ import (
 //
 // Two separate exclusions live here and both are load bearing.
 //
-// A TYPE POSITION is ESLint's `TYPE_NODES` check. Measured, its five ESTree kinds are three of ours:
+// A type position is ESLint's `TYPE_NODES` check. Measured, its five ESTree kinds are three of ours:
 // `KindTypeReference` covers a plain annotation, an `implements` clause and an `extends` clause
 // alike, `KindTypeQuery` is `typeof X`, and `KindQualifiedName` is `NS.Test`.
 //
-// A NAME THAT IS NOT A REFERENCE AT ALL: the declaration's own name, a property key, a member's
+// A name that is not a reference at all: the declaration's own name, a property key, a member's
 // property half, an import or export specifier, and a label, none of which is a reference to
 // anything. ESLint's clean `foo.bar` restricting `bar` is the case that states the member half, and
 // `import foo from 'bar'` restricting `foo` is the one that states the specifier.

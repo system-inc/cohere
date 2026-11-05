@@ -84,10 +84,10 @@ func unreachableInRoot(root *ast.Node) []Unreachable {
 	//
 	// # The duplicate-layout trap, measured on this substrate
 	//
-	// The CFG lays a `finally` block out TWICE — once for normal completion, once for the path that
+	// The CFG lays a `finally` block out twice — once for normal completion, once for the path that
 	// leaves the `try` through `return`, `throw`, or a suspended `yield`. Both copies carry the same
 	// source positions, and the second copy is unreachable exactly when nothing takes the abrupt
-	// path. So `try { return 1; } finally { beta(); }` puts `beta()` in a reachable block AND in an
+	// path. So `try { return 1; } finally { beta(); }` puts `beta()` in a reachable block and in an
 	// unreachable one, and a scan that reports any statement found in an unreachable block condemns
 	// a `finally` body that certainly runs.
 	//

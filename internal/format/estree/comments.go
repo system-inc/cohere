@@ -164,7 +164,7 @@ func lineTerminatorSize(text string, position int) int {
 }
 
 // whitespaceSize is the byte length of the JavaScript whitespace or line terminator at pos, or 0.
-// JavaScript's \s: the ASCII spaces, U+00A0, U+FEFF, the Unicode Zs category, and line terminators.
+// JavaScript's \s: the ASCII spaces, `U+00A0`, `U+FEFF`, the Unicode Zs category, and line terminators.
 func whitespaceSize(text string, position int) int {
 	character := text[position]
 	if character < utf8.RuneSelf {

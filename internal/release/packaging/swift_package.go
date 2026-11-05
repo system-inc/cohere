@@ -230,7 +230,7 @@ func readReleaseCommit(moduleDirectory string) (string, error) {
 
 // requireArchitecture refuses a binary that is not built for exactly architecture.
 //
-// The Go binary gets its architecture from GOARCH and cannot be wrong without failing to build. The
+// The Go binary gets its architecture from `GOARCH` and cannot be wrong without failing to build. The
 // Swift engine gets its from a separate `--arch` flag, so a package could carry an engine for the other
 // Mac, and on Apple silicon Rosetta would hide it.
 func requireArchitecture(path string, architecture string) error {

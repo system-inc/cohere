@@ -9,10 +9,10 @@ import (
 // `TestCopyNestedBodyLeavesTheNestedFunctionUntouched`, and it exists because that test's shape was
 // not enough.
 //
-// That test asserts over block REFERENCES. It caught a shared terminal pointer, which is real. But
+// That test asserts over block references. It caught a shared terminal pointer, which is real. But
 // the same aliasing existed one field over and it was invisible to a block-reference assertion:
 // `Instruction.Value` is an interface holding a pointer, the copy assigned it directly, and
-// `EachInstructionPlacePointer` then rewrote the operands of the NESTED function's instruction
+// `EachInstructionPlacePointer` then rewrote the operands of the nested function's instruction
 // rather than the copy's.
 //
 // Measured before the fix, on the fixture below: ten of nineteen places in the nested body had been
@@ -26,7 +26,7 @@ import (
 func TestCopyNestedBodyLeavesTheNestedFunctionsPlacesUntouched(test *testing.T) {
 	test.Parallel()
 
-	// The body must hold a value with a SLICE of places -- a method call's arguments here. A
+	// The body must hold a value with a slice of places -- a method call's arguments here. A
 	// one-level struct copy duplicates a slice header while both headers point at one backing
 	// array, so a body of only single-place values would be copied correctly by a shallow copier
 	// and this test would pass against the defect it exists to catch.

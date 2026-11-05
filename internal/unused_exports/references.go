@@ -66,7 +66,7 @@ type Report struct {
 	// told apart from a broken inventory.
 	DeclarationsAnalyzed int
 
-	// ClosurePasses is the longest chain THIS traversal followed, which is a lower bound on the
+	// ClosurePasses is the longest chain this traversal followed, which is a lower bound on the
 	// graph's depth rather than a property of it: a worklist reaches a symbol by whichever path it
 	// pops first, so the number moves between runs while the finding does not. Reported because a
 	// closure that stops at depth 1 on a real tree has failed to propagate, and that failure produces
@@ -76,7 +76,7 @@ type Report struct {
 
 // referenceIndex is the edge set: which declarations reference which symbols.
 //
-// It replaced a plain `map[*ast.Symbol]bool` that recorded only THAT a symbol was used. The walk is
+// It replaced a plain `map[*ast.Symbol]bool` that recorded only that a symbol was used. The walk is
 // identical and costs the same; what changed is what it stores. Recording the edge is what makes
 // the transitive question answerable, and the transitive question is the one that finds an island —
 // an abandoned export plus the private world that existed only to serve it.
@@ -91,7 +91,7 @@ type referenceIndex struct {
 	referenced map[*ast.Symbol]bool
 }
 
-// record adds one edge. A nil `from` means the reference sits at module top level, which is a ROOT
+// record adds one edge. A nil `from` means the reference sits at module top level, which is a root
 // and not an absent referrer — the distinction the whole closure turns on.
 func (index *referenceIndex) record(to *ast.Symbol, from *ast.Symbol) {
 	index.referenced[to] = true
@@ -103,7 +103,7 @@ func (index *referenceIndex) record(to *ast.Symbol, from *ast.Symbol) {
 //
 // # Why the walk stops where it does
 //
-// The set of kinds is the set of things that can THEMSELVES be dead. A reference inside an `if`
+// The set of kinds is the set of things that can themselves be dead. A reference inside an `if`
 // block belongs to the function containing the block, because deleting the function deletes the
 // reference; the block is not a unit anyone deletes on its own. Function, class, interface, type,
 // enum, variable, method, accessor, constructor, property, module and export-assignment are the
@@ -166,7 +166,7 @@ func enclosingDeclarationNode(node *ast.Node) *ast.Node {
 // second `GetSymbolAtLocation` on the declaration's name, with zero disagreements and zero nils from
 // the free path.
 //
-// The free path is also strictly BETTER on one shape. `export default arrow` produces an anonymous
+// The free path is also strictly better on one shape. `export default arrow` produces an anonymous
 // ExportAssignment with no name for `GetSymbolAtLocation` to be given, so the checker path returns
 // nil and drops the edge, while `node.Symbol()` returns the `default` symbol regardless. The cheaper
 // call is the more complete one, which is not the usual direction and is why it is written down.
@@ -215,7 +215,7 @@ func FindUnreferenced(
 	var inventory []declarationRecord
 	rootSymbols := map[*ast.Symbol]bool{}
 
-	// Pass one: every symbol that anything anywhere refers to, and WHO refers to it.
+	// Pass one: every symbol that anything anywhere refers to, and who refers to it.
 	//
 	// Built from identifier positions rather than from import statements, because a reference is a
 	// use wherever it appears — a call, a type position, a JSX tag, a re-export — and enumerating the
@@ -293,7 +293,7 @@ func FindUnreferenced(
 		fileUnusedExports := 0
 		var fileFindings []Unreferenced
 
-		// The closure needs EVERY declaration, not only the exported ones. The private helper that
+		// The closure needs every declaration, not only the exported ones. The private helper that
 		// existed to serve an abandoned export is the second half of an island, and a report that
 		// inventoried only exports could never find it.
 		if deep {

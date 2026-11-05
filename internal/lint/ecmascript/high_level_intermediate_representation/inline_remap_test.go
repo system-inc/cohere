@@ -4,7 +4,7 @@ package high_level_intermediate_representation
 //
 // Two properties are load-bearing and neither is incidental. The nested body branches, so it holds
 // more than one block and its terminals name blocks -- a single-block body has no reference a
-// skipped remap could leave stale. And the PARENT branches before it ever reaches the call, which
+// skipped remap could leave stale. And the parent branches before it ever reaches the call, which
 // pushes the parent's own block ids past the low numbers a freshly lowered nested body starts at.
 // Measured: with a straight-line parent, the two id spaces coincided exactly, so a mutation that
 // skipped the block remap left ids that were still inside the copied set and the test passed. The
@@ -47,7 +47,7 @@ func TestCopyNestedBodyLeavesNoUnresolvedReference(test *testing.T) {
 	identifiersBefore := len(parent.Identifiers)
 	blocksBefore := len(parent.Blocks)
 	// Every identifier the parent already owns. A copied instruction naming one of these that is
-	// NOT a capture means the remap was skipped and the id happened to be in range, which is the
+	// not a capture means the remap was skipped and the id happened to be in range, which is the
 	// failure an in-range check cannot see.
 	preexisting := map[static_single_assignment.IdentifierId]bool{}
 	for id := range parent.Identifiers {
@@ -116,7 +116,7 @@ func TestCopyNestedBodyLeavesNoUnresolvedReference(test *testing.T) {
 				return
 			}
 			// Holding the block is not enough. The parent's ids and the nested body's both start
-			// low, so a skipped remap leaves an id the parent happens to hold -- one of its OWN
+			// low, so a skipped remap leaves an id the parent happens to hold -- one of its own
 			// blocks, not the copied one. Measured: a mutation skipping the block remap survived an
 			// in-parent check entirely. Every reference out of a copied block must name a copied
 			// block, since the body is self-contained until the caller splices it.

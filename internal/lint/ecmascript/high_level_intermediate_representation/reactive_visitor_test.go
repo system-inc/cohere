@@ -24,7 +24,7 @@ import (
 // The first spelling of this test used `result.Instructions` as the denominator and failed at 10 of
 // 12 on the for-of case, which is exactly the residue `eachTerminalValue`'s comment already
 // describes. That was the test being wrong about the tree, not the walk being wrong about the tree.
-// The property that actually matters is stated instead: every `ReactiveInstruction` NODE in the
+// The property that actually matters is stated instead: every `ReactiveInstruction` node in the
 // tree is reached, counted by an independent walk rather than by the builder.
 func TestReactiveVisitorReachesEveryInstruction(test *testing.T) {
 	test.Parallel()
@@ -67,7 +67,7 @@ func TestReactiveVisitorReachesEveryInstruction(test *testing.T) {
 					"pass is blind wherever the walk does not go", nodes, walked)
 			}
 			// The builder's own count is higher by the collapsed value blocks described above. It is
-			// asserted as an upper bound rather than ignored, so a walk somehow reaching MORE nodes
+			// asserted as an upper bound rather than ignored, so a walk somehow reaching more nodes
 			// than exist would still fail.
 			if walked > result.Instructions {
 				test.Errorf("the walk reached %d instruction nodes but the builder measured only %d "+
@@ -123,7 +123,7 @@ func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(test *testing.T) {
 
 	// # Why the comparison above is not sufficient on its own
 	//
-	// A walk that calls the hook and then descends REGARDLESS -- the single-character change of
+	// A walk that calls the hook and then descends regardless -- the single-character change of
 	// dropping the `return` after the hook -- raises both counts by the same amount and leaves the
 	// inequality holding. A mutation sweep found exactly that: the two-walk comparison scored it as
 	// caught when it was not.
@@ -150,7 +150,7 @@ func TestReactiveVisitorPrunesWhenTraverseIsNotCalled(test *testing.T) {
 
 // TestReactiveVisitorSeesSequenceInstructions covers the one nesting a value-only walk would miss.
 //
-// A `ReactiveSequenceValue` carries instructions INSIDE a value, and upstream visits them as
+// A `ReactiveSequenceValue` carries instructions inside a value, and upstream visits them as
 // instructions rather than as values. A walk that only recursed through values would skip them, and
 // this package has already paid for that exact omission once: the first spelling of `valueOf`
 // dropped everything but a block's last instruction and cost 27 functions.

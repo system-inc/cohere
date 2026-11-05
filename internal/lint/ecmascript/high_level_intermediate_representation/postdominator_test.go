@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The post-dominator tree is checked against the DEFINITION rather than against the algorithm.
+// The post-dominator tree is checked against the definition rather than against the algorithm.
 //
 // A block B post-dominates a block A when every path from A to a `Return` passes through B. That is
 // established here by deleting B from the graph and asking whether any `Return` is still reachable
@@ -77,7 +77,7 @@ func postDominates(tree *postDominanceTree, block, candidate static_single_assig
 //
 // `minimumPairs` is a vacuity guard, and it is not decoration. It fired on the first run here and
 // caught three cases checking nothing: `a(); b(); return c;`, a sequence expression, and an optional
-// chain all lower to a SINGLE block, so there is no ordered pair to ask about and every assertion
+// chain all lower to a single block, so there is no ordered pair to ask about and every assertion
 // over them passes for free. They were removed rather than given a zero threshold, because a case
 // kept at zero is the vacuity the guard exists to catch, written down and blessed. The same guard
 // caught two such cases on the first run of the forward dominator work.
@@ -191,7 +191,7 @@ func TestPostDominatorDefinitionCheckCanFail(test *testing.T) {
 
 	// A corruption is only detectable where there was structure to destroy. Self-parenting a block
 	// removes every ancestor from its chain, so it changes an answer only when the chain held a
-	// REAL block; a block whose immediate post-dominator is already the synthetic exit has nothing
+	// real block; a block whose immediate post-dominator is already the synthetic exit has nothing
 	// above it and reparenting it is invisible.
 	//
 	// That is a true property of post-dominance rather than a weakness in the check, and it is why
@@ -282,7 +282,7 @@ func TestUnconditionalBlocksOnMeasuredShapes(test *testing.T) {
 	cases := []struct {
 		name string
 		code string
-		// wantUnconditional is whether the block holding the LAST call in the body runs on every
+		// wantUnconditional is whether the block holding the last call in the body runs on every
 		// path. That is the question the rule asks and the one React's verdict answers.
 		wantUnconditional bool
 	}{

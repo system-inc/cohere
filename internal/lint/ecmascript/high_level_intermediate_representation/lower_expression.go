@@ -144,7 +144,7 @@ func (builder *builder) lowerExpressionToPlace(node *ast.Node) Place {
 
 // lowerIdentifier resolves a name to a value.
 //
-// Resolution is by SYMBOL, via `symbolOf`, rather than by a scope tree this package maintains. That
+// Resolution is by symbol, via `symbolOf`, rather than by a scope tree this package maintains. That
 // is the payoff of having a resident checker: shadowing, hoisting, and closure capture are already
 // answered correctly, including through imports, and re-deriving them here would be a second
 // implementation that can disagree with the first.
@@ -336,7 +336,7 @@ func (builder *builder) lowerLogicalExpression(node *ast.Node) Place {
 		Fallthrough: fallthroughBlock.Id,
 	}, testBlock)
 
-	// The arms write DISTINCT identifiers under the result's declaration, so construction sees two
+	// The arms write distinct identifiers under the result's declaration, so construction sees two
 	// definitions of one binding and merges them. See `newTemporaryUnder`.
 	shared := builder.function.Identifiers[result.Identifier].Declaration
 
@@ -433,7 +433,7 @@ func (builder *builder) lowerAssignmentTarget(target *ast.Node, value Place, kin
 		if symbol != nil {
 			if _, known := builder.identifiers[symbol]; known {
 				place := builder.bind(target.Text(), symbol, target)
-				// A binding this function declared is still a CONTEXT binding when a closure inside
+				// A binding this function declared is still a context binding when a closure inside
 				// it reads the value and something reassigns it, which is upstream's second rule at
 				// `FindContextIdentifiers.ts:108`. The write is in the outer function either way, so
 				// the writer's position cannot decide it -- see `context_identifiers.go`.
@@ -920,8 +920,8 @@ func (builder *builder) lowerArrayBindingPattern(node *ast.Node) Pattern {
 	result := &ArrayPattern{}
 
 	for _, element := range pattern.Elements.Nodes {
-		// A hole in a BINDING pattern - the gap in `const [a, , b] = xs` - arrives as a
-		// BindingElement with no name, NOT as an OmittedExpression. (An assignment pattern, the
+		// A hole in a binding pattern - the gap in `const [a, , b] = xs` - arrives as a
+		// BindingElement with no name, not as an OmittedExpression. (An assignment pattern, the
 		// `[a, , b] = xs` form, does use OmittedExpression; the two spellings are handled in their
 		// own functions.) Measured against the parser rather than assumed: the first version of this
 		// checked for OmittedExpression here and silently dropped every hole, which shifts every

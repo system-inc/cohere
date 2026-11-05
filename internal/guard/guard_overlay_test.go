@@ -16,27 +16,27 @@ import (
 	"testing"
 )
 
-// guardOverlay is the overlay the guards here read the rule packages through: the one GOFLAGS names, as
-// file path to contents, or nil when GOFLAGS names none.
+// guardOverlay is the overlay the guards here read the rule packages through: the one `GOFLAGS` names, as
+// file path to contents, or nil when `GOFLAGS` names none.
 //
 // The guards load the rule packages with internal/gotypes, which runs `go list` and then parses every
 // file itself, from disk. `go test -overlay x.json` reaches neither: the flag builds the test binary and
 // stops there, and nothing in the binary can see it (measured: no build setting records it, and the
 // environment is untouched). So a guard run that way checked the working tree while the command line
-// said it checked the overlay, and two wrong "dispatch green" claims went through on it. GOFLAGS is
+// said it checked the overlay, and two wrong "dispatch green" claims went through on it. `GOFLAGS` is
 // inherited by the test binary, so `GOFLAGS=-overlay=x.json` is the spelling it can read; this hands its
 // contents to the loader's own parser, which keeps the flag out of the go commands it runs, since go list
 // only answers for the files the loader reads anyway and a runner of prebuilt tests refuses it.
 //
 // The spelling that cannot work is refused rather than ignored, when it can be seen: on Unix the `go`
-// command that started this binary is asked for its arguments, and an -overlay there that GOFLAGS does
+// command that started this binary is asked for its arguments, and an -overlay there that `GOFLAGS` does
 // not carry fails the guard by name.
 func guardOverlay(test *testing.T) map[string][]byte {
 	test.Helper()
 	return guardOverlayFrom(test, os.Getenv("GOFLAGS"))
 }
 
-// guardOverlayFrom is guardOverlay reading goFlags in place of the environment's GOFLAGS, so the tests
+// guardOverlayFrom is guardOverlay reading goFlags in place of the environment's `GOFLAGS`, so the tests
 // that prove a named overlay is what the guards read can name one without test.Setenv, and run in parallel
 // (#nxgt2ca).
 func guardOverlayFrom(test *testing.T, goFlags string) map[string][]byte {
@@ -103,7 +103,7 @@ func readOverlay(path string) (map[string][]byte, error) {
 }
 
 // refuseUnreachableOverlayFlag fails the guard when the `go test` that started this binary was given
-// -overlay on its command line rather than through GOFLAGS. Best effort: where the parent's arguments
+// -overlay on its command line rather than through `GOFLAGS`. Best effort: where the parent's arguments
 // cannot be read, nothing is refused.
 func refuseUnreachableOverlayFlag(test *testing.T) {
 	test.Helper()
@@ -121,7 +121,7 @@ func refuseUnreachableOverlayFlag(test *testing.T) {
 	}
 }
 
-// overlayFlagOutsideGoFlags reports a go command line that carries -overlay when GOFLAGS does not.
+// overlayFlagOutsideGoFlags reports a go command line that carries -overlay when `GOFLAGS` does not.
 func overlayFlagOutsideGoFlags(arguments string, goFlags string) bool {
 	if strings.Contains(goFlags, "overlay") {
 		return false
@@ -156,7 +156,7 @@ func writeOverlay(test *testing.T, target string, contents string) string {
 	return overlayFile
 }
 
-// The creating-getter guard reads an overlay GOFLAGS names: a GetLocals call that exists only in the
+// The creating-getter guard reads an overlay `GOFLAGS` names: a GetLocals call that exists only in the
 // overlay is caught, and the working tree, which has none, is not what was read.
 func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	test.Parallel()
@@ -180,7 +180,7 @@ func TestTheCreatingGetterGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	}
 }
 
-// The TypeReach guard reads an overlay GOFLAGS names: a Shapes claim added only in the overlay, to a rule
+// The TypeReach guard reads an overlay `GOFLAGS` names: a Shapes claim added only in the overlay, to a rule
 // the scan already finds reading imported bodies, is caught.
 func TestTheTypeReachGuardReadsTheGoFlagsOverlay(test *testing.T) {
 	test.Parallel()
@@ -329,7 +329,7 @@ func TestAShapesClaimPlantsIntoEveryRuleFile(test *testing.T) {
 	}
 }
 
-// The command line `go test -overlay` is refused, since it cannot reach the guard, and GOFLAGS is not.
+// The command line `go test -overlay` is refused, since it cannot reach the guard, and `GOFLAGS` is not.
 func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(test *testing.T) {
 	test.Parallel()
 

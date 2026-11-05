@@ -50,8 +50,8 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 
 	// An imported binding resolves to an alias whose target is the real declaration in the other
 	// file. Renaming the alias alone renames the local half of an import and leaves the export
-	// untouched, which is a legitimate and DIFFERENT act from renaming the export. The position
-	// decides which one the user asked for, so the alias is NOT followed here: the user put their
+	// untouched, which is a legitimate and different act from renaming the export. The position
+	// decides which one the user asked for, so the alias is not followed here: the user put their
 	// cursor on a local binding and gets a local rename.
 	//
 	// The consequence is stated rather than hidden. Renaming the local half of `import { err }`
@@ -114,7 +114,7 @@ func projectFileNames(files []*ast.SourceFile) map[string]bool {
 //
 // A symbol may carry several declarations through declaration merging, and the brief's standing
 // instruction is to never index [0] and to say which question is being answered. The question here
-// is "may I rewrite every declaration of this", so the answer must be no if ANY of them sits
+// is "may I rewrite every declaration of this", so the answer must be no if any of them sits
 // outside the project: renaming an interface that merges with one in a dependency's `.d.ts` would
 // rewrite our half and leave theirs, producing two types where the author meant one.
 func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string, int, string) {
@@ -214,7 +214,7 @@ func editFor(
 		if !sameSymbol(fileChecker, valueSymbol, anchor) {
 			return Edit{}, false
 		}
-		// EXPANSION, not replacement. `{ err }` means `{ err: err }`, and the property name is part
+		// Expansion, not replacement. `{ err }` means `{ err: err }`, and the property name is part
 		// of the object's contract while the value is the binding being renamed. Writing `{ error }`
 		// would rename the property too, silently changing the shape of every object literal that
 		// puns the name.
@@ -238,7 +238,7 @@ func editFor(
 	kind := EditReference
 
 	// An import specifier's identifier is an alias in its own right whose target is the real
-	// declaration in the other file. Renaming the export must rewrite this SOURCE half and leave a
+	// declaration in the other file. Renaming the export must rewrite this source half and leave a
 	// local alias alone, which falls out of resolving the alias and comparing the target: in
 	// `import { err as failure }` the `err` half resolves through the alias to the anchor and the
 	// `failure` half is the alias's own name, which is a declaration name of a different symbol.
@@ -255,7 +255,7 @@ func editFor(
 	// Classification order is load-bearing and was measured rather than reasoned about, because the
 	// obvious order is wrong in a way that still produces a correct rename and a misleading preview.
 	//
-	// An import specifier's identifier satisfies `parent.Name() == node` in BOTH spellings: for
+	// An import specifier's identifier satisfies `parent.Name() == node` in both spellings: for
 	// `import { err }` the Name is `err` and there is no PropertyName, and for
 	// `import { err as failure }` the Name is `failure` while the PropertyName is `err`. So a
 	// declaration check running last relabels every import site as a declaration, which tells the
@@ -263,9 +263,9 @@ func editFor(
 	//
 	// The preview is the entire safety mechanism for this verb, so a preview that misdescribes what
 	// it is about to do is a real defect even when the bytes it writes are right.
-	// The source half is classified HERE rather than inside the alias branch above, and the
+	// The source half is classified here rather than inside the alias branch above, and the
 	// difference is not cosmetic. In `import { err as failure }` the `err` half resolves through
-	// `GetSymbolAtLocation` DIRECTLY to the anchor, so `matched` is already true and the alias branch
+	// `GetSymbolAtLocation` directly to the anchor, so `matched` is already true and the alias branch
 	// never runs — which left the source half labelled an ordinary reference. The bytes were right
 	// and the preview was wrong, and since the preview is the whole safety mechanism of this verb, a
 	// preview that misdescribes what it is about to do is a real defect. Caught by a fixture
@@ -341,7 +341,7 @@ func isOwnDeclarationName(node *ast.Node) bool {
 // renames that would have been fine, because a binding in an unrelated function of the same file
 // cannot actually collide. The asymmetry is the point — a false refusal costs the user a message
 // they can read and work around, while a missed collision produces either a duplicate binding or a
-// silent shadow, and a silent shadow COMPILES. Refusing loudly beats guessing, which is the line
+// silent shadow, and a silent shadow compiles. Refusing loudly beats guessing, which is the line
 // this codebase already holds elsewhere.
 func findCollision(
 	ctx context.Context,

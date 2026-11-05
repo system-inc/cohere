@@ -23,7 +23,7 @@ type Directives struct {
 	// DocEnd is the doc-end marker ...
 	DocEnd bool
 	YAML   DirectivesYAML
-	// Tags maps each %TAG handle to its prefix.
+	// Tags maps each `%TAG` handle to its prefix.
 	Tags map[string]string
 
 	atNextDocument bool
@@ -118,7 +118,7 @@ func splitSpaceOrTab(text []uint16) [][]uint16 {
 	return append(parts, text[start:len(text):len(text)])
 }
 
-// tagName resolves a tag, matching handles to those defined in %TAG directives. It returns the resolved
+// tagName resolves a tag, matching handles to those defined in `%TAG` directives. It returns the resolved
 // tag, which may also be the non-specific tag '!' or a '!local' tag, or "" where upstream returns null
 // (unresolvable). Upstream can also return the empty string, for !<>; every caller treats the two alike.
 func (directives *Directives) tagName(source []uint16, onError func(message string)) string {

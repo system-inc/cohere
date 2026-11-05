@@ -91,7 +91,7 @@ import (
 // destructuring assignment target parses as an array or object *literal* rather than as a pattern,
 // so the wrappers below are the path from a rest element out to the assignment that decides it.
 //
-// # What this is NOT
+// # What this is not
 //
 // A rule asking whether an occurrence *only* writes, never reads, wants a different predicate.
 // `x += 1` and `x++` both write and both read, and `no-unused-private-class-members` enumerates the

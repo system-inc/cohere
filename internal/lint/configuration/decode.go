@@ -44,7 +44,7 @@ func DecodeInto[Options any]() Decoder {
 // RuleOptions pairs a rule name with how to decode its options and whether it can run without them.
 //
 // Exactly one of Decode and DecodeList is set, and which one is the rule's arity. Decode serves a
-// rule that takes ONE option element and is handed that element alone. DecodeList serves a rule
+// rule that takes one option element and is handed that element alone. DecodeList serves a rule
 // whose upstream schema takes more than one, and is handed every element as a JSON array, which is
 // upstream's own `context.options` with the severity removed. The arity has to live here, beside
 // the decoder, because this is the only layer that sees both the elements and the rule.

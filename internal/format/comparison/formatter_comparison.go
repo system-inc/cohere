@@ -46,7 +46,7 @@ func Settings(newLine string) format.FormatCodeSettings {
 	settings.InsertSpaceAfterKeywordsInControlFlowStatements = core.TSFalse
 
 	// "insert" makes the formatter add semicolons after type members, turning `{ a: number }` into
-	// `{ a: number; }`, which our Prettier does not do. It is also the setting that reaches the ASI
+	// `{ a: number; }`, which our Prettier does not do. It is also the setting that reaches the `ASI`
 	// path that panics on some real files. "ignore" leaves existing semicolons alone, which is what
 	// an already-semicolon-correct codebase wants.
 	settings.Semicolons = format.SemicolonPreferenceIgnore

@@ -8,13 +8,13 @@ import (
 	"testing"
 )
 
-// compilerFixture is a module whose HEAD pins a compiler at TypeScript, with the compiler checked out at
+// compilerFixture is a module whose `HEAD` pins a compiler at TypeScript, with the compiler checked out at
 // that pin.
 type compilerFixture struct {
 	// Module is the module's directory.
 	Module string
 
-	// Recorded is the compiler commit the module's HEAD pins.
+	// Recorded is the compiler commit the module's `HEAD` pins.
 	Recorded string
 
 	// Later is a second compiler commit, which the submodule can be moved to without a commit.
@@ -174,7 +174,7 @@ func TestCompilerPinAcceptsARelativeModuleDirectory(test *testing.T) {
 }
 
 // TestReleaseRefusesACompilerMovedWithoutACommit is the known-dirty control: the checkout is at a real
-// compiler commit, just not the one cohere's HEAD records. The refusal names both, since either could
+// compiler commit, just not the one cohere's `HEAD` records. The refusal names both, since either could
 // be the one someone meant.
 func TestReleaseRefusesACompilerMovedWithoutACommit(test *testing.T) {
 	test.Parallel()
@@ -194,7 +194,7 @@ func TestReleaseRefusesACompilerMovedWithoutACommit(test *testing.T) {
 }
 
 // TestPatchedCompilerAtThePinProceeds holds the compatibility the compiler patches need. They change
-// files in the checkout without moving its HEAD, so a check that compared trees would refuse every
+// files in the checkout without moving its `HEAD`, so a check that compared trees would refuse every
 // patched release, which is every correct one.
 func TestPatchedCompilerAtThePinProceeds(test *testing.T) {
 	test.Parallel()
@@ -215,7 +215,7 @@ func TestPatchedCompilerAtThePinProceeds(test *testing.T) {
 }
 
 // TestUncheckedOutCompilerIsNamedAsSuch covers the empty directory a submodule that was never initialized
-// leaves. `git -C` from there walks up and answers with the module's own HEAD, which would be reported
+// leaves. `git -C` from there walks up and answers with the module's own `HEAD`, which would be reported
 // as a moved compiler naming a commit that is not a compiler.
 func TestUncheckedOutCompilerIsNamedAsSuch(test *testing.T) {
 	test.Parallel()

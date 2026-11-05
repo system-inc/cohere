@@ -79,7 +79,7 @@ func MergeConsecutiveBlocks(function *Function) int {
 	}
 
 	// Blocks that are some terminal's fallthrough. Collected as the walk goes, matching upstream:
-	// a fallthrough named by a LATER block does not protect an earlier one, because the walk is in
+	// a fallthrough named by a later block does not protect an earlier one, because the walk is in
 	// reverse postorder and a fallthrough is always laid out after the terminal that names it.
 	fallthroughs := map[static_single_assignment.BlockId]bool{}
 	merged := 0
@@ -161,7 +161,7 @@ func MergeConsecutiveBlocks(function *Function) int {
 	// a block the function no longer holds.
 	//
 	// A mutation sweep could not kill this loop either, and the measurement says why rather than
-	// leaving it as a shrug: a merged-away block is absorbed INTO its only predecessor, so the only
+	// leaving it as a shrug: a merged-away block is absorbed into its only predecessor, so the only
 	// terminal that named it is that predecessor's, and the merge overwrites that terminal in the
 	// same step. Nothing else can name it, because "nothing else can reach it" is the condition
 	// that let it merge.

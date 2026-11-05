@@ -21,9 +21,9 @@
 // code. `typescript/no-unused-vars` is being ported, and oxc spends roughly 990 lines in `usage.rs`
 // deciding this same question — self-references, a variable only reassigned to itself, aliases,
 // re-exports, type-position uses — with every answer measured against a large corpus. The answers
-// below are NOT measured against a corpus. They are measured against this substrate and this tree,
+// below are not measured against a corpus. They are measured against this substrate and this tree,
 // which establishes that they behave as described but not that they are the answers a corpus would
-// have chosen. So each one is marked MEASURED or JUDGMENT, and the JUDGMENT entries are exactly
+// have chosen. So each one is marked measured or judgment, and the judgment entries are exactly
 // where this analysis and a future no-unused-vars could disagree forever without either noticing.
 //
 // A reference is recorded when an identifier resolves through the checker to a symbol, and the

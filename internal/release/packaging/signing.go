@@ -17,7 +17,7 @@ import (
 //   - An unsigned binary with no quarantine attribute runs normally. This is what an `npm install`
 //     produces today: package managers extract tarballs without setting `com.apple.quarantine`, so
 //     a consumer installing cohere from the registry is not blocked.
-//   - The same binary with the quarantine attribute set is killed by the kernel: exit 137, SIGKILL,
+//   - The same binary with the quarantine attribute set is killed by the kernel: exit 137, `SIGKILL`,
 //     and zero bytes on both stdout and stderr. Measured directly on a staged darwin/arm64 build.
 //
 // That second case is the reason to sign. It is reached whenever the binary travels as a file
