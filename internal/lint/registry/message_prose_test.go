@@ -12,6 +12,9 @@ import (
 	"testing"
 )
 
+// proseWordPattern splits a description into the tokens a package name could occupy.
+var proseWordPattern = regexp.MustCompile(`[A-Za-z0-9_]+`)
+
 // TestMessagesDoNotNameInternalPackages refuses a package directory's name inside a rule's prose.
 //
 // Two package renames rewrote English along with the identifiers. `78bffa9` renamed
@@ -59,9 +62,6 @@ func TestMessagesDoNotNameInternalPackages(test *testing.T) {
 		}
 	}
 }
-
-// proseWordPattern splits a description into the tokens a package name could occupy.
-var proseWordPattern = regexp.MustCompile(`[A-Za-z0-9_]+`)
 
 // underscoredInternalPackageNames is every directory under internal/ that holds a Go package and
 // whose name carries an underscore.

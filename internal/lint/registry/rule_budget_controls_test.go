@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func budgetThreadCPU() time.Duration {
+func budgetThreadCpu() time.Duration {
 	var spec unix.Timespec
 	if clockGettimeError := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); clockGettimeError != nil {
 		panic(clockGettimeError)
@@ -27,7 +27,7 @@ func budgetThreadCPU() time.Duration {
 
 // The sleeper waits longer than the CPU budget but less than the safety deadline.
 // The spinner supplies the positive control using the same thread clock as --timing.
-func TestRuleBudgetRejectsCPUWorkAndDoesNotBillWaiting(test *testing.T) {
+func TestRuleBudgetRejectsCpuWorkAndDoesNotBillWaiting(test *testing.T) {
 	test.Parallel()
 	graph := buildBudgetGraph(test, map[string]string{"file.ts": "export const value = 1;\n"})
 	sleeper := rule.Rule{Name: "planted-waiter", Run: func(ruleContext rule.Context, options any) rule.Listeners {
@@ -39,8 +39,8 @@ func TestRuleBudgetRejectsCPUWorkAndDoesNotBillWaiting(test *testing.T) {
 	}
 	spinner := rule.Rule{Name: "planted-spinner", Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			start := budgetThreadCPU()
-			for budgetThreadCPU()-start < 350*time.Millisecond {
+			start := budgetThreadCpu()
+			for budgetThreadCpu()-start < 350*time.Millisecond {
 			}
 		}}
 	}}

@@ -52,7 +52,7 @@ type eslintCorpusRow struct {
 	Options     []json.RawMessage `json:"options"`
 	UsesGlobals bool              `json:"usesGlobals"`
 	Skipped     string            `json:"skipped"`
-	ESLint      [][3]any          `json:"eslint"`
+	EsLint      [][3]any          `json:"eslint"`
 }
 
 // key names a row by its code and options, so the gaps list survives a re-extract that reorders rows
@@ -159,8 +159,8 @@ func corpusVerdict(test *testing.T, registration rule.Registration, row eslintCo
 		return "harness"
 	}
 	byteOffset := utf16ToByteOffsets(code)
-	expected := make([]string, 0, len(row.ESLint))
-	for _, finding := range row.ESLint {
+	expected := make([]string, 0, len(row.EsLint))
+	for _, finding := range row.EsLint {
 		// JSON decodes every number into an any as a float64, so anything else is a vendored file gone wrong
 		startOffset, startIsNumber := finding[1].(float64)
 		endOffset, endIsNumber := finding[2].(float64)
@@ -233,7 +233,7 @@ func corpusPlace(start int, end int) string {
 	return fmt.Sprintf("%d-%d", start, end)
 }
 
-func TestCohereAgreesWithESLintsCoreCorpus(test *testing.T) {
+func TestCohereAgreesWithEsLintsCoreCorpus(test *testing.T) {
 	test.Parallel()
 
 	registrations := map[string]rule.Registration{}
@@ -339,7 +339,7 @@ func TestCohereAgreesWithESLintsCoreCorpus(test *testing.T) {
 }
 
 // ESLint counts UTF-16 units: é is one unit and two bytes, 😀 is two units and four bytes.
-func TestUTF16OffsetsBecomeByteOffsets(test *testing.T) {
+func TestUtf16OffsetsBecomeByteOffsets(test *testing.T) {
 	test.Parallel()
 
 	code := "é😀x"
@@ -402,7 +402,7 @@ func TestCorpusVerdictComparesPlaces(test *testing.T) {
 		{"behind a mark, a later line, another place", "\ufefflet x;\nx = 0;", 1, 8, "span"},
 	}
 	for _, testCase := range cases {
-		row := eslintCorpusRow{Code: testCase.code, ESLint: [][3]any{{"probe", testCase.start, testCase.start + 1}}}
+		row := eslintCorpusRow{Code: testCase.code, EsLint: [][3]any{{"probe", testCase.start, testCase.start + 1}}}
 		if verdict := corpusVerdict(test, probe(testCase.occurrence), row); verdict != testCase.want {
 			test.Errorf("%s: the verdict is %q, want %q", testCase.name, verdict, testCase.want)
 		}

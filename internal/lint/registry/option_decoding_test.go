@@ -169,13 +169,15 @@ func optionDecodeTarget(info *types.Info, call *ast.CallExpr) (string, types.Typ
 
 // walkOptionType reports whether a decode into valueType reaches a struct, and records every field
 // it reaches that declares no `json` key, as `file:line Type.Field`.
+//
+// Mutates: seen the walk marks each type it enters, so a recursive type is walked once
 func walkOptionType(valueType types.Type, fileSet *token.FileSet, rulesRoot string, untagged map[string]bool, seen map[types.Type]bool) bool {
-	valueType = types.Unalias(valueType)
-	if seen[valueType] {
+	unaliased := types.Unalias(valueType)
+	if seen[unaliased] {
 		return false
 	}
-	seen[valueType] = true
-	switch shape := valueType.(type) {
+	seen[unaliased] = true
+	switch shape := unaliased.(type) {
 	case *types.Pointer:
 		return walkOptionType(shape.Elem(), fileSet, rulesRoot, untagged, seen)
 	case *types.Slice:
@@ -201,6 +203,10 @@ func walkOptionType(valueType types.Type, fileSet *token.FileSet, rulesRoot stri
 	return false
 }
 
+// walkOptionStruct walks each field of structure, owned by the type named owner, the way walkOptionType
+// walks a type.
+//
+// Mutates: untagged the walk records every exported field with no `json` key, so one set gathers a whole tree
 func walkOptionStruct(structure *types.Struct, owner string, fileSet *token.FileSet, rulesRoot string, untagged map[string]bool, seen map[types.Type]bool) {
 	for index := range structure.NumFields() {
 		field := structure.Field(index)

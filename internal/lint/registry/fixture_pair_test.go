@@ -27,7 +27,7 @@ import (
 // Parsing rather than grepping. The example that made the case was internal/rules/upstream/adapt.go,
 // where a grep for `rule.Rule{` reported an unpaired rule because the adapter built a rule.Rule
 // inside a function: the text matched while the declaration did not exist. That file is gone, but
-// the reasoning outlives it — any helper that constructs a rule value rather than declaring one
+// the reasoning outlives it: any helper that constructs a rule value rather than declaring one
 // reproduces the same false positive. It is cheap here and expensive at 171 rules, and it is the
 // same class as two probes that searched for invented harness names and returned confident wrong
 // answers.
