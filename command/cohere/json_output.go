@@ -153,14 +153,14 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 }
 
 // writeJSONLine writes one object as one line.
-func writeJSONLine(out *bufio.Writer, value any) {
+func writeJSONLine[Value any](out *bufio.Writer, value Value) {
 	fmt.Fprint(out, jsonLine(value))
 }
 
 // jsonLine is one object as one line, newline included. A value that does not encode is a line the reader never
 // gets, so it is reported to package streams, and the run exits nonzero saying so, rather than printing a
 // stream with a record missing; the line is then empty.
-func jsonLine(value any) string {
+func jsonLine[Value any](value Value) string {
 	line, marshalError := json.Marshal(value)
 	if marshalError != nil {
 		streams.Report(fmt.Errorf("encoding a line of --json: %w", marshalError))

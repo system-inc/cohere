@@ -34,6 +34,8 @@ func cleanSummary() runSummary {
 }
 
 // warmSummary is a green warm run: three files edited and checked, the rest from the cache.
+//
+// Mutates: summary a case's summary func turns the clean summary it is handed into the run it names
 func warmSummary(summary *runSummary) {
 	summary.Total = 700 * time.Millisecond
 	summary.Graph = 200 * time.Millisecond
@@ -47,6 +49,9 @@ func warmSummary(summary *runSummary) {
 	summary.Nodes = 4_100
 }
 
+// replaySummary is a run replayed whole from the run cache.
+//
+// Mutates: summary a case's summary func turns the clean summary it is handed into the run it names
 func replaySummary(summary *runSummary) {
 	*summary = runSummary{
 		Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Rules: 480, FilesInScope: 3926, FilesCached: 3926,

@@ -96,36 +96,31 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a broken record kills the engine rather than waiting on it", func(test *testing.T) {
-		start := time.Now()
-		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test, "head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; sleep 30", engineModeCheck)
+		// The engine sleeps past any run, so a front door that waited on it hangs, a hang go test's -timeout fails.
+		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test, "head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; sleep 100000", engineModeCheck)
 		if runFakeSwiftEngineError == nil || exitCode != 1 || !strings.Contains(runFakeSwiftEngineError.Error(), "the Swift engine is broken") {
 			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
-		}
-		if elapsed := time.Since(start); elapsed > 10*time.Second {
-			test.Errorf("waited %s for an engine that had already broken its contract", elapsed)
 		}
 	})
 
 	// The child is started before the broken record, so it is always alive when the engine is killed.
-	// Killing only the engine left it holding the pipes, and the front door waited out its 30 seconds.
+	// Killing only the engine left it holding the pipes, and the front door waited on it. It sleeps past any
+	// run, so a front door that waits on it again hangs, a hang go test's -timeout fails.
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a broken engine's children die with it", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
-		start := time.Now()
 		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test,
-			"sleep 30 & echo $! > '"+childFile+"'; head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; wait",
+			"sleep 100000 & echo $! > '"+childFile+"'; head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; wait",
 			engineModeCheck)
 		if runFakeSwiftEngineError == nil || exitCode != 1 || !strings.Contains(runFakeSwiftEngineError.Error(), "the Swift engine is broken") {
 			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
-		}
-		if elapsed := time.Since(start); elapsed > 10*time.Second {
-			test.Errorf("waited %s on a child of an engine that had already broken its contract", elapsed)
 		}
 		requireProcessEnded(test, childFile)
 	})
 
 	// `SIGTERM` rather than an interrupt, because a POSIX shell starts a background job with interrupts
-	// ignored, and the stand-in's child must be one the signal can end.
+	// ignored, and the stand-in's child must be one the signal can end. The engine waits on a child that sleeps
+	// past any run, so a signal not passed on leaves the run waiting, a hang go test's -timeout fails.
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a signal cohere receives is passed to the engine and everything it started", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
@@ -138,16 +133,12 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 			waitForFile(test, childFile)
 			interrupts <- syscall.SIGTERM
 		}()
-		start := time.Now()
 		exitCode, runEngineBinaryUntilError := runEngineBinaryUntil(
-			fakeSwiftEngine(test, "sleep 30 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait"),
+			fakeSwiftEngine(test, "sleep 100000 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait"),
 			[]string{"--contract", "1"}, run, &standardError, interrupts)
 		flushStream(test, stream)
 		if runEngineBinaryUntilError == nil || exitCode != 1 || !strings.Contains(runEngineBinaryUntilError.Error(), "was killed by") {
 			test.Fatalf("an engine signalled through cohere exited %d, err %v\n%s", exitCode, runEngineBinaryUntilError, out.String())
-		}
-		if elapsed := time.Since(start); elapsed > 10*time.Second {
-			test.Errorf("the signal took %s to end the engine, so it was not passed on", elapsed)
 		}
 		requireProcessEnded(test, childFile)
 	})

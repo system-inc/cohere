@@ -36,8 +36,10 @@ func (stream *panicOnce) Write(data []byte) (int, error) {
 // A panic in main still delivers what was written to stderr before it. The test binary runs itself as a
 // cohere-dev with no verb, whose usage lands in stderr's buffer behind a line written first, and whose
 // Finish flushes stdout first, into a stream that panics. Nothing else would flush stderr after that, so the
-// lines arrive only through main's deferred show.
+// lines arrive only through the show finishedExitCode defers. The child is a process of its own running this
+// test alone, so the globals it sets are shared with no other test, and the test runs in parallel.
 func TestAPanicDeliversWhatWasWrittenBeforeIt(test *testing.T) {
+	test.Parallel()
 	if os.Getenv(panicChildVariable) == "1" {
 		fmt.Fprintln(streams.Errors, panicMarker)
 		streams.Output = bufio.NewWriter(&panicOnce{})
@@ -46,7 +48,6 @@ func TestAPanicDeliversWhatWasWrittenBeforeIt(test *testing.T) {
 		main()
 		return
 	}
-	test.Parallel()
 	executable, executableError := os.Executable()
 	if executableError != nil {
 		test.Fatal(executableError)

@@ -21,9 +21,15 @@ import (
 	"github.com/system-inc/cohere/internal/streams"
 )
 
+// main exits with the code finishedExitCode returns, once that has run its deferred show.
 func main() {
+	os.Exit(finishedExitCode())
+}
+
+// finishedExitCode runs the dispatcher and returns the code it exits with, after every path out has finished.
+func finishedExitCode() int {
 	// Deferred calls run while a panic unwinds, though not on os.Exit, so this delivers what was written before
-	// the panic's own report.
+	// the panic's own report, and main exits only after it has run.
 	defer func() {
 		streams.Show(streams.Errors)
 		streams.Show(streams.Output)
@@ -32,10 +38,10 @@ func main() {
 		// The launcher's report writes to stderr itself, so what this process said first is delivered first.
 		streams.Show(streams.Errors)
 		dispatch.Report.Fail("cohere: %s", sentence.FromError(runError))
-		os.Exit(streams.Finish(1))
+		return streams.Finish(1)
 	}
 	// Every path out finishes, this one too, so none can leave what was written in the buffers.
-	os.Exit(streams.Finish(0))
+	return streams.Finish(0)
 }
 
 func run() error {
