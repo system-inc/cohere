@@ -636,14 +636,15 @@ func (walker *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, valu
 	if value == nil {
 		return
 	}
+	peeled := value
 
 	// `PropTypes.any.isRequired` peels to `PropTypes.any`.
-	if value.Kind == ast.KindPropertyAccessExpression {
-		access := value.AsPropertyAccessExpression()
+	if peeled.Kind == ast.KindPropertyAccessExpression {
+		access := peeled.AsPropertyAccessExpression()
 		if name := access.Name(); name != nil && name.Kind == ast.KindIdentifier &&
 			name.Text() == "isRequired" {
-			value = access.Expression
-			if value == nil {
+			peeled = access.Expression
+			if peeled == nil {
 				return
 			}
 		}
@@ -651,8 +652,8 @@ func (walker *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, valu
 
 	// `PropTypes.arrayOf(PropTypes.object)` reports on the argument's name, then continues with the
 	// callee so the wrapper's own name is considered too.
-	if value.Kind == ast.KindCallExpression {
-		call := value.AsCallExpression()
+	if peeled.Kind == ast.KindCallExpression {
+		call := peeled.AsCallExpression()
 		if !walker.isPropTypesPackage(call.Expression) {
 			return
 		}
@@ -661,16 +662,16 @@ func (walker *forbidPropTypesWalker) checkPropertyValue(property *ast.Node, valu
 				walker.reportIfForbidden(property, forbidPropTypesTypeName(argument))
 			}
 		}
-		value = call.Expression
-		if value == nil {
+		peeled = call.Expression
+		if peeled == nil {
 			return
 		}
 	}
 
-	if !walker.isPropTypesPackage(value) {
+	if !walker.isPropTypesPackage(peeled) {
 		return
 	}
-	walker.reportIfForbidden(property, forbidPropTypesTypeName(value))
+	walker.reportIfForbidden(property, forbidPropTypesTypeName(peeled))
 }
 
 // forbidPropTypesTypeName reads the type name off a value, which upstream does two ways.

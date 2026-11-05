@@ -63,13 +63,18 @@ package react_conformance
 var categoryByMessage = map[string]string{
 
 	// CapitalizedCalls
-	"Capitalized functions are reserved for components, which must be invoked with JSX. If this is a component, render it with JSX. Otherwise, ensure that it has no hook calls and rename it to begin with a lowercase letter. Alternatively, if you know for a fact that this function is not a component, you can allowlist it via the compiler config": "CapitalizedCalls",
+	"Capitalized functions are reserved for components, which must be invoked with JSX. If this is a component, " +
+		"render it with JSX. Otherwise, ensure that it has no hook calls and rename it to begin with a lowercase " +
+		"letter. Alternatively, if you know for a fact that this function is not a component, you can allowlist it " +
+		"via the compiler config": "CapitalizedCalls",
 
 	// Config
 	"Invalid type configuration for module": "Config",
 
 	// EffectDerivationsOfState
-	"Values derived from props and state should be calculated during render, not in an effect. (https://react.dev/learn/you-might-not-need-an-effect#updating-state-based-on-props-or-state)": "EffectDerivationsOfState",
+	"Values derived from props and state should be calculated during render, not in an effect. " +
+		"(https://react.dev/learn/you-might-not-need-an-effect" +
+		"#updating-state-based-on-props-or-state)": "EffectDerivationsOfState",
 
 	// EffectExhaustiveDependencies
 	"Found extra effect dependencies":         "EffectExhaustiveDependencies",
@@ -83,10 +88,16 @@ var categoryByMessage = map[string]string{
 	"Cannot reassign variables declared outside of the component/hook": "Globals",
 
 	// Hooks
-	"Hooks may not be referenced as normal values, they must be called. See https://react.dev/reference/rules/react-calls-components-and-hooks#never-pass-around-hooks-as-regular-values":                                        "Hooks",
-	"Hooks must always be called in a consistent order, and may not be called conditionally. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)":                                                      "Hooks",
-	"Hooks must be called at the top level in the body of a function component or custom hook, and may not be called within function expressions. See the Rules of Hooks (https://react.dev/warnings/invalid-hook-call-warning)": "Hooks",
-	"Hooks must be the same function on every render, but this value may change over time to a different function. See https://react.dev/reference/rules/react-calls-components-and-hooks#dont-dynamically-use-hooks":            "Hooks",
+	"Hooks may not be referenced as normal values, they must be called. " +
+		"See https://react.dev/reference/rules/react-calls-components-and-hooks" +
+		"#never-pass-around-hooks-as-regular-values": "Hooks",
+	"Hooks must always be called in a consistent order, and may not be called conditionally. See the Rules of Hooks " +
+		"(https://react.dev/warnings/invalid-hook-call-warning)": "Hooks",
+	"Hooks must be called at the top level in the body of a function component or custom hook, and may not be " +
+		"called within function expressions. See the Rules of Hooks " +
+		"(https://react.dev/warnings/invalid-hook-call-warning)": "Hooks",
+	"Hooks must be the same function on every render, but this value may change over time to a different function. " +
+		"See https://react.dev/reference/rules/react-calls-components-and-hooks#dont-dynamically-use-hooks": "Hooks",
 
 	// Immutability
 	"Cannot access variable before it is declared":         "Immutability",
@@ -128,8 +139,10 @@ var categoryByMessage = map[string]string{
 	"Cannot call setState during render":                         "RenderSetState",
 
 	// Suppression
-	"React Compiler has skipped optimizing this component because one or more React ESLint rules were disabled":            "Suppression",
-	"React Compiler has skipped optimizing this component because one or more React rule violations were reported by Flow": "Suppression",
+	"React Compiler has skipped optimizing this component because one or more React ESLint rules " +
+		"were disabled": "Suppression",
+	"React Compiler has skipped optimizing this component because one or more React rule violations " +
+		"were reported by Flow": "Suppression",
 
 	// Syntax
 	"Cannot reassign a `const` variable":      "Syntax",

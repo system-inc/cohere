@@ -106,7 +106,8 @@ func TestForbidDomPropsFires(test *testing.T) {
             <div otherProp="bar" />
           </div>
         );
-      `, `{"forbid":[{"propName":"className","message":"Please use class instead of ClassName"},{"propName":"otherProp","message":"Avoid using otherProp"}]}`, 2},
+      `, `{"forbid":[{"propName":"className","message":"Please use class instead of ClassName"},` +
+			`{"propName":"otherProp","message":"Avoid using otherProp"}]}`, 2},
 		{"invalid 7", `
         const First = (props) => (
           <div className="foo">
@@ -121,7 +122,8 @@ func TestForbidDomPropsFires(test *testing.T) {
             <input type="hidden" name="fullname" />
           </form>
         );
-      `, `{"forbid":[{"propName":"accept","disallowedFor":["form"],"message":"Avoid using the accept attribute on <form>"}]}`, 1},
+      `, `{"forbid":[{"propName":"accept","disallowedFor":["form"],` +
+			`"message":"Avoid using the accept attribute on <form>"}]}`, 1},
 		{"invalid 9", `
         const First = (props) => (
           <div className="foo">
@@ -130,7 +132,9 @@ func TestForbidDomPropsFires(test *testing.T) {
             <div otherProp="bar" />
           </div>
         );
-      `, `{"forbid":[{"propName":"className","disallowedFor":["div","span"],"message":"Please use class instead of ClassName"},{"propName":"otherProp","message":"Avoid using otherProp"}]}`, 3},
+      `, `{"forbid":[{"propName":"className","disallowedFor":["div","span"],` +
+			`"message":"Please use class instead of ClassName"},` +
+			`{"propName":"otherProp","message":"Avoid using otherProp"}]}`, 3},
 		// the clone counts five, filtering two of the thirdProp sites by value;
 		// the installed build has no such feature and reports all six by name.
 		{"invalid 10", `
@@ -145,7 +149,11 @@ func TestForbidDomPropsFires(test *testing.T) {
             <p thirdProp="baz" />
           </div>
         );
-      `, `{"forbid":[{"propName":"className","disallowedFor":["div","span"],"message":"Please use class instead of ClassName"},{"propName":"otherProp","message":"Avoid using otherProp"},{"propName":"thirdProp","disallowedFor":["p"],"disallowedValues":["bar","baz"],"message":"Do not use thirdProp with values bar and baz on p"}]}`, 6},
+      `, `{"forbid":[{"propName":"className","disallowedFor":["div","span"],` +
+			`"message":"Please use class instead of ClassName"},` +
+			`{"propName":"otherProp","message":"Avoid using otherProp"},` +
+			`{"propName":"thirdProp","disallowedFor":["p"],"disallowedValues":["bar","baz"],` +
+			`"message":"Do not use thirdProp with values bar and baz on p"}]}`, 6},
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
 		// The value is never read, so a bare prop and an expression container both report. This is
