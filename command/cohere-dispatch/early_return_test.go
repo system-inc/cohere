@@ -107,15 +107,17 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 
 // buildDispatcherAndEngine builds this dispatcher and the engine it runs, from the working tree.
 func buildDispatcherAndEngine(test *testing.T) (dispatcher string, engine string) {
-	binaries := test.TempDir()
-	build := func(output string, packagePath string) string {
-		binary := filepath.Join(binaries, output)
-		if combined, outputError := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput(); outputError != nil {
-			test.Fatalf("building %s: %v\n%s", packagePath, outputError, combined)
-		}
-		return binary
+	return buildBinary(test, "cohere-dispatch", "."), buildBinary(test, "cohere", "../cohere")
+}
+
+// buildBinary builds the package at packagePath, from the working tree, into a directory of its own.
+func buildBinary(test *testing.T, output string, packagePath string) string {
+	binary := filepath.Join(test.TempDir(), output)
+	combined, outputError := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("building %s: %v\n%s", packagePath, outputError, combined)
 	}
-	return build("cohere-dispatch", "."), build("cohere", "../cohere")
+	return binary
 }
 
 // writeEarlyReturnProject writes a small project with one lint rule on, plus the given files, and returns
