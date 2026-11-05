@@ -98,12 +98,12 @@ func newInput(css string) *input {
 // treats a reversed or out-of-range pair.
 func (input *input) slice(start int, end int) string {
 	length := len(input.units)
-	start = min(max(start, 0), length)
-	end = min(max(end, 0), length)
-	if end <= start {
+	clampedStart := min(max(start, 0), length)
+	clampedEnd := min(max(end, 0), length)
+	if clampedEnd <= clampedStart {
 		return ""
 	}
-	return input.css[input.byteOffsets[start]:input.byteOffsets[end]]
+	return input.css[input.byteOffsets[clampedStart]:input.byteOffsets[clampedEnd]]
 }
 
 // byteOffset converts a unit offset to bytes. postcss can report an offset past the end (freeSemicolon
