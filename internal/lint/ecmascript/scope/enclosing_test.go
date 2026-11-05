@@ -13,9 +13,9 @@ import (
 func atMarker(test *testing.T, source string, ask func(node *ast.Node)) {
 	test.Helper()
 	found := false
-	rule_testing.Run(test, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "scope-probe",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindIdentifier: func(node *ast.Node) {
 					if found || node.Text() != "marker" {
