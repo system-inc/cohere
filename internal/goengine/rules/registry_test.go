@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/nilness"
+	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"golang.org/x/tools/go/analysis/suite/vet"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
@@ -66,7 +68,8 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 	expected := []string{"a house rule has no upstream", `rule "cohere-go/printf" is registered twice`}
 	if len(plantedProblems) != len(expected) {
 		test.Fatalf(
-			"the planted registry has %d problems, expected %d: %q", len(plantedProblems), len(expected), plantedProblems,
+			"the planted registry has %d problems, expected %d: %q",
+			len(plantedProblems), len(expected), plantedProblems,
 		)
 	}
 	for index, saying := range expected {
@@ -97,6 +100,39 @@ func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
 		}
 		if registeredRule.UpstreamName != analyzer.Name {
 			test.Errorf("vet's pass %q names upstream %q", analyzer.Name, registeredRule.UpstreamName)
+		}
+	}
+}
+
+// TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
+// after vet's suite, as tools rules running their own analyzers.
+func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
+	test.Parallel()
+	expected := []*analysis.Analyzer{nilness.Analyzer, unusedwrite.Analyzer}
+	if len(registry) != len(vet.Suite)+len(expected) {
+		test.Fatalf(
+			"the registry has %d rules, expected vet's %d passes and %d more",
+			len(registry), len(vet.Suite), len(expected),
+		)
+	}
+	for offset, analyzer := range expected {
+		index := len(vet.Suite) + offset
+		registeredRule := registry[index]
+		if registeredRule.Analyzer != analyzer {
+			test.Errorf("rule %d runs %q, expected %q", index, registeredRule.Analyzer.Name, analyzer.Name)
+			continue
+		}
+		if registeredRule.Name != rule.Namespace+analyzer.Name || registeredRule.UpstreamName != analyzer.Name {
+			test.Errorf(
+				"%q is registered as %q with upstream %q",
+				analyzer.Name, registeredRule.Name, registeredRule.UpstreamName,
+			)
+		}
+		if registeredRule.Origin != rule.OriginTools {
+			test.Errorf("%q has origin %q, expected %q", analyzer.Name, registeredRule.Origin, rule.OriginTools)
+		}
+		if !registeredRule.TypeAware {
+			test.Errorf("%q reads SSA built from type information, so it is type aware", analyzer.Name)
 		}
 	}
 }

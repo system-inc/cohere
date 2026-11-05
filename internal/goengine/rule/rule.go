@@ -24,6 +24,9 @@ const (
 	OriginVet Origin = "vet"
 	// OriginStaticcheck is one of staticcheck's checks, ported under its own name.
 	OriginStaticcheck Origin = "staticcheck"
+	// OriginTools is one of golang.org/x/tools' own analysis passes that cmd/vet leaves out, ported under its
+	// own name.
+	OriginTools Origin = "tools"
 )
 
 // Rule is one rule of the Go engine: an analyzer, plus the naming and provenance cohere adds to it.
@@ -65,12 +68,15 @@ func (rule Rule) Validate() error {
 		if rule.UpstreamName != "" {
 			return fmt.Errorf("rule %q is a house rule and names upstream %q; a house rule has no upstream", rule.Name, rule.UpstreamName)
 		}
-	case OriginVet, OriginStaticcheck:
+	case OriginVet, OriginStaticcheck, OriginTools:
 		if rule.UpstreamName == "" {
 			return fmt.Errorf("rule %q is ported from %s and names no upstream rule, so nobody can find what it ports", rule.Name, rule.Origin)
 		}
 	default:
-		return fmt.Errorf("rule %q has origin %q, which is none of %q, %q and %q", rule.Name, rule.Origin, OriginHouse, OriginVet, OriginStaticcheck)
+		return fmt.Errorf(
+			"rule %q has origin %q, which is none of %q, %q, %q and %q",
+			rule.Name, rule.Origin, OriginHouse, OriginVet, OriginStaticcheck, OriginTools,
+		)
 	}
 	return nil
 }
