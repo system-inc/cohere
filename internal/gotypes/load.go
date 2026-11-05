@@ -22,7 +22,7 @@ type Config struct {
 	// Directory is where go list runs and names the source module: the module of the go.mod at or above it.
 	Directory string
 
-	// Environment is added to every go command's environment, such as GOOS and GOARCH for another target.
+	// Environment is added to every go command's environment, such as `GOOS` and `GOARCH` for another target.
 	Environment []string
 
 	// Overlay is read in place of the files it names, by absolute path. Every file it names must be one of
@@ -351,7 +351,7 @@ func (loader *loader) check(listedPackage *listedPackage, packagePath, name stri
 	if listedPackage.Module != nil && listedPackage.Module.GoVersion != "" {
 		configuration.GoVersion = "go" + listedPackage.Module.GoVersion
 	}
-	// The error handler has every error, so Check's own return adds nothing.
+	// Ignored: the error handler has every error, so Check's own return adds nothing.
 	checked.Types, _ = configuration.Check(packagePath, loader.fileSet, checked.Syntax, info)
 	parsed := checked.Syntax
 	if !loader.roots[listedPackage.ImportPath] || variant {
@@ -436,6 +436,8 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 
 // parse reads the named files of one package into read, each from the overlay when it names it, with what
 // the parser reported, and with what go list reported when withListErrors, as the package's errors.
+//
+// Mutates: read gains the files, their syntax and their errors, as the package being loaded
 func (loader *loader) parse(listedPackage *listedPackage, names []string, withListErrors bool, read *Package) {
 	if withListErrors && listedPackage.Error != nil {
 		read.Errors = append(read.Errors, errors.New(listedPackage.Error.Err))
@@ -447,11 +449,16 @@ func (loader *loader) parse(listedPackage *listedPackage, names []string, withLi
 	}
 	for _, name := range names {
 		path := filepath.Join(listedPackage.Dir, name)
-		var source any
+		mode := parser.AllErrors | parser.ParseComments
+		var file *ast.File
+		var parseFileError error
+		// The parser reads the file itself when handed a nil source, and a nil []byte is no nil source: it would
+		// parse as an empty file. So the overlay's contents go in only when the overlay names the file.
 		if replacement, ok := loader.config.Overlay[path]; ok {
-			source = replacement
+			file, parseFileError = parser.ParseFile(loader.fileSet, path, replacement, mode)
+		} else {
+			file, parseFileError = parser.ParseFile(loader.fileSet, path, nil, mode)
 		}
-		file, parseFileError := parser.ParseFile(loader.fileSet, path, source, parser.AllErrors|parser.ParseComments)
 		if parseFileError != nil {
 			read.Errors = append(read.Errors, parseFileError)
 		}

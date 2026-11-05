@@ -94,7 +94,9 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 			Skipped: []string{"test-set-skips"}},
 	}
 	if !reflect.DeepEqual(records, want) {
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		got, _ := json.Marshal(records)
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		expected, _ := json.Marshal(want)
 		test.Errorf("readiness records\n got %s\nwant %s", got, expected)
 	}
@@ -283,7 +285,9 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 			warm.Coverage.Suppressed, cold.Coverage.Suppressed)
 	}
 	if !reflect.DeepEqual(recordsOf(cold), recordsOf(warm)) {
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		got, _ := json.Marshal(recordsOf(warm))
+		// Ignored: the records are plain structs of strings, numbers and slices, which always marshal.
 		want, _ := json.Marshal(recordsOf(cold))
 		test.Errorf("the warm walk's records\n got %s\nwant %s", got, want)
 	}

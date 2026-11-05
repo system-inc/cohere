@@ -15,11 +15,11 @@ import (
 // one file's bytes. Same bytes, same rule, same findings, with nothing else in the world able
 // to change the answer. So the key is a content hash and there is no invalidation graph.
 //
-// The word doing the work there is "pure". A rule that reads other files is not, and caching
-// it under one file's hash serves a stale result forever when the OTHER file changes. Two live
-// rules are cross-file today, and a third case is latent: the upstream adapter hands the whole
-// program to every rule it wraps and cannot inspect what it wrapped, so it can never truthfully
-// declare purity for a body it does not own.
+// The word doing the work there is "pure". A rule that reads other files is not, and caching it
+// under one file's hash serves a stale result forever when the other file, the one the hash never
+// covered, changes. Two live rules are cross-file today, and a third case is latent: the upstream
+// adapter hands the whole program to every rule it wraps and cannot inspect what it wrapped, so it
+// can never truthfully declare purity for a body it does not own.
 //
 // That is what CacheableRules exists to decide, and why it defaults to excluding rather than
 // including. The asymmetry is the same one the codebase already chose for the type checker:
@@ -246,7 +246,7 @@ func mergeAdamic(first *AdamicRecord, second *AdamicRecord) *AdamicRecord {
 // 2026-08-25 over `internal/rules`: 340 message ids, of which 11 build their description with
 // `fmt.Sprintf` from runtime values, so for those one id maps to many strings and no table could
 // exist. A cached finding replaying only the id would print an empty or wrong sentence beside a
-// correct file, range and rule — the right metadata carrying the wrong message, which is the one
+// correct file, range and rule: the right metadata carrying the wrong message, which is the one
 // failure here that looks exactly like success.
 //
 // The text is stored rather than the 11 being refused because refusing them buys bytes with a
@@ -260,7 +260,7 @@ func mergeAdamic(first *AdamicRecord, second *AdamicRecord) *AdamicRecord {
 // MessageId). Lookups key on the pair even though the text is now stored, so nobody later assumes
 // ids are unique.
 //
-// Fixes and suggestions are counted rather than stored, and that omission IS sound: a fix is a
+// Fixes and suggestions are counted rather than stored, and leaving them out is sound: a fix is a
 // replacement over a byte range, and replaying one computed against different bytes would corrupt
 // the file it claims to repair. A cached finding is a report, never an edit.
 type LintCacheFinding struct {
@@ -296,7 +296,7 @@ func HashContent(content string) [sha256.Size]byte {
 // (sortDiagnostics in walk.go); rule order never decided it.
 //
 // The conclusion survives the correction on different grounds. A reordered rule set can change
-// which findings EXIST rather than merely their sequence, because fixes applied by an earlier
+// which findings exist at all, not merely their sequence, because fixes applied by an earlier
 // rule change the text a later rule reads, and suppression directives are consumed in the order
 // rules run. So a cache keyed without rule order could replay a set the current configuration
 // would not produce, which is what this hash prevents.

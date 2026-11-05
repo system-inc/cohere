@@ -83,6 +83,10 @@ func FileVersion(text string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// syntaxDefinition prefixes every syntax elidedBodiesVersion computes, and moves when what it covers does.
+// 2: whitespace and plain comments outside bodies are left out.
+const syntaxDefinition = "syntax2:"
+
 // Signatures returns every project file's signature, keyed by file name, and how many were computed rather
 // than carried forward from previous.
 func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEntry) (map[string]SignatureEntry, int) {
@@ -173,6 +177,8 @@ var beforeSignatureEmit func(fileName string)
 //
 // The emits run on a goroutine of their own, and only this function touches shapes, so whatever the goroutine
 // finishes after the deadline is dropped.
+//
+// Mutates: shapes takes each graduated entry and the abandoned one, for the caller to write to the table
 func (g *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline time.Time, abandonAfter time.Duration) (graduated int, abandoned string) {
 	var candidates []*ast.SourceFile
 	for _, sourceFile := range g.ProjectFiles() {
@@ -286,10 +292,6 @@ func countContentKeyed(projectFiles []*ast.SourceFile, signatures map[string]Sig
 	}
 	return count
 }
-
-// syntaxDefinition prefixes every syntax elidedBodiesVersion computes, and moves when what it covers does.
-// 2: whitespace and plain comments outside bodies are left out.
-const syntaxDefinition = "syntax2:"
 
 // elidedBodiesVersion is the version of a file's text with the body of every function, method, accessor,
 // constructor and arrow function cut out, outermost first, and with the whitespace and
@@ -518,7 +520,7 @@ func writeSignatureDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.Source
 }
 
 // SignatureFingerprints gives each project file a hash of everything its types can depend on, like
-// TypeFingerprints, except that what it hashes of every OTHER file in its import closure is that file's
+// TypeFingerprints, except that what it hashes of every other file in its import closure is that file's
 // signature rather than its bytes. A body edit to a file imported by half the tree changes its own
 // fingerprint and nobody else's.
 //

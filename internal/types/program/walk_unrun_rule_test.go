@@ -46,7 +46,9 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(test *
 	listening := rule.Rule{
 		Name: "no-console",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				// Listens and reports nothing, so the rule counts as run.
+			}}
 		},
 	}
 

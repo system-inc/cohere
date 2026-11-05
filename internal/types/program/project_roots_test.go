@@ -50,8 +50,13 @@ func TestBuildRefusesARootItCannotReadInsteadOfPanicking(test *testing.T) {
 	if changeModeError := os.Chmod(locked, 0o000); changeModeError != nil {
 		test.Fatal(changeModeError)
 	}
-	test.Cleanup(func() { os.Chmod(locked, 0o644) })
+	test.Cleanup(func() {
+		// Ignored: the mode is put back only to be tidy, since removing the temporary directory unlinks the
+		// file whatever its mode.
+		os.Chmod(locked, 0o644)
+	})
 	if file, openError := os.Open(locked); openError == nil {
+		// Ignored: the file was opened read-only, only to learn whether it can be, so closing it loses nothing.
 		file.Close()
 		test.Skip("this user can read a mode-000 file, so the fixture cannot make a root unreadable")
 	}
@@ -108,7 +113,10 @@ func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(test *testing.T) {
 			default:
 			}
 			name := filepath.Join(directory, "Churn"+string(rune('A'+index%8))+".ts")
+			// Ignored: the churn only has to move the tree under the build, a write or removal that fails is
+			// one change fewer, and the test's claim holds for every interleaving.
 			os.WriteFile(name, []byte("export const churn = 1;\n"), 0o644)
+			// Ignored: as the write above, one change fewer.
 			os.Remove(name)
 		}
 	}()

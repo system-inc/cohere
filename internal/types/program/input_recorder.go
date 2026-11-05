@@ -15,7 +15,7 @@ import (
 // It exists for the run cache, and the reason it observes rather than enumerates is that every
 // hand-written list of a build's inputs turned out to be missing something. The program's source files
 // are the obvious inputs. Less obvious: the tsconfig's extends chain, every package.json module
-// resolution consulted, and every path resolution probed and did NOT find, since creating one of those
+// resolution consulted, and every path resolution probed and failed to find, since creating one of those
 // changes what an import resolves to. An in-place edit to a package.json beside the tsconfig moves no
 // directory's mtime, so a cache that only watched program files and their directories would replay a
 // stale verdict over a changed resolution. Recording at the filesystem boundary sees all of them

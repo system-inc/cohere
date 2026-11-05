@@ -84,8 +84,8 @@ func TestBuildProducesAProgramAndAChecker(test *testing.T) {
 // TestProjectFilesExcludesDeclarations proves the linted set is the config's own root set rather
 // than the program's whole population.
 //
-// This matters more than it looks. The program's file paths are canonicalized — lowercased on a
-// case-insensitive filesystem — while the config's names keep their original casing. Comparing the
+// This matters more than it looks. The program's file paths are canonicalized (lowercased on a
+// case-insensitive filesystem) while the config's names keep their original casing. Comparing the
 // two without canonicalizing matches nothing, and "nothing" is indistinguishable from a clean tree.
 // That is the exact shape of failure this project exists to refuse, so it is asserted rather than
 // assumed.
@@ -200,7 +200,9 @@ func TestWalkReportsCoverage(test *testing.T) {
 	listening := rule.Rule{
 		Name: "test-listening",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing: the test tells a rule that ran quiet from one that declined.
+			}}
 		},
 	}
 	// A rule that declines every file must be visibly distinct from one that ran and found nothing.
@@ -593,7 +595,9 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 		Name: "test-reports-nothing",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			return rule.Listeners{
-				ast.KindVariableDeclaration: func(node *ast.Node) {},
+				ast.KindVariableDeclaration: func(node *ast.Node) {
+					// Listens and reports nothing, so the walk runs it and nothing in it can panic.
+				},
 			}
 		},
 	}

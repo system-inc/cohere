@@ -120,7 +120,7 @@ func roundTripLintCache(test *testing.T, cache *program.LintCache) *program.Lint
 //
 // It then happened a fourth time, in the way this test could not see. The comparisons below were
 // written out by hand, so `MessageDescription` was added to the struct and this test kept passing
-// without ever looking at it — a test named for every field, checking the fields someone
+// without ever looking at it: a test named for every field, checking the fields someone
 // remembered. TestLintCacheFindingHasNoUncheckedFields now makes that structural: it fails when a
 // field exists that the comparison does not name, so the next field cannot be added silently.
 func TestLintCacheRoundTripsEveryField(test *testing.T) {
@@ -337,8 +337,8 @@ func TestRuleSetHashIsOrderSensitive(test *testing.T) {
 // for every field silently stopped covering one.
 //
 // So this asserts the field set itself. Adding a field to LintCacheFinding fails here until it is
-// named below AND compared above, which is the cheapest way to make "the encoder forgot a field"
-// impossible to ship — the exact bug this format has produced four times.
+// named below and compared above as well, which is the cheapest way to make "the encoder forgot a
+// field" impossible to ship: the exact bug this format has produced four times.
 func TestLintCacheFindingHasNoUncheckedFields(test *testing.T) {
 	test.Parallel()
 	// Every field the round-trip test compares. Kept in sync by this test failing, not by discipline.

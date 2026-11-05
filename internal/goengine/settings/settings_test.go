@@ -69,6 +69,7 @@ var fileFixtures = map[string]string{
 func TestMain(suite *testing.M) {
 	root, createError := os.MkdirTemp("", "goengine-settings-")
 	if createError != nil {
+		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "creating the fixture directory: %v\n", createError)
 		os.Exit(1)
 	}
@@ -76,11 +77,13 @@ func TestMain(suite *testing.M) {
 	writeError := writeFixtures()
 	code := 1
 	if writeError != nil {
+		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "writing the fixtures: %v\n", writeError)
 	} else {
 		code = suite.Run()
 	}
 	if removeError := os.RemoveAll(root); removeError != nil {
+		// Ignored: standard error is the only place left to say it, and the test binary exits next.
 		fmt.Fprintf(os.Stderr, "removing the fixture directory %s: %v\n", root, removeError)
 	}
 	os.Exit(code)

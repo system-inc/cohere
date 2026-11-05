@@ -88,13 +88,6 @@ func (timing DiskTiming) Summed() time.Duration {
 		timing.Realpaths.Summed
 }
 
-// diskCounters accumulates calls from many goroutines at once. Atomic rather than locked, because a
-// lock here would serialize the loaders and measure itself.
-type diskCounters struct {
-	counts    [diskCallKinds]atomic.Int64
-	durations [diskCallKinds]atomic.Int64
-}
-
 const (
 	diskRead = iota
 	diskExistence
@@ -103,6 +96,13 @@ const (
 	diskRealpath
 	diskCallKinds
 )
+
+// diskCounters accumulates calls from many goroutines at once. Atomic rather than locked, because a
+// lock here would serialize the loaders and measure itself.
+type diskCounters struct {
+	counts    [diskCallKinds]atomic.Int64
+	durations [diskCallKinds]atomic.Int64
+}
 
 func (c *diskCounters) add(kind int, started time.Time) {
 	c.counts[kind].Add(1)

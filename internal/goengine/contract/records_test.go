@@ -76,6 +76,9 @@ func shapeOf(name string, value any) shape {
 	return nil
 }
 
+// mergeShapes is first with second's fields merged in at every depth, or second when first is nil.
+//
+// Mutates: first takes second's fields, and is returned, so the caller folds every shape into one map
 func mergeShapes(first shape, second shape) shape {
 	if first == nil {
 		return second
@@ -89,6 +92,8 @@ func mergeShapes(first shape, second shape) shape {
 // indexFields records the shape of every field at any depth by its name, so a field whose example in
 // one record is empty (a finding's `suggestions: []`) is compared against its example in another (an
 // unused record's suggestions).
+//
+// Mutates: index gains every field of fields, at any depth, merged with the shape it already held for that name
 func indexFields(fields shape, index map[string]shape) {
 	for key, member := range fields {
 		if member != nil {
@@ -353,7 +358,9 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 				continue
 			}
 			compared++
-			var reencoded, original any
+			// Every record is a JSON object, so each side decodes into one.
+			reencoded := map[string]any{}
+			original := map[string]any{}
 			if decodeError := json.Unmarshal(output.Bytes(), &reencoded); decodeError != nil {
 				test.Fatalf("%s: the reencoded %s record does not decode: %v\n%s", filepath.Base(fixture), envelope.Kind, decodeError, output.String())
 			}
@@ -361,11 +368,9 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 				test.Fatal(decodeError)
 			}
 			// A fixture from before an additive field has none, and this engine always writes it.
-			if reencodedObject, isObject := reencoded.(map[string]any); isObject {
-				for _, additive := range additiveFields[envelope.Kind] {
-					if !strings.Contains(line, `"`+additive+`"`) {
-						delete(reencodedObject, additive)
-					}
+			for _, additive := range additiveFields[envelope.Kind] {
+				if !strings.Contains(line, `"`+additive+`"`) {
+					delete(reencoded, additive)
 				}
 			}
 			if !reflect.DeepEqual(reencoded, original) {

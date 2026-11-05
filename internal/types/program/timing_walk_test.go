@@ -87,7 +87,8 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 
 	// The walk locks each worker to its thread for the walk, so a listener's own reads of the thread
 	// clock are of the thread the meter reads.
-	var sleptTotal, spunTotal atomic.Int64
+	var sleptTotal atomic.Int64
+	var spunTotal atomic.Int64
 	sleeper := rule.Rule{
 		Name: "planted-sleeper",
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {

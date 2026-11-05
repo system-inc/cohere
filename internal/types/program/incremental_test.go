@@ -229,7 +229,7 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	}
 	test.Logf("build info written, %d bytes", written.Size())
 
-	// Leg three: plant a violation AFTER the build info was written, then run warm. This is
+	// Leg three: plant a violation only once the build info is written, then run warm. This is
 	// the case a stale cache fails. The file is new, so the cache has never seen it, and a
 	// cache that trusts its snapshot over the filesystem reports nothing here.
 	plantedPath := filepath.Join(directory, "planted.ts")

@@ -398,7 +398,7 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 			}
 			path := filepath.Join(root, "lib.ts")
 			bodyText := strings.Replace(lib, "return \"before\";", "return \"edited body\";", 1)
-			if writeError := os.WriteFile(path, []byte(bodyText), 0644); writeError != nil {
+			if writeError := os.WriteFile(path, []byte(bodyText), 0o644); writeError != nil {
 				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
@@ -422,7 +422,7 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 				test.Fatal("body replay differs from cold")
 			}
 			signatureText := strings.Replace(bodyText, "function shapeProbe(): string { return \"edited body\"; }", "function shapeProbe(): number { return 1; }", 1)
-			if writeError := os.WriteFile(path, []byte(signatureText), 0644); writeError != nil {
+			if writeError := os.WriteFile(path, []byte(signatureText), 0o644); writeError != nil {
 				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}
@@ -439,7 +439,7 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 				test.Fatal("signature refresh differs from cold")
 			}
 			initializerText := strings.Replace(signatureText, "= React.createElement", "= Other.createElement", 1)
-			if writeError := os.WriteFile(path, []byte(initializerText), 0644); writeError != nil {
+			if writeError := os.WriteFile(path, []byte(initializerText), 0o644); writeError != nil {
 				test.Fatal(writeError)
 			}
 			counter.ran = map[string]int{}

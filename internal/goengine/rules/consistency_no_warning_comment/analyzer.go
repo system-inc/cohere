@@ -4,7 +4,7 @@
 // code around it reads as finished to every reader not looking at that line, and the task is done only if someone
 // happens to edit the file. A deferred task belongs where tasks are tracked, where it is seen.
 //
-// The words are matched as written, in capitals, and only as whole words, so a sentence about TODOS or a lowercase
+// The words are matched as written, in capitals, and only as whole words, so a sentence about `TODOS` or a lowercase
 // todo is prose. Go's directives are instructions to a tool and are not read, and neither is anything in backticks,
 // which is how a comment mentions the word without deferring anything, as this package's own comments do.
 package consistency_no_warning_comment
@@ -122,7 +122,7 @@ func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGr
 }
 
 // isWholeWord is whether text[start:end] stands alone: no letter, digit or underscore of any script touches it on
-// either side, so TODOS, TODO_LIST, XXXX, 0xXXX and ÜTODO are other words.
+// either side, so `TODOS`, `TODO_LIST`, `XXXX`, `0xXXX` and `ÜTODO` are other words.
 func isWholeWord(text string, start int, end int) bool {
 	before, _ := utf8.DecodeLastRuneInString(text[:start])
 	after, _ := utf8.DecodeRuneInString(text[end:])

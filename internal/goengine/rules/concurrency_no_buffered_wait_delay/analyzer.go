@@ -34,6 +34,9 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/concurrency-no-buffered-wait-delay"
 
+// cureFlag is the option naming the cure package's import path.
+const cureFlag = "cure"
+
 // NewAnalyzer builds the rule's analyzer with a flag set of its own. The rule reads its cure option from the
 // analyzer running it, so a test can run a configured and an unconfigured analyzer side by side without one
 // setting a flag the other reads.
@@ -70,9 +73,6 @@ var Rule = rule.Rule{
 var bufferedWaitDelayMessage = policy.MessageOf(Name, "bufferedWaitDelay")
 
 var bufferedWaitDelayWithoutReasonMessage = policy.MessageOf(Name, "bufferedWaitDelayWithoutReason")
-
-// cureFlag is the option naming the cure package's import path.
-const cureFlag = "cure"
 
 // waitDelayMarker opens the comment that excuses a WaitDelay, Adamic's spelling, so a reason written for Adamic's
 // rule carries over.

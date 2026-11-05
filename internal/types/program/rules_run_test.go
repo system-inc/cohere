@@ -36,7 +36,9 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 
 	listens := func(name string) rule.Rule {
 		return rule.Rule{Name: name, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {}}
+			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+				// Listens and reports nothing: the test counts which rules were offered a file, not what they found.
+			}}
 		}}
 	}
 	declines := rule.Rule{Name: "test-declines", Run: func(ruleContext rule.Context, options any) rule.Listeners { return nil }}
