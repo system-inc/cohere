@@ -66,14 +66,33 @@ func parseWith(text string, construct func(in *input) *parser) (root *estree.Nod
 	return toEstree(parser.root, in), nil
 }
 
-// toEstree hands a node out as an estree.Node, offsets crossing from UTF-16 units to bytes.
+// toEstree hands a node out as an estree.Node, offsets crossing from UTF-16 units to bytes. raws and
+// source become the plain objects the css glue reads, built only here, where they are handed to the node;
+// the parser carries them typed.
 func toEstree(each *node, in *input) *estree.Node {
 	start, end := 0, 0
 	if each.source != nil && each.source.start != nil && each.source.end != nil {
 		start = in.byteOffset(each.source.start.offset)
 		end = in.byteOffset(each.source.end.offset)
 	}
-	result := estree.New(each.nodeType, start, end, "raws", rawsToMap(each.raws))
+	// raws holds each raw as postcss does: text as a string, a flag as a bool, and Parser.raw's pair as
+	// {raw, value}, with postcss-scss's scss beside them where it set one.
+	raws := make(map[string]any, len(each.raws))
+	for key, entry := range each.raws {
+		switch typed := entry.(type) {
+		case rawText:
+			raws[key] = string(typed)
+		case rawFlag:
+			raws[key] = bool(typed)
+		case *rawValue:
+			pair := map[string]any{"raw": typed.raw, "value": typed.value}
+			if typed.hasScss {
+				pair["scss"] = typed.scss
+			}
+			raws[key] = pair
+		}
+	}
+	result := estree.New(each.nodeType, start, end, "raws", raws)
 	for _, key := range each.keys {
 		switch key {
 		case "nodes":
@@ -83,7 +102,22 @@ func toEstree(each *node, in *input) *estree.Node {
 			}
 			result.Set("nodes", children)
 		case "source":
-			result.Set("source", sourceToMap(each.source, in))
+			// Each position's offset is in bytes; its column stays in UTF-16 units, as postcss counts.
+			nodeSource := map[string]any{
+				"start": map[string]any{
+					"column": each.source.start.column,
+					"line":   each.source.start.line,
+					"offset": in.byteOffset(each.source.start.offset),
+				},
+			}
+			if each.source.end != nil {
+				nodeSource["end"] = map[string]any{
+					"column": each.source.end.column,
+					"line":   each.source.end.line,
+					"offset": in.byteOffset(each.source.end.offset),
+				}
+			}
+			result.Set("source", nodeSource)
 		case "selector":
 			result.Set("selector", each.selector)
 		case "name":
@@ -101,41 +135,10 @@ func toEstree(each *node, in *input) *estree.Node {
 		case "isNested":
 			result.Set("isNested", each.isNested)
 		default:
+			// Invariant: keys holds only the names the node constructors list and the parser marks, and
+			// each of them has an arm here; Parse recovers the panic into an error.
 			panic("postcss: no field " + key)
 		}
 	}
 	return result
-}
-
-func rawsToMap(raws map[string]any) map[string]any {
-	result := make(map[string]any, len(raws))
-	for key, value := range raws {
-		if raw, isRaw := value.(*rawValue); isRaw {
-			rawMap := map[string]any{"raw": raw.raw, "value": raw.value}
-			if raw.hasScss {
-				rawMap["scss"] = raw.scss
-			}
-			result[key] = rawMap
-			continue
-		}
-		result[key] = value
-	}
-	return result
-}
-
-func sourceToMap(each *source, in *input) map[string]any {
-	result := map[string]any{"start": positionToMap(each.start, in)}
-	if each.end != nil {
-		result["end"] = positionToMap(each.end, in)
-	}
-	return result
-}
-
-// positionToMap is a position with its offset in bytes; column stays in UTF-16 units, as postcss counts.
-func positionToMap(each *position, in *input) map[string]any {
-	return map[string]any{
-		"column": each.column,
-		"line":   each.line,
-		"offset": in.byteOffset(each.offset),
-	}
 }
