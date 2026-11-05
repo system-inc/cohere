@@ -321,7 +321,11 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding nil: %v", err)
 		}
-		if decoded.(PreferStatelessFunctionOptions).IgnorePureComponents {
+		options, ok := decoded.(PreferStatelessFunctionOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want PreferStatelessFunctionOptions", decoded)
+		}
+		if options.IgnorePureComponents {
 			test.Fatal("ignorePureComponents defaulted to true, upstream defaults it to false")
 		}
 	})
@@ -332,7 +336,11 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding: %v", err)
 		}
-		if !decoded.(PreferStatelessFunctionOptions).IgnorePureComponents {
+		options, ok := decoded.(PreferStatelessFunctionOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want PreferStatelessFunctionOptions", decoded)
+		}
+		if !options.IgnorePureComponents {
 			test.Fatal("the option did not decode")
 		}
 	})

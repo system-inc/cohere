@@ -294,7 +294,10 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding the array arm: %v", err)
 		}
-		options := decoded.(JsxNoScriptUrlOptions)
+		options, ok := decoded.(JsxNoScriptUrlOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		}
 		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Foo" {
 			test.Fatalf("legacy list is %v, want one entry named Foo", options.Legacy)
 		}
@@ -309,7 +312,11 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding the object arm: %v", err)
 		}
-		if options := decoded.(JsxNoScriptUrlOptions); len(options.Legacy) != 0 {
+		options, ok := decoded.(JsxNoScriptUrlOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		}
+		if len(options.Legacy) != 0 {
 			test.Fatalf("legacy list is %v, want empty", options.Legacy)
 		}
 	})
@@ -320,7 +327,10 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding both arms: %v", err)
 		}
-		options := decoded.(JsxNoScriptUrlOptions)
+		options, ok := decoded.(JsxNoScriptUrlOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want JsxNoScriptUrlOptions", decoded)
+		}
 		if len(options.Legacy) != 1 || options.Legacy[0].Name != "Bar" {
 			test.Fatalf("legacy list is %v, want one entry named Bar", options.Legacy)
 		}

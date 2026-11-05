@@ -466,7 +466,10 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("decoding a named allow list: %v", err)
 		}
-		options := decoded.(StylePropObjectOptions)
+		options, ok := decoded.(StylePropObjectOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want StylePropObjectOptions", decoded)
+		}
 		if len(options.Allow) != 2 || options.Allow[0] != "MyComponent" || options.Allow[1] != "Other" {
 			test.Fatalf("allow list is %v", options.Allow)
 		}

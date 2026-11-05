@@ -112,10 +112,7 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 		if err := rule.UnmarshalOptions(item, &asObject); err != nil {
 			return options, fmt.Errorf("decoding a forbid entry: %w", err)
 		}
-		options.Forbid = append(options.Forbid, ForbidElementsEntry{
-			Element: asObject.Element,
-			Message: asObject.Message,
-		})
+		options.Forbid = append(options.Forbid, ForbidElementsEntry(asObject))
 	}
 	return options, nil
 }

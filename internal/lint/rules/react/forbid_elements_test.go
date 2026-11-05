@@ -400,7 +400,10 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		options := decoded.(ForbidElementsOptions)
+		options, ok := decoded.(ForbidElementsOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidElementsOptions", decoded)
+		}
 		if len(options.Forbid) != 2 {
 			test.Fatalf("want 2 entries, got %d", len(options.Forbid))
 		}
@@ -418,7 +421,10 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		options := decoded.(ForbidElementsOptions)
+		options, ok := decoded.(ForbidElementsOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidElementsOptions", decoded)
+		}
 		got := []string{options.Forbid[0].Element, options.Forbid[1].Element, options.Forbid[2].Element}
 		if got[0] != "x" || got[1] != "y" || got[2] != "z" {
 			test.Errorf("order is %v", got)

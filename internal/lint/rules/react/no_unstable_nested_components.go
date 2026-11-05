@@ -865,11 +865,17 @@ func (s *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *ast.No
 // kept in propNamePatternMatchers. Keyed by the pattern rather than held in one variable, because a
 // run can lint under more than one configuration.
 func compilePropNamePattern(pattern string) func(string) bool {
-	if cached, found := propNamePatternMatchers.Load(pattern); found {
-		return cached.(func(string) bool)
+	stored, found := propNamePatternMatchers.Load(pattern)
+	if !found {
+		stored, _ = propNamePatternMatchers.LoadOrStore(pattern, buildPropNamePattern(pattern))
 	}
-	matcher, _ := propNamePatternMatchers.LoadOrStore(pattern, buildPropNamePattern(pattern))
-	return matcher.(func(string) bool)
+	matcher, isMatcher := stored.(func(string) bool)
+	if !isMatcher {
+		// Invariant: this function is the only writer to propNamePatternMatchers, and it stores only
+		// what buildPropNamePattern returns.
+		panic("react: propNamePatternMatchers held something other than a matcher")
+	}
+	return matcher
 }
 
 // propNamePatternMatchers holds compilePropNamePattern's matcher for each pattern seen.

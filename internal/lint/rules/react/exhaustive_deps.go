@@ -95,24 +95,12 @@ var (
 			"render, and the state it sets causes the next render. That is a loop with no exit. Pass " +
 			"a dependency array saying what the effect actually depends on.",
 	}
-	messageExhaustiveDepsRefCleanup = rule.Message{
-		Id: "exhaustiveDepsRefCleanup",
-		Description: "A cleanup function runs after the component has moved on, so a ref read there " +
-			"gives whatever the ref points at then, not what it pointed at when the effect ran. Copy " +
-			"the ref's value into a local inside the effect and read that local in the cleanup.",
-	}
 	messageExhaustiveDepsRequireExplicitEffectDeps = rule.Message{
 		Id: "exhaustiveDepsRequireExplicitEffectDeps",
 		Description: "This effect was called with no second argument, and the configuration asks every " +
 			"effect to say what it depends on. An effect with no array runs after every render, which " +
 			"is sometimes the intent and often an oversight nobody can tell apart from it. Pass a " +
 			"dependency array, or an explicit `undefined` to say every render is meant.",
-	}
-	messageExhaustiveDepsStaleAssignment = rule.Message{
-		Id: "exhaustiveDepsStaleAssignment",
-		Description: "Assigning to a variable declared in the component body from inside a Hook " +
-			"writes to that render's copy, which is discarded when the next render makes a new one. " +
-			"Hold the value in a useRef so it survives, or move the variable inside the callback.",
 	}
 )
 

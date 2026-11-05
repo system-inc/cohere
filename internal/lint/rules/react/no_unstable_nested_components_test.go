@@ -1630,8 +1630,12 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding a pattern: %v", err)
 	}
-	if pattern := decoded.(NoUnstableNestedComponentsOptions).PropNamePattern; pattern != "*Renderer" {
-		test.Errorf("pattern %q, want *Renderer", pattern)
+	options, ok = decoded.(NoUnstableNestedComponentsOptions)
+	if !ok {
+		test.Fatalf("decoder returned %T", decoded)
+	}
+	if options.PropNamePattern != "*Renderer" {
+		test.Errorf("pattern %q, want *Renderer", options.PropNamePattern)
 	}
 
 	// An explicit empty pattern folds back onto the default, matching upstream's `|| 'render*'`,
@@ -1640,8 +1644,12 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding an empty pattern: %v", err)
 	}
-	if pattern := decoded.(NoUnstableNestedComponentsOptions).PropNamePattern; pattern != "render*" {
-		test.Errorf("empty pattern gave %q, want render*", pattern)
+	options, ok = decoded.(NoUnstableNestedComponentsOptions)
+	if !ok {
+		test.Fatalf("decoder returned %T", decoded)
+	}
+	if options.PropNamePattern != "render*" {
+		test.Errorf("empty pattern gave %q, want render*", options.PropNamePattern)
 	}
 
 	// customValidators is in upstream's schema and unread by this rule. It must decode rather than
