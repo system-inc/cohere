@@ -25,7 +25,8 @@ func correctnessNoWriteOnlyCollectionMessage() rule.Message {
 
 // CorrectnessNoWriteOnlyCollection reports a local array, Map or Set that is filled and never read.
 //
-//	invalid: const bmRanks = new Map<number, number>(); rows.forEach(function(row, index) { bmRanks.set(row.rowid, index); });
+//	invalid: const bmRanks = new Map<number, number>();
+//	         rows.forEach(function(row, index) { bmRanks.set(row.rowid, index); });
 //	invalid: const seen: string[] = []; for(const row of rows) { seen.push(row.id); }
 //	valid:   const ranks = new Map<number, number>(); rows.forEach(...ranks.set(...)...); return ranks.get(id);
 //	valid:   const seen = new Set<string>(); for(...) { if(seen.has(id)) continue; seen.add(id); }

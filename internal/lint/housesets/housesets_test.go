@@ -19,7 +19,8 @@ func buildProject(test *testing.T, files map[string]string) (string, *program.Gr
 	// A copy takes the default tsconfig, so the caller's map holds only what the caller put in it.
 	fixture := maps.Clone(files)
 	if _, written := fixture["tsconfig.json"]; !written {
-		fixture["tsconfig.json"] = `{"compilerOptions": {"jsx": "preserve", "strict": true, "noEmit": true, "skipLibCheck": true}, "include": ["**/*"]}`
+		fixture["tsconfig.json"] = `{"compilerOptions": {"jsx": "preserve", "strict": true, "noEmit": true, ` +
+			`"skipLibCheck": true}, "include": ["**/*"]}`
 	}
 	for name, contents := range fixture {
 		path := filepath.Join(root, name)

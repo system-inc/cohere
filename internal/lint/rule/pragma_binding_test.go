@@ -28,7 +28,8 @@ func TestPragmaBindingRejectsWrongFileIdentifier(test *testing.T) {
 	test.Parallel()
 	home := pragmaParse(test, "/home.ts", "const local = 1;")
 	foreign := pragmaParse(test, "/foreign.ts", "const createElement = React.createElement;")
-	identifier := foreign.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Name()
+	variableStatement := foreign.Statements.Nodes[0].AsVariableStatement()
+	identifier := variableStatement.DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Name()
 	defer func() {
 		if recover() == nil {
 			test.Error("wrong-file identifier accepted before checker lookup")

@@ -442,7 +442,8 @@ func TestConsistencyNoIsoStringDateCutFollowsOnlyThisFile(test *testing.T) {
 		scripts,
 	))
 
-	files["/repository/source/Reading.ts"] = "const startedIsoHere = new Date().toISOString();\nconst startedOnHere = startedIsoHere.slice(0, 10);"
+	files["/repository/source/Reading.ts"] = "const startedIsoHere = new Date().toISOString();\n" +
+		"const startedOnHere = startedIsoHere.slice(0, 10);"
 	consistencyNoIsoStringDateCutExpect(test, rule_testing.RunTypedFilesWithSetup(
 		test,
 		ConsistencyNoIsoStringDateCut,

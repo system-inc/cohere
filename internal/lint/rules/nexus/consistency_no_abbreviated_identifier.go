@@ -499,7 +499,8 @@ func importedNamesNeverRedeclared(sourceFile *ast.SourceFile) map[string]bool {
 	visit = func(node *ast.Node) bool {
 		if node.Kind == ast.KindIdentifier && node.Parent != nil && node.Parent.Name() == node {
 			switch node.Parent.Kind {
-			case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier, ast.KindImportEqualsDeclaration:
+			case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier,
+				ast.KindImportEqualsDeclaration:
 				imported[node.Text()] = true
 			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment, ast.KindPropertyAccessExpression,
 				ast.KindPropertySignature, ast.KindPropertyDeclaration, ast.KindMethodDeclaration,

@@ -34,9 +34,11 @@ var exportOriginFiles = map[string]string{
 	"hooks.d.ts":    "declare module 'hooks' {\n  export { useMemo as useHook } from 'react';\n}\n",
 	"body.ts": "import * as React from 'react';\n" +
 		"export function make() { return 5; }\nexport const viaBody = make();\n",
-	"main.ts": "import * as React from 'react';\nimport ReactDefault from 'react';\nimport { useMemo as memo } from 'react';\n" +
+	"main.ts": "import * as React from 'react';\nimport ReactDefault from 'react';\n" +
+		"import { useMemo as memo } from 'react';\n" +
 		"import { useLocalState } from './star';\nimport { useAliased } from './alias';\n" +
-		"import { useMemo as starMemo } from './star_react';\nimport { useCycled } from './cycle_b';\nimport { useHook } from 'hooks';\nimport { viaBody } from './body';\n" +
+		"import { useMemo as starMemo } from './star_react';\nimport { useCycled } from './cycle_b';\n" +
+		"import { useHook } from 'hooks';\nimport { viaBody } from './body';\n" +
 		"const localThing = (value: number) => value;\n" +
 		"starMemo(() => 1, []);\nuseLocalState(1);\nuseAliased(() => 1, []);\nuseCycled(1);\nuseHook(() => 1, []);\n" +
 		"React.useState(1);\nReact['useMemo'](() => 1, []);\nReactDefault.useMemo(() => 1, []);\n" +
