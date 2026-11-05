@@ -329,7 +329,7 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 		&UnaryExpression{Value: place(1)},
 		&PrefixUpdate{LValue: place(1), Value: place(2)},
 		&PostfixUpdate{LValue: place(1), Value: place(2)},
-		&Primitive{Value: nil},
+		&Primitive{Value: PrimitiveUndefined{}},
 		&RegExpLiteral{},
 		&TemplateLiteral{Subexprs: []Place{place(1)}},
 		&TaggedTemplateExpression{Tag: place(1), Subexprs: []Place{place(2)}},

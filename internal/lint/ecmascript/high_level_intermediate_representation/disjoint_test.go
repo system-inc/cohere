@@ -500,7 +500,7 @@ func TestDisjointMayAllocateMatchesReact(test *testing.T) {
 		{"PropertyDelete", &PropertyDelete{}, false},
 		{"ComputedLoad", &ComputedLoad{}, false},
 		{"ComputedDelete", &ComputedDelete{}, false},
-		{"Primitive", &Primitive{}, false},
+		{"Primitive", &Primitive{Value: PrimitiveUndefined{}}, false},
 		{"TemplateLiteral", &TemplateLiteral{}, false},
 		{"JsxText", &JsxText{}, false},
 		{"UnaryExpression", &UnaryExpression{}, false},

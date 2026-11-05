@@ -635,7 +635,7 @@ func (builder *builder) lowerReturnStatement(node *ast.Node) {
 		builder.emitTo(builder.function.Returns, &LoadLocal{Place: result}, node)
 		value = builder.function.Returns
 	} else {
-		builder.emitTo(builder.function.Returns, &Primitive{Value: nil}, node)
+		builder.emitTo(builder.function.Returns, &Primitive{Value: PrimitiveUndefined{}}, node)
 	}
 	builder.terminateWith(&Return{Value: value})
 }

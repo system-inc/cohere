@@ -317,8 +317,8 @@ func refsPrimitiveStringAt(
 		}
 		if primitive, isPrimitive :=
 			instruction.Value.(*high_level_intermediate_representation.Primitive); isPrimitive {
-			if text, isText := primitive.Value.(string); isText {
-				return text
+			if text, isText := primitive.Value.(high_level_intermediate_representation.PrimitiveString); isText {
+				return string(text)
 			}
 		}
 		return ""

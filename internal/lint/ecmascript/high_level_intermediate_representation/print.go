@@ -158,7 +158,7 @@ func printValue(function *Function, value InstructionValue) string {
 	case *PostfixUpdate:
 		return fmt.Sprintf("PostfixUpdate %s%s", place(typed.Value), typed.Operation)
 	case *Primitive:
-		return fmt.Sprintf("Primitive %v", typed.Value)
+		return "Primitive " + printPrimitiveValue(typed.Value)
 	case *RegExpLiteral:
 		return fmt.Sprintf("RegExp /%s/%s", typed.Pattern, typed.Flags)
 	case *TemplateLiteral:
@@ -247,6 +247,27 @@ func printValue(function *Function, value InstructionValue) string {
 		return fmt.Sprintf("Unsupported %s", typed.Reason)
 	}
 	return "<unknown>"
+}
+
+// printPrimitiveValue renders a literal as bare text: a number, a string and a bigint as the text
+// they hold, a boolean as `true` or `false`, and null and undefined by name so the two read apart.
+// A `Primitive` built with no value at all prints `<nil>`.
+func printPrimitiveValue(value PrimitiveValue) string {
+	switch typed := value.(type) {
+	case PrimitiveNull:
+		return "null"
+	case PrimitiveUndefined:
+		return "undefined"
+	case PrimitiveBoolean:
+		return fmt.Sprintf("%t", bool(typed))
+	case PrimitiveNumber:
+		return string(typed)
+	case PrimitiveString:
+		return string(typed)
+	case PrimitiveBigInt:
+		return string(typed)
+	}
+	return "<nil>"
 }
 
 func printPattern(function *Function, pattern Pattern) string {

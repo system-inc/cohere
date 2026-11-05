@@ -40,7 +40,10 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(test *testing.T) {
 			function := NewFunction(nil, "helper", FunctionKindOther)
 			function.NewIdentifier("condition", nil, 0)
 			function.NewIdentifier("input", nil, 1)
-			leaf := &ReactiveInstruction{Order: 7, Value: &ReactiveInstructionValue{Value: &Primitive{Value: 1}}}
+			leaf := &ReactiveInstruction{
+				Order: 7,
+				Value: &ReactiveInstructionValue{Value: &Primitive{Value: PrimitiveNumber("1")}},
+			}
 			inner := &ReactiveScopeBlock{
 				Scope:        2,
 				Pruned:       testCase.prunedInner,
