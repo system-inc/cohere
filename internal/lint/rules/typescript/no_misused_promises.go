@@ -524,8 +524,8 @@ var NoMisusedPromises = rule.Rule{
 			t *checker.Type,
 			memberName string,
 		) *ast.Symbol {
-			// `@typescript-eslint` escapes the name first, with `ts.escapeLeadingUnderscores`. Upstream
-			// does not, and neither does this port.
+			// Upstream escapes the name first, with `ts.escapeLeadingUnderscores`. This port does not, a gap
+			// carried from the Go port it came from (see the doc above).
 			symbol := checker.Type_symbol(t)
 			if symbol != nil {
 				symbol = symbol.Members[memberName]
@@ -831,8 +831,8 @@ var NoMisusedPromises = rule.Rule{
 							ruleContext.ReportNode(returnType, buildVoidReturnPropertyMessage())
 						} else {
 							ruleContext.ReportNode(
-								// `@typescript-eslint` narrows this to the function's head with
-								// `getFunctionHeadLoc`; upstream reports the whole initializer, as this does.
+								// Upstream narrows this to the function's head with `getFunctionHeadLoc`;
+								// this port reports the whole initializer, the same finding over a wider range.
 								property.Initializer,
 								buildVoidReturnPropertyMessage(),
 							)
@@ -889,8 +889,8 @@ var NoMisusedPromises = rule.Rule{
 						ruleContext.ReportNode(node.Type(), buildVoidReturnPropertyMessage())
 					} else {
 						ruleContext.ReportNode(
-							// `@typescript-eslint` narrows this to the function's head with
-							// `getFunctionHeadLoc`; upstream reports the whole node, as this does.
+							// Upstream narrows this to the function's head with `getFunctionHeadLoc`;
+							// this port reports the whole node, the same finding over a wider range.
 							node,
 							buildVoidReturnPropertyMessage(),
 						)
