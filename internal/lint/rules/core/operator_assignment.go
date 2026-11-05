@@ -220,10 +220,11 @@ var OperatorAssignment = rule.Rule{
 // Written as a loop with its own nil check rather than calling `ast.SkipParentheses`, which
 // dereferences its argument. Every caller here can be handed a nil operand from a recovered parse.
 func operatorAssignmentUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // operatorAssignmentVerify is upstream's `cohere`, the `always` arm.

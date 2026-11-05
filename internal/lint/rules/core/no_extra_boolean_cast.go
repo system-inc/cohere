@@ -437,6 +437,7 @@ func (reporter booleanCastReporter) padForTokenBoundary(target *ast.Node, replac
 	}
 	span := rule.TokenRange(reporter.context.SourceFile, target)
 	start, end := span.Pos(), span.End()
+	padded := replacement
 
 	// Decoded as runes rather than indexed as bytes. Upstream indexes bytes and casts, which reads
 	// a continuation byte as a character whenever the neighbour is non-ASCII, and every identifier
@@ -446,16 +447,16 @@ func (reporter booleanCastReporter) padForTokenBoundary(target *ast.Node, replac
 	// wrong in whichever direction the continuation byte happened to fall.
 	previous, previousSize := utf8.DecodeLastRuneInString(reporter.sourceText[:start])
 	if previousSize > 0 && isIdentifierPart(previous) {
-		if first, _ := utf8.DecodeRuneInString(replacement); isIdentifierPart(first) {
-			replacement = " " + replacement
+		if first, _ := utf8.DecodeRuneInString(padded); isIdentifierPart(first) {
+			padded = " " + padded
 		}
 	}
 	next, nextSize := utf8.DecodeRuneInString(reporter.sourceText[end:])
 	if nextSize > 0 && isIdentifierStart(next) &&
-		!isASCIISpace(replacement[len(replacement)-1]) {
-		replacement += " "
+		!isAsciiSpace(padded[len(padded)-1]) {
+		padded += " "
 	}
-	return replacement
+	return padded
 }
 
 // tokenText returns a node's own source text, without the trivia in front of it.
@@ -599,8 +600,8 @@ func isIdentifierStart(character rune) bool {
 	return character == '$' || character == '_' || unicode.IsLetter(character)
 }
 
-// isASCIISpace answers whether a byte is ASCII whitespace.
-func isASCIISpace(character byte) bool {
+// isAsciiSpace answers whether a byte is ASCII whitespace.
+func isAsciiSpace(character byte) bool {
 	switch character {
 	case ' ', '\t', '\n', '\r', '\v', '\f':
 		return true

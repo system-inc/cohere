@@ -191,6 +191,8 @@ func noUselessReturnSomethingRunsAfter(block *control_flow_graph.Block[noUseless
 }
 
 // noUselessReturnWalk follows the successors, including the dead tail the return itself created.
+//
+// Mutates: seen the walk marks every block it enters, so one set stops the whole recursion revisiting
 func noUselessReturnWalk(from *control_flow_graph.Block[noUselessReturnEvent],
 	seen map[*control_flow_graph.Block[noUselessReturnEvent]]bool, enclosingTry *ast.Node) bool {
 	for _, successor := range from.Successors {
@@ -415,12 +417,12 @@ func noUselessReturnIsTheOnlyReturn(root *ast.Node, candidate *ast.Node) bool {
 
 // noUselessReturnMaybeTypeOfKind is the checker's `maybeTypeOfKind`: the type has the flag, or a
 // union or intersection member does.
-func noUselessReturnMaybeTypeOfKind(t *checker.Type, kind checker.TypeFlags) bool {
-	if t.Flags()&kind != 0 {
+func noUselessReturnMaybeTypeOfKind(checkedType *checker.Type, kind checker.TypeFlags) bool {
+	if checkedType.Flags()&kind != 0 {
 		return true
 	}
-	if t.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
-		for _, member := range t.Types() {
+	if checkedType.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
+		for _, member := range checkedType.Types() {
 			if noUselessReturnMaybeTypeOfKind(member, kind) {
 				return true
 			}

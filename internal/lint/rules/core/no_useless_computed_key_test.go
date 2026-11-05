@@ -24,7 +24,7 @@ type noUselessComputedKeyCase struct {
 	properties  []string
 }
 
-func stringPointer(value string) *string { return &value }
+func stringPointer(value string) *string { return new(value) }
 
 // decodeUselessComputedKeyOptionsForTest routes a case's options through the shipped decoder.
 //
@@ -167,8 +167,8 @@ func TestNoUselessComputedKeyFires(test *testing.T) {
 				testCase.source, decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.properties))
-			for i := range wantIds {
-				wantIds[i] = "unnecessarilyComputedProperty"
+			for index := range wantIds {
+				wantIds[index] = "unnecessarilyComputedProperty"
 			}
 			rule_testing.ExpectFindings(test, result, wantIds...)
 
@@ -177,21 +177,21 @@ func TestNoUselessComputedKeyFires(test *testing.T) {
 			// exactly rather than with a substring test: a `strings.Contains` on an interpolated
 			// value stays green when the interpolation doubles a character, which is a defect this
 			// tree has actually shipped.
-			for i, property := range testCase.properties {
+			for index, property := range testCase.properties {
 				want := "Unnecessarily computed property [" + property + "] found."
-				got := result.Diagnostics[i].Message.Description
+				got := result.Diagnostics[index].Message.Description
 				if !strings.HasPrefix(got, want) {
-					test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+					test.Errorf("finding %d: message should begin %q, got %q", index, want, got)
 				}
 			}
 
 			if testCase.fixedSource == nil {
 				// Upstream's `output: null`: reported, deliberately not repaired. Reproducing the
 				// decline is the assertion.
-				for i, diagnostic := range result.Diagnostics {
+				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
 						test.Errorf("finding %d proposes %d fixes; upstream declines to fix this case",
-							i, len(diagnostic.Fixes))
+							index, len(diagnostic.Fixes))
 					}
 				}
 				return
@@ -418,10 +418,10 @@ func TestNoUselessComputedKeyAddedCases(test *testing.T) {
 				return
 			}
 			if testCase.fixedSource == "" {
-				for i, diagnostic := range result.Diagnostics {
+				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
 						test.Errorf("finding %d proposes a fix; upstream declines here (%s)",
-							i, testCase.reason)
+							index, testCase.reason)
 					}
 				}
 				return
@@ -547,11 +547,11 @@ func TestNoUselessComputedKeyDeclinesToRepairARecoveredParse(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, source)
 			rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
-			for i, diagnostic := range result.Diagnostics {
+			for index, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
 					test.Errorf("finding %d proposes %d fixes on a recovered parse; the bracket span "+
 						"is not delimited by brackets, so any repair would corrupt the file",
-						i, len(diagnostic.Fixes))
+						index, len(diagnostic.Fixes))
 				}
 			}
 		})

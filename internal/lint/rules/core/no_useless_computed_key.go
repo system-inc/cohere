@@ -330,8 +330,8 @@ func uselessComputedKeyRepair(ruleContext rule.Context, name *ast.Node, key *ast
 // `({ [('x')]: 0 })` repair to `({ 'x': 0 })` exactly as upstream's own case asserts. Anything else
 // non-whitespace here is a comment, and a comment is upstream's decline.
 func uselessComputedKeyHasTrivia(between string) bool {
-	for i := 0; i < len(between); i++ {
-		switch between[i] {
+	for index := 0; index < len(between); index++ {
+		switch between[index] {
 		case ' ', '\t', '\n', '\r', '\v', '\f', '(', ')':
 			continue
 		}
@@ -378,20 +378,21 @@ func uselessComputedKeyTokensCanBeAdjacent(source string, openBracket int, key *
 	// A numeric literal fuses only when its first character can continue an identifier. `.2` starts
 	// with a dot and cannot; `2` can.
 	keyStart := source[key.Pos():key.End()]
-	for i := 0; i < len(keyStart); i++ {
-		if keyStart[i] == ' ' || keyStart[i] == '\t' || keyStart[i] == '\n' || keyStart[i] == '\r' {
+	for index := 0; index < len(keyStart); index++ {
+		if keyStart[index] == ' ' || keyStart[index] == '\t' || keyStart[index] == '\n' || keyStart[index] == '\r' {
 			continue
 		}
-		return !uselessComputedKeyIsWordCharacter(keyStart[i])
+		return !uselessComputedKeyIsWordCharacter(keyStart[index])
 	}
 	return true
 }
 
 // uselessComputedKeyIsWordCharacter says whether a byte can appear inside an identifier or a number,
 // which is what decides whether two tokens fuse when written flush.
-func uselessComputedKeyIsWordCharacter(b byte) bool {
-	return b == '_' || b == '$' ||
-		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+func uselessComputedKeyIsWordCharacter(character byte) bool {
+	return character == '_' || character == '$' ||
+		(character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+		(character >= '0' && character <= '9')
 }
 
 // uselessComputedKeyName returns the member's name node, for the member kinds this rule visits.

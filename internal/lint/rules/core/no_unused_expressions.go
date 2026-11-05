@@ -33,9 +33,9 @@ type NoUnusedExpressionsOptions struct {
 	// ever builds a string.
 	AllowTaggedTemplates bool `json:"allowTaggedTemplates"`
 
-	// EnforceForJSX extends the rule to `<div />` in statement position, which is off by default in
+	// EnforceForJsx extends the rule to `<div />` in statement position, which is off by default in
 	// both upstreams because an element expression is a common intermediate while editing.
-	EnforceForJSX bool `json:"enforceForJSX"`
+	EnforceForJsx bool `json:"enforceForJSX"`
 
 	// IgnoreDirectives is inert in this port and deliberately so.
 	//
@@ -200,7 +200,7 @@ func (verdict unusedExpressionVerdict) isDisallowed(expression *ast.Node) bool {
 		return !verdict.options.AllowTaggedTemplates
 
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
-		return verdict.options.EnforceForJSX
+		return verdict.options.EnforceForJsx
 
 	// The wrappers that carry no runtime meaning: parentheses and the type-only assertions. Each
 	// hands the question to what it wraps, which is why `(a())` stays silent while `(a)` reports.

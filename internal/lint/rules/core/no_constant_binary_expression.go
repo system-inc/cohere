@@ -191,30 +191,30 @@ func (judge constantJudge) constantComparisonOperand(known *ast.Node, other *ast
 // nullish and accepts any `void`, since `void anything` evaluates to undefined. Merging them would
 // widen a rule nobody asked me to change.
 func (judge constantJudge) isNullishValue(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindNullKeyword, ast.KindVoidExpression:
 		return true
 	case ast.KindIdentifier:
-		return node.Text() == "undefined" && judge.isGlobal(node)
+		return unwrapped.Text() == "undefined" && judge.isGlobal(unwrapped)
 	}
 	return false
 }
 
 // isStaticBoolean reports a literal true or false, or a Boolean call with a constant argument.
 func (judge constantJudge) isStaticBoolean(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
 	case ast.KindCallExpression:
-		return judge.isGlobalBooleanCall(node)
+		return judge.isGlobalBooleanCall(unwrapped)
 	}
 	return false
 }
@@ -225,15 +225,15 @@ func (judge constantJudge) isStaticBoolean(node *ast.Node) bool {
 // which is what stops `null ?? a` reporting on a left side that is exactly the value `??` exists to
 // handle.
 func (judge constantJudge) hasConstantNullishness(node *ast.Node, nonNullish bool) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
-	if nonNullish && judge.isNullishValue(node) {
+	if nonNullish && judge.isNullishValue(unwrapped) {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
 		ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindClassExpression,
 		ast.KindNewExpression,
@@ -248,14 +248,14 @@ func (judge constantJudge) hasConstantNullishness(node *ast.Node, nonNullish boo
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "undefined" && judge.isGlobal(node)
+		return unwrapped.Text() == "undefined" && judge.isGlobal(unwrapped)
 
 	case ast.KindVoidExpression, ast.KindTypeOfExpression, ast.KindPrefixUnaryExpression,
 		ast.KindDeleteExpression, ast.KindAwaitExpression:
 		// void is always undefined; typeof is always a string; the unary math and logical
 		// operators all yield numbers, strings, or booleans. Await is ESLint's addition and is
 		// deliberately not claimed here, so it falls through to false below.
-		switch node.Kind {
+		switch unwrapped.Kind {
 		case ast.KindAwaitExpression:
 			return false
 		}
@@ -263,7 +263,7 @@ func (judge constantJudge) hasConstantNullishness(node *ast.Node, nonNullish boo
 
 	case ast.KindCallExpression:
 		// The five wrapper constructors always return a value of their own type.
-		call := node.AsCallExpression()
+		call := unwrapped.AsCallExpression()
 		callee := ast.SkipParentheses(call.Expression)
 		if callee == nil || callee.Kind != ast.KindIdentifier {
 			return false
@@ -278,7 +278,7 @@ func (judge constantJudge) hasConstantNullishness(node *ast.Node, nonNullish boo
 		return false
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}
@@ -310,12 +310,12 @@ func (judge constantJudge) hasConstantNullishness(node *ast.Node, nonNullish boo
 // fixed rather than whether the node can be a boolean at all. `[]` coerces to `0`, `[1]` coerces to
 // `1`, so an array of one element is not fixed while an empty one or a longer one is.
 func (judge constantJudge) hasConstantLooseBooleanComparison(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression, ast.KindClassExpression,
 		ast.KindArrowFunction, ast.KindFunctionExpression,
 		ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
@@ -324,13 +324,13 @@ func (judge constantJudge) hasConstantLooseBooleanComparison(node *ast.Node) boo
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "undefined" && judge.isGlobal(node)
+		return unwrapped.Text() == "undefined" && judge.isGlobal(unwrapped)
 
 	case ast.KindArrayLiteralExpression:
 		// `[x]` coerces to whatever x stringifies to, which could be "0" or "1", so a single
 		// element is the one case that varies. Empty or several elements always coerce to
 		// something that is neither.
-		elements := node.AsArrayLiteralExpression().Elements.Nodes
+		elements := unwrapped.AsArrayLiteralExpression().Elements.Nodes
 		nonSpread := 0
 		for _, element := range elements {
 			if element != nil && element.Kind != ast.KindSpreadElement {
@@ -341,13 +341,13 @@ func (judge constantJudge) hasConstantLooseBooleanComparison(node *ast.Node) boo
 
 	case ast.KindTemplateExpression:
 		// A template with substitutions could produce "0" or "1".
-		return len(node.AsTemplateExpression().TemplateSpans.Nodes) == 0
+		return len(unwrapped.AsTemplateExpression().TemplateSpans.Nodes) == 0
 
 	case ast.KindVoidExpression, ast.KindTypeOfExpression:
 		return true
 
 	case ast.KindPrefixUnaryExpression:
-		unary := node.AsPrefixUnaryExpression()
+		unary := unwrapped.AsPrefixUnaryExpression()
 		if unary.Operator == ast.KindExclamationToken {
 			return isConstantExpression(unary.Operand, true)
 		}
@@ -359,10 +359,10 @@ func (judge constantJudge) hasConstantLooseBooleanComparison(node *ast.Node) boo
 		return false
 
 	case ast.KindCallExpression:
-		return judge.isGlobalBooleanCall(node)
+		return judge.isGlobalBooleanCall(unwrapped)
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}
@@ -384,12 +384,12 @@ func (judge constantJudge) hasConstantLooseBooleanComparison(node *ast.Node) boo
 // boolean, so `[] === true` is always false whatever the array holds. That makes it broader than
 // the loose version rather than narrower, which reads backwards until you see why.
 func (judge constantJudge) hasConstantStrictBooleanComparison(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
 		ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindClassExpression,
 		ast.KindNewExpression, ast.KindTemplateExpression,
@@ -401,10 +401,10 @@ func (judge constantJudge) hasConstantStrictBooleanComparison(node *ast.Node) bo
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "undefined" && judge.isGlobal(node)
+		return unwrapped.Text() == "undefined" && judge.isGlobal(unwrapped)
 
 	case ast.KindPrefixUnaryExpression:
-		unary := node.AsPrefixUnaryExpression()
+		unary := unwrapped.AsPrefixUnaryExpression()
 		if unary.Operator == ast.KindExclamationToken {
 			return isConstantExpression(unary.Operand, true)
 		}
@@ -416,7 +416,7 @@ func (judge constantJudge) hasConstantStrictBooleanComparison(node *ast.Node) bo
 		return false
 
 	case ast.KindCallExpression:
-		call := node.AsCallExpression()
+		call := unwrapped.AsCallExpression()
 		callee := ast.SkipParentheses(call.Expression)
 		if callee == nil || callee.Kind != ast.KindIdentifier {
 			return false
@@ -429,12 +429,12 @@ func (judge constantJudge) hasConstantStrictBooleanComparison(node *ast.Node) bo
 			// Never return a boolean.
 			return true
 		case "Boolean":
-			return isConstantBooleanCall(node)
+			return isConstantBooleanCall(unwrapped)
 		}
 		return false
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}
@@ -474,26 +474,26 @@ func isNumericOrStringBinaryOperator(operator ast.Kind) bool {
 // A `new` call counts only for the built-in constructors. A user-defined one may return a sentinel
 // from its constructor, which is a real pattern and would make the comparison meaningful.
 func (judge constantJudge) isAlwaysNew(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
 		ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindClassExpression,
 		ast.KindRegularExpressionLiteral:
 		return true
 
 	case ast.KindNewExpression:
-		callee := ast.SkipParentheses(node.AsNewExpression().Expression)
+		callee := ast.SkipParentheses(unwrapped.AsNewExpression().Expression)
 		if callee == nil || callee.Kind != ast.KindIdentifier {
 			return false
 		}
 		return isEcmaScriptGlobalConstructor(callee.Text()) && judge.isGlobal(callee)
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}
@@ -504,7 +504,7 @@ func (judge constantJudge) isAlwaysNew(node *ast.Node) bool {
 		return false
 
 	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return judge.isAlwaysNew(conditional.WhenTrue) && judge.isAlwaysNew(conditional.WhenFalse)
 	}
 
@@ -532,25 +532,25 @@ func isEcmaScriptGlobalConstructor(name string) bool {
 
 // isStaticLiteral reports a value knowable without running anything.
 func (judge constantJudge) isStaticLiteral(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
 		ast.KindRegularExpressionLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		return true
 
 	case ast.KindIdentifier:
-		return node.Text() == "undefined" && judge.isGlobal(node)
+		return unwrapped.Text() == "undefined" && judge.isGlobal(unwrapped)
 
 	case ast.KindTemplateExpression:
-		return len(node.AsTemplateExpression().TemplateSpans.Nodes) == 0
+		return len(unwrapped.AsTemplateExpression().TemplateSpans.Nodes) == 0
 
 	case ast.KindPrefixUnaryExpression:
-		unary := node.AsPrefixUnaryExpression()
+		unary := unwrapped.AsPrefixUnaryExpression()
 		switch unary.Operator {
 		case ast.KindMinusToken, ast.KindPlusToken, ast.KindTildeToken:
 			operand := ast.SkipParentheses(unary.Operand)
