@@ -4,7 +4,8 @@ package constrained
 
 import "fmt"
 
-// Generated is a generator's, unformatted and with a printf finding, neither of which is reported.
+// Generated is a generator's: unformatted, which gofmt leaves alone, and with a printf finding, which vet
+// reports here as anywhere.
 func Generated() {
     fmt.Printf("%d\n", "three")
 }

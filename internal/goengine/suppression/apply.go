@@ -107,8 +107,19 @@ func Apply(knownRules []string, rulesRan []string, indexes []*Index, findings []
 		ran[ruleName] = true
 	}
 
-	statesByFile := map[string][]*directiveState{}
+	// One index per file, the first: a second copy's directives would be built as states of their own, and a
+	// finding credits only one of them, so the other would be reported unused for withholding what its twin did.
+	var unique []*Index
+	seenFiles := map[string]bool{}
 	for _, index := range indexes {
+		if !seenFiles[index.File] {
+			seenFiles[index.File] = true
+			unique = append(unique, index)
+		}
+	}
+
+	statesByFile := map[string][]*directiveState{}
+	for _, index := range unique {
 		for _, indexed := range index.directives {
 			statesByFile[index.File] = append(statesByFile[index.File], resolveDirective(index.File, indexed, known))
 		}
@@ -125,12 +136,10 @@ func Apply(knownRules []string, rulesRan []string, indexes []*Index, findings []
 		outcome.WithheldByRule[finding.Rule]++
 	}
 
-	for _, index := range indexes {
+	for _, index := range unique {
 		for _, state := range statesByFile[index.File] {
 			outcome.DirectiveFindings = append(outcome.DirectiveFindings, directiveFindings(state, ran)...)
 		}
-		// Two indexes for one file would otherwise report its directives twice.
-		delete(statesByFile, index.File)
 	}
 	slices.SortStableFunc(outcome.DirectiveFindings, func(left DirectiveFinding, right DirectiveFinding) int {
 		return cmp.Or(

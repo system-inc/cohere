@@ -13,21 +13,14 @@ import (
 	"github.com/system-inc/cohere/internal/goengine/suppression"
 )
 
-// lintRecord is the contract's lint record with one additive field, withheldBySuppression: the findings each
-// rule's //cohere:ignore comments withheld, so a run that hid everything never reads like one that found
-// nothing. The front door ignores the field until it reads it, as the contract asks of a field it does not list.
-// Embedding keeps the record's kind the contract's own, so the writer still knows it as a lint record.
-type lintRecord struct {
-	contract.LintRecord
-	WithheldBySuppression map[string]int `json:"withheldBySuppression"`
-}
-
 // lintSuppressionRules are suppression's two rules, which run in the lint phase on the directives themselves.
 var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.RuleRequireIgnoreReason}
 
 // runLint is the lint phase: the rules the settings leave on, over the analyzed packages, after a load with no
 // type error. Findings outside the scope or in an excluded file are dropped, then the //cohere:ignore comments
-// in the files in scope withhold what they cover and report what is wrong with them.
+// in the files in scope withhold what they cover and report what is wrong with them. A generated file is in
+// scope like any other: the driver itself withholds a house rule's findings there and counts them, and a vet or
+// tools finding there is still a bug in what ships, so it is written.
 func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 	if !engine.request.requests(contract.PhaseLint) {
 		engine.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -114,8 +107,9 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 		engine.write(finding)
 	}
 
-	record := engine.lintCoverage(result, findings, turnedOff)
+	record := engine.lintCoverage(result, findings, turnedOff, notConfigured(enabled))
 	record.WithheldBySuppression = outcome.withheldByRule
+	record.WithheldAsGenerated = result.WithheldAsGenerated
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true
 	}
@@ -194,25 +188,46 @@ func ruleFinding(found check.Finding, severity contract.Severity) contract.Findi
 	}
 }
 
+// notConfigured are the enabled rules missing an option without which they report nothing, sorted by name. The
+// options were set from the settings before the first record, so an empty flag here is one nobody configured.
+func notConfigured(enabled []rule.Rule) []string {
+	names := []string{}
+	for _, enabledRule := range enabled {
+		for _, option := range enabledRule.ConfiguredBy {
+			if flag := enabledRule.Analyzer.Flags.Lookup(option); flag == nil || flag.Value.String() == "" {
+				names = append(names, enabledRule.Name)
+				break
+			}
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
 // lintCoverage is the lint record's counts. The rules are the analyzers and suppression's two, never the format
 // rule, which belongs to the fix phase. Of them, the ones the settings turned off listened to no file and are
-// named silent, off by the config for every file the rules walked; the ones that ran and wrote no finding,
-// whether they had nothing to say or everything they said was outside the scope or withheld, are watched and
-// quiet; the rest found something. A rule that crashed on a package is counted by what it wrote on the others,
-// and the crash itself is in crashes, which makes the run incomplete.
+// named silent, off by the config for every file the rules walked; so are the ones not configured that wrote
+// nothing, since a rule missing its options cannot report and is not quiet but unconfigured. The ones that ran
+// and wrote no finding, whether they had nothing to say or everything they said was outside the scope or
+// withheld, are watched and quiet; the rest found something. A rule that crashed on a package is counted by what
+// it wrote on the others, and the crash itself is in crashes, which makes the run incomplete.
 func (engine *pipeline) lintCoverage(
-	result *check.Result, written []contract.FindingRecord, turnedOff []string,
-) lintRecord {
+	result *check.Result, written []contract.FindingRecord, turnedOff []string, unconfigured []string,
+) contract.LintRecord {
 	writtenByRule := map[string]int{}
 	for _, finding := range written {
 		writtenByRule[finding.Rule]++
 	}
-	ranNames := make([]string, 0, len(result.FindingsByRule)+len(lintSuppressionRules))
-	for name := range result.FindingsByRule {
-		ranNames = append(ranNames, name)
-	}
 	// Never nil, so a run with nothing off writes `[]` rather than `null`.
 	silent := append([]string{}, turnedOff...)
+	ranNames := make([]string, 0, len(result.FindingsByRule)+len(lintSuppressionRules))
+	for name := range result.FindingsByRule {
+		if slices.Contains(unconfigured, name) && writtenByRule[name] == 0 {
+			silent = append(silent, name)
+			continue
+		}
+		ranNames = append(ranNames, name)
+	}
 	for _, name := range lintSuppressionRules {
 		if _, on := engine.severityOf(name); on {
 			ranNames = append(ranNames, name)
@@ -222,7 +237,7 @@ func (engine *pipeline) lintCoverage(
 	}
 	slices.Sort(silent)
 
-	record := lintRecord{LintRecord: contract.LintRecord{
+	record := contract.LintRecord{
 		Findings:           len(written),
 		RulesRun:           len(ranNames) + len(silent),
 		FilesWalked:        result.FilesWalked,
@@ -230,9 +245,9 @@ func (engine *pipeline) lintCoverage(
 		RulesSilent:        silent,
 		Crashes:            []contract.Crash{},
 		RulesScopedOff:     map[string]int{},
-		RulesNotConfigured: []string{},
+		RulesNotConfigured: unconfigured,
 		ConfigNote:         engine.settings.Note,
-	}}
+	}
 	for _, name := range ranNames {
 		if writtenByRule[name] == 0 {
 			record.RulesWatchedAndQuiet++
@@ -240,7 +255,9 @@ func (engine *pipeline) lintCoverage(
 	}
 	if result.FilesWalked > 0 {
 		for _, name := range silent {
-			record.RulesScopedOff[name] = result.FilesWalked
+			if !slices.Contains(unconfigured, name) {
+				record.RulesScopedOff[name] = result.FilesWalked
+			}
 		}
 	}
 	for _, crash := range result.Crashes {

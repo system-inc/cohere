@@ -4,9 +4,6 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -21,9 +18,6 @@ import (
 	"github.com/system-inc/cohere/internal/goengine/project"
 )
 
-// generatedReason is why a generated file is not ours: its output is its generator's to fix.
-const generatedReason = "generated, marked // Code generated ... DO NOT EDIT"
-
 // moduleDescription is one owned module as the project record names it.
 type moduleDescription struct {
 	// directory is absolute.
@@ -37,8 +31,8 @@ type moduleDescription struct {
 type describedProject struct {
 	workspace project.Workspace
 
-	// readableOurs are the census's files that are ours and could be read, before the build constraints and
-	// generated files narrow them: what the load accounts for. An unreadable file is left out, since the load
+	// readableOurs are the census's files that are ours and could be read, before the build constraints narrow
+	// them: what the load accounts for. An unreadable file is left out, since the load
 	// reads each file it accounts for and one it cannot open fails it whole; the file is already a record.
 	readableOurs []string
 
@@ -148,10 +142,9 @@ func describeProject(request invocation) (*describedProject, error) {
 		constraintReasons[excluded.File] = excluded.Reason
 	}
 	for _, file := range readable {
+		// A generated file stays ours: format.Run skips it, and the driver keeps vet's findings there and withholds
+		// a house rule's, so excluding it here would hide the bugs a generator ships.
 		reason, excluded := constraintReasons[file]
-		if !excluded && isGenerated(file, contents[file]) {
-			reason, excluded = generatedReason, true
-		}
 		if excluded {
 			described.record.Excluded = append(described.record.Excluded,
 				contract.ExcludedFile{File: file, Reason: reason})
@@ -288,15 +281,6 @@ func insideScope(file string, scope []string) bool {
 		}
 	}
 	return false
-}
-
-// isGenerated reports whether a file is a generator's, by the rule go/ast.IsGenerated reads from the comments
-// above the package clause. A file that does not get that far is the fix and types phases' to report, so it is
-// not called generated.
-func isGenerated(file string, contents []byte) bool {
-	headerMode := parser.PackageClauseOnly | parser.ParseComments
-	header, parseError := parser.ParseFile(token.NewFileSet(), file, contents, headerMode)
-	return parseError == nil && ast.IsGenerated(header)
 }
 
 // unreadableSentence says why a file could not be read, without the path the record already names.

@@ -44,6 +44,58 @@ var panickingRule = rule.Rule{
 	},
 }
 
+// everyFileRule is a planted house rule that reports at every file's package clause, so a run shows which files
+// a house rule's findings are written for and which the driver withholds as generated.
+var everyFileRule = rule.Rule{
+	Name:   rule.Namespace + "consistency-report-every-file",
+	Origin: rule.OriginHouse,
+	Analyzer: &analysis.Analyzer{
+		Name: "everyfile",
+		Doc:  "everyfile reports every file, so a test can see which of its findings are written.",
+		Run: func(pass *analysis.Pass) (any, error) {
+			for _, file := range pass.Files {
+				pass.Reportf(file.Package, "a file")
+			}
+			return nil, nil
+		},
+	},
+}
+
+// limitRule is a planted rule with an option, which reports the value it read, so a run shows the option the
+// settings gave it reached its analyzer.
+var limitRule = rule.Rule{
+	Name:     rule.Namespace + "correctness-report-limit",
+	Origin:   rule.OriginHouse,
+	Analyzer: newLimitAnalyzer(),
+}
+
+func newLimitAnalyzer() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{Name: "reportlimit", Doc: "reportlimit reports the limit it was given, once."}
+	limit := analyzer.Flags.Int("limit", 0, "the limit to report")
+	analyzer.Run = func(pass *analysis.Pass) (any, error) {
+		pass.Reportf(pass.Files[0].Package, "the limit is %d", *limit)
+		return nil, nil
+	}
+	return analyzer
+}
+
+// unconfiguredRule is a planted rule that reports nothing without its one option, which no setting gives it.
+var unconfiguredRule = rule.Rule{
+	Name:         rule.Namespace + "correctness-require-package-option",
+	Origin:       rule.OriginHouse,
+	Analyzer:     newUnconfiguredAnalyzer(),
+	ConfiguredBy: []string{"package"},
+}
+
+func newUnconfiguredAnalyzer() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{
+		Name: "packageoption", Doc: "packageoption reports nothing until it names a package.",
+	}
+	analyzer.Flags.String("package", "", "the package to look for")
+	analyzer.Run = func(*analysis.Pass) (any, error) { return nil, nil }
+	return analyzer
+}
+
 // endToEndCase is one run of the engine over a copy of a fixture, compared with the case's expected stream.
 type endToEndCase struct {
 	// name is the case, and the directory under testdata holding its expected files.
@@ -81,7 +133,10 @@ var endToEndCases = []endToEndCase{
 	{name: "vet-finding", exitCode: 1},
 	{name: "workspace", exitCode: 0, verify: unchanged("third_party/lib/lib.go", "workspace")},
 	{name: "cgo", exitCode: 0},
-	{name: "build-constrained", exitCode: 0, verify: unchanged("generated.go", "build-constrained")},
+	{name: "build-constrained", exitCode: 1, verify: unchanged("generated.go", "build-constrained")},
+	{name: "generated-house-rule", fixture: "build-constrained", exitCode: 1, rules: []rule.Rule{everyFileRule}},
+	{name: "options", exitCode: 1, rules: []rule.Rule{limitRule, unconfiguredRule}},
+	{name: "option-unknown", exitCode: 2, rules: []rule.Rule{limitRule}},
 	{name: "panicking-rule", fixture: "clean", exitCode: 1, rules: []rule.Rule{panickingRule}},
 	{name: "suppression", exitCode: 1},
 	{name: "configured", exitCode: 1},

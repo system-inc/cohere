@@ -621,6 +621,24 @@ func TestApplyStillReportsAnUnknownRuleAndAMissingReason(test *testing.T) {
 	}
 }
 
+// TestApplyKeepsOneIndexPerFile hands Apply the same file's index twice. Built twice, the directive's two copies
+// would split one finding between them, and the copy not credited would be reported unused.
+func TestApplyKeepsOneIndexPerFile(test *testing.T) {
+	test.Parallel()
+	source := "package fixture\n//cohere:ignore printf the format is built at run time\nvar first = risky()\n"
+	indexes := []*Index{Build("a.go", []byte(source)), Build("a.go", []byte(source))}
+	findings := []Finding{{Rule: "cohere-go/printf", File: "a.go", Line: 3}}
+
+	outcome := Apply(knownRules, knownRules, indexes, findings)
+
+	if len(outcome.DirectiveFindings) != 0 {
+		test.Fatalf("directive findings %s, want none", renderDirectiveFindings(outcome.DirectiveFindings))
+	}
+	if len(outcome.Kept) != 0 || outcome.WithheldByRule["cohere-go/printf"] != 1 {
+		test.Fatalf("kept %v and withheld %v, want the one finding withheld once", outcome.Kept, outcome.WithheldByRule)
+	}
+}
+
 // TestBuildConcurrently builds and applies from many goroutines at once, as the engine does per package.
 func TestBuildConcurrently(test *testing.T) {
 	test.Parallel()

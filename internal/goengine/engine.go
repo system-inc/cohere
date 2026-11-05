@@ -81,6 +81,9 @@ func run(arguments []string, standardOutput io.Writer, standardError io.Writer, 
 	if settingsError != nil {
 		return refuse(standardError, settingsError)
 	}
+	if optionsError := configureRules(ruleSettings, registered); optionsError != nil {
+		return refuse(standardError, optionsError)
+	}
 	described, describeError := describeProject(request)
 	if describeError != nil {
 		return refuse(standardError, describeError)
