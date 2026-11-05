@@ -12,6 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/goengine/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
+	"github.com/system-inc/cohere/internal/lint/optionschema"
 	"github.com/system-inc/cohere/internal/lint/registry"
 )
 
@@ -147,6 +148,130 @@ func TestTheGoExampleLoadsInTheGoEngine(test *testing.T) {
 	if _, loadError := settings.Load(filepath.Dir(path), path, knownRules); loadError != nil {
 		test.Errorf("the reference's go example is refused by the Go engine: %v", loadError)
 	}
+}
+
+// goBlockRule is the one rule the go blocks below name, and the one the Go engine is told it knows.
+const goBlockRule = "cohere-go/performance-require-parallel-test"
+
+// goBlocks are go blocks of every shape the Go engine accepts and every shape it refuses. Each is judged by
+// both the engine and the published schema, and neither verdict is written here, so the list needs no
+// upkeep beyond a new shape. A rule name the engine does not know is left out on purpose: the schema leaves
+// names open, since the Go engine's registry is not the one this package lists, and the engine refuses them.
+var goBlocks = []string{
+	`{"rules": {}}`,
+	`{"rules": {"` + goBlockRule + `": "error"}}`,
+	`{"rules": {"` + goBlockRule + `": "warn"}}`,
+	`{"rules": {"` + goBlockRule + `": "warning"}}`,
+	`{"rules": {"` + goBlockRule + `": "off"}}`,
+	`{"rules": {"` + goBlockRule + `": ["error"]}}`,
+	`{"rules": {"` + goBlockRule + `": ["warn", {}]}}`,
+	`{"rules": {"` + goBlockRule + `": ["off", {"limit": 3}]}}`,
+
+	`{}`,
+	`[]`,
+	`null`,
+	`"error"`,
+	`{"format": {}, "rules": {}}`,
+	`{"rules": {}, "severity": "error"}`,
+	`{"rules": []}`,
+	`{"rules": null}`,
+	`{"rules": {"` + goBlockRule + `": "fatal"}}`,
+	`{"rules": {"` + goBlockRule + `": "Error"}}`,
+	`{"rules": {"` + goBlockRule + `": "allow"}}`,
+	`{"rules": {"` + goBlockRule + `": "deny"}}`,
+	`{"rules": {"` + goBlockRule + `": ["deny"]}}`,
+	`{"rules": {"` + goBlockRule + `": [2]}}`,
+	`{"rules": {"` + goBlockRule + `": 2}}`,
+	`{"rules": {"` + goBlockRule + `": true}}`,
+	`{"rules": {"` + goBlockRule + `": null}}`,
+	`{"rules": {"` + goBlockRule + `": {}}}`,
+	`{"rules": {"` + goBlockRule + `": []}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", {}, {}]}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", "always"]}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", null]}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", [{}]]}}`,
+}
+
+// TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts: every go block above is read by
+// internal/goengine/settings and validated against the go block of the published schema, and the two
+// verdicts must agree in both directions, so an editor never passes a block the engine refuses (`{}` once
+// did, before the schema required rules) or flags one it reads.
+func TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts(test *testing.T) {
+	test.Parallel()
+	goSchema := compiledGoSchema(test)
+	for _, block := range goBlocks {
+		path := writeSettings(test, map[string]string{"CohereSettings.json": `{"go": ` + block + `}`})
+		_, engineError := settings.Load(filepath.Dir(path), path, []string{goBlockRule})
+		schemaError := goSchema.Validate([]json.RawMessage{json.RawMessage(block)})
+		switch {
+		case engineError != nil && schemaError == nil:
+			test.Errorf("the schema accepts the go block %s, and the engine refuses it: %v", block, engineError)
+		case engineError == nil && schemaError != nil:
+			test.Errorf("the schema refuses the go block %s, and the engine reads it: %v", block, schemaError)
+		}
+	}
+}
+
+// compiledGoSchema compiles the published project schema's go block with internal/lint/optionschema, the
+// repository's in-process validator. That validator is a draft-04 subset held to ajv 6, and the published
+// schema is 2020-12, so one keyword is translated: prefixItems becomes draft-04's tuple, items as a list,
+// which means the same thing. The validator ignores a keyword it does not know, and an untranslated one
+// reads as permissive, so a keyword this misses fails the refusal half of the test above rather than
+// hiding there. The block is wrapped as the one element of a list, since Validate checks an option list.
+func compiledGoSchema(test *testing.T) *optionschema.Schema {
+	test.Helper()
+	var published struct {
+		Properties map[string]any `json:"properties"`
+	}
+	if decodeError := json.Unmarshal(built(test)[ProjectSchemaPath], &published); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	goBlock, present := published.Properties["go"]
+	if !present {
+		test.Fatal("the project schema has no go block")
+	}
+	wrapped, encodeError := json.Marshal(map[string]any{
+		"type":            "array",
+		"items":           []any{draftFourTuples(test, goBlock)},
+		"additionalItems": false,
+	})
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	compiled, compileError := optionschema.Compile(wrapped)
+	if compileError != nil {
+		test.Fatalf("compiling the go block of the published schema: %v", compileError)
+	}
+	return compiled
+}
+
+// draftFourTuples rewrites every prefixItems in a decoded 2020-12 schema as draft-04's items list. A
+// schema that also writes items beside prefixItems means something draft-04 says differently, so it stops.
+func draftFourTuples(test *testing.T, value any) any {
+	test.Helper()
+	switch typed := value.(type) {
+	case map[string]any:
+		_, hasPrefixItems := typed["prefixItems"]
+		if _, hasItems := typed["items"]; hasPrefixItems && hasItems {
+			test.Fatalf("a schema node writes both prefixItems and items, which this translation does not "+
+				"carry over: %v", typed)
+		}
+		translated := make(map[string]any, len(typed))
+		for key, member := range typed {
+			if key == "prefixItems" {
+				key = "items"
+			}
+			translated[key] = draftFourTuples(test, member)
+		}
+		return translated
+	case []any:
+		translated := make([]any, len(typed))
+		for index, member := range typed {
+			translated[index] = draftFourTuples(test, member)
+		}
+		return translated
+	}
+	return value
 }
 
 // TestTheLoaderTablesAgreeWithItsTypes: parsedTopLevelKeys and overrideKeys are the loader's refusal
