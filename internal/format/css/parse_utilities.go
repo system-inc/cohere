@@ -91,10 +91,18 @@ func ensureSource(node *estree.Node) map[string]any {
 	return source
 }
 
-// rawsIn is node.raws when it is an object, or nil (which reads as an empty object).
-func rawsIn(node *estree.Node) map[string]any {
+// rawStringIn is node.raws[key] when node.raws is an object and the property a string. An absent raws
+// reads as an empty object.
+func rawStringIn(node *estree.Node, key string) (string, bool) {
 	raws, _ := node.Get("raws").(map[string]any)
-	return raws
+	text, isString := raws[key].(string)
+	return text, isString
+}
+
+// isRawTruthy is whether node.raws[key] is truthy, false when node.raws is not an object.
+func isRawTruthy(node *estree.Node, key string) bool {
+	raws, _ := node.Get("raws").(map[string]any)
+	return estree.IsTruthy(raws[key])
 }
 
 // mapIn is object[key] when it is an object.
@@ -194,14 +202,16 @@ func firstTruthyString(values ...any) string {
 // sliceJavaScript is text.slice(start, end): negative indexes count from the end, and both clamp.
 func sliceJavaScript(text string, start int, end int) string {
 	clamp := func(index int) int {
-		if index < 0 {
-			index += len(text)
+		position := index
+		if position < 0 {
+			position += len(text)
 		}
-		return max(0, min(index, len(text)))
+		return max(0, min(position, len(text)))
 	}
-	start, end = clamp(start), clamp(end)
-	if start >= end {
+	clampedStart := clamp(start)
+	clampedEnd := clamp(end)
+	if clampedStart >= clampedEnd {
 		return ""
 	}
-	return text[start:end]
+	return text[clampedStart:clampedEnd]
 }
