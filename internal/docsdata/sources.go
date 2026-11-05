@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/system-inc/cohere/internal/benchresults"
+	"github.com/system-inc/cohere/internal/goengine/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -21,6 +22,7 @@ func SourceInputs(root string) (Inputs, error) {
 		SetNames:      configuration.SetNames(),
 		LoadSet:       func(name string) (*configuration.Config, error) { return configuration.LoadFor(name, names) },
 		SetContents:   configuration.SourceContents,
+		GoRules:       rules.All(),
 	}
 	var err error
 	if inputs.SwiftVerdicts, err = os.ReadFile(filepath.Join(root, "swift", "HouseRuleVerdicts.json")); err != nil {

@@ -17,7 +17,12 @@ func TestRulesFlagListsEveryRegisteredRule(t *testing.T) {
 
 	binary := buildCohere(t)
 
-	output, err := exec.Command(binary, "-rules").Output()
+	// Run outside every project: this package's directory is inside cohere's own Go workspace, and `-rules`
+	// there lists the Go engine's rules, as it lists Swift's in a Swift package. This test is about the
+	// TypeScript registry, which a run in no project lists.
+	command := exec.Command(binary, "-rules")
+	command.Dir = t.TempDir()
+	output, err := command.Output()
 	if err != nil {
 		t.Fatalf("running -rules: %v", err)
 	}
@@ -58,6 +63,8 @@ func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(t *testing.T) {
 	binary := buildCohere(t)
 
 	command := exec.Command(binary, "-rules")
+	// Outside every project, for the reason TestRulesFlagListsEveryRegisteredRule gives.
+	command.Dir = t.TempDir()
 	var standardError strings.Builder
 	command.Stderr = &standardError
 	standardOutput, err := command.Output()
