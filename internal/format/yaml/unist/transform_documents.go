@@ -196,7 +196,8 @@ func (context *context) categorizeHeadNodes(
 
 // getHeadPosition is document-head.mjs's getPosition.
 func (context *context) getHeadPosition(directives []*Node, document *compose.Document, docStart *cst.Token) *position {
-	var start, end int
+	var start int
+	var end int
 	switch {
 	case docStart != nil:
 		start, end = docStart.Offset, docStart.Offset+len(docStart.Source)

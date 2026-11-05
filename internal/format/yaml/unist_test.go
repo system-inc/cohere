@@ -231,9 +231,9 @@ func loadTree(node *jsonNode, offsets unitOffsets, parent *unist.Node) *unist.No
 // normalize line endings to \n.
 func normalizeInput(text string) (string, bool) {
 	hasByteOrderMark := strings.HasPrefix(text, "\ufeff")
-	text = strings.TrimPrefix(text, "\ufeff")
-	text = strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
-	return text, hasByteOrderMark
+	withoutByteOrderMark := strings.TrimPrefix(text, "\ufeff")
+	normalized := strings.ReplaceAll(strings.ReplaceAll(withoutByteOrderMark, "\r\n", "\n"), "\r", "\n")
+	return normalized, hasByteOrderMark
 }
 
 // TestLoaderConvertsOffsets checks the loader on astral and multi-byte text, since every position the

@@ -146,6 +146,8 @@ func parseHeader(header string) (chomping string, indent *int) {
 	if parsed != nil {
 		if parsed[2] != "" {
 			// Number(parsed[2]). The lexer reads one digit of indentation indicator, so this fits.
+			// Ignored: the pattern matches only ASCII digits and the lexer gives at most one, so Atoi has
+			// nothing it can fail on.
 			value, _ := strconv.Atoi(parsed[2])
 			indent = &value
 		}
@@ -214,7 +216,8 @@ func (context *context) transformQuoteValue(nodeType string, quoteValue *compose
 func (context *context) transformContentProperties(node *compose.Node, tokens []*cst.Token) content {
 	middleComments := []*Node{}
 	var firstTagOrAnchorRange []int
-	var tag, anchor *Node
+	var tag *Node
+	var anchor *Node
 	for _, token := range tokens {
 		tokenRange := []int{token.Offset, token.Offset + len(token.Source)}
 		switch token.Type {
