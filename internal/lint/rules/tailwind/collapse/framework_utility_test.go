@@ -198,13 +198,13 @@ func formatReading(reading Reading) string {
 
 func loadWave1Fixture(test *testing.T, name string) wave1Fixture {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("read %s: %v", name, err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("read %s: %v", name, readError)
 	}
 	var fixture wave1Fixture
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		test.Fatalf("parse %s: %v", name, err)
+	if decodeError := json.Unmarshal(raw, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
 		test.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)
@@ -216,12 +216,12 @@ func loadWave1Fixture(test *testing.T, name string) wave1Fixture {
 // naming the variable when the corpus is unset, and a failure when it is set and does not load.
 func loadWave1DesignSystem(test *testing.T) *LoadedDesignSystem {
 	test.Helper()
-	system, err := LoadDesignSystem(LoadOptions{
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
 		EntryPoint:          corpus.Resolve(test, "ahra:app/_theme/styles/theme.css"),
 		TailwindPackageRoot: vendored.TailwindPackageRoot(),
 	})
-	if err != nil {
-		test.Fatalf("%s is set, but its design system does not load: %v", corpus.Ahra.Variable, err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("%s is set, but its design system does not load: %v", corpus.Ahra.Variable, loadDesignSystemError)
 	}
 	return system
 }

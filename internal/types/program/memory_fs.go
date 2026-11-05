@@ -119,7 +119,7 @@ func decodeLikeDisk(s string) string {
 // binary.Read into len/2 code units leaves it unread.
 func decodeUtf16LikeDisk(s string, order binary.ByteOrder) string {
 	ints := make([]uint16, len(s)/2)
-	if err := binary.Read(strings.NewReader(s), order, &ints); err != nil {
+	if readError := binary.Read(strings.NewReader(s), order, &ints); readError != nil {
 		return ""
 	}
 	return string(utf16.Decode(ints))

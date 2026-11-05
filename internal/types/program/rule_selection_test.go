@@ -71,8 +71,8 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 		},
 		RuleOptions: configuration.OptionsRegistry{"derived": {Decode: func(raw json.RawMessage) (any, error) {
 			var marker string
-			err := json.Unmarshal(raw, &marker)
-			return marker, err
+			decodeError := json.Unmarshal(raw, &marker)
+			return marker, decodeError
 		}}},
 	}
 	var calls atomic.Int32

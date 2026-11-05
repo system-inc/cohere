@@ -51,7 +51,7 @@ func DecodePreferEs6ClassOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected a mode string, "always" or "never", got %s`, raw)
 	}
 	switch mode {

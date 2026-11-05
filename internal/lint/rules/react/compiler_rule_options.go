@@ -26,7 +26,7 @@ func DecodeCompilerRuleOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var object map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &object); err != nil || object == nil {
+	if decodeError := json.Unmarshal(raw, &object); decodeError != nil || object == nil {
 		return options, fmt.Errorf("expected an options object, got %s", raw)
 	}
 	if len(object) == 0 {

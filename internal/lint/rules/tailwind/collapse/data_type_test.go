@@ -54,13 +54,13 @@ type dataTypeCase struct {
 
 func loadDataTypeCorpus(test *testing.T) dataTypeCorpus {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "datatype_fixtures.json"))
-	if err != nil {
-		test.Fatalf("read fixtures: %v", err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", "datatype_fixtures.json"))
+	if readError != nil {
+		test.Fatalf("read fixtures: %v", readError)
 	}
 	var corpus dataTypeCorpus
-	if err := json.Unmarshal(raw, &corpus); err != nil {
-		test.Fatalf("parse fixtures: %v", err)
+	if decodeError := json.Unmarshal(raw, &corpus); decodeError != nil {
+		test.Fatalf("parse fixtures: %v", decodeError)
 	}
 	// A corpus that quietly shrank is the failure this approach exists to prevent, and it would
 	// otherwise read as a passing run. The task this port was written for set the bar explicitly:

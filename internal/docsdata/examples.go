@@ -62,9 +62,9 @@ func (examples Examples) FixKind() string {
 
 // ReadCaptures reads every record the harness wrote into directory.
 func ReadCaptures(directory string) ([]capture.Record, error) {
-	paths, err := filepath.Glob(filepath.Join(directory, "capture-*.jsonl"))
-	if err != nil {
-		return nil, err
+	paths, globError := filepath.Glob(filepath.Join(directory, "capture-*.jsonl"))
+	if globError != nil {
+		return nil, globError
 	}
 	sort.Strings(paths)
 	var records []capture.Record
@@ -77,9 +77,9 @@ func ReadCaptures(directory string) ([]capture.Record, error) {
 		scanner.Buffer(make([]byte, 0, 1<<20), 1<<28)
 		for scanner.Scan() {
 			var record capture.Record
-			if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
+			if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
 				file.Close()
-				return nil, fmt.Errorf("docsdata: %s: %w", path, err)
+				return nil, fmt.Errorf("docsdata: %s: %w", path, decodeError)
 			}
 			records = append(records, record)
 		}
@@ -191,7 +191,7 @@ func shortest(candidates []capture.Record) *Example {
 func ReadCommittedExamples(root string) (map[string]Examples, error) {
 	examples := map[string]Examples{}
 	directory := filepath.Join(root, ExamplesDirectory)
-	err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
 		if os.IsNotExist(err) && path == directory {
 			return filepath.SkipDir
 		}
@@ -203,11 +203,11 @@ func ReadCommittedExamples(root string) (map[string]Examples, error) {
 			return err
 		}
 		var example Examples
-		if err := json.Unmarshal(contents, &example); err != nil {
-			return fmt.Errorf("docsdata: %s: %w", path, err)
+		if decodeError := json.Unmarshal(contents, &example); decodeError != nil {
+			return fmt.Errorf("docsdata: %s: %w", path, decodeError)
 		}
 		examples[example.Rule] = example
 		return nil
 	})
-	return examples, err
+	return examples, walkError
 }

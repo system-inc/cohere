@@ -143,8 +143,8 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 			}
 
 			// An edit outside what the fingerprint covers: the edited file runs, the other replays.
-			if err := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export const a = 1;\nexport const more = 3;\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export const a = 1;\nexport const more = 3;\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			if runsOf(runs) != 1 {
@@ -155,8 +155,8 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 			}
 
 			// The data the rule reads changes, and no file it reports in does.
-			if err := os.WriteFile(filepath.Join(root, "marker.ts"), []byte("// blue\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "marker.ts"), []byte("// blue\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			stale := !agrees("marker edited", warm)
@@ -299,8 +299,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 			}
 			registry := configuration.OptionsRegistry{"test-derived-options": {Decode: func(raw json.RawMessage) (any, error) {
 				var marker string
-				err := json.Unmarshal(raw, &marker)
-				return marker, err
+				decodeError := json.Unmarshal(raw, &marker)
+				return marker, decodeError
 			}}}
 			ctx := context.Background()
 			key := program.HashRuleSet([]string{"derived-options"})
@@ -352,8 +352,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 			}
 
 			// Only the blue files' data changes: they run again, and the red files replay.
-			if err := os.WriteFile(filepath.Join(root, "blue-marker.ts"), []byte("// navy\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "blue-marker.ts"), []byte("// navy\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			stale := !agrees(warm)
@@ -366,8 +366,8 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 			}
 
 			// And the red files' data: they run again, and the blue files replay.
-			if err := os.WriteFile(filepath.Join(root, "red-marker.ts"), []byte("// crimson\n"), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(root, "red-marker.ts"), []byte("// crimson\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			warm, runs = walk(true)
 			if !scenario.wantStale && (!agrees(warm) || !ran(runs, "a.ts") || ran(runs, "b.ts")) {
@@ -394,9 +394,9 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 		}
 	}
 	root := writeProject(test, files)
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), Checkers: 4})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	if graph.Workers() < 2 {
 		test.Fatalf("the walk runs on %d worker, so no two workers ever ask for one fingerprint", graph.Workers())
@@ -425,8 +425,8 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 		{Files: []string{"c/**"}, Rules: map[string]configuration.RuleSetting{"test-derived-b": {Severity: configuration.SeverityError}}},
 	}}
 	graph.FindingsReuse = program.NewFindingsReuse(program.HashRuleSet([]string{"computed-once"}), nil, program.PathAnchor{})
-	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules); err != nil {
-		test.Fatal(err)
+	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules); walkError != nil {
+		test.Fatal(walkError)
 	}
 	if computations.Load() != 6 {
 		test.Fatalf("a walk of six derived rules over three resolutions on %d workers computed %d program fingerprints, want 6",

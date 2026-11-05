@@ -23,9 +23,9 @@ func libraryParsesConfig(target string, libs string) string {
 
 func buildWithLibraryParses(test testing.TB, directory string, parses *program.LibraryParses) *program.Graph {
 	test.Helper()
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	return graph
 }
@@ -157,9 +157,9 @@ func TestLibraryParsesAreSafeAcrossConcurrentPrograms(test *testing.T) {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses})
-			if err != nil {
-				test.Errorf("building: %v", err)
+			graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses})
+			if buildError != nil {
+				test.Errorf("building: %v", buildError)
 				return
 			}
 			if diagnostics := graph.AllDiagnostics(context.Background()); len(diagnostics) != 1 {

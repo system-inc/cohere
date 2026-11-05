@@ -164,9 +164,9 @@ func runGoList(test *testing.T, arguments ...string) []string {
 	// module root.
 	command.Dir = filepath.Join("..", "..")
 
-	output, err := command.Output()
-	if err != nil {
-		test.Fatalf("go list %s: %v", strings.Join(arguments, " "), err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		test.Fatalf("go list %s: %v", strings.Join(arguments, " "), outputError)
 	}
 
 	lines := []string{}
@@ -189,9 +189,9 @@ func registeringPackages(test *testing.T, packages []string) []string {
 	registering := make([]string, 0, len(packages))
 	for _, importPath := range packages {
 		directory := strings.TrimPrefix(importPath, modulePrefix)
-		matches, err := filepath.Glob(filepath.Join("..", "..", directory, "*_register.go"))
-		if err != nil {
-			test.Fatalf("looking for registrations in %s: %v", importPath, err)
+		matches, globError := filepath.Glob(filepath.Join("..", "..", directory, "*_register.go"))
+		if globError != nil {
+			test.Fatalf("looking for registrations in %s: %v", importPath, globError)
 		}
 		if len(matches) > 0 {
 			registering = append(registering, importPath)

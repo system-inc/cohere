@@ -153,11 +153,11 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 	// Resolved the way a Swift run resolves it, so the answer comes from the engine that will check. A
 	// development cohere may build it here, a step its progress shows and clears before the report.
 	dispatch.Report.SetVerbose(activeOutput.Mode == outputVerbose)
-	binaryPath, _, err := resolveSwiftEngineBinary(projectLocation{Root: directories[0], Engine: engineSwift}, release.Current())
+	binaryPath, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(projectLocation{Root: directories[0], Engine: engineSwift}, release.Current())
 	dispatch.Report.Clear()
-	if err != nil {
+	if resolveSwiftEngineBinaryError != nil {
 		for _, project := range projects {
-			answers[project.Directory] = coverageAnswer{err: fmt.Errorf("resolving the Swift engine: %w", err)}
+			answers[project.Directory] = coverageAnswer{err: fmt.Errorf("resolving the Swift engine: %w", resolveSwiftEngineBinaryError)}
 		}
 		return answers
 	}
@@ -170,10 +170,10 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 		go func() {
 			defer group.Done()
 			querying <- struct{}{}
-			record, err := queryCoveredPackages(binaryPath, directories[index])
+			record, queryCoveredPackagesError := queryCoveredPackages(binaryPath, directories[index])
 			<-querying
-			answer := coverageAnswer{err: err}
-			if err == nil {
+			answer := coverageAnswer{err: queryCoveredPackagesError}
+			if queryCoveredPackagesError == nil {
 				answer.covered = coveredPackages{
 					label:     projectLabel(project),
 					directory: resolvedPath(directories[index]),
@@ -218,7 +218,7 @@ func queryCoveredPackages(binaryPath string, directory string) (coveredPackagesR
 	scanner.Buffer(make([]byte, 64*1024), 64*1024*1024)
 	for scanner.Scan() {
 		var record coveredPackagesRecord
-		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
+		if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
 			return coveredPackagesRecord{}, fmt.Errorf("the engine printed a line that is not a record: %q", lastLine(scanner.Text()))
 		}
 		if record.Kind == "coveredPackages" {
@@ -249,7 +249,7 @@ func lastLine(text string) string {
 // as `/tmp`, and this process may have been handed either. A path that cannot be resolved is compared as it
 // is, cleaned, and simply matches nothing it should not.
 func resolvedPath(name string) string {
-	if resolved, err := filepath.EvalSymlinks(name); err == nil {
+	if resolved, resolveSymlinksError := filepath.EvalSymlinks(name); resolveSymlinksError == nil {
 		return resolved
 	}
 	return filepath.Clean(name)

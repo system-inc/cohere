@@ -79,16 +79,16 @@ type entry struct {
 // or another trim may have removed it first.
 func Trim(directory string, limit Limit, now time.Time) (Trimmed, error) {
 	trimmed := Trimmed{Directory: directory}
-	if err := Check(directory); err != nil {
-		return trimmed, err
+	if checkError := Check(directory); checkError != nil {
+		return trimmed, checkError
 	}
 
 	inUseSince := now.Add(-limit.Spare)
 	entries := []entry{}
 	for index := 0; index < 256; index++ {
 		subdirectory := filepath.Join(directory, fmt.Sprintf("%02x", index))
-		names, err := readNames(subdirectory)
-		if err != nil {
+		names, readNamesError := readNames(subdirectory)
+		if readNamesError != nil {
 			continue
 		}
 		for _, name := range names {
@@ -117,8 +117,8 @@ func Trim(directory string, limit Limit, now time.Time) (Trimmed, error) {
 		if trimmed.After <= limit.Target {
 			break
 		}
-		if err := removeEntry(candidate); err != nil {
-			return trimmed, err
+		if removeEntryError := removeEntry(candidate); removeEntryError != nil {
+			return trimmed, removeEntryError
 		}
 		trimmed.After -= candidate.bytes
 		trimmed.Removed++
@@ -128,8 +128,8 @@ func Trim(directory string, limit Limit, now time.Time) (Trimmed, error) {
 
 // Check says whether a directory is a Go build cache, by the README the go command writes into each one.
 func Check(directory string) error {
-	readme, err := os.ReadFile(filepath.Join(directory, "README"))
-	if err != nil || !strings.HasPrefix(string(readme), readmeMarker) {
+	readme, readError := os.ReadFile(filepath.Join(directory, "README"))
+	if readError != nil || !strings.HasPrefix(string(readme), readmeMarker) {
 		return fmt.Errorf("refusing to trim %s: it has no README saying it is a Go build cache", directory)
 	}
 	return nil
@@ -137,9 +137,9 @@ func Check(directory string) error {
 
 // readNames lists a directory's names without following anything inside it.
 func readNames(directory string) ([]string, error) {
-	file, err := os.Open(directory)
-	if err != nil {
-		return nil, err
+	file, openError := os.Open(directory)
+	if openError != nil {
+		return nil, openError
 	}
 	defer file.Close()
 	return file.Readdirnames(-1)
@@ -148,8 +148,8 @@ func readNames(directory string) ([]string, error) {
 // readEntry measures one entry. An executable entry is a directory of plain files, and anything else in
 // it, a nested directory or a link, makes it one Trim leaves alone.
 func readEntry(path string) (entry, bool) {
-	information, err := os.Lstat(path)
-	if err != nil {
+	information, statError := os.Lstat(path)
+	if statError != nil {
 		return entry{}, false
 	}
 	found := entry{path: path, used: information.ModTime()}
@@ -157,13 +157,13 @@ func readEntry(path string) (entry, bool) {
 	case information.Mode().IsRegular():
 		found.bytes = information.Size()
 	case information.IsDir():
-		names, err := readNames(path)
-		if err != nil {
+		names, readNamesError := readNames(path)
+		if readNamesError != nil {
 			return entry{}, false
 		}
 		for _, name := range names {
-			inner, err := os.Lstat(filepath.Join(path, name))
-			if err != nil || !inner.Mode().IsRegular() {
+			inner, statError := os.Lstat(filepath.Join(path, name))
+			if statError != nil || !inner.Mode().IsRegular() {
 				return entry{}, false
 			}
 			found.bytes += inner.Size()
@@ -178,12 +178,12 @@ func readEntry(path string) (entry, bool) {
 // removeEntry removes one entry, an executable entry's files by name and then its emptied directory.
 func removeEntry(candidate entry) error {
 	for _, name := range candidate.files {
-		if err := os.Remove(filepath.Join(candidate.path, name)); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("trimming the Go build cache: %w", err)
+		if removeError := os.Remove(filepath.Join(candidate.path, name)); removeError != nil && !os.IsNotExist(removeError) {
+			return fmt.Errorf("trimming the Go build cache: %w", removeError)
 		}
 	}
-	if err := os.Remove(candidate.path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("trimming the Go build cache: %w", err)
+	if removeError := os.Remove(candidate.path); removeError != nil && !os.IsNotExist(removeError) {
+		return fmt.Errorf("trimming the Go build cache: %w", removeError)
 	}
 	return nil
 }

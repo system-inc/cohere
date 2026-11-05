@@ -41,9 +41,9 @@ func decodeNoBitwiseOptionsForTest(test *testing.T, optionsJson string) any {
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeNoBitwiseOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	decoded, decodeNoBitwiseOptionsError := DecodeNoBitwiseOptions(json.RawMessage(optionsJson))
+	if decodeNoBitwiseOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeNoBitwiseOptionsError)
 	}
 	return decoded
 }
@@ -246,15 +246,15 @@ func TestNoBitwiseDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T)
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoBitwiseOptions(json.RawMessage(testCase.raw))
+			decoded, decodeNoBitwiseOptionsError := DecodeNoBitwiseOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodeNoBitwiseOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+			if decodeNoBitwiseOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeNoBitwiseOptionsError)
 			}
 			options, ok := decoded.(NoBitwiseOptions)
 			if !ok {
@@ -481,9 +481,9 @@ func TestNoBitwiseEveryAcceptedSpellingActuallyExempts(test *testing.T) {
 // mustJson quotes a string the way the config would, so the option text is built rather than typed.
 func mustJson(test *testing.T, value string) []byte {
 	test.Helper()
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		test.Fatalf("encoding %q: %v", value, err)
+	encoded, encodeError := json.Marshal(value)
+	if encodeError != nil {
+		test.Fatalf("encoding %q: %v", value, encodeError)
 	}
 	return encoded
 }

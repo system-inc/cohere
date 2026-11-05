@@ -168,9 +168,9 @@ var noPlusplusSilentCases = []noPlusplusCase{
 // decodedNoPlusplus routes a row's raw JSON through the rule's own exported decoder.
 func decodedNoPlusplus(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeNoPlusplusOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", raw, err)
+	decoded, decodeNoPlusplusOptionsError := DecodeNoPlusplusOptions([]byte(raw))
+	if decodeNoPlusplusOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeNoPlusplusOptionsError)
 	}
 	return decoded
 }

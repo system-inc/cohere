@@ -549,7 +549,7 @@ func compileIgnoredNames(options NoParamReassignOptions) ignoredParameterNames {
 		compiled.literal[name] = true
 	}
 	for _, source := range options.IgnorePropertyModificationsForRegex {
-		if pattern, err := esregexp.Compile(source, "u"); err == nil {
+		if pattern, compileError := esregexp.Compile(source, "u"); compileError == nil {
 			compiled.patterns = append(compiled.patterns, pattern)
 		}
 	}
@@ -567,8 +567,8 @@ func DecodeNoParamReassignOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

@@ -24,9 +24,9 @@ func preferLiteralEnumMemberCaseName(index int) string {
 // the bare object rather than upstream's one-element array.
 func decodePreferLiteralEnumMemberOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodePreferLiteralEnumMemberOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodePreferLiteralEnumMemberOptionsError := DecodePreferLiteralEnumMemberOptions(json.RawMessage(raw))
+	if decodePreferLiteralEnumMemberOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodePreferLiteralEnumMemberOptionsError)
 	}
 	return decoded
 }

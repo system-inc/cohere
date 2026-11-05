@@ -153,8 +153,8 @@ func isFontStretchPercentage(value string) bool {
 	if !strings.HasSuffix(value, "%") {
 		return false
 	}
-	number, err := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
-	if err != nil {
+	number, parseError := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
+	if parseError != nil {
 		return false
 	}
 	if number != math.Trunc(number) || number < 50 || number > 200 {

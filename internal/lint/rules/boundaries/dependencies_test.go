@@ -52,9 +52,9 @@ const projectModuleOptions = `{
 
 func decodeForTest(test *testing.T, raw string) DependenciesOptions {
 	test.Helper()
-	decoded, err := decodeDependenciesOptions([]byte(raw), rule.OptionsBase{})
-	if err != nil {
-		test.Fatalf("decoding the options: %v", err)
+	decoded, decodeDependenciesOptionsError := decodeDependenciesOptions([]byte(raw), rule.OptionsBase{})
+	if decodeDependenciesOptionsError != nil {
+		test.Fatalf("decoding the options: %v", decodeDependenciesOptionsError)
 	}
 	return decoded.(DependenciesOptions)
 }
@@ -397,12 +397,12 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			_, err := decodeDependenciesOptions([]byte(testCase.raw), rule.OptionsBase{})
-			if err == nil {
+			_, decodeDependenciesOptionsError := decodeDependenciesOptions([]byte(testCase.raw), rule.OptionsBase{})
+			if decodeDependenciesOptionsError == nil {
 				test.Fatalf("expected a refusal mentioning %q, the options loaded", testCase.wantErr)
 			}
-			if !strings.Contains(err.Error(), testCase.wantErr) {
-				test.Fatalf("expected a refusal mentioning %q, got %v", testCase.wantErr, err)
+			if !strings.Contains(decodeDependenciesOptionsError.Error(), testCase.wantErr) {
+				test.Fatalf("expected a refusal mentioning %q, got %v", testCase.wantErr, decodeDependenciesOptionsError)
 			}
 		})
 	}
@@ -412,17 +412,17 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 	test.Parallel()
 	for _, raw := range []string{basePackageOptions, projectModuleOptions} {
-		decoded, err := decodeDependenciesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: "/repo", ProjectRoot: "/elsewhere"})
-		if err != nil {
-			test.Fatalf("Base's own block was refused: %v", err)
+		decoded, decodeDependenciesOptionsError := decodeDependenciesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: "/repo", ProjectRoot: "/elsewhere"})
+		if decodeDependenciesOptionsError != nil {
+			test.Fatalf("Base's own block was refused: %v", decodeDependenciesOptionsError)
 		}
 		if root := decoded.(DependenciesOptions).Root; root != "/repo" {
 			test.Fatalf("expected the root at the config's directory, got %q", root)
 		}
 	}
-	decoded, err := decodeDependenciesOptions([]byte(projectModuleOptions), rule.OptionsBase{ProjectRoot: "/project"})
-	if err != nil {
-		test.Fatal(err)
+	decoded, decodeDependenciesOptionsError := decodeDependenciesOptions([]byte(projectModuleOptions), rule.OptionsBase{ProjectRoot: "/project"})
+	if decodeDependenciesOptionsError != nil {
+		test.Fatal(decodeDependenciesOptionsError)
 	}
 	if root := decoded.(DependenciesOptions).Root; root != "/project" {
 		test.Fatalf("expected the project root when the config's directory is unknown, got %q", root)

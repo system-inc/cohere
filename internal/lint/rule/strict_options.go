@@ -31,13 +31,13 @@ import (
 func UnmarshalOptions(raw []byte, target any) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return err
+	if decodeError := decoder.Decode(target); decodeError != nil {
+		return decodeError
 	}
 
 	var generic any
-	if err := json.Unmarshal(raw, &generic); err != nil {
-		return err
+	if decodeError := json.Unmarshal(raw, &generic); decodeError != nil {
+		return decodeError
 	}
 	return checkKeyCase(generic, reflect.TypeOf(target), "")
 }
@@ -84,8 +84,8 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 					continue
 				}
 			}
-			if err := checkKeyCase(member, field.Type, path+key+"."); err != nil {
-				return err
+			if checkKeyCaseError := checkKeyCase(member, field.Type, path+key+"."); checkKeyCaseError != nil {
+				return checkKeyCaseError
 			}
 		}
 	case reflect.Slice, reflect.Array:
@@ -94,8 +94,8 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 			return nil
 		}
 		for index, element := range list {
-			if err := checkKeyCase(element, valueType.Elem(), fmt.Sprintf("%s%d.", path, index)); err != nil {
-				return err
+			if checkKeyCaseError := checkKeyCase(element, valueType.Elem(), fmt.Sprintf("%s%d.", path, index)); checkKeyCaseError != nil {
+				return checkKeyCaseError
 			}
 		}
 	case reflect.Map:
@@ -104,8 +104,8 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 			return nil
 		}
 		for key, member := range object {
-			if err := checkKeyCase(member, valueType.Elem(), path+key+"."); err != nil {
-				return err
+			if checkKeyCaseError := checkKeyCase(member, valueType.Elem(), path+key+"."); checkKeyCaseError != nil {
+				return checkKeyCaseError
 			}
 		}
 	}

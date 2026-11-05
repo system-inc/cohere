@@ -33,7 +33,7 @@ func (report *openReport) add(path string) {
 	if path == "" {
 		return
 	}
-	if absolute, err := filepath.Abs(path); err == nil {
+	if absolute, absolutePathError := filepath.Abs(path); absolutePathError == nil {
 		path = absolute
 	}
 	path = filepath.Clean(path)
@@ -48,8 +48,8 @@ func (report *openReport) add(path string) {
 
 // launchEditor is injected into report.open by tests. No shell interprets source file names.
 func launchEditor(paths []string) error {
-	editor, err := exec.LookPath("code")
-	if err != nil {
+	editor, lookPathError := exec.LookPath("code")
+	if lookPathError != nil {
 		return fmt.Errorf("code is not on PATH")
 	}
 	command := exec.Command(editor, append([]string{"--"}, paths...)...)
@@ -92,8 +92,8 @@ func finishOpen() {
 
 func readOpenReport(path string) *openReport {
 	report := &openReport{}
-	contents, err := os.ReadFile(path)
-	if err == nil {
+	contents, readError := os.ReadFile(path)
+	if readError == nil {
 		if json.Unmarshal(contents, report) != nil {
 			return &openReport{}
 		}

@@ -58,9 +58,9 @@ var adamicOptions = []struct {
 // loadReadiness is the set's rules with their raw options, read the way the loader reads any chain. A
 // cohere that carries no such set measures nothing, and says so, rather than measuring against nothing.
 func loadReadiness() (*program.Readiness, error) {
-	set, err := configuration.Load(readinessSetName)
-	if err != nil {
-		return nil, err
+	set, loadError := configuration.Load(readinessSetName)
+	if loadError != nil {
+		return nil, loadError
 	}
 	resolution := set.Resolve("index.ts")
 	options := map[string][]json.RawMessage{}
@@ -230,8 +230,8 @@ func requestedReadiness() *program.Readiness {
 
 // readinessOf is the run's readiness from its walk.
 func readinessOf(graph *program.Graph, result program.Result, typesRan bool, typeErrorFiles map[string]bool) *readinessSummary {
-	if _, err := readinessSet(); err != nil {
-		return notMeasured(err.Error())
+	if _, readinessSetError := readinessSet(); readinessSetError != nil {
+		return notMeasured(readinessSetError.Error())
 	}
 	if !typesRan {
 		return notMeasured("types did not run, so no file's type errors are known")

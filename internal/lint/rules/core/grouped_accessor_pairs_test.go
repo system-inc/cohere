@@ -22,9 +22,9 @@ func decodedGroupedAccessorPairsOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeGroupedAccessorPairsOptionsError := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw))
+	if decodeGroupedAccessorPairsOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeGroupedAccessorPairsOptionsError)
 	}
 	return options
 }
@@ -421,9 +421,9 @@ func TestDecodeGroupedAccessorPairsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("the decoder refused %q: %v", testCase.raw, err)
+			decoded, decodeGroupedAccessorPairsOptionsError := DecodeGroupedAccessorPairsOptions(json.RawMessage(testCase.raw))
+			if decodeGroupedAccessorPairsOptionsError != nil {
+				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeGroupedAccessorPairsOptionsError)
 			}
 			options, isOptions := decoded.(GroupedAccessorPairsOptions)
 			if !isOptions {
@@ -455,7 +455,7 @@ func TestDecodeGroupedAccessorPairsOptionsRefusesAValueOutsideTheEnum(test *test
 	} {
 		test.Run(raw, func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw)); err == nil {
+			if _, decodeGroupedAccessorPairsOptionsError := DecodeGroupedAccessorPairsOptions(json.RawMessage(raw)); decodeGroupedAccessorPairsOptionsError == nil {
 				test.Errorf("the decoder accepted %s, which is outside upstream's enum", raw)
 			}
 		})

@@ -71,16 +71,16 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 			home, _ := os.UserHomeDir()
 			corpus = filepath.Join(home, corpus[2:])
 		}
-		listing, err := exec.Command("git", "-C", corpus, "ls-files", "--", "*.ts", "*.tsx").Output()
-		if err != nil {
-			test.Fatalf("listing %s: %v", corpus, err)
+		listing, outputError := exec.Command("git", "-C", corpus, "ls-files", "--", "*.ts", "*.tsx").Output()
+		if outputError != nil {
+			test.Fatalf("listing %s: %v", corpus, outputError)
 		}
 		for _, name := range strings.Split(string(listing), "\n") {
 			path := filepath.Join(corpus, name)
 			if name == "" || seen[path] {
 				continue
 			}
-			if _, err := os.Stat(path); err != nil {
+			if _, statError := os.Stat(path); statError != nil {
 				continue
 			}
 			seen[path] = true
@@ -93,8 +93,8 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 	command.Stdin = strings.NewReader(strings.Join(files, "\n"))
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	oracle := map[string]map[string]any{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
@@ -102,8 +102,8 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 			continue
 		}
 		var record map[string]any
-		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		oracle[record["file"].(string)] = record
 	}

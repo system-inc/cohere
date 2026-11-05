@@ -32,8 +32,8 @@ import (
 // Every refusal is marked printing.Syntax, so the format phase skips a file that is not JSON rather
 // than reporting a broken formatter.
 func ParseJSON(text string, allowComments bool) (*Node, []*Node, error) {
-	root, comments, err := parseJSON(text, allowComments)
-	return root, comments, printing.Syntax(err)
+	root, comments, parseJSONError := parseJSON(text, allowComments)
+	return root, comments, printing.Syntax(parseJSONError)
 }
 
 func parseJSON(text string, allowComments bool) (*Node, []*Node, error) {
@@ -42,9 +42,9 @@ func parseJSON(text string, allowComments bool) (*Node, []*Node, error) {
 	if reader.position >= len(text) {
 		return nil, nil, fmt.Errorf("json: empty input")
 	}
-	expression, err := reader.parseValue()
-	if err != nil {
-		return nil, nil, err
+	expression, parseValueError := reader.parseValue()
+	if parseValueError != nil {
+		return nil, nil, parseValueError
 	}
 	reader.skipTrivia()
 	if reader.err != nil {
@@ -145,9 +145,9 @@ func (reader *jsonReader) parseValue() (*Node, error) {
 	case character == '+' || character == '-':
 		start := reader.position
 		reader.position++
-		argument, err := reader.parseValue()
-		if err != nil {
-			return nil, err
+		argument, parseValueError := reader.parseValue()
+		if parseValueError != nil {
+			return nil, parseValueError
 		}
 		// assertJsonNode: a sign only before a number, Infinity or NaN.
 		if !argument.Is("NumericLiteral") &&
@@ -187,17 +187,17 @@ func (reader *jsonReader) parseObject() (*Node, error) {
 			reader.position++
 			break
 		}
-		property, err := reader.parseProperty()
-		if err != nil {
-			return nil, err
+		property, parsePropertyError := reader.parseProperty()
+		if parsePropertyError != nil {
+			return nil, parsePropertyError
 		}
 		properties = append(properties, property)
 		if reader.peek() == ',' {
 			reader.position++
 			continue
 		}
-		if err := reader.expect('}'); err != nil {
-			return nil, err
+		if expectError := reader.expect('}'); expectError != nil {
+			return nil, expectError
 		}
 		break
 	}
@@ -259,17 +259,17 @@ func (reader *jsonReader) parseArray() (*Node, error) {
 			elements = append(elements, nil)
 			continue
 		}
-		element, err := reader.parseValue()
-		if err != nil {
-			return nil, err
+		element, parseValueError := reader.parseValue()
+		if parseValueError != nil {
+			return nil, parseValueError
 		}
 		elements = append(elements, element)
 		if reader.peek() == ',' {
 			reader.position++
 			continue
 		}
-		if err := reader.expect(']'); err != nil {
-			return nil, err
+		if expectError := reader.expect(']'); expectError != nil {
+			return nil, expectError
 		}
 		break
 	}
@@ -295,9 +295,9 @@ func (reader *jsonReader) parseString() (*Node, error) {
 	}
 	reader.position = position + 1
 	raw := text[start:reader.position]
-	value, err := decodeJavaScriptString(raw[1 : len(raw)-1])
-	if err != nil {
-		return nil, reader.errorf("%v", err)
+	value, decodeJavaScriptStringError := decodeJavaScriptString(raw[1 : len(raw)-1])
+	if decodeJavaScriptStringError != nil {
+		return nil, reader.errorf("%v", decodeJavaScriptStringError)
 	}
 	return New("StringLiteral", start, reader.position, "value", value, "raw", raw), nil
 }
@@ -320,9 +320,9 @@ func (reader *jsonReader) parseTemplate() (*Node, error) {
 	}
 	reader.position = position + 1
 	raw := strings.ReplaceAll(strings.ReplaceAll(text[start+1:position], "\r\n", "\n"), "\r", "\n")
-	cooked, err := decodeJavaScriptString(raw)
-	if err != nil {
-		return nil, reader.errorf("%v", err)
+	cooked, decodeJavaScriptStringError := decodeJavaScriptString(raw)
+	if decodeJavaScriptStringError != nil {
+		return nil, reader.errorf("%v", decodeJavaScriptStringError)
 	}
 	element := New("TemplateElement", start+1, position, "value", &TemplateValue{Cooked: &cooked, Raw: raw}, "tail", true)
 	return New("TemplateLiteral", start, reader.position, "expressions", []*Node{}, "quasis", []*Node{element}), nil
@@ -379,8 +379,8 @@ func (reader *jsonReader) parseNumber() (*Node, error) {
 		if len(literal) > 1 && literal[0] == '0' && literal[1] >= '0' && literal[1] <= '9' {
 			return nil, reader.errorf("legacy octal literal %q", literal)
 		}
-		parsed, err := strconv.ParseFloat(literal, 64)
-		if err != nil && !isRangeError(err) {
+		parsed, parseError := strconv.ParseFloat(literal, 64)
+		if parseError != nil && !isRangeError(parseError) {
 			return nil, reader.errorf("invalid number %q", literal)
 		}
 		value = parsed
@@ -503,21 +503,21 @@ func decodeJavaScriptString(content string) (string, error) {
 			if index+2 >= len(content) {
 				return "", fmt.Errorf("an incomplete \\x escape")
 			}
-			code, err := strconv.ParseUint(content[index+1:index+3], 16, 8)
-			if err != nil {
+			code, parseError := strconv.ParseUint(content[index+1:index+3], 16, 8)
+			if parseError != nil {
 				return "", fmt.Errorf("an invalid \\x escape")
 			}
 			builder.WriteRune(rune(code))
 			index += 2
 		case 'u':
-			code, length, err := readUnicodeEscape(content[index+1:])
-			if err != nil {
-				return "", err
+			code, length, readUnicodeEscapeError := readUnicodeEscape(content[index+1:])
+			if readUnicodeEscapeError != nil {
+				return "", readUnicodeEscapeError
 			}
 			index += length
 			// A surrogate pair spelled as two escapes is one character.
 			if code >= 0xD800 && code <= 0xDBFF && strings.HasPrefix(content[index+1:], "\\u") {
-				if low, lowLength, err := readUnicodeEscape(content[index+3:]); err == nil && low >= 0xDC00 && low <= 0xDFFF {
+				if low, lowLength, readUnicodeEscapeError := readUnicodeEscape(content[index+3:]); readUnicodeEscapeError == nil && low >= 0xDC00 && low <= 0xDFFF {
 					code = (code-0xD800)<<10 + (low - 0xDC00) + 0x10000
 					index += 2 + lowLength
 				}
@@ -548,8 +548,8 @@ func readUnicodeEscape(text string) (int, int, error) {
 		if closing < 0 {
 			return 0, 0, fmt.Errorf("an incomplete \\u{} escape")
 		}
-		code, err := strconv.ParseUint(text[1:closing], 16, 32)
-		if err != nil || code > 0x10FFFF {
+		code, parseError := strconv.ParseUint(text[1:closing], 16, 32)
+		if parseError != nil || code > 0x10FFFF {
 			return 0, 0, fmt.Errorf("an invalid \\u{} escape")
 		}
 		return int(code), closing + 1, nil
@@ -557,8 +557,8 @@ func readUnicodeEscape(text string) (int, int, error) {
 	if len(text) < 4 {
 		return 0, 0, fmt.Errorf("an incomplete \\u escape")
 	}
-	code, err := strconv.ParseUint(text[:4], 16, 16)
-	if err != nil {
+	code, parseError := strconv.ParseUint(text[:4], 16, 16)
+	if parseError != nil {
 		return 0, 0, fmt.Errorf("an invalid \\u escape")
 	}
 	return int(code), 4, nil

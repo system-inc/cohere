@@ -34,9 +34,9 @@ const forbidDomPropsFile = "/repository/source/ForbidDomProps.tsx"
 // the nil-options case: an unconfigured rule declines everything.
 func forbidDomPropsOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeForbidDomPropsOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(raw))
+	if decodeForbidDomPropertiesOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeForbidDomPropertiesOptionsError)
 	}
 	return decoded
 }
@@ -374,9 +374,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("an empty body forbids nothing", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidDomPropsOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding an empty body: %v", err)
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions(nil)
+		if decodeForbidDomPropertiesOptionsError != nil {
+			test.Fatalf("decoding an empty body: %v", decodeForbidDomPropertiesOptionsError)
 		}
 		options, ok := decoded.(ForbidDomPropsOptions)
 		if !ok {
@@ -389,9 +389,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("the string arm", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":["id","style"]}`))
-		if err != nil {
-			test.Fatalf("decoding the string arm: %v", err)
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":["id","style"]}`))
+		if decodeForbidDomPropertiesOptionsError != nil {
+			test.Fatalf("decoding the string arm: %v", decodeForbidDomPropertiesOptionsError)
 		}
 		options, ok := decoded.(ForbidDomPropsOptions)
 		if !ok {
@@ -409,9 +409,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("an absent disallowedFor means every tag", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className"}]}`))
-		if err != nil {
-			test.Fatalf("decoding an absent disallowedFor: %v", err)
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className"}]}`))
+		if decodeForbidDomPropertiesOptionsError != nil {
+			test.Fatalf("decoding an absent disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
 		options, ok := decoded.(ForbidDomPropsOptions)
 		if !ok {
@@ -427,9 +427,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("an empty disallowedFor means no tag", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":[]}]}`))
-		if err != nil {
-			test.Fatalf("decoding an empty disallowedFor: %v", err)
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":[]}]}`))
+		if decodeForbidDomPropertiesOptionsError != nil {
+			test.Fatalf("decoding an empty disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
 		options, ok := decoded.(ForbidDomPropsOptions)
 		if !ok {
@@ -445,9 +445,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("a named disallowedFor matches only those tags", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":["div","span"]}]}`))
-		if err != nil {
-			test.Fatalf("decoding a named disallowedFor: %v", err)
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":["div","span"]}]}`))
+		if decodeForbidDomPropertiesOptionsError != nil {
+			test.Fatalf("decoding a named disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
 		options, ok := decoded.(ForbidDomPropsOptions)
 		if !ok {

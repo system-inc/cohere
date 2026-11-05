@@ -125,13 +125,13 @@ func main() {
 		packagesToShimFullNames[i] = tsgoInternalPrefix + pkg
 	}
 
-	packages, err := packages.Load(&packages.Config{
+	packages, loadError := packages.Load(&packages.Config{
 		// TODO: path relative to repo root
 		Dir:  "./TypeScript-shim/compiler",
 		Mode: packages.LoadSyntax,
 	}, packagesToShimFullNames...)
-	if err != nil {
-		log.Fatalf("Error loading package: %v", err)
+	if loadError != nil {
+		log.Fatalf("Error loading package: %v", loadError)
 	}
 
 	var shimHeaderBuilder strings.Builder
@@ -142,9 +142,9 @@ func main() {
 		shimDirPath := path.Join("./TypeScript-shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
 		var extraShim ExtraShim
 		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
-		if data, err := os.ReadFile(extraShimFilePath); err == nil {
-			if err := json.Unmarshal(data, &extraShim); err != nil {
-				fmt.Printf("error parsing %v: %v", extraShimFilePath, err)
+		if data, readError := os.ReadFile(extraShimFilePath); readError == nil {
+			if decodeError := json.Unmarshal(data, &extraShim); decodeError != nil {
+				fmt.Printf("error parsing %v: %v", extraShimFilePath, decodeError)
 				return
 			}
 		}
@@ -501,12 +501,12 @@ func main() {
 		// output nobody may edit by hand. A source that does not parse is refused rather than written: the
 		// printer cannot format it, and a shim that does not compile is worse than the stale one it replaces.
 		shimGoPath := path.Join(shimDirPath, "shim.go")
-		formatted, err := format.Source([]byte(shimHeaderBuilder.String() + shimBuilder.String()))
-		if err != nil {
-			log.Fatalf("error formatting %v, so it was not written: %v", shimGoPath, err)
+		formatted, sourceError := format.Source([]byte(shimHeaderBuilder.String() + shimBuilder.String()))
+		if sourceError != nil {
+			log.Fatalf("error formatting %v, so it was not written: %v", shimGoPath, sourceError)
 		}
-		if err := os.WriteFile(shimGoPath, formatted, 0o644); err != nil {
-			log.Fatalf("error writing %v: %v", shimGoPath, err)
+		if writeError := os.WriteFile(shimGoPath, formatted, 0o644); writeError != nil {
+			log.Fatalf("error writing %v: %v", shimGoPath, writeError)
 		}
 
 		shimHeaderBuilder.Reset()

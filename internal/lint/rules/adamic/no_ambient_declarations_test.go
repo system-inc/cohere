@@ -25,7 +25,7 @@ func ambientFixture(test *testing.T, name string) map[string]string {
 	test.Helper()
 	files := map[string]string{}
 	root := filepath.Join("testdata/ambient", name)
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -43,8 +43,8 @@ func ambientFixture(test *testing.T, name string) map[string]string {
 		files[filepath.ToSlash(relative)] = string(data)
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	return files
 }
@@ -118,8 +118,8 @@ func TestNoAmbientDeclarationsFileScope(test *testing.T) {
 			setup := func(directory string) {
 				writeAdamicSupport(test)(directory)
 				config := strings.Replace(strings.Replace(adamicConfiguration, `"strict": true`, `"strict": true, "allowJs": true`, 1), `"include": ["**/*.ts"]`, `"sourceExtensions": [".a"], "include": ["**/*"]`, 1)
-				if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-					test.Fatal(err)
+				if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+					test.Fatal(writeError)
 				}
 			}
 			result := rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), map[string]string{filename: source}, filename, setup)
@@ -140,16 +140,16 @@ func ambientCheckTypes(test *testing.T, files map[string]string) {
 	ambientSetup(test, files)(directory)
 	for name, source := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(source), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(source), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
-	if err != nil {
-		test.Fatal(err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	if diagnostics := graph.Program.GetSyntacticDiagnostics(context.Background(), nil); len(diagnostics) != 0 {
 		test.Fatalf("syntactic diagnostics: %d, want 0", len(diagnostics))
@@ -166,8 +166,8 @@ func ambientSetup(test *testing.T, files map[string]string) func(string) {
 	return func(directory string) {
 		writeAdamicSupport(test)(directory)
 		if strings.Contains(files["Case.ts"], `<reference lib="dom"`) {
-			if err := os.Remove(filepath.Join(directory, "console.d.ts")); err != nil {
-				test.Fatal(err)
+			if removeError := os.Remove(filepath.Join(directory, "console.d.ts")); removeError != nil {
+				test.Fatal(removeError)
 			}
 		}
 	}

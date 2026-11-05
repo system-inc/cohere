@@ -11,12 +11,12 @@ import (
 func loadFixture(test *testing.T) (string, string) {
 	test.Helper()
 	directory := test.TempDir()
-	if err := os.WriteFile(filepath.Join(directory, "go.mod"), []byte("module example.com/fixture\n\ngo 1.21\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "go.mod"), []byte("module example.com/fixture\n\ngo 1.21\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	file := filepath.Join(directory, "fixture.go")
-	if err := os.WriteFile(file, []byte("package fixture\n\nvar Count int = 1\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("package fixture\n\nvar Count int = 1\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return directory, file
 }
@@ -54,9 +54,9 @@ func TestAnOverlayNoSourcePackageReadsIsRefused(test *testing.T) {
 
 	directory, _ := loadFixture(test)
 	added := filepath.Join(directory, "added.go")
-	_, err := Load(Config{Directory: directory, Overlay: map[string][]byte{added: []byte("package fixture\n")}}, ".")
-	if err == nil || !strings.Contains(err.Error(), added) {
-		test.Fatalf("an overlay naming a file the load does not read was not refused by name: %v", err)
+	_, loadError := Load(Config{Directory: directory, Overlay: map[string][]byte{added: []byte("package fixture\n")}}, ".")
+	if loadError == nil || !strings.Contains(loadError.Error(), added) {
+		test.Fatalf("an overlay naming a file the load does not read was not refused by name: %v", loadError)
 	}
 }
 
@@ -65,11 +65,11 @@ func writeFiles(test *testing.T, directory string, files map[string]string) {
 	test.Helper()
 	for name, contents := range files {
 		path := filepath.Join(directory, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }
@@ -90,9 +90,9 @@ func TestTestsAreCheckedAsGoTestBuildsThem(test *testing.T) {
 		"q/q.go":              "package q\n\nimport \"example.com/variants/p\"\n\nfunc Make() p.T { return p.T{N: 1} }\n",
 		"q/signature_test.go": "package q\n\nfunc TestWrongSignature(count int) {}\n",
 	})
-	loaded, err := Load(Config{Directory: directory, Tests: true}, "./...")
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadError := Load(Config{Directory: directory, Tests: true}, "./...")
+	if loadError != nil {
+		test.Fatal(loadError)
 	}
 	problems := loaded.ErrorsAnywhere()
 	if len(problems) != 1 || !strings.Contains(problems[0].Error(), "wrong signature for TestWrongSignature") {

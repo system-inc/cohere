@@ -665,8 +665,8 @@ func isValidOpacityValue(value string) bool {
 // for every value in range here. The modulo is done in float64 exactly as upstream does it, so a
 // value where floating point makes `num % 0.25` non-zero is rejected in both.
 func isMultipleOf(value string, divisor float64) bool {
-	parsed, err := strconv.ParseFloat(value, 64)
-	if err != nil {
+	parsed, parseError := strconv.ParseFloat(value, 64)
+	if parseError != nil {
 		return false
 	}
 	if parsed < 0 {

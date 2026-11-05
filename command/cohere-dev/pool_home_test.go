@@ -20,8 +20,8 @@ import (
 func TestARunUnderAScratchHomeUsesTheMachinesPool(test *testing.T) {
 	test.Parallel()
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	account, err := user.Current()
 	if err != nil {
@@ -38,8 +38,8 @@ func TestARunUnderAScratchHomeUsesTheMachinesPool(test *testing.T) {
 	if !strings.Contains(string(output), "("+machine+")") {
 		test.Errorf("under a scratch home the pool is not the machine's, %s:\n%s", machine, output)
 	}
-	if _, err := os.Stat(filepath.Join(userCacheDirectoryIn(scratch), "cohere")); !os.IsNotExist(err) {
-		test.Errorf("a scratch home grew a pool of its own (%v)", err)
+	if _, statError := os.Stat(filepath.Join(userCacheDirectoryIn(scratch), "cohere")); !os.IsNotExist(statError) {
+		test.Errorf("a scratch home grew a pool of its own (%v)", statError)
 	}
 }
 
@@ -53,39 +53,39 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	home := test.TempDir()
 	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
-	if err := os.MkdirAll(slots, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(slots, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	// Elsewhere: not under the pool home's user cache directory.
 	cache := test.TempDir()
-	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {
 		path := filepath.Join(cache, fmt.Sprintf("%02x", index), fmt.Sprintf("%02xaa-d", index))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, make([]byte, 1024), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, make([]byte, 1024), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		old := time.Now().Add(-3 * time.Hour)
-		if err := os.Chtimes(path, old, old); err != nil {
-			test.Fatal(err)
+		if changeTimesError := os.Chtimes(path, old, old); changeTimesError != nil {
+			test.Fatal(changeTimesError)
 		}
 	}
 	scratch := scratchHome(test)
 	trim := exec.Command(wrapper, trimCacheVerb)
 	trim.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratch, "GOCACHE="+cache,
 		tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
-	output, err := trim.CombinedOutput()
-	if exited, ok := err.(*exec.ExitError); !ok || exited.ExitCode() != 2 {
-		test.Errorf("the trim of a cache its pool does not guard did not exit 2 (%v):\n%s", err, output)
+	output, outputError := trim.CombinedOutput()
+	if exited, ok := outputError.(*exec.ExitError); !ok || exited.ExitCode() != 2 {
+		test.Errorf("the trim of a cache its pool does not guard did not exit 2 (%v):\n%s", outputError, output)
 	}
 	remaining := 0
 	filepath.WalkDir(cache, func(path string, entry os.DirEntry, err error) error {
@@ -101,8 +101,8 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 	if !strings.Contains(string(log), "not trimmed: the Go build cache "+cache+" is outside "+userCacheDirectoryIn(home)) {
 		test.Errorf("the pool's log does not say why the cache was not trimmed:\n%s", log)
 	}
-	if _, err := os.Stat(filepath.Join(userCacheDirectoryIn(scratch), "cohere")); !os.IsNotExist(err) {
-		test.Errorf("the trim made a pool under the scratch home (%v)", err)
+	if _, statError := os.Stat(filepath.Join(userCacheDirectoryIn(scratch), "cohere")); !os.IsNotExist(statError) {
+		test.Errorf("the trim made a pool under the scratch home (%v)", statError)
 	}
 }
 
@@ -114,11 +114,11 @@ func scratchHome(test *testing.T) string {
 	home := test.TempDir()
 	for _, configuration := range []string{filepath.Join(home, "Library", "Application Support"), filepath.Join(home, ".config")} {
 		telemetry := filepath.Join(configuration, "go", "telemetry")
-		if err := os.MkdirAll(telemetry, 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(telemetry, 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(filepath.Join(telemetry, "mode"), []byte("off"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(telemetry, "mode"), []byte("off"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	return home

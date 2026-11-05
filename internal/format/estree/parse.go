@@ -48,9 +48,9 @@ func treeIsFor(fileName string, text string, parsed *ast.SourceFile) bool {
 
 // convertTypeScript is the convert and postprocess half of ParseTypeScript, over a tree in hand.
 func convertTypeScript(sourceFile *ast.SourceFile, text string, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
-	program, comments, err := Convert(sourceFile, nodes)
-	if err != nil {
-		return nil, nil, nil, err
+	program, comments, convertError := Convert(sourceFile, nodes)
+	if convertError != nil {
+		return nil, nil, nil, convertError
 	}
 	program, comments, stripped := Postprocess(program, comments, text)
 	return program, comments, stripped, nil
@@ -71,9 +71,9 @@ func convertTypeScript(sourceFile *ast.SourceFile, text string, nodes *Arena) (*
 //
 // The tree is typescript-estree's with Babel's one postprocess difference: see ConvertForBabel.
 func ParseJavaScript(fileName string, text string, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
-	program, comments, err := ConvertForBabel(ParseSourceFile(fileName, ReplaceHashbang(text)), nodes)
-	if err != nil {
-		return nil, nil, nil, err
+	program, comments, convertForBabelError := ConvertForBabel(ParseSourceFile(fileName, ReplaceHashbang(text)), nodes)
+	if convertForBabelError != nil {
+		return nil, nil, nil, convertForBabelError
 	}
 	program, comments, stripped := Postprocess(program, comments, text)
 	if found := findTypeScriptNode(program); found != nil {

@@ -18,30 +18,30 @@ func main() {
 	check := flag.Bool("check", false, "report stale files and exit 1, writing nothing")
 	flag.Parse()
 
-	if err := run(*check); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	if runError := run(*check); runError != nil {
+		fmt.Fprintln(os.Stderr, runError)
 		os.Exit(1)
 	}
 }
 
 func run(check bool) error {
-	files, err := policy.SwiftFiles()
-	if err != nil {
-		return err
+	files, swiftFilesError := policy.SwiftFiles()
+	if swiftFilesError != nil {
+		return swiftFilesError
 	}
 	var stale []string
 	for _, file := range files {
-		existing, err := os.ReadFile(file.Path)
-		if err != nil && !os.IsNotExist(err) {
-			return err
+		existing, readError := os.ReadFile(file.Path)
+		if readError != nil && !os.IsNotExist(readError) {
+			return readError
 		}
 		if bytes.Equal(existing, file.Contents) {
 			continue
 		}
 		stale = append(stale, file.Path)
 		if !check {
-			if err := os.WriteFile(file.Path, file.Contents, 0o644); err != nil {
-				return err
+			if writeError := os.WriteFile(file.Path, file.Contents, 0o644); writeError != nil {
+				return writeError
 			}
 			fmt.Println("wrote", file.Path)
 		}

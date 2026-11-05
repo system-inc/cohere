@@ -40,9 +40,9 @@ const jsxNoScriptUrlFile = "/repository/source/JsxNoScriptUrl.tsx"
 // upstream still checks `a` and `href`, so the answer is the built-in pair rather than an error.
 func jsxNoScriptUrlOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeJsxNoScriptUrlOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw))
+	if decodeJsxNoScriptUrlOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeJsxNoScriptUrlOptionsError)
 	}
 	return decoded
 }
@@ -271,9 +271,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 
 	test.Run("an empty body keeps the built-in pair", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding an empty body: %v", err)
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(nil)
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding an empty body: %v", decodeJsxNoScriptUrlOptionsError)
 		}
 		options, ok := decoded.(JsxNoScriptUrlOptions)
 		if !ok {
@@ -290,9 +290,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 
 	test.Run("the array arm alone", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Foo","props":["to","href"]}]]`))
-		if err != nil {
-			test.Fatalf("decoding the array arm: %v", err)
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Foo","props":["to","href"]}]]`))
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding the array arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
 		options, ok := decoded.(JsxNoScriptUrlOptions)
 		if !ok {
@@ -308,9 +308,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 
 	test.Run("the object arm alone, at its default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[{"includeFromSettings":false}]`))
-		if err != nil {
-			test.Fatalf("decoding the object arm: %v", err)
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[{"includeFromSettings":false}]`))
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding the object arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
 		options, ok := decoded.(JsxNoScriptUrlOptions)
 		if !ok {
@@ -323,9 +323,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 
 	test.Run("both arms in order", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`))
-		if err != nil {
-			test.Fatalf("decoding both arms: %v", err)
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`))
+		if decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("decoding both arms: %v", decodeJsxNoScriptUrlOptionsError)
 		}
 		options, ok := decoded.(JsxNoScriptUrlOptions)
 		if !ok {
@@ -341,11 +341,11 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		// `[[], {...}]` is upstream's own spelling in two corpus cases. An empty JSON array is the
 		// array arm, so the object must still be read from the second position: the refusal of
 		// `true` there is what proves it was read at all.
-		if _, err := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":true}]`)); err == nil {
+		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":true}]`)); decodeJsxNoScriptUrlOptionsError == nil {
 			test.Fatal("the object in the second position was not read, so its `true` was not refused")
 		}
-		if _, err := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":false}]`)); err != nil {
-			test.Fatalf("the same list at the default was refused: %v", err)
+		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":false}]`)); decodeJsxNoScriptUrlOptionsError != nil {
+			test.Fatalf("the same list at the default was refused: %v", decodeJsxNoScriptUrlOptionsError)
 		}
 	})
 
@@ -362,7 +362,7 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 			`[[{"name":"Foo","prop":["to"]}]]`,
 			`[{"includeFromSetting":false}]`,
 		} {
-			if decoded, err := DecodeJsxNoScriptUrlOptions([]byte(raw)); err == nil {
+			if decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw)); decodeJsxNoScriptUrlOptionsError == nil {
 				test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 			}
 		}
@@ -386,16 +386,16 @@ func TestJsxNoScriptUrlRefusesIncludeFromSettings(test *testing.T) {
 		`[{"includeFromSettings":true}]`,                                        // invalid 7, one finding upstream
 		`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":true}]`,      // invalid 8, two findings upstream
 	} {
-		_, err := DecodeJsxNoScriptUrlOptions([]byte(raw))
-		if err == nil || !strings.Contains(err.Error(), "includeFromSettings") {
-			test.Errorf("%s: want a refusal naming includeFromSettings, got %v", raw, err)
+		_, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw))
+		if decodeJsxNoScriptUrlOptionsError == nil || !strings.Contains(decodeJsxNoScriptUrlOptionsError.Error(), "includeFromSettings") {
+			test.Errorf("%s: want a refusal naming includeFromSettings, got %v", raw, decodeJsxNoScriptUrlOptionsError)
 			continue
 		}
 		// The refusal says why (no shared settings) and where the components go instead (ruled on
 		// #e06zm4b), so an author copying an ESLint config is told what to write.
 		for _, want := range []string{"does not read settings.linkComponents", `[{"name": "Link", "props": ["to"]}]`} {
-			if !strings.Contains(err.Error(), want) {
-				test.Errorf("%s: the refusal does not say %q: %v", raw, want, err)
+			if !strings.Contains(decodeJsxNoScriptUrlOptionsError.Error(), want) {
+				test.Errorf("%s: the refusal does not say %q: %v", raw, want, decodeJsxNoScriptUrlOptionsError)
 			}
 		}
 	}

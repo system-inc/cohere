@@ -13,8 +13,8 @@ import (
 func newCache(test *testing.T) string {
 	test.Helper()
 	directory := test.TempDir()
-	if err := os.WriteFile(filepath.Join(directory, "README"), []byte(readmeMarker+"\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "README"), []byte(readmeMarker+"\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return directory
 }
@@ -23,21 +23,21 @@ func newCache(test *testing.T) string {
 func put(test *testing.T, directory, name string, bytes int, used time.Time) string {
 	test.Helper()
 	path := filepath.Join(directory, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte(strings.Repeat("x", bytes)), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte(strings.Repeat("x", bytes)), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.Chtimes(path, used, used); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(path, used, used); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
 	return path
 }
 
 func exists(path string) bool {
-	_, err := os.Lstat(path)
-	return err == nil
+	_, statError := os.Lstat(path)
+	return statError == nil
 }
 
 // A directory that does not say it is a Go build cache is never trimmed, however large.
@@ -45,8 +45,8 @@ func TestADirectoryWithoutGosReadmeIsRefused(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	file := put(test, directory, "ab/0000ab-d", 4096, time.Now().Add(-48*time.Hour))
-	if _, err := Trim(directory, Limit{Cap: 1, Target: 0, Spare: InUseWindow}, time.Now()); err == nil || !strings.Contains(err.Error(), "refusing to trim") {
-		test.Fatalf("a directory with no README was trimmed: %v", err)
+	if _, trimError := Trim(directory, Limit{Cap: 1, Target: 0, Spare: InUseWindow}, time.Now()); trimError == nil || !strings.Contains(trimError.Error(), "refusing to trim") {
+		test.Fatalf("a directory with no README was trimmed: %v", trimError)
 	}
 	if !exists(file) {
 		test.Fatal("a refused trim removed a file")
@@ -106,9 +106,9 @@ func TestEntriesInUseAreNeverRemoved(test *testing.T) {
 		put(test, directory, "03/03aa-a", 400, now),
 	}
 
-	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 100, Spare: InUseWindow}, now)
-	if err != nil {
-		test.Fatal(err)
+	trimmed, trimError := Trim(directory, Limit{Cap: 1000, Target: 100, Spare: InUseWindow}, now)
+	if trimError != nil {
+		test.Fatal(trimError)
 	}
 	if trimmed.Removed != 1 || trimmed.InUse != 1200 || trimmed.After != 1200 {
 		test.Fatalf("trimmed %+v, want only the stale entry removed and 1200 bytes in use kept over the cap", trimmed)
@@ -133,9 +133,9 @@ func TestAShortSpareWindowReachesRecentlyUsedEntries(test *testing.T) {
 	recent := put(test, directory, "01/01aa-d", 400, now.Add(-20*time.Minute))
 	justWritten := put(test, directory, "02/02aa-a", 400, now.Add(-2*time.Minute))
 
-	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 500, Spare: 10 * time.Minute}, now)
-	if err != nil {
-		test.Fatal(err)
+	trimmed, trimError := Trim(directory, Limit{Cap: 1000, Target: 500, Spare: 10 * time.Minute}, now)
+	if trimError != nil {
+		test.Fatal(trimError)
 	}
 	if trimmed.Removed != 2 || trimmed.After != 400 || trimmed.InUse != 400 {
 		test.Fatalf("trimmed %+v, want the two entries older than the window removed, oldest first", trimmed)
@@ -154,17 +154,17 @@ func TestAnExecutableEntryIsRemovedByName(test *testing.T) {
 	now := time.Now()
 	old := now.Add(-48 * time.Hour)
 	binary := put(test, directory, "00/00aa-d/cohere", 2000, old)
-	if err := os.Chtimes(filepath.Dir(binary), old, old); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(filepath.Dir(binary), old, old); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
 	nested := put(test, directory, "01/01aa-d/inner/file", 2000, old)
-	if err := os.Chtimes(filepath.Dir(filepath.Dir(nested)), old, old); err != nil {
-		test.Fatal(err)
+	if changeTimesError := os.Chtimes(filepath.Dir(filepath.Dir(nested)), old, old); changeTimesError != nil {
+		test.Fatal(changeTimesError)
 	}
 
-	trimmed, err := Trim(directory, Limit{Cap: 1000, Target: 0, Spare: InUseWindow}, now)
-	if err != nil {
-		test.Fatal(err)
+	trimmed, trimError := Trim(directory, Limit{Cap: 1000, Target: 0, Spare: InUseWindow}, now)
+	if trimError != nil {
+		test.Fatal(trimError)
 	}
 	if trimmed.Removed != 1 || trimmed.Before != 2000 {
 		test.Fatalf("trimmed %+v, want the one executable entry of 2000 bytes", trimmed)
@@ -181,32 +181,32 @@ func TestAnExecutableEntryIsRemovedByName(test *testing.T) {
 // the go command opens the trimmed cache and builds again with no error.
 func TestTheGoCommandBuildsFromATrimmedCache(test *testing.T) {
 	test.Parallel()
-	if _, err := exec.LookPath("go"); err != nil {
+	if _, lookPathError := exec.LookPath("go"); lookPathError != nil {
 		test.Skip("no go command")
 	}
 	cache := test.TempDir()
 	module := test.TempDir()
-	if err := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module trimmed\n\ngo 1.21\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module trimmed\n\ngo 1.21\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.WriteFile(filepath.Join(module, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(module, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	build := func() {
 		test.Helper()
 		command := exec.Command("go", "build", "-o", filepath.Join(test.TempDir(), "trimmed"), ".")
 		command.Dir = module
 		command.Env = append(os.Environ(), "GOCACHE="+cache, "GOFLAGS=", "GOWORK=off")
-		if output, err := command.CombinedOutput(); err != nil {
-			test.Fatalf("go build: %v: %s", err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("go build: %v: %s", outputError, output)
 		}
 	}
 	build()
 
 	// A day from now nothing is in use, so a target of zero takes every entry.
-	trimmed, err := Trim(cache, Limit{Cap: 0, Target: 0, Spare: InUseWindow}, time.Now().Add(24*time.Hour))
-	if err != nil {
-		test.Fatal(err)
+	trimmed, trimError := Trim(cache, Limit{Cap: 0, Target: 0, Spare: InUseWindow}, time.Now().Add(24*time.Hour))
+	if trimError != nil {
+		test.Fatal(trimError)
 	}
 	if trimmed.Removed == 0 || trimmed.After != 0 {
 		test.Fatalf("trimmed %+v, want every entry gone", trimmed)

@@ -34,7 +34,7 @@ func DecodeNoMethodSetStateOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var mode string
-	if err := json.Unmarshal(raw, &mode); err != nil {
+	if decodeError := json.Unmarshal(raw, &mode); decodeError != nil {
 		return options, fmt.Errorf(`expected the mode string "disallow-in-func", got %s`, raw)
 	}
 	if mode != "disallow-in-func" {

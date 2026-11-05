@@ -25,9 +25,9 @@ func noUselessDefaultAssignmentOptionsFor(test *testing.T, optionsJson string) a
 	if optionsJson == "" {
 		return DefaultNoUselessDefaultAssignmentSettings()
 	}
-	decoded, err := DecodeNoUselessDefaultAssignmentOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeNoUselessDefaultAssignmentOptionsError := DecodeNoUselessDefaultAssignmentOptions(json.RawMessage(optionsJson))
+	if decodeNoUselessDefaultAssignmentOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeNoUselessDefaultAssignmentOptionsError)
 	}
 	return decoded
 }

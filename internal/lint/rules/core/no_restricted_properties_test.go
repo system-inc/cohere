@@ -194,10 +194,10 @@ func TestNoRestrictedPropertiesEnforcesNothingUnconfigured(test *testing.T) {
 
 	// The control: the same source under a restriction reports, so the silence above is the empty
 	// configuration rather than a rule that cannot fire.
-	decoded, err := DecodeNoRestrictedPropertiesOptions(
+	decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
 		[]byte(`[{"object":"foo","property":"bar"}]`))
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	if decodeNoRestrictedPropertiesOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeNoRestrictedPropertiesOptionsError)
 	}
 	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoRestrictedProperties,
 		noRestrictedPropertiesFile, source, decoded),
@@ -463,9 +463,9 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 
 	test.Run("nil input yields an empty list", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoRestrictedPropertiesOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(nil)
+		if decodeNoRestrictedPropertiesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
 		if len(decoded.(NoRestrictedPropertiesOptions).Restrictions) != 0 {
 			test.Error("nil input produced restrictions")
@@ -474,34 +474,34 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 
 	test.Run("an entry naming neither an object nor a property is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`[{"message":"nope"}]`)); err == nil {
+		if _, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
+			[]byte(`[{"message":"nope"}]`)); decodeNoRestrictedPropertiesOptionsError == nil {
 			test.Error("an entry that can never match anything decoded")
 		}
 	})
 
 	test.Run("object paired with allowObjects is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`[{"object":"foo","allowObjects":["bar"]}]`)); err == nil {
+		if _, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
+			[]byte(`[{"object":"foo","allowObjects":["bar"]}]`)); decodeNoRestrictedPropertiesOptionsError == nil {
 			test.Error("a self-contradictory pairing decoded")
 		}
 	})
 
 	test.Run("property paired with allowProperties is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeNoRestrictedPropertiesOptions(
-			[]byte(`[{"property":"foo","allowProperties":["bar"]}]`)); err == nil {
+		if _, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
+			[]byte(`[{"property":"foo","allowProperties":["bar"]}]`)); decodeNoRestrictedPropertiesOptionsError == nil {
 			test.Error("a self-contradictory pairing decoded")
 		}
 	})
 
 	test.Run("every element is a restriction, upstream's variadic spelling", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoRestrictedPropertiesOptions(
+		decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions(
 			[]byte(`[{"object":"foo","property":"bar"},{"property":"__proto__","message":"No."}]`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		if decodeNoRestrictedPropertiesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
 		restrictions := decoded.(NoRestrictedPropertiesOptions).Restrictions
 		if len(restrictions) != 2 || restrictions[1].Property != "__proto__" || restrictions[1].Message != "No." {
@@ -519,7 +519,7 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 			// An element that is not a restriction object.
 			`["foo"]`,
 		} {
-			if decoded, err := DecodeNoRestrictedPropertiesOptions([]byte(raw)); err == nil {
+			if decoded, decodeNoRestrictedPropertiesOptionsError := DecodeNoRestrictedPropertiesOptions([]byte(raw)); decodeNoRestrictedPropertiesOptionsError == nil {
 				test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 			}
 		}

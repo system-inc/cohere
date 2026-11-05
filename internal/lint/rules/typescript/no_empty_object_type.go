@@ -70,8 +70,8 @@ func DecodeNoEmptyObjectTypeOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire noEmptyObjectTypeWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.AllowInterfaces != nil {
 		switch *wire.AllowInterfaces {
@@ -90,9 +90,9 @@ func DecodeNoEmptyObjectTypeOptions(raw []byte) (any, error) {
 		}
 	}
 	if wire.AllowWithName != nil && *wire.AllowWithName != "" {
-		tester, err := esregexp.Compile(*wire.AllowWithName, "u")
-		if err != nil {
-			return options, fmt.Errorf("allowWithName %q is not a JavaScript regular expression under the u flag: %w", *wire.AllowWithName, err)
+		tester, compileError := esregexp.Compile(*wire.AllowWithName, "u")
+		if compileError != nil {
+			return options, fmt.Errorf("allowWithName %q is not a JavaScript regular expression under the u flag: %w", *wire.AllowWithName, compileError)
 		}
 		options.AllowWithName = *wire.AllowWithName
 		options.allowWithNameTester = tester

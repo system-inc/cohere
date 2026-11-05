@@ -100,9 +100,9 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 			// published under a name the binary no longer answers to.
 			continue
 		}
-		encoded, err := encode(examples)
-		if err != nil {
-			return nil, err
+		encoded, encodeError := encode(examples)
+		if encodeError != nil {
+			return nil, encodeError
 		}
 		files[ExamplePath(name)] = encoded
 	}
@@ -187,9 +187,9 @@ func Stale(root string, files map[string][]byte) ([]string, error) {
 			stale = append(stale, path)
 		}
 	}
-	orphans, err := OrphanedExamples(root, files)
-	if err != nil {
-		return nil, err
+	orphans, orphanedExamplesError := OrphanedExamples(root, files)
+	if orphanedExamplesError != nil {
+		return nil, orphanedExamplesError
 	}
 	stale = append(stale, orphans...)
 	sort.Strings(stale)
@@ -200,7 +200,7 @@ func Stale(root string, files map[string][]byte) ([]string, error) {
 func OrphanedExamples(root string, files map[string][]byte) ([]string, error) {
 	var orphans []string
 	directory := filepath.Join(root, ExamplesDirectory)
-	err := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, err error) error {
 		if os.IsNotExist(err) && path == directory {
 			return filepath.SkipDir
 		}
@@ -218,7 +218,7 @@ func OrphanedExamples(root string, files map[string][]byte) ([]string, error) {
 		return nil
 	})
 	sort.Strings(orphans)
-	return orphans, err
+	return orphans, walkError
 }
 
 // encode writes a value with four-space indentation and no HTML escaping, so a regeneration diffs
@@ -229,8 +229,8 @@ func encode(value any) ([]byte, error) {
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(value); err != nil {
-		return nil, err
+	if encodeError := encoder.Encode(value); encodeError != nil {
+		return nil, encodeError
 	}
 	return buffer.Bytes(), nil
 }

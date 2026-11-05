@@ -336,9 +336,9 @@ func TestRadixIgnoresItsDeprecatedOption(test *testing.T) {
 	}
 
 	for _, raw := range []string{"", `"always"`, `"as-needed"`} {
-		options, err := DecodeRadixOptions([]byte(raw))
-		if err != nil {
-			test.Fatalf("the decoder refused %q: %v", raw, err)
+		options, decodeRadixOptionsError := DecodeRadixOptions([]byte(raw))
+		if decodeRadixOptionsError != nil {
+			test.Fatalf("the decoder refused %q: %v", raw, decodeRadixOptionsError)
 		}
 		for _, testCase := range cases {
 			test.Run(raw+" "+testCase.sourceText, func(test *testing.T) {
@@ -364,7 +364,7 @@ func TestDecodeRadixOptionsRefusesWhatTheSchemaRefuses(test *testing.T) {
 	} {
 		test.Run(raw, func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeRadixOptions([]byte(raw)); err == nil {
+			if _, decodeRadixOptionsError := DecodeRadixOptions([]byte(raw)); decodeRadixOptionsError == nil {
 				test.Errorf("expected %s to be refused, it was accepted", raw)
 			}
 		})
@@ -373,9 +373,9 @@ func TestDecodeRadixOptionsRefusesWhatTheSchemaRefuses(test *testing.T) {
 	for raw, want := range map[string]RadixMode{`"always"`: RadixAlways, `"as-needed"`: RadixAsNeeded} {
 		test.Run(raw, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeRadixOptions([]byte(raw))
-			if err != nil {
-				test.Fatalf("expected %s to be accepted, got %v", raw, err)
+			decoded, decodeRadixOptionsError := DecodeRadixOptions([]byte(raw))
+			if decodeRadixOptionsError != nil {
+				test.Fatalf("expected %s to be accepted, got %v", raw, decodeRadixOptionsError)
 			}
 			if decoded != want {
 				test.Errorf("expected %s to decode to %q, got %#v", raw, want, decoded)

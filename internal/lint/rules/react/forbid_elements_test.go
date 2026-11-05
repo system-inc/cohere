@@ -35,9 +35,9 @@ const forbidElementsFile = "/repository/source/ForbidElements.tsx"
 // `configuration.forbid || []`, so the answer is an empty list and the rule declines everything.
 func forbidElementsOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeForbidElementsOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(raw))
+	if decodeForbidElementsOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeForbidElementsOptionsError)
 	}
 	return decoded
 }
@@ -381,9 +381,9 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 
 	test.Run("an empty body yields an empty list rather than an error", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidElementsOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidElementsOptionsError := DecodeForbidElementsOptions(nil)
+		if decodeForbidElementsOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidElementsOptionsError)
 		}
 		options, ok := decoded.(ForbidElementsOptions)
 		if !ok {
@@ -396,9 +396,9 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 
 	test.Run("both arms of the union decode", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidElementsOptions([]byte(`{"forbid":["a",{"element":"b","message":"m"}]}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(`{"forbid":["a",{"element":"b","message":"m"}]}`))
+		if decodeForbidElementsOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidElementsOptionsError)
 		}
 		options, ok := decoded.(ForbidElementsOptions)
 		if !ok {
@@ -417,9 +417,9 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 
 	test.Run("order is preserved, which is what makes the last entry win", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidElementsOptions([]byte(`{"forbid":["x","y","z"]}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(`{"forbid":["x","y","z"]}`))
+		if decodeForbidElementsOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidElementsOptionsError)
 		}
 		options, ok := decoded.(ForbidElementsOptions)
 		if !ok {
@@ -433,10 +433,10 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 
 	test.Run("a malformed body errors rather than silently emptying the list", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeForbidElementsOptions([]byte(`{"forbid":`)); err == nil {
+		if _, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(`{"forbid":`)); decodeForbidElementsOptionsError == nil {
 			test.Error("want an error for a truncated body")
 		}
-		if _, err := DecodeForbidElementsOptions([]byte(`{"forbid":[1]}`)); err == nil {
+		if _, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(`{"forbid":[1]}`)); decodeForbidElementsOptionsError == nil {
 			test.Error("want an error for an entry that is neither a string nor an object")
 		}
 	})

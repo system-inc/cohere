@@ -379,9 +379,9 @@ func TestStrictFollowsTheCompilersAlwaysStrict(test *testing.T) {
 		return func(directory string) {
 			config := `{"compilerOptions": {` + compilerOptions + `, "target": "ES2022", ` +
 				`"lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
-			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config),
-				0o644); err != nil {
-				test.Fatalf("writing the tsconfig: %v", err)
+			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config),
+				0o644); writeError != nil {
+				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
 		}
 	}
@@ -500,15 +500,15 @@ func TestStrictHasNoImpliedMode(test *testing.T) {
 	// the same thing that could disagree with the first. `module` is refused for the same reason:
 	// the file's own imports select it.
 	for _, mode := range []string{"safe", "global", "function", "never", "implied", "module"} {
-		_, err := DecodeStrictOptions([]byte(`"` + mode + `"`))
+		_, decodeStrictOptionsError := DecodeStrictOptions([]byte(`"` + mode + `"`))
 		if mode == "implied" || mode == "module" {
-			if err == nil {
+			if decodeStrictOptionsError == nil {
 				test.Errorf("mode %q decoded, but it is selected by the file, not the option", mode)
 			}
 			continue
 		}
-		if err != nil {
-			test.Errorf("mode %q should decode: %v", mode, err)
+		if decodeStrictOptionsError != nil {
+			test.Errorf("mode %q should decode: %v", mode, decodeStrictOptionsError)
 		}
 	}
 }
@@ -522,9 +522,9 @@ func TestDecodeStrictOptions(test *testing.T) {
 
 	test.Run("nil input selects Safe", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeStrictOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeStrictOptionsError := DecodeStrictOptions(nil)
+		if decodeStrictOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeStrictOptionsError)
 		}
 		if mode := decoded.(StrictMode); mode != StrictSafe {
 			test.Errorf("mode came back %q, wanted upstream's default %q", mode, StrictSafe)
@@ -533,9 +533,9 @@ func TestDecodeStrictOptions(test *testing.T) {
 
 	test.Run("upstream's bare string decodes to its mode", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeStrictOptions([]byte(`"never"`))
-		if err != nil {
-			test.Fatalf("upstream's own `[\"error\", \"never\"]` was refused: %v", err)
+		decoded, decodeStrictOptionsError := DecodeStrictOptions([]byte(`"never"`))
+		if decodeStrictOptionsError != nil {
+			test.Fatalf("upstream's own `[\"error\", \"never\"]` was refused: %v", decodeStrictOptionsError)
 		}
 		if mode := decoded.(StrictMode); mode != StrictNever {
 			test.Errorf("mode came back %q, wanted %q", mode, StrictNever)
@@ -546,7 +546,7 @@ func TestDecodeStrictOptions(test *testing.T) {
 	// carrying it was never valid ESLint. Refusing it keeps one spelling for one setting.
 	test.Run("the object form is refused", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeStrictOptions([]byte(`{"mode":"never"}`)); err == nil {
+		if _, decodeStrictOptionsError := DecodeStrictOptions([]byte(`{"mode":"never"}`)); decodeStrictOptionsError == nil {
 			test.Error(`{"mode":"never"} decoded; upstream's option is a bare string`)
 		}
 	})
@@ -554,7 +554,7 @@ func TestDecodeStrictOptions(test *testing.T) {
 	// Upstream's enum is case-sensitive, so a PascalCase spelling is a typo rather than a synonym.
 	test.Run("another casing is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeStrictOptions([]byte(`"Never"`)); err == nil {
+		if _, decodeStrictOptionsError := DecodeStrictOptions([]byte(`"Never"`)); decodeStrictOptionsError == nil {
 			test.Error(`"Never" decoded; upstream spells it "never"`)
 		}
 	})
@@ -562,7 +562,7 @@ func TestDecodeStrictOptions(test *testing.T) {
 	test.Run("an unknown mode is rejected", func(test *testing.T) {
 		test.Parallel()
 		for _, raw := range []string{`"sometimes"`, `""`, `null`, `1`} {
-			if _, err := DecodeStrictOptions([]byte(raw)); err == nil {
+			if _, decodeStrictOptionsError := DecodeStrictOptions([]byte(raw)); decodeStrictOptionsError == nil {
 				test.Errorf("%s decoded", raw)
 			}
 		}

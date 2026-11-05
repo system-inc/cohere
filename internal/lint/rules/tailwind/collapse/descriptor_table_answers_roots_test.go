@@ -164,13 +164,13 @@ func lookupClass(test *testing.T, system *LoadedDesignSystem, table *Table, clas
 
 func loadWave3Fixture(test *testing.T, name string) wave3Fixture {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("read %s: %v", name, err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("read %s: %v", name, readError)
 	}
 	var fixture wave3Fixture
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		test.Fatalf("parse %s: %v", name, err)
+	if decodeError := json.Unmarshal(raw, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
 		test.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)

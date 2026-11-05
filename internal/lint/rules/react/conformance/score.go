@@ -128,8 +128,8 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 	score := Score{Considered: len(fixtures)}
 
 	for _, fixture := range fixtures {
-		if err := CheckPragmas(fixture.Name, fixture.Pragmas); err != nil {
-			return Score{}, err
+		if checkPragmasError := CheckPragmas(fixture.Name, fixture.Pragmas); checkPragmasError != nil {
+			return Score{}, checkPragmasError
 		}
 	}
 
@@ -144,10 +144,10 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 			continue
 		}
 
-		result, err := implementation.Analyze(fixture)
-		if err != nil {
+		result, analyzeError := implementation.Analyze(fixture)
+		if analyzeError != nil {
 			var unsupported *ErrUnsupported
-			if asUnsupported(err, &unsupported) {
+			if asUnsupported(analyzeError, &unsupported) {
 				score.Declined++
 				score.Fixtures = append(score.Fixtures, FixtureScore{
 					Name:           fixture.Name,
@@ -157,7 +157,7 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 				})
 				continue
 			}
-			return Score{}, fmt.Errorf("%s: %w", fixture.Name, err)
+			return Score{}, fmt.Errorf("%s: %w", fixture.Name, analyzeError)
 		}
 
 		verdict := Compare(fixture.Expected, result)
@@ -171,8 +171,8 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 		score.Fixtures = append(score.Fixtures, verdict)
 	}
 
-	if err := score.Check(); err != nil {
-		return Score{}, err
+	if checkError := score.Check(); checkError != nil {
+		return Score{}, checkError
 	}
 	return score, nil
 }

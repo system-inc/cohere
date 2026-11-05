@@ -341,9 +341,9 @@ func TestStateInConstructorStaysSilent(test *testing.T) {
 // or `"never"`. A fixture handing RunWithOptions a struct would leave the decoder untested.
 func runStateInConstructor(test *testing.T, mode StateInConstructorMode, sourceText string) rule_testing.Result {
 	test.Helper()
-	decoded, err := DecodeStateInConstructorOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
-	if err != nil {
-		test.Fatalf("decoding mode %q: %v", mode, err)
+	decoded, decodeStateInConstructorOptionsError := DecodeStateInConstructorOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
+	if decodeStateInConstructorOptionsError != nil {
+		test.Fatalf("decoding mode %q: %v", mode, decodeStateInConstructorOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, StateInConstructor, stateInConstructorFile, sourceText, decoded)
 }
@@ -764,9 +764,9 @@ func TestDecodeStateInConstructorOptions(test *testing.T) {
 	for _, testCase := range accepted {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeStateInConstructorOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			decoded, decodeStateInConstructorOptionsError := DecodeStateInConstructorOptions([]byte(testCase.raw))
+			if decodeStateInConstructorOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeStateInConstructorOptionsError)
 			}
 			options, ok := decoded.(StateInConstructorOptions)
 			if !ok {
@@ -795,7 +795,7 @@ func TestDecodeStateInConstructorOptions(test *testing.T) {
 	for _, testCase := range refused {
 		test.Run(testCase.name+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeStateInConstructorOptions([]byte(testCase.raw)); err == nil {
+			if _, decodeStateInConstructorOptionsError := DecodeStateInConstructorOptions([]byte(testCase.raw)); decodeStateInConstructorOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})

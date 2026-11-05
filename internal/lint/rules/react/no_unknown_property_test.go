@@ -37,9 +37,9 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 // the defaults under test. An empty body is the nil-options case.
 func noUnknownPropertyOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeNoUnknownPropertyOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions([]byte(raw))
+	if decodeNoUnknownPropertyOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeNoUnknownPropertyOptionsError)
 	}
 	return decoded
 }
@@ -567,9 +567,9 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 
 	test.Run("an empty body carries upstream's defaults", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUnknownPropertyOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding an empty body: %v", err)
+		decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions(nil)
+		if decodeNoUnknownPropertyOptionsError != nil {
+			test.Fatalf("decoding an empty body: %v", decodeNoUnknownPropertyOptionsError)
 		}
 		options, ok := decoded.(NoUnknownPropertyOptions)
 		if !ok {
@@ -585,9 +585,9 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 
 	test.Run("both keys decode", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoUnknownPropertyOptions([]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`))
-		if err != nil {
-			test.Fatalf("decoding both keys: %v", err)
+		decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions([]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`))
+		if decodeNoUnknownPropertyOptionsError != nil {
+			test.Fatalf("decoding both keys: %v", decodeNoUnknownPropertyOptionsError)
 		}
 		options, ok := decoded.(NoUnknownPropertyOptions)
 		if !ok {

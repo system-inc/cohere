@@ -32,9 +32,9 @@ func noDuplicateTypeConstituentsOptionsFor(test *testing.T, optionsJson string) 
 	if optionsJson == "" {
 		return DefaultNoDuplicateTypeConstituentsSettings()
 	}
-	decoded, err := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", optionsJson, err)
+	decoded, decodeNoDuplicateTypeConstituentsOptionsError := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(optionsJson))
+	if decodeNoDuplicateTypeConstituentsOptionsError != nil {
+		test.Fatalf("decoding %s: %v", optionsJson, decodeNoDuplicateTypeConstituentsOptionsError)
 	}
 	return decoded
 }
@@ -777,9 +777,9 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.raw, err)
+			decoded, decodeNoDuplicateTypeConstituentsOptionsError := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(testCase.raw))
+			if decodeNoDuplicateTypeConstituentsOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.raw, decodeNoDuplicateTypeConstituentsOptionsError)
 			}
 			options, isOptions := decoded.(NoDuplicateTypeConstituentsOptions)
 			if !isOptions {

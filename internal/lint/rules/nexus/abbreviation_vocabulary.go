@@ -125,17 +125,17 @@ type abbreviationVocabulary struct {
 var vocabulary = mustLoadAbbreviationVocabulary(policy.AbbreviationsFile())
 
 func mustLoadAbbreviationVocabulary(data []byte) *abbreviationVocabulary {
-	loaded, err := loadAbbreviationVocabulary(data)
-	if err != nil {
-		panic(fmt.Sprintf("policy/Abbreviations.json: %v", err))
+	loaded, loadAbbreviationVocabularyError := loadAbbreviationVocabulary(data)
+	if loadAbbreviationVocabularyError != nil {
+		panic(fmt.Sprintf("policy/Abbreviations.json: %v", loadAbbreviationVocabularyError))
 	}
 	return loaded
 }
 
 func loadAbbreviationVocabulary(data []byte) (*abbreviationVocabulary, error) {
 	var file abbreviationVocabularyFile
-	if err := rule.UnmarshalOptions(data, &file); err != nil {
-		return nil, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(data, &file); unmarshalOptionsError != nil {
+		return nil, unmarshalOptionsError
 	}
 
 	loaded := &abbreviationVocabulary{
@@ -147,8 +147,8 @@ func loadAbbreviationVocabulary(data []byte) (*abbreviationVocabulary, error) {
 	seen := map[string]bool{}
 	for index := range file.Abbreviations {
 		entry := &file.Abbreviations[index]
-		if err := validateAbbreviationEntry(entry); err != nil {
-			return nil, fmt.Errorf("entry %d (%q): %w", index, entry.Abbreviation, err)
+		if validateAbbreviationEntryError := validateAbbreviationEntry(entry); validateAbbreviationEntryError != nil {
+			return nil, fmt.Errorf("entry %d (%q): %w", index, entry.Abbreviation, validateAbbreviationEntryError)
 		}
 		if seen[entry.Abbreviation] {
 			return nil, fmt.Errorf("entry %q appears twice", entry.Abbreviation)

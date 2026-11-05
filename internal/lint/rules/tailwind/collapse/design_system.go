@@ -452,9 +452,9 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 		resolve = NodeStylesheetResolver(options.TailwindPackageRoot)
 	}
 
-	entryPoint, err := filepath.Abs(options.EntryPoint)
-	if err != nil {
-		return nil, fmt.Errorf("resolve %s: %w", options.EntryPoint, err)
+	entryPoint, absolutePathError := filepath.Abs(options.EntryPoint)
+	if absolutePathError != nil {
+		return nil, fmt.Errorf("resolve %s: %w", options.EntryPoint, absolutePathError)
 	}
 
 	collector := &stylesheetCollector{
@@ -465,8 +465,8 @@ func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 		utilityRoots:       map[string]map[UtilityKind]bool{},
 		customVariants:     map[string]bool{},
 	}
-	if err := collector.loadFile(entryPoint); err != nil {
-		return nil, err
+	if loadFileError := collector.loadFile(entryPoint); loadFileError != nil {
+		return nil, loadFileError
 	}
 
 	variants := NewVariantRegistry()
@@ -629,8 +629,8 @@ func (collector *stylesheetCollector) ingest(nodes []*Node, path string) error {
 	for _, node := range nodes {
 		if node.Kind != KindAtRule {
 			if node.IsContainer() {
-				if err := collector.ingest(node.Nodes, path); err != nil {
-					return err
+				if ingestError := collector.ingest(node.Nodes, path); ingestError != nil {
+					return ingestError
 				}
 			}
 			continue
@@ -638,22 +638,22 @@ func (collector *stylesheetCollector) ingest(nodes []*Node, path string) error {
 
 		switch node.Name {
 		case "@import":
-			resolved, err := collector.resolveImport(node, path)
-			if err != nil {
-				return err
+			resolved, resolveImportError := collector.resolveImport(node, path)
+			if resolveImportError != nil {
+				return resolveImportError
 			}
-			if err := collector.loadFile(resolved); err != nil {
-				return err
+			if loadFileError := collector.loadFile(resolved); loadFileError != nil {
+				return loadFileError
 			}
 
 		case "@theme":
-			if err := collector.ingestThemeBlock(node, path); err != nil {
-				return err
+			if ingestThemeBlockError := collector.ingestThemeBlock(node, path); ingestThemeBlockError != nil {
+				return ingestThemeBlockError
 			}
 
 		case "@utility":
-			if err := collector.ingestUtilityBlock(node, path); err != nil {
-				return err
+			if ingestUtilityBlockError := collector.ingestUtilityBlock(node, path); ingestUtilityBlockError != nil {
+				return ingestUtilityBlockError
 			}
 
 		case "@custom-variant":
@@ -670,8 +670,8 @@ func (collector *stylesheetCollector) ingest(nodes []*Node, path string) error {
 			// `@layer theme { @theme default { ... } }` is how the framework's own index.css is
 			// written, so descending into container at-rules is required rather than defensive.
 			if node.IsContainer() {
-				if err := collector.ingest(node.Nodes, path); err != nil {
-					return err
+				if ingestError := collector.ingest(node.Nodes, path); ingestError != nil {
+					return ingestError
 				}
 			}
 		}
@@ -742,8 +742,8 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 			return WalkContinue
 		}
 		if child.Kind == KindDeclaration && strings.HasPrefix(child.Property, "--") {
-			if err := collector.theme.Add(unescapeCSSIdentifier(child.Property), child.Value, options); err != nil {
-				walkErr = fmt.Errorf("%s: %w", path, err)
+			if addError := collector.theme.Add(unescapeCSSIdentifier(child.Property), child.Value, options); addError != nil {
+				walkErr = fmt.Errorf("%s: %w", path, addError)
 				return WalkStop
 			}
 			return WalkContinue

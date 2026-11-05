@@ -9,8 +9,8 @@ import (
 // Every committed record is the honest account of its own runs, and is named for itself.
 func TestEveryCommittedRecordValidates(test *testing.T) {
 	test.Parallel()
-	if _, err := Read(filepath.Join("..", "..", Directory)); err != nil {
-		test.Fatal(err)
+	if _, readError := Read(filepath.Join("..", "..", Directory)); readError != nil {
+		test.Fatal(readError)
 	}
 }
 
@@ -79,8 +79,8 @@ func coldOnlyRecord() Record {
 func TestAnHonestRecordValidates(test *testing.T) {
 	test.Parallel()
 	record := honestRecord()
-	if err := Validate(record); err != nil {
-		test.Fatal(err)
+	if validateError := Validate(record); validateError != nil {
+		test.Fatal(validateError)
 	}
 	if record.Modes[ModeEdit].Quiet != nil {
 		test.Fatalf("Edit had no quiet run and carries a quiet number: %+v", record.Modes[ModeEdit].Quiet)
@@ -99,16 +99,16 @@ func TestAnHonestRecordValidates(test *testing.T) {
 // A schema 1 record, as committed before idleness decided, still validates by the loads it was judged by.
 func TestALoadSchemaRecordStillValidates(test *testing.T) {
 	test.Parallel()
-	if err := Validate(loadSchemaRecord()); err != nil {
-		test.Fatal(err)
+	if validateError := Validate(loadSchemaRecord()); validateError != nil {
+		test.Fatal(validateError)
 	}
 }
 
 // A record may measure Cold alone, read no cache and so prime nothing, and stop early when its quiet runs agree.
 func TestAColdOnlyRecordThatStoppedEarlyValidates(test *testing.T) {
 	test.Parallel()
-	if err := Validate(coldOnlyRecord()); err != nil {
-		test.Fatal(err)
+	if validateError := Validate(coldOnlyRecord()); validateError != nil {
+		test.Fatal(validateError)
 	}
 }
 
@@ -210,10 +210,10 @@ func TestADishonestRecordIsRefused(test *testing.T) {
 			test.Parallel()
 			record := honestRecord()
 			mutate(&record)
-			if err := Validate(record); err == nil {
+			if validateError := Validate(record); validateError == nil {
 				test.Fatal("validated")
 			}
-			if _, err := Encode(record); err == nil {
+			if _, encodeError := Encode(record); encodeError == nil {
 				test.Fatal("encoded")
 			}
 		})

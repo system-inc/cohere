@@ -1581,9 +1581,9 @@ func TestNoInvalidHtmlAttributeOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoInvalidHtmlAttributeOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeNoInvalidHtmlAttributeOptionsError := DecodeNoInvalidHtmlAttributeOptions([]byte(testCase.raw))
+			if decodeNoInvalidHtmlAttributeOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeNoInvalidHtmlAttributeOptionsError)
 			}
 			result := rule_testing.RunWithOptions(test, NoInvalidHtmlAttribute, noInvalidHtmlAttributeFile, source, decoded)
 			if len(result.Diagnostics) != testCase.wantCount {
@@ -1595,7 +1595,7 @@ func TestNoInvalidHtmlAttributeOptions(test *testing.T) {
 	for _, raw := range []string{`["rel", "rel"]`, `["href"]`, `"rel"`, `{}`, `null`} {
 		test.Run(raw+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeNoInvalidHtmlAttributeOptions([]byte(raw)); err == nil {
+			if _, decodeNoInvalidHtmlAttributeOptionsError := DecodeNoInvalidHtmlAttributeOptions([]byte(raw)); decodeNoInvalidHtmlAttributeOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", raw)
 			}
 		})

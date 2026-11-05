@@ -14,9 +14,9 @@ import (
 
 func mustParse(test *testing.T, text string) *estree.Node {
 	test.Helper()
-	root, err := parse(text)
-	if err != nil {
-		test.Fatalf("parse(%q): %v", text, err)
+	root, parseError := parse(text)
+	if parseError != nil {
+		test.Fatalf("parse(%q): %v", text, parseError)
 	}
 	return root
 }
@@ -136,15 +136,15 @@ func TestParseGlueFrontMatter(test *testing.T) {
 
 func TestParseGlueErrors(test *testing.T) {
 	test.Parallel()
-	if _, err := parse("a {"); err == nil || !printing.IsSyntax(err) {
-		test.Errorf("an unclosed block: want a syntax error, got %v", err)
+	if _, parseError := parse("a {"); parseError == nil || !printing.IsSyntax(parseError) {
+		test.Errorf("an unclosed block: want a syntax error, got %v", parseError)
 	}
 	// Upstream throws a TypeError reading node.raws.value.raw: a crash, not a parse failure.
-	if _, err := parse(":root { --x: {a} b }"); err == nil || printing.IsSyntax(err) {
-		test.Errorf("a custom property upstream cannot read: want a plain error, got %v", err)
+	if _, parseError := parse(":root { --x: {a} b }"); parseError == nil || printing.IsSyntax(parseError) {
+		test.Errorf("a custom property upstream cannot read: want a plain error, got %v", parseError)
 	}
-	if _, err := parse("@custom-selector foo;"); err == nil || printing.IsSyntax(err) {
-		test.Errorf("a custom selector without a name: want a plain error, got %v", err)
+	if _, parseError := parse("@custom-selector foo;"); parseError == nil || printing.IsSyntax(parseError) {
+		test.Errorf("a custom selector without a name: want a plain error, got %v", parseError)
 	}
 }
 

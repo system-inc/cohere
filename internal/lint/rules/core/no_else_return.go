@@ -45,8 +45,8 @@ func DecodeNoElseReturnOptions(raw []byte) (any, error) {
 	}
 
 	var wire noElseReturnWireShape
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoElseReturnSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoElseReturnSettings(), unmarshalOptionsError
 	}
 
 	settings := DefaultNoElseReturnSettings()

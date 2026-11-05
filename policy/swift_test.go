@@ -13,18 +13,18 @@ import (
 // Swift tests.
 func TestSwiftFilesAreCurrent(test *testing.T) {
 	test.Parallel()
-	files, err := SwiftFiles()
-	if err != nil {
-		test.Fatal(err)
+	files, swiftFilesError := SwiftFiles()
+	if swiftFilesError != nil {
+		test.Fatal(swiftFilesError)
 	}
 	if len(files) == 0 {
 		test.Fatal("no Swift files are generated, so nothing below was checked")
 	}
 	for _, file := range files {
 		// The test runs in policy/, one below the module root the paths start from.
-		onDisk, err := os.ReadFile(filepath.Join("..", file.Path))
-		if err != nil {
-			test.Fatalf("%s: %v (run go run ./policy/tools/generate)", file.Path, err)
+		onDisk, readError := os.ReadFile(filepath.Join("..", file.Path))
+		if readError != nil {
+			test.Fatalf("%s: %v (run go run ./policy/tools/generate)", file.Path, readError)
 		}
 		if !bytes.Equal(onDisk, file.Contents) {
 			test.Errorf("%s is stale (run go run ./policy/tools/generate)", file.Path)
@@ -58,9 +58,9 @@ func TestSwiftSourceOutrunsTheText(test *testing.T) {
 		{"a \"\"\"# b\n", `##"""`},
 		{"a \\## b\n", `###"""`},
 	} {
-		source, err := swiftSource("Test.json", "PolicyTest", []byte(testCase.text))
-		if err != nil {
-			test.Fatal(err)
+		source, swiftSourceError := swiftSource("Test.json", "PolicyTest", []byte(testCase.text))
+		if swiftSourceError != nil {
+			test.Fatal(swiftSourceError)
 		}
 		opening := "static let file = " + testCase.delimiter + "\n"
 		closing := "\n" + swiftStringIndentation + `"""` + strings.TrimSuffix(testCase.delimiter, `"""`) + "\n}"
@@ -75,9 +75,9 @@ func TestSwiftSourceOutrunsTheText(test *testing.T) {
 // which Swift strips, and an empty line stays empty, so the string is the text and the file is formatted.
 func TestSwiftSourceIndentsTheLinesItCarries(test *testing.T) {
 	test.Parallel()
-	source, err := swiftSource("Test.json", "PolicyTest", []byte("{\n\n    \"a\": 1\n}\n"))
-	if err != nil {
-		test.Fatal(err)
+	source, swiftSourceError := swiftSource("Test.json", "PolicyTest", []byte("{\n\n    \"a\": 1\n}\n"))
+	if swiftSourceError != nil {
+		test.Fatal(swiftSourceError)
 	}
 	want := "#\"\"\"\n" + swiftStringIndentation + "{\n\n" + swiftStringIndentation + "    \"a\": 1\n" +
 		swiftStringIndentation + "}\n\n" + swiftStringIndentation + "\"\"\"#\n}\n"
@@ -90,7 +90,7 @@ func TestSwiftSourceIndentsTheLinesItCarries(test *testing.T) {
 // so the compiled-in text would differ from the file.
 func TestSwiftSourceRefusesACarriageReturn(test *testing.T) {
 	test.Parallel()
-	if _, err := swiftSource("Test.json", "PolicyTest", []byte("{}\r\n")); err == nil {
+	if _, swiftSourceError := swiftSource("Test.json", "PolicyTest", []byte("{}\r\n")); swiftSourceError == nil {
 		test.Error("a file with a carriage return was generated")
 	}
 }

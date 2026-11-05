@@ -150,7 +150,7 @@ type ReportedError struct {
 // run, which is the failure this package exists to make impossible.
 func Load(root string) ([]Fixture, error) {
 	var inputPaths []string
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -160,8 +160,8 @@ func Load(root string) ([]Fixture, error) {
 		inputPaths = append(inputPaths, path)
 		return nil
 	})
-	if err != nil {
-		return nil, err
+	if walkError != nil {
+		return nil, walkError
 	}
 	sort.Strings(inputPaths)
 
@@ -384,8 +384,8 @@ func parseFoundHeader(line string) (int, bool) {
 	if rest != "error" && rest != "errors" && !strings.HasPrefix(rest, "error") {
 		return 0, false
 	}
-	count, err := strconv.Atoi(digits)
-	if err != nil {
+	count, parseError := strconv.Atoi(digits)
+	if parseError != nil {
 		return 0, false
 	}
 	return count, true

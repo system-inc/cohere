@@ -61,12 +61,12 @@ func TestVerifyBinaryRefusesTheWrongPlatformsExecutable(test *testing.T) {
 	darwin := Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
 
 	elf := writeFakeExecutable(test, []byte{0x7f, 'E', 'L', 'F'})
-	if _, err := cohereBinary(elf, darwin); err == nil {
+	if _, cohereBinaryError := cohereBinary(elf, darwin); cohereBinaryError == nil {
 		test.Fatalf("a Linux binary passed verification as a darwin package's contents")
 	}
 
 	windows := writeFakeExecutable(test, []byte{'M', 'Z'})
-	if _, err := cohereBinary(windows, darwin); err == nil {
+	if _, cohereBinaryError := cohereBinary(windows, darwin); cohereBinaryError == nil {
 		test.Fatalf("a Windows binary passed verification as a darwin package's contents")
 	}
 }
@@ -76,7 +76,7 @@ func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(test *testing.T) {
 
 	// Large enough to clear the size floor and still not a program.
 	notABinary := writeFakeExecutable(test, []byte("#!/bin/sh\necho nope\n"))
-	if _, err := cohereBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); err == nil {
+	if _, cohereBinaryError := cohereBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); cohereBinaryError == nil {
 		test.Fatalf("plain text passed verification as a Linux binary")
 	}
 }
@@ -94,8 +94,8 @@ func TestVerifyBinaryAcceptsTheRightFormat(test *testing.T) {
 	for operatingSystem, magic := range cases {
 		path := writeFakeExecutable(test, magic)
 		target := Target{GoOperatingSystem: operatingSystem, GoArchitecture: "amd64"}
-		if _, err := cohereBinary(path, target); err != nil {
-			test.Errorf("a correct %s binary was refused: %v", operatingSystem, err)
+		if _, cohereBinaryError := cohereBinary(path, target); cohereBinaryError != nil {
+			test.Errorf("a correct %s binary was refused: %v", operatingSystem, cohereBinaryError)
 		}
 	}
 }
@@ -122,8 +122,8 @@ func writeFakeExecutable(test *testing.T, magic []byte) string {
 	contents := make([]byte, clearsTheSizeFloor)
 	copy(contents, magic)
 
-	if err := os.WriteFile(path, contents, 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, contents, 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return path
 }
@@ -163,12 +163,12 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(test *testing.T) {
 			"GOARCH="+target.GoArchitecture,
 			"CGO_ENABLED=0",
 		)
-		if output, err := command.CombinedOutput(); err != nil {
-			test.Fatalf("cross-compiling for %s: %v\n%s", target, err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("cross-compiling for %s: %v\n%s", target, outputError, output)
 		}
 
-		if _, err := cohereBinaryFormatOnly(path, target); err != nil {
-			test.Errorf("the magic table rejects a binary Go actually produced for %s: %v", target, err)
+		if _, cohereBinaryFormatOnlyError := cohereBinaryFormatOnly(path, target); cohereBinaryFormatOnlyError != nil {
+			test.Errorf("the magic table rejects a binary Go actually produced for %s: %v", target, cohereBinaryFormatOnlyError)
 		}
 	}
 }
@@ -183,10 +183,10 @@ func cohereBinaryFormatOnly(path string, target Target) (int64, error) {
 
 func writeFile(test *testing.T, path string, contents string) {
 	test.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 }

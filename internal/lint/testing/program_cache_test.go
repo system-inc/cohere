@@ -25,9 +25,9 @@ func withProgramCacheCapacity(test *testing.T, capacity int) {
 func cachedFixture(test *testing.T, index int) string {
 	test.Helper()
 	files := map[string]string{"bound.ts": fmt.Sprintf("export const planted%d = %d;\n", index, index)}
-	_, directory, err := buildCachedProgram(files, "bound.ts", false)
-	if err != nil {
-		test.Fatalf("building planted fixture %d: %v", index, err)
+	_, directory, buildCachedProgramError := buildCachedProgram(files, "bound.ts", false)
+	if buildCachedProgramError != nil {
+		test.Fatalf("building planted fixture %d: %v", index, buildCachedProgramError)
 	}
 	return directory
 }

@@ -38,9 +38,9 @@ func decodeNoUnderscoreDangleOptionsForTest(test *testing.T, optionsJson string)
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeNoUnderscoreDangleOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	decoded, decodeNoUnderscoreDangleOptionsError := DecodeNoUnderscoreDangleOptions(json.RawMessage(optionsJson))
+	if decodeNoUnderscoreDangleOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", optionsJson, decodeNoUnderscoreDangleOptionsError)
 	}
 	return decoded
 }
@@ -204,15 +204,15 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoUnderscoreDangleOptions(json.RawMessage(testCase.raw))
+			decoded, decodeNoUnderscoreDangleOptionsError := DecodeNoUnderscoreDangleOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodeNoUnderscoreDangleOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+			if decodeNoUnderscoreDangleOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodeNoUnderscoreDangleOptionsError)
 			}
 			options, ok := decoded.(NoUnderscoreDangleOptions)
 			if !ok {

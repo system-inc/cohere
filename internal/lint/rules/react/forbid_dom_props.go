@@ -96,21 +96,21 @@ func DecodeForbidDomPropsOptions(raw []byte) (any, error) {
 	}
 
 	var wire forbidDomPropsWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	for _, item := range wire.Forbid {
 		var asString string
-		if err := json.Unmarshal(item, &asString); err == nil {
+		if decodeError := json.Unmarshal(item, &asString); decodeError == nil {
 			options.Forbid = append(options.Forbid, ForbidDomPropsEntry{PropName: asString})
 			continue
 		}
 		// Lenient on purpose: eslint-plugin-react 7.37.5's schema leaves a forbid entry object open (no
 		// `additionalProperties`), so ESLint loads `{"propName": "id", "extra": 1}` and so must this.
 		var asObject forbidDomPropsWireEntry
-		if err := json.Unmarshal(item, &asObject); err != nil {
-			return options, fmt.Errorf("decoding a forbid entry: %w", err)
+		if decodeError := json.Unmarshal(item, &asObject); decodeError != nil {
+			return options, fmt.Errorf("decoding a forbid entry: %w", decodeError)
 		}
 		entry := ForbidDomPropsEntry{
 			PropName: asObject.PropName,

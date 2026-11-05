@@ -159,9 +159,9 @@ func Compile(source string, flags string) (*RegExp, error) {
 // MustCompile is Compile for a pattern written in this repository rather than
 // read from a user, and panics rather than returning an error.
 func MustCompile(source string, flags string) *RegExp {
-	re, err := Compile(source, flags)
-	if err != nil {
-		panic(fmt.Sprintf("esregexp: cannot compile /%s/%s: %v", source, flags, err))
+	re, compileError := Compile(source, flags)
+	if compileError != nil {
+		panic(fmt.Sprintf("esregexp: cannot compile /%s/%s: %v", source, flags, compileError))
 	}
 	return re
 }
@@ -176,8 +176,8 @@ func (r *RegExp) Test(s string) bool {
 	if r == nil || r.re == nil {
 		return false
 	}
-	matched, err := r.re.MatchString(s)
-	return err == nil && matched
+	matched, matchStringError := r.re.MatchString(s)
+	return matchStringError == nil && matched
 }
 
 // TestOrTimeout is Test for a caller whose no answer is what produces a
@@ -186,8 +186,8 @@ func (r *RegExp) Test(s string) bool {
 // false positive there, so a match that overruns MatchTimeout counts as a
 // match and the report is skipped.
 func (r *RegExp) TestOrTimeout(s string) bool {
-	matched, err := r.TestOrError(s)
-	return matched || err != nil
+	matched, testOrError := r.TestOrError(s)
+	return matched || testOrError != nil
 }
 
 // TestOrError is Test for a caller that has to tell "no match" apart from "the

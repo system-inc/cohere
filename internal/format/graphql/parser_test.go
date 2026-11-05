@@ -116,9 +116,9 @@ func TestParseShapes(test *testing.T) {
 		},
 	}
 	for _, each := range cases {
-		document, _, err := Parse(each.text)
-		if err != nil {
-			test.Errorf("%s: %v", each.name, err)
+		document, _, parseError := Parse(each.text)
+		if parseError != nil {
+			test.Errorf("%s: %v", each.name, parseError)
 			continue
 		}
 		if got := outline(document); got != each.want {
@@ -142,9 +142,9 @@ func TestParseStringValues(test *testing.T) {
 		{name: "block string CRLF", text: "{ a(s: \"\"\"\r\n  x\r\n  y\r\n\"\"\") }", want: "x\ny"},
 	}
 	for _, each := range cases {
-		document, _, err := Parse(each.text)
-		if err != nil {
-			test.Errorf("%s: %v", each.name, err)
+		document, _, parseError := Parse(each.text)
+		if parseError != nil {
+			test.Errorf("%s: %v", each.name, parseError)
 			continue
 		}
 		value := document.List("definitions")[0].Child("selectionSet").List("selections")[0].List("arguments")[0].Child("value")
@@ -160,9 +160,9 @@ func TestParseStringValues(test *testing.T) {
 func TestParseComments(test *testing.T) {
 	test.Parallel()
 	text := "# one 😀\n{ a # two\n}\n#"
-	_, comments, err := Parse(text)
-	if err != nil {
-		test.Fatal(err)
+	_, comments, parseError := Parse(text)
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
 	var got []string
 	for _, comment := range comments {
@@ -189,13 +189,13 @@ func TestParseErrors(test *testing.T) {
 		{text: "type T { f(a: Int = $v): Int }", want: `Syntax Error: Unexpected variable "$v" in constant value. (1:21)`},
 	}
 	for _, each := range cases {
-		document, comments, err := Parse(each.text)
-		if err == nil || document != nil || comments != nil {
+		document, comments, parseError := Parse(each.text)
+		if parseError == nil || document != nil || comments != nil {
 			test.Errorf("%q: parsed, want %s", each.text, each.want)
 			continue
 		}
-		if err.Error() != each.want {
-			test.Errorf("%q:\n got %s\nwant %s", each.text, err.Error(), each.want)
+		if parseError.Error() != each.want {
+			test.Errorf("%q:\n got %s\nwant %s", each.text, parseError.Error(), each.want)
 		}
 	}
 }

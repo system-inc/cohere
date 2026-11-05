@@ -84,13 +84,13 @@ func DefaultObjectShorthandSettings() ObjectShorthandSettings {
 // in a mode name would otherwise produce a rule that looks configured and enforces the default.
 func DecodeObjectShorthandOptions(list []byte) (any, error) {
 	settings := DefaultObjectShorthandSettings()
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return settings, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return settings, optionElementsError
 	}
 
 	var modeText string
-	if err := json.Unmarshal(elements[0], &modeText); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &modeText); decodeError != nil {
 		return settings, fmt.Errorf("object-shorthand element 1 takes a mode string, got %s", elements[0])
 	}
 	mode, ok := objectShorthandModeFor(modeText)
@@ -109,8 +109,8 @@ func DecodeObjectShorthandOptions(list []byte) (any, error) {
 		MethodsIgnorePattern      *string `json:"methodsIgnorePattern"`
 		AvoidExplicitReturnArrows *bool   `json:"avoidExplicitReturnArrows"`
 	}
-	if err := rule.UnmarshalOptions(elements[1], &wire); err != nil {
-		return settings, fmt.Errorf("object-shorthand element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &wire); unmarshalOptionsError != nil {
+		return settings, fmt.Errorf("object-shorthand element 2: %w", unmarshalOptionsError)
 	}
 
 	// Upstream's schema: no flags beside never or the consistent modes, only avoidQuotes beside
@@ -141,11 +141,11 @@ func DecodeObjectShorthandOptions(list []byte) (any, error) {
 		// Upstream's `new RegExp(PARAMS.methodsIgnorePattern, "u")`, read as JavaScript reads it: RE2
 		// refuses a lookaround or a backreference its user wrote, and reads `\s` and `\b` differently
 		// (#7mztrdd).
-		compiled, err := esregexp.Compile(*wire.MethodsIgnorePattern, "u")
-		if err != nil {
+		compiled, compileError := esregexp.Compile(*wire.MethodsIgnorePattern, "u")
+		if compileError != nil {
 			return settings, fmt.Errorf(
 				"object-shorthand methodsIgnorePattern %q does not compile: %w",
-				*wire.MethodsIgnorePattern, err)
+				*wire.MethodsIgnorePattern, compileError)
 		}
 		settings.MethodsIgnorePattern = compiled
 		settings.MethodsIgnorePatternText = *wire.MethodsIgnorePattern

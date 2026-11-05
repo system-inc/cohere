@@ -34,9 +34,9 @@ func formatWithProseWrap(fileName string, text string, options formatoptions.Opt
 	}
 	nodes := nodeArenas.Get().(*arena.Arena[unist.Node])
 	defer releaseNodes(nodes)
-	root, err := parse(text, nodes)
-	if err != nil {
-		return "", err
+	root, parseError := parse(text, nodes)
+	if parseError != nil {
+		return "", parseError
 	}
 	return printFile(fileName, root, text, options, proseWrap, textToDoc, nodes.Len())
 }
@@ -49,9 +49,9 @@ func formatWithProseWrap(fileName string, text string, options formatoptions.Opt
 func FormatDoc(text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
 	nodes := nodeArenas.Get().(*arena.Arena[unist.Node])
 	defer releaseNodes(nodes)
-	root, err := parse(text, nodes)
-	if err != nil {
-		return nil, err
+	root, parseError := parse(text, nodes)
+	if parseError != nil {
+		return nil, parseError
 	}
 	// The doc holds only text, no node, so the tree is released once it is built.
 	return printDocFile("", root, text, options, "preserve", textToDoc, nodes.Len())
@@ -77,14 +77,14 @@ func releaseNodes(nodes *arena.Arena[unist.Node]) {
 // it does not expect), so both are marked as syntax errors and the format phase skips the file. A panic
 // in the port itself is a bug, not malformed input, and is returned unmarked.
 func parse(text string, nodes *arena.Arena[unist.Node]) (*unist.Node, error) {
-	root, err := unist.Parse(text, nodes)
-	if err != nil {
+	root, parseError := unist.Parse(text, nodes)
+	if parseError != nil {
 		var syntaxError *unist.SyntaxError
 		var thrown *unist.ThrownError
-		if errors.As(err, &syntaxError) || errors.As(err, &thrown) {
-			return nil, printing.Syntax(err)
+		if errors.As(parseError, &syntaxError) || errors.As(parseError, &thrown) {
+			return nil, printing.Syntax(parseError)
 		}
-		return nil, err
+		return nil, parseError
 	}
 	root.Comments = nil
 	return root, nil

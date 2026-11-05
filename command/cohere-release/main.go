@@ -22,8 +22,8 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-release: %v\n", err)
+	if runError := run(); runError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-release: %v\n", runError)
 		os.Exit(1)
 	}
 }

@@ -17,9 +17,9 @@ const tripleSlashFile = "/repository/source/Thing.ts"
 func decodeTripleSlashOptions(test *testing.T, configuration string) any {
 	test.Helper()
 
-	options, err := DecodeTripleSlashReferenceOptions([]byte(configuration))
-	if err != nil {
-		test.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions([]byte(configuration))
+	if decodeTripleSlashReferenceOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeTripleSlashReferenceOptionsError)
 	}
 	return options
 }
@@ -423,9 +423,9 @@ func TestDecodeTripleSlashReferenceOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeTripleSlashReferenceOptions([]byte(testCase.configuration))
-			if err != nil {
-				test.Fatalf("could not decode: %v", err)
+			decoded, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions([]byte(testCase.configuration))
+			if decodeTripleSlashReferenceOptionsError != nil {
+				test.Fatalf("could not decode: %v", decodeTripleSlashReferenceOptionsError)
 			}
 			got, ok := decoded.(TripleSlashReferenceOptions)
 			if !ok {

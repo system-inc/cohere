@@ -125,8 +125,8 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 	}
 
 	var wire buttonHasTypeWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.Button != nil {
 		options.Button = *wire.Button

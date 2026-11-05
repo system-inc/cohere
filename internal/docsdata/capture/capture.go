@@ -79,12 +79,12 @@ func Write(record Record) error {
 	writeMutex.Lock()
 	defer writeMutex.Unlock()
 	if output == nil {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			return err
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			return createDirectoryError
 		}
-		file, err := os.OpenFile(filepath.Join(directory, fmt.Sprintf("capture-%d.jsonl", os.Getpid())), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-		if err != nil {
-			return err
+		file, openError := os.OpenFile(filepath.Join(directory, fmt.Sprintf("capture-%d.jsonl", os.Getpid())), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if openError != nil {
+			return openError
 		}
 		output = file
 	}

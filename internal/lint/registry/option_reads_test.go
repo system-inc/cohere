@@ -178,8 +178,8 @@ func collectOptionStructFields(structure *types.Struct, owner string, fileSet *t
 			continue
 		}
 		position := fileSet.Position(field.Pos())
-		relative, err := filepath.Rel(rulesRoot, position.Filename)
-		if err != nil {
+		relative, relativePathError := filepath.Rel(rulesRoot, position.Filename)
+		if relativePathError != nil {
 			relative = position.Filename
 		}
 		fields[field.Origin()] = optionField{
@@ -266,9 +266,9 @@ func selectedField(info *types.Info, expression ast.Expr) *types.Var {
 // TestEveryOptionFieldARuleDecodesIsRead is the guard over the rules tree.
 func TestEveryOptionFieldARuleDecodesIsRead(test *testing.T) {
 	test.Parallel()
-	rulesRoot, err := filepath.Abs("../rules")
-	if err != nil {
-		test.Fatal(err)
+	rulesRoot, absolutePathError := filepath.Abs("../rules")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	findings := findUnreadOptionFields(test, "../../..", rulesRoot, "./internal/lint/rules/...")
 
@@ -299,9 +299,9 @@ func TestEveryOptionFieldARuleDecodesIsRead(test *testing.T) {
 // above is a measurement rather than a matcher that never matches.
 func TestTheOptionReadGuardSeesAnUnreadField(test *testing.T) {
 	test.Parallel()
-	plantedRoot, err := filepath.Abs("testdata/optionreads")
-	if err != nil {
-		test.Fatal(err)
+	plantedRoot, absolutePathError := filepath.Abs("testdata/optionreads")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	findings := findUnreadOptionFields(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optionreads")
 

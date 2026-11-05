@@ -13,9 +13,9 @@ func TestNextLeavesImportMetaPathsToTestsAndEslintConfigs(test *testing.T) {
 	directory := writeConfigs(test, map[string]string{
 		"CohereSettings.json": `{"extends": "cohere:next"}`,
 	})
-	loaded, err := Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadError := Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatal(loadError)
 	}
 	const name = "nexus/correctness-no-load-time-import-meta-path"
 	for _, file := range []string{"source/RunSuites.ts", "app/page.tsx", "modules/os/Paths.ts"} {

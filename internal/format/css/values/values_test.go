@@ -11,9 +11,9 @@ import (
 // parseNodes parses with Prettier's options and returns the Value's children.
 func parseNodes(test *testing.T, text string) []*estree.Node {
 	test.Helper()
-	root, err := Parse(text, Options{Loose: true})
-	if err != nil {
-		test.Fatalf("Parse(%q): %v", text, err)
+	root, parseError := Parse(text, Options{Loose: true})
+	if parseError != nil {
+		test.Fatalf("Parse(%q): %v", text, parseError)
 	}
 	if !root.Is("root") || len(root.List("nodes")) != 1 || !root.List("nodes")[0].Is("value") {
 		test.Fatalf("Parse(%q): want a root holding one value, got %v", text, root.Keys())
@@ -87,9 +87,9 @@ func TestParseShapes(test *testing.T) {
 		test.Errorf("inline comment: got %s %q", comment.Type(), comment.String("value"))
 	}
 	// Outside loose mode url() arguments become one word.
-	strict, err := Parse("url(a b)", Options{})
-	if err != nil {
-		test.Fatal(err)
+	strict, parseError := Parse("url(a b)", Options{})
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
 	if url := strict.List("nodes")[0].List("nodes")[0].List("nodes"); len(url) != 3 || url[1].String("value") != "a b" || url[1].Has("isHex") {
 		test.Errorf("strict url: got %d children", len(url))
@@ -106,15 +106,15 @@ func TestParseRefusals(test *testing.T) {
 		" ":     "TypeError: Cannot read properties of undefined (reading 'raws')",
 		"a + +": "TypeError: Cannot read properties of undefined (reading '0')",
 	} {
-		_, err := Parse(text, Options{Loose: true})
-		if err == nil || !printing.IsSyntax(err) || err.Error() != want {
-			test.Errorf("Parse(%q): want the syntax error %q, got %v", text, want, err)
+		_, parseError := Parse(text, Options{Loose: true})
+		if parseError == nil || !printing.IsSyntax(parseError) || parseError.Error() != want {
+			test.Errorf("Parse(%q): want the syntax error %q, got %v", text, want, parseError)
 		}
 	}
-	if _, err := Parse("calc(1 -2)", Options{}); err == nil {
+	if _, parseError := Parse("calc(1 -2)", Options{}); parseError == nil {
 		test.Errorf("calc(1 -2) without loose: want a refusal")
 	}
-	if _, err := Parse("calc(1 -2)", Options{Loose: true}); err != nil {
-		test.Errorf("calc(1 -2) with loose: %v", err)
+	if _, parseError := Parse("calc(1 -2)", Options{Loose: true}); parseError != nil {
+		test.Errorf("calc(1 -2) with loose: %v", parseError)
 	}
 }

@@ -35,9 +35,9 @@ func TestDiffSetNamesEachKindOfChange(test *testing.T) {
 			"new-rule": "warn"
 		}
 	}`)
-	changes, err := DiffSet(before, after)
-	if err != nil {
-		test.Fatal(err)
+	changes, diffSetError := DiffSet(before, after)
+	if diffSetError != nil {
+		test.Fatal(diffSetError)
 	}
 	for label, pair := range map[string][2][]string{
 		"on":       {changes.TurnedOn, {"new-rule (warn)"}},
@@ -76,9 +76,9 @@ func TestEachChangeAllowsTheSmallestVersionThePolicySays(test *testing.T) {
 		{"a set added", nil, []byte(`{"rules":{"a":"error"}}`), Minor},
 		{"a set removed", []byte(`{"rules":{"a":"error"}}`), nil, Major},
 	} {
-		changes, err := DiffSet(testCase.before, testCase.after)
-		if err != nil {
-			test.Fatalf("%s: %v", testCase.name, err)
+		changes, diffSetError := DiffSet(testCase.before, testCase.after)
+		if diffSetError != nil {
+			test.Fatalf("%s: %v", testCase.name, diffSetError)
 		}
 		if changes.Bump != testCase.want {
 			test.Errorf("%s: bump %s, want %s", testCase.name, changes.Bump, testCase.want)
@@ -88,7 +88,7 @@ func TestEachChangeAllowsTheSmallestVersionThePolicySays(test *testing.T) {
 
 func TestASeverityThatIsNotOneIsRefused(test *testing.T) {
 	test.Parallel()
-	if _, err := DiffSet([]byte(`{"rules":{"a":"error"}}`), []byte(`{"rules":{"a":"fatal"}}`)); err == nil {
+	if _, diffSetError := DiffSet([]byte(`{"rules":{"a":"error"}}`), []byte(`{"rules":{"a":"fatal"}}`)); diffSetError == nil {
 		test.Fatal("a severity of \"fatal\" was read as one")
 	}
 }
@@ -123,9 +123,9 @@ func TestRequireBump(test *testing.T) {
 		{"0.2.0", "0.1.9", Patch, false},
 		{"0.1.4", "0.1.4", Patch, false},
 	} {
-		err := RequireBump(testCase.previous, testCase.next, testCase.bump)
-		if (err == nil) != testCase.allowed {
-			test.Errorf("%s -> %s at %s: allowed %v, err %v", testCase.previous, testCase.next, testCase.bump, err == nil, err)
+		requireBumpError := RequireBump(testCase.previous, testCase.next, testCase.bump)
+		if (requireBumpError == nil) != testCase.allowed {
+			test.Errorf("%s -> %s at %s: allowed %v, err %v", testCase.previous, testCase.next, testCase.bump, requireBumpError == nil, requireBumpError)
 		}
 	}
 }
@@ -135,24 +135,24 @@ func TestRequireBump(test *testing.T) {
 func TestRequireBumpBelowOneNamesTheMinor(test *testing.T) {
 	test.Parallel()
 	for _, bump := range []Bump{Minor, Major} {
-		err := RequireBump("0.1.0", "0.1.1", bump)
-		if err == nil {
+		requireBumpError := RequireBump("0.1.0", "0.1.1", bump)
+		if requireBumpError == nil {
 			test.Fatalf("0.1.0 -> 0.1.1 at %s was allowed", bump)
 		}
-		if !strings.Contains(err.Error(), "next minor") || strings.Contains(err.Error(), "needs a major") {
-			test.Errorf("0.1.0 -> 0.1.1 at %s was refused without naming the next minor: %v", bump, err)
+		if !strings.Contains(requireBumpError.Error(), "next minor") || strings.Contains(requireBumpError.Error(), "needs a major") {
+			test.Errorf("0.1.0 -> 0.1.1 at %s was refused without naming the next minor: %v", bump, requireBumpError)
 		}
 	}
 }
 
 func TestRenderNamesEverySetThatChanged(test *testing.T) {
 	test.Parallel()
-	changed, bump, err := Diff(
+	changed, bump, diffError := Diff(
 		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
 		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error","c":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
 	)
-	if err != nil {
-		test.Fatal(err)
+	if diffError != nil {
+		test.Fatal(diffError)
 	}
 	section := Render("1.1.0", "2026-10-03", changed, nil)
 	want := "## 1.1.0 (2026-10-03)\n\n### `cohere:typescript`\n\n- On: `c (error)`\n"
@@ -172,7 +172,7 @@ func TestSetsAtACommitMatchTheTree(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if status, err := exec.Command("git", "-C", module, "status", "--porcelain", "--", SetDirectory).Output(); err != nil || len(status) > 0 {
+	if status, outputError := exec.Command("git", "-C", module, "status", "--porcelain", "--", SetDirectory).Output(); outputError != nil || len(status) > 0 {
 		test.Skipf("NOT MEASURED: the sets have uncommitted changes, so HEAD and the tree differ by design (%s)", bytes.TrimSpace(status))
 	}
 	committed, err := SetsAt(module, "HEAD")

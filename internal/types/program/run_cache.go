@@ -143,9 +143,9 @@ var ErrRunCacheMiss = errors.New("run cache miss")
 
 // RunCacheKey hashes what identifies a run apart from its files. It is RunCacheKeyPartsOf's key.
 func RunCacheKey(arguments []string, workingDirectory string, facts ...string) (string, error) {
-	parts, err := RunCacheKeyPartsOf(arguments, workingDirectory, facts...)
-	if err != nil {
-		return "", err
+	parts, runCacheKeyPartsOfError := RunCacheKeyPartsOf(arguments, workingDirectory, facts...)
+	if runCacheKeyPartsOfError != nil {
+		return "", runCacheKeyPartsOfError
 	}
 	return parts.Key(), nil
 }
@@ -178,7 +178,7 @@ func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...st
 		return RunCacheKeyParts{}, fmt.Errorf("locating the running binary: %w", err)
 	}
 	// Resolved, as the callers resolve the directory, so a binary reached through a link keys as itself (#547dhjz).
-	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+	if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 		executable = resolved
 	}
 	information, err := os.Stat(executable)
@@ -376,9 +376,9 @@ func signaturesOf(paths []string) ([]RunCacheInput, error) {
 // than an absent entry: recording it as absent would make the next run's absence look like a match,
 // and the run that just finished did read it.
 func signatureOf(path string) (RunCacheInput, error) {
-	information, err := os.Stat(path)
-	if err != nil {
-		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, err)
+	information, statError := os.Stat(path)
+	if statError != nil {
+		return RunCacheInput{}, fmt.Errorf("recording %s: %w", path, statError)
 	}
 	changed, inode := changeTimeAndInode(path, information)
 	return RunCacheInput{
@@ -445,10 +445,10 @@ func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 		go func() {
 			defer waitGroup.Done()
 			for index := range next {
-				if err := c.Inputs[index].stillMatches(snapshot); err != nil {
+				if stillMatchesError := c.Inputs[index].stillMatches(snapshot); stillMatchesError != nil {
 					mutex.Lock()
 					if index < earliest {
-						earliest, mismatch = index, err
+						earliest, mismatch = index, stillMatchesError
 					}
 					mutex.Unlock()
 				}
@@ -467,22 +467,22 @@ func (c *RunCache) changedInput(snapshot *StatSnapshot) error {
 // stillMatches compares one input against the filesystem now, noting what the stat found in snapshot, matching or
 // not: the stat is current either way.
 func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
-	information, err := os.Stat(input.Path)
+	information, statError := os.Stat(input.Path)
 	if snapshot != nil {
-		snapshot.note(input.Path, information, err)
+		snapshot.note(input.Path, information, statError)
 	}
 	if !input.Exists {
-		if err == nil {
+		if statError == nil {
 			return fmt.Errorf("%w: %s now exists", ErrRunCacheMiss, input.Path)
 		}
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(statError, os.ErrNotExist) {
 			return nil
 		}
 		// Neither present nor provably absent, for example a permission error. Doubt is a miss.
-		return fmt.Errorf("%w: %s cannot be checked: %v", ErrRunCacheMiss, input.Path, err)
+		return fmt.Errorf("%w: %s cannot be checked: %v", ErrRunCacheMiss, input.Path, statError)
 	}
-	if err != nil {
-		return fmt.Errorf("%w: %s: %v", ErrRunCacheMiss, input.Path, err)
+	if statError != nil {
+		return fmt.Errorf("%w: %s: %v", ErrRunCacheMiss, input.Path, statError)
 	}
 	if information.IsDir() != input.Directory {
 		return fmt.Errorf("%w: %s changed between file and directory", ErrRunCacheMiss, input.Path)

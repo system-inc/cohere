@@ -26,8 +26,8 @@ type packFixture struct {
 func newPackFixture(test *testing.T) *packFixture {
 	root := test.TempDir()
 	fixture := &packFixture{t: test, files: filepath.Join(root, "files"), cache: filepath.Join(root, "cache")}
-	if err := os.MkdirAll(fixture.files, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(fixture.files, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	return fixture
 }
@@ -36,17 +36,17 @@ func (f *packFixture) path(name string) string { return filepath.Join(f.files, n
 
 func (f *packFixture) write(name string, contents string) {
 	f.t.Helper()
-	if err := os.WriteFile(f.path(name), []byte(contents), 0o644); err != nil {
-		f.t.Fatal(err)
+	if writeError := os.WriteFile(f.path(name), []byte(contents), 0o644); writeError != nil {
+		f.t.Fatal(writeError)
 	}
 }
 
 // run opens the pack, reads every name through it, saves, and returns what it read and the pack's counts.
 func (f *packFixture) run(names ...string) (map[string]string, int, int, int) {
 	f.t.Helper()
-	pack, err := OpenContentPack(f.cache)
-	if err != nil {
-		f.t.Logf("open: %v", err)
+	pack, openContentPackError := OpenContentPack(f.cache)
+	if openContentPackError != nil {
+		f.t.Logf("open: %v", openContentPackError)
 	}
 	fileSystem := pack.wrap(osvfs.FS())
 	read := map[string]string{}
@@ -57,8 +57,8 @@ func (f *packFixture) run(names ...string) (map[string]string, int, int, int) {
 		}
 		read[name] = contents
 	}
-	if err := pack.Save(); err != nil {
-		f.t.Fatalf("saving the pack: %v", err)
+	if saveError := pack.Save(); saveError != nil {
+		f.t.Fatalf("saving the pack: %v", saveError)
 	}
 	hits, misses, damaged := pack.Counts()
 	return read, hits, misses, damaged
@@ -103,29 +103,29 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 		{"a different size", func(f *packFixture) { f.write("a.ts", "export const a = 100;\n") }},
 		{"the same size", func(f *packFixture) { f.write("a.ts", "export const a = 9;\n") }},
 		{"the same size with the modification time restored", func(f *packFixture) {
-			information, err := os.Stat(f.path("a.ts"))
-			if err != nil {
-				f.t.Fatal(err)
+			information, statError := os.Stat(f.path("a.ts"))
+			if statError != nil {
+				f.t.Fatal(statError)
 			}
 			f.write("a.ts", "export const a = 9;\n")
-			if err := os.Chtimes(f.path("a.ts"), information.ModTime(), information.ModTime()); err != nil {
-				f.t.Fatal(err)
+			if changeTimesError := os.Chtimes(f.path("a.ts"), information.ModTime(), information.ModTime()); changeTimesError != nil {
+				f.t.Fatal(changeTimesError)
 			}
 			if after, _ := os.Stat(f.path("a.ts")); !after.ModTime().Equal(information.ModTime()) || after.Size() != information.Size() {
 				f.t.Fatal("the fixture did not restore the size and modification time, so this proves nothing")
 			}
 		}},
 		{"a replace by rename, size and modification time kept", func(f *packFixture) {
-			information, err := os.Stat(f.path("a.ts"))
-			if err != nil {
-				f.t.Fatal(err)
+			information, statError := os.Stat(f.path("a.ts"))
+			if statError != nil {
+				f.t.Fatal(statError)
 			}
 			f.write("replacement.ts", "export const a = 9;\n")
-			if err := os.Chtimes(f.path("replacement.ts"), information.ModTime(), information.ModTime()); err != nil {
-				f.t.Fatal(err)
+			if changeTimesError := os.Chtimes(f.path("replacement.ts"), information.ModTime(), information.ModTime()); changeTimesError != nil {
+				f.t.Fatal(changeTimesError)
 			}
-			if err := os.Rename(f.path("replacement.ts"), f.path("a.ts")); err != nil {
-				f.t.Fatal(err)
+			if renameError := os.Rename(f.path("replacement.ts"), f.path("a.ts")); renameError != nil {
+				f.t.Fatal(renameError)
 			}
 		}},
 	} {
@@ -206,12 +206,12 @@ func TestAContentPackTruncatedUnderItsMappingIsReadAround(test *testing.T) {
 	fixture := newPackFixture(test)
 	fixture.write("a.ts", strings.Repeat("export const a = 1;\n", 4096))
 	fixture.run("a.ts")
-	pack, err := OpenContentPack(fixture.cache)
-	if err != nil {
-		test.Fatal(err)
+	pack, openContentPackError := OpenContentPack(fixture.cache)
+	if openContentPackError != nil {
+		test.Fatal(openContentPackError)
 	}
-	if err := os.Truncate(fixture.dataFile(), 0); err != nil {
-		test.Fatal(err)
+	if truncateError := os.Truncate(fixture.dataFile(), 0); truncateError != nil {
+		test.Fatal(truncateError)
 	}
 	contents, ok := pack.wrap(osvfs.FS()).ReadFile(tspath.RootedFilePath(fixture.path("a.ts")))
 	if !ok || contents != strings.Repeat("export const a = 1;\n", 4096) {
@@ -267,9 +267,9 @@ func TestAServedFileIsAViewOfTheMappingThatOutlivesThePack(test *testing.T) {
 	fixture.write("a.ts", want)
 	fixture.run("a.ts")
 
-	pack, err := OpenContentPack(fixture.cache)
-	if err != nil {
-		test.Fatal(err)
+	pack, openContentPackError := OpenContentPack(fixture.cache)
+	if openContentPackError != nil {
+		test.Fatal(openContentPackError)
 	}
 	served, ok := pack.wrap(osvfs.FS()).ReadFile(tspath.RootedFilePath(fixture.path("a.ts")))
 	if !ok {

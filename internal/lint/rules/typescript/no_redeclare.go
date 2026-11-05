@@ -61,8 +61,8 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire noRedeclareWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	if wire.BuiltinGlobals != nil {
 		options.BuiltinGlobals = *wire.BuiltinGlobals

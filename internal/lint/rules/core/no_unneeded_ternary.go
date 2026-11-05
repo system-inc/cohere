@@ -38,8 +38,8 @@ func DecodeNoUnneededTernaryOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }

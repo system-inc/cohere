@@ -123,13 +123,13 @@ func applyProposedFixes(
 
 	var result program.Result
 	if len(projectFiles) > 0 {
-		walked, err := graph.Walk(ctx, projectFiles, rules)
-		if err != nil {
+		walked, walkError := graph.Walk(ctx, projectFiles, rules)
+		if walkError != nil {
 			if early != nil {
 				speculation = early.speculationOf()
 			}
 			speculation.wait()
-			return edit.Summary{}, program.Result{}, nil, fmt.Errorf("collecting proposals: %w", err)
+			return edit.Summary{}, program.Result{}, nil, fmt.Errorf("collecting proposals: %w", walkError)
 		}
 		// Before anything the walk prints, so the scope's own notes come where they always came.
 		takePlan()

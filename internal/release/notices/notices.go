@@ -108,9 +108,9 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 		command.Env = append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture, "CGO_ENABLED=0")
 		var standardError bytes.Buffer
 		command.Stderr = &standardError
-		output, err := command.Output()
-		if err != nil {
-			return nil, fmt.Errorf("listing cohere's build graph for %s: %w\n%s", target, err, standardError.String())
+		output, outputError := command.Output()
+		if outputError != nil {
+			return nil, fmt.Errorf("listing cohere's build graph for %s: %w\n%s", target, outputError, standardError.String())
 		}
 		for line := range strings.SplitSeq(strings.TrimSpace(string(output)), "\n") {
 			fields := strings.Split(line, "\t")
@@ -140,15 +140,15 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 func repositoryOnlyModules(moduleDirectory string, compiled []Module) ([]Module, error) {
 	command := exec.Command("go", "mod", "edit", "-json")
 	command.Dir = moduleDirectory
-	output, err := command.Output()
-	if err != nil {
-		return nil, fmt.Errorf("reading go.mod: %w", err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		return nil, fmt.Errorf("reading go.mod: %w", outputError)
 	}
 	var goMod struct {
 		Require []struct{ Path, Version string }
 	}
-	if err := json.Unmarshal(output, &goMod); err != nil {
-		return nil, fmt.Errorf("reading go.mod: %w", err)
+	if decodeError := json.Unmarshal(output, &goMod); decodeError != nil {
+		return nil, fmt.Errorf("reading go.mod: %w", decodeError)
 	}
 
 	byPath := map[string]Module{}
@@ -159,13 +159,13 @@ func repositoryOnlyModules(moduleDirectory string, compiled []Module) ([]Module,
 		}
 		download := exec.Command("go", "mod", "download", "-json", requirement.Path+"@"+requirement.Version)
 		download.Dir = moduleDirectory
-		output, err := download.Output()
-		if err != nil {
-			return nil, fmt.Errorf("finding %s@%s to read its license: %w", requirement.Path, requirement.Version, err)
+		output, outputError := download.Output()
+		if outputError != nil {
+			return nil, fmt.Errorf("finding %s@%s to read its license: %w", requirement.Path, requirement.Version, outputError)
 		}
 		var downloaded struct{ Dir string }
-		if err := json.Unmarshal(output, &downloaded); err != nil {
-			return nil, err
+		if decodeError := json.Unmarshal(output, &downloaded); decodeError != nil {
+			return nil, decodeError
 		}
 		byPath[requirement.Path] = Module{Path: requirement.Path, Version: requirement.Version, Directory: downloaded.Dir}
 	}
@@ -188,8 +188,8 @@ var moduleLicenseFileNames = []string{"LICENSE", "LICENSE.md", "LICENSE.txt", "L
 // with no license file can't be credited, and that is a question for a person, not something to skip.
 func readModuleLicense(module Module) (string, error) {
 	for _, name := range moduleLicenseFileNames {
-		contents, err := os.ReadFile(filepath.Join(module.Directory, name))
-		if err == nil {
+		contents, readError := os.ReadFile(filepath.Join(module.Directory, name))
+		if readError == nil {
 			return string(contents), nil
 		}
 	}
@@ -225,9 +225,9 @@ type swiftPin struct {
 }
 
 func readSwiftPins(moduleDirectory string) ([]swiftPin, error) {
-	contents, err := os.ReadFile(filepath.Join(moduleDirectory, "swift", "Package.resolved"))
-	if err != nil {
-		return nil, fmt.Errorf("reading the Swift engine's resolved packages: %w", err)
+	contents, readError := os.ReadFile(filepath.Join(moduleDirectory, "swift", "Package.resolved"))
+	if readError != nil {
+		return nil, fmt.Errorf("reading the Swift engine's resolved packages: %w", readError)
 	}
 	var resolved struct {
 		Pins []struct {
@@ -236,8 +236,8 @@ func readSwiftPins(moduleDirectory string) ([]swiftPin, error) {
 			State    struct{ Version, Revision string }
 		}
 	}
-	if err := json.Unmarshal(contents, &resolved); err != nil {
-		return nil, fmt.Errorf("reading swift/Package.resolved: %w", err)
+	if decodeError := json.Unmarshal(contents, &resolved); decodeError != nil {
+		return nil, fmt.Errorf("reading swift/Package.resolved: %w", decodeError)
 	}
 	pins := make([]swiftPin, 0, len(resolved.Pins))
 	for _, pin := range resolved.Pins {

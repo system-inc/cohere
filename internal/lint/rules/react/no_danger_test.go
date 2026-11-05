@@ -242,9 +242,9 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 
 	test.Run("absent options give the documented default", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoDangerOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding nil: %v", err)
+		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(nil)
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding nil: %v", decodeNoDangerOptionsError)
 		}
 		settings, ok := decoded.(NoDangerOptions)
 		if !ok {
@@ -257,9 +257,9 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 
 	test.Run("the wire name is customComponentNames", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"customComponentNames":["A","B*"]}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(json.RawMessage(`{"customComponentNames":["A","B*"]}`))
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
 		settings, ok := decoded.(NoDangerOptions)
 		if !ok {
@@ -272,9 +272,9 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 
 	test.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeNoDangerOptions(json.RawMessage(`{"somethingElse":1}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(json.RawMessage(`{"somethingElse":1}`))
+		if decodeNoDangerOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
 		settings, ok := decoded.(NoDangerOptions)
 		if !ok {
@@ -400,9 +400,9 @@ func TestNoDangerHasNoFileSuffixGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeNoDangerOptions(nil)
-			if err != nil {
-				test.Fatalf("decoding: %v", err)
+			decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(nil)
+			if decodeNoDangerOptionsError != nil {
+				test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 			}
 			result := rule_testing.RunWithOptions(test, NoDanger, fileName, sourceText, decoded)
 			rule_testing.ExpectFindings(test, result, "dangerousProp")

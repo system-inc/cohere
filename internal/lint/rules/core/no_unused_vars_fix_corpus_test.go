@@ -48,8 +48,8 @@ func noUnusedVarsFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase) str
 		CompilerOptions map[string]any `json:"compilerOptions"`
 		Include         []string       `json:"include"`
 	}
-	if err := json.Unmarshal([]byte(noUnusedVarsOptionsCorpusTsconfig), &configuration); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal([]byte(noUnusedVarsOptionsCorpusTsconfig), &configuration); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	configuration.CompilerOptions["jsx"] = "react"
 	if row.jsxFactory != "" {
@@ -59,9 +59,9 @@ func noUnusedVarsFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase) str
 		configuration.CompilerOptions["jsxFragmentFactory"] = row.jsxFragmentFactory
 	}
 	configuration.Include = []string{"file.tsx"}
-	encoded, err := json.Marshal(configuration)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(configuration)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	return string(encoded)
 }
@@ -109,9 +109,9 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			options, err := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", row.options, err)
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
+			if decodeNoUnusedVariablesOptionsError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeNoUnusedVariablesOptionsError)
 			}
 			fileName := "file.ts"
 			if row.jsx {
@@ -120,8 +120,8 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 			configuration := noUnusedVarsFixTsconfig(test, row)
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{fileName: row.source}, fileName, options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-						test.Fatal(err)
+					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 

@@ -49,13 +49,13 @@ type valueParserCase struct {
 
 func loadValueParserCorpus(test *testing.T) valueParserCorpus {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "valueparser_fixtures.json"))
-	if err != nil {
-		test.Fatalf("read fixtures: %v", err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", "valueparser_fixtures.json"))
+	if readError != nil {
+		test.Fatalf("read fixtures: %v", readError)
 	}
 	var corpus valueParserCorpus
-	if err := json.Unmarshal(raw, &corpus); err != nil {
-		test.Fatalf("parse fixtures: %v", err)
+	if decodeError := json.Unmarshal(raw, &corpus); decodeError != nil {
+		test.Fatalf("parse fixtures: %v", decodeError)
 	}
 	// A corpus that quietly shrank is the failure this approach exists to prevent, and it would
 	// otherwise read as a passing run.

@@ -16,9 +16,9 @@ import (
 // removed.
 func ParseMarkdown(text string, nodes *arena.Arena[Node]) (*Node, error) {
 	frontMatter, content := ParseFrontMatter(text)
-	root, err := FromMarkdown(content, text, nodes)
-	if err != nil {
-		return nil, err
+	root, fromMarkdownError := FromMarkdown(content, text, nodes)
+	if fromMarkdownError != nil {
+		return nil, fromMarkdownError
 	}
 
 	if frontMatter != nil {

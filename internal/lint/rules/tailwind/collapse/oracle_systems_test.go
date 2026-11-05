@@ -78,12 +78,12 @@ func oracleSystem(test *testing.T, entryPoint string) *LoadedDesignSystem {
 	if entryPoint == "" {
 		test.Fatal("the fixture records no entry point, so nothing says which design system it measured")
 	}
-	system, err := LoadDesignSystem(LoadOptions{
+	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
 		EntryPoint:          corpus.Resolve(test, entryPoint),
 		TailwindPackageRoot: vendored.TailwindPackageRoot(),
 	})
-	if err != nil {
-		test.Fatalf("%s resolves, but its design system does not load: %v", entryPoint, err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("%s resolves, but its design system does not load: %v", entryPoint, loadDesignSystemError)
 	}
 	return system
 }

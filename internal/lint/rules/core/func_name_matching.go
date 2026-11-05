@@ -595,14 +595,14 @@ func DefaultFuncNameMatchingOptions() FuncNameMatchingOptions {
 // and the defaults are exactly what the author wrote the option to change.
 func DecodeFuncNameMatchingOptions(list []byte) (any, error) {
 	options := DefaultFuncNameMatchingOptions()
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	objectElement := elements[0]
 	var direction string
-	if err := json.Unmarshal(elements[0], &direction); err == nil {
+	if decodeError := json.Unmarshal(elements[0], &direction); decodeError == nil {
 		if direction != "always" && direction != "never" {
 			return options, fmt.Errorf(
 				"func-name-matching: unknown direction %q, wanted always or never", direction)
@@ -619,8 +619,8 @@ func DecodeFuncNameMatchingOptions(list []byte) (any, error) {
 	}
 
 	var object FuncNameMatchingOptions
-	if err := rule.UnmarshalOptions(objectElement, &object); err != nil {
-		return options, fmt.Errorf("func-name-matching options object: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(objectElement, &object); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("func-name-matching options object: %w", unmarshalOptionsError)
 	}
 	options.ConsiderPropertyDescriptor = object.ConsiderPropertyDescriptor
 	options.IncludeCommonJSModuleExports = object.IncludeCommonJSModuleExports

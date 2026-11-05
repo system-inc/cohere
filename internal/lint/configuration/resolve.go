@@ -372,7 +372,7 @@ func (c *Config) relativePath(path string) string {
 	normalized := filepath.ToSlash(path)
 
 	if c.Root != "" && filepath.IsAbs(path) {
-		if relative, err := filepath.Rel(c.Root, path); err == nil {
+		if relative, relativePathError := filepath.Rel(c.Root, path); relativePathError == nil {
 			normalized = filepath.ToSlash(relative)
 		}
 	}

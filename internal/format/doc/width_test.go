@@ -106,21 +106,21 @@ process.stdin.setEncoding("utf8");
 let data = ""; process.stdin.on("data", (chunk) => data += chunk);
 process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(data).map(getStringWidth))));
 `
-	encoded, err := json.Marshal(inputs)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(inputs)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	command := exec.Command("node", "--input-type=module", "-e", script)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
 	var stdout, stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
-	if err := command.Run(); err != nil {
-		test.Fatalf("node: %v\n%s", err, stderr.String())
+	if runError := command.Run(); runError != nil {
+		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 	var widths []int
-	if err := json.Unmarshal(stdout.Bytes(), &widths); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(stdout.Bytes(), &widths); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(widths) != len(inputs) {
 		test.Fatalf("upstream returned %d widths for %d inputs", len(widths), len(inputs))
@@ -140,9 +140,9 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 // be measuring different strings, which is exactly the comparison that looks clean and proves nothing.
 func nonASCIILines(test *testing.T, root string, seen map[string]bool) []string {
 	test.Helper()
-	engine, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	engine, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	var lines []string
 	pending := []string{root}
@@ -171,8 +171,8 @@ func nonASCIILines(test *testing.T, root string, seen map[string]bool) []string 
 		}
 		measured = append(measured, fmt.Sprintf("%s (%d)", current, len(enumeration.Files)))
 		for _, path := range enumeration.Files {
-			file, err := os.Open(path)
-			if err != nil {
+			file, openError := os.Open(path)
+			if openError != nil {
 				continue
 			}
 			scanner := bufio.NewScanner(file)

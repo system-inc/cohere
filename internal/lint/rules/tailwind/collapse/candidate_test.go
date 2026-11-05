@@ -129,14 +129,14 @@ func loadCandidateCorpus(test *testing.T) candidateCorpus {
 	test.Helper()
 
 	path := filepath.Join("testdata", "candidate_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("read %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("read %s: %v", path, readError)
 	}
 
 	var corpus candidateCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
-		test.Fatalf("parse %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &corpus); decodeError != nil {
+		test.Fatalf("parse %s: %v", path, decodeError)
 	}
 	if len(corpus.Cases) == 0 {
 		test.Fatalf("%s holds no cases", path)
@@ -331,16 +331,16 @@ func candidatesFromFixture(test *testing.T, fixtures []fixtureCandidate) []Parse
 			// is why Value is RawMessage on the fixture struct: the field is genuinely two
 			// different shapes depending on the kind.
 			var propertyValue string
-			if err := json.Unmarshal(fixture.Value, &propertyValue); err != nil {
-				test.Fatalf("arbitrary candidate value was not a string: %v", err)
+			if decodeError := json.Unmarshal(fixture.Value, &propertyValue); decodeError != nil {
+				test.Fatalf("arbitrary candidate value was not a string: %v", decodeError)
 			}
 			candidate.PropertyValue = propertyValue
 
 		case ParsedCandidateKindFunctional:
 			if len(fixture.Value) > 0 && string(fixture.Value) != "null" {
 				var utilityValue fixtureUtilityValue
-				if err := json.Unmarshal(fixture.Value, &utilityValue); err != nil {
-					test.Fatalf("functional candidate value was not an object: %v", err)
+				if decodeError := json.Unmarshal(fixture.Value, &utilityValue); decodeError != nil {
+					test.Fatalf("functional candidate value was not an object: %v", decodeError)
 				}
 				value := &ParsedValue{
 					Kind:  ParsedValueKind(utilityValue.Kind),

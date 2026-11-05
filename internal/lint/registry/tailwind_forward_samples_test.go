@@ -39,9 +39,9 @@ var tailwindAcceptedBefore = map[string][]string{
 func TestTailwindForwardSamplesLoadOncePorted(test *testing.T) {
 	test.Parallel()
 
-	data, err := os.ReadFile(filepath.Join("testdata", "better-tailwindcss-forward-samples.json"))
-	if err != nil {
-		test.Fatal(err)
+	data, readError := os.ReadFile(filepath.Join("testdata", "better-tailwindcss-forward-samples.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var file struct {
 		Samples []struct {
@@ -49,8 +49,8 @@ func TestTailwindForwardSamplesLoadOncePorted(test *testing.T) {
 			Elements []json.RawMessage `json:"elements"`
 		} `json:"samples"`
 	}
-	if err := json.Unmarshal(data, &file); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(data, &file); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(file.Samples) == 0 {
 		test.Fatal("no samples were read, so this test would prove nothing")
@@ -101,12 +101,12 @@ func isTailwindPorted(ruleName string, key string) bool {
 func compactJSON(test *testing.T, raw json.RawMessage) []byte {
 	test.Helper()
 	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(raw, &value); decodeError != nil {
+		test.Fatal(decodeError)
 	}
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(value)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	return encoded
 }

@@ -27,11 +27,11 @@ func writeProject(test testing.TB, files map[string]string) string {
 	directory := test.TempDir()
 	for name, contents := range files {
 		full := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			test.Fatalf("creating %s: %v", filepath.Dir(full), err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {
+			test.Fatalf("creating %s: %v", filepath.Dir(full), createDirectoryError)
 		}
-		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", full, err)
+		if writeError := os.WriteFile(full, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", full, writeError)
 		}
 	}
 	return directory
@@ -57,9 +57,9 @@ func TestBuildProducesAProgramAndAChecker(test *testing.T) {
 		"main.ts":       "export const greeting: string = 'hello';\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	// The program carries far more than our one file: every lib.*.d.ts the target pulls in. That is
@@ -97,9 +97,9 @@ func TestProjectFilesExcludesDeclarations(test *testing.T) {
 		"Beta.ts":       "export const beta = 2;\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	projectFiles := graph.ProjectFiles()
@@ -244,18 +244,18 @@ func TestBuildFailsLoudly(test *testing.T) {
 	test.Parallel()
 	test.Run("no config named", func(test *testing.T) {
 		test.Parallel()
-		if _, err := program.Build(program.Options{CurrentDirectory: test.TempDir()}); err == nil {
+		if _, buildError := program.Build(program.Options{CurrentDirectory: test.TempDir()}); buildError == nil {
 			test.Fatal("building with no tsconfig returned no error")
 		}
 	})
 
 	test.Run("config does not exist", func(test *testing.T) {
 		test.Parallel()
-		_, err := program.Build(program.Options{
+		_, buildError := program.Build(program.Options{
 			ConfigFileName:   "absent.json",
 			CurrentDirectory: test.TempDir(),
 		})
-		if err == nil {
+		if buildError == nil {
 			test.Fatal("a missing tsconfig returned no error")
 		}
 	})
@@ -265,8 +265,8 @@ func TestBuildFailsLoudly(test *testing.T) {
 		directory := writeProject(test, map[string]string{
 			"tsconfig.json": `{"include":["./nothing-here/**/*.ts"]}`,
 		})
-		_, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-		if err == nil {
+		_, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if buildError == nil {
 			test.Fatal("a config matching zero files built a program instead of failing")
 		}
 	})
@@ -277,7 +277,7 @@ func TestBuildFailsLoudly(test *testing.T) {
 			"tsconfig.json": `{"compilerOptions": {"target": "ES2022",, "strict": true}}`,
 			"main.ts":       "export const value = 1;\n",
 		})
-		if _, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory}); err == nil {
+		if _, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory}); buildError == nil {
 			test.Fatal("a tsconfig with a JSON syntax error built a program instead of failing")
 		}
 	})
@@ -291,9 +291,9 @@ func TestBuildFailsLoudly(test *testing.T) {
 			"tsconfig.json": `{"compilerOptions": {"target": "NotARealTarget"}}`,
 			"main.ts":       "export const value = 1;\n",
 		})
-		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-		if err != nil {
-			test.Fatalf("an invalid option value refused the build: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if buildError != nil {
+			test.Fatalf("an invalid option value refused the build: %v", buildError)
 		}
 		reported := false
 		for _, diagnostic := range graph.ConfigDiagnostics(context.Background()) {
@@ -316,15 +316,15 @@ func TestWalkRefusesAnEmptyRun(test *testing.T) {
 		"main.ts":       "export const value = 1;\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
-	if _, err := graph.Walk(context.Background(), nil, []rule.Rule{{Name: "any"}}); err == nil {
+	if _, walkError := graph.Walk(context.Background(), nil, []rule.Rule{{Name: "any"}}); walkError == nil {
 		test.Error("walking an empty file set returned a clean result")
 	}
-	if _, err := graph.Walk(context.Background(), graph.ProjectFiles(), nil); err == nil {
+	if _, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), nil); walkError == nil {
 		test.Error("walking with no rules returned a clean result")
 	}
 }
@@ -340,9 +340,9 @@ func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
 			"main.ts":       "const value: number = 'not a number';\n",
 		})
 
-		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 
 		diagnostics := graph.Diagnostics(context.Background(), graph.ProjectFiles()[0])
@@ -370,9 +370,9 @@ func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
 			"main.ts":       "const value: number = 42;\nexport default value;\n",
 		})
 
-		graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-		if err != nil {
-			test.Fatalf("building: %v", err)
+		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		if buildError != nil {
+			test.Fatalf("building: %v", buildError)
 		}
 
 		diagnostics := graph.Diagnostics(context.Background(), graph.ProjectFiles()[0])
@@ -392,9 +392,9 @@ func TestCheckerResolvesAcrossFiles(test *testing.T) {
 		"main.ts":       "import type { Shape } from './Shape.ts';\nconst square: Shape = { sides: 'four' };\nexport default square;\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	found := false
@@ -625,9 +625,9 @@ func TestACompilerDiagnosticRendersThroughLocalize(test *testing.T) {
 		"main.ts":       "export const counted: string = 41 + 1;\n",
 	})
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 
 	diagnostics := graph.AllDiagnostics(context.Background())

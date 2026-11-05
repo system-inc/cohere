@@ -143,9 +143,9 @@ func formatOptionSets() map[string]formatoptions.Options {
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
 	for optionsName, options := range formatOptionSets() {
-		oracle, err := prettier.New(options)
-		if err != nil {
-			test.Fatal(err)
+		oracle, newPrettierError := prettier.New(options)
+		if newPrettierError != nil {
+			test.Fatal(newPrettierError)
 		}
 		for _, testCase := range formatCases {
 			expected, err := oracle.Format("Probe.graphql", testCase.source)
@@ -175,9 +175,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 // The option sets have to change the output somewhere, or running under them proves nothing.
 func TestOptionSetsChangeTheOutput(test *testing.T) {
 	test.Parallel()
-	defaults, err := Format(formatCases[2].source, formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	defaults, formatError := Format(formatCases[2].source, formatoptions.Default())
+	if formatError != nil {
+		test.Fatal(formatError)
 	}
 	for optionsName, options := range formatOptionSets() {
 		if optionsName == "defaults" {
@@ -205,15 +205,15 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 // on a shorthand query.
 func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 	test.Parallel()
-	oracle, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	oracle, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	for _, source := range []string{"query { }\n", "query { a() }\n", "\"description\" { a }\n", "type T { a: }\n"} {
-		if _, err := oracle.Format("Probe.graphql", source); err == nil {
+		if _, formatError := oracle.Format("Probe.graphql", source); formatError == nil {
 			test.Fatalf("the oracle accepted %q", source)
 		}
-		if formatted, err := Format(source, formatoptions.Default()); err == nil {
+		if formatted, formatError := Format(source, formatoptions.Default()); formatError == nil {
 			test.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
@@ -237,7 +237,7 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 			test.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
 		}
 	}
-	if _, err := PrintToDoc("query { }", options); err == nil {
+	if _, printToDocError := PrintToDoc("query { }", options); printToDocError == nil {
 		test.Error("PrintToDoc printed an empty selection set instead of refusing it")
 	}
 }

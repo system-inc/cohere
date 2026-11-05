@@ -122,8 +122,8 @@ func DecodeSortCompOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	return options, nil
 }
@@ -553,8 +553,8 @@ func sortCompGroupMatches(group string, member sortCompMember) bool {
 // (#7mztrdd). A flag the compiler refuses, or one given twice, is a pattern that does not compile,
 // which is the same "matches nothing" answer an unreadable body gets.
 func sortCompCompilePattern(body string, flags string) (*esregexp.RegExp, bool) {
-	pattern, err := esregexp.Compile(body, flags)
-	if err != nil {
+	pattern, compileError := esregexp.Compile(body, flags)
+	if compileError != nil {
 		return nil, false
 	}
 	return pattern, true

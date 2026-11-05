@@ -150,16 +150,16 @@ func productKey(product Product, root string, environment map[string]string, lis
 	}
 	sort.Strings(paths)
 	relative := func(path string) (string, error) {
-		within, err := filepath.Rel(root, path)
-		if err != nil || within == ".." || strings.HasPrefix(within, ".."+string(filepath.Separator)) || filepath.IsAbs(within) {
+		within, relativePathError := filepath.Rel(root, path)
+		if relativePathError != nil || within == ".." || strings.HasPrefix(within, ".."+string(filepath.Separator)) || filepath.IsAbs(within) {
 			return "", fmt.Errorf("%s is outside the repository at %s, so nothing can key it the same on another machine", path, root)
 		}
 		return filepath.ToSlash(within), nil
 	}
 	contentHash := func(path string) (string, error) {
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return "", err
+		content, readError := os.ReadFile(path)
+		if readError != nil {
+			return "", readError
 		}
 		sum := sha256.Sum256(content)
 		return hex.EncodeToString(sum[:]), nil
@@ -223,9 +223,9 @@ func productKey(product Product, root string, environment map[string]string, lis
 func cacheDirectory() (string, error) {
 	directory := os.Getenv("ADAMIC_BUILD_CACHE_DIR")
 	if directory == "" {
-		user, err := os.UserCacheDir()
-		if err != nil {
-			return "", err
+		user, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			return "", userCacheDirectoryError
 		}
 		directory = filepath.Join(user, "adamic-build")
 	}
@@ -262,15 +262,15 @@ func (product Product) Find() (*Exports, error) {
 // otherKeys names each product of the same name the cache holds under another key, with the first line its
 // description and this one's differ on: a key a runner computed differently from Workshop's, named.
 func otherKeys(product Product, state *productState) string {
-	descriptions, err := filepath.Glob(filepath.Join(state.cache, "*.inputs"))
-	if err != nil {
+	descriptions, globError := filepath.Glob(filepath.Join(state.cache, "*.inputs"))
+	if globError != nil {
 		return ""
 	}
 	wanted := strings.Split(state.description, "\n")
 	var found []string
 	for _, path := range descriptions {
-		content, err := os.ReadFile(path)
-		if err != nil {
+		content, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		lines := strings.Split(string(content), "\n")
@@ -300,19 +300,19 @@ func otherKeys(product Product, state *productState) string {
 // open reads a product's manifest and checks every file it names is there.
 func open(product Product, state *productState) (*Exports, error) {
 	directory := filepath.Join(state.cache, state.key)
-	content, err := os.ReadFile(filepath.Join(directory, manifestName))
-	if err != nil {
-		return nil, err
+	content, readError := os.ReadFile(filepath.Join(directory, manifestName))
+	if readError != nil {
+		return nil, readError
 	}
 	var read manifest
-	if err := json.Unmarshal(content, &read); err != nil {
-		return nil, fmt.Errorf("the %s product %s's manifest: %w", product.Name, state.key[:12], err)
+	if decodeError := json.Unmarshal(content, &read); decodeError != nil {
+		return nil, fmt.Errorf("the %s product %s's manifest: %w", product.Name, state.key[:12], decodeError)
 	}
 	exports := &Exports{name: product.Name, key: state.key, patterns: product.Patterns, files: map[string]string{}}
 	for path, file := range read.Packages {
 		absolute := filepath.Join(directory, filepath.FromSlash(file))
-		if _, err := os.Stat(absolute); err != nil {
-			return nil, fmt.Errorf("the %s product %s names %s for %s, and it is not there: the product is incomplete: %w", product.Name, state.key[:12], file, path, err)
+		if _, statError := os.Stat(absolute); statError != nil {
+			return nil, fmt.Errorf("the %s product %s names %s for %s, and it is not there: the product is incomplete: %w", product.Name, state.key[:12], file, path, statError)
 		}
 		exports.files[path] = absolute
 	}
@@ -335,7 +335,7 @@ func (product Product) Build() (*Exports, error) {
 	}
 	uncached := os.Getenv("ADAMIC_BUILD_CACHE") == "off"
 	if !uncached {
-		if exports, err := open(product, state); err == nil {
+		if exports, openError := open(product, state); openError == nil {
 			record(product, state.key, "hit", started)
 			return exports, nil
 		}
@@ -345,26 +345,26 @@ func (product Product) Build() (*Exports, error) {
 		return nil, err
 	}
 	defer os.RemoveAll(scratch)
-	if err := product.compile(state, scratch); err != nil {
-		return nil, err
+	if compileError := product.compile(state, scratch); compileError != nil {
+		return nil, compileError
 	}
-	if err := os.WriteFile(filepath.Join(state.cache, state.key+".inputs"), []byte(state.description), 0o644); err != nil {
-		return nil, err
+	if writeError := os.WriteFile(filepath.Join(state.cache, state.key+".inputs"), []byte(state.description), 0o644); writeError != nil {
+		return nil, writeError
 	}
 	destination := filepath.Join(state.cache, state.key)
 	if uncached {
-		if _, err := os.Stat(destination); err == nil {
+		if _, statError := os.Stat(destination); statError == nil {
 			retired := scratch + "-retired"
-			if err := os.Rename(destination, retired); err != nil {
-				return nil, err
+			if renameError := os.Rename(destination, retired); renameError != nil {
+				return nil, renameError
 			}
 			defer os.RemoveAll(retired)
 		}
 	}
 	// The product appears whole, by one rename. A builder that lost the race to another finds the winner's.
-	if err := os.Rename(scratch, destination); err != nil {
+	if renameError := os.Rename(scratch, destination); renameError != nil {
 		if _, statError := os.Stat(filepath.Join(destination, manifestName)); statError != nil {
-			return nil, err
+			return nil, renameError
 		}
 	}
 	exports, err := open(product, state)
@@ -413,10 +413,10 @@ func (product Product) compile(state *productState, directory string) error {
 			Export     string
 			Error      *struct{ Err string }
 		}
-		if err := decoder.Decode(&listed); errors.Is(err, io.EOF) {
+		if decodeError := decoder.Decode(&listed); errors.Is(decodeError, io.EOF) {
 			break
-		} else if err != nil {
-			return err
+		} else if decodeError != nil {
+			return decodeError
 		}
 		if listed.Error != nil {
 			return fmt.Errorf("building the %s product: %s: %s", product.Name, listed.ImportPath, listed.Error.Err)
@@ -434,8 +434,8 @@ func (product Product) compile(state *productState, directory string) error {
 	}
 	sort.Strings(paths)
 	written := manifest{Name: product.Name, Packages: map[string]string{}}
-	if err := os.MkdirAll(filepath.Join(directory, "exports"), 0o755); err != nil {
-		return err
+	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "exports"), 0o755); createDirectoryError != nil {
+		return createDirectoryError
 	}
 	for index, path := range paths {
 		if exportFiles[path] == "" {
@@ -449,8 +449,8 @@ func (product Product) compile(state *productState, directory string) error {
 			return fmt.Errorf("building the %s product, %s's export file %s: %w", product.Name, path, exportFiles[path], err)
 		}
 		name := fmt.Sprintf("exports/%04d.a", index)
-		if err := os.WriteFile(filepath.Join(directory, filepath.FromSlash(name)), content, 0o644); err != nil {
-			return err
+		if writeError := os.WriteFile(filepath.Join(directory, filepath.FromSlash(name)), content, 0o644); writeError != nil {
+			return writeError
 		}
 		written.Packages[path] = name
 	}
@@ -473,7 +473,7 @@ func exportDataOnly(archive []byte) ([]byte, error) {
 	for offset+headerSize <= len(archive) {
 		header := archive[offset : offset+headerSize]
 		var size int
-		if _, err := fmt.Sscan(string(bytes.TrimSpace(header[48:58])), &size); err != nil || size < 0 || offset+headerSize+size > len(archive) {
+		if _, scanError := fmt.Sscan(string(bytes.TrimSpace(header[48:58])), &size); scanError != nil || size < 0 || offset+headerSize+size > len(archive) {
 			return nil, fmt.Errorf("its member at %d has a malformed size", offset)
 		}
 		if string(bytes.TrimSpace(header[:16])) == "__.PKGDEF" {
@@ -497,8 +497,8 @@ func record(product Product, key, outcome string, started time.Time) {
 	if path == "" {
 		return
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
+	file, openError := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if openError != nil {
 		return
 	}
 	defer file.Close()

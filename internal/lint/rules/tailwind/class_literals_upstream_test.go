@@ -103,26 +103,26 @@ type classLiteralOracle struct {
 
 func readClassLiteralCases(test *testing.T) []classLiteralCase {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "class_literals", "cases.json"))
-	if err != nil {
-		test.Fatal(err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", "class_literals", "cases.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var cases []classLiteralCase
-	if err := json.Unmarshal(raw, &cases); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(raw, &cases); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	return cases
 }
 
 func readClassLiteralOracle(test *testing.T) classLiteralOracle {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", "class_literals", "upstream.json"))
-	if err != nil {
-		test.Fatal(err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", "class_literals", "upstream.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var oracle classLiteralOracle
-	if err := json.Unmarshal(raw, &oracle); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(raw, &oracle); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	return oracle
 }

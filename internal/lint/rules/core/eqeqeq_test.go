@@ -48,9 +48,9 @@ func runEqeqeq(test *testing.T, testCase eqeqeqCase) rule_testing.Result {
 	if testCase.options == nil {
 		return rule_testing.Run(test, Eqeqeq, eqeqeqFile, testCase.sourceText)
 	}
-	decoded, err := DecodeEqeqeqOptions([]byte(eqeqeqUpstreamList(testCase.options.(EqeqeqOptions))))
-	if err != nil {
-		test.Fatalf("could not decode options: %v", err)
+	decoded, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(eqeqeqUpstreamList(testCase.options.(EqeqeqOptions))))
+	if decodeEqeqeqOptionsError != nil {
+		test.Fatalf("could not decode options: %v", decodeEqeqeqOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, Eqeqeq, eqeqeqFile, testCase.sourceText, decoded)
 }
@@ -433,9 +433,9 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 
 	test.Run("nil input selects upstream's defaults", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeEqeqeqOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeEqeqeqOptionsError := DecodeEqeqeqOptions(nil)
+		if decodeEqeqeqOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeEqeqeqOptionsError)
 		}
 		settings := decoded.(EqeqeqOptions).resolve()
 		if settings.mode != EqeqeqAlways || settings.null != EqeqeqNullAlways {
@@ -445,9 +445,9 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 
 	test.Run("the second element is read: always plus null ignore", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}]`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}]`))
+		if decodeEqeqeqOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeEqeqeqOptionsError)
 		}
 		if settings := decoded.(EqeqeqOptions).resolve(); settings.mode != EqeqeqAlways ||
 			settings.null != EqeqeqNullIgnore {
@@ -457,9 +457,9 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 
 	test.Run("allow-null is always plus null ignore, as upstream reads it", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeEqeqeqOptions([]byte(`["allow-null"]`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["allow-null"]`))
+		if decodeEqeqeqOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeEqeqeqOptionsError)
 		}
 		if settings := decoded.(EqeqeqOptions).resolve(); settings.mode != EqeqeqAlways ||
 			settings.null != EqeqeqNullIgnore {
@@ -469,14 +469,14 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 
 	test.Run("smart takes no second element, so one is refused rather than discarded", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeEqeqeqOptions([]byte(`["smart", {"null": "never"}]`)); err == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["smart", {"null": "never"}]`)); decodeEqeqeqOptionsError == nil {
 			test.Error("a null policy beside smart decoded, and the rule would never read it")
 		}
 	})
 
 	test.Run("a third element is refused", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}, "smart"]`)); err == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}, "smart"]`)); decodeEqeqeqOptionsError == nil {
 			test.Error("a third element decoded and would have been dropped")
 		}
 	})
@@ -484,7 +484,7 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 	test.Run("an unknown mode is rejected rather than disabling the rule", func(test *testing.T) {
 		test.Parallel()
 		// The Go constant's spelling, which is not upstream's.
-		if _, err := DecodeEqeqeqOptions([]byte(`["Always"]`)); err == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["Always"]`)); decodeEqeqeqOptionsError == nil {
 			test.Error("an unrecognized mode decoded; every arm here is selected by equality, so " +
 				"an unrecognized string would report nothing at all")
 		}
@@ -492,21 +492,21 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 
 	test.Run("an unknown null policy is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"null": "sometimes"}]`)); err == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["always", {"null": "sometimes"}]`)); decodeEqeqeqOptionsError == nil {
 			test.Error("an unrecognized null policy decoded")
 		}
 	})
 
 	test.Run("an unknown key in the second element is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeEqeqeqOptions([]byte(`["always", {"nul": "ignore"}]`)); err == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["always", {"nul": "ignore"}]`)); decodeEqeqeqOptionsError == nil {
 			test.Error("a misspelled key decoded, so the null policy it carried would be ignored")
 		}
 	})
 
 	test.Run("the retired object spelling is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, err := DecodeEqeqeqOptions([]byte(`{"mode":"Smart","null":"Never"}`)); err == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`{"mode":"Smart","null":"Never"}`)); decodeEqeqeqOptionsError == nil {
 			test.Error("the pre-list object spelling decoded, which the config layer never delivers")
 		}
 	})

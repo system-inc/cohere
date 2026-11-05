@@ -405,9 +405,9 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 	// green-over-zero-files failure this binary exists to have stopped making, and it was one
 	// `filepath.Join` away from shipping.
 	if workingDirectory == "" {
-		current, err := os.Getwd()
-		if err != nil {
-			return formatScope{}, fmt.Errorf("resolving the working directory: %w", err)
+		current, workingDirectoryError := os.Getwd()
+		if workingDirectoryError != nil {
+			return formatScope{}, fmt.Errorf("resolving the working directory: %w", workingDirectoryError)
 		}
 		workingDirectory = current
 	}

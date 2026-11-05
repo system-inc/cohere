@@ -76,12 +76,12 @@ func (inputs Inputs) Compute() (string, error) {
 	sort.Strings(files)
 
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			// A file that was listed as an input and cannot be read is a loud failure. Hashing
 			// around it would produce a stable digest for a tree we could not actually see, which
 			// is the stale-binary failure wearing a different hat.
-			return "", fmt.Errorf("reading build input %s: %w", path, err)
+			return "", fmt.Errorf("reading build input %s: %w", path, readError)
 		}
 		fmt.Fprintf(digest, "file\x00%s\x00%d\x00", filepath.Base(path), len(contents))
 		digest.Write(contents)
@@ -132,9 +132,9 @@ func goEnvironment(moduleDirectory string) (string, error) {
 	command := exec.Command("go", "env", "GOVERSION", "GOOS", "GOARCH")
 	command.Dir = moduleDirectory
 
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("reading the Go toolchain version: %w", err)
+	output, outputError := command.Output()
+	if outputError != nil {
+		return "", fmt.Errorf("reading the Go toolchain version: %w", outputError)
 	}
 
 	return strings.Join(strings.Fields(string(output)), " "), nil
@@ -142,9 +142,9 @@ func goEnvironment(moduleDirectory string) (string, error) {
 
 // typeScriptCommit reads the commit the vendored compiler's checkout is at, from its own files.
 func typeScriptCommit(moduleDirectory string) (string, error) {
-	commit, err := readHead(filepath.Join(moduleDirectory, "TypeScript"))
-	if err != nil {
-		return "", fmt.Errorf("reading the pinned TypeScript commit: %w", err)
+	commit, readHeadError := readHead(filepath.Join(moduleDirectory, "TypeScript"))
+	if readHeadError != nil {
+		return "", fmt.Errorf("reading the pinned TypeScript commit: %w", readHeadError)
 	}
 	return commit, nil
 }
@@ -162,13 +162,13 @@ func listSourceFiles(moduleDirectory string, packagePath string) ([]string, erro
 	command := exec.Command("go", "list", "-deps", "-f", template, packagePath)
 	command.Dir = moduleDirectory
 
-	output, err := command.Output()
-	if err != nil {
+	output, outputError := command.Output()
+	if outputError != nil {
 		var exitError *exec.ExitError
-		if errors.As(err, &exitError) {
-			return nil, fmt.Errorf("listing build inputs for %s: %w\n%s", packagePath, err, exitError.Stderr)
+		if errors.As(outputError, &exitError) {
+			return nil, fmt.Errorf("listing build inputs for %s: %w\n%s", packagePath, outputError, exitError.Stderr)
 		}
-		return nil, fmt.Errorf("listing build inputs for %s: %w", packagePath, err)
+		return nil, fmt.Errorf("listing build inputs for %s: %w", packagePath, outputError)
 	}
 
 	files := []string{}

@@ -30,9 +30,9 @@ func decodeRootForTest(test *testing.T, root string, base rule.OptionsBase) (Imp
 	if root != "" {
 		raw = "{" + rootTestAliases + `, "repositoryRoot": "` + root + `"}`
 	}
-	decoded, err := decodeImportRequirePathAliasOptions([]byte(raw), base)
-	if err != nil {
-		return ImportRequirePathAliasOptions{}, err
+	decoded, decodeImportRequirePathAliasOptionsError := decodeImportRequirePathAliasOptions([]byte(raw), base)
+	if decodeImportRequirePathAliasOptionsError != nil {
+		return ImportRequirePathAliasOptions{}, decodeImportRequirePathAliasOptionsError
 	}
 	return decoded.(ImportRequirePathAliasOptions), nil
 }
@@ -46,8 +46,8 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 	configDirectory := test.TempDir()
 	projectRoot := filepath.Join(configDirectory, "project")
 	for _, directory := range []string{projectRoot, filepath.Join(configDirectory, "beside")} {
-		if err := os.Mkdir(directory, 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.Mkdir(directory, 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
 	}
 	base := rule.OptionsBase{ConfigDirectory: configDirectory, ProjectRoot: projectRoot}
@@ -69,9 +69,9 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 	for _, testCase := range accepted {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := decodeRootForTest(test, testCase.root, base)
-			if err != nil {
-				test.Fatalf("refused: %v", err)
+			decoded, decodeRootForTestError := decodeRootForTest(test, testCase.root, base)
+			if decodeRootForTestError != nil {
+				test.Fatalf("refused: %v", decodeRootForTestError)
 			}
 			if decoded.RepositoryRoot != testCase.want {
 				test.Errorf("root = %q, want %q", decoded.RepositoryRoot, testCase.want)
@@ -83,8 +83,8 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 	}
 
 	aFile := filepath.Join(configDirectory, "NotADirectory.json")
-	if err := os.WriteFile(aFile, []byte("{}"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(aFile, []byte("{}"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	refused := []struct {
@@ -106,12 +106,12 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 	for _, testCase := range refused {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := decodeRootForTest(test, testCase.root, testCase.base)
-			if err == nil {
+			decoded, decodeRootForTestError := decodeRootForTest(test, testCase.root, testCase.base)
+			if decodeRootForTestError == nil {
 				test.Fatalf("accepted a root that cannot be determined: %q", decoded.RepositoryRoot)
 			}
-			if !strings.Contains(err.Error(), "repositoryRoot") {
-				test.Errorf("the refusal does not name the option: %v", err)
+			if !strings.Contains(decodeRootForTestError.Error(), "repositoryRoot") {
+				test.Errorf("the refusal does not name the option: %v", decodeRootForTestError)
 			}
 		})
 	}

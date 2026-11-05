@@ -24,13 +24,13 @@ func TestTheDevelopmentHashLandsInCoheresOwnCache(test *testing.T) {
 	module := test.TempDir()
 	project := test.TempDir()
 	paths := DefaultPaths(module)
-	if err := os.MkdirAll(paths.BinaryDirectory(), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(paths.BinaryDirectory(), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	test.Chdir(project)
-	if err := recordDevelopmentHash(paths, "0123456789abcdef"); err != nil {
-		test.Fatal(err)
+	if recordDevelopmentHashError := recordDevelopmentHash(paths, "0123456789abcdef"); recordDevelopmentHashError != nil {
+		test.Fatal(recordDevelopmentHashError)
 	}
 
 	cache := filepath.Join(module, ".cache", "cohere") + string(filepath.Separator)
@@ -38,13 +38,13 @@ func TestTheDevelopmentHashLandsInCoheresOwnCache(test *testing.T) {
 	if !filepath.IsAbs(written) || !strings.HasPrefix(written, cache) {
 		test.Errorf("the development hash path %s is not inside the module's cache %s", written, cache)
 	}
-	if contents, err := os.ReadFile(written); err != nil || strings.TrimSpace(string(contents)) != "0123456789abcdef" {
-		test.Errorf("the hash was not written where the path says (read %q, %v)", contents, err)
+	if contents, readError := os.ReadFile(written); readError != nil || strings.TrimSpace(string(contents)) != "0123456789abcdef" {
+		test.Errorf("the hash was not written where the path says (read %q, %v)", contents, readError)
 	}
 
-	entries, err := os.ReadDir(project)
-	if err != nil {
-		test.Fatal(err)
+	entries, readDirectoryError := os.ReadDir(project)
+	if readDirectoryError != nil {
+		test.Fatal(readDirectoryError)
 	}
 	if len(entries) != 0 {
 		names := make([]string, 0, len(entries))

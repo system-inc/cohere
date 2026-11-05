@@ -95,8 +95,8 @@ func TestCheckCommittedVersionReadsWhatARealBinaryPrints(test *testing.T) {
 	provenance := release.Provenance{Version: "dev", SelfCommit: commit, CompilerCommit: "1f70213d4922", GoToolchain: "go1.27.0", Platform: "darwin/arm64"}
 	clean := provenance.String() + "\n"
 
-	if err := checkCommittedVersion(clean, commit); err != nil {
-		test.Fatalf("a correct version was refused: %v", err)
+	if checkCommittedVersionError := checkCommittedVersion(clean, commit); checkCommittedVersionError != nil {
+		test.Fatalf("a correct version was refused: %v", checkCommittedVersionError)
 	}
 
 	cases := map[string]string{
@@ -109,7 +109,7 @@ func TestCheckCommittedVersionReadsWhatARealBinaryPrints(test *testing.T) {
 		"no commit at all": release.Provenance{Version: "dev"}.String() + "\n",
 	}
 	for name, version := range cases {
-		if err := checkCommittedVersion(version, commit); err == nil {
+		if checkCommittedVersionError := checkCommittedVersion(version, commit); checkCommittedVersionError == nil {
 			test.Errorf("%s was accepted:\n%s", name, version)
 		}
 	}
@@ -135,9 +135,9 @@ func TestFrozenRunsOnlyCohereBinaries(test *testing.T) {
 	paths := newCacheWithBinaries(test, binaries)
 	setModificationTimes(test, paths, append([]string{cohere}, impostors...))
 
-	frozen, err := ResolveFrozen(paths)
-	if err != nil {
-		test.Fatalf("resolving frozen: %v", err)
+	frozen, resolveFrozenError := ResolveFrozen(paths)
+	if resolveFrozenError != nil {
+		test.Fatalf("resolving frozen: %v", resolveFrozenError)
 	}
 	if filepath.Base(frozen.Path) != cohere {
 		test.Fatalf("--frozen chose %s, which is not a cohere binary", filepath.Base(frozen.Path))
@@ -207,8 +207,8 @@ func main() {
 	// The builds use the toolchain's own Go cache, as the launcher's do, so the fixture does not compile
 	// the standard library cold for every test.
 	cache := filepath.Join(root, "cache")
-	if err := os.MkdirAll(cache, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	return committedFixture{
@@ -236,18 +236,18 @@ func gitCommand(test *testing.T, directory string, arguments ...string) string {
 		"-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"}, arguments...)...)
 	command.Dir = directory
 	command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
-	output, err := command.CombinedOutput()
-	if err != nil {
-		test.Fatalf("git %s in %s: %v\n%s", strings.Join(arguments, " "), directory, err, output)
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("git %s in %s: %v\n%s", strings.Join(arguments, " "), directory, outputError, output)
 	}
 	return string(output)
 }
 
 func run(test *testing.T, binary string, arguments ...string) string {
 	test.Helper()
-	output, err := exec.Command(binary, arguments...).CombinedOutput()
-	if err != nil {
-		test.Fatalf("running %s: %v\n%s", binary, err, output)
+	output, outputError := exec.Command(binary, arguments...).CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("running %s: %v\n%s", binary, outputError, output)
 	}
 	return string(output)
 }
@@ -261,14 +261,14 @@ func TestALaunchedBuildUsesTheCallersGoCache(test *testing.T) {
 	fixture := newCommittedFixture(test)
 	shared := test.TempDir()
 	test.Setenv("GOCACHE", shared)
-	if _, _, built, err := ResolveCommitted(fixture.paths, "./command/cohere"); err != nil || !built {
-		test.Fatalf("building: built=%v, %v", built, err)
+	if _, _, built, resolveCommittedError := ResolveCommitted(fixture.paths, "./command/cohere"); resolveCommittedError != nil || !built {
+		test.Fatalf("building: built=%v, %v", built, resolveCommittedError)
 	}
-	entries, err := os.ReadDir(shared)
-	if err != nil || len(entries) < 2 {
-		test.Fatalf("the caller's Go cache holds %d entries after a build, so the build compiled somewhere else: %v", len(entries), err)
+	entries, readDirectoryError := os.ReadDir(shared)
+	if readDirectoryError != nil || len(entries) < 2 {
+		test.Fatalf("the caller's Go cache holds %d entries after a build, so the build compiled somewhere else: %v", len(entries), readDirectoryError)
 	}
-	if _, err := os.Stat(filepath.Join(fixture.paths.CacheDirectory, "gocache")); !os.IsNotExist(err) {
-		test.Fatalf("the launcher made a Go cache of its own: %v", err)
+	if _, statError := os.Stat(filepath.Join(fixture.paths.CacheDirectory, "gocache")); !os.IsNotExist(statError) {
+		test.Fatalf("the launcher made a Go cache of its own: %v", statError)
 	}
 }

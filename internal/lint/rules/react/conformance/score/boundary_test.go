@@ -19,9 +19,9 @@ import (
 // divergence entries have to be revisited deliberately.
 func TestConfigFixturesNeedAModuleTypeProvider(test *testing.T) {
 	test.Parallel()
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	// The modules upstream's `shared-runtime-type-provider.ts` invents. Nothing resolves them.
@@ -58,9 +58,9 @@ func TestConfigFixturesNeedAModuleTypeProvider(test *testing.T) {
 // corpus, because inferring "this flag must be off" from "upstream reported something" is circular.
 func TestOptInPragmaFixturesAreEnumerated(test *testing.T) {
 	test.Parallel()
-	fixtures, err := react_conformance.Load(fixtureRoot)
-	if err != nil {
-		test.Fatalf("loading the corpus: %v", err)
+	fixtures, loadError := react_conformance.Load(fixtureRoot)
+	if loadError != nil {
+		test.Fatalf("loading the corpus: %v", loadError)
 	}
 
 	// Measured as `z.boolean().default(false)` in React 7.1.1.

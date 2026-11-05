@@ -205,8 +205,8 @@ func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc
 	printEmbeddedLanguages(path, mainPrint, options, embeds)
 
 	printed := callPluginPrintFunction(path, options, mainPrint, nil, embeds)
-	if err := ensureAllCommentsPrinted(options); err != nil {
-		return nil, err
+	if ensureAllCommentsPrintedError := ensureAllCommentsPrinted(options); ensureAllCommentsPrintedError != nil {
+		return nil, ensureAllCommentsPrintedError
 	}
 	return printed, nil
 }

@@ -38,8 +38,8 @@ func spin(iterations int) {
 // called; a rule's panic is contained and shows up below as a rule that ran on fewer files.
 func threadCPU() time.Duration {
 	var spec unix.Timespec
-	if err := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); err != nil {
-		panic(fmt.Sprintf("reading the thread CPU clock: %v", err))
+	if clockGettimeError := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); clockGettimeError != nil {
+		panic(fmt.Sprintf("reading the thread CPU clock: %v", clockGettimeError))
 	}
 	return time.Duration(spec.Nano())
 }

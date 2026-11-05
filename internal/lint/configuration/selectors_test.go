@@ -18,20 +18,20 @@ func TestZeroMatchOverrideSelectorIsRefused(test *testing.T) {
 		}},
 	}
 
-	err := configuration.ValidateSelectors([]string{
+	validateSelectorsError := configuration.ValidateSelectors([]string{
 		"/repo/index.ts",
 		"/repo/modules/finance/Sync.ts",
 		"/repo/libraries/api/generated/Operations.ts",
 	})
-	if err == nil {
+	if validateSelectorsError == nil {
 		test.Fatal("a config with one live selector and one zero-match selector validated, so the live " +
 			"one hid the vacuous one")
 	}
-	if !strings.Contains(err.Error(), "generated-miss") {
-		test.Errorf("the error does not name the selector a reader must fix: %v", err)
+	if !strings.Contains(validateSelectorsError.Error(), "generated-miss") {
+		test.Errorf("the error does not name the selector a reader must fix: %v", validateSelectorsError)
 	}
-	if strings.Contains(err.Error(), `"modules/**"`) {
-		test.Errorf("the error names a selector that did match: %v", err)
+	if strings.Contains(validateSelectorsError.Error(), `"modules/**"`) {
+		test.Errorf("the error names a selector that did match: %v", validateSelectorsError)
 	}
 }
 
@@ -48,13 +48,13 @@ func TestEveryMatchingSelectorPasses(test *testing.T) {
 		},
 	}
 
-	err := configuration.ValidateSelectors([]string{
+	validateSelectorsError := configuration.ValidateSelectors([]string{
 		"/repo/libraries/api/generated/Operations.ts",
 		"/repo/next-env.d.ts",
 		"/repo/modules/finance/Sync.ts",
 	})
-	if err != nil {
-		test.Fatalf("the three live selector shapes did not validate against files each one reaches: %v", err)
+	if validateSelectorsError != nil {
+		test.Fatalf("the three live selector shapes did not validate against files each one reaches: %v", validateSelectorsError)
 	}
 }
 
@@ -71,15 +71,15 @@ func TestASelectorReachingOnlyIgnoredFilesIsRefused(test *testing.T) {
 		}},
 	}
 
-	err := configuration.ValidateSelectors([]string{
+	validateSelectorsError := configuration.ValidateSelectors([]string{
 		"/repo/index.ts",
 		"/repo/generated/Operations.ts",
 	})
-	if err == nil {
+	if validateSelectorsError == nil {
 		test.Fatal("a selector reaching only globally ignored files validated even though no rule can run there")
 	}
-	if !strings.Contains(err.Error(), "1 non-ignored project files") {
-		test.Errorf("the error does not state the population it actually checked: %v", err)
+	if !strings.Contains(validateSelectorsError.Error(), "1 non-ignored project files") {
+		test.Errorf("the error does not state the population it actually checked: %v", validateSelectorsError)
 	}
 }
 
@@ -89,11 +89,11 @@ func TestAnOverrideWithoutSelectorsIsRefused(test *testing.T) {
 	test.Parallel()
 	configuration := &Config{Overrides: []Override{{}}}
 
-	err := configuration.ValidateSelectors([]string{"index.ts"})
-	if err == nil {
+	validateSelectorsError := configuration.ValidateSelectors([]string{"index.ts"})
+	if validateSelectorsError == nil {
 		test.Fatal("an override with no files patterns validated even though it cannot select a file")
 	}
-	if !strings.Contains(err.Error(), "override 0 with no files patterns") {
-		test.Errorf("the error does not identify the empty override: %v", err)
+	if !strings.Contains(validateSelectorsError.Error(), "override 0 with no files patterns") {
+		test.Errorf("the error does not identify the empty override: %v", validateSelectorsError)
 	}
 }

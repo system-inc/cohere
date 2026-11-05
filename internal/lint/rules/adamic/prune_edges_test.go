@@ -44,12 +44,12 @@ func typeErrorCount(test *testing.T, source string) int {
 	test.Helper()
 	directory := test.TempDir()
 	writeAdamicSupport(test)(directory)
-	if err := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	return len(graph.Program.GetSemanticDiagnostics(context.Background(), nil))
 }

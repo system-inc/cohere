@@ -97,19 +97,19 @@ func ownExtends(contents []byte) ([]string, error) {
 	var file struct {
 		Extends json.RawMessage `json:"extends"`
 	}
-	if err := json.Unmarshal(contents, &file); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal(contents, &file); decodeError != nil {
+		return nil, decodeError
 	}
 	if len(file.Extends) == 0 {
 		return nil, nil
 	}
 	var single string
-	if err := json.Unmarshal(file.Extends, &single); err == nil {
+	if decodeError := json.Unmarshal(file.Extends, &single); decodeError == nil {
 		return []string{single}, nil
 	}
 	var many []string
-	if err := json.Unmarshal(file.Extends, &many); err != nil {
-		return nil, fmt.Errorf("extends is neither a name nor a list of names: %w", err)
+	if decodeError := json.Unmarshal(file.Extends, &many); decodeError != nil {
+		return nil, fmt.Errorf("extends is neither a name nor a list of names: %w", decodeError)
 	}
 	return many, nil
 }

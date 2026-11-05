@@ -464,15 +464,15 @@ func TestDecodeDisplayNameOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeDisplayNameOptions([]byte(testCase.raw))
+			decoded, decodeDisplayNameOptionsError := DecodeDisplayNameOptions([]byte(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodeDisplayNameOptionsError == nil {
 					test.Fatalf("want an error, got %#v", decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			if decodeDisplayNameOptionsError != nil {
+				test.Fatalf("unexpected error: %v", decodeDisplayNameOptionsError)
 			}
 			options, isOptions := decoded.(DisplayNameOptions)
 			if !isOptions {

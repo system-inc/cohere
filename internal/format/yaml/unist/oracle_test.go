@@ -123,12 +123,12 @@ type oracleResult struct {
 // oracleParse runs the real parser over every text, a Node process per few megabytes.
 func oracleParse(test testing.TB, texts []string) []oracleResult {
 	test.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed; the parse oracle needs it")
 	}
 	script := filepath.Join(test.TempDir(), "parse.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", forkRoot(test))), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	results := make([]oracleResult, 0, len(texts))
 	const batchBytes = 4 << 20
@@ -151,8 +151,8 @@ func oracleParse(test testing.TB, texts []string) []oracleResult {
 			test.Fatalf("the parse oracle failed: %v\n%s", err, stderr.String())
 		}
 		var batch []oracleResult
-		if err := json.Unmarshal(output, &batch); err != nil {
-			test.Fatal(err)
+		if decodeError := json.Unmarshal(output, &batch); decodeError != nil {
+			test.Fatal(decodeError)
 		}
 		if len(batch) != end-start {
 			test.Fatalf("the parse oracle returned %d results for %d inputs", len(batch), end-start)
@@ -308,17 +308,17 @@ func (c *comparison) node(path string, mine *Node, theirs *jsonNode) {
 
 // compareParse compares Parse's result for the text with the oracle's and returns the differences.
 func compareParse(text string, expected oracleResult) []string {
-	root, err := Parse(text, nil)
+	root, parseError := Parse(text, nil)
 	offsets := newUnitOffsets(text, nil)
 	if expected.Error != nil {
-		if err == nil {
+		if parseError == nil {
 			return []string{fmt.Sprintf("upstream throws %s: %s; the port parses", expected.Error.Name, expected.Error.Message)}
 		}
-		name, message := "", err.Error()
+		name, message := "", parseError.Error()
 		var syntaxError *SyntaxError
 		var thrown *ThrownError
 		switch {
-		case errors.As(err, &syntaxError):
+		case errors.As(parseError, &syntaxError):
 			name, message = "YAMLSyntaxError", syntaxError.Message
 			if expected.Error.Position == nil {
 				return []string{"upstream's YAMLSyntaxError has no position"}
@@ -330,7 +330,7 @@ func compareParse(text string, expected oracleResult) []string {
 			if syntaxError.Position != want {
 				return []string{fmt.Sprintf("the error's position is %+v, upstream's %+v", syntaxError.Position, want)}
 			}
-		case errors.As(err, &thrown):
+		case errors.As(parseError, &thrown):
 			name, message = thrown.Name, thrown.Message
 		}
 		if name != expected.Error.Name || message != expected.Error.Message {
@@ -338,14 +338,14 @@ func compareParse(text string, expected oracleResult) []string {
 		}
 		return nil
 	}
-	if err != nil {
-		return []string{fmt.Sprintf("the port fails (%v); upstream parses", err)}
+	if parseError != nil {
+		return []string{fmt.Sprintf("the port fails (%v); upstream parses", parseError)}
 	}
 	decoder := json.NewDecoder(bytes.NewReader(expected.Root))
 	decoder.DisallowUnknownFields()
 	var theirs jsonNode
-	if err := decoder.Decode(&theirs); err != nil {
-		return []string{fmt.Sprintf("decoding upstream's tree: %v", err)}
+	if decodeError := decoder.Decode(&theirs); decodeError != nil {
+		return []string{fmt.Sprintf("decoding upstream's tree: %v", decodeError)}
 	}
 	c := &comparison{offsets: offsets, byID: map[int]*Node{}, idOf: map[*Node]int{}, parents: map[*Node]int{}}
 	c.node("root", root, &theirs)

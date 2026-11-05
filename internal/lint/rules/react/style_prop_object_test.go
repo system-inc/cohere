@@ -35,9 +35,9 @@ const stylePropObjectFile = "/repository/source/StylePropObject.tsx"
 // means the rule declines everything.
 func stylePropObjectOptions(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeStylePropObjectOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions([]byte(raw))
+	if decodeStylePropertyObjectOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeStylePropertyObjectOptionsError)
 	}
 	return decoded
 }
@@ -447,9 +447,9 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 
 	test.Run("an empty body allows nothing", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeStylePropObjectOptions(nil)
-		if err != nil {
-			test.Fatalf("decoding an empty body: %v", err)
+		decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions(nil)
+		if decodeStylePropertyObjectOptionsError != nil {
+			test.Fatalf("decoding an empty body: %v", decodeStylePropertyObjectOptionsError)
 		}
 		options, ok := decoded.(StylePropObjectOptions)
 		if !ok {
@@ -462,9 +462,9 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 
 	test.Run("a named allow list", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeStylePropObjectOptions([]byte(`{"allow":["MyComponent","Other"]}`))
-		if err != nil {
-			test.Fatalf("decoding a named allow list: %v", err)
+		decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions([]byte(`{"allow":["MyComponent","Other"]}`))
+		if decodeStylePropertyObjectOptionsError != nil {
+			test.Fatalf("decoding a named allow list: %v", decodeStylePropertyObjectOptionsError)
 		}
 		options, ok := decoded.(StylePropObjectOptions)
 		if !ok {

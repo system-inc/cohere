@@ -81,8 +81,8 @@ func main() {
 		fail("read %s: %v", *input, err)
 	}
 	var file suggestionsFile
-	if err := json.Unmarshal(raw, &file); err != nil {
-		fail("parse %s: %v", *input, err)
+	if decodeError := json.Unmarshal(raw, &file); decodeError != nil {
+		fail("parse %s: %v", *input, decodeError)
 	}
 	if len(file.Functional) == 0 || len(file.Statics) == 0 || len(file.DefaultSpacingSuggestions) == 0 || len(file.SuggestedFractions) == 0 {
 		fail("%s is missing recipes, statics, the spacing scale or the fractions, so it is not a whole extraction", *input)
@@ -94,9 +94,9 @@ func main() {
 	}
 
 	if *check {
-		existing, err := os.ReadFile(*output)
-		if err != nil {
-			fail("read %s: %v", *output, err)
+		existing, readError := os.ReadFile(*output)
+		if readError != nil {
+			fail("read %s: %v", *output, readError)
 		}
 		if !bytes.Equal(existing, source) {
 			fail("%s is stale: the engine's recipes changed, so regenerate it and read the diff", *output)
@@ -104,8 +104,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "generate_suggestions: %s is current\n", *output)
 		return
 	}
-	if err := os.WriteFile(*output, source, 0o644); err != nil {
-		fail("write %s: %v", *output, err)
+	if writeError := os.WriteFile(*output, source, 0o644); writeError != nil {
+		fail("write %s: %v", *output, writeError)
 	}
 	fmt.Fprintf(os.Stderr, "generate_suggestions: %d functional roots, %d statics\n", len(file.Functional), len(file.Statics))
 }

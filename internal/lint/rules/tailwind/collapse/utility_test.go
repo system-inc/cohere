@@ -130,13 +130,13 @@ var utilityTailwindPackageRoot = vendored.TailwindPackageRoot()
 func utilityLoadCorpus(test *testing.T, name string) utilityCorpus {
 	test.Helper()
 
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("read utility fixture: %v", err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("read utility fixture: %v", readError)
 	}
 	var fixture utilityCorpus
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		test.Fatalf("decode utility fixture: %v", err)
+	if decodeError := json.Unmarshal(raw, &fixture); decodeError != nil {
+		test.Fatalf("decode utility fixture: %v", decodeError)
 	}
 	if len(fixture.Cases) == 0 {
 		test.Fatal("utility fixture holds no cases")
@@ -155,9 +155,9 @@ func utilityBuildEvaluator(test *testing.T, fixture utilityCorpus) *UtilityEvalu
 	test.Helper()
 
 	entryPath := corpus.Resolve(test, fixture.EntryPath)
-	theme, _, err := LoadThemeFromFile(entryPath, NodeStylesheetResolver(utilityTailwindPackageRoot))
-	if err != nil {
-		test.Fatalf("load theme from %s: %v", entryPath, err)
+	theme, _, loadThemeFromFileError := LoadThemeFromFile(entryPath, NodeStylesheetResolver(utilityTailwindPackageRoot))
+	if loadThemeFromFileError != nil {
+		test.Fatalf("load theme from %s: %v", entryPath, loadThemeFromFileError)
 	}
 
 	definitions := utilityParseDefinitions(test, fixture)
@@ -188,9 +188,9 @@ func utilityParseDefinitions(test *testing.T, fixture utilityCorpus) []*UtilityD
 		if !strings.HasSuffix(block.Name, "-*") {
 			continue
 		}
-		nodes, err := ParseCSS(block.Source)
-		if err != nil {
-			test.Fatalf("parse @utility %s: %v", block.Name, err)
+		nodes, parseCSSError := ParseCSS(block.Source)
+		if parseCSSError != nil {
+			test.Fatalf("parse @utility %s: %v", block.Name, parseCSSError)
 		}
 		if len(nodes) != 1 || nodes[0].Kind != KindAtRule || nodes[0].Name != "@utility" {
 			test.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))
@@ -744,8 +744,8 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 		test.Run(syntheticCase.Name, func(test *testing.T) {
 			theme := NewTheme()
 			for key, value := range syntheticCase.ThemeEntries {
-				if err := theme.Add(key, value, ThemeOptionNone); err != nil {
-					test.Fatalf("add theme entry %q: %v", key, err)
+				if addError := theme.Add(key, value, ThemeOptionNone); addError != nil {
+					test.Fatalf("add theme entry %q: %v", key, addError)
 				}
 			}
 
@@ -754,9 +754,9 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 				if !strings.HasSuffix(block.Name, "-*") {
 					continue
 				}
-				nodes, err := ParseCSS(block.Source)
-				if err != nil {
-					test.Fatalf("parse @utility %s: %v", block.Name, err)
+				nodes, parseCSSError := ParseCSS(block.Source)
+				if parseCSSError != nil {
+					test.Fatalf("parse @utility %s: %v", block.Name, parseCSSError)
 				}
 				if len(nodes) != 1 || nodes[0].Kind != KindAtRule {
 					test.Fatalf("@utility %s parsed to %d nodes, expected one at-rule", block.Name, len(nodes))

@@ -67,9 +67,9 @@ func applyConsistentTypeAssertionsSuggestion(test *testing.T, source string, sug
 // settings. Nothing but the decoder can tell a port that reads that shape from one that guesses.
 func decodeConsistentTypeAssertionsOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeConsistentTypeAssertionsOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeConsistentTypeAssertionsOptionsError := DecodeConsistentTypeAssertionsOptions(json.RawMessage(raw))
+	if decodeConsistentTypeAssertionsOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeConsistentTypeAssertionsOptionsError)
 	}
 	return decoded
 }

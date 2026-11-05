@@ -98,19 +98,19 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 	}
 
 	var wire forbidElementsWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 
 	for _, item := range wire.Forbid {
 		var asString string
-		if err := json.Unmarshal(item, &asString); err == nil {
+		if decodeError := json.Unmarshal(item, &asString); decodeError == nil {
 			options.Forbid = append(options.Forbid, ForbidElementsEntry{Element: asString})
 			continue
 		}
 		var asObject forbidElementsWireEntry
-		if err := rule.UnmarshalOptions(item, &asObject); err != nil {
-			return options, fmt.Errorf("decoding a forbid entry: %w", err)
+		if unmarshalOptionsError := rule.UnmarshalOptions(item, &asObject); unmarshalOptionsError != nil {
+			return options, fmt.Errorf("decoding a forbid entry: %w", unmarshalOptionsError)
 		}
 		options.Forbid = append(options.Forbid, ForbidElementsEntry(asObject))
 	}

@@ -16,9 +16,9 @@ const maxDepthFile = "/repository/source/MaxDepth.ts"
 // so a fixture cannot bypass the decoder or accidentally test a shape a config could not deliver.
 // That is section 7c of the standard applied at the fixture rather than only in a contract test.
 func maxDepthOf(optionJson string) any {
-	settings, err := DecodeMaxDepthOptions([]byte(optionJson))
-	if err != nil {
-		panic(err)
+	settings, decodeMaximumDepthOptionsError := DecodeMaxDepthOptions([]byte(optionJson))
+	if decodeMaximumDepthOptionsError != nil {
+		panic(decodeMaximumDepthOptionsError)
 	}
 	return settings
 }
@@ -230,9 +230,9 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		decoded, err := DecodeMaxDepthOptions([]byte(testCase.optionJson))
-		if err != nil {
-			test.Errorf("decoding %s: %v", testCase.optionJson, err)
+		decoded, decodeMaximumDepthOptionsError := DecodeMaxDepthOptions([]byte(testCase.optionJson))
+		if decodeMaximumDepthOptionsError != nil {
+			test.Errorf("decoding %s: %v", testCase.optionJson, decodeMaximumDepthOptionsError)
 			continue
 		}
 		settings, ok := decoded.(MaxDepthSettings)

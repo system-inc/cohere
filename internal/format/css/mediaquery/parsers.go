@@ -233,9 +233,9 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 			}
 			// if it's an expression, parse its contents
 			if node.nodeType == "media-feature-expression" {
-				nodes, err := parseMediaFeature(node.value, node.sourceIndex)
-				if err != nil {
-					return nil, err
+				nodes, parseMediaFeatureError := parseMediaFeature(node.value, node.sourceIndex)
+				if parseMediaFeatureError != nil {
+					return nil, parseMediaFeatureError
 				}
 				node.nodes = nodes
 			}
@@ -392,9 +392,9 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 		if levelLocal == 0 && character == ',' {
 			mediaQueryString := text[interimIndex:i]
 			spaceBefore := leadingWhitespace(mediaQueryString)
-			nodes, err := parseMediaQuery(mediaQueryString, interimIndex)
-			if err != nil {
-				return nil, err
+			nodes, parseMediaQueryError := parseMediaQuery(mediaQueryString, interimIndex)
+			if parseMediaQueryError != nil {
+				return nil, parseMediaQueryError
 			}
 			result = append(result, newContainer(
 				trailingWhitespace(mediaQueryString),
@@ -410,9 +410,9 @@ func parseMediaList(text string) ([]*estree.Node, error) {
 
 	mediaQueryString := text[interimIndex:]
 	spaceBefore := leadingWhitespace(mediaQueryString)
-	nodes, err := parseMediaQuery(mediaQueryString, interimIndex)
-	if err != nil {
-		return nil, err
+	nodes, parseMediaQueryError := parseMediaQuery(mediaQueryString, interimIndex)
+	if parseMediaQueryError != nil {
+		return nil, parseMediaQueryError
 	}
 	result = append(result, newContainer(
 		trailingWhitespace(mediaQueryString),

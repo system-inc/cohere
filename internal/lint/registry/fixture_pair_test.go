@@ -92,8 +92,8 @@ func harnessAssertionsIn(test *testing.T, path string) harnessAssertions {
 	test.Helper()
 
 	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
-	if err != nil {
+	parsed, parseFileError := parser.ParseFile(fileSet, path, nil, 0)
+	if parseFileError != nil {
 		return harnessAssertions{}
 	}
 
@@ -131,9 +131,9 @@ func harnessAssertionsIn(test *testing.T, path string) harnessAssertions {
 func ruleDeclarationsByFile(test *testing.T) map[string][]string {
 	test.Helper()
 
-	matches, err := filepath.Glob("../rules/*/*.go")
-	if err != nil {
-		test.Fatalf("globbing rule files: %v", err)
+	matches, globError := filepath.Glob("../rules/*/*.go")
+	if globError != nil {
+		test.Fatalf("globbing rule files: %v", globError)
 	}
 
 	byFile := make(map[string][]string)
@@ -183,8 +183,8 @@ func proposesAFix(test *testing.T, path string) bool {
 	test.Helper()
 
 	fileSet := token.NewFileSet()
-	parsed, err := parser.ParseFile(fileSet, path, nil, 0)
-	if err != nil {
+	parsed, parseFileError := parser.ParseFile(fileSet, path, nil, 0)
+	if parseFileError != nil {
 		return false
 	}
 

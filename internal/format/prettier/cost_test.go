@@ -22,9 +22,9 @@ func TestCost(test *testing.T) {
 	if listPath == "" {
 		test.Skip("set COHERE_COST_LIST")
 	}
-	listBytes, err := os.ReadFile(listPath)
-	if err != nil {
-		test.Fatalf("reading the list: %v", err)
+	listBytes, readError := os.ReadFile(listPath)
+	if readError != nil {
+		test.Fatalf("reading the list: %v", readError)
 	}
 
 	constructionStart := time.Now()
@@ -39,13 +39,13 @@ func TestCost(test *testing.T) {
 		if path == "" || !engine.Handles(path) {
 			continue
 		}
-		source, err := os.ReadFile(path)
-		if err != nil {
+		source, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		start := time.Now()
-		if _, err := engine.Format(path, string(source)); err != nil {
-			test.Errorf("%s: %v", path, err)
+		if _, formatError := engine.Format(path, string(source)); formatError != nil {
+			test.Errorf("%s: %v", path, formatError)
 			continue
 		}
 		formatting += time.Since(start)

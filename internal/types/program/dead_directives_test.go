@@ -28,24 +28,24 @@ func deadDirectiveRules() []rule.Rule {
 
 func deadDirectiveGraph(test *testing.T, root, source string) *program.Graph {
 	test.Helper()
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName: "tsconfig.json", CurrentDirectory: root,
 		FileSystem: program.NewMemoryFS(map[string]string{
 			filepath.Join(root, "tsconfig.json"): minimalConfig,
 			filepath.Join(root, "main.ts"):       source,
 		}),
 	})
-	if err != nil {
-		test.Fatal(err)
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	return graph
 }
 
 func walkDeadDirectiveFixture(test *testing.T, graph *program.Graph, rules []rule.Rule) program.Result {
 	test.Helper()
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
-	if err != nil {
-		test.Fatal(err)
+	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	return result
 }
@@ -99,11 +99,11 @@ func TestDeadDisableFindingsAndFixes(test *testing.T) {
 					test.Fatalf("range is not the comment: %q", comment)
 				}
 			}
-			fixed, err := edit.FixText(filepath.Join(root, "main.ts"), fixture.source, func(fileName, text string) ([]edit.Proposal, error) {
+			fixed, fixTextError := edit.FixText(filepath.Join(root, "main.ts"), fixture.source, func(fileName, text string) ([]edit.Proposal, error) {
 				return edit.ProposalsFrom(lint(text)), nil
 			}, 2)
-			if err != nil {
-				test.Fatal(err)
+			if fixTextError != nil {
+				test.Fatal(fixTextError)
 			}
 			if fixed.Text != fixture.fixed {
 				test.Fatalf("fixed text\n got %q\nwant %q", fixed.Text, fixture.fixed)
@@ -140,14 +140,14 @@ func TestDeadDisableFindingsSurviveReplay(test *testing.T) {
 		if result.Coverage.Suppressed != 1 || len(result.Diagnostics) != 1 {
 			test.Fatalf("want 1 withheld and 1 dead finding, got %+v", result)
 		}
-		fixed, err := edit.FixText(filepath.Join(root, "main.ts"), source, func(fileName, text string) ([]edit.Proposal, error) {
+		fixed, fixTextError := edit.FixText(filepath.Join(root, "main.ts"), source, func(fileName, text string) ([]edit.Proposal, error) {
 			if text != source {
 				return nil, nil
 			}
 			return edit.ProposalsFrom(result.Diagnostics), nil
 		}, 2)
-		if err != nil {
-			test.Fatal(err)
+		if fixTextError != nil {
+			test.Fatal(fixTextError)
 		}
 		if want := "// cohere-disable-next-line test-live -- needed\ndebugger;\n"; fixed.Text != want {
 			test.Fatalf("replay fixed %q, want %q", fixed.Text, want)

@@ -37,24 +37,24 @@ func TestASlotIsHeldUntilReleased(test *testing.T) {
 		test.Skip("slots are a Unix lock")
 	}
 	directory := test.TempDir()
-	first, err := takeSlot(directory, 1, "go test ./...")
-	if err != nil || first == nil {
-		test.Fatalf("an empty machine gave no slot: %v", err)
+	first, takeSlotError := takeSlot(directory, 1, "go test ./...")
+	if takeSlotError != nil || first == nil {
+		test.Fatalf("an empty machine gave no slot: %v", takeSlotError)
 	}
-	if second, err := takeSlot(directory, 1, "go test ./..."); err != nil || second != nil {
-		test.Fatalf("a held slot was taken again (%v)", err)
+	if second, takeSlotError := takeSlot(directory, 1, "go test ./..."); takeSlotError != nil || second != nil {
+		test.Fatalf("a held slot was taken again (%v)", takeSlotError)
 	}
 	if lines := holders(directory, 1); len(lines) != 1 || !strings.Contains(lines[0], "go test ./...") {
 		test.Fatalf("the holder is not named: %v", lines)
 	}
-	if two, err := takeSlot(directory, 2, "go test ./..."); err != nil || two == nil {
-		test.Fatalf("with two slots the second was not free (%v)", err)
+	if two, takeSlotError := takeSlot(directory, 2, "go test ./..."); takeSlotError != nil || two == nil {
+		test.Fatalf("with two slots the second was not free (%v)", takeSlotError)
 	} else {
 		two.release()
 	}
 	first.release()
-	if again, err := takeSlot(directory, 1, "go test ./..."); err != nil || again == nil {
-		test.Fatalf("a released slot was not free (%v)", err)
+	if again, takeSlotError := takeSlot(directory, 1, "go test ./..."); takeSlotError != nil || again == nil {
+		test.Fatalf("a released slot was not free (%v)", takeSlotError)
 	} else {
 		again.release()
 	}
@@ -68,8 +68,8 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 		test.Skip("slots are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	// A go that takes two seconds to test anything, on the front of the path. It leaves a mark as it starts,
 	// which only a run holding the slot reaches, so the second run starts once the first holds it. A fixed
@@ -78,8 +78,8 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 	bin := test.TempDir()
 	started := filepath.Join(bin, "started")
 	script := "#!/bin/sh\ntouch '" + started + "'\nsleep 2\necho tested \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(script), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(script), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	home := privatePool(test)
 	environment := append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -88,8 +88,8 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 	run := func(arguments ...string) (string, error) {
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
 		command.Env = environment
-		output, err := command.CombinedOutput()
-		return string(output), err
+		output, outputError := command.CombinedOutput()
+		return string(output), outputError
 	}
 
 	began := time.Now()
@@ -147,8 +147,8 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 		test.Skip("slots are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	bin := test.TempDir()
 	order := filepath.Join(bin, "order")
@@ -175,17 +175,17 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 
 	// A go that records which run reached it and takes a second to test. The first run's waits for a release
 	// file too, so the line forms behind it before anyone can move.
-	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN\" >> '"+order+"'\n"+
-		"[ \"$COHERE_DEV_TEST_RUN\" = A ] && while [ ! -e '"+order+".release' ]; do sleep 0.05; done\nsleep 1\n"), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN\" >> '"+order+"'\n"+
+		"[ \"$COHERE_DEV_TEST_RUN\" = A ] && while [ ! -e '"+order+".release' ]; do sleep 0.05; done\nsleep 1\n"), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	runs := map[string]*exec.Cmd{}
 	for index, name := range []string{"A", "B", "C", "D", "E"} {
 		command := exec.Command(wrapper, "test", "./...")
 		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 			homeVariable+"="+home, tokensVariable+"=1", "COHERE_DEV_TEST_RUN="+name)
-		if err := command.Start(); err != nil {
-			test.Fatal(err)
+		if startError := command.Start(); startError != nil {
+			test.Fatal(startError)
 		}
 		runs[name] = command
 		if index == 0 {
@@ -194,16 +194,16 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 			waitFor(name+" to join the line", func() bool { return tickets() == index })
 		}
 	}
-	if err := runs["C"].Process.Kill(); err != nil {
-		test.Fatal(err)
+	if killError := runs["C"].Process.Kill(); killError != nil {
+		test.Fatal(killError)
 	}
 	runs["C"].Wait()
-	if err := os.WriteFile(order+".release", nil, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(order+".release", nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	for _, name := range []string{"A", "B", "D", "E"} {
-		if err := runs[name].Wait(); err != nil {
-			test.Errorf("run %s failed: %v", name, err)
+		if waitError := runs[name].Wait(); waitError != nil {
+			test.Errorf("run %s failed: %v", name, waitError)
 		}
 	}
 	if contents, _ := os.ReadFile(order); string(contents) != "A\nB\nD\nE\n" {
@@ -234,13 +234,13 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		test.Skip("nice is a Unix priority")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	// A go that says how nice it is and what it was asked.
 	bin := test.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	// A pool of its own, so the run never waits in line behind the machine's real ones.
 	home := privatePool(test)
@@ -353,8 +353,8 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 		test.Skip("tokens are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	// A go, and a tool, that log when they start and end, with their share, and take a second.
 	bin := test.TempDir()
@@ -362,8 +362,8 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 	stand := "#!/bin/sh\necho \"start $COHERE_DEV_TEST_RUN token=$" + heldTokenVariable + " flags=$GOFLAGS threads=$GOMAXPROCS $*\" >> '" + log + "'\n" +
 		"sleep 1\necho \"end $COHERE_DEV_TEST_RUN\" >> '" + log + "'\n"
 	for _, name := range []string{"go", "tool"} {
-		if err := os.WriteFile(filepath.Join(bin, name), []byte(stand), 0o755); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(bin, name), []byte(stand), 0o755); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	home := privatePool(test)
@@ -372,8 +372,8 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 		command.Env = append(environment, "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 			homeVariable+"="+home, tokensVariable+"=2", packagesVariable+"=4", threadsVariable+"=3",
 			"COHERE_DEV_TEST_RUN="+name)
-		if err := command.Start(); err != nil {
-			test.Fatal(err)
+		if startError := command.Start(); startError != nil {
+			test.Fatal(startError)
 		}
 		return command
 	}
@@ -386,14 +386,14 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 	// Already under a token: runs at once, in its parent's share.
 	nested := start("nested", append(outsideThePool(os.Environ()), heldTokenVariable+"=7", "GOMAXPROCS=5", "GOFLAGS=-p=6"), "test", "./internal/edit")
 	for _, command := range append(runs, nested) {
-		if err := command.Wait(); err != nil {
-			test.Errorf("a run failed: %v", err)
+		if waitError := command.Wait(); waitError != nil {
+			test.Errorf("a run failed: %v", waitError)
 		}
 	}
 
-	contents, err := os.ReadFile(log)
-	if err != nil {
-		test.Fatal(err)
+	contents, readError := os.ReadFile(log)
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	running, most := 0, 0
 	started := map[string]string{}
@@ -440,35 +440,35 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	home := test.TempDir()
 	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
-	if err := os.MkdirAll(slots, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(slots, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	// A Go build cache of ten 1 KB entries three hours old, and one written a minute ago.
 	// The cache in the pool home's user cache directory, where the trim guards it (poolGuards).
 	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
-	if err := os.MkdirAll(cache, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	put := func(name string, age time.Duration) string {
 		path := filepath.Join(cache, name[:2], name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, make([]byte, 1024), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, make([]byte, 1024), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		when := time.Now().Add(-age)
-		if err := os.Chtimes(path, when, when); err != nil {
-			test.Fatal(err)
+		if changeTimesError := os.Chtimes(path, when, when); changeTimesError != nil {
+			test.Fatal(changeTimesError)
 		}
 		return path
 	}
@@ -500,8 +500,8 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 	}
 	trim := exec.Command(wrapper, trimCacheVerb)
 	trim.Env = environment
-	if err := trim.Start(); err != nil {
-		test.Fatal(err)
+	if startError := trim.Start(); startError != nil {
+		test.Fatal(startError)
 	}
 	time.Sleep(2 * time.Second)
 	if remaining := size(); remaining != 11*1024 {
@@ -509,16 +509,16 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 		test.Fatalf("the trim removed entries while a run held a token: %d bytes left", remaining)
 	}
 	held.release()
-	if err := trim.Wait(); err != nil {
-		test.Fatalf("the trim failed: %v", err)
+	if waitError := trim.Wait(); waitError != nil {
+		test.Fatalf("the trim failed: %v", waitError)
 	}
 	if remaining := size(); remaining > 6*1024/4*3 {
 		test.Errorf("the trim left %d bytes, over three quarters of the 6 KB cap", remaining)
 	}
-	if _, err := os.Stat(fresh); err != nil {
+	if _, statError := os.Stat(fresh); statError != nil {
 		test.Error("the entry written a minute ago was trimmed")
 	}
-	if _, err := os.Stat(old[9]); err == nil {
+	if _, statError := os.Stat(old[9]); statError == nil {
 		test.Error("the oldest entry survived the trim")
 	}
 
@@ -546,8 +546,8 @@ func privatePool(test *testing.T) string {
 	test.Helper()
 	home := test.TempDir()
 	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
-	if err := os.MkdirAll(slots, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(slots, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	claimCacheLook(slots, time.Now())
 	return home
@@ -563,33 +563,33 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	home := test.TempDir()
 	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
-	if err := os.MkdirAll(slots, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(slots, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	// The cache in the pool home's user cache directory, where the trim guards it (poolGuards).
 	cache := filepath.Join(userCacheDirectoryIn(home), "go-build")
-	if err := os.MkdirAll(cache, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {
 		path := filepath.Join(cache, fmt.Sprintf("%02x", index), fmt.Sprintf("%02xaa-d", index))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, make([]byte, 1024), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, make([]byte, 1024), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		old := time.Now().Add(-3 * time.Hour)
-		if err := os.Chtimes(path, old, old); err != nil {
-			test.Fatal(err)
+		if changeTimesError := os.Chtimes(path, old, old); changeTimesError != nil {
+			test.Fatal(changeTimesError)
 		}
 	}
 
@@ -607,8 +607,8 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 	trim := exec.Command(wrapper, trimCacheVerb)
 	trim.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "HOME="+scratchHome(test),
 		"GOCACHE="+cache, tokensVariable+"=2", cacheCapVariable+"="+strconv.FormatFloat(6*1024.0/(1<<30), 'g', -1, 64))
-	if err := trim.Start(); err != nil {
-		test.Fatal(err)
+	if startError := trim.Start(); startError != nil {
+		test.Fatal(startError)
 	}
 
 	// Through three seconds of the job, token 1 must be free whenever the test looks: anyone may take it.
@@ -618,9 +618,9 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 	const step = 20 * time.Millisecond
 	wasHeld := false
 	for end := time.Now().Add(3 * time.Second); time.Now().Before(end); time.Sleep(step) {
-		lock, err := os.OpenFile(lockPath(slots, 1), os.O_CREATE|os.O_RDWR, 0o644)
-		if err != nil {
-			test.Fatal(err)
+		lock, openError := os.OpenFile(lockPath(slots, 1), os.O_CREATE|os.O_RDWR, 0o644)
+		if openError != nil {
+			test.Fatal(openError)
 		}
 		taken, _ := tryLockFile(lock)
 		if taken {
@@ -632,8 +632,8 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 		lock.Close()
 	}
 	job.release()
-	if err := trim.Wait(); err != nil {
-		test.Fatalf("the trim failed: %v", err)
+	if waitError := trim.Wait(); waitError != nil {
+		test.Fatalf("the trim failed: %v", waitError)
 	}
 	if idle > 0 {
 		test.Errorf("the trim held token 1 idle for about %s while the job held token 2", idle)

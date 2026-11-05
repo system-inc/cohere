@@ -395,9 +395,9 @@ func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(test *testing.T) {
 		{name: "explicit false", raw: `{"capIsConstructor":false}`, want: false},
 	}
 	for _, testCase := range cases {
-		decoded, err := DecodeNoInvalidThisOptions([]byte(testCase.raw))
-		if err != nil && testCase.raw != "" {
-			test.Errorf("%s: decode returned %v", testCase.name, err)
+		decoded, decodeNoInvalidThisOptionsError := DecodeNoInvalidThisOptions([]byte(testCase.raw))
+		if decodeNoInvalidThisOptionsError != nil && testCase.raw != "" {
+			test.Errorf("%s: decode returned %v", testCase.name, decodeNoInvalidThisOptionsError)
 			continue
 		}
 		settings, ok := decoded.(noInvalidThisSettings)

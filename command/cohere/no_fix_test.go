@@ -15,7 +15,7 @@ import (
 func treeSnapshot(test *testing.T, root string) map[string]string {
 	test.Helper()
 	snapshot := map[string]string{}
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
 		// cohere's own cache for the project is outside `--no-fix`'s promise, which is about source: it is
 		// cohere's to keep, and `--no-cache` is the flag that writes none of it. So is a nested
 		// repository's, where the drift check keeps that repository's format record.
@@ -27,15 +27,15 @@ func treeSnapshot(test *testing.T, root string) map[string]string {
 		if walkError != nil || entry.IsDir() {
 			return walkError
 		}
-		contents, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
 		snapshot[path] = string(contents)
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	return snapshot
 }

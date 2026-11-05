@@ -63,9 +63,9 @@ func readQuiet(directory string) (quietWindow, bool, error) {
 // log: why it held back, or that an expired marker was passed over. A marker that cannot be read holds,
 // since someone meant to open a window, and the line says what is wrong with it.
 func quietHolds(directory string, now time.Time) (bool, string) {
-	window, present, err := readQuiet(directory)
-	if err != nil {
-		return true, err.Error() + "; treated as open until it is fixed or removed with cohere-dev quiet off"
+	window, present, readQuietError := readQuiet(directory)
+	if readQuietError != nil {
+		return true, readQuietError.Error() + "; treated as open until it is fixed or removed with cohere-dev quiet off"
 	}
 	if !present {
 		return false, ""
@@ -80,9 +80,9 @@ func quietHolds(directory string, now time.Time) (bool, string) {
 // quiet is `cohere-dev quiet on [--for <duration>] [why]`, `quiet off`, and bare `quiet`, which says whether
 // one is open.
 func quiet(arguments []string) int {
-	directory, err := poolDirectory()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+	directory, poolDirectoryError := poolDirectory()
+	if poolDirectoryError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", poolDirectoryError)
 		return 1
 	}
 	if len(arguments) == 0 {
@@ -94,8 +94,8 @@ func quiet(arguments []string) int {
 		return quietOn(directory, arguments[1:], time.Now())
 	case "off":
 		window, present, _ := readQuiet(directory)
-		if err := os.Remove(quietPath(directory)); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(os.Stderr, "cohere-dev: releasing the quiet window: %v\n", err)
+		if removeError := os.Remove(quietPath(directory)); removeError != nil && !os.IsNotExist(removeError) {
+			fmt.Fprintf(os.Stderr, "cohere-dev: releasing the quiet window: %v\n", removeError)
 			return 1
 		}
 		if present {
@@ -116,8 +116,8 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 			fmt.Fprintf(os.Stderr, "cohere-dev: --for wants a duration, like 30m\n")
 			return 2
 		}
-		parsed, err := time.ParseDuration(arguments[1])
-		if err != nil || parsed <= 0 || parsed > quietLongest {
+		parsed, parseDurationError := time.ParseDuration(arguments[1])
+		if parseDurationError != nil || parsed <= 0 || parsed > quietLongest {
 			fmt.Fprintf(os.Stderr, "cohere-dev: --for is %q, want a duration above 0 and at most %s, like 30m\n", arguments[1], quietLongest)
 			return 2
 		}
@@ -133,12 +133,12 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 	working, _ := os.Getwd()
 	holder := fmt.Sprintf("opened in %s at %s: %s", working, now.Format("15:04:05"), why)
 	temporary := filepath.Join(directory, "."+quietFile)
-	if err := os.WriteFile(temporary, []byte(until.Format(time.RFC3339)+"\n"+holder+"\n"), 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: opening the quiet window: %v\n", err)
+	if writeError := os.WriteFile(temporary, []byte(until.Format(time.RFC3339)+"\n"+holder+"\n"), 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: opening the quiet window: %v\n", writeError)
 		return 1
 	}
-	if err := os.Rename(temporary, quietPath(directory)); err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: opening the quiet window: %v\n", err)
+	if renameError := os.Rename(temporary, quietPath(directory)); renameError != nil {
+		fmt.Fprintf(os.Stderr, "cohere-dev: opening the quiet window: %v\n", renameError)
 		return 1
 	}
 	fmt.Printf("quiet window open until %s: the Go build cache trim holds off; release it with cohere-dev quiet off\n",

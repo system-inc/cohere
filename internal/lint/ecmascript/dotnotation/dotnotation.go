@@ -47,8 +47,8 @@ func CompileAllowPattern(source string) *regexp.Regexp {
 	if source == "" {
 		return nil
 	}
-	compiled, err := regexp.Compile(source)
-	if err != nil {
+	compiled, compileError := regexp.Compile(source)
+	if compileError != nil {
 		return nil
 	}
 	return compiled

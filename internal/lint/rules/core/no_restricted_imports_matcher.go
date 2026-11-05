@@ -211,8 +211,8 @@ func noRestrictedImportsCompileGlob(pattern string, caseSensitive bool) (*noRest
 	if !caseSensitive {
 		flags = "iu"
 	}
-	compiled, err := esregexp.Compile(expression.String(), flags)
-	if err != nil {
+	compiled, compileError := esregexp.Compile(expression.String(), flags)
+	if compileError != nil {
 		return nil, false
 	}
 	return &noRestrictedImportsGlob{negated: negated, expression: compiled}, true

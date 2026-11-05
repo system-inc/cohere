@@ -41,8 +41,8 @@ func TestRunOutputReadsRealRuns(test *testing.T) {
 			}
 			if want.cache == "files " {
 				edited := Run{Mode: ModeEdit, Cache: run.Cache}
-				if err := cacheFitsMode(edited); err != nil {
-					test.Errorf("a real edit run's cache does not fit an edit: %v", err)
+				if cacheFitsModeError := cacheFitsMode(edited); cacheFitsModeError != nil {
+					test.Errorf("a real edit run's cache does not fit an edit: %v", cacheFitsModeError)
 				}
 			}
 			if (run.Findings > 0) != want.hasFindings {
@@ -63,7 +63,7 @@ func TestRunOutputRefusesWhatItCannotRead(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			if run, err := ParseRunOutput([]byte(output)); err == nil {
+			if run, parseRunOutputError := ParseRunOutput([]byte(output)); parseRunOutputError == nil {
 				test.Fatalf("read %+v", run)
 			}
 		})

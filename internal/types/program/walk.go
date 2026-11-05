@@ -1644,9 +1644,9 @@ func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved
 			if status == configuration.StatusScopedOff || status == configuration.StatusUnconfigured {
 				// Off for the chain and run for readiness: still counted as off below, since that is what
 				// the chain says, and run at the set's own options.
-				decoded, err := g.RuleOptions.Decode(subject.Name, g.Readiness.Options[subject.Name])
-				if err != nil {
-					selection.err = err
+				decoded, decodeError := g.RuleOptions.Decode(subject.Name, g.Readiness.Options[subject.Name])
+				if decodeError != nil {
+					selection.err = decodeError
 					return selection
 				}
 				if decoded != nil {
@@ -1676,9 +1676,9 @@ func (g *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved
 		}
 
 		raw := resolution.RawOptionsFor(subject.Name)
-		decoded, err := g.RuleOptions.Decode(subject.Name, raw)
-		if err != nil {
-			selection.err = err
+		decoded, decodeError := g.RuleOptions.Decode(subject.Name, raw)
+		if decodeError != nil {
+			selection.err = decodeError
 			return selection
 		}
 		if decoded != nil {

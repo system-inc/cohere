@@ -50,8 +50,8 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	writeAdamicSupport(test)(directory)
-	if err := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(sharedWalkerFixture), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(sharedWalkerFixture), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	walk := func(rules ...rule.Rule) []string {
 		test.Helper()

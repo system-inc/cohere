@@ -54,9 +54,9 @@ func guardOverlayFrom(test *testing.T, goFlags string) map[string][]byte {
 	if overlayFile == "" {
 		return nil
 	}
-	overlay, err := readOverlay(overlayFile)
-	if err != nil {
-		test.Fatalf("GOFLAGS names the overlay %s, and the guards cannot read it: %v", overlayFile, err)
+	overlay, readOverlayError := readOverlay(overlayFile)
+	if readOverlayError != nil {
+		test.Fatalf("GOFLAGS names the overlay %s, and the guards cannot read it: %v", overlayFile, readOverlayError)
 	}
 	return overlay
 }
@@ -71,15 +71,15 @@ func readOverlay(path string) (map[string][]byte, error) {
 	if !filepath.IsAbs(path) {
 		return nil, fmt.Errorf("the overlay path %s is relative; name it absolutely", path)
 	}
-	encoded, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+	encoded, readError := os.ReadFile(path)
+	if readError != nil {
+		return nil, readError
 	}
 	var file struct {
 		Replace map[string]string
 	}
-	if err := json.Unmarshal(encoded, &file); err != nil {
-		return nil, fmt.Errorf("reading %s as an overlay: %w", path, err)
+	if decodeError := json.Unmarshal(encoded, &file); decodeError != nil {
+		return nil, fmt.Errorf("reading %s as an overlay: %w", path, decodeError)
 	}
 	overlay := map[string][]byte{}
 	for target, replacement := range file.Replace {
@@ -89,9 +89,9 @@ func readOverlay(path string) (map[string][]byte, error) {
 		if replacement == "" {
 			return nil, fmt.Errorf("the overlay deletes %s, which the loader cannot express, so the guard would still read it", target)
 		}
-		contents, err := os.ReadFile(replacement)
-		if err != nil {
-			return nil, fmt.Errorf("reading the overlay's replacement for %s: %w", target, err)
+		contents, readError := os.ReadFile(replacement)
+		if readError != nil {
+			return nil, fmt.Errorf("reading the overlay's replacement for %s: %w", target, readError)
 		}
 		overlay[target] = contents
 	}
@@ -106,8 +106,8 @@ func refuseUnreachableOverlayFlag(test *testing.T) {
 	if runtime.GOOS == "windows" {
 		return
 	}
-	output, err := exec.Command("ps", "-o", "args=", "-p", fmt.Sprint(os.Getppid())).Output()
-	if err != nil {
+	output, outputError := exec.Command("ps", "-o", "args=", "-p", fmt.Sprint(os.Getppid())).Output()
+	if outputError != nil {
 		return
 	}
 	if overlayFlagOutsideGoFlags(string(output), os.Getenv("GOFLAGS")) {
@@ -135,16 +135,16 @@ func writeOverlay(test *testing.T, target string, contents string) string {
 	test.Helper()
 	directory := test.TempDir()
 	replacement := filepath.Join(directory, filepath.Base(target))
-	if err := os.WriteFile(replacement, []byte(contents), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(replacement, []byte(contents), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	encoded, err := json.Marshal(map[string]map[string]string{"Replace": {target: replacement}})
-	if err != nil {
-		test.Fatal(err)
+	encoded, encodeError := json.Marshal(map[string]map[string]string{"Replace": {target: replacement}})
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	overlayFile := filepath.Join(directory, "overlay.json")
-	if err := os.WriteFile(overlayFile, encoded, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(overlayFile, encoded, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	return overlayFile
 }
@@ -223,9 +223,9 @@ func TestTheTypeReachGuardReadsTheGoFlagsOverlay(test *testing.T) {
 // a column-aligned `Name:` or any other spelling of the literal is planted the same way, and spelled with
 // the literal's own package qualifier.
 func plantShapesClaim(source []byte) ([]byte, error) {
-	file, err := parser.ParseFile(token.NewFileSet(), "", source, 0)
-	if err != nil {
-		return nil, err
+	file, parseFileError := parser.ParseFile(token.NewFileSet(), "", source, 0)
+	if parseFileError != nil {
+		return nil, parseFileError
 	}
 	var literal *ast.CompositeLit
 	var qualifier string

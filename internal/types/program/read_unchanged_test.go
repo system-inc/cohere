@@ -47,13 +47,13 @@ func TestTheProgramsCopyIsTheFilesBytesOnlyWithoutAByteOrderMark(test *testing.T
 				test.Fatal(err)
 			}
 			for name, file := range files {
-				if err := os.WriteFile(filepath.Join(directory, name), file.bytes, 0o644); err != nil {
-					test.Fatal(err)
+				if writeError := os.WriteFile(filepath.Join(directory, name), file.bytes, 0o644); writeError != nil {
+					test.Fatal(writeError)
 				}
 			}
 			configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext"},"include":["*.ts"]}`
-			if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 			var pack *ContentPack
 			if withPack {

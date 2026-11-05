@@ -54,7 +54,7 @@ func startEarlyFormat(engine formatEngine, record *formatRecord, root string, ma
 		defer close(early.ready)
 		// A test instrument: hold the pass this long before it enumerates, so its scope is ready only after the
 		// walk is done, as a cold run's often was. See TestALateEarlyFormatScopeFindsWhatAPromptOneDoes.
-		if held, err := time.ParseDuration(os.Getenv("COHERE_TEST_LATE_EARLY_FORMAT")); err == nil {
+		if held, parseDurationError := time.ParseDuration(os.Getenv("COHERE_TEST_LATE_EARLY_FORMAT")); parseDurationError == nil {
 			time.Sleep(held)
 		}
 		early.universe, early.err = enumerateFormatUniverse(engine, root)

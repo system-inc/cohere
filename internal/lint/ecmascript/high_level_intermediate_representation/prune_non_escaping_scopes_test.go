@@ -397,9 +397,9 @@ func TestMemoMarkersArePrunedOnlyWhenTheirScopeWas(test *testing.T) {
 	// Measured on the vendored corpus rather than on constructed source: whether a marker's value
 	// carries a scope depends on lowering and on four passes upstream of this one, so a hand-written
 	// fixture would be asserting the pipeline rather than the pass.
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	marked, total := 0, 0

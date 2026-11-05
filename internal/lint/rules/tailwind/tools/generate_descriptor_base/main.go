@@ -195,16 +195,16 @@ func main() {
 
 	generated, stats := generate(systems, *packageName)
 
-	formatted, err := format.Source(generated)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: generated file does not parse: %v\n", err)
+	formatted, sourceError := format.Source(generated)
+	if sourceError != nil {
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: generated file does not parse: %v\n", sourceError)
 		os.Exit(1)
 	}
 
 	if *outputPath == "-" {
 		os.Stdout.Write(formatted)
-	} else if err := os.WriteFile(*outputPath, formatted, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", err)
+	} else if writeError := os.WriteFile(*outputPath, formatted, 0o644); writeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: writing output: %v\n", writeError)
 		os.Exit(1)
 	}
 
@@ -228,13 +228,13 @@ func systems0Version(systems []system) string {
 }
 
 func readJSON(path string, into any) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: reading %s: %v\n", path, err)
+	raw, readError := os.ReadFile(path)
+	if readError != nil {
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: reading %s: %v\n", path, readError)
 		os.Exit(1)
 	}
-	if err := json.Unmarshal(raw, into); err != nil {
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: parsing %s: %v\n", path, err)
+	if decodeError := json.Unmarshal(raw, into); decodeError != nil {
+		fmt.Fprintf(os.Stderr, "generate_descriptor_base: parsing %s: %v\n", path, decodeError)
 		os.Exit(1)
 	}
 }

@@ -100,7 +100,7 @@ func f(d doc.Doc) {
 
 	// The test runs in internal/format/doc, so its parent is internal/format.
 	var found []string
-	err := filepath.WalkDir("..", func(path string, entry fs.DirEntry, err error) error {
+	walkError := filepath.WalkDir("..", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -114,8 +114,8 @@ func f(d doc.Doc) {
 		found = append(found, arrayTypeChecks(test, path, string(source))...)
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	if len(found) > 0 {
 		test.Fatalf("ask doc.Parts instead of naming Concat or Sequence:\n%s", strings.Join(found, "\n"))
@@ -127,9 +127,9 @@ func f(d doc.Doc) {
 func arrayTypeChecks(test *testing.T, path string, source string) []string {
 	test.Helper()
 	files := token.NewFileSet()
-	file, err := parser.ParseFile(files, path, source, 0)
-	if err != nil {
-		test.Fatalf("%s: %v", path, err)
+	file, parseFileError := parser.ParseFile(files, path, source, 0)
+	if parseFileError != nil {
+		test.Fatalf("%s: %v", path, parseFileError)
 	}
 	var found []string
 	report := func(expression ast.Expr) {

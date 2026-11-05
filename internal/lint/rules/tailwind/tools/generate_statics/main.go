@@ -80,13 +80,13 @@ func main() {
 
 	systems := make([]staticsFile, 0, len(inputs))
 	for _, path := range inputs {
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			fail("read %s: %v", path, err)
+		raw, readError := os.ReadFile(path)
+		if readError != nil {
+			fail("read %s: %v", path, readError)
 		}
 		var file staticsFile
-		if err := json.Unmarshal(raw, &file); err != nil {
-			fail("parse %s: %v", path, err)
+		if decodeError := json.Unmarshal(raw, &file); decodeError != nil {
+			fail("parse %s: %v", path, decodeError)
 		}
 		if len(file.Statics) == 0 {
 			fail("%s holds no statics, so an intersection against it is empty for a reason that is not a measurement", path)
@@ -114,15 +114,15 @@ func main() {
 		fail("every input system registers an identical name set, so the intersection removed nothing and the framework/repository split is unverified; include a design system that shares no stylesheet with the others")
 	}
 
-	source, err := render(systems, shared, dropped)
-	if err != nil {
-		fail("render: %v", err)
+	source, renderError := render(systems, shared, dropped)
+	if renderError != nil {
+		fail("render: %v", renderError)
 	}
 
 	if *output == "" {
 		os.Stdout.Write(source)
-	} else if err := os.WriteFile(*output, source, 0o644); err != nil {
-		fail("write %s: %v", *output, err)
+	} else if writeError := os.WriteFile(*output, source, 0o644); writeError != nil {
+		fail("write %s: %v", *output, writeError)
 	}
 
 	fmt.Fprintf(os.Stderr, "generate_statics: %d design systems, %d statics registered by all of them (%d dropped as repository-specific)\n",

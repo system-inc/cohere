@@ -163,9 +163,9 @@ func decodedNoSelfAssign(test *testing.T, raw string) any {
 	if raw != "" {
 		input = []byte(raw)
 	}
-	decoded, err := DecodeNoSelfAssignOptions(input)
-	if err != nil {
-		test.Fatalf("decoding %q: %v", raw, err)
+	decoded, decodeNoSelfAssignOptionsError := DecodeNoSelfAssignOptions(input)
+	if decodeNoSelfAssignOptionsError != nil {
+		test.Fatalf("decoding %q: %v", raw, decodeNoSelfAssignOptionsError)
 	}
 	return decoded
 }
@@ -214,7 +214,7 @@ func TestNoSelfAssignRefusesUnknownOptions(test *testing.T) {
 	for _, raw := range []string{`{"prop": false}`, `{"Props": false}`, `{"props": "no"}`, `false`} {
 		test.Run(raw, func(test *testing.T) {
 			test.Parallel()
-			if _, err := DecodeNoSelfAssignOptions([]byte(raw)); err == nil {
+			if _, decodeNoSelfAssignOptionsError := DecodeNoSelfAssignOptions([]byte(raw)); decodeNoSelfAssignOptionsError == nil {
 				test.Errorf("decoded %s, expected it refused", raw)
 			}
 		})

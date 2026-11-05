@@ -67,8 +67,8 @@ func corpus(test *testing.T) (string, []string) {
 	paths := make([]string, 0, len(contents))
 	for name, text := range contents {
 		path := filepath.Join(root, name)
-		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(text), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		paths = append(paths, path)
 	}
@@ -81,9 +81,9 @@ func corpus(test *testing.T) (string, []string) {
 func TestOracleAgainstItselfReadsComplete(test *testing.T) {
 	test.Parallel()
 	root, files := corpus(test)
-	report, err := Compare(root, files, factory(trimmingOracle{}), factory(trimmingOracle{}), 3, nil)
-	if err != nil {
-		test.Fatal(err)
+	report, compareError := Compare(root, files, factory(trimmingOracle{}), factory(trimmingOracle{}), 3, nil)
+	if compareError != nil {
+		test.Fatal(compareError)
 	}
 	total := report.Total()
 	if total.Percent() != 100 {
@@ -102,9 +102,9 @@ func TestOracleAgainstItselfReadsComplete(test *testing.T) {
 func TestUnchangedCandidateIsCaughtOnRewrites(test *testing.T) {
 	test.Parallel()
 	root, files := corpus(test)
-	report, err := Compare(root, files, factory(trimmingOracle{}), factory(unchanged{}), 3, nil)
-	if err != nil {
-		test.Fatal(err)
+	report, compareError := Compare(root, files, factory(trimmingOracle{}), factory(unchanged{}), 3, nil)
+	if compareError != nil {
+		test.Fatal(compareError)
 	}
 	total := report.Total()
 	if total.Identical != 3 || total.Different != 2 {
@@ -125,9 +125,9 @@ func TestUnchangedCandidateIsCaughtOnRewrites(test *testing.T) {
 func TestRefusalNeverCountsAsMatch(test *testing.T) {
 	test.Parallel()
 	root, files := corpus(test)
-	report, err := Compare(root, files, factory(trimmingOracle{}), factory(refuser{}), 3, nil)
-	if err != nil {
-		test.Fatal(err)
+	report, compareError := Compare(root, files, factory(trimmingOracle{}), factory(refuser{}), 3, nil)
+	if compareError != nil {
+		test.Fatal(compareError)
 	}
 	total := report.Total()
 	if total.Identical != 0 || total.CandidateRefused != 5 || total.Percent() != 0 {
@@ -144,9 +144,9 @@ func TestRefusalNeverCountsAsMatch(test *testing.T) {
 func TestOracleFailureLeavesTheDenominatorButIsNamed(test *testing.T) {
 	test.Parallel()
 	root, files := corpus(test)
-	report, err := Compare(root, files, factory(trimmingOracle{}), factory(trimmingOracle{}), 3, nil)
-	if err != nil {
-		test.Fatal(err)
+	report, compareError := Compare(root, files, factory(trimmingOracle{}), factory(trimmingOracle{}), 3, nil)
+	if compareError != nil {
+		test.Fatal(compareError)
 	}
 	total := report.Total()
 	if total.OracleFailed != 1 || total.Measured() != 5 {
@@ -183,8 +183,8 @@ func TestCacheServesTheSameAnswerAndKeysOnIdentity(test *testing.T) {
 	}
 
 	beforeThird := calls.Load()
-	if _, err := Compare(root, files, oracle, factory(unchanged{}), 2, &OracleCache{Directory: directory, Identity: "bundles-2"}); err != nil {
-		test.Fatal(err)
+	if _, compareError := Compare(root, files, oracle, factory(unchanged{}), 2, &OracleCache{Directory: directory, Identity: "bundles-2"}); compareError != nil {
+		test.Fatal(compareError)
 	}
 	if missed := calls.Load() - beforeThird; missed != int64(len(files)) {
 		test.Fatalf("a different oracle identity reused %d cached answers, want every file recomputed", int64(len(files))-missed)

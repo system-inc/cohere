@@ -253,9 +253,9 @@ type tableInPackage struct {
 func tablesDeclaredInPackage(test *testing.T) map[string]tableInPackage {
 	test.Helper()
 
-	paths, err := filepath.Glob("*.go")
-	if err != nil {
-		test.Fatalf("listing the package's files: %v", err)
+	paths, globError := filepath.Glob("*.go")
+	if globError != nil {
+		test.Fatalf("listing the package's files: %v", globError)
 	}
 
 	declared := make(map[string]tableInPackage)
@@ -264,9 +264,9 @@ func tablesDeclaredInPackage(test *testing.T) map[string]tableInPackage {
 			continue
 		}
 		fileSet := token.NewFileSet()
-		parsed, err := parser.ParseFile(fileSet, path, nil, 0)
-		if err != nil {
-			test.Fatalf("parsing %s: %v", path, err)
+		parsed, parseFileError := parser.ParseFile(fileSet, path, nil, 0)
+		if parseFileError != nil {
+			test.Fatalf("parsing %s: %v", path, parseFileError)
 		}
 		for _, declaration := range parsed.Decls {
 			general, isGeneral := declaration.(*ast.GenDecl)
