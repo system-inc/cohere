@@ -582,7 +582,8 @@ func TestApplyLeavesTheIndexUnchanged(test *testing.T) {
 // turned off by the settings, where it is neither used nor unused and nothing is reported.
 func TestApplyLeavesARuleThatDidNotRunAlone(test *testing.T) {
 	test.Parallel()
-	source := "package fixture\n//cohere:ignore printf,correctness-no-machine-path built at run time\nvar first = risky()\n"
+	source := "package fixture\n//cohere:ignore printf,correctness-no-machine-path built at run time\n" +
+		"var first = risky()\n"
 	findings := []Finding{{Rule: "cohere-go/printf", File: "a.go", Line: 3}}
 
 	bothRan := Apply(knownRules, knownRules, []*Index{Build("a.go", []byte(source))}, findings)
