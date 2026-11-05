@@ -259,18 +259,18 @@ var correctnessNoCallerDataMutationWriterNames = func() map[string]bool {
 // correctnessNoCallerDataMutationCheckTarget judges the target of an assignment, an update or a
 // `delete`.
 func correctnessNoCallerDataMutationCheckTarget(ruleContext rule.Context, target *ast.Node) {
-	target = ast.SkipParentheses(target)
-	if target.Kind != ast.KindPropertyAccessExpression && target.Kind != ast.KindElementAccessExpression {
+	unwrapped := ast.SkipParentheses(target)
+	if unwrapped.Kind != ast.KindPropertyAccessExpression && unwrapped.Kind != ast.KindElementAccessExpression {
 		return
 	}
 	// The receiver, not the slot being replaced, must be shared. A copied array owns its
 	// slots even when those slots still contain the caller's objects.
-	receiver := target.Expression()
+	receiver := unwrapped.Expression()
 	parameter := correctnessNoCallerDataMutationParameterReached(ruleContext, receiver)
 	if parameter == nil {
 		return
 	}
-	if !correctnessNoCallerDataMutationWritesData(ruleContext, target) {
+	if !correctnessNoCallerDataMutationWritesData(ruleContext, unwrapped) {
 		return
 	}
 	if tagged, isProcessState := correctnessNoCallerDataMutationProcessStateOf(ruleContext, parameter); isProcessState {
@@ -281,7 +281,7 @@ func correctnessNoCallerDataMutationCheckTarget(ruleContext rule.Context, target
 		ruleContext.Note(contract)
 		return
 	}
-	ruleContext.ReportNode(target, correctnessNoCallerDataMutationMessage())
+	ruleContext.ReportNode(unwrapped, correctnessNoCallerDataMutationMessage())
 }
 
 // correctnessNoCallerDataMutationCheckCall judges a call of a mutating collection method.
@@ -325,6 +325,10 @@ func correctnessNoCallerDataMutationParameterReached(ruleContext rule.Context, e
 	return correctnessNoCallerDataMutationOrigin(ruleContext, expression, 0, map[*ast.Node]bool{})
 }
 
+// correctnessNoCallerDataMutationOrigin is the parameter an expression's value is reached from at depth, or nil.
+//
+// Mutates: seen the recursion marks each expression on the way down and unmarks it on the way back, so one set
+// bounds a whole walk's cycles
 func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression *ast.Node, depth int, seen map[*ast.Node]bool) *ast.Symbol {
 	if expression == nil || seen[expression] {
 		return nil
@@ -334,18 +338,18 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 	next := func(node *ast.Node, depth int) *ast.Symbol {
 		return correctnessNoCallerDataMutationOrigin(ruleContext, node, depth, seen)
 	}
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindNonNullExpression:
-		return next(expression.AsNonNullExpression().Expression, depth)
+		return next(unwrapped.AsNonNullExpression().Expression, depth)
 	case ast.KindPropertyAccessExpression:
 		// Do not let an alias turn a host-owned property (such as element.dataset) into
 		// project data merely because its new receiver is an identifier.
-		if correctnessNoCallerDataMutationWritesData(ruleContext, expression) {
-			return next(expression.AsPropertyAccessExpression().Expression, depth)
+		if correctnessNoCallerDataMutationWritesData(ruleContext, unwrapped) {
+			return next(unwrapped.AsPropertyAccessExpression().Expression, depth)
 		}
 	case ast.KindElementAccessExpression:
-		access := expression.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		if index, ok := correctnessNoCallerDataMutationLiteralIndex(access.ArgumentExpression); ok && index >= 0 {
 			if element := correctnessNoCallerDataMutationKnownElement(ruleContext, access.Expression, index); element != nil {
 				return next(element, depth)
@@ -356,7 +360,7 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 		if depth == 0 {
 			return nil
 		}
-		for _, element := range expression.AsArrayLiteralExpression().Elements.Nodes {
+		for _, element := range unwrapped.AsArrayLiteralExpression().Elements.Nodes {
 			if element.Kind == ast.KindSpreadElement {
 				if origin := next(element.AsSpreadElement().Expression, depth); origin != nil {
 					return origin
@@ -366,7 +370,7 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 			}
 		}
 	case ast.KindCallExpression:
-		call := expression.AsCallExpression()
+		call := unwrapped.AsCallExpression()
 		callee := ast.SkipParentheses(call.Expression)
 		if callee.Kind != ast.KindPropertyAccessExpression {
 			return nil
@@ -414,7 +418,7 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 			}
 		}
 	case ast.KindIdentifier:
-		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 		if parameter := correctnessNoCallerDataMutationParameterOf(ruleContext, symbol); parameter != nil {
 			function := parameter.Parent
 			if function != nil && !correctnessNoCallerDataMutationIsCallback(function) &&
@@ -457,12 +461,12 @@ func correctnessNoCallerDataMutationRemovalBindingOrigin(ruleContext rule.Contex
 	var origin *ast.Symbol
 	valid := true
 	accept := func(value *ast.Node) {
-		value = ast.SkipParentheses(value)
-		if value.Kind != ast.KindCallExpression {
+		unwrapped := ast.SkipParentheses(value)
+		if unwrapped.Kind != ast.KindCallExpression {
 			valid = false
 			return
 		}
-		callee := ast.SkipParentheses(value.AsCallExpression().Expression)
+		callee := ast.SkipParentheses(unwrapped.AsCallExpression().Expression)
 		if callee.Kind != ast.KindPropertyAccessExpression {
 			valid = false
 			return
@@ -472,7 +476,7 @@ func correctnessNoCallerDataMutationRemovalBindingOrigin(ruleContext rule.Contex
 			valid = false
 			return
 		}
-		candidate := originOf(value, depth)
+		candidate := originOf(unwrapped, depth)
 		if candidate == nil || (origin != nil && candidate != origin) {
 			valid = false
 			return
@@ -526,17 +530,19 @@ func correctnessNoCallerDataMutationRemovalBindingOrigin(ruleContext rule.Contex
 // [fresh, ...caller][0] and [...caller, fresh].at(-1) write to fresh, not to caller data.
 func correctnessNoCallerDataMutationKnownElement(ruleContext rule.Context, array *ast.Node, index int) *ast.Node {
 	slots := correctnessNoCallerDataMutationKnownSlots(ruleContext, array, map[*ast.Node]bool{})
+	// The position in slots to read: index itself, or, for a negative index, its place in the reversed slots.
+	slotIndex := index
 	if index < 0 {
 		for left, right := 0, len(slots)-1; left < right; left, right = left+1, right-1 {
 			slots[left], slots[right] = slots[right], slots[left]
 		}
-		index = -index - 1
+		slotIndex = -index - 1
 	}
 	for position, slot := range slots {
 		if slot == nil { // An unknown-length spread prevents resolving positions beyond it.
 			return nil
 		}
-		if position == index {
+		if position == slotIndex {
 			return slot
 		}
 	}
@@ -545,6 +551,9 @@ func correctnessNoCallerDataMutationKnownElement(ruleContext rule.Context, array
 
 // nil is an unknown-length segment; non-nil slots are the expressions placed into a new array.
 // This is deliberately limited to literal construction and concat, not arbitrary array evaluation.
+//
+// Mutates: seen the recursion marks each array on the way down and unmarks it on the way back, so one set
+// bounds a whole walk's cycles
 func correctnessNoCallerDataMutationKnownSlots(ruleContext rule.Context, array *ast.Node, seen map[*ast.Node]bool) []*ast.Node {
 	unknown := []*ast.Node{nil}
 	if array == nil || seen[array] {
@@ -552,11 +561,11 @@ func correctnessNoCallerDataMutationKnownSlots(ruleContext rule.Context, array *
 	}
 	seen[array] = true
 	defer delete(seen, array)
-	array = ast.SkipParentheses(array)
+	unwrapped := ast.SkipParentheses(array)
 	slots := []*ast.Node{}
-	switch array.Kind {
+	switch unwrapped.Kind {
 	case ast.KindArrayLiteralExpression:
-		for _, element := range array.AsArrayLiteralExpression().Elements.Nodes {
+		for _, element := range unwrapped.AsArrayLiteralExpression().Elements.Nodes {
 			if element.Kind == ast.KindSpreadElement {
 				slots = append(slots, correctnessNoCallerDataMutationKnownSlots(ruleContext, element.AsSpreadElement().Expression, seen)...)
 			} else {
@@ -565,7 +574,7 @@ func correctnessNoCallerDataMutationKnownSlots(ruleContext rule.Context, array *
 		}
 		return slots
 	case ast.KindIdentifier:
-		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(array)
+		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 		for _, declaration := range rule.DeclarationsIn(ruleContext.SourceFile, symbol) {
 			if declaration.Kind != ast.KindVariableDeclaration || declaration.Initializer() == nil {
 				continue
@@ -579,7 +588,7 @@ func correctnessNoCallerDataMutationKnownSlots(ruleContext rule.Context, array *
 			}
 		}
 	case ast.KindCallExpression:
-		call := array.AsCallExpression()
+		call := unwrapped.AsCallExpression()
 		callee := ast.SkipParentheses(call.Expression)
 		if callee.Kind != ast.KindPropertyAccessExpression {
 			return unknown
@@ -605,16 +614,18 @@ func correctnessNoCallerDataMutationLiteralIndex(expression *ast.Node) (int, boo
 	if expression == nil {
 		return 0, false
 	}
-	expression = ast.SkipParentheses(expression)
+	unwrapped := ast.SkipParentheses(expression)
 	sign := 1
-	if expression.Kind == ast.KindPrefixUnaryExpression && expression.AsPrefixUnaryExpression().Operator == ast.KindMinusToken {
+	// The literal whose value is the index's magnitude, under its minus sign when there is one.
+	magnitude := unwrapped
+	if unwrapped.Kind == ast.KindPrefixUnaryExpression && unwrapped.AsPrefixUnaryExpression().Operator == ast.KindMinusToken {
 		sign = -1
-		expression = expression.AsPrefixUnaryExpression().Operand
+		magnitude = unwrapped.AsPrefixUnaryExpression().Operand
 	}
-	if expression.Kind != ast.KindNumericLiteral {
+	if magnitude.Kind != ast.KindNumericLiteral {
 		return 0, false
 	}
-	index, parseError := strconv.Atoi(expression.Text())
+	index, parseError := strconv.Atoi(magnitude.Text())
 	return sign * index, parseError == nil
 }
 
@@ -639,15 +650,15 @@ func correctnessNoCallerDataMutationArrayMethod(ruleContext rule.Context, name *
 // Accept only an unreassigned first parameter returned directly, as an expression or a single return
 // statement. Object construction, arbitrary helpers and branching callbacks do not prove identity.
 func correctnessNoCallerDataMutationIdentityCallback(ruleContext rule.Context, callback *ast.Node) bool {
-	callback = ast.SkipParentheses(callback)
-	if callback.Kind != ast.KindArrowFunction && callback.Kind != ast.KindFunctionExpression {
+	unwrapped := ast.SkipParentheses(callback)
+	if unwrapped.Kind != ast.KindArrowFunction && unwrapped.Kind != ast.KindFunctionExpression {
 		return false
 	}
-	parameters := callback.Parameters()
+	parameters := unwrapped.Parameters()
 	if len(parameters) == 0 || parameters[0].Name().Kind != ast.KindIdentifier {
 		return false
 	}
-	body := callback.Body()
+	body := unwrapped.Body()
 	if body == nil {
 		return false
 	}
@@ -664,7 +675,7 @@ func correctnessNoCallerDataMutationIdentityCallback(ruleContext rule.Context, c
 	body = ast.SkipParentheses(body)
 	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(parameters[0].Name())
 	return body.Kind == ast.KindIdentifier && symbol != nil && ruleContext.TypeChecker.GetSymbolAtLocation(body) == symbol &&
-		!correctnessNoCallerDataMutationIsReassigned(ruleContext, callback, symbol)
+		!correctnessNoCallerDataMutationIsReassigned(ruleContext, unwrapped, symbol)
 }
 
 // correctnessNoCallerDataMutationParameterOf returns the parameter a symbol is declared by, directly or
@@ -742,34 +753,35 @@ func correctnessNoCallerDataMutationIsReassigned(ruleContext rule.Context, funct
 // declares: a property declared in a source file and not a setter, or an element of an array, a tuple,
 // a `Record` or its kin, or a type a source file declares.
 func correctnessNoCallerDataMutationWritesData(ruleContext rule.Context, target *ast.Node) bool {
+	written := target
 	for {
-		target = ast.SkipParentheses(target)
-		if target.Kind != ast.KindNonNullExpression {
+		written = ast.SkipParentheses(written)
+		if written.Kind != ast.KindNonNullExpression {
 			break
 		}
-		target = target.AsNonNullExpression().Expression
+		written = written.AsNonNullExpression().Expression
 	}
 	var key *ast.Node
 	var receiver *ast.Node
-	switch target.Kind {
+	switch written.Kind {
 	case ast.KindPropertyAccessExpression:
-		access := target.AsPropertyAccessExpression()
+		access := written.AsPropertyAccessExpression()
 		key = access.Name()
 		receiver = access.Expression
 	case ast.KindElementAccessExpression:
-		access := target.AsElementAccessExpression()
+		access := written.AsElementAccessExpression()
 		key = access.ArgumentExpression
 		receiver = access.Expression
 	case ast.KindCallExpression:
 		// A selected element can itself be a collection. Origin has already checked the
 		// default-library array contract and every intervening host/project boundary.
-		return correctnessNoCallerDataMutationParameterReached(ruleContext, target) != nil
+		return correctnessNoCallerDataMutationParameterReached(ruleContext, written) != nil
 	default:
 		return false
 	}
 	// Only a name or a literal key names a property. `buffer[offset]` asked about `offset` answers with
 	// the variable, which a source file declares, and would make every element write look like data.
-	if target.Kind == ast.KindPropertyAccessExpression || ast.IsStringOrNumericLiteralLike(key) {
+	if written.Kind == ast.KindPropertyAccessExpression || ast.IsStringOrNumericLiteralLike(key) {
 		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(key); symbol != nil && len(symbol.Declarations) > 0 {
 			return symbol.Flags&ast.SymbolFlagsSetAccessor == 0 && rule.IsDeclaredInASourceFile(symbol)
 		}

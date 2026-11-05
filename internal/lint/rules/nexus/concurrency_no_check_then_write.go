@@ -319,21 +319,21 @@ func (analysis *concurrencyNoCheckThenWriteLoop) throwingCheckOf(statement *ast.
 // concurrencyNoCheckThenWriteCounterOf returns the identifier an expression counts with (`x++`, `--x`,
 // `x += n`, `x -= n`), or nil.
 func concurrencyNoCheckThenWriteCounterOf(expression *ast.Node) *ast.Node {
-	expression = ast.SkipParentheses(expression)
+	unwrapped := ast.SkipParentheses(expression)
 	var operand *ast.Node
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPrefixUnaryExpression:
-		if reference.IsUpdateOperator(expression.AsPrefixUnaryExpression().Operator) {
-			operand = expression.AsPrefixUnaryExpression().Operand
+		if reference.IsUpdateOperator(unwrapped.AsPrefixUnaryExpression().Operator) {
+			operand = unwrapped.AsPrefixUnaryExpression().Operand
 		}
 	case ast.KindPostfixUnaryExpression:
-		if reference.IsUpdateOperator(expression.AsPostfixUnaryExpression().Operator) {
-			operand = expression.AsPostfixUnaryExpression().Operand
+		if reference.IsUpdateOperator(unwrapped.AsPostfixUnaryExpression().Operator) {
+			operand = unwrapped.AsPostfixUnaryExpression().Operand
 		}
 	case ast.KindBinaryExpression:
-		switch expression.AsBinaryExpression().OperatorToken.Kind {
+		switch unwrapped.AsBinaryExpression().OperatorToken.Kind {
 		case ast.KindPlusEqualsToken, ast.KindMinusEqualsToken:
-			operand = expression.AsBinaryExpression().Left
+			operand = unwrapped.AsBinaryExpression().Left
 		}
 	}
 	if operand == nil {
@@ -654,8 +654,8 @@ func (analysis *concurrencyNoCheckThenWriteLoop) nonExclusiveDestination(call *a
 // write non-exclusive. A callback in the options position (`writeFile(path, data, done)`) passes no
 // options. Anything the source does not settle answers false, which leaves the write alone.
 func concurrencyNoCheckThenWriteOptionsNotExclusive(options *ast.Node, flagKey string) bool {
-	options = ast.SkipParentheses(options)
-	switch options.Kind {
+	unwrapped := ast.SkipParentheses(options)
+	switch unwrapped.Kind {
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
 		return true
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
@@ -665,7 +665,7 @@ func concurrencyNoCheckThenWriteOptionsNotExclusive(options *ast.Node, flagKey s
 		if flagKey == "" {
 			return false
 		}
-		for _, member := range options.AsObjectLiteralExpression().Properties.Nodes {
+		for _, member := range unwrapped.AsObjectLiteralExpression().Properties.Nodes {
 			if member.Kind != ast.KindPropertyAssignment {
 				// A spread, a shorthand or a method could carry the flag in a way the source does
 				// not show.
@@ -730,32 +730,36 @@ func (analysis *concurrencyNoCheckThenWriteLoop) samePathAt(checkedPath *ast.Nod
 
 // expand reads an identifier through a `const` the comparison may read through, recording a loop-body
 // declaration's position, and returns the node to compare in its place.
+//
+// Mutates: comparison the walk lowers its bodyDeclarationStart to the earliest loop-body declaration it
+// reads through, so one comparison carries the whole proof's earliest point
 func (analysis *concurrencyNoCheckThenWriteLoop) expand(comparison *concurrencyNoCheckThenWriteComparison, node *ast.Node) *ast.Node {
+	current := node
 	for depth := 0; depth < 16; depth++ {
-		node = ast.SkipParentheses(node)
-		if node.Kind != ast.KindIdentifier {
-			return node
+		current = ast.SkipParentheses(current)
+		if current.Kind != ast.KindIdentifier {
+			return current
 		}
-		symbol := analysis.resolve(node)
+		symbol := analysis.resolve(current)
 		if symbol == nil {
-			return node
+			return current
 		}
 		initializer, bodyPosition := analysis.readThrough(symbol)
 		if initializer == nil {
-			return node
+			return current
 		}
 		if bodyPosition >= 0 && (comparison.bodyDeclarationStart < 0 || bodyPosition < comparison.bodyDeclarationStart) {
 			comparison.bodyDeclarationStart = bodyPosition
 		}
-		node = initializer
+		current = initializer
 	}
-	return node
+	return current
 }
 
 // same compares two path expressions as the doc comment's "Same path, proven" describes.
-func (analysis *concurrencyNoCheckThenWriteLoop) same(comparison *concurrencyNoCheckThenWriteComparison, left *ast.Node, right *ast.Node) bool {
-	left = analysis.expand(comparison, left)
-	right = analysis.expand(comparison, right)
+func (analysis *concurrencyNoCheckThenWriteLoop) same(comparison *concurrencyNoCheckThenWriteComparison, leftPath *ast.Node, rightPath *ast.Node) bool {
+	left := analysis.expand(comparison, leftPath)
+	right := analysis.expand(comparison, rightPath)
 	if left.Kind != right.Kind {
 		return false
 	}

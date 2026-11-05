@@ -1,6 +1,7 @@
 package nexus
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,8 +72,10 @@ func buildTranslations(test *testing.T, files map[string]string) (*program.Graph
 	test.Helper()
 
 	directory := test.TempDir()
-	files["tsconfig.json"] = translationsConfig
-	for name, contents := range files {
+	// A copy, so the caller's fixture map stays as it was handed in.
+	withConfig := maps.Clone(files)
+	withConfig["tsconfig.json"] = translationsConfig
+	for name, contents := range withConfig {
 		full := filepath.Join(directory, name)
 		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {
 			test.Fatalf("creating %s: %v", filepath.Dir(full), createDirectoryError)

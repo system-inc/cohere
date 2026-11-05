@@ -365,10 +365,10 @@ func securityNoInterpolatedSqlStringHasFragmentKeyword(texts []string) bool {
 // opening quote, across interpolations, and returns the interpolations inside it with the text and
 // index of its closing quote. It returns a closing text of -1 when the string never closes or holds a
 // backslash.
-func securityNoInterpolatedSqlStringReadString(texts []string, textIndex int, start int) ([]int, int, int) {
+func securityNoInterpolatedSqlStringReadString(texts []string, startTextIndex int, start int) ([]int, int, int) {
 	var spans []int
 	index := start
-	for ; textIndex < len(texts); textIndex++ {
+	for textIndex := startTextIndex; textIndex < len(texts); textIndex++ {
 		text := texts[textIndex]
 		for ; index < len(text); index++ {
 			switch text[index] {
@@ -452,14 +452,14 @@ func securityNoInterpolatedSqlStringPartCanHoldQuote(typeChecker *checker.Checke
 // securityNoInterpolatedSqlStringIsEscaped says whether an interpolated expression, or the
 // initializer of the `const` it names, ends in the one escape the doc comment accepts.
 func securityNoInterpolatedSqlStringIsEscaped(ruleContext rule.Context, expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	if securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, expression) {
+	unwrapped := ast.SkipParentheses(expression)
+	if securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, unwrapped) {
 		return true
 	}
-	if expression.Kind != ast.KindIdentifier {
+	if unwrapped.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 		return false
 	}

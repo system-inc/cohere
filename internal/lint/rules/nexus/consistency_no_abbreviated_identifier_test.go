@@ -773,7 +773,9 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 			}, fileName, ConsistencyNoAbbreviatedIdentifierOptions{
 				FrameworkParameterFilePatterns: []string{"app/page.tsx"},
 				FrameworkConstantFilePatterns:  []string{"app/page.tsx"},
-			}, func(string) {})
+			}, func(string) {
+				// The fixture's files are all in the map, so the directory needs nothing more.
+			})
 			if len(result.Diagnostics) != testCase.want {
 				test.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
 			}

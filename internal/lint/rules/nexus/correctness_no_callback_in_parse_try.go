@@ -243,13 +243,14 @@ func correctnessNoCallbackInParseTryIsParseJsonOrThrow(ruleContext rule.Context,
 	if symbol == nil {
 		return false
 	}
+	resolved := symbol
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = checker.SkipAlias(symbol, ruleContext.TypeChecker)
+		resolved = checker.SkipAlias(symbol, ruleContext.TypeChecker)
 	}
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	if resolved == nil || len(resolved.Declarations) == 0 {
 		return false
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range resolved.Declarations {
 		if declaration.Kind != ast.KindFunctionDeclaration || declaration.Name() == nil ||
 			declaration.Name().Text() != "parseJsonOrThrow" {
 			return false
