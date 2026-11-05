@@ -1,11 +1,10 @@
 package nexus
 
 import (
-	"strings"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/shouting"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -18,7 +17,7 @@ var consistencyNoShoutingText = policy.MessageOf("nexus/consistency-no-shouting"
 func messageShoutingInComment(tokens []string) rule.Message {
 	return rule.Message{
 		Id:          consistencyNoShoutingText.Id,
-		Description: consistencyNoShoutingText.Render(map[string]string{"tokens": quotedTokenList(tokens)}),
+		Description: consistencyNoShoutingText.Render(map[string]string{"tokens": shouting.QuotedTokenList(tokens)}),
 	}
 }
 
@@ -67,7 +66,7 @@ var ConsistencyNoShouting = rule.Rule{
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				for _, comment := range comments.ForFile(ctx) {
-					tokens := shoutedTokensIn(comment.Text)
+					tokens := shouting.TokensIn(comment.Text)
 
 					kept := tokens[:0]
 					for _, token := range tokens {
@@ -84,24 +83,4 @@ var ConsistencyNoShouting = rule.Rule{
 			},
 		}
 	},
-}
-
-// quotedTokenList renders the first few shouted tokens for a reader, so the finding names what to
-// look at rather than making them rescan the comment.
-//
-// Capped because a banner line can hold a dozen, and a message that lists all of them is harder to
-// act on than one that names the first few.
-func quotedTokenList(tokens []string) string {
-	const maximumListed = 4
-
-	listed := tokens
-	if len(listed) > maximumListed {
-		listed = listed[:maximumListed]
-	}
-
-	quoted := make([]string, 0, len(listed))
-	for _, token := range listed {
-		quoted = append(quoted, `"`+token+`"`)
-	}
-	return strings.Join(quoted, ", ")
 }

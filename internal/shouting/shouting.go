@@ -1,4 +1,10 @@
-package nexus
+// Package shouting is what counts as shouting in a comment, in one place, for every engine that judges comments.
+//
+// The TypeScript rule nexus/consistency-no-shouting and the Go engine's cohere-go/consistency-no-shouting both read
+// it, so an acronym added to the safe list, or a mask taught a new shape of code, quiets both at once. It lives in
+// its own package, importing nothing heavier than the standard library, because the nexus rules package links the
+// TypeScript checker and the Go engine must not.
+package shouting
 
 import (
 	"regexp"
@@ -7,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
-// What counts as shouting, in one place.
+// What counts as shouting.
 //
 // All-caps reads as aggression, and it spreads: a reader mirrors the register of what they are
 // answering, so one shouted line ratchets a whole file's comments into block capitals. In a codebase
@@ -186,14 +192,14 @@ var (
 	commandLine        = regexp.MustCompile(`^\s*(\$|ahra\s|git\s|pnpm\s|npm\s|sqlite3\s|curl\s|s\s+c\b)`)
 )
 
-// maskCodeAndCommands blanks out anything that is code, so nothing inside it is ever read as
+// MaskCodeAndCommands blanks out anything that is code, so nothing inside it is ever read as
 // shouting: fenced blocks, inline backticks, quoted strings, JSDoc examples, and command lines.
 //
 // Replacing with spaces rather than deleting preserves every offset, so a caller reporting positions
 // keeps true line and column numbers. Newlines are preserved for the same reason: collapsing a
 // fence's newlines to spaces keeps character offsets right but destroys the line count, and every
 // line after the fence then reports against the wrong source line.
-func maskCodeAndCommands(text string) string {
+func MaskCodeAndCommands(text string) string {
 	masked := blankKeepingNewlines(fencedBlock, text)
 	masked = maskIndentedCodeBlocks(masked)
 	masked = blankKeepingNewlines(inlineBackticks, masked)
@@ -398,11 +404,11 @@ func maskCommandLines(text string) string {
 	return strings.Join(lines, "\n")
 }
 
-// shoutedTokensIn returns the distinct shouted tokens in a comment body, in first-seen order.
+// TokensIn returns the distinct shouted tokens in a comment body, in first-seen order.
 //
 // The body is masked first, so code is invisible. Order is first-seen rather than sorted because a
 // reader looking for what to fix scans the comment top to bottom.
-func shoutedTokensIn(body string) []string {
+func TokensIn(body string) []string {
 	// The cheapest question first, and it lets the whole rule skip 94% of comments.
 	//
 	// `uppercaseToken` is `\b[A-Z][A-Z0-9_]*\b`, and `isShoutedToken` declines anything under two
@@ -414,12 +420,17 @@ func shoutedTokensIn(body string) []string {
 	// Measured over 8,814 real comments: 5.7% hold two adjacent uppercase letters. The byte scan is
 	// 579µs against 5,413µs for the regex over the same corpus, and masking is another 6,019µs that
 	// this avoids entirely.
-	if !hasAdjacentUppercaseLetters(body) {
+	if !HasAdjacentUppercaseLetters(body) {
 		return nil
 	}
+	return TokensInMasked(MaskCodeAndCommands(body))
+}
 
-	masked := maskCodeAndCommands(body)
-
+// TokensInMasked returns the distinct shouted tokens in text MaskCodeAndCommands has already masked, in first-seen
+// order. It is TokensIn's scan on its own, for a caller that masks a wider text than the one it reports on: the Go
+// engine masks a whole comment group, so a fence or a wrapped quote spanning its lines is seen, then reads each
+// comment's slice of the result.
+func TokensInMasked(masked string) []string {
 	var tokens []string
 	seen := map[string]bool{}
 	for _, token := range uppercaseToken.FindAllString(masked, -1) {
@@ -465,13 +476,14 @@ func containsAnyCommandStarter(text string) bool {
 // structureCommandStarter is the `s\s+c` arm, which no literal can express.
 var structureCommandStarter = regexp.MustCompile(`s\s+c`)
 
-// hasAdjacentUppercaseLetters reports whether two uppercase letters appear in a row.
+// HasAdjacentUppercaseLetters reports whether two uppercase letters appear in a row.
 //
 // That is the shortest thing `uppercaseToken` can match that `isShoutedToken` will not immediately
 // decline, so it is a superset of what the rule can report. Over-approximating costs one masking
 // pass on a comment that turns out to hold only acronyms; under-approximating would silence the rule
-// for a real shout, which is the failure that cannot be allowed.
-func hasAdjacentUppercaseLetters(text string) bool {
+// for a real shout, which is the failure that cannot be allowed. Exported so a caller masking a wider
+// text than TokensIn takes can skip it by the same gate.
+func HasAdjacentUppercaseLetters(text string) bool {
 	previousWasUppercase := false
 	for index := 0; index < len(text); index++ {
 		character := text[index]
@@ -482,4 +494,25 @@ func hasAdjacentUppercaseLetters(text string) bool {
 		previousWasUppercase = isUppercase
 	}
 	return false
+}
+
+// QuotedTokenList renders the first few shouted tokens for a reader, so the finding names what to
+// look at rather than making them rescan the comment. It lives beside the tokens so every engine's
+// finding names them the same way.
+//
+// Capped because a banner line can hold a dozen, and a message that lists all of them is harder to
+// act on than one that names the first few.
+func QuotedTokenList(tokens []string) string {
+	const maximumListed = 4
+
+	listed := tokens
+	if len(listed) > maximumListed {
+		listed = listed[:maximumListed]
+	}
+
+	quoted := make([]string, 0, len(listed))
+	for _, token := range listed {
+		quoted = append(quoted, `"`+token+`"`)
+	}
+	return strings.Join(quoted, ", ")
 }
