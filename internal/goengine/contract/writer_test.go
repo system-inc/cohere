@@ -10,48 +10,48 @@ import (
 var provenanceForTest = ProvenanceRecord{Contract: Version, Engine: "cohere-go", Version: "0.1.0", Commit: "dev", Toolchain: "go1.27"}
 
 // TestWriterRefusesARecordBeforeProvenance holds the first line of every stream to provenance.
-func TestWriterRefusesARecordBeforeProvenance(t *testing.T) {
-	t.Parallel()
+func TestWriterRefusesARecordBeforeProvenance(test *testing.T) {
+	test.Parallel()
 	var output bytes.Buffer
 	writer := NewWriter(&output)
 	writeError := writer.Write(SummaryRecord{Findings: 0, Complete: true, ExitCode: 0})
 	if writeError == nil || !strings.Contains(writeError.Error(), "before provenance") {
-		t.Fatalf("a summary as the first record: got %v, expected a refusal naming provenance", writeError)
+		test.Fatalf("a summary as the first record: got %v, expected a refusal naming provenance", writeError)
 	}
 	if output.Len() != 0 {
-		t.Errorf("a refused record wrote %q", output.String())
+		test.Errorf("a refused record wrote %q", output.String())
 	}
 	// The refusal leaves the writer able to start the stream properly.
 	if writeError := writer.Write(provenanceForTest); writeError != nil {
-		t.Fatalf("provenance after a refused record: %v", writeError)
+		test.Fatalf("provenance after a refused record: %v", writeError)
 	}
 }
 
 // TestWriterRefusesASecondProvenance holds a stream to one provenance, as the front door does.
-func TestWriterRefusesASecondProvenance(t *testing.T) {
-	t.Parallel()
+func TestWriterRefusesASecondProvenance(test *testing.T) {
+	test.Parallel()
 	var output bytes.Buffer
 	writer := NewWriter(&output)
 	if writeError := writer.Write(provenanceForTest); writeError != nil {
-		t.Fatal(writeError)
+		test.Fatal(writeError)
 	}
 	written := output.Len()
 	if writeError := writer.Write(provenanceForTest); writeError == nil {
-		t.Fatal("a second provenance record was accepted")
+		test.Fatal("a second provenance record was accepted")
 	}
 	if output.Len() != written {
-		t.Errorf("a refused record wrote %q", output.String()[written:])
+		test.Errorf("a refused record wrote %q", output.String()[written:])
 	}
 }
 
 // TestWriterRefusesEveryRecordAfterTheSummary holds the summary to last, for each kind that could follow.
-func TestWriterRefusesEveryRecordAfterTheSummary(t *testing.T) {
-	t.Parallel()
+func TestWriterRefusesEveryRecordAfterTheSummary(test *testing.T) {
+	test.Parallel()
 	var output bytes.Buffer
 	writer := NewWriter(&output)
 	for _, record := range []Record{provenanceForTest, PhaseRecord{Name: PhaseFix, Outcome: OutcomeRan}, SummaryRecord{Complete: true}} {
 		if writeError := writer.Write(record); writeError != nil {
-			t.Fatalf("%s: %v", record.kind(), writeError)
+			test.Fatalf("%s: %v", record.kind(), writeError)
 		}
 	}
 	written := output.Len()
@@ -62,19 +62,19 @@ func TestWriterRefusesEveryRecordAfterTheSummary(t *testing.T) {
 	for _, record := range after {
 		writeError := writer.Write(record)
 		if writeError == nil || !strings.Contains(writeError.Error(), "after the summary") {
-			t.Errorf("a %s record after the summary: got %v, expected a refusal", record.kind(), writeError)
+			test.Errorf("a %s record after the summary: got %v, expected a refusal", record.kind(), writeError)
 		}
 	}
 	if output.Len() != written {
-		t.Errorf("refused records wrote %q", output.String()[written:])
+		test.Errorf("refused records wrote %q", output.String()[written:])
 	}
 }
 
 // TestWriterWritesOneLinePerRecordWithKindFirst is the line shape the front door reads: one object per
 // line, its kind first, a message's newline escaped rather than splitting the line, and nothing escaped
 // that JSON outside HTML leaves alone.
-func TestWriterWritesOneLinePerRecordWithKindFirst(t *testing.T) {
-	t.Parallel()
+func TestWriterWritesOneLinePerRecordWithKindFirst(test *testing.T) {
+	test.Parallel()
 	var output bytes.Buffer
 	writer := NewWriter(&output)
 	records := []Record{
@@ -85,38 +85,38 @@ func TestWriterWritesOneLinePerRecordWithKindFirst(t *testing.T) {
 	}
 	for _, record := range records {
 		if writeError := writer.Write(record); writeError != nil {
-			t.Fatalf("%s: %v", record.kind(), writeError)
+			test.Fatalf("%s: %v", record.kind(), writeError)
 		}
 	}
 	lines := strings.Split(strings.TrimSuffix(output.String(), "\n"), "\n")
 	if len(lines) != len(records) {
-		t.Fatalf("%d records wrote %d lines:\n%s", len(records), len(lines), output.String())
+		test.Fatalf("%d records wrote %d lines:\n%s", len(records), len(lines), output.String())
 	}
 	for index, record := range records {
 		if !strings.HasPrefix(lines[index], `{"kind":"`+string(record.kind())+`",`) {
-			t.Errorf("line %d does not open with its kind: %s", index, lines[index])
+			test.Errorf("line %d does not open with its kind: %s", index, lines[index])
 		}
 	}
 	if !strings.Contains(lines[1], `"message":"a <- b & c\nsecond line"`) {
-		t.Errorf("the finding's message was escaped differently than expected: %s", lines[1])
+		test.Errorf("the finding's message was escaped differently than expected: %s", lines[1])
 	}
 	if expected := `{"kind":"summary","findings":1,"complete":true,"exitCode":1}`; lines[2] != expected {
-		t.Errorf("summary line\n got: %s\nwant: %s", lines[2], expected)
+		test.Errorf("summary line\n got: %s\nwant: %s", lines[2], expected)
 	}
 }
 
 // TestFixRecordListsNoChangedFilesAsAnEmptyList keeps an engine that wrote nothing from reading, at the
 // front door, as one that did not say what it wrote.
-func TestFixRecordListsNoChangedFilesAsAnEmptyList(t *testing.T) {
-	t.Parallel()
+func TestFixRecordListsNoChangedFilesAsAnEmptyList(test *testing.T) {
+	test.Parallel()
 	var output bytes.Buffer
 	writer := NewWriter(&output)
 	for _, record := range []Record{provenanceForTest, FixRecord{FormatScope: "every file"}} {
 		if writeError := writer.Write(record); writeError != nil {
-			t.Fatal(writeError)
+			test.Fatal(writeError)
 		}
 	}
 	if !strings.Contains(output.String(), `"changedFiles":[]`) {
-		t.Errorf("a fix record with no changed files wrote:\n%s", output.String())
+		test.Errorf("a fix record with no changed files wrote:\n%s", output.String())
 	}
 }

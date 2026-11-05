@@ -24,10 +24,10 @@ func loadMinimalMessages(text string) (*MessageCatalog, error) {
 
 // TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse: the minimal file loads, and each one-place
 // change that would misread does not.
-func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
-	t.Parallel()
+func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
+	test.Parallel()
 	if _, err := loadMinimalMessages(minimalMessages); err != nil {
-		t.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
+		test.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
 	}
 	for _, refused := range []struct {
 		name string
@@ -56,24 +56,24 @@ func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
     }`, ``},
 	} {
 		if !strings.Contains(minimalMessages, refused.old) {
-			t.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
+			test.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
 		}
 		if _, err := loadMinimalMessages(strings.Replace(minimalMessages, refused.old, refused.new, 1)); err == nil {
-			t.Errorf("%s loaded", refused.name)
+			test.Errorf("%s loaded", refused.name)
 		}
 	}
 }
 
 // A lone house rule has no twin to differ from, so a term on one is refused, and without terms it loads.
-func TestALoneRuleCarriesNoTerms(t *testing.T) {
-	t.Parallel()
+func TestALoneRuleCarriesNoTerms(test *testing.T) {
+	test.Parallel()
 	lone := `{"rules": {"TypeScript": "base/consistency-no-thing"}, "messages": {"thing": {"text": "This is %s."}}}`
 	if _, err := loadMinimalMessages(strings.Replace(lone, "%s", "a thing", 1)); err != nil {
-		t.Fatalf("a lone rule with no terms is refused: %v", err)
+		test.Fatalf("a lone rule with no terms is refused: %v", err)
 	}
 	withTerm := `{"rules": {"TypeScript": "base/consistency-no-thing"}, "messages": {"thing": {"text": "This is [[subject]].", "terms": {"subject": {"TypeScript": "a thing"}}}}}`
 	if _, err := loadMinimalMessages(withTerm); err == nil {
-		t.Error("a lone rule with a term loaded")
+		test.Error("a lone rule with a term loaded")
 	}
 }
 
@@ -112,32 +112,32 @@ func TestGoNamesALoneFileAndJoinsATwinWithItsOwnTerms(test *testing.T) {
 }
 
 // A rule named by two files is refused, wherever the second one is.
-func TestARuleNamedByTwoFilesIsRefused(t *testing.T) {
-	t.Parallel()
+func TestARuleNamedByTwoFilesIsRefused(test *testing.T) {
+	test.Parallel()
 	second := strings.Replace(minimalMessages, `"base/consistency-no-thing"`, `"base/consistency-no-other"`, 1)
 	_, err := LoadMessages(fstest.MapFS{
 		"consistency-no-thing.json": {Data: []byte(minimalMessages)},
 		"consistency-no-other.json": {Data: []byte(second)},
 	})
 	if err == nil {
-		t.Error("cohere-swift/consistency-no-thing named by two files loaded")
+		test.Error("cohere-swift/consistency-no-thing named by two files loaded")
 	}
 }
 
 // Each language's text resolves its own terms, and Render puts in exactly the values that text uses.
-func TestEachLanguageRendersItsOwnTermsAndValues(t *testing.T) {
-	t.Parallel()
+func TestEachLanguageRendersItsOwnTermsAndValues(test *testing.T) {
+	test.Parallel()
 	catalog, err := loadMinimalMessages(minimalMessages)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	typeScript := MessageHandle{Rule: "base/consistency-no-thing", Id: "thing"}
 	if got, want := catalog.Render(typeScript, map[string]string{"kind": "class", "count": "3"}), "This is a class, which names 3 things."; got != want {
-		t.Errorf("TypeScript renders %q, want %q", got, want)
+		test.Errorf("TypeScript renders %q, want %q", got, want)
 	}
 	swift := MessageHandle{Rule: "cohere-swift/consistency-no-thing", Id: "thing"}
 	if got, want := catalog.Render(swift, map[string]string{"count": "3"}), "This is an enum, which names 3 things."; got != want {
-		t.Errorf("Swift renders %q, want %q", got, want)
+		test.Errorf("Swift renders %q, want %q", got, want)
 	}
 
 	for name, values := range map[string]map[string]string{
@@ -148,7 +148,7 @@ func TestEachLanguageRendersItsOwnTermsAndValues(t *testing.T) {
 		func() {
 			defer func() {
 				if recover() == nil {
-					t.Errorf("%s rendered", name)
+					test.Errorf("%s rendered", name)
 				}
 			}()
 			catalog.Render(typeScript, values)
@@ -157,22 +157,22 @@ func TestEachLanguageRendersItsOwnTermsAndValues(t *testing.T) {
 }
 
 // MessageOf refuses a message the catalog does not hold, when the rule's package initializes.
-func TestMessageOfRefusesAMissingMessage(t *testing.T) {
-	t.Parallel()
+func TestMessageOfRefusesAMissingMessage(test *testing.T) {
+	test.Parallel()
 	defer func() {
 		if recover() == nil {
-			t.Error("a handle on a missing message was taken")
+			test.Error("a handle on a missing message was taken")
 		}
 	}()
 	MessageOf("base/consistency-no-bare-throw", "noSuchMessage")
 }
 
 // The embedded catalog loaded at init, and holds the bare-throw pair for both languages.
-func TestTheEmbeddedCatalogHoldsBothTwins(t *testing.T) {
-	t.Parallel()
+func TestTheEmbeddedCatalogHoldsBothTwins(test *testing.T) {
+	test.Parallel()
 	for _, language := range []string{MessageLanguageTypeScript, MessageLanguageSwift} {
 		if len(Messages.MessagesFor(language)) == 0 {
-			t.Errorf("no %s messages in the embedded catalog", language)
+			test.Errorf("no %s messages in the embedded catalog", language)
 		}
 	}
 }
@@ -192,10 +192,10 @@ const minimalPhrases = `{
 
 // TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse: the file with phrases loads, and each one-place
 // change that would misread does not.
-func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
-	t.Parallel()
+func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
+	test.Parallel()
 	if _, err := loadMinimalMessages(minimalPhrases); err != nil {
-		t.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
+		test.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
 	}
 	for _, refused := range []struct {
 		name string
@@ -214,34 +214,34 @@ func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(t *testing.T) {
 		{"a malformed value in an option", `{{name}}`, `{{name`},
 	} {
 		if !strings.Contains(minimalPhrases, refused.old) {
-			t.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
+			test.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
 		}
 		if _, err := loadMinimalMessages(strings.Replace(minimalPhrases, refused.old, refused.new, 1)); err == nil {
-			t.Errorf("%s loaded", refused.name)
+			test.Errorf("%s loaded", refused.name)
 		}
 	}
 }
 
 // A string phrase is put in at load, and an object phrase is the option the rule picks, with that
 // option's values, and nothing else.
-func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
-	t.Parallel()
+func TestPhrasesRenderTheSharedTextAndThePickedOption(test *testing.T) {
+	test.Parallel()
 	catalog, err := loadMinimalMessages(minimalPhrases)
 	if err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	first := MessageHandle{Rule: "base/consistency-no-thing", Id: "first"}
 	second := MessageHandle{Rule: "base/consistency-no-thing", Id: "second"}
 	setter := catalog.Option(first, "reason", "setter")
 	constructor := catalog.Option(first, "reason", "constructor")
 	if got, want := catalog.Render(first, map[string]string{"name": "value"}, setter), "First, because it is a setter for value. Both say this."; got != want {
-		t.Errorf("the setter option renders %q, want %q", got, want)
+		test.Errorf("the setter option renders %q, want %q", got, want)
 	}
 	if got, want := catalog.Render(first, nil, constructor), "First, because it is a constructor. Both say this."; got != want {
-		t.Errorf("the constructor option renders %q, want %q", got, want)
+		test.Errorf("the constructor option renders %q, want %q", got, want)
 	}
 	if got, want := catalog.Render(second, nil), "Second. Both say this."; got != want {
-		t.Errorf("the shared phrase renders %q, want %q", got, want)
+		test.Errorf("the shared phrase renders %q, want %q", got, want)
 	}
 
 	for name, render := range map[string]func(){
@@ -255,7 +255,7 @@ func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
 		func() {
 			defer func() {
 				if recover() == nil {
-					t.Errorf("%s rendered", name)
+					test.Errorf("%s rendered", name)
 				}
 			}()
 			render()
@@ -264,19 +264,19 @@ func TestPhrasesRenderTheSharedTextAndThePickedOption(t *testing.T) {
 }
 
 // A twin file can hold a message only one engine renders, named by its languages.
-func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(t *testing.T) {
-	t.Parallel()
+func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(test *testing.T) {
+	test.Parallel()
 	withOneLanguage := strings.Replace(minimalMessages, `"messages": {`, `"messages": {
     "onlyHere": { "text": "Only TypeScript says {{this}}.", "languages": ["TypeScript"] },`, 1)
 	catalog, err := loadMinimalMessages(withOneLanguage)
 	if err != nil {
-		t.Fatalf("a twin file with a TypeScript-only message is refused: %v", err)
+		test.Fatalf("a twin file with a TypeScript-only message is refused: %v", err)
 	}
 	if _, rendered := catalog.templates["cohere-swift/consistency-no-thing"]["onlyHere"]; rendered {
-		t.Error("the Swift rule holds a message only TypeScript renders")
+		test.Error("the Swift rule holds a message only TypeScript renders")
 	}
 	if _, rendered := catalog.templates["base/consistency-no-thing"]["onlyHere"]; !rendered {
-		t.Error("the TypeScript rule does not hold its own message")
+		test.Error("the TypeScript rule does not hold its own message")
 	}
 	for _, refused := range []struct {
 		name string
@@ -289,13 +289,13 @@ func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(t *testing.T) {
 		{"a term on a one-language message", `"languages": ["TypeScript"]`, `"languages": ["TypeScript"], "terms": {"x": {"TypeScript": "y"}}`},
 	} {
 		if _, err := loadMinimalMessages(strings.Replace(withOneLanguage, refused.old, refused.new, 1)); err == nil {
-			t.Errorf("%s loaded", refused.name)
+			test.Errorf("%s loaded", refused.name)
 		}
 	}
 	twinTerm := strings.Replace(minimalMessages, `"terms": { "subject": { "TypeScript": "a {{kind}}", "Swift": "an enum" } }`,
 		`"terms": { "subject": { "TypeScript": "a {{kind}}", "Swift": "an enum" } }, "languages": ["TypeScript"]`, 1)
 	if _, err := loadMinimalMessages(twinTerm); err == nil {
-		t.Error("a term giving words for a language the message is not rendered in loaded")
+		test.Error("a term giving words for a language the message is not rendered in loaded")
 	}
 }
 
@@ -317,11 +317,11 @@ const optionsByLanguage = `{
 
 // An option's text may be given by language, as a term's is. Each language renders its own, and an
 // option with no text for a language does not reach it, so that language's rule cannot pick it.
-func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
-	t.Parallel()
+func TestAnOptionCanGiveItsTextByLanguage(test *testing.T) {
+	test.Parallel()
 	catalog, err := loadMinimalMessages(optionsByLanguage)
 	if err != nil {
-		t.Fatalf("an option with text by language is refused: %v", err)
+		test.Fatalf("an option with text by language is refused: %v", err)
 	}
 	typeScript := MessageHandle{Rule: "base/consistency-no-thing", Id: "lostUpdate"}
 	swift := MessageHandle{Rule: "cohere-swift/consistency-no-thing", Id: "lostUpdate"}
@@ -338,13 +338,13 @@ func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
 		{typeScript, "storeEntry", map[string]string{"read": "cache.get(key)"}, "This write is computed from what cache.get(key) returned."},
 	} {
 		if got := catalog.Render(rendered.handle, rendered.values, catalog.Option(rendered.handle, "source", rendered.option)); got != rendered.want {
-			t.Errorf("%s %s renders %q, want %q", rendered.handle.Rule, rendered.option, got, rendered.want)
+			test.Errorf("%s %s renders %q, want %q", rendered.handle.Rule, rendered.option, got, rendered.want)
 		}
 	}
 	func() {
 		defer func() {
 			if recover() == nil {
-				t.Error("the Swift rule took a TypeScript-only option")
+				test.Error("the Swift rule took a TypeScript-only option")
 			}
 		}()
 		catalog.Option(swift, "source", "storeEntry")
@@ -365,10 +365,10 @@ func TestAnOptionCanGiveItsTextByLanguage(t *testing.T) {
 		{"a malformed value in an option's language text", `"from the property {{target}}"`, `"from the property {{target"`},
 	} {
 		if !strings.Contains(optionsByLanguage, refused.old) {
-			t.Fatalf("%s: the anchor %q is not in the file, so the change would not apply", refused.name, refused.old)
+			test.Fatalf("%s: the anchor %q is not in the file, so the change would not apply", refused.name, refused.old)
 		}
 		if _, err := loadMinimalMessages(strings.Replace(optionsByLanguage, refused.old, refused.new, 1)); err == nil {
-			t.Errorf("%s loaded", refused.name)
+			test.Errorf("%s loaded", refused.name)
 		}
 	}
 }
