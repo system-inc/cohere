@@ -46,7 +46,7 @@ func fallsOutPastSemicolon(count int) int {
 	switch count {
 	default:
 		count = 0
-		fallthrough;;
+		fallthrough
 	case 1:
 		count++
 	}
