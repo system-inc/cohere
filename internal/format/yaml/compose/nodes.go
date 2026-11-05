@@ -84,9 +84,9 @@ type Node struct {
 	Format string
 	// MinFractionDigits is set by the float tags for a value written with trailing zeros, 1.50.
 	MinFractionDigits int
-	// ScalarValue is a Scalar's resolved value: nil (null), bool, float64, string (WTF-8), MergeKey,
-	// Date or Binary.
-	ScalarValue any
+	// ScalarValue is a Scalar's resolved value: nil (null), a ScalarBoolean, ScalarNumber, ScalarString
+	// (WTF-8), *MergeKey, Date or Binary.
+	ScalarValue ScalarValue
 }
 
 // HasSource is whether the node has a source: every alias, and every scalar composeScalar made.
@@ -106,15 +106,21 @@ func (node *Node) SetAnchor(name string) {
 // distinct.
 type MergeKey struct{ _ byte }
 
+func (*MergeKey) scalarValue() {}
+
 // Date is the value the timestamp tag resolves to: upstream's Date, as its time value in milliseconds,
 // NaN for an invalid date.
 type Date float64
 
+func (Date) scalarValue() {}
+
 // Binary is the value the binary tag resolves to: upstream's Buffer.
 type Binary []byte
 
+func (Binary) scalarValue() {}
+
 // newScalar is `new Scalar(value)`.
-func newScalar(value any) *Node {
+func newScalar(value ScalarValue) *Node {
 	return &Node{Kind: KindScalar, Class: "Scalar", ScalarValue: value}
 }
 
@@ -125,7 +131,7 @@ func newAlias(source string) *Node {
 
 // newScalar, newPair and newCollection on a context take the node from the parse's arena when the
 // options carry one (Options.Nodes), and allocate it otherwise (#v6ksqg3).
-func (composition *composeContext) newScalar(value any) *Node {
+func (composition *composeContext) newScalar(value ScalarValue) *Node {
 	return composition.options.Nodes.New(Node{Kind: KindScalar, Class: "Scalar", ScalarValue: value})
 }
 
@@ -161,6 +167,8 @@ func collectionNode(class string) Node {
 	case "YAMLOMap":
 		return Node{Kind: KindSeq, Class: class, Items: []*Node{}, Tag: omapTagName}
 	}
+	// Invariant: class is a literal in this package or a tag's NodeClass, and the four tags that set
+	// one (map, seq, omap and set) name exactly the four classes above.
 	panic("compose: unknown collection class " + class)
 }
 

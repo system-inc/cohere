@@ -16,8 +16,8 @@ var trueTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:bool",
 	Test:    regexp.MustCompile(`^(?:Y|y|[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$`),
-	resolveScalar: func([]uint16, func(string), *Options) (any, error) {
-		return newScalar(true), nil
+	resolveScalar: func([]uint16, func(string), *Options) (*Node, ScalarValue, error) {
+		return newScalar(ScalarBoolean(true)), nil, nil
 	},
 }
 
@@ -25,8 +25,8 @@ var falseTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:bool",
 	Test:    regexp.MustCompile(`^(?:N|n|[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$`),
-	resolveScalar: func([]uint16, func(string), *Options) (any, error) {
-		return newScalar(false), nil
+	resolveScalar: func([]uint16, func(string), *Options) (*Node, ScalarValue, error) {
+		return newScalar(ScalarBoolean(false)), nil, nil
 	},
 }
 
@@ -46,10 +46,11 @@ func removeUnderscores(text []uint16) []uint16 {
 // yaml11IntResolve is int.js's intResolve. intAsBigInt is never set on this path.
 func yaml11IntResolve(value []uint16, offset int, radix int) float64 {
 	sign := characterAt(value, 0)
+	digitsOffset := offset
 	if sign == '-' || sign == '+' {
-		offset++
+		digitsOffset++
 	}
-	digits := removeUnderscores(substring(value, offset, len(value)))
+	digits := removeUnderscores(substring(value, digitsOffset, len(value)))
 	number := parseInt(digits, radix)
 	if sign == '-' {
 		return -1 * number
@@ -62,8 +63,8 @@ var yaml11IntBinTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "BIN",
 	Test:    regexp.MustCompile(`^[-+]?0b[0-1_]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 2, 2), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 2, 2)), nil
 	},
 }
 
@@ -72,8 +73,8 @@ var yaml11IntOctTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "OCT",
 	Test:    regexp.MustCompile(`^[-+]?0[0-7_]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 1, 8), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 1, 8)), nil
 	},
 }
 
@@ -81,8 +82,8 @@ var yaml11IntTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:int",
 	Test:    regexp.MustCompile(`^[-+]?[0-9][0-9_]*$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 0, 10), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 0, 10)), nil
 	},
 }
 
@@ -91,8 +92,8 @@ var yaml11IntHexTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "HEX",
 	Test:    regexp.MustCompile(`^[-+]?0x[0-9a-fA-F_]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return yaml11IntResolve(value, 2, 16), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(yaml11IntResolve(value, 2, 16)), nil
 	},
 }
 
@@ -110,8 +111,8 @@ var yaml11FloatExpTag = &Tag{
 	Tag:     "tag:yaml.org,2002:float",
 	Format:  "EXP",
 	Test:    regexp.MustCompile(`^[-+]?(?:[0-9][0-9_]*)?(?:\.[0-9_]*)?[eE][-+]?[0-9]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return parseFloat(removeUnderscores(value)), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(parseFloat(removeUnderscores(value))), nil
 	},
 }
 
@@ -119,8 +120,8 @@ var yaml11FloatTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:float",
 	Test:    regexp.MustCompile(`^[-+]?(?:[0-9][0-9_]*)?\.[0-9_]*$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		node := newScalar(parseFloat(removeUnderscores(value)))
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		node := newScalar(ScalarNumber(parseFloat(removeUnderscores(value))))
 		dot := indexOfUnit(value, '.')
 		if dot != -1 {
 			f := removeUnderscores(substring(value, dot+1, len(value)))
@@ -128,7 +129,7 @@ var yaml11FloatTag = &Tag{
 				node.MinFractionDigits = len(f)
 			}
 		}
-		return node, nil
+		return node, nil, nil
 	},
 }
 
@@ -137,8 +138,8 @@ var yaml11FloatTag = &Tag{
 var binaryTag = &Tag{
 	Default: defaultFalse,
 	Tag:     "tag:yaml.org,2002:binary",
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return nodeBase64Decode(value), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, nodeBase64Decode(value), nil
 	},
 }
 
@@ -207,48 +208,52 @@ func nodeBase64Decode(text []uint16) Binary {
 // base64DecodeGroupSlow is nbytes' Base64DecodeGroupSlow: one group of four alphabet characters,
 // skipping others, writing as many bytes as fit. It returns false to stop decoding.
 func base64DecodeGroupSlow(destination []byte, destinationLength int, text []uint16, index int) ([]byte, int, bool) {
-	var hi, lo byte
+	var hi byte
+	var lo byte
+	// readIndex walks the text forward from index, and decoded grows from destination.
+	readIndex := index
+	decoded := destination
 	// next is the V macro's loop: the next alphabet character, false at = or the end.
 	next := func() bool {
 		for {
-			character := byte(text[index])
-			lo = unbase64(text[index])
-			index++
+			character := byte(text[readIndex])
+			lo = unbase64(text[readIndex])
+			readIndex++
 			if lo < 64 {
 				return true
 			}
-			if character == '=' || index >= len(text) {
+			if character == '=' || readIndex >= len(text) {
 				return false
 			}
 		}
 	}
 	// after is the V macro's tail: false at the end of the input or of the buffer.
 	after := func() bool {
-		if index >= len(text) || len(destination) >= destinationLength {
+		if readIndex >= len(text) || len(decoded) >= destinationLength {
 			return false
 		}
 		hi = lo
 		return true
 	}
 	if !next() || !after() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
 	if !next() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x3F)<<2|(lo&0x30)>>4)
+	decoded = append(decoded, (hi&0x3F)<<2|(lo&0x30)>>4)
 	if !after() || !next() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x0F)<<4|(lo&0x3C)>>2)
+	decoded = append(decoded, (hi&0x0F)<<4|(lo&0x3C)>>2)
 	if !after() || !next() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	destination = append(destination, (hi&0x03)<<6|lo&0x3F)
+	decoded = append(decoded, (hi&0x03)<<6|lo&0x3F)
 	if !after() {
-		return destination, index, false
+		return decoded, readIndex, false
 	}
-	return destination, index, true
+	return decoded, readIndex, true
 }
 
 // unbase64 is nbytes' table lookup on a code unit's low byte: 0 to 63 for the standard and URL-safe
@@ -276,9 +281,9 @@ var mergeTag = &Tag{
 	Default: defaultKey,
 	Tag:     "tag:yaml.org,2002:merge",
 	Test:    regexp.MustCompile(`^<<$`),
-	resolveScalar: func([]uint16, func(string), *Options) (any, error) {
+	resolveScalar: func([]uint16, func(string), *Options) (*Node, ScalarValue, error) {
 		// `Object.assign(new Scalar(Symbol(MERGE_KEY)), { addToJSMap })`
-		return newScalar(&MergeKey{}), nil
+		return newScalar(&MergeKey{}), nil, nil
 	},
 }
 
@@ -352,7 +357,7 @@ var omapTag = &Tag{
 	resolveCollection: func(seq *Node, onError func(message string)) *Node {
 		pairs := resolvePairs(seq, onError)
 		// `seenKeys.includes(key.value)` is SameValueZero.
-		var seenKeys []any
+		var seenKeys []ScalarValue
 		for _, item := range pairs.Items {
 			key := item.Key
 			if IsScalar(key) {
@@ -417,8 +422,8 @@ var intTimeTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "TIME",
 	Test:    regexp.MustCompile(`^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return parseSexagesimal(value), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(parseSexagesimal(value)), nil
 	},
 }
 
@@ -427,20 +432,8 @@ var floatTimeTag = &Tag{
 	Tag:     "tag:yaml.org,2002:float",
 	Format:  "TIME",
 	Test:    regexp.MustCompile(`^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return parseSexagesimal(value), nil
-	},
-}
-
-var timestampTag = &Tag{
-	Default: defaultTrue,
-	Tag:     "tag:yaml.org,2002:timestamp",
-	// If the time zone is omitted, the timestamp is assumed to be specified in UTC. The time part
-	// may be omitted altogether, resulting in a date format. In such a case, the time part is
-	// assumed to be 00:00:00Z (start of day, UTC).
-	Test: timestampRegexp,
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return timestampResolve(value)
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(parseSexagesimal(value)), nil
 	},
 }
 
@@ -451,7 +444,20 @@ var timestampRegexp = regexp.MustCompile(`^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})`
 	`(?:[ \t]*(Z|[-+][012]?[0-9](?::[0-9]{2})?))?` + // Z | +5 | -03:30
 	`)?$`)
 
-func timestampResolve(value []uint16) (any, error) {
+var timestampTag = &Tag{
+	Default: defaultTrue,
+	Tag:     "tag:yaml.org,2002:timestamp",
+	// If the time zone is omitted, the timestamp is assumed to be specified in UTC. The time part
+	// may be omitted altogether, resulting in a date format. In such a case, the time part is
+	// assumed to be 00:00:00Z (start of day, UTC).
+	Test: timestampRegexp,
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		date, resolveError := timestampResolve(value)
+		return nil, date, resolveError
+	},
+}
+
+func timestampResolve(value []uint16) (ScalarValue, error) {
 	match := timestampRegexp.FindStringSubmatch(asciiView(value))
 	if match == nil {
 		return nil, errorString("!!timestamp expects a date, starting with yyyy-mm-dd")
@@ -501,11 +507,12 @@ func dateUTC(year, month, day, hour, minute, second, millisecond float64) float6
 		}
 	}
 	yearInteger := math.Trunc(year)
+	fullYear := year
 	if yearInteger >= 0 && yearInteger <= 99 {
-		year = 1900 + yearInteger
+		fullYear = 1900 + yearInteger
 	}
 	// MakeDay.
-	y, m, dt := math.Trunc(year), math.Trunc(month), math.Trunc(day)
+	y, m, dt := math.Trunc(fullYear), math.Trunc(month), math.Trunc(day)
 	ym := y + math.Floor(m/12)
 	mn := math.Mod(m, 12)
 	if mn < 0 {
@@ -519,15 +526,17 @@ func dateUTC(year, month, day, hour, minute, second, millisecond float64) float6
 
 // daysFromCivil is the number of days from 1970-01-01 to the proleptic Gregorian date.
 func daysFromCivil(year int64, month int64, day int64) float64 {
+	// civilYear counts years from March, as the algorithm does, so January and February fall in the year before.
+	civilYear := year
 	if month <= 2 {
-		year--
+		civilYear--
 	}
-	era := year
+	era := civilYear
 	if era < 0 {
 		era -= 399
 	}
 	era /= 400
-	yearOfEra := year - era*400
+	yearOfEra := civilYear - era*400
 	shifted := month + 9
 	if month > 2 {
 		shifted = month - 3
