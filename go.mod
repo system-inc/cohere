@@ -65,12 +65,19 @@ require (
 	// option-decoding guard loads the rules tree with type information, because whether a decode is strict
 	// depends on the type it decodes into, which a regex over the source cannot see.
 	golang.org/x/tools v0.49.0
+
+	// staticcheck's SA, S and U1000 checks, which the Go engine registers as rules under their own codes
+	// (internal/goengine/rules). They are go/analysis analyzers already, so they run in the engine's one
+	// load with no runner of staticcheck's own. Minimal version selection keeps our x/tools over the older
+	// one staticcheck asks for, and the registry's tests prove its analyzers validate against ours.
+	honnef.co/go/tools v0.8.1
 )
 
 require (
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 )
