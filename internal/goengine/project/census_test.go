@@ -1,15 +1,18 @@
 package project
 
 import (
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
 // The census of a workspace is every `.go` file go would see in its owned modules, as absolute paths: inner
-// walked as itself, and nothing from testdata, a dot or underscore directory, the unowned nested module, or the
-// submodule. A file a `.gitignore` names, at the root or in inner, or one under an ignored directory, is in the
-// workspace and not ours.
+// walked as itself, and nothing from testdata, a dot or underscore directory, below vendor, a path an
+// `ignore` directive names, the unowned nested module, or the submodule. A file a `.gitignore` names, at the
+// root or in inner, or one under an ignored directory, is in the workspace and not ours.
 func TestTakeCensusListsWhatGoSeesAndExcludesWhatGitIgnores(test *testing.T) {
 	test.Parallel()
 	built := readFixture(test)
@@ -29,7 +32,8 @@ func TestTakeCensusListsWhatGoSeesAndExcludesWhatGitIgnores(test *testing.T) {
 		return paths
 	}
 
-	ours := absolute("inner/deeper/deeper.go", "inner/inner.go", "main.go")
+	ours := absolute("deep/deep.go", "deep/generated/kept.go", "inner/deeper/deeper.go", "inner/inner.go",
+		"main.go", "tools/tool.go", "vendor/vendored.go")
 	ignored := absolute("build/generated.go", "inner/local.go", "scratch.go")
 	if !slices.Equal(census.Ours, ours) {
 		test.Errorf("ours are %q, want %q", census.Ours, ours)
@@ -67,6 +71,12 @@ func TestTakeCensusDoesNotEnterWhatGoDoesNot(test *testing.T) {
 		"an underscore directory":       "_scratch/underscore.go",
 		"a module go.work does not use": "nested/nested.go",
 		"a submodule":                   "library/mod/library.go",
+		"a directory below vendor":      "vendor/library/library.go",
+		"an anchored ignore directive":  "generated/generated.go",
+		"an ignore directive's path":    "tools/scripts/script.go",
+		"an ignore directive deeper":    "deep/tools/scripts/script.go",
+		"a nested ignore directive":     "deep/inside/inside.go",
+		"below a nested ignore":         "deep/inside/below/below.go",
 	}
 	for name, file := range skipped {
 		test.Run(name, func(test *testing.T) {
@@ -75,6 +85,83 @@ func TestTakeCensusDoesNotEnterWhatGoDoesNot(test *testing.T) {
 				test.Errorf("the census counted %s", file)
 			}
 		})
+	}
+
+	// What ./... does match beside them: vendor's own package, the ignored path's parent, and a directory of
+	// the anchored name below the module's root.
+	counted := map[string]string{
+		"a vendor directory's own files":  "vendor/vendored.go",
+		"the parent of an ignored path":   "tools/tool.go",
+		"an anchored name below the root": "deep/generated/kept.go",
+		"the parent of a nested ignore":   "deep/deep.go",
+	}
+	for name, file := range counted {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			if !slices.Contains(census.Ours, filepath.Join(built.repository, filepath.FromSlash(file))) {
+				test.Errorf("the census left out %s", file)
+			}
+		})
+	}
+}
+
+// The census's directories in the root module are the ones `go list ./...` lists there, so what go leaves
+// out of ./... by testdata, `.` and `_`, vendor, `ignore` directives and module boundaries, the census leaves
+// out the same way, checked against go rather than against this package's reading of it. The submodule is
+// a module of its own, so go never counts it in the root module either.
+func TestTakeCensusSeesTheRootModulesPackagesGoListSees(test *testing.T) {
+	test.Parallel()
+	built := readFixture(test)
+	covered, readError := ReadWorkspace(built.repository)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	census, censusError := TakeCensus(covered)
+	if censusError != nil {
+		test.Fatal(censusError)
+	}
+
+	command := exec.Command("go", "list", "-f", `{{if eq .Module.Path "example.com/root"}}{{.Dir}}{{end}}`, "./...")
+	command.Dir = built.repository
+	// -mod=readonly, since a vendor directory at a go.work's root could otherwise read as the workspace's
+	// vendoring, and workspace mode allows no other value.
+	command.Env = append(withoutVariable(os.Environ(), "GOWORK"), "GOTOOLCHAIN=local", "GOPROXY=off",
+		"GOFLAGS=-mod=readonly")
+	output, listError := command.CombinedOutput()
+	if listError != nil {
+		test.Fatalf("go list: %v\n%s", listError, output)
+	}
+	// go answers from its resolved working directory, a temporary directory's symbolic links followed, so both
+	// sides are compared relative to the root they were read from.
+	resolvedRepository, resolveError := filepath.EvalSymlinks(built.repository)
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	var listed []string
+	for _, directory := range strings.Fields(string(output)) {
+		relative, relativeError := filepath.Rel(resolvedRepository, directory)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		listed = append(listed, filepath.ToSlash(relative))
+	}
+	slices.Sort(listed)
+
+	var censused []string
+	for _, file := range census.Files {
+		relative, relativeError := filepath.Rel(built.repository, filepath.Dir(file))
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		relative = filepath.ToSlash(relative)
+		if relative == "inner" || strings.HasPrefix(relative, "inner/") || slices.Contains(censused, relative) {
+			continue
+		}
+		censused = append(censused, relative)
+	}
+	slices.Sort(censused)
+	if !slices.Equal(censused, listed) {
+		test.Errorf("the census's root-module directories are %q, and go list's are %q", censused, listed)
 	}
 }
 

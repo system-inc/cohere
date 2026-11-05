@@ -15,7 +15,8 @@ import (
 type fixture struct {
 	// repository holds the go.work. Beside the modules it uses it holds what neither the gate nor the census
 	// may take for ours: testdata, a dot directory, an underscore directory, nested (a module go.work does not
-	// use), and files its ignore files exclude.
+	// use), and files its ignore files exclude. Its root go.mod's `ignore` directives name ./generated,
+	// anchored, tools/scripts, at any depth, and ./deep/inside, a nested path; deep/generated is kept.
 	repository string
 
 	// lone is a go.mod with no go.work around it, outside the repository.
@@ -73,8 +74,9 @@ func buildFixture(base string) (fixture, error) {
 	}
 
 	repositoryFiles := map[string]string{
-		"go.work":                          "go 1.21\n\nuse (\n\t.\n\t./inner\n\t./library/mod\n)\n",
-		"go.mod":                           "module example.com/root\n\ngo 1.21\n",
+		"go.work": "go 1.25\n\nuse (\n\t.\n\t./inner\n\t./library/mod\n)\n",
+		"go.mod": "module example.com/root\n\ngo 1.25\n\n" +
+			"ignore (\n\t./generated\n\ttools/scripts\n\t./deep/inside\n)\n",
 		".gitignore":                       "scratch.go\nbuild/\n",
 		"main.go":                          "package root\n",
 		"notes.txt":                        "not go\n",
@@ -95,6 +97,16 @@ func buildFixture(base string) (fixture, error) {
 		"inner/local.go":                   "package inner\n",
 		"inner/deeper/deeper.go":           "package deeper\n",
 		"inner/deeper/testdata/skipped.go": "package skipped\n",
+		"vendor/vendored.go":               "package vendor\n",
+		"vendor/library/library.go":        "package library\n",
+		"generated/generated.go":           "package generated\n",
+		"deep/deep.go":                     "package deep\n",
+		"deep/generated/kept.go":           "package generated\n",
+		"deep/inside/inside.go":            "package inside\n",
+		"deep/inside/below/below.go":       "package below\n",
+		"tools/tool.go":                    "package tools\n",
+		"tools/scripts/script.go":          "package scripts\n",
+		"deep/tools/scripts/script.go":     "package scripts\n",
 	}
 	if writeError := writeFiles(built.repository, repositoryFiles); writeError != nil {
 		return fixture{}, writeError
