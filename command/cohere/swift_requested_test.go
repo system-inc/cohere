@@ -10,8 +10,8 @@ import (
 
 // renderRequested renders a stream for a command line that asked for the phases requested names, the way
 // runSwiftEngine does, and returns what renderRecords returns.
-func renderRequested(t *testing.T, lines []string, requested map[phaseName]bool, engineExit int) (string, int, error) {
-	t.Helper()
+func renderRequested(test *testing.T, lines []string, requested map[phaseName]bool, engineExit int) (string, int, error) {
+	test.Helper()
 	var out bytes.Buffer
 	run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
 	run.requested = requested
@@ -39,20 +39,20 @@ func flagsOf(names ...string) (map[string]bool, func(string) string) {
 }
 
 // editRecords rewrites the records of a fixture: drop removes a record, and edit changes one in place.
-func editRecords(t *testing.T, lines []string, edit func(record map[string]any) (keep bool)) []string {
-	t.Helper()
+func editRecords(test *testing.T, lines []string, edit func(record map[string]any) (keep bool)) []string {
+	test.Helper()
 	edited := []string{}
 	for _, line := range lines {
 		record := map[string]any{}
 		if err := json.Unmarshal([]byte(line), &record); err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if !edit(record) {
 			continue
 		}
 		encoded, err := json.Marshal(record)
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		edited = append(edited, string(encoded))
 	}
@@ -60,8 +60,8 @@ func editRecords(t *testing.T, lines []string, edit func(record map[string]any) 
 }
 
 // A command line asks for the phases the TypeScript run would run for it.
-func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(t *testing.T) {
-	t.Parallel()
+func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(test *testing.T) {
+	test.Parallel()
 	for _, testCase := range []struct {
 		flags []string
 		want  string
@@ -83,7 +83,7 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(t *testing.T) {
 			}
 		}
 		if got := strings.Join(names, " "); got != testCase.want {
-			t.Errorf("cohere %v asks for %q, want %q", testCase.flags, got, testCase.want)
+			test.Errorf("cohere %v asks for %q, want %q", testCase.flags, got, testCase.want)
 		}
 	}
 }
@@ -91,20 +91,20 @@ func TestSwiftRequestedPhasesReadTheFlagsAsTheTypeScriptRunDoes(t *testing.T) {
 // `cohere --lint` on a Swift package: the engine skips fix and types as not requested and calls the run
 // complete, which it is (swift/Contract.md, `complete`). LintOnly.jsonl is a real stream of that run.
 // Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
-func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(t *testing.T) {
+func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(test *testing.T) {
 	lint := engineRequestedPhases(flagsOf("lint"))
 
-	output, exitCode, err := renderRequested(t, contractFixture(t, "LintOnly.jsonl"), lint, 1)
+	output, exitCode, err := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), lint, 1)
 	if err != nil || exitCode != 1 {
-		t.Fatalf("a --lint run with two findings: exit %d, err %v\n%s", exitCode, err, output)
+		test.Fatalf("a --lint run with two findings: exit %d, err %v\n%s", exitCode, err, output)
 	}
-	requireLines(t, output,
+	requireLines(test, output,
 		"[cohere-swift/toolchain-require-upcoming-features/upcomingFeatureMissing]",
 		"phases: fix skipped (not requested) · types skipped (not requested) · lint ran",
 	)
 
 	// The same run with nothing found passes.
-	clean := editRecords(t, contractFixture(t, "LintOnly.jsonl"), func(record map[string]any) bool {
+	clean := editRecords(test, contractFixture(test, "LintOnly.jsonl"), func(record map[string]any) bool {
 		switch record["kind"] {
 		case "finding":
 			return false
@@ -116,26 +116,26 @@ func TestALintRunThatSkipsWhatItWasNotAskedForIsComplete(t *testing.T) {
 		}
 		return true
 	})
-	output, exitCode, err = renderRequested(t, clean, lint, 0)
+	output, exitCode, err = renderRequested(test, clean, lint, 0)
 	if err != nil || exitCode != 0 {
-		t.Fatalf("a clean --lint run: exit %d, err %v\n%s", exitCode, err, output)
+		test.Fatalf("a clean --lint run: exit %d, err %v\n%s", exitCode, err, output)
 	}
 }
 
 // A phase the caller asked for that comes back skipped still fails, whatever the engine calls it.
 // Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
-func TestARequestedPhaseThatComesBackSkippedStillFails(t *testing.T) {
+func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
 	// Skipped as not requested when it was requested: a bare run reported as though it were --lint. The
 	// engine is refused rather than believed.
-	_, _, err := renderRequested(t, contractFixture(t, "LintOnly.jsonl"), engineRequestedPhases(flagsOf()), 1)
+	_, _, err := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), engineRequestedPhases(flagsOf()), 1)
 	if err == nil || !strings.Contains(err.Error(), "the fix phase was asked for, and the engine skipped it as \"not requested\"") {
-		t.Fatalf("a bare run whose fix came back not requested was accepted: %v", err)
+		test.Fatalf("a bare run whose fix came back not requested was accepted: %v", err)
 	}
 
 	// Skipped for any other reason, under --lint, while calling the run complete: the contradiction the
 	// summary check exists for.
 	otherSkip := func(complete bool) []string {
-		return editRecords(t, contractFixture(t, "LintOnly.jsonl"), func(record map[string]any) bool {
+		return editRecords(test, contractFixture(test, "LintOnly.jsonl"), func(record map[string]any) bool {
 			if record["kind"] == "phase" && record["name"] == "lint" {
 				record["outcome"] = "skipped"
 				record["detail"] = "no rule was configured"
@@ -147,37 +147,37 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(t *testing.T) {
 		})
 	}
 	lint := engineRequestedPhases(flagsOf("lint"))
-	_, _, err = renderRequested(t, otherSkip(true), lint, 1)
+	_, _, err = renderRequested(test, otherSkip(true), lint, 1)
 	if err == nil || !strings.Contains(err.Error(), "calls the run complete") {
-		t.Fatalf("a requested lint skipped for another reason, called complete, was accepted: %v", err)
+		test.Fatalf("a requested lint skipped for another reason, called complete, was accepted: %v", err)
 	}
 
 	// Called incomplete instead, it is believed and fails as an incomplete run.
-	output, exitCode, err := renderRequested(t, otherSkip(false), lint, 1)
+	output, exitCode, err := renderRequested(test, otherSkip(false), lint, 1)
 	if err != nil || exitCode != 1 || !strings.Contains(output, "this run did not check everything") {
-		t.Fatalf("a requested lint skipped and called incomplete: exit %d, err %v\n%s", exitCode, err, output)
+		test.Fatalf("a requested lint skipped and called incomplete: exit %d, err %v\n%s", exitCode, err, output)
 	}
 }
 
 // --format-only asks for the fix phase alone, as TypeScript's does, so the engine's types and lint skipped as
 // not requested are no gap, and its format finding is the verdict (#nqb3mjv, c024df4b). Without it a phase
 // flag would be read as asking for everything, and the format gate would fail on phases it never asked for.
-func TestFormatOnlyAsksForTheFixPhaseAlone(t *testing.T) {
-	t.Parallel()
+func TestFormatOnlyAsksForTheFixPhaseAlone(test *testing.T) {
+	test.Parallel()
 	given, value := flagsOf("no-fix", "format-only")
 	requested := engineRequestedPhases(given, value)
 	if !requested[phaseFix] || requested[phaseTypes] || requested[phaseLint] || requested[phaseUnused] {
-		t.Fatalf("--format-only requested %v, want fix alone", requested)
+		test.Fatalf("--format-only requested %v, want fix alone", requested)
 	}
-	output, exitCode, err := renderRequested(t, contractFixture(t, "FormatOnly.jsonl"), requested, 1)
+	output, exitCode, err := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), requested, 1)
 	if err != nil {
-		t.Fatalf("the format-only stream was refused: %v\n%s", err, output)
+		test.Fatalf("the format-only stream was refused: %v\n%s", err, output)
 	}
 	if exitCode != 1 {
-		t.Errorf("the format finding exited %d, want 1:\n%s", exitCode, output)
+		test.Errorf("the format finding exited %d, want 1:\n%s", exitCode, output)
 	}
 	everything := engineRequestedPhases(flagsOf("no-fix"))
-	if _, _, err := renderRequested(t, contractFixture(t, "FormatOnly.jsonl"), everything, 1); err == nil {
-		t.Errorf("a stream skipping types and lint as not requested was accepted for a run that asked for them")
+	if _, _, err := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), everything, 1); err == nil {
+		test.Errorf("a stream skipping types and lint as not requested was accepted for a run that asked for them")
 	}
 }

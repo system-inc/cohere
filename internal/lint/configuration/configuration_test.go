@@ -13,8 +13,8 @@ import (
 // `consistency-require-type-suffix` fired 336 times across
 // `libraries/structure/source/api/graphql/generated/`, which the gate cohere replaces correctly
 // stays silent on. If this test ever passes in the wrong direction, those 336 come back.
-func TestTheThreeHundredThirtySixCase(t *testing.T) {
-	t.Parallel()
+func TestTheThreeHundredThirtySixCase(test *testing.T) {
+	test.Parallel()
 	configuration := &Config{
 		Rules: map[string]RuleSetting{
 			"consistency-require-type-suffix": {Severity: SeverityError},
@@ -29,14 +29,14 @@ func TestTheThreeHundredThirtySixCase(t *testing.T) {
 
 	generated := configuration.Resolve("libraries/structure/source/api/graphql/generated/GraphQlOperations.ts")
 	if generated.Enabled("consistency-require-type-suffix") {
-		t.Fatal("the rule is still enabled inside generated/, which is the 336 findings")
+		test.Fatal("the rule is still enabled inside generated/, which is the 336 findings")
 	}
 
 	// The other half, and the one a too-broad override would break silently: the rule must still run
 	// everywhere else. An override that disabled it globally would pass the assertion above.
 	authored := configuration.Resolve("libraries/structure/source/components/buttons/Button.tsx")
 	if !authored.Enabled("consistency-require-type-suffix") {
-		t.Fatal("the override leaked outside generated/, disabling the rule on authored code")
+		test.Fatal("the override leaked outside generated/, disabling the rule on authored code")
 	}
 }
 
@@ -46,8 +46,8 @@ func TestTheThreeHundredThirtySixCase(t *testing.T) {
 // Treating `**` as `*` makes the generated override miss every nested file. Treating `*` as
 // crossing slashes makes `modules/*` swallow a whole subtree and scope rules off files nobody
 // excluded. The first is loud, the second is invisible.
-func TestDoubleStarCrossesDirectoriesAndStarDoesNot(t *testing.T) {
-	t.Parallel()
+func TestDoubleStarCrossesDirectoriesAndStarDoesNot(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		pattern string
 		path    string
@@ -70,15 +70,15 @@ func TestDoubleStarCrossesDirectoriesAndStarDoesNot(t *testing.T) {
 
 	for _, testCase := range cases {
 		if got := Match(testCase.pattern, testCase.path); got != testCase.want {
-			t.Errorf("Match(%q, %q) = %v, want %v", testCase.pattern, testCase.path, got, testCase.want)
+			test.Errorf("Match(%q, %q) = %v, want %v", testCase.pattern, testCase.path, got, testCase.want)
 		}
 	}
 }
 
 // TestBraceExpansion covers `*.{ts,tsx}`, which is in the live configuration. A matcher that ignored braces
 // would match neither extension while looking like it worked.
-func TestBraceExpansion(t *testing.T) {
-	t.Parallel()
+func TestBraceExpansion(test *testing.T) {
+	test.Parallel()
 	cases := []struct {
 		pattern string
 		path    string
@@ -97,7 +97,7 @@ func TestBraceExpansion(t *testing.T) {
 
 	for _, testCase := range cases {
 		if got := Match(testCase.pattern, testCase.path); got != testCase.want {
-			t.Errorf("Match(%q, %q) = %v, want %v", testCase.pattern, testCase.path, got, testCase.want)
+			test.Errorf("Match(%q, %q) = %v, want %v", testCase.pattern, testCase.path, got, testCase.want)
 		}
 	}
 }
@@ -106,8 +106,8 @@ func TestBraceExpansion(t *testing.T) {
 //
 // Hand-written patterns in a test can drift from the config they claim to model. These are the real
 // strings.
-func TestEveryLivePatternBehaves(t *testing.T) {
-	t.Parallel()
+func TestEveryLivePatternBehaves(test *testing.T) {
+	test.Parallel()
 	ignore := []string{
 		"code-quality/fixtures/**", "node_modules/**", "public/**", "**/.next/**",
 		"**/.open-next/**", "**/.worker-next/**", "**/.wrangler/**", "**/build/**",
@@ -126,7 +126,7 @@ func TestEveryLivePatternBehaves(t *testing.T) {
 	}
 	for _, path := range excluded {
 		if !MatchAny(ignore, path) {
-			t.Errorf("%q should be ignored by the live patterns but is not", path)
+			test.Errorf("%q should be ignored by the live patterns but is not", path)
 		}
 	}
 
@@ -139,7 +139,7 @@ func TestEveryLivePatternBehaves(t *testing.T) {
 	}
 	for _, path := range kept {
 		if MatchAny(ignore, path) {
-			t.Errorf("%q is real source and must not be ignored", path)
+			test.Errorf("%q is real source and must not be ignored", path)
 		}
 	}
 }
@@ -147,8 +147,8 @@ func TestEveryLivePatternBehaves(t *testing.T) {
 // TestLaterOverridesWin pins the precedence both ESLint and oxlint use. Getting this backwards makes
 // cohere disagree with the gate about which rules were supposed to run, which is the thing that
 // blocks an honest acceptance diff.
-func TestLaterOverridesWin(t *testing.T) {
-	t.Parallel()
+func TestLaterOverridesWin(test *testing.T) {
+	test.Parallel()
 	configuration := &Config{
 		Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
 		Overrides: []Override{
@@ -158,10 +158,10 @@ func TestLaterOverridesWin(t *testing.T) {
 	}
 
 	if configuration.Resolve("modules/other/File.ts").Enabled("a-rule") {
-		t.Fatal("the first override should have disabled the rule under modules/")
+		test.Fatal("the first override should have disabled the rule under modules/")
 	}
 	if !configuration.Resolve("modules/finance/File.ts").Enabled("a-rule") {
-		t.Fatal("the later override should have re-enabled the rule under modules/finance/")
+		test.Fatal("the later override should have re-enabled the rule under modules/finance/")
 	}
 }
 
@@ -170,8 +170,8 @@ func TestLaterOverridesWin(t *testing.T) {
 // override `"prefer-const": "error"` dropped the Nexus tier's ignoreReadBeforeAssign in cohere only, so
 // the two engines judged prefer-const differently on every TS file (#na0hgjz). An override that writes
 // its own options still replaces them.
-func TestABareSeverityInAnOverrideKeepsTheOptionsInForce(t *testing.T) {
-	t.Parallel()
+func TestABareSeverityInAnOverrideKeepsTheOptionsInForce(test *testing.T) {
+	test.Parallel()
 	inherited := []json.RawMessage{json.RawMessage(`{"ignoreReadBeforeAssign":true}`)}
 	written := []json.RawMessage{json.RawMessage(`{"destructuring":"all"}`)}
 	configuration := &Config{
@@ -183,20 +183,20 @@ func TestABareSeverityInAnOverrideKeepsTheOptionsInForce(t *testing.T) {
 	}
 
 	if options := configuration.Resolve("modules/File.ts").RawOptionsFor("prefer-const"); len(options) != 1 || string(options[0]) != string(inherited[0]) {
-		t.Errorf("a bare severity in an override dropped the options in force: got %s", options)
+		test.Errorf("a bare severity in an override dropped the options in force: got %s", options)
 	}
 	if options := configuration.Resolve("modules/written/File.ts").RawOptionsFor("prefer-const"); len(options) != 1 || string(options[0]) != string(written[0]) {
-		t.Errorf("an override's own options did not replace the ones in force: got %s", options)
+		test.Errorf("an override's own options did not replace the ones in force: got %s", options)
 	}
 	if options := configuration.Resolve("modules/File.js").RawOptionsFor("prefer-const"); len(options) != 1 || string(options[0]) != string(inherited[0]) {
-		t.Errorf("a file no override matches lost its options: got %s", options)
+		test.Errorf("a file no override matches lost its options: got %s", options)
 	}
 }
 
 // TestOneFilesOverridesDoNotLeakIntoTheNext guards a real aliasing bug: sharing the base rule map
 // across files makes the first override permanent for every file resolved afterward.
-func TestOneFilesOverridesDoNotLeakIntoTheNext(t *testing.T) {
-	t.Parallel()
+func TestOneFilesOverridesDoNotLeakIntoTheNext(test *testing.T) {
+	test.Parallel()
 	configuration := &Config{
 		Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
 		Overrides: []Override{{
@@ -207,14 +207,14 @@ func TestOneFilesOverridesDoNotLeakIntoTheNext(t *testing.T) {
 
 	configuration.Resolve("src/generated/File.ts")
 	if !configuration.Resolve("src/authored/File.ts").Enabled("a-rule") {
-		t.Fatal("resolving a generated file disabled the rule for a later authored file")
+		test.Fatal("resolving a generated file disabled the rule for a later authored file")
 	}
 }
 
 // TestIgnoredFileRunsNoRulesAndSaysWhy proves exclusion is reportable rather than merely silent. A
 // file skipped by ignorePatterns and a file with no findings are identical output otherwise.
-func TestIgnoredFileRunsNoRulesAndSaysWhy(t *testing.T) {
-	t.Parallel()
+func TestIgnoredFileRunsNoRulesAndSaysWhy(test *testing.T) {
+	test.Parallel()
 	configuration := &Config{
 		Rules:          map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
 		IgnorePatterns: []string{"node_modules/**"},
@@ -222,31 +222,31 @@ func TestIgnoredFileRunsNoRulesAndSaysWhy(t *testing.T) {
 
 	resolved := configuration.Resolve("node_modules/thing/index.ts")
 	if !resolved.Ignored {
-		t.Fatal("an ignored path did not resolve as ignored")
+		test.Fatal("an ignored path did not resolve as ignored")
 	}
 	if resolved.IgnoredBy != "node_modules/**" {
-		t.Fatalf("the excluding pattern was not reported: %q", resolved.IgnoredBy)
+		test.Fatalf("the excluding pattern was not reported: %q", resolved.IgnoredBy)
 	}
 	if resolved.Enabled("a-rule") {
-		t.Fatal("a rule ran on an ignored file")
+		test.Fatal("a rule ran on an ignored file")
 	}
 }
 
 // TestAnUnconfiguredRuleDoesNotRun keeps adding a rule to the registry from silently enabling it
 // across the whole tree.
-func TestAnUnconfiguredRuleDoesNotRun(t *testing.T) {
-	t.Parallel()
+func TestAnUnconfiguredRuleDoesNotRun(test *testing.T) {
+	test.Parallel()
 	configuration := &Config{Rules: map[string]RuleSetting{"known": {Severity: SeverityError}}}
 
 	if configuration.Resolve("File.ts").Enabled("never-configured") {
-		t.Fatal("a rule the config never mentions was treated as enabled")
+		test.Fatal("a rule the config never mentions was treated as enabled")
 	}
 }
 
 // TestBothRuleShapesLoad covers the 173 bare severities and the 9 that carry options.
-func TestBothRuleShapesLoad(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestBothRuleShapesLoad(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	path := filepath.Join(directory, ".oxlintrc.json")
 	contents := `{
 		"rules": {
@@ -259,62 +259,62 @@ func TestBothRuleShapesLoad(t *testing.T) {
 		"overrides": [{"files": ["**/generated/**/*.{ts,tsx}"], "rules": {"plain-rule": "off"}}]
 	}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		t.Fatalf("writing the config: %v", err)
+		test.Fatalf("writing the config: %v", err)
 	}
 
 	loaded, err := Load(path)
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		test.Fatalf("loading: %v", err)
 	}
 
 	if loaded.Rules["plain-rule"].Severity != SeverityError {
-		t.Fatal("a bare severity did not load as error")
+		test.Fatal("a bare severity did not load as error")
 	}
 	if loaded.Rules["disabled-rule"].Severity != SeverityOff {
-		t.Fatal("an off rule did not load as off")
+		test.Fatal("an off rule did not load as off")
 	}
 	if loaded.Rules["configured-rule"].Severity != SeverityError {
-		t.Fatal("a [severity, options] rule did not load its severity")
+		test.Fatal("a [severity, options] rule did not load its severity")
 	}
 	if len(loaded.Rules["configured-rule"].Options) == 0 {
-		t.Fatal("a rule's options were dropped, which is how a rule ends up guarding nothing")
+		test.Fatal("a rule's options were dropped, which is how a rule ends up guarding nothing")
 	}
 	if len(loaded.Rules["plain-rule"].Options) != 0 {
-		t.Fatal("a bare rule invented options it was never given")
+		test.Fatal("a bare rule invented options it was never given")
 	}
 	if len(loaded.Overrides) != 1 || len(loaded.IgnorePatterns) != 1 {
-		t.Fatalf("overrides or ignorePatterns did not load: %+v", loaded)
+		test.Fatalf("overrides or ignorePatterns did not load: %+v", loaded)
 	}
 }
 
 // TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig is the loudness guard. An empty config lints
 // everything with nothing configured, which looks exactly like a clean run.
-func TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig(t *testing.T) {
-	t.Parallel()
-	if _, err := Load(filepath.Join(t.TempDir(), "absent.json")); err == nil {
-		t.Fatal("a missing config file loaded successfully")
+func TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig(test *testing.T) {
+	test.Parallel()
+	if _, err := Load(filepath.Join(test.TempDir(), "absent.json")); err == nil {
+		test.Fatal("a missing config file loaded successfully")
 	}
 
-	directory := t.TempDir()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "broken.json")
 	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
-		t.Fatalf("writing: %v", err)
+		test.Fatalf("writing: %v", err)
 	}
 	if _, err := Load(path); err == nil {
-		t.Fatal("a malformed config loaded successfully")
+		test.Fatal("a malformed config loaded successfully")
 	}
 }
 
 // TestAnUnknownSeverityIsRefused keeps a typo from silently disabling a rule tree-wide.
-func TestAnUnknownSeverityIsRefused(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestAnUnknownSeverityIsRefused(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "config.json")
 	if err := os.WriteFile(path, []byte(`{"rules":{"a-rule":"errrror"}}`), 0o644); err != nil {
-		t.Fatalf("writing: %v", err)
+		test.Fatalf("writing: %v", err)
 	}
 	if _, err := Load(path); err == nil {
-		t.Fatal("an unknown severity was accepted, which would disable the rule silently")
+		test.Fatal("an unknown severity was accepted, which would disable the rule silently")
 	}
 }
 
@@ -328,32 +328,32 @@ func TestAnUnknownSeverityIsRefused(t *testing.T) {
 //
 // The fixture uses a key nobody would add by accident, so a future config gaining a real key does
 // not make this test wrong. What it asserts is the mechanism, not a particular key.
-func TestUnimplementedTopLevelKeyIsRefused(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestUnimplementedTopLevelKeyIsRefused(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"a-rule": "error"}, "notAKeyThisLoaderKnows": {"anything": 1}}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		t.Fatalf("writing the config: %v", err)
+		test.Fatalf("writing the config: %v", err)
 	}
 
 	_, err := Load(path)
 	if err == nil {
-		t.Fatal("a config declaring an unimplemented top-level key loaded successfully, so the key " +
+		test.Fatal("a config declaring an unimplemented top-level key loaded successfully, so the key " +
 			"was discarded silently and whatever it configures would never take effect")
 	}
 	if !strings.Contains(err.Error(), "notAKeyThisLoaderKnows") {
-		t.Errorf("the error does not name the offending key, so a reader cannot act on it: %v", err)
+		test.Errorf("the error does not name the offending key, so a reader cannot act on it: %v", err)
 	}
 
 	// The control. The same config without the key must load, or the test above passes for the
 	// wrong reason and this guard would reject every config equally.
 	controlPath := filepath.Join(directory, "control.json")
 	if err := os.WriteFile(controlPath, []byte(`{"rules": {"a-rule": "error"}}`), 0o644); err != nil {
-		t.Fatalf("writing the control config: %v", err)
+		test.Fatalf("writing the control config: %v", err)
 	}
 	if _, err := Load(controlPath); err != nil {
-		t.Fatalf("the control config failed to load, so the guard rejects more than it should: %v", err)
+		test.Fatalf("the control config failed to load, so the guard rejects more than it should: %v", err)
 	}
 }
 
@@ -391,25 +391,25 @@ func TestAGoBlockIsLeftToTheGoEngine(test *testing.T) {
 // parameter through `Load` for the sole benefit of this assertion.
 // Not parallel: it adds an entry to the package's ignoredTopLevelKeys map, which Load reads for every
 // top-level key it does not parse.
-func TestIgnoredKeyWithoutAReasonIsRefused(t *testing.T) {
+func TestIgnoredKeyWithoutAReasonIsRefused(test *testing.T) {
 	const key = "keyRecordedWithNoReason"
 	ignoredTopLevelKeys[key] = ""
-	t.Cleanup(func() { delete(ignoredTopLevelKeys, key) })
+	test.Cleanup(func() { delete(ignoredTopLevelKeys, key) })
 
-	directory := t.TempDir()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"rules": {"a-rule": "error"}, "keyRecordedWithNoReason": true}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		t.Fatalf("writing the config: %v", err)
+		test.Fatalf("writing the config: %v", err)
 	}
 
 	_, err := Load(path)
 	if err == nil {
-		t.Fatal("a key listed as ignored with no reason loaded successfully; an entry with no " +
+		test.Fatal("a key listed as ignored with no reason loaded successfully; an entry with no " +
 			"reason says only that somebody wanted the config to load")
 	}
 	if !strings.Contains(err.Error(), "no reason") {
-		t.Errorf("the error does not say the reason is what is missing: %v", err)
+		test.Errorf("the error does not say the reason is what is missing: %v", err)
 	}
 }
 
@@ -418,14 +418,14 @@ func TestIgnoredKeyWithoutAReasonIsRefused(t *testing.T) {
 // The test above proves an empty reason is refused at load time, which only helps if someone
 // actually loads a config carrying that key. This asserts the invariant directly, so an entry added
 // with no reason fails immediately rather than whenever a config happens to use it.
-func TestEveryIgnoredKeyCarriesAReason(t *testing.T) {
-	t.Parallel()
+func TestEveryIgnoredKeyCarriesAReason(test *testing.T) {
+	test.Parallel()
 	if len(ignoredTopLevelKeys) == 0 {
-		t.Fatal("no ignored keys are recorded, so this test asserts nothing")
+		test.Fatal("no ignored keys are recorded, so this test asserts nothing")
 	}
 	for key, reason := range ignoredTopLevelKeys {
 		if strings.TrimSpace(reason) == "" {
-			t.Errorf("ignored key %q carries no reason", key)
+			test.Errorf("ignored key %q carries no reason", key)
 		}
 	}
 }
@@ -436,14 +436,14 @@ func TestEveryIgnoredKeyCarriesAReason(t *testing.T) {
 // Each of those is a different state and only the last is correct, so this asserts the current one
 // rather than leaving the transition implicit. It also documents why `plugins` is absent from the
 // known-dirty control below: it left that population by being fixed.
-func TestPluginsIsParsedRatherThanIgnored(t *testing.T) {
-	t.Parallel()
+func TestPluginsIsParsedRatherThanIgnored(test *testing.T) {
+	test.Parallel()
 	if !parsedTopLevelKeys["plugins"] {
-		t.Error("`plugins` is not parsed; it was implemented under #0ympke3 and a config declaring " +
+		test.Error("`plugins` is not parsed; it was implemented under #0ympke3 and a config declaring " +
 			"it would be refused rather than honoured")
 	}
 	if _, ignored := ignoredTopLevelKeys["plugins"]; ignored {
-		t.Error("`plugins` is recorded as deliberately ignored AND parsed; one of the two is stale " +
+		test.Error("`plugins` is recorded as deliberately ignored AND parsed; one of the two is stale " +
 			"and a reader cannot tell which describes the behaviour")
 	}
 }
@@ -460,7 +460,7 @@ func TestPluginsIsParsedRatherThanIgnored(t *testing.T) {
 // identical from a green suite.
 // Not parallel: its subtests delete entries from the package's ignoredTopLevelKeys map, which Load reads
 // for every top-level key it does not parse.
-func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
+func TestTheThreeRealKeysWouldHaveBeenCaught(test *testing.T) {
 	// `plugins` and `settings` were two of these and are no longer: each is implemented now, so it is
 	// parsed rather than ignored and the decay guard below correctly refused to keep testing it
 	// (`settings` since #gj5nm6e, read for better-tailwindcss). Removed here rather than by weakening
@@ -468,71 +468,71 @@ func TestTheThreeRealKeysWouldHaveBeenCaught(t *testing.T) {
 	for _, key := range []string{"jsPlugins"} {
 		// Not parallel: each one deletes and restores an entry in the package's ignoredTopLevelKeys map, so
 		// two at once would write the same map.
-		t.Run(key, func(t *testing.T) {
+		test.Run(key, func(test *testing.T) {
 			reason, recorded := ignoredTopLevelKeys[key]
 			if !recorded {
-				t.Fatalf("%q is no longer recorded as ignored, so this control is testing a key "+
+				test.Fatalf("%q is no longer recorded as ignored, so this control is testing a key "+
 					"that is not the one that was being dropped; either it was implemented, in "+
 					"which case remove it from this list, or the entry was deleted", key)
 			}
 			delete(ignoredTopLevelKeys, key)
-			t.Cleanup(func() { ignoredTopLevelKeys[key] = reason })
+			test.Cleanup(func() { ignoredTopLevelKeys[key] = reason })
 
-			directory := t.TempDir()
+			directory := test.TempDir()
 			path := filepath.Join(directory, "CohereSettings.json")
 			contents := `{"rules": {"a-rule": "error"}, "` + key + `": ["something"]}`
 			if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-				t.Fatalf("writing the config: %v", err)
+				test.Fatalf("writing the config: %v", err)
 			}
 
 			_, err := Load(path)
 			if err == nil {
-				t.Fatalf("a config declaring %q loaded successfully with the key unaccounted for; "+
+				test.Fatalf("a config declaring %q loaded successfully with the key unaccounted for; "+
 					"this is the exact state the live config was in and nothing reported it", key)
 			}
 			if !strings.Contains(err.Error(), key) {
-				t.Errorf("the error does not name %q: %v", key, err)
+				test.Errorf("the error does not name %q: %v", key, err)
 			}
 		})
 	}
 }
 
 // TestPluginDeclarationEnablesItsRules is the mechanism, on a config naming none of them.
-func TestPluginDeclarationEnablesItsRules(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestPluginDeclarationEnablesItsRules(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"plugins": ["react"], "rules": {"some-named-rule": "error"}}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		t.Fatalf("writing the config: %v", err)
+		test.Fatalf("writing the config: %v", err)
 	}
 
 	loaded, err := Load(path)
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		test.Fatalf("loading: %v", err)
 	}
 
 	// A react rule nobody named must now be enabled, at warn.
 	setting, enabled := loaded.Rules["react/no-children-prop"]
 	if !enabled {
-		t.Fatal("declaring the react plugin did not enable react/no-children-prop, which the real " +
+		test.Fatal("declaring the react plugin did not enable react/no-children-prop, which the real " +
 			"oxlint binary reports on a tree whose config never names it")
 	}
 	if setting.Severity != SeverityWarn {
-		t.Errorf("react/no-children-prop resolved at severity %v, want warn: `warn_correctness` "+
+		test.Errorf("react/no-children-prop resolved at severity %v, want warn: `warn_correctness` "+
 			"inserts Warn and reporting it louder than the gate does is a divergence", setting.Severity)
 	}
 
 	// A typescript rule must NOT be, since that plugin is not declared. Without this the test
 	// passes for a resolver that enables everything.
 	if _, enabled := loaded.Rules["typescript/no-extra-non-null-assertion"]; enabled {
-		t.Error("a typescript rule was enabled by a config declaring only react, so the plugin " +
+		test.Error("a typescript rule was enabled by a config declaring only react, so the plugin " +
 			"filter is not discriminating")
 	}
 
 	// Core rules arrive whatever is declared, because `ESLINT` is an empty bitflag upstream.
 	if _, enabled := loaded.Rules["no-const-assign"]; !enabled {
-		t.Error("no-const-assign was not enabled; core correctness rules are contributed " +
+		test.Error("no-const-assign was not enabled; core correctness rules are contributed " +
 			"unconditionally and upstream states there is no way to disable them")
 	}
 }
@@ -542,21 +542,21 @@ func TestPluginDeclarationEnablesItsRules(t *testing.T) {
 // An explicit entry is a decision and a default is not. Getting this backwards would let a plugin
 // declaration silently re-enable a rule someone deliberately turned off, which is the loudest way
 // this feature could go wrong.
-func TestAnExplicitLineBeatsAPluginDefault(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestAnExplicitLineBeatsAPluginDefault(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 	contents := `{"plugins": ["react"], "rules": {"react/no-children-prop": "off"}, "reasons": {"react/no-children-prop": "turned off on purpose"}}`
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		t.Fatalf("writing the config: %v", err)
+		test.Fatalf("writing the config: %v", err)
 	}
 
 	loaded, err := Load(path)
 	if err != nil {
-		t.Fatalf("loading: %v", err)
+		test.Fatalf("loading: %v", err)
 	}
 	if loaded.Rules["react/no-children-prop"].Severity != SeverityOff {
-		t.Error("a plugin default overrode an explicit `off`, so declaring a plugin would silently " +
+		test.Error("a plugin default overrode an explicit `off`, so declaring a plugin would silently " +
 			"re-enable rules somebody decided to disable")
 	}
 }
@@ -564,28 +564,28 @@ func TestAnExplicitLineBeatsAPluginDefault(t *testing.T) {
 // TestTheFormatBlockLoadsAndAnUnknownKeyBesideItStillDoesNot: the formatter's options live in the
 // same file as the rules, under "format", and the linter must load around them. Accepting that one key
 // must not loosen the guard, so an unknown key next to it is still refused and still named.
-func TestTheFormatBlockLoadsAndAnUnknownKeyBesideItStillDoesNot(t *testing.T) {
-	t.Parallel()
-	directory := t.TempDir()
+func TestTheFormatBlockLoadsAndAnUnknownKeyBesideItStillDoesNot(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
 	path := filepath.Join(directory, "CohereSettings.json")
 
 	accepted := `{"rules": {"a-rule": "error"}, "format": {"printWidth": 120, "tabWidth": 4}}`
 	if err := os.WriteFile(path, []byte(accepted), 0o644); err != nil {
-		t.Fatalf("writing the config: %v", err)
+		test.Fatalf("writing the config: %v", err)
 	}
 	if _, err := Load(path); err != nil {
-		t.Fatalf("a config carrying the formatter's options did not load: %v", err)
+		test.Fatalf("a config carrying the formatter's options did not load: %v", err)
 	}
 
 	refused := `{"rules": {"a-rule": "error"}, "format": {"printWidth": 120}, "formatter": {}}`
 	if err := os.WriteFile(path, []byte(refused), 0o644); err != nil {
-		t.Fatalf("writing the config: %v", err)
+		test.Fatalf("writing the config: %v", err)
 	}
 	_, err := Load(path)
 	if err == nil {
-		t.Fatal("an unknown top-level key beside \"format\" loaded, so accepting format loosened the guard")
+		test.Fatal("an unknown top-level key beside \"format\" loaded, so accepting format loosened the guard")
 	}
 	if !strings.Contains(err.Error(), "formatter") {
-		t.Errorf("the refusal does not name the unknown key: %v", err)
+		test.Errorf("the refusal does not name the unknown key: %v", err)
 	}
 }

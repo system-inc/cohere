@@ -21,7 +21,7 @@ func TestRulesFlagListsEveryRegisteredRule(test *testing.T) {
 	// there lists the Go engine's rules, as it lists Swift's in a Swift package. This test is about the
 	// TypeScript registry, which a run in no project lists.
 	command := exec.Command(binary, "-rules")
-	command.Dir = t.TempDir()
+	command.Dir = test.TempDir()
 	output, err := command.Output()
 	if err != nil {
 		test.Fatalf("running -rules: %v", err)
@@ -64,7 +64,7 @@ func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(test *testing.T) {
 
 	command := exec.Command(binary, "-rules")
 	// Outside every project, for the reason TestRulesFlagListsEveryRegisteredRule gives.
-	command.Dir = t.TempDir()
+	command.Dir = test.TempDir()
 	var standardError strings.Builder
 	command.Stderr = &standardError
 	standardOutput, err := command.Output()
