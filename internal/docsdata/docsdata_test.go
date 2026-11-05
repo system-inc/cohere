@@ -187,6 +187,16 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	}
 }
 
+// swiftRegistryEntry is one rule in swift/Rules.json, every field Build reads and every field the file holds,
+// since Build refuses one it does not know: so an entry decoded here and encoded again is the entry the file
+// wrote.
+type swiftRegistryEntry struct {
+	Name         string `json:"name"`
+	Origin       string `json:"origin"`
+	UpstreamName string `json:"upstreamName,omitempty"`
+	TypeAware    bool   `json:"typeAware"`
+}
+
 // TestCheckSeesASwiftRegistryChange: a Swift rule removed from swift/Rules.json makes rules.json stale, and
 // a Swift rule with an unknown origin, a misnamed house rule, or a verdict naming a missing Swift rule
 // refuses the build.
@@ -196,20 +206,14 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 	if stale := staleAgainstCommitted(test, built(test, inputs)); len(stale) > 0 {
 		test.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
 	}
-	var entries []map[string]any
-	if decodeError := json.Unmarshal(inputs.SwiftRules, &entries); decodeError != nil {
+	// Read as Build reads it, refusing a field the entry does not name, so a field added to the file fails
+	// here rather than vanishing from every changed copy below.
+	var entries []swiftRegistryEntry
+	if decodeError := rule.UnmarshalOptions(inputs.SwiftRules, &entries); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	withEntries := func(change func([]map[string]any) []map[string]any) Inputs {
-		copied := make([]map[string]any, 0, len(entries))
-		for _, entry := range entries {
-			clone := map[string]any{}
-			for key, value := range entry {
-				clone[key] = value
-			}
-			copied = append(copied, clone)
-		}
-		encoded, encodeError := json.Marshal(change(copied))
+	withEntries := func(change func([]swiftRegistryEntry) []swiftRegistryEntry) Inputs {
+		encoded, encodeError := json.Marshal(change(slices.Clone(entries)))
 		if encodeError != nil {
 			test.Fatal(encodeError)
 		}
@@ -218,11 +222,11 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 		return changed
 	}
 
-	removed := withEntries(func(entries []map[string]any) []map[string]any {
+	removed := withEntries(func(entries []swiftRegistryEntry) []swiftRegistryEntry {
 		// The last row, so a rule no verdict needs is the likelier one removed; a verdict-carrying rule
 		// would refuse the build instead, which is the case below.
 		for index := len(entries) - 1; index >= 0; index-- {
-			if entries[index]["origin"] != houseOrigin {
+			if entries[index].Origin != houseOrigin {
 				return append(entries[:index], entries[index+1:]...)
 			}
 		}
@@ -233,17 +237,21 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 		test.Errorf("removing a Swift rule left rules.json current: %v", stale)
 	}
 
-	for name, change := range map[string]func([]map[string]any) []map[string]any{
-		"an unknown origin": func(entries []map[string]any) []map[string]any {
-			entries[0]["origin"] = "swiftlint-ish"
+	for name, change := range map[string]func([]swiftRegistryEntry) []swiftRegistryEntry{
+		"an unknown origin": func(entries []swiftRegistryEntry) []swiftRegistryEntry {
+			entries[0].Origin = "swiftlint-ish"
 			return entries
 		},
-		"a house rule outside the scheme": func(entries []map[string]any) []map[string]any {
-			return append(entries, map[string]any{"name": swiftNamespace + "/docsdata-test-rule", "origin": houseOrigin, "typeAware": false})
+		"a house rule outside the scheme": func(entries []swiftRegistryEntry) []swiftRegistryEntry {
+			return append(entries, swiftRegistryEntry{
+				Name:      swiftNamespace + "/docsdata-test-rule",
+				Origin:    houseOrigin,
+				TypeAware: false,
+			})
 		},
-		"a verdict naming a missing Swift rule": func(entries []map[string]any) []map[string]any {
+		"a verdict naming a missing Swift rule": func(entries []swiftRegistryEntry) []swiftRegistryEntry {
 			for index, entry := range entries {
-				if entry["name"] == swiftNamespace+"/consistency-no-bare-throw" {
+				if entry.Name == swiftNamespace+"/consistency-no-bare-throw" {
 					return append(entries[:index], entries[index+1:]...)
 				}
 			}

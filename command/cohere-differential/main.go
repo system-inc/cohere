@@ -21,8 +21,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/system-inc/cohere/internal/differential"
@@ -65,7 +67,8 @@ func run() error {
 		return fmt.Errorf("loading the lint config: %w", err)
 	}
 
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfig, options.controls, cohereOnlyRuleSettings(options.root)); checkControlsAreLintableError != nil {
+	suppliedRules := slices.Collect(maps.Keys(cohereOnlyRuleSettings(options.root)))
+	if checkControlsAreLintableError := checkControlsAreLintable(lintConfig, options.controls, suppliedRules); checkControlsAreLintableError != nil {
 		return checkControlsAreLintableError
 	}
 
@@ -393,14 +396,14 @@ func cohereOnlyRuleSettings(root string) map[string]any {
 //
 // The check runs before either gate is launched, so a misplaced control costs a second rather than
 // two full lint runs and a misleading verdict.
-func checkControlsAreLintable(lintConfig *configuration.Config, controls []differential.Control, extraVerifyRules map[string]any) error {
+func checkControlsAreLintable(lintConfig *configuration.Config, controls []differential.Control, extraVerifyRules []string) error {
 	// The rules supplied to cohere alone, reduced to bare names. A control naming one of these is
 	// enabled for cohere's run even though the tree's own config says nothing about it, so the
 	// check below has to know about them or it rejects exactly the directional control it should
 	// be admitting. The ignore check still applies to them: an ignored path is ignored by both
 	// sides regardless of which config names the rule.
 	suppliedToVerify := map[string]bool{}
-	for name := range extraVerifyRules {
+	for _, name := range extraVerifyRules {
 		suppliedToVerify[differential.NormalizeRuleName(name)] = true
 	}
 

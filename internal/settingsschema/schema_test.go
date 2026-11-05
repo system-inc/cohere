@@ -221,7 +221,7 @@ func TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts(test *testing.T) {
 func compiledGoSchema(test *testing.T) *optionschema.Schema {
 	test.Helper()
 	var published struct {
-		Properties map[string]any `json:"properties"`
+		Properties map[string]json.RawMessage `json:"properties"`
 	}
 	if decodeError := json.Unmarshal(built(test)[ProjectSchemaPath], &published); decodeError != nil {
 		test.Fatal(decodeError)
@@ -245,31 +245,52 @@ func compiledGoSchema(test *testing.T) *optionschema.Schema {
 	return compiled
 }
 
-// draftFourTuples rewrites every prefixItems in a decoded 2020-12 schema as draft-04's items list. A
-// schema that also writes items beside prefixItems means something draft-04 says differently, so it stops.
-func draftFourTuples(test *testing.T, value any) any {
+// draftFourTuples rewrites every prefixItems in a 2020-12 schema as draft-04's items list. The schema is read as
+// raw text, so each object and array is decoded only as far as its members, and a decode that fails fails the
+// test. A schema that also writes items beside prefixItems means something draft-04 says differently, so it stops.
+func draftFourTuples(test *testing.T, value json.RawMessage) json.RawMessage {
 	test.Helper()
-	switch typed := value.(type) {
-	case map[string]any:
-		_, hasPrefixItems := typed["prefixItems"]
-		if _, hasItems := typed["items"]; hasPrefixItems && hasItems {
-			test.Fatalf("a schema node writes both prefixItems and items, which this translation does not "+
-				"carry over: %v", typed)
+	trimmed := bytes.TrimSpace(value)
+	if len(trimmed) == 0 {
+		return value
+	}
+	switch trimmed[0] {
+	case '{':
+		members := map[string]json.RawMessage{}
+		if decodeError := json.Unmarshal(trimmed, &members); decodeError != nil {
+			test.Fatalf("reading a schema node's members: %v\n%s", decodeError, trimmed)
 		}
-		translated := make(map[string]any, len(typed))
-		for key, member := range typed {
+		_, hasPrefixItems := members["prefixItems"]
+		if _, hasItems := members["items"]; hasPrefixItems && hasItems {
+			test.Fatalf("a schema node writes both prefixItems and items, which this translation does not "+
+				"carry over: %s", trimmed)
+		}
+		translated := make(map[string]json.RawMessage, len(members))
+		for key, member := range members {
 			if key == "prefixItems" {
 				key = "items"
 			}
 			translated[key] = draftFourTuples(test, member)
 		}
-		return translated
-	case []any:
-		translated := make([]any, len(typed))
-		for index, member := range typed {
-			translated[index] = draftFourTuples(test, member)
+		encoded, encodeError := json.Marshal(translated)
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
-		return translated
+		return encoded
+	case '[':
+		var elements []json.RawMessage
+		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
+			test.Fatalf("reading a schema list's elements: %v\n%s", decodeError, trimmed)
+		}
+		translated := make([]json.RawMessage, len(elements))
+		for index, element := range elements {
+			translated[index] = draftFourTuples(test, element)
+		}
+		encoded, encodeError := json.Marshal(translated)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		return encoded
 	}
 	return value
 }
