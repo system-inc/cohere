@@ -8,7 +8,7 @@ import (
 
 // The corpus is upstream's, extracted by stubbing its RuleTester and capturing what the test file
 // hands it, so no case was retyped and no escape was typed by hand. Every case was then run
-// against the INSTALLED build and the expectations below are what that build reported, not what
+// against the installed build and the expectations below are what that build reported, not what
 // the clone's corpus asserts. The two disagree on exactly three cases; see
 // TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing.
 const displayNameFile = "/repository/source/DisplayName.tsx"
@@ -145,12 +145,12 @@ func TestDisplayNameFires(test *testing.T) {
 // TestDisplayNameSettingsGatedCasesUnderDefaultSettings recovers twelve of the sixteen corpus cases
 // whose verdict upstream is decided by a `settings.react` key we have no surface for.
 //
-// Three surfaces appear in this corpus and none of them exists here: a React VERSION gate, a custom
+// Three surfaces appear in this corpus and none of them exists here: a React version gate, a custom
 // `createClass` factory name, and a custom `pragma`. A fixture written from such a case while
 // silently dropping its settings asserts the wrong thing, which is what the first draft of this
 // file did.
 //
-// So each was re-measured against the installed build with the settings REMOVED, and the twelve
+// So each was re-measured against the installed build with the settings removed, and the twelve
 // below are the ones whose verdict does not move. They are real corpus data about the rule rather
 // than about the gate, and they belong in the suite. The four that do move are recorded in
 // TestDisplayNameSettingsGatedCasesThisPortCannotExpress instead.
@@ -186,7 +186,7 @@ func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(test *testing.T) {
 // verdict genuinely depends on a settings surface we do not have, rather than deleting them.
 //
 // All four were measured against the installed build twice on 2026-08-27, once with the corpus's
-// settings and once with them removed, and the verdict MOVES between the two runs. That is what
+// settings and once with them removed, and the verdict moves between the two runs. That is what
 // separates them from the twelve recovered above.
 //
 //	invalid 4, 13   `settings.react.createClass: 'createClass'` renames the ES5 factory, so
@@ -197,8 +197,8 @@ func TestDisplayNameSettingsGatedCasesUnderDefaultSettings(test *testing.T) {
 //	                `checkContextObjects` at all, so the option is inert there and active here.
 //
 // The direction matters and is stated rather than left to inference: on the three createClass cases
-// this port is SILENT where upstream reports, which costs findings and never adds them. On valid 73
-// this port REPORTS where upstream is silent, and that one would be a false positive on a codebase
+// this port is silent where upstream reports, which costs findings and never adds them. On valid 73
+// this port reports where upstream is silent, and that one would be a false positive on a codebase
 // pinned below React 16.3. Nothing in this tree is, and the option is off by default, so it cannot
 // fire today.
 //
@@ -243,11 +243,11 @@ func TestDisplayNameSettingsGatedCasesThisPortCannotExpress(test *testing.T) {
 }
 
 // TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing records the three corpus cases
-// where the CLONE and the INSTALLED build disagree, and which this port follows.
+// where the clone and the installed build disagree, and which this port follows.
 //
 // Both trees report version 7.37.5. The clone carries an `isShadowedComponent` helper exempting a
 // wrapper whose identifier is shadowed, handling both a bare `memo(...)` and a `React.memo(...)`.
-// Measured on 2026-08-27: the installed build exempts the bare form and does NOT exempt the member
+// Measured on 2026-08-27: the installed build exempts the bare form and does not exempt the member
 // form, so these three cases are silent in the clone's corpus and report on the build our
 // differential compares against. They are the only three disagreements in 116 cases.
 //
@@ -273,7 +273,7 @@ func TestDisplayNameCloneAheadOfTheInstalledBuildOnMemberShadowing(test *testing
 
 // TestDisplayNameBareWrapperShadowingIsExempt is the control for the test above.
 //
-// The bare half of shadowing IS in the installed build, so a shadowed `memo(...)` is silent. Without
+// The bare half of shadowing is in the installed build, so a shadowed `memo(...)` is silent. Without
 // this row the test above reads as "shadowing is unimplemented" rather than as "one half of it is".
 func TestDisplayNameBareWrapperShadowingIsExempt(test *testing.T) {
 	test.Parallel()
@@ -383,12 +383,12 @@ func TestDisplayNameMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *t
 // # This case cannot be measured against the installed build, and that is stated rather than hidden
 //
 // The ESLint probe used for every other measurement in this file runs the default parser, which
-// cannot read `interface` at all: the input comes back as a FATAL parse error, and a harness
+// cannot read `interface` at all: the input comes back as a fatal parse error, and a harness
 // counting only rule diagnostics reports it as zero findings. Three rows written from that zero
 // asserted the opposite of the truth and were removed. Our parser reads TypeScript, so the shape is
 // expressible here even though upstream's tester cannot express it.
 //
-// What IS measured is the difference between the two implementations, against our own parser on
+// What is measured is the difference between the two implementations, against our own parser on
 // 2026-08-27: with the loop the first row below is silent, and with an index-zero pick it reports.
 // That is the distinguishing input, and it is why a surviving mutant on this branch was a real
 // defect rather than an equivalent rewrite.
@@ -439,7 +439,7 @@ func TestDisplayNameMergedDeclarationsStillReportWhenUnnamed(test *testing.T) {
 // existed. The wire names are the two lines in this rule with no upstream counterpart to check them
 // against, so they are the ones most worth pinning.
 //
-// Both options default to FALSE, so the zero value happens to be correct and the decoder needs no
+// Both options default to `false`, so the zero value happens to be correct and the decoder needs no
 // pointer fields. That is worth stating because the sibling `self-closing-comp` defaults both of
 // its options to true and the same shape there would silently disable the rule.
 func TestDecodeDisplayNameOptions(test *testing.T) {
@@ -511,7 +511,7 @@ func TestDisplayNameNilOptionsFallsBackToTheDefault(test *testing.T) {
 // TestDisplayNameAnchorsOnTheComponent pins where each finding points.
 //
 // `ExpectFindings` asserts ids and counts and can see none of this. Upstream reports on the
-// component NODE, which differs per shape: the whole wrapping call for a pragma wrapper, the
+// component node, which differs per shape: the whole wrapping call for a pragma wrapper, the
 // function itself for an anonymous default export, and the class for a class component. Every span
 // below was measured against the installed build on 2026-08-27 by slicing its reported range.
 func TestDisplayNameAnchorsOnTheComponent(test *testing.T) {

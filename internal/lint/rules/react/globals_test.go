@@ -8,7 +8,7 @@ import (
 )
 
 // The corpus for this rule is unusually large and unusually misleading, and both facts are recorded
-// here rather than in the rule, because they are facts about the FIXTURES.
+// here rather than in the rule, because they are facts about the fixtures.
 //
 // # Where the cases came from
 //
@@ -27,22 +27,22 @@ import (
 // # The trap in this corpus, which is that most of it is silent under the rule
 //
 // Two fixtures are named for globals, read exactly like this rule's, and belong to a different rule:
-// `error.store-property-in-global` and `error.mutate-property-from-global` both write to a PROPERTY
+// `error.store-property-in-global` and `error.mutate-property-from-global` both write to a property
 // of a module-scope binding, and both report `This value cannot be modified` under React's
 // immutability rule. Neither carries a `Globals` diagnostic. They are excluded here, and a fixture
 // pins the property-write shape as silent so that a later widening has to argue with a test.
 //
-// More importantly, SIX of the nine distinct goldens produce NO finding under React's own lint rule,
+// More importantly, six of the nine distinct goldens produce no finding under React's own lint rule,
 // which was measured by running it rather than inferred. The goldens come from the compiler's
 // fixture harness, which compiles a named entrypoint unconditionally; the lint rule instead selects
 // its own roots and requires a component or hook to write JSX or call a hook. `function Component()
 // { someUnknownGlobal = true; }` has neither, so the compiler fixture reports twice and the lint
-// rule is silent. Every such case is recorded below as SILENT with the golden's count in its note,
+// rule is silent. Every such case is recorded below as silent with the golden's count in its note,
 // because the lint rule is what this port reproduces and pinning them as reporting would have meant
 // building a rule that fires on inputs React's rule passes.
 //
 // That is the port brief's warning about a passing case not being evidence about what you think,
-// arriving through the imported corpus in its most expensive form: here the FAILING cases are the
+// arriving through the imported corpus in its most expensive form: here the failing cases are the
 // ones that mislead.
 //
 // # How the rest of the cases were established
@@ -141,7 +141,7 @@ func globalsFiresCases() []globalsCase {
 		// The shorthand accessor returns nil for an undeclared target, which is the reporting case
 		// rather than a decline. See the note in `declaredOutsideCompilationRoot`.
 		{name: "destructureShorthandOnModuleBinding", source: "let a = 0;\nfunction Component(props) {\n  ({a} = props);\n  return <div />;\n}\n", count: 1},
-		// A rest parameter declines ONE function rather than bailing out the file. A sibling rule
+		// A rest parameter declines one function rather than bailing out the file. A sibling rule
 		// found upstream silencing a whole function on a rest parameter with no diagnostic to
 		// explain it, so the same shape was measured here with a control: the second component in
 		// this file still reports, and a rest parameter in a nested function or in a destructuring
@@ -183,7 +183,7 @@ func globalsSilentCases() []globalsCase {
 		{name: "localDeclaredInComponent", source: "function Component() {\n  let x = 1;\n  x = 2;\n  return <div />;\n}\n"},
 		// own parameter
 		{name: "parameterWritten", source: "function Component(props) {\n  props = 1;\n  return <div />;\n}\n"},
-		// the HIR gets this one wrong; upstream classifies it StoreContext
+		// the `HIR` gets this one wrong; upstream classifies it StoreContext
 		{name: "captureFromEnclosingFunction", source: "function Component() {\n  let x = 1;\n  const f = () => { x = 2; };\n  f();\n  return <div />;\n}\n"},
 		// shadow
 		{name: "shadowedByLocal", source: "let g = 0;\nfunction Component() {\n  let g = 1;\n  g = 2;\n  return <div />;\n}\n"},
@@ -240,31 +240,31 @@ func globalsSilentCases() []globalsCase {
 		// not during render
 		{name: "writeInsideEventHandler", source: "let g = 0;\nfunction Component() {\n  return <div onClick={() => { g = 1; }} />;\n}\n"},
 		// The three shapes that keep the unconditional shorthand substitution honest: a shadow must
-		// still decline, and a default VALUE is a read rather than a write.
+		// still decline, and a default value is a read rather than a write.
 		{name: "shorthandShadowedByLocal", source: "function Component(props) {\n  let a;\n  ({a} = props);\n  return <div />;\n}\n"},
 		{name: "shorthandShadowedByParameter", source: "function Component(props, a) {\n  ({a} = props);\n  return <div />;\n}\n"},
 		{name: "shorthandDefaultValueIsARead", source: "let a = 0;\nfunction Component(props) {\n  let files;\n  ({files = a} = props);\n  return <div />;\n}\n"},
-		// A parenthesized target under a NON-reporting operator. These are what make the upward
+		// A parenthesized target under a non-reporting operator. These are what make the upward
 		// parenthesis skip in `isGlobalStoreTarget` load-bearing: without it the switch never sees
 		// the update or logical-assign parent, falls through, and reports. A mutant removing that
-		// skip SURVIVED the whole suite before these existed, because every parenthesized fixture
-		// here used a REPORTING operator, where skipping and not skipping both reach "report".
+		// skip survived the whole suite before these existed, because every parenthesized fixture
+		// here used a reporting operator, where skipping and not skipping both reach "report".
 		// All four measured silent under React's own rule.
 		{name: "parenthesizedPostfixIncrement", source: "let g = 0;\nfunction Component() {\n  (g)++;\n  return <div />;\n}\n"},
 		{name: "parenthesizedPrefixIncrement", source: "let g = 0;\nfunction Component() {\n  ++(g);\n  return <div />;\n}\n"},
 		{name: "parenthesizedLogicalOrAssign", source: "let g = 0;\nfunction Component() {\n  (g) ||= 1;\n  return <div />;\n}\n"},
 		{name: "parenthesizedNullishAssign", source: "let g = 0;\nfunction Component() {\n  (g) ??= 1;\n  return <div />;\n}\n"},
-		// A rest parameter in a NESTED function, and a rest element in a destructuring, are not the
+		// A rest parameter in a nested function, and a rest element in a destructuring, are not the
 		// component's own parameter list and do not decline it. Both measured; both report their
 		// global write, which is why they are in the fires table rather than here. What is pinned
-		// here is the component whose OWN parameter list carries the rest.
+		// here is the component whose own parameter list carries the rest.
 		{name: "restParameterOnTheComponentItself", source: "let g = 0;\nfunction Widget(...props) {\n  g = 1;\n  return <div />;\n}\n"},
 	}
 }
 
 // TestGlobalsSpans asserts where each finding points, which no message-id assertion can see.
 //
-// This rule has TWO spans and they are upstream's, not a choice: a simple assignment reports the
+// This rule has two spans and they are upstream's, not a choice: a simple assignment reports the
 // identifier and a compound assignment reports the whole assignment expression. The two come from
 // two lowering sites passing different spans (`build_hir.rs:4408` against `:4534`), React's ESLint
 // output and oxc's snapshot agree on both, and a port could satisfy every count fixture above while
@@ -363,7 +363,7 @@ func TestGlobalsMessageNamesTheBinding(test *testing.T) {
 // TestGlobalsRequiresTheTypedHarness pins that this rule needs a checker.
 //
 // The port brief records that `GetSymbolAtLocation` on a nil checker returns nil rather than
-// panicking, so a typed rule run through the untyped harness goes VACUOUSLY GREEN rather than
+// panicking, so a typed rule run through the untyped harness goes vacuously green rather than
 // failing loudly. Every silent fixture above would pass for the wrong reason if the harness were
 // ever changed, so this asserts the difference directly: the same input reports under `RunTyped`
 // and is silent under `Run`.
@@ -391,7 +391,7 @@ func TestGlobalsRequiresTheTypedHarness(test *testing.T) {
 // spelled and ordered, so there is no narrower syntactic approximation worth shipping. This rule
 // therefore reports only writes lexically inside the compilation root's own body.
 //
-// Each case below is one React REPORTS and this rule does not. They are pinned as silent so that a
+// Each case below is one React reports and this rule does not. They are pinned as silent so that a
 // later widening has to come here and change them deliberately, and so the next reader can see
 // exactly what the subset costs rather than having to rediscover it.
 func TestGlobalsBoundary(test *testing.T) {

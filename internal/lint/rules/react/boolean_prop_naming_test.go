@@ -68,7 +68,7 @@ func TestBooleanPropNamingStaysSilent(test *testing.T) {
 	}
 }
 
-// TestBooleanPropNamingFires asserts the count AND the rendered message of every finding. The
+// TestBooleanPropNamingFires asserts both the count and the rendered message of every finding. The
 // message interpolates the prop name and the pattern, so a message-id assertion could not see
 // an interpolation defect at all.
 func TestBooleanPropNamingFires(test *testing.T) {
@@ -304,7 +304,7 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 		wantErr           bool
 	}{
 		{
-			// Empty input is a rule configured as a bare `"error"`. The decoder REFUSES it, which
+			// Empty input is a rule configured as a bare `"error"`. The decoder refuses it, which
 			// is what gives `RequiresOptions` its effect: that flag only changes behaviour when the
 			// decoder errors. A decoder returning defaults here would make the flag inert and the
 			// rule would run tree-wide on a configuration upstream treats as off.
@@ -393,7 +393,7 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 // TestBooleanPropNamingDeclinesWithoutOptions pins the RequiresOptions contract.
 //
 // Upstream reads its pattern from `context.options[0]` and ESLint fills a schema default only into
-// an options object that is PRESENT. Measured on the installed build with one violating input three
+// an options object that is present. Measured on the installed build with one violating input three
 // ways: no options at all reports zero, `{}` reports one, an explicit pattern reports one. So the
 // rule is entirely inert when configured as a bare `"error"`.
 //
@@ -516,7 +516,7 @@ func TestBooleanPropNamingMessageUsesUpstreamsApostrophe(test *testing.T) {
 // TestBooleanPropNamingDoesNotPanicOnNameShapesThatCannotBeRead pins a crash class.
 //
 // `ast.Node.Text()` panics on several node shapes, a binding pattern among them, and this rule
-// reads a NAME off every prop key and every parameter it inspects. The walk recovers per FILE
+// reads a name off every prop key and every parameter it inspects. The walk recovers per file
 // rather than per rule, so one such call would cost every rule in this package its verdict on that
 // file while the run still printed a plausible summary.
 //
@@ -533,7 +533,7 @@ func TestBooleanPropNamingDoesNotPanicOnNameShapesThatCannotBeRead(test *testing
 		"interface Props { enabled: boolean }\nfunction C({ enabled }: Props) { return <div/>; }",
 		// An array-pattern parameter.
 		"function C([first]: boolean[]) { return <div/>; }",
-		// A rest parameter, whose name IS an identifier and is the control for the two above.
+		// A rest parameter, whose name is an identifier and is the control for the two above.
 		"function C(...rest: boolean[]) { return <div/>; }",
 		// A computed propTypes key.
 		"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { [key]: PropTypes.bool };",

@@ -31,7 +31,7 @@ const forbidPropTypesFile = "/repository/source/PropTypes.tsx"
 // divergence instead of leaving it unrecorded. What is imported is 48 passing and 49 reporting
 // cases asserting 56 findings.
 //
-// Thirty-seven of the reporting cases state only a COUNT rather than per-error data, so these
+// Thirty-seven of the reporting cases state only a count rather than per-error data, so these
 // assert the count. `ExpectFindings` takes one id per finding and every finding this rule can
 // produce carries the same id, so a repeated id is the faithful expectation.
 
@@ -1216,7 +1216,7 @@ func TestForbidPropTypesValueShapes(test *testing.T) {
 
 		// The silent rows.
 		//
-		// A BARE nested object contributes nothing, because `checkProperties` does not recurse: a
+		// A bare nested object contributes nothing, because `checkProperties` does not recurse: a
 		// nested `shape({...})` is reached by the shape arm instead, which visits every such call
 		// in the file independently. The pair of rows below is what separates those two routes, and
 		// a mutant adding recursion survived every imported case because the corpus writes no bare
@@ -1319,7 +1319,7 @@ func TestForbidPropTypesContextOptions(test *testing.T) {
 // clearest thing the imported corpus did for this port: nothing about the rule's description
 // suggests a validation library is the false positive to worry about.
 //
-// The discriminator is the RECEIVER, not the import. `isPropTypesPackage` accepts an identifier or
+// The discriminator is the receiver, not the import. `isPropTypesPackage` accepts an identifier or
 // a member expression and nothing else, so a call receiver such as `Yup.object()` falls through to
 // false whatever is imported. Measured with and without the yup import: both clean.
 func TestForbidPropTypesShapeReceiver(test *testing.T) {
@@ -1392,7 +1392,7 @@ func TestForbidPropTypesForeignPackageGuard(test *testing.T) {
 			1,
 		},
 
-		// The rows that need BOTH imports, which is what makes the recorded local name observable.
+		// The rows that need both imports, which is what makes the recorded local name observable.
 		// Without a foreign import the package predicate passes everything, so the recorded name is
 		// never consulted and a mutant dropping the `import { PropTypes } from 'react'` branch
 		// survives. These two are the same file shape with different sources for the alias, and
@@ -1424,7 +1424,7 @@ func TestForbidPropTypesForeignPackageGuard(test *testing.T) {
 
 // TestForbidPropTypesCollectsImportsBeforeJudging pins the ordering the pre-pass exists for.
 //
-// A foreign `PropTypes` import written BELOW the declaration it governs still silences it. Upstream
+// A foreign `PropTypes` import written below the declaration it governs still silences it. Upstream
 // gets this from ESLint visiting the whole program before the rule's other listeners can matter for
 // a top-level import; our walk is a single pre-order pass, so the imports are collected explicitly
 // first. Without that pass this case reports and the one above it does not, which is a difference no
@@ -1467,7 +1467,7 @@ func TestForbidPropTypesDoesNotUnwrapPropWrappers(test *testing.T) {
 
 // TestForbidPropTypesSpans asserts where each finding points.
 //
-// The finding is anchored on the PROPERTY rather than on the value, so `a: PropTypes.any`
+// The finding is anchored on the property rather than on the value, so `a: PropTypes.any`
 // underlines the whole property including its key. For a nested shape it underlines the inner
 // property, which is the row a message-id fixture cannot see: both findings would otherwise look
 // identical.
@@ -1678,7 +1678,7 @@ func TestForbidPropTypesAssignmentOperators(test *testing.T) {
 
 // TestForbidPropTypesGetterTakesTheLastReturn pins which return a multi-return getter uses.
 //
-// Upstream's `findReturnStatement` walks the body's statement list backwards and takes the LAST
+// Upstream's `findReturnStatement` walks the body's statement list backwards and takes the last
 // top-level return. Nothing in the corpus writes a getter with two returns, so a mutant reversing
 // the search direction survived every imported case.
 //
@@ -1692,7 +1692,7 @@ func TestForbidPropTypesGetterTakesTheLastReturn(test *testing.T) {
 		body      string
 		wantCount int
 	}{
-		// Both returns are TOP LEVEL statements, and that is load-bearing rather than incidental.
+		// Both returns are top level statements, and that is load-bearing rather than incidental.
 		// A first draft wrote the earlier return as `if (x) return ...`, which puts it inside an
 		// if statement rather than in the body's own statement list, so only one return was at the
 		// top level and the search direction could not matter. The mutant survived that fixture,
@@ -1710,7 +1710,7 @@ func TestForbidPropTypesGetterTakesTheLastReturn(test *testing.T) {
 			0,
 		},
 		{
-			// And a return nested inside an if is NOT top level, so it is not scanned at all.
+			// And a return nested inside an if is not top level, so it is not scanned at all.
 			"a forbidden return nested inside an if, with an allowed one after",
 			"if (x) return { a: PropTypes.any };\n    return { a: PropTypes.string };",
 			0,
@@ -1742,7 +1742,7 @@ func TestForbidPropTypesGetterTakesTheLastReturn(test *testing.T) {
 // The predicate is not symmetric. Its member arm compares a receiver against `reactPackageName`
 // only, so an aliased `prop-types` import never qualifies there; its identifier arm compares a bare
 // value against `propTypesPackageName`. So the only shape on which the recorded name matters is a
-// BARE prop type value whose name happens to equal that recorded local name, with a foreign
+// bare prop type value whose name happens to equal that recorded local name, with a foreign
 // `PropTypes` import present to close the general escape hatch.
 //
 // That took three attempts to locate. Two mutants survived here, one dropping the branch that
@@ -1816,7 +1816,7 @@ func TestForbidPropTypesRecordedPackageNameReachesTheIdentifierArm(test *testing
 //
 // The object-literal arm, which handles `createReactClass({ propTypes: ... })`, tests for an object
 // expression and nothing else. The member-assignment arm routes through the full resolution, which
-// also follows an identifier to what it was declared with. So the SAME identifier reports through
+// also follows an identifier to what it was declared with. So the same identifier reports through
 // one and is silent through the other.
 //
 // Nothing in the corpus writes a factory whose propTypes is an identifier, so a mutant widening the

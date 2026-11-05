@@ -31,7 +31,7 @@ func load(test *testing.T) []Fixture {
 //
 // The number is asserted rather than derived because a derived number agrees with whatever it
 // found. The research pass this suite comes from reported 221 error fixtures because its grep was
-// anchored at the fixture root and so excluded every subdirectory — wrong by a third, and it read
+// anchored at the fixture root and so excluded every subdirectory. It was wrong by a third, and it read
 // exactly like a clean result. It was caught only because a parallel investigation returned a
 // different number.
 //
@@ -108,7 +108,7 @@ func TestCorpusIsTheSizeItClaimsToBe(test *testing.T) {
 // TestEveryFixtureHasAParsedExpectation proves the goldens were read, not merely opened.
 //
 // Load succeeding says the files exist. This says they parsed into something with content in it, so
-// an expectation parser that silently produced empty results cannot pass — which it otherwise
+// an expectation parser that silently produced empty results cannot pass, which it otherwise
 // would, since an empty expectation compared against an empty result is a pass, and 325 of those is
 // a perfect score over a corpus nobody read.
 func TestEveryFixtureHasAParsedExpectation(test *testing.T) {
@@ -117,7 +117,7 @@ func TestEveryFixtureHasAParsedExpectation(test *testing.T) {
 
 	withDeclaredCount, withLocation, totalErrors := 0, 0, 0
 	for _, fixture := range fixtures {
-		// A clean fixture has no `## Error` block, and that absence IS its expectation rather than a
+		// A clean fixture has no `## Error` block, and that absence is its expectation rather than a
 		// parse failure. Only an error-named fixture with an empty block is the defect this catches.
 		base := filepath.Base(fixture.Name)
 		if !strings.HasPrefix(base, "error.") && !strings.HasPrefix(base, "todo.error.") {
@@ -403,8 +403,8 @@ func (perfectImplementation) Analyze(fixture Fixture) (Result, error) {
 
 // TestRunnerCanDetectAPass is the calibration, and it is the most important test in this file.
 //
-// Everything else here confirms the runner reports zero. A runner that always reported zero — a
-// Compare that never returns Passed, a loader that finds nothing, a scorer that never increments —
+// Everything else here confirms the runner reports zero. A runner that always reported zero (a
+// Compare that never returns Passed, a loader that finds nothing, a scorer that never increments)
 // would satisfy every one of those tests and would be worthless, because the number it prints would
 // not be a measurement of anything.
 //
@@ -425,7 +425,7 @@ func TestRunnerCanDetectAPass(test *testing.T) {
 		test.Errorf("a correct implementation scored %d / %d; the comparison cannot recognise a right answer", score.Passed, score.Considered)
 		for _, fixtureScore := range score.Fixtures {
 			if fixtureScore.Outcome != OutcomePassed {
-				test.Logf("  %s: %s — %s", fixtureScore.Name, fixtureScore.Outcome, fixtureScore.Detail)
+				test.Logf("  %s: %s \u2014 %s", fixtureScore.Name, fixtureScore.Outcome, fixtureScore.Detail)
 			}
 		}
 	}
@@ -499,8 +499,8 @@ func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(test *testing.T) {
 	}
 
 	if score.Considered != ExpectedFixtureCount {
-		test.Errorf("considered %d fixtures, want %d — a zero over a smaller denominator is not the same measurement",
-			score.Considered, ExpectedFixtureCount)
+		test.Errorf("considered %d fixtures, want %d \u2014 a zero over a smaller denominator is not "+
+			"the same measurement", score.Considered, ExpectedFixtureCount)
 	}
 	if score.Passed != 0 {
 		test.Errorf("passed %d, want 0; nothing implements these rules yet", score.Passed)
@@ -546,8 +546,8 @@ func TestFlowExclusionIsCountedNotDropped(test *testing.T) {
 // TestVendoredCorpusPairsAreComplete guards the vendored tree against silent drift.
 //
 // Vendoring buys hermeticity and pays for it with the risk that the checked-in tree stops matching
-// the sha it claims. A pair going missing — a bad merge, a partial re-vendor, a file deleted by
-// something walking the tree — would shrink the denominator, and every other test here is written
+// the sha it claims. A pair going missing (a bad merge, a partial re-vendor, a file deleted by
+// something walking the tree) would shrink the denominator, and every other test here is written
 // against counts, so most of them would fail loudly. This one names the failure directly rather
 // than leaving it to be inferred from an arithmetic mismatch.
 //
@@ -557,7 +557,8 @@ func TestFlowExclusionIsCountedNotDropped(test *testing.T) {
 // the current tree was verified byte-for-byte when it was written.
 func TestVendoredCorpusPairsAreComplete(test *testing.T) {
 	test.Parallel()
-	var inputs, expectations []string
+	var inputs []string
+	var expectations []string
 	walkError := filepath.WalkDir(fixtureRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -617,8 +618,8 @@ func TestKnownAndIgnoredPragmasDoNotOverlap(test *testing.T) {
 	}
 
 	// 25 modelled and 6 ignored, summing to the 31 distinct directives the corpus uses. Every
-	// modelled key was checked against upstream's own schemas when it was written — the 15
-	// PluginOptions keys in `Entrypoint/Options.ts` and the 40 in `EnvironmentConfigSchema` — so
+	// modelled key was checked against upstream's own schemas when it was written (the 15
+	// PluginOptions keys in `Entrypoint/Options.ts` and the 40 in `EnvironmentConfigSchema`), so
 	// none of them is a directive this package invented a meaning for.
 	if got := len(KnownPragmaKeys()) + len(IgnoredPragmaKeys()); got != 34 {
 		test.Errorf("modelled plus ignored = %d, want 34 to match the corpus's distinct directives", got)

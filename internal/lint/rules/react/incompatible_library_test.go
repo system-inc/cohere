@@ -97,7 +97,7 @@ func TestIncompatibleLibraryFiresOnUpstreamFixtures(test *testing.T) {
 
 // TestIncompatibleLibraryFiresOnTheRealDefaultTable is the proof this rule is not configuration-bound.
 //
-// It runs WITHOUT the seeded table, so the rule consults the shipped
+// It runs without the seeded table, so the rule consults the shipped
 // `defaultIncompatibleLibraryTable` exactly as it does on Kirk's tree. All three entries report on
 // their real library names with no configuration whatsoever, which is the finding that separates
 // this rule from `react/config`: that one's default table is self-consistent and can never fire,
@@ -142,8 +142,8 @@ func TestIncompatibleLibraryFiresOnTheOxcCorpus(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "incompatibleLibrary")
 }
 
-// TestIncompatibleLibraryReadsThroughAnAlias pins that the IMPORTED name decides the lookup while
-// the LOCAL name decides the match at the call site.
+// TestIncompatibleLibraryReadsThroughAnAlias pins that the imported name decides the lookup while
+// the local name decides the match at the call site.
 //
 // No upstream fixture writes an alias, so this is written from measuring React 7.1.1 directly:
 // `import {useReactTable as renamed}` reports, with the span on `renamed`. Keying the table by the
@@ -163,7 +163,7 @@ func TestIncompatibleLibraryReadsThroughAnAlias(test *testing.T) {
 // TestIncompatibleLibraryFiresOnARenamedDestructure covers the nested entry through a rename.
 //
 // Measured at React 7.1.1: `const {watch: w} = useForm(); w()` reports with the span on `w`. The
-// PROPERTY name is what looks the entry up and the LOCAL name is what the call spells, which is the
+// property name is what looks the entry up and the local name is what the call spells, which is the
 // same split as the alias case above but at a different node. Written because the single upstream
 // nested fixture does not rename, so nothing imported exercises this.
 func TestIncompatibleLibraryFiresOnARenamedDestructure(test *testing.T) {
@@ -181,8 +181,8 @@ func TestIncompatibleLibraryFiresOnARenamedDestructure(test *testing.T) {
 //
 // A separate code path from the destructure, and silent if only the destructure is matched. The
 // span is the one case in this rule a reader would guess wrong, and this fixture was written
-// asserting the property and CORRECTED by measurement rather than the other way round: React 7.1.1
-// underlines the OBJECT, `form`, not `form.watch` and not `watch`. The wrong expectation failed
+// asserting the property and corrected by measurement rather than the other way round: React 7.1.1
+// underlines the object, `form`, not `form.watch` and not `watch`. The wrong expectation failed
 // here first, which is the fixture doing its job.
 //
 // The chained form is the same judgment with no intervening binding, and upstream's span there is
@@ -266,7 +266,7 @@ func TestIncompatibleLibraryReportsOncePerFunction(test *testing.T) {
 	}
 }
 
-// TestIncompatibleLibraryReportsPerComponent pins that the abort is scoped to ONE function.
+// TestIncompatibleLibraryReportsPerComponent pins that the abort is scoped to one function.
 //
 // Two sibling components each calling an incompatible API report once each, for two findings in the
 // file. Written because the one-per-function bookkeeping could be implemented as a single file-wide
@@ -295,7 +295,7 @@ func TestIncompatibleLibraryStaysSilent(test *testing.T) {
 		{"rightNameWrongModule", "import {useReactTable} from 'some-other-module';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
 		// A property the configured module does not declare.
 		{"propertyNotInTable", "import {somethingElse} from '@tanstack/react-table';\n\nfunction Component() {\n  const x = somethingElse();\n  return <div>{x}</div>;\n}\n"},
-		// Imported and never called. The diagnostic is raised while inferring a CALL's effects, so
+		// Imported and never called. The diagnostic is raised while inferring a call's effects, so
 		// an unused import is silent. Measured.
 		{"importedNotCalled", "import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  return <div>hi</div>;\n}\n"},
 		// Passed onward as a value rather than called. Also measured silent upstream.
@@ -315,9 +315,9 @@ func TestIncompatibleLibraryStaysSilent(test *testing.T) {
 		// Destructured but never called.
 		{"propertyDestructuredNotCalled", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch} = useForm();\n  return <div>hi</div>;\n}\n"},
 		// Read off the result but never called. Measured silent at React 7.1.1: the diagnostic is
-		// raised while inferring a CALL's effects, so merely naming the property is fine.
+		// raised while inferring a call's effects, so merely naming the property is fine.
 		{"propertyReadNotCalled", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form.watch}</div>;\n}\n"},
-		// The module name is compared EXACTLY. Both of these are measured silent at React 7.1.1,
+		// The module name is compared exactly. Both of these are measured silent at React 7.1.1,
 		// and both would report under a lowercasing or prefix-matching comparison. `configuration.go`'s
 		// `isKnownReactModule` does lowercase, so this is the axis on which the two rules differ and
 		// a reader copying that helper here would introduce a false positive.
@@ -345,9 +345,9 @@ func TestIncompatibleLibraryStaysSilent(test *testing.T) {
 	}
 }
 
-// TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier pins the kind guard as CRASH protection.
+// TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier pins the kind guard as crash protection.
 //
-// This exists because a mutation deleting `ast.IsStringLiteralLike` SURVIVED the whole suite, and
+// This exists because a mutation deleting `ast.IsStringLiteralLike` survived the whole suite, and
 // the reason is the fifth survivor category rather than a fixture blind spot: no `ExpectFindings`
 // case can see a panic, so the sweep scores a guard that prevents one identically whether it matters
 // or not.
@@ -367,7 +367,7 @@ func TestIncompatibleLibraryStaysSilent(test *testing.T) {
 //	import {u} from ('@tanstack/react-table') KindParenthesizedExpression    Text() PANICS
 //
 // So three of six recovered shapes take the linter down without the guard, and the last one is the
-// sharpest: the parenthesized form carries a specifier that WOULD match the table. Each is asserted
+// sharpest: the parenthesized form carries a specifier that would match the table. Each is asserted
 // clean here, and each would panic rather than fail if the guard were removed.
 func TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier(test *testing.T) {
 	test.Parallel()
@@ -392,7 +392,7 @@ func TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier(test *testing.T) {
 // TestIncompatibleLibraryAcceptsATemplateSpecifier pins the other half of `IsStringLiteralLike`.
 //
 // A no-substitution template is a real module specifier and the predicate accepts it, so this
-// REPORTS. Written because a guard narrowed to `ast.IsStringLiteral` would pass every case above
+// reports. Written because a guard narrowed to `ast.IsStringLiteral` would pass every case above
 // while going silent here, and nothing in the imported corpus writes a template.
 func TestIncompatibleLibraryAcceptsATemplateSpecifier(test *testing.T) {
 	test.Parallel()
@@ -403,7 +403,7 @@ func TestIncompatibleLibraryAcceptsATemplateSpecifier(test *testing.T) {
 
 // TestIncompatibleLibraryDeclinesTheNamespaceForm records a measured gap rather than hiding it.
 //
-// React 7.1.1 DOES report on `table.useReactTable()` after `import * as table`, with the span on the
+// React 7.1.1 does report on `table.useReactTable()` after `import * as table`, with the span on the
 // object rather than the property. This port is silent there, because reproducing it means resolving
 // a namespace member against the module's table, which is the member-access path the rule declines
 // to build. Asserted as clean with the reason at the line rather than deleted: a case removed from a
@@ -415,7 +415,7 @@ func TestIncompatibleLibraryDeclinesTheNamespaceForm(test *testing.T) {
 	rule_testing.ExpectClean(test, result)
 }
 
-// TestIncompatibleLibraryReportsOnTheCallee pins WHERE the finding points.
+// TestIncompatibleLibraryReportsOnTheCallee pins where the finding points.
 //
 // `ExpectFindings` asserts ids and count and nothing else, so a rule pointing at the whole call
 // expression, at the variable being assigned, or at the import would pass every case above while
@@ -445,7 +445,7 @@ func TestIncompatibleLibraryReportsOnTheCallee(test *testing.T) {
 // literals typed here rather than against `messageIncompatibleLibrary`, so a mutation rewriting the
 // constant moves the rule and the test in opposite directions instead of together.
 //
-// The two cases carry DIFFERENT entry text, which is what makes this able to see a rule that always
+// The two cases carry different entry text, which is what makes this able to see a rule that always
 // appends the same message.
 func TestIncompatibleLibraryMessageCarriesTheEntryText(test *testing.T) {
 	test.Parallel()

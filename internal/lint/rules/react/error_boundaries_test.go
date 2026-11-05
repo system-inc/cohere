@@ -127,7 +127,7 @@ func TestErrorBoundariesFires(test *testing.T) {
 		},
 		{
 			// "Ref" strictly in the middle, which is what separates a substring test from a prefix
-			// one AND from a suffix one. Every other ref fixture here ends in the needle, so a
+			// one and from a suffix one. Every other ref fixture here ends in the needle, so a
 			// mutant narrowing `Contains` to `HasSuffix` survived them all.
 			name:   "secondParameterWithRefInTheMiddle",
 			source: "function Component(props, theRefValue) {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    el = null;\n  }\n  log(el);\n  return el;\n}\n",
@@ -135,15 +135,15 @@ func TestErrorBoundariesFires(test *testing.T) {
 		},
 		{
 			// Upstream's looseness, pinned rather than tidied: a parameter named `prefix` contains
-			// `ref`, so it counts as a ref and the function is a component. Measured REPORTING on
+			// `ref`, so it counts as a ref and the function is a component. Measured reporting on
 			// React. It reads like a bug and it is upstream's, so it is reproduced.
 			name:   "secondParameterNamedPrefixCountsAsARef",
 			source: "function Component(props, prefix) {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    el = null;\n  }\n  log(el);\n  return el;\n}\n",
 			count:  1,
 		},
 		{
-			// Upstream's ref test is a SUBSTRING test, `name.includes('ref') || name.includes('Ref')`,
-			// not equality, and these two are what pin that. Both measured REPORTING on React.
+			// Upstream's ref test is a substring test, `name.includes('ref') || name.includes('Ref')`,
+			// not equality, and these two are what pin that. Both measured reporting on React.
 			name:   "secondParameterNamedForwardedRef",
 			source: "function Component(props, forwardedRef) {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    el = null;\n  }\n  log(el);\n  return el;\n}\n",
 			count:  1,
@@ -174,7 +174,7 @@ func TestErrorBoundariesFires(test *testing.T) {
 			count:  1,
 		},
 		{
-			// Upstream is CLEAN here and this rule reports, deliberately. `el` is assigned and
+			// Upstream is clean here and this rule reports, deliberately. `el` is assigned and
 			// never read, so React's lowering drops the JSX instruction as a value nothing
 			// consumes before the validator runs. That elimination is not reproduced; see the
 			// divergence recorded at `ErrorBoundaries`. Measured on the real rule rather than
@@ -192,7 +192,7 @@ func TestErrorBoundariesFires(test *testing.T) {
 		},
 		{
 			// A nested function's returns say nothing about the enclosing one, and the nested
-			// function has to be written INSIDE the component's own return for a fixture to see
+			// function has to be written inside the component's own return for a fixture to see
 			// that. A nested function written earlier cannot: an unguarded walk visits its return
 			// first and the component's own return last, and since upstream assigns rather than
 			// accumulates, the last one decides in both versions. Two fixtures written that way
@@ -200,7 +200,7 @@ func TestErrorBoundariesFires(test *testing.T) {
 			// time, which is what the brief asks for after a second failed hypothesis.
 			//
 			// Here the nested function sits in the return's own argument list, so an unguarded walk
-			// visits `return {}` LAST and answers non-component. Measured REPORTING on React.
+			// visits `return {}` last and answers non-component. Measured reporting on React.
 			name:   "nestedFunctionReturningANonNodeInsideTheComponentsOwnReturn",
 			source: "function Component() {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    el = null;\n  }\n  return log(el, function () {\n    return {};\n  });\n}\n",
 			count:  1,
@@ -267,12 +267,12 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 			source: "function Component() {\n  try {\n    foo();\n  } catch {\n    bar();\n  }\n  return <div />;\n}\n",
 		},
 		{
-			// A METHOD is a function boundary too, and these are what prove it. The arrow and
+			// A method is a function boundary too, and these are what prove it. The arrow and
 			// function-expression cases nearby cannot: a mutant that dropped methods and accessors
 			// from the boundary set survived every one of them, because those shapes are bounded by
 			// an arm the mutant kept.
 			//
-			// All three measured CLEAN on React, which is the same reason the arrow cases are
+			// All three measured clean on React, which is the same reason the arrow cases are
 			// clean: the inner function is its own compilation unit, so its JSX sits in no try.
 			name:   "jsxInObjectMethodInsideTry",
 			source: "function Component() {\n  let el;\n  try {\n    const o = {\n      render() {\n        return <div />;\n      },\n    };\n    el = o.render();\n  } catch {\n    el = null;\n  }\n  log(el);\n  return el;\n}\n",
@@ -322,7 +322,7 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 			source: "class Foo {\n  Component() {\n    let el;\n    try {\n      el = <div />;\n    } catch {\n      return null;\n    }\n    return el;\n  }\n}\n",
 		},
 		{
-			// The class arm of the candidacy walk, isolated. An arrow inside a class STATIC BLOCK
+			// The class arm of the candidacy walk, isolated. An arrow inside a class static block
 			// is bound to a variable, so it has a readable name and passes every later gate; the
 			// only thing declining it is its class ancestor. The property-arrow cases below cannot
 			// see that arm at all, because a property holds no name the rule can read and the name
@@ -331,7 +331,7 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 			// Found by reading after a fixture written on a wrong hypothesis failed to kill the
 			// mutant a second time, which is the brief's own instruction. Both spellings of the
 			// class are pinned, because the mutant kept the declaration arm and dropped only the
-			// expression one. Measured CLEAN on React before either was written.
+			// expression one. Measured clean on React before either was written.
 			name:   "componentArrowInsideAClassExpressionStaticBlock",
 			source: "const K = class {\n  static {\n    const Component = () => {\n    let el;\n    try {\n      el = <div />;\n    } catch {\n      el = null;\n    }\n    log(el);\n    return el;\n    };\n  }\n};\n",
 		},
@@ -340,13 +340,13 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 			source: "class K {\n  static {\n    const Component = () => {\n    let el;\n    try {\n      el = <div />;\n    } catch {\n      el = null;\n    }\n    log(el);\n    return el;\n    };\n  }\n}\n",
 		},
 		{
-			// A class PROPERTY holding an arrow reaches the class node with no function-like
+			// A class property holding an arrow reaches the class node with no function-like
 			// ancestor in between, which is the only shape where the class arm of the candidacy
 			// walk decides anything on its own. The method cases nearby are declined by their
 			// method ancestor first, so they cannot see it.
 			//
 			// Written for a surviving mutant that dropped `KindClassExpression` from that arm, and
-			// measured CLEAN on React first. Both spellings of the class are pinned, because the
+			// measured clean on React first. Both spellings of the class are pinned, because the
 			// mutant kept the declaration arm and dropped only the expression one.
 			name:   "classExpressionPropertyArrowNamedComponent",
 			source: "const K = class {\n  Component = () => {\n    let el;\n    try {\n      el = <div />;\n    } catch {\n      el = null;\n    }\n    log(el);\n    return el;\n  };\n};\n",
@@ -366,12 +366,12 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 		{
 			// The upward walk must stop at the enclosing function, and this is the input that
 			// proves it. The declaration sits lexically inside a module-scope try block and it
-			// PASSES the component gate, so nothing else declines it: only the boundary does.
+			// passes the component gate, so nothing else declines it: only the boundary does.
 			//
 			// The nested-function cases above cannot see that, because their inner functions are
 			// declined by the gate first and both a stopping walk and a running one reach silence
 			// by different routes. Found by a surviving mutant that removed the boundary test, and
-			// measured CLEAN on React before this was written down rather than after.
+			// measured clean on React before this was written down rather than after.
 			name:   "componentDeclaredInsideAModuleScopeTryBlock",
 			source: "try {\n  function Component() {\n    return <div />;\n  }\n} catch {\n  log();\n}\n",
 		},
@@ -386,10 +386,10 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 			source: "function Outer() {\n  function Component() {\n    let el;\n    try {\n      el = <div />;\n    } catch {\n      return null;\n    }\n    return el;\n  }\n  return <Component />;\n}\n",
 		},
 		{
-			// Three parameters whose SECOND one does mention `ref`. The plain three-parameter case
+			// Three parameters whose second one does mention `ref`. The plain three-parameter case
 			// below cannot see a mutant that widens the arity test, because its second parameter
 			// fails the ref test anyway and both versions reach silence by different routes.
-			// Measured CLEAN on React before it was written.
+			// Measured clean on React before it was written.
 			name:   "threeParametersWithARefInSecondPosition",
 			source: "function Component(props, ref, third) {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    el = null;\n  }\n  log(el);\n  return el;\n}\n",
 		},
@@ -414,7 +414,7 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 			source: "function Component() {\n  let el;\n  try {\n    el = <div />;\n  } catch {\n    el = null;\n  }\n  log(el);\n  return {};\n}\n",
 		},
 		{
-			// The same discrimination in the other direction: a non-node return visited BEFORE a
+			// The same discrimination in the other direction: a non-node return visited before a
 			// node one does not decide the answer, because upstream assigns rather than
 			// accumulates. Measured reporting, so this belongs among the silent cases only as its
 			// mirror; it lives in the Fires table.
@@ -430,13 +430,13 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 			// The concise-body arrow branch of `returnsNonNode`, isolated, and the fixture is here
 			// because a confident unreachability argument was wrong. The reasoning ran: a concise
 			// arrow's body is an expression, a try is a statement, so no try can sit between the
-			// JSX and the arrow and the branch cannot be reached. A class STATIC BLOCK inside a
-			// class EXPRESSION is a statement position inside an expression, which breaks it, and
+			// JSX and the arrow and the branch cannot be reached. A class static block inside a
+			// class expression is a statement position inside an expression, which breaks it, and
 			// the rule's own two predicates were run over this input rather than the argument being
 			// trusted: the walk does find the try and the gate is asked.
 			//
 			// It is clean because the arrow's concise body is a class expression, which is on
-			// upstream's non-node list, so the arrow is not a component. Measured CLEAN on React.
+			// upstream's non-node list, so the arrow is not a component. Measured clean on React.
 			// Deleting the branch makes this report.
 			name:   "conciseArrowBodyIsAClassExpressionHoldingAStaticBlockTry",
 			source: "const Component = () => class {\n  static {\n    try {\n      foo(<div />);\n    } catch {\n      bar();\n    }\n  }\n};\n",
@@ -460,7 +460,7 @@ func TestErrorBoundariesStaysSilent(test *testing.T) {
 	}
 }
 
-// TestErrorBoundariesSpan pins WHERE the finding points, which no message-id assertion can see.
+// TestErrorBoundariesSpan pins where the finding points, which no message-id assertion can see.
 //
 // The span is byte-verified against React's own golden rather than chosen. React's
 // `invalid-jsx-in-try-with-catch.expect.md` logs the finding at `"index":123` through

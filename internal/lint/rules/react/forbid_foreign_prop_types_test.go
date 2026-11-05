@@ -31,7 +31,7 @@ const forbidForeignPropTypesFile = "/repository/source/ForbidForeignPropTypes.ts
 //
 // Two invalid cases carry upstream's `no-ts` marker, which says its own TypeScript parsers fail
 // them. Ours parses both, and both are imported as reporting, which is upstream's verdict under the
-// parser that can read them. Their marker is a TODO in upstream's file rather than a statement
+// parser that can read them. Their marker is a `TODO` in upstream's file rather than a statement
 // about the rule.
 
 // forbidForeignPropTypesOptions decodes a raw option body the way the config layer does.
@@ -164,7 +164,7 @@ func TestForbidForeignPropTypesStaysSilent(test *testing.T) {
 		{"valid 3 a bare identifier as an argument", `foo(propTypes)`, ""},
 		{"valid 4 a bare identifier in an operand", `foo + propTypes`, ""},
 		{"valid 5 a bare identifier in an array", `const foo = [propTypes]`, ""},
-		// An object LITERAL is not an object PATTERN, and only the pattern arm exists.
+		// An object literal is not an object pattern, and only the pattern arm exists.
 		{"valid 6 a shorthand in an object literal", `const foo = { propTypes }`, ""},
 		{"valid 7 a plain member as an assignment target", `Foo.propTypes = propTypes`, ""},
 		{"valid 8 a computed member as an assignment target", `Foo["propTypes"] = propTypes`, ""},
@@ -235,7 +235,7 @@ func TestForbidForeignPropTypesHasNoFileSuffixGate(test *testing.T) {
 // TestForbidForeignPropTypesAnchorsOnTheProperty asserts where each finding points.
 //
 // The corpus asserts message ids only, so nothing in it can see a rule reporting the right judgment
-// in the wrong place. Upstream anchors on the PROPERTY node for a member access and on the whole
+// in the wrong place. Upstream anchors on the property node for a member access and on the whole
 // matched property for a destructuring, which are two different choices in one rule, and both were
 // read from upstream's reported columns rather than from its source.
 func TestForbidForeignPropTypesAnchorsOnTheProperty(test *testing.T) {
@@ -294,7 +294,7 @@ func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(test *testing.T) {
 		// exempt for the same reason. `ast.IsAssignmentExpression(node, false)` is what reproduces
 		// that; passing true would report here and diverge.
 		{"a compound assignment target is exempt", `Foo.propTypes += 1;`, nil},
-		// An update expression is NOT an AssignmentExpression, so upstream reports on a write.
+		// An update expression is not an AssignmentExpression, so upstream reports on a write.
 		// Reproduced rather than corrected.
 		{"an update expression is not exempt", `Foo.propTypes++;`, []string{"forbiddenPropType"}},
 		{"a delete is not exempt", `delete Foo.propTypes;`, []string{"forbiddenPropType"}},
@@ -317,8 +317,8 @@ func TestForbidForeignPropTypesExemptsOnlyAssignmentTargets(test *testing.T) {
 // TestForbidForeignPropTypesUnwrapsParentheses covers the parser difference, in the direction that
 // costs a false positive.
 //
-// `(Foo.propTypes) = {}` is CLEAN upstream, measured. Its parser folds the parenthesis away so the
-// member access IS the assignment's left. Ours keeps a `KindParenthesizedExpression` between them,
+// `(Foo.propTypes) = {}` is clean upstream, measured. Its parser folds the parenthesis away so the
+// member access is the assignment's left. Ours keeps a `KindParenthesizedExpression` between them,
 // so a naive parent test sees a parenthesis instead of an assignment, concludes the access is not a
 // target, and reports where upstream is silent. No imported fixture can express this: upstream's
 // corpus cannot write the shape, because its parser deleted the node before any test existed.
@@ -373,7 +373,7 @@ func TestForbidForeignPropTypesReadsOnlyLiteralKeys(test *testing.T) {
 		{"a string literal pattern key declines", `const { "propTypes": p } = Foo;`, nil},
 		{"a pattern without the key declines", `const { other } = Foo;`, nil},
 		{"a rest only pattern declines", `const { ...rest } = Foo;`, nil},
-		// Upstream uses `properties.find`, so a pattern naming the key twice reports ONCE. A loop
+		// Upstream uses `properties.find`, so a pattern naming the key twice reports once. A loop
 		// that did not stop would report twice, and nothing in the corpus writes the shape.
 		{"a pattern naming it twice reports once", `const { propTypes, propTypes: q } = Foo;`, []string{"forbiddenPropType"}},
 		{"any object pattern counts, including a parameter", `function f({ propTypes }) {}`, []string{"forbiddenPropType"}},
@@ -408,7 +408,7 @@ func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(test *testing.T) {
 	}{
 		{"an assignment exempts through two levels of nesting", `Foo.propTypes = { a: { b: Bar.propTypes.c } };`, nil},
 		{"a class field exempts through a closure", `class C { static propTypes = { a: () => Q.propTypes.c }; }`, nil},
-		// The assignment walk tests the LEFT's property name, so assigning into anything else does
+		// The assignment walk tests the left's property name, so assigning into anything else does
 		// not exempt. This is the case that makes the walk a discrimination rather than a blanket.
 		{"assigning into another property does not exempt", `Foo.other = Bar.propTypes;`, []string{"forbiddenPropType"}},
 		// Upstream does not test `static`, measured, so an instance field exempts too.

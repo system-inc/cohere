@@ -4,7 +4,7 @@
 //
 // `internal/react_conformance` owns the corpus, the expectation parser, and the categories. It
 // deliberately depends on nothing in cohere's rule engine, so that the instrument cannot be bent by
-// the thing it measures — and so that its 0.3s suite stays cheap enough never to be gated.
+// the thing it measures, and so that its 0.3s suite stays cheap enough never to be gated.
 //
 // Running a real rule costs a TypeScript program build, which is roughly a second per fixture.
 // Putting that in the same package would either make the instrument slow enough to gate, or push
@@ -14,7 +14,7 @@
 // # What this proves that the categorisation cannot
 //
 // `react_conformance` can decide, from the corpus alone, which fixtures a shipped rule is
-// responsible for. It cannot decide whether those rules are RIGHT, and a harness that only ever
+// responsible for. It cannot decide whether those rules are right, and a harness that only ever
 // reported "94 addressable, 0 scored" would be a taxonomy wearing a scoreboard's clothes.
 //
 // This scores one rule end to end against real goldens, so the wiring from fixture to finding to
@@ -44,8 +44,8 @@ const fixtureRoot = "../testdata/fixtures"
 // belong to upstream's `globals` rule, and requires the harness to produce a non-zero pass count.
 //
 // The assertion is a floor rather than an exact number, and that choice is deliberate in one
-// direction only. An exact number would be the better assertion — it is what
-// `TestAttributionIsAMeasurementNotAGuess` does — but it would pin the SPAN and LINE conventions of
+// direction only. An exact number would be the better assertion (it is what
+// `TestAttributionIsAMeasurementNotAGuess` does), but it would pin the span and line conventions of
 // a rule that was never written against this corpus, turning any future span refinement into a
 // failure here rather than where it belongs. A floor still fails for the thing this test exists to
 // catch: a harness that cannot turn a real rule's real finding into a pass.
@@ -70,7 +70,7 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
 	// 11 flow-free fixtures whose every diagnostic is a `globals` one. Pinned so that a change in
 	// the attribution shows up here as well as in its own test.
 	//
-	// Not 23. The wider figure counts every fixture whose diagnostics are all Globals INCLUDING the
+	// Not 23. The wider figure counts every fixture whose diagnostics are all Globals including the
 	// twelve `error.todo-*` differential-testing fixtures, whose expectations are Todo diagnostics
 	// from the Rust backend comparison rather than Globals findings. Selecting on the attributed
 	// rule rather than on the filename is what keeps them out, and the gap between 11 and 23 is a
@@ -109,7 +109,7 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
 	}
 
 	// And the honest half: today the rule passes none of them. Asserted so the zero is a recorded
-	// measurement rather than something a reader has to infer from its absence — and so that the
+	// measurement rather than something a reader has to infer from its absence, and so that the
 	// day a scope decision closes one of these divergences, this test fails and someone updates the
 	// number deliberately instead of the improvement passing unnoticed.
 	if got := counts[react_conformance.VerdictPassed]; got != 0 {
