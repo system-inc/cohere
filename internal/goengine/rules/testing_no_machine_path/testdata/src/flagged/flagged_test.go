@@ -6,7 +6,7 @@ package flagged
 import "testing"
 
 // A macOS home path.
-const macRoot = "/Users/someone/Projects/ahra" // want `^This test names a home directory, so it reads a path that exists on one developer's machine`
+const macRoot = "/Users/someone/Projects/ahra" // want `^This test names a home directory, so it reads a path`
 
 // A Linux home path, in a raw string.
 const linuxRoot = `/home/someone/checkouts/ahra` // want `This test names a home directory`

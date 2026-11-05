@@ -47,7 +47,7 @@ package flagged
  * // want `^"DO", "NOT" in a comment`
  */
 
-// straight back in. A miss is a LOUD failure with near misses named by ID, never a silent // want `^"LOUD" in a comment`
+// straight back in. A miss is a LOUD failure with near misses named by ID, never a silent // want `^"LOUD" in a`
 
 // Apostrophes that are not quotes open nothing, verbatim.
 

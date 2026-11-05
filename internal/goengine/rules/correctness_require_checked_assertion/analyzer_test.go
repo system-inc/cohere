@@ -22,7 +22,9 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 	}
 }
 
-// The flagged fixtures carry a // want on every single-value assertion, in every position one can stand, and
+// The flagged fixtures carry a // want on every single-value assertion, in every position one can stand, with the
+// matching-case message only where a type switch on the same variable already matched the one target type and the
+// panic message wherever the type, the variable, the case's type count or a closure says otherwise, and
 // analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and lookalike
 // fixtures prove the rule stays quiet on comma-ok in each of its forms, on type switches, and on conversions and
 // other comma-ok reads that are no assertion.
