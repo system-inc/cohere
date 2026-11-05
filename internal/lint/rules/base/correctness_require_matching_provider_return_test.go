@@ -35,12 +35,12 @@ declare namespace Namespace {
 }
 `
 
-// These fixtures are WRITTEN rather than imported, which inverts the usual advice.
+// These fixtures are written rather than imported, which inverts the usual advice.
 //
 // This is one of our own base rules, so there is no upstream corpus, and a fixture written beside
 // the port carries the same beliefs the port does. The mitigation is that the source repository is a
 // real oracle, and for this rule the oracle is unusually strong: the check ran against
-// api-phi-health's ACTUAL `Provider` decorator and `TypedInjectionKey` rather than a synthetic
+// api-phi-health's actual `Provider` decorator and `TypedInjectionKey` rather than a synthetic
 // stand-in, on a file seeded inside that project's tsconfig include. The original and this port
 // agreed on two reporting shapes and three clean ones, and the rendered types matched character for
 // character, including `string | ObjectFactory<string> | undefined`.
@@ -135,11 +135,11 @@ func TestProviderReturnMatchesTokenOnlyJudgesMethods(test *testing.T) {
 		// The row that actually proves the parent guard, and the only one that does.
 		//
 		// Written for a surviving mutant, and the first hypothesis about that survivor was wrong.
-		// The three rows above pass with OR without the guard: a property, a getter and a setter
+		// The three rows above pass with or without the guard: a property, a getter and a setter
 		// have no call signature, so the rule exits at the return-type lookup rather than at the
 		// parent test, and dropping the guard changes nothing for them.
 		//
-		// A property whose TYPE is a function does have a call signature, so it is the one shape
+		// A property whose type is a function does have a call signature, so it is the one shape
 		// that separates the two versions: with the guard it is clean, without it, it reports.
 		// Measured against the original on a seeded file inside api-phi-health's tsconfig, using
 		// the real Provider decorator: it reports the equivalent real method and stays silent on
@@ -162,7 +162,7 @@ func TestProviderReturnMatchesTokenOnlyJudgesMethods(test *testing.T) {
 //
 // A message-id assertion cannot see anything the format string does, and this one interpolates three
 // values, so a slot filled from the wrong variable reads as a correct finding. The rendered strings
-// here were taken from the ORIGINAL rule's output on the seeded file rather than derived: it printed
+// here were taken from the original rule's output on the seeded file rather than derived: it printed
 // `string | ObjectFactory<string> | undefined` and `number` for the same input.
 //
 // Asserted against literals typed here rather than against the rule's own constant, since comparing
@@ -205,7 +205,7 @@ func TestProviderReturnMatchesTokenRendersBothTypes(test *testing.T) {
 //
 // The original reports the method's value node, which is the function carrying the return type the
 // author has to change. Every assertion above is satisfied by a rule reporting the decorator
-// instead, and pointing at the decorator would show the reader the line they must NOT edit.
+// instead, and pointing at the decorator would show the reader the line they must not edit.
 func TestProviderReturnMatchesTokenPointsAtTheMethod(test *testing.T) {
 	test.Parallel()
 

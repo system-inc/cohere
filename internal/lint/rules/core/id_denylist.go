@@ -30,7 +30,7 @@ func DefaultIdDenylistSettings() IdDenylistSettings {
 // Hand rolled rather than routed through `rule.DecodeOptionsInto` because the wire shape is a JSON
 // list of strings rather than an object, and the generic helper decodes into a struct.
 //
-// # Upstream's option surface is VARIADIC, and the list arrives whole
+// # Upstream's option surface is variadic, and the list arrives whole
 //
 // Upstream reads `context.options`, which is every element of the config array after the severity:
 //
@@ -122,7 +122,7 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //
 // A sibling port in this batch found `react/prefer-exact-props` carrying the same audit verdict as
 // this rule -- "Yes, violations: none" -- while being structurally incapable of firing here: its
-// only reporting path reads `settings.propWrapperFunctions`, a SHARED ESLint setting that
+// only reporting path reads `settings.propWrapperFunctions`, a shared ESLint setting that
 // `rule.Context` has no path to and that ahra configures nowhere. The ruling is at
 // `internal/lint/rules/react/forbid_prop_types.go:158-183`. So the audit's zero cannot by itself
 // tell a clean tree from a rule that cannot report at all, and both readings had to be separated
@@ -141,14 +141,14 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //
 // The last is the one that settles it, and it carries its own control: the same harness runs
 // `react/prefer-exact-props` on a reporting case from its own corpus and measures 0 findings
-// without settings against 1 with, so the probe demonstrably CAN detect a settings dependency and
+// without settings against 1 with, so the probe demonstrably can detect a settings dependency and
 // refuses to report if that control stays flat. This rule's zero is therefore "nothing is
 // configured yet", which a denylist fixes, rather than "nothing can be".
 // # What is checked is narrower than "every identifier", and each exclusion is a false-positive
 // class upstream already paid for
 //
 // Upstream's `shouldCheck` is five tests, and the reasoning under all of them is the same: a
-// denylist governs names WE choose, not names imposed on us from outside.
+// denylist governs names we choose, not names imposed on us from outside.
 //
 //	a callee or a constructor      foo() and new foo()      the function was named elsewhere
 //	an import's exported name      import { foo as bar }    the exporting module chose it
@@ -160,7 +160,7 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //
 // Member access splits rather than being excluded outright, and the split is the sharpest judgment
 // in the rule: reading `foo.bar` is allowed because `foo` may be an object we do not own, while
-// WRITING `foo.bar = 1` is denied because the write is what creates a property with that name.
+// writing `foo.bar = 1` is denied because the write is what creates a property with that name.
 // Upstream's `isAssignmentTarget` covers a plain assignment and every destructuring position, and
 // all of them are reproduced below.
 //
@@ -168,7 +168,7 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 // configuration surface rather than the algorithm
 //
 // Upstream's `isReferenceToGlobalVariable` reads ESLint's global scope: a name is exempt when the
-// scope holds a variable for it with ZERO definitions, which means the environment declared it and
+// scope holds a variable for it with zero definitions, which means the environment declared it and
 // the source did not. Measured by mutation against the installed rule, that exemption decides
 // **13 of the 145 corpus cases**, so it cannot be dropped:
 //
@@ -177,7 +177,7 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //
 // The checker answers the same question through `idDenylistIsReferenceToGlobalVariable` below.
 // Reaching for `identifierIsShadowed`, the helper already in this package, is the obvious move and
-// it is WRONG here by exactly one row -- see that function's own comment for the measurement.
+// it is wrong here by exactly one row -- see that function's own comment for the measurement.
 // Over all thirteen shapes, the four resolution outcomes are:
 //
 //	nil symbol                  not shadowed  -> the environment's  -> exempt
@@ -186,9 +186,9 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //	declared in source          SHADOWED      -> ours               -> checked
 //
 // **Where it diverges, and why the divergence is not repairable here.** ESLint lets a config
-// DECLARE globals that the code never mentions -- `languageOptions.globals: {myGlobal: "readonly"}`
+// declare globals that the code never mentions -- `languageOptions.globals: {myGlobal: "readonly"}`
 // and the `/* global myGlobal */` comment directive. Eight corpus cases turn on that surface, five
-// of which actually diverge -- they are pinned one by one, at MEASURED verdicts, in
+// of which actually diverge -- they are pinned one by one, at measured verdicts, in
 // TestIdDenylistDivergesOnTheEslintGlobalsSurface. And
 // cohere has no counterpart to it: `CohereSettings.json` carries no globals key, and the checker's
 // answer comes from the lib and `@types` a file is actually compiled against. So for a name that is
@@ -202,7 +202,7 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 //
 // That is the source-type hazard the standard names, one layer over: the two instruments are being
 // asked different questions, and re-running the measurement reproduces the same difference. The
-// checker's answer is the RIGHT one for a TypeScript tree, because an undeclared name here is a
+// checker's answer is the right one for a TypeScript tree, because an undeclared name here is a
 // compile error rather than an ambient global, so the divergence is recorded rather than worked
 // around. The fixtures below carry these cases at the verdict this port produces, with the
 // upstream verdict named at the line.
@@ -210,7 +210,7 @@ var messageIdDenylistRestrictedPrivate = rule.Message{
 // # Upstream deduplicates by source range and this port does not need to
 //
 // `reportedNodes` is a set of stringified ranges, and its comment says why: in ESTree a shorthand
-// property `{ foo }` is TWO identifier nodes, a key and a value, sharing one range, so a rule
+// property `{ foo }` is two identifier nodes, a key and a value, sharing one range, so a rule
 // visiting both would report twice. Measured here, `({ foo } = a)` is a single
 // `KindShorthandPropertyAssignment` carrying exactly one name node, and `let { foo } = a` is a
 // single `KindBindingElement` likewise. That is a parser difference rather than a judgment, so the
@@ -236,7 +236,7 @@ var IdDenylist = rule.Rule{
 			// rather than once per identifier, and it is what a rule configured as a bare severity
 			// gets, since there is no sensible default denylist.
 			//
-			// This early exit is a MEASURED EQUIVALENCE rather than a discrimination, and it is
+			// This early exit is a measured equivalence rather than a discrimination, and it is
 			// recorded so the next reader does not chase it. A mutation removing it survives every
 			// fixture, correctly: with an empty map the per-identifier membership test below fails
 			// for every name, so the rule reports nothing either way. The exit buys speed, not a
@@ -276,7 +276,7 @@ var IdDenylist = rule.Rule{
 // idDenylistNameOf reads the name a denylist entry would have to match.
 //
 // A private identifier's `Text()` already carries the leading `#`, so it is trimmed: upstream
-// matches `node.name`, which for a `PrivateIdentifier` is the name WITHOUT the hash, and renders
+// matches `node.name`, which for a `PrivateIdentifier` is the name without the hash, and renders
 // the hash back into the message itself. A port matching the hashed spelling would need `#foo` in
 // the config to deny `#foo`, which is not what the corpus configures.
 func idDenylistNameOf(node *ast.Node) string {
@@ -305,8 +305,8 @@ func idDenylistShouldCheck(ruleContext rule.Context, node *ast.Node) bool {
 		return false
 	}
 
-	// Member access has its own rule, and it is the sharpest judgment here. READING a property with
-	// a denied name is allowed, because the object may be one we do not own. WRITING one is not,
+	// Member access has its own rule, and it is the sharpest judgment here. Reading a property with
+	// a denied name is allowed, because the object may be one we do not own. Writing one is not,
 	// because the write is what creates a property with that name.
 	//
 	// Upstream tests `parent.type === "MemberExpression" && parent.property === node &&
@@ -347,14 +347,14 @@ func idDenylistShouldCheck(ruleContext rule.Context, node *ast.Node) bool {
 
 // idDenylistIsReferenceToGlobalVariable is upstream's `isReferenceToGlobalVariable`.
 //
-// Upstream reads the global scope and requires THREE things at once: a variable exists there under
+// Upstream reads the global scope and requires three things at once: a variable exists there under
 // this name, it has zero definitions, and this identifier is one of its references. All three
 // matter, and the middle one is what makes the predicate narrow.
 //
 // The tempting shortcut is `!identifierIsShadowed`, the helper already in this package, and it is
-// WRONG here by exactly one row. That helper answers "is any declaration of this symbol in a real
+// wrong here by exactly one row. That helper answers "is any declaration of this symbol in a real
 // source file", so it returns false both for a genuine ambient global and for a name that resolves
-// to NOTHING AT ALL. Upstream separates those: an undeclared name is `scope.through` rather than a
+// to nothing at all. Upstream separates those: an undeclared name is `scope.through` rather than a
 // global-scope variable, so it is checked rather than exempted. Measured directly against the
 // installed rule:
 //
@@ -397,7 +397,7 @@ func idDenylistIsReferenceToGlobalVariable(ruleContext rule.Context, node *ast.N
 // idDenylistIsImportAttributeKey is ESLint's `astUtils.isImportAttributeKey`.
 //
 // An import attribute is read by the module loader, which decides what the keys mean, so a denylist
-// governing names WE choose has no business there. Two spellings reach it and both are in the
+// governing names we choose has no business there. Two spellings reach it and both are in the
 // corpus, which is why the second arm is worth its machinery rather than being declined:
 //
 //	import foo from 'foo.json' with { type: 'json' }      static, its own node kind
@@ -406,7 +406,7 @@ func idDenylistIsReferenceToGlobalVariable(ruleContext rule.Context, node *ast.N
 // The static form is trivial here because our parser gives it a dedicated `KindImportAttribute`
 // whose name slot is exactly upstream's `parent.key`.
 //
-// The dynamic form is not, and the corpus pins precisely where the exemption STOPS. Eight cases
+// The dynamic form is not, and the corpus pins precisely where the exemption stops. Eight cases
 // exercise this, six clean and two reporting, and the two reporting ones are what make it a real
 // judgment rather than "anything under an import call is exempt":
 //
@@ -433,7 +433,7 @@ func idDenylistIsImportAttributeKey(node *ast.Node) bool {
 
 	// The dynamic form. Only a non-computed key or a shorthand's single name qualifies; a computed
 	// key's identifier has `KindComputedPropertyName` for a parent and never reaches here, and a
-	// property's VALUE fails the name test below.
+	// property's value fails the name test below.
 	var objectLiteral *ast.Node
 	switch parent.Kind {
 	case ast.KindPropertyAssignment:
@@ -445,7 +445,7 @@ func idDenylistIsImportAttributeKey(node *ast.Node) bool {
 
 	case ast.KindShorthandPropertyAssignment:
 		// Upstream's `parent.value === node && parent.shorthand && !parent.method`. A shorthand is
-		// one node here carrying one name, so being the name IS being the shorthand.
+		// one node here carrying one name, so being the name is being the shorthand.
 		assignment := parent.AsShorthandPropertyAssignment()
 		if assignment == nil || assignment.Name() != node {
 			return false
@@ -486,7 +486,7 @@ func idDenylistIsImportOptionsObject(objectLiteral *ast.Node) bool {
 
 	// An inner object: the value of a key that is itself an import attribute key. Upstream spells
 	// this `isImportAttributeKey(objectExpressionParent.key)`, so the recursion runs through the
-	// KEY rather than through this object, which is why a quoted `'with'` still qualifies -- the
+	// key rather than through this object, which is why a quoted `'with'` still qualifies -- the
 	// name slot of the property assignment is what gets asked, whatever its spelling.
 	if parent.Kind == ast.KindPropertyAssignment {
 		assignment := parent.AsPropertyAssignment()
@@ -507,7 +507,7 @@ func idDenylistIsImportOptionsObject(objectLiteral *ast.Node) bool {
 //
 // Upstream's five arms are a plain assignment, an ArrayPattern element, a RestElement, an
 // ObjectPattern property's value, and an AssignmentPattern's left side. Only the first and the
-// destructuring-through-a-member forms can reach a MEMBER ACCESS at all, because a binding pattern
+// destructuring-through-a-member forms can reach a member access at all, because a binding pattern
 // declaring new names holds identifiers rather than member accesses. In this tree an assignment
 // destructuring is written with literal syntax rather than binding syntax, so `[foo.bar] = a` is a
 // `KindArrayLiteralExpression` and `({ x: foo.bar } = a)` a `KindPropertyAssignment` inside a
@@ -527,13 +527,13 @@ func idDenylistIsAssignmentTarget(node *ast.Node) bool {
 		return binary != nil && binary.Left == node && ast.IsAssignmentOperator(binary.OperatorToken.Kind)
 
 	// `[foo.bar] = a`, upstream's ArrayPattern. An assignment destructuring parses as an array
-	// LITERAL here and is reinterpreted as a pattern by the checker, so the element's parent is the
+	// literal here and is reinterpreted as a pattern by the checker, so the element's parent is the
 	// literal.
 	//
 	// The destructuring test is load-bearing and upstream needs no equivalent, because its parser
-	// produces `ArrayPattern` ONLY for a genuine target and `ArrayExpression` for a value. Ours
+	// produces `ArrayPattern` only for a genuine target and `ArrayExpression` for a value. Ours
 	// produces one kind for both. Without the test, the bare statement `[foo.bar]` reads as a
-	// pattern and reports, and upstream's corpus lists exactly that source as CLEAN.
+	// pattern and reports, and upstream's corpus lists exactly that source as clean.
 	case ast.KindArrayLiteralExpression:
 		return idDenylistIsDestructuringTarget(parent)
 
@@ -564,7 +564,7 @@ func idDenylistIsAssignmentTarget(node *ast.Node) bool {
 
 // idDenylistIsDestructuringTarget answers whether an object literal is standing in for a pattern.
 //
-// Upstream reads the node TYPE, because its parser produces an `ObjectPattern` for a destructuring
+// Upstream reads the node type, because its parser produces an `ObjectPattern` for a destructuring
 // target and an `ObjectExpression` for a value. Our parser produces `KindObjectLiteralExpression`
 // for both and lets the checker reinterpret it, so the question has to be asked of the context: an
 // object literal is a pattern exactly when it is the left side of an assignment, or is itself
@@ -604,11 +604,11 @@ func idDenylistIsDestructuringTarget(node *ast.Node) bool {
 // an import, or in a re-export, belongs to the module we are importing from.
 //
 // The two directions are not symmetric, and getting them the wrong way round is silent. For
-// `import { a as b }` the EXPORTED name is `a` (our `PropertyName`) and the local binding is `b`.
+// `import { a as b }` the exported name is `a` (our `PropertyName`) and the local binding is `b`.
 // For `export { a as b } from 'mod'` the local half is `a` (also our `PropertyName`) and the
 // exported name is `b`. So both arms exempt `PropertyName`, but they mean opposite things and only
 // the export arm requires a `from` clause: `let foo; export { foo as bar };` re-exports a name this
-// file DECLARED, so `foo` is ours and is checked, which is exactly what upstream's
+// file declared, so `foo` is ours and is checked, which is exactly what upstream's
 // `parent.parent.source` test says.
 func idDenylistIsRenamedImport(node *ast.Node) bool {
 	parent := node.Parent
@@ -646,7 +646,7 @@ func idDenylistExportHasSource(specifier *ast.Node) bool {
 }
 
 // idDenylistIsPropertyNameInDestructuring is upstream's `isPropertyNameInDestructuring`: in
-// `const { foo: bar } = baz`, the key `foo` is the SOURCE object's own property name and we did not
+// `const { foo: bar } = baz`, the key `foo` is the source object's own property name and we did not
 // choose it, so only the new binding `bar` is checked.
 //
 // Upstream reads `Property && parent.parent.type === "ObjectPattern" && parent.key === node`. This

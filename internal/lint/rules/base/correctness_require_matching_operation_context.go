@@ -37,7 +37,7 @@ var graphQlOperationDecorators = map[string]struct{}{
 //
 // # What this rule deliberately does not check, because a sibling already does
 //
-// Whether the parameter's BASE type is an operation context at all is `inject-type-matches-parameter`'s
+// Whether the parameter's base type is an operation context at all is `inject-type-matches-parameter`'s
 // question, answered through the decorator's branded resolved type. This rule reports a wrong base
 // type anyway, under its own message, because it has already resolved the type and the alternative
 // is silence on the shape that most needs saying something. The original's header comment states
@@ -88,13 +88,13 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 				// KindParameter for each. That is fidelity to what the rule decides rather than to
 				// how the original obtained it.
 				//
-				// The KIND GUARD is the one part of that helper that survives, and it is
+				// The kind guard is the one part of that helper that survives, and it is
 				// load-bearing rather than defensive. A decorator can sit on a class, a method, a
 				// property or an accessor, and all four reach this listener with a non-parameter
 				// parent, measured. Most are then declined by the enclosing-method walk below,
 				// because a class member has no enclosing method, which is why the obvious
 				// placements cannot prove the guard. The shape that can is a decorator on a member
-				// of a LOCAL CLASS declared inside an operation method: the walk finds the outer
+				// of a local class declared inside an operation method: the walk finds the outer
 				// method, and without this guard the rule reports a bogus mismatch on its property
 				// and a bogus wrongBaseType on its method. Both are silent upstream, where
 				// `resolveDecoratedParameterNode` answers null for a non-parameter owner, and both
@@ -117,7 +117,7 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 					return
 				}
 
-				// The base type has to BE an operation context. Reported rather than skipped, for
+				// The base type has to be an operation context. Reported rather than skipped, for
 				// the reason in the doc comment.
 				symbol := checker.Type_symbol(parameterType)
 				if symbol == nil || symbol.Name != "GraphQlOperationContext" {
@@ -161,7 +161,7 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 //
 // Nil when the parameter belongs to a plain function, an arrow, or a constructor.
 //
-// The loop is EQUIVALENT to a single step today and is written as a loop anyway. Probed: a decorated
+// The loop is equivalent to a single step today and is written as a loop anyway. Probed: a decorated
 // parameter's parent is always the method or constructor directly, with nothing between them, so a
 // mutant stopping after one iteration survives every fixture. It is kept because the original is a
 // loop and because a future parser change that introduced an intermediate node would silently
@@ -169,8 +169,8 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 //
 // The constructor case is a real narrowing against the original and it costs nothing, which was
 // measured rather than argued. estree calls a constructor a MethodDefinition, so the original's walk
-// reaches it while this one does not. But a GraphQL operation decorator on a constructor is a PARSE
-// ERROR, so the scope gate would decline it anyway: driving the real rule over a seeded constructor
+// reaches it while this one does not. But a GraphQL operation decorator on a constructor is a parse
+// error, so the scope gate would decline it anyway: driving the real rule over a seeded constructor
 // carrying one reports `Decorators are not valid here` and nothing else, and over a legal
 // constructor parameter with no operation decorator it reports nothing. The two versions reach the
 // same set through different routes.
@@ -210,7 +210,7 @@ func methodReturnTypeOf(ruleContext rule.Context, methodDeclaration *ast.Node) *
 // unchanged. The set is the original's exactly; widening it would make two genuinely different
 // selection sets compare equal.
 //
-// The union arm requires exactly ONE non-nullish member rather than taking the first: a real union
+// The union arm requires exactly one non-nullish member rather than taking the first: a real union
 // of two object types is a different selection set from either, and collapsing it would compare the
 // wrong thing.
 func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *checker.Type {
@@ -224,9 +224,9 @@ func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *check
 			}
 		}
 
-		// EQUIVALENT for this rule, and kept for fidelity. Measured twice over: the arm is
+		// Equivalent for this rule, and kept for fidelity. Measured twice over: the arm is
 		// reachable and does unwrap `Readonly<T>` to `T`, and a mutant deleting it still changes no
-		// verdict, because `Readonly<T>` and `T` are MUTUALLY ASSIGNABLE while not being identical.
+		// verdict, because `Readonly<T>` and `T` are mutually assignable while not being identical.
 		// The bidirectional comparison below therefore accepts the pair whether or not the wrapper
 		// was stripped, so no input can distinguish the two versions.
 		//

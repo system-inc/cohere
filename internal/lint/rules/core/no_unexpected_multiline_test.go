@@ -242,7 +242,7 @@ func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(test *testing.T) 
 		{"newExpression", "var a = new b\n(x)", "upstream listens on CallExpression alone"},
 		{"optionalCall", "var a = b?.\n(x)", "the continuation is spelled explicitly"},
 		{"optionalElementAccess", "var a = b?.\n[x]", "the continuation is spelled explicitly"},
-		// Upstream's selector requires the LEFT child to be a `/` binary specifically, and
+		// Upstream's selector requires the left child to be a `/` binary specifically, and
 		// multiplicative operators share a precedence level, so `foo * bar / g` puts a `*` binary
 		// there. Without the operator test the arm reports this, and no case in upstream's corpus
 		// writes a mixed multiplicative chain. Found by a surviving mutant, then measured clean
@@ -269,7 +269,7 @@ func TestNoUnexpectedMultilineMeasuredAgainstTheInstalledBuild(test *testing.T) 
 	}{
 		{"flagsFollowedByMemberAccess", "foo\n/ bar /g.x", []string{"division"}},
 		{"twoNestedCalls", "var a = b\n(c\n(d))", []string{"function", "function"}},
-		// Both findings, in WALK order rather than source order: the walk is pre-order, so the
+		// Both findings, in walk order rather than source order: the walk is pre-order, so the
 		// outer call fires before the element access nested inside its callee. Upstream reports the
 		// same two findings the other way round, which is its own diagnostic sorting rather than a
 		// judgment of the rule, and ExpectFindings compares the sequence.
