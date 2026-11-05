@@ -4,11 +4,11 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 
 // init registers @typescript-eslint/no-useless-default-assignment.
 //
-// Registered and deliberately NOT enabled in the live config. CohereSettings.json line 373 carries
+// Registered and deliberately not enabled in the live config. CohereSettings.json line 373 carries
 // `"typescript/no-useless-default-assignment": "off"`, a standing decision somebody made under the
 // old short spelling. That key cannot resolve against this registration: `settingFor` matches
-// exactly, then trims the RULE NAME off the CONFIG KEY and requires what remains to end in a slash.
-// The old key is 40 characters and the registered name is 48, so the key is SHORTER than the name,
+// exactly, then trims the rule name off the config key and requires what remains to end in a slash.
+// The old key is 40 characters and the registered name is 48, so the key is shorter than the name,
 // the trim is a no-op, and the branch never fires. Measured rather than read, with two controls
 // that do resolve.
 //

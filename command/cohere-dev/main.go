@@ -166,7 +166,7 @@ func run(verb string, arguments []string) int {
 	})
 }
 
-// withoutVCSStamping adds -buildvcs=false to a test or vet run's GOFLAGS, unless the caller chose a -buildvcs
+// withoutVCSStamping adds -buildvcs=false to a test or vet run's `GOFLAGS`, unless the caller chose a -buildvcs
 // of their own. Most worktrees are made with TypeScript a symlink to another checkout's, git status refuses
 // that tree, and so every go build a test runs failed "error obtaining VCS status": four of
 // @system_cohere_go's Circles set it by hand on 2026-11-05. The landing gate has run with it since

@@ -83,7 +83,7 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
 	}
 }
 
-// withoutHome is the environment without its HOME, which a fixture sets for itself.
+// withoutHome is the environment without its `HOME`, which a fixture sets for itself.
 func withoutHome(environment []string) []string {
 	kept := make([]string, 0, len(environment))
 	for _, variable := range environment {

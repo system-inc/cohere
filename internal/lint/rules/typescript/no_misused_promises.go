@@ -191,12 +191,12 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // field for field rather than being re-declared.
 //
 // oxc declares this rule as a tsgolint delegate and carries no algorithm and no corpus, so the
-// behavior oxlint exhibits IS tsgolint's: the release binary shells out to a `tsgolint` executable
+// behavior oxlint exhibits is tsgolint's: the release binary shells out to a `tsgolint` executable
 // and refuses to run the rule when that binary is absent, which is what it does on this machine
 // (`Failed to find tsgolint executable`). That refusal is itself the proof, so oxlint cannot serve as
 // ground truth here and tsgolint's own test file is the corpus instead.
 //
-// # THREE independent checks, and one of them is an object of sub-flags
+// # three independent checks, and one of them is an object of sub-flags
 //
 // This is the most structurally complex rule in this family, and the shape is the thing to hold:
 //
@@ -211,7 +211,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // Checked against upstream's 34 checksConditionals rows and edge rows in
 // no_misused_promises_conditionals_corpus_test.go.
 //
-// `checksVoidReturn` is not one check. It gates SIX sub-flags, each of which is a distinct position
+// `checksVoidReturn` is not one check. It gates six sub-flags, each of which is a distinct position
 // in the syntax and a distinct message id, and each of which registers its own listeners:
 //
 //	arguments         voidReturnArgument         KindCallExpression, KindNewExpression
@@ -235,7 +235,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 //
 // # The pointer fields are load-bearing and must not be flattened to plain bools
 //
-// EVERY option on this rule defaults to TRUE — all three top-level checks and all six void-return
+// Every option on this rule defaults to true — all three top-level checks and all six void-return
 // sub-flags. That is nine fields whose default is not the zero value, so a plain `bool` could not
 // tell "the user wrote false" from "the user wrote nothing", and the entire defaulting block at the
 // top of `Run` reads exactly that distinction. Flattening any of them would silently turn the whole
@@ -263,7 +263,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 //	              `IsAssignmentExpression`; the plugin has a dedicated AssignmentExpression node.
 //	              Same rule, different grammar.
 //
-// The one genuine, user-visible disagreement is MESSAGE TEXT on the spread id: the plugin renders
+// The one genuine, user-visible disagreement is message text on the spread id: the plugin renders
 // "Expected a non-Promise value to be spread in an object" and tsgolint renders "…to be spreaded in
 // an object". Upstream's wording is an error of English and it is reproduced here unrepaired, because
 // oxlint runs tsgolint and the differential harness compares against oxlint, so correcting it would
@@ -285,12 +285,12 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // `RunTyped`. While this family was adapted through `internal/rules/upstream`, the standing
 // `if ctx.TypeChecker == nil` could not be written, because the listener bodies were upstream's and
 // that adapter set `NeedsTypeChecker` unconditionally, which made the nil case unreachable. That
-// adapter is gone. Absorbing the rule makes the nil case REACHABLE, so the guard is written here.
+// adapter is gone. Absorbing the rule makes the nil case reachable, so the guard is written here.
 //
 // The direction matters more than usual. Under a checker-less Context this rule does not panic: our
 // shim's `GetTypeAtLocation` and `GetSymbolAtLocation` return nil rather than crashing, so the rule
-// would go SILENT, and silence makes every clean fixture pass having proven nothing — which for this
-// rule is ONE HUNDRED AND TWENTY-THREE of its two hundred and thirteen cases. The guard sits at the
+// would go silent, and silence makes every clean fixture pass having proven nothing — which for this
+// rule is one hundred and twenty-THREE of its two hundred and thirteen cases. The guard sits at the
 // top of `Run` rather than inside each of the fourteen listeners, which is strictly stronger: no
 // listener is even registered, so no arm can be added later that forgets it.
 // `TestNoMisusedPromisesRequiresTheTypedHarness` pins the declaration and the guard together so a
@@ -322,8 +322,8 @@ var NoMisusedPromises = rule.Rule{
 	// honest answer here is no.
 	//
 	// Worth knowing for whoever writes the next one of these: the guard in `internal/dispatch` that
-	// enforces the flag is TEXTUAL, a grep for the selector over the rule's whole file, comments
-	// included. So a doc comment that merely NAMES the thing it is declining to use fails the guard
+	// enforces the flag is textual, a grep for the selector over the rule's whole file, comments
+	// included. So a doc comment that merely names the thing it is declining to use fails the guard
 	// with a message asserting the opposite of the truth. This paragraph is worded around the token
 	// for that reason, rather than because the phrasing reads better.
 
@@ -742,7 +742,7 @@ var NoMisusedPromises = rule.Rule{
 			return voidReturnIndices
 		}
 
-		// An argument is reported when its position takes a void-returning function AND the argument
+		// An argument is reported when its position takes a void-returning function and the argument
 		// returns a thenable. Upstream resolves the positions first, which walks every parameter of
 		// every signature and asks each its contextual type, for every call in the file, including
 		// calls with no arguments at all. Asking each argument first is the same conjunction in the

@@ -284,7 +284,7 @@ func poolGuards(cache string) error {
 		"so holding this pool would not keep out the builds reading that cache; trim it from a run whose home holds it", cache, root)
 }
 
-// goCacheDirectory is the cache a plain go command here uses: GOCACHE when it is set, Go's default
+// goCacheDirectory is the cache a plain go command here uses: `GOCACHE` when it is set, Go's default
 // otherwise.
 func goCacheDirectory() (string, error) {
 	output, outputError := exec.Command("go", "env", "GOCACHE").Output()

@@ -32,7 +32,7 @@ import (
 // # The parameter walk is the port, not the `any` test
 //
 // Deciding whether an argument is unsafe is one call to the shared `IsUnsafeAssignment`. Deciding
-// WHICH parameter an argument lands on is the work, and upstream keeps it in a `FunctionSignature`
+// which parameter an argument lands on is the work, and upstream keeps it in a `FunctionSignature`
 // helper that this file reproduces as `unsafeArgumentSignature` below. Arguments consume parameters
 // in order, a rest parameter absorbs everything after it, and a rest parameter that is itself a
 // tuple hands out its members one at a time before repeating its last. A spread of a tuple whose
@@ -40,7 +40,7 @@ import (
 //
 // # Two whole-call declines, both upstream's and both load-bearing
 //
-// A call with no arguments returns immediately, and a call whose CALLEE is `any` returns too. The
+// A call with no arguments returns immediately, and a call whose callee is `any` returns too. The
 // second matters: `no-unsafe-call` already reports that call, and without this test every argument
 // of it would be reported here as well. Six of upstream's passing cases are calls the checker
 // cannot resolve, which fall out of the same test because an unresolved callee types as `any` or
@@ -125,11 +125,11 @@ func checkUnsafeArguments(
 	// An `any` callee is `no-unsafe-call`'s finding, not this rule's, and upstream declines here so
 	// the same code does not collect a finding from both rules.
 	//
-	// Against this checker the test is currently SUBSUMED, and that was measured rather than
+	// Against this checker the test is currently subsumed, and that was measured rather than
 	// assumed after a mutant neutralizing it survived every fixture. The first hypothesis, that the
 	// fixtures simply had no `any`-callee case with arguments, was wrong: four such shapes were
 	// tried and the two versions agreed on all four. The mechanical reason is that an `any` callee
-	// resolves to a signature with ZERO parameters and no rest, probed across a bare identifier, a
+	// resolves to a signature with zero parameters and no rest, probed across a bare identifier, a
 	// parameter typed `any`, a property access on an `any`, and an `any`-typed property. So
 	// `nextParameterType` answers nil for every argument and the loop skips them all.
 	//
@@ -268,7 +268,7 @@ func describeUnsafeArgumentType(ruleContext rule.Context, t *checker.Type) strin
 }
 
 // describeUnsafeSpreadType is upstream's `describeTypeForSpread`, which differs from the plain one
-// in exactly one place: an array OF the error type renders as the bare word `error`, so the message
+// in exactly one place: an array of the error type renders as the bare word `error`, so the message
 // reads "Unsafe spread of an error array type" rather than naming the array.
 func describeUnsafeSpreadType(ruleContext rule.Context, t *checker.Type) string {
 	if checker.Checker_isArrayType(ruleContext.TypeChecker, t) {
@@ -297,8 +297,8 @@ func describeUnsafeTupleType(ruleContext rule.Context, t *checker.Type) string {
 // second rule wants it, that is the moment to promote it.
 //
 // The three rest shapes are upstream's and they are not interchangeable. A rest parameter that is a
-// TUPLE hands out its members positionally and then repeats its last, which is what makes
-// `(...params: [number, string, any])` line up. A rest parameter that is an ARRAY hands out its
+// tuple hands out its members positionally and then repeats its last, which is what makes
+// `(...params: [number, string, any])` line up. A rest parameter that is an array hands out its
 // element type forever. Anything else hands out the parameter type itself.
 type unsafeArgumentSignature struct {
 	parameterTypes []*checker.Type

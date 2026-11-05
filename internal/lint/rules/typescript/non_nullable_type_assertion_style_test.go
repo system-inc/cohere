@@ -44,7 +44,7 @@ func asTheTypedHarnessWroteIt(text string) string {
 // These are the false positives upstream already thought about, and several of them are the only
 // thing standing between this port and a rule that rewrites working code. Case 3 asserts to `any`,
 // case 2 starts from a union containing `any`, and cases 6 and 7 assert to NonNullable<T>, which
-// removes nullish from a type ALIAS rather than from the expression, so the assertion is doing real
+// removes nullish from a type alias rather than from the expression, so the assertion is doing real
 // work a `!` would not do.
 func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(test *testing.T) {
 	test.Parallel()
@@ -72,7 +72,7 @@ func TestNonNullableTypeAssertionStyleStaysSilentOnUpstreamPassCases(test *testi
 }
 
 // TestNonNullableTypeAssertionStyleFiresOnUpstreamFailCases is the imported failing corpus,
-// verbatim, with the span AND the applied repair asserted on every row.
+// verbatim, with the span and the applied repair asserted on every row.
 //
 // The repair is half this port: meta.fixable is "code", the fix is applied unattended, and a fixer
 // that repairs the right span with the wrong text satisfies every message id assertion. Upstream
@@ -308,7 +308,7 @@ func TestNonNullableTypeAssertionStyleRendersUpstreamsMessageText(test *testing.
 // TestNonNullableTypeAssertionStyleRequiresTheTypedHarness pins the checker guard.
 //
 // Every listener starts with a nil check, and the shim answers nil from a type query on a nil
-// checker rather than panicking, so a rule missing that guard does not crash, it goes SILENT. A
+// checker rather than panicking, so a rule missing that guard does not crash, it goes silent. A
 // vacuous green is the more dangerous of the two failures because nothing announces it, so this
 // asserts the untyped harness produces no finding on an input the typed one reports, which makes a
 // later revert to rule_testing.Run fail loudly rather than quietly.
@@ -325,7 +325,7 @@ func TestNonNullableTypeAssertionStyleRequiresTheTypedHarness(test *testing.T) {
 // TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions covers the branches upstream's
 // corpus leaves untouched because of what it never writes.
 //
-// Upstream asserts FROM a type parameter twice and TO one never, so the whole couldBeNullish
+// Upstream asserts from a type parameter twice and to one never, so the whole couldBeNullish
 // recursion is invisible to the imported cases; and every one of its failing rows asserts to exactly
 // the original minus nullish, so neither half of the two-way membership comparison is separable from
 // the other there. Four mutations survived the imported corpus and these rows are what kill them.
@@ -428,15 +428,15 @@ func TestNonNullableTypeAssertionStyleOnTypeParametersAndPartialUnions(test *tes
 // TestNonNullableTypeAssertionStyleOnNullishFlagsAndUnionAssertions covers the two branches of
 // couldBeNullish that upstream's corpus cannot reach.
 //
-// couldBeNullish is asked only about ASSERTED types, and every asserted type in upstream's twenty
+// couldBeNullish is asked only about asserted types, and every asserted type in upstream's twenty
 // cases is a single non-nullish type, so neither its union arm nor its leaf flag test decides
 // anything there. Both can be neutralized with all twenty imported cases staying green.
 //
 // The route to them is narrower than it first looks, and the first fixtures written for it did not
-// work. unionConstituentsIfNotLoose splits the asserted type BEFORE couldBeNullish is called, so the
+// work. unionConstituentsIfNotLoose splits the asserted type before couldBeNullish is called, so the
 // top-level call never receives a union at all: asserting to `string | undefined` hands the leaf test
 // a bare `undefined`, and both survivors lived through fixtures built on that shape. The union arm is
-// reachable only by recursing into a type parameter's CONSTRAINT, and only a constraint carrying no
+// reachable only by recursing into a type parameter's constraint, and only a constraint carrying no
 // nullish part runs the loop to completion and reaches its false return. The rows below are built on
 // that shape instead, and they are what killed both mutants.
 //

@@ -279,7 +279,7 @@ func (r *pipelineReport) checkedEverything() bool {
 		//
 		// Unused is exempt for a different reason, and it is worth stating rather than folding into
 		// the same clause. Fix is exempt because skipping it withholds no finding; unused withholds
-		// findings by definition when it is skipped. It is exempt because being absent is its NORMAL
+		// findings by definition when it is skipped. It is exempt because being absent is its normal
 		// state — it is opt-in, so a bare `cohere` skips it every time, and a coverage warning that
 		// fires on every ordinary run is one people learn to stop reading. That would cost exactly
 		// the case the warning exists for.

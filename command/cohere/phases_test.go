@@ -55,7 +55,7 @@ func TestABailNamesTheUnreachedPhasesAndWarns(test *testing.T) {
 	}
 }
 
-// An opt-in phase the caller DID ask for and that a bail then cut off is a real gap, and must read
+// An opt-in phase the caller did ask for and that a bail then cut off is a real gap, and must read
 // as one.
 //
 // This is the other half of the distinction above, and it is the half that would be easy to lose:

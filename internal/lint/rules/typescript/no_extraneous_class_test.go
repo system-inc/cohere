@@ -92,7 +92,7 @@ func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(test *testing.T) {
 // TestNoExtraneousClassFiresOnUpstreamFailCases is the imported failing corpus, verbatim, with the
 // span of every finding asserted.
 //
-// The span is doing real work on this rule. Upstream reports on the class NAME when there is one and
+// The span is doing real work on this rule. Upstream reports on the class name when there is one and
 // on the whole class otherwise, so an anonymous default export is reported across its entire body
 // while a named class beside it is reported on three characters. Both shapes are in this table, and a
 // port anchoring uniformly either way satisfies every message id here and points somewhere upstream
@@ -522,7 +522,7 @@ func TestNoExtraneousClassRendersUpstreamsMessageText(test *testing.T) {
 // abstract shape on its own. Neutralizing the arm survived the whole fixture set, which is what sent
 // this to a parse probe rather than to an equivalence argument.
 //
-// The parser recovers. `static abstract x: number` comes back as a property carrying BOTH modifiers,
+// The parser recovers. `static abstract x: number` comes back as a property carrying both modifiers,
 // in either written order, for properties, methods and accessors alike. So the arm is reachable, and
 // it is load bearing: upstream is silent on all four of these and reports on the legal control in
 // the same run, so a port without the arm reports where upstream does not. The grammar says one
@@ -598,7 +598,7 @@ func TestNoExtraneousClassOnIllegalStaticAbstractMembers(test *testing.T) {
 //
 // ESTree gives a class its decorators in their own array, so upstream reads one field and cannot
 // confuse a decorator with anything else. Our parser puts decorators, `export`, `default`, `declare`
-// and `abstract` in ONE modifier list, so the search has to name the kind. A search that merely
+// and `abstract` in one modifier list, so the search has to name the kind. A search that merely
 // asked whether the list was non-empty survives every imported case, because upstream pairs the
 // option only with classes that really are decorated.
 //

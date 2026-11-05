@@ -17,7 +17,7 @@ import (
 //
 // A verb rather than a flag, and that separation is the design rather than a naming preference. Every
 // other write in this tool is a fix: a rule found something wrong, the repair is scoped to the file
-// the rule was looking at, and `--fix` runs by DEFAULT because a fix is meaning-preserving by
+// the rule was looking at, and `--fix` runs by default because a fix is meaning-preserving by
 // construction. A rename is none of those things. Nothing is wrong with the code, the user is
 // asserting an intention rather than accepting a repair, and the blast radius is wherever the symbol
 // lives. Folding it into `--fix` would mean a flag whose default is on could rewrite a symbol across
@@ -35,7 +35,7 @@ const renameVerbName = "rename"
 // intent, so the tool doing the obvious repair is a service rather than a surprise.
 //
 // A rename inverts every one of those. It is imperative rather than reactive, so the tool has no
-// independent judgment that the edit is correct — the user's assertion IS the justification. It is
+// independent judgment that the edit is correct — the user's assertion is the justification. It is
 // unbounded, reaching every file that mentions the symbol. And its characteristic failure is silent:
 // `internal/rule/rule.go` records a shipped case where a rename updated a usage, missed its
 // declaration, and produced a file that parsed while failing to compile. A rename that is subtly
@@ -146,7 +146,7 @@ func runRenameVerb(arguments []string) error {
 		return nil
 	}
 
-	// Printed BEFORE applying, so the record of what was about to happen exists even if the write
+	// Printed before applying, so the record of what was about to happen exists even if the write
 	// fails partway. A summary printed only on success cannot explain a tree that was half-written.
 	rename.Write(os.Stdout, plan, true)
 

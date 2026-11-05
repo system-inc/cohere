@@ -13,11 +13,11 @@ import (
 
 // The corpus for restrict-plus-operands, taken verbatim from upstream's own tester.
 //
-// Extracted by PARSING the upstream test file with the TypeScript compiler and serialising each
+// Extracted by parsing the upstream test file with the TypeScript compiler and serialising each
 // string through a JSON encoder, so nothing was retyped or passed through a shell, then byte-compared
 // against the source with a control asserted absent: 115 of the 119 cases match the source literally
 // and the remaining four match under the backtick escaping a template literal requires, because they
-// carry TypeScript template LITERAL types whose `${...}` has to survive.
+// carry TypeScript template literal types whose `${...}` has to survive.
 //
 // That last part was a real defect caught by the byte check rather than a formality. A first
 // extractor read a template's cooked `.text`, which evaluates `${string}` away, and produced four
@@ -25,7 +25,7 @@ import (
 // version kept the raw source and left the backslashes in, which the parser then rejected outright.
 // Only the third is right, and only the byte comparison could tell the three apart.
 //
-// The whole corpus was additionally driven through the INSTALLED rule at 8.67.0 on a real type graph,
+// The whole corpus was additionally driven through the installed rule at 8.67.0 on a real type graph,
 // honouring each case's own options. It agreed with upstream's recorded expectations on all 119
 // inputs and reproduced all 56 recorded message texts exactly, so the oracle used to settle the
 // questions below is pinned against the corpus rather than trusted.
@@ -33,7 +33,7 @@ const restrictPlusOperandsFile = "file.ts"
 
 // restrictPlusOperandsBool is the address-taking helper the option struct needs.
 //
-// Every `allow` field is a *bool because all five default to TRUE, so a zero-valued struct would
+// Every `allow` field is a *bool because all five default to true, so a zero-valued struct would
 // mean "forbid everything" and invert the rule.
 func restrictPlusOperandsBool(value bool) *bool { return &value }
 
@@ -116,7 +116,7 @@ func TestRestrictPlusOperandsStaysSilent(test *testing.T) {
 
 // TestRestrictPlusOperandsFires is upstream's invalid list, with the ids it records per case.
 //
-// Several cases report TWICE, once per operand, and those are the ones that pin the ordering between
+// Several cases report twice, once per operand, and those are the ones that pin the ordering between
 // the two passes: an expression whose operands are each individually impossible reports both operands
 // and never the pair, because the pair pass is gated on the first pass having found nothing.
 func TestRestrictPlusOperandsFires(test *testing.T) {
@@ -197,7 +197,7 @@ func TestRestrictPlusOperandsFires(test *testing.T) {
 	}
 }
 
-// TestRestrictPlusOperandsMessages asserts the RENDERED text of every finding, exactly.
+// TestRestrictPlusOperandsMessages asserts the rendered text of every finding, exactly.
 //
 // This is not optional for this rule and no id assertion above can stand in for it. All three
 // messages interpolate, and one slot, `stringLike`, is assembled from which `allow` options are on,
@@ -205,7 +205,7 @@ func TestRestrictPlusOperandsFires(test *testing.T) {
 // rendered by the checker, where the difference between `string` and `string | boolean` is the whole
 // content of the finding.
 //
-// The expectations are the strings the INSTALLED rule produced for these inputs, which were
+// The expectations are the strings the installed rule produced for these inputs, which were
 // themselves checked against upstream's recorded `data` for all 56 findings that carry it.
 func TestRestrictPlusOperandsMessages(test *testing.T) {
 	test.Parallel()
@@ -285,12 +285,12 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 	}
 }
 
-// TestRestrictPlusOperandsSpans asserts WHERE each finding points, which no message assertion above
+// TestRestrictPlusOperandsSpans asserts where each finding points, which no message assertion above
 // can see.
 //
 // The two passes point at different nodes and that difference is the rule's whole shape. An
-// individually impossible operand reports at the OPERAND, so the reader is shown which side is
-// wrong; a mismatched or bigint-and-number pair reports at the WHOLE EXPRESSION, because neither
+// individually impossible operand reports at the operand, so the reader is shown which side is
+// wrong; a mismatched or bigint-and-number pair reports at the whole expression, because neither
 // side is wrong alone. The rows below carry both kinds and a two-operand case, so a rule that
 // collapsed the distinction in either direction fails here while passing every id fixture.
 //
@@ -335,7 +335,7 @@ func TestRestrictPlusOperandsSpans(test *testing.T) {
 // TestRestrictPlusOperandsDecoder routes configuration through the rule's own exported decoder,
 // which is the only thing that puts the default inversion under test.
 //
-// Every `allow` option DEFAULTS TO TRUE, so the zero-valued struct means the opposite of the
+// Every `allow` option defaults to true, so the zero-valued struct means the opposite of the
 // default and a rule reading it would report most of a real tree. Building the options struct
 // directly in a fixture, as every other test in this file does, cannot see that: the struct is
 // already correct by the time the rule reads it. Only the wire format can be wrong.
@@ -343,9 +343,9 @@ func TestRestrictPlusOperandsSpans(test *testing.T) {
 // So these rows start from JSON, exactly as the config layer delivers it, and assert three things
 // the struct-built fixtures structurally cannot:
 //
-//   - an ABSENT key falls back to true rather than to the zero value
+//   - an absent key falls back to true rather than to the zero value
 //   - an explicit `false` is distinguishable from an absent key, which is why the fields are *bool
-//   - a rule configured as a bare "error", which arrives as NIL options, gets the defaults
+//   - a rule configured as a bare "error", which arrives as nil options, gets the defaults
 func TestRestrictPlusOperandsDecoder(test *testing.T) {
 	test.Parallel()
 
@@ -405,12 +405,12 @@ func TestRestrictPlusOperandsDecoder(test *testing.T) {
 
 // TestRestrictPlusOperandsStringLikeRenderings pins all three spellings of the interpolated slot.
 //
-// The SINGULAR spelling is the one worth writing this test for: it is reachable, and no case in
+// The singular spelling is the one worth writing this test for: it is reachable, and no case in
 // upstream's corpus renders it, because none leaves exactly one `allow` option on. So it is a live
 // branch with no imported coverage, which is precisely the shape that ships wrong and stays wrong.
 // The configuration below is constructed rather than imported for that reason.
 //
-// The plural rendering also pins the ORDER, which is upstream's and is not alphabetical: `null` and
+// The plural rendering also pins the order, which is upstream's and is not alphabetical: `null` and
 // `undefined` are both gated on allowNullish and sit on either side of `RegExp`.
 func TestRestrictPlusOperandsStringLikeRenderings(test *testing.T) {
 	test.Parallel()
@@ -510,14 +510,14 @@ func TestRestrictPlusOperandsSurvivesMalformedExpressions(test *testing.T) {
 // TestRestrictPlusOperandsIndividualComplaintSuppressesThePair pins the ordering between the two
 // passes, which upstream's own corpus never separates.
 //
-// An expression can be wrong in both ways at once: an operand that is individually impossible AND a
+// An expression can be wrong in both ways at once: an operand that is individually impossible and a
 // pair the second pass would also complain about. Upstream reports the operand and stops, because
 // its `hadIndividualComplaint` flag gates the pair passes entirely. Removing that gate survived all
 // 174 imported rows, so no case upstream ships is wrong in both ways at the same time.
 //
-// The first input tried for it was NOT distinguishing, and the reason is worth keeping. `string |
+// The first input tried for it was not distinguishing, and the reason is worth keeping. `string |
 // symbol` added to a number has an impossible operand and looks like a string-plus-number mismatch,
-// but `allowNumberAndString` DEFAULTS TO TRUE, so the mismatched arm never fires under defaults and
+// but `allowNumberAndString` defaults to true, so the mismatched arm never fires under defaults and
 // both versions report once. The bigint arm is the one no option gates, so it is the only second-pass
 // arm reachable under the default configuration. Measured with the gate removed:
 //

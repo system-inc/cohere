@@ -16,11 +16,11 @@ import (
 //	invalid: class A { foo: string; foo: string; }
 //
 // Upstream's wrapper is `baseRule.create(context)` with two filters laid over the member listener:
-// a member whose key is COMPUTED is skipped, and one whose value is a bodiless function expression
+// a member whose key is computed is skipped, and one whose value is a bodiless function expression
 // is skipped. Everything that reports comes from the core rule underneath, which is ported here as
 // `core.NoDupeClassMembers`, so this file carries the difference and nothing else.
 //
-// # Only ONE of upstream's two filters actually narrows anything, and it is not the obvious one
+// # Only one of upstream's two filters actually narrows anything, and it is not the obvious one
 //
 // The bodiless-function filter exists so a TypeScript overload signature is not read as a duplicate
 // of its implementation. Our core already declines those, and not by inheritance: a previous porter
@@ -32,7 +32,7 @@ import (
 //
 // The computed filter is the one that bites, and it bites in the direction that reads backwards.
 // `[x]()` twice is silent in both, since neither can know what `x` is. But `['foo']()` twice is a
-// resolvable key, and the CORE reports it while the WRAPPER does not:
+// resolvable key, and the core reports it while the wrapper does not:
 //
 //	['foo']() twice     core reports, wrapper silent
 //	['foo']() and foo() core reports, wrapper silent
@@ -84,12 +84,12 @@ var NoDupeClassMembers = rule.Rule{
 			},
 		}
 
-		// A class carrying a computed member is handed to the core with those members REMOVED from
+		// A class carrying a computed member is handed to the core with those members removed from
 		// its list, rather than having the core's findings filtered afterwards.
 		//
 		// Filtering the output was tried first and is wrong, in a way worth recording because it
 		// looks right. Upstream skips a computed member before it is keyed, so the member never
-		// enters the collision map and cannot make a LATER member look like a duplicate. Dropping
+		// enters the collision map and cannot make a later member look like a duplicate. Dropping
 		// findings after the fact cannot express that: measured, `class A { ['foo']() {} foo() {} }`
 		// then reported on `foo`, whose own key is not computed, while upstream is silent. The
 		// distinction is which member seeds the collision, and only the input side knows.

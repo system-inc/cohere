@@ -17,7 +17,7 @@ func noDuplicateTypeConstituentsCaseName(index int) string {
 
 // noDuplicateTypeConstituentsFinding is one expected finding with every layer it can be wrong at.
 //
-// The message is asserted in full because it INTERPOLATES: the duplicate message names both the
+// The message is asserted in full because it interpolates: the duplicate message names both the
 // union-or-intersection word and the previous constituent's own text, so one rule renders many
 // different strings and a message-id assertion cannot see any of them.
 type noDuplicateTypeConstituentsFinding struct {
@@ -105,13 +105,13 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(test *testing
 // both message ids. Every span and every rendered message was measured against the installed build
 // rather than transcribed.
 //
-// The span assertions matter more here than on most rules, because the reported range is NOT the
+// The span assertions matter more here than on most rules, because the reported range is not the
 // range the repair removes. A duplicate written as a parenthesized nesting underlines text starting
 // inside the parenthesis and ending after the closing bracket, so `A | (A | A)` reports a span
 // reading as an unbalanced fragment. That is upstream's choice and only a span fixture records it.
 //
 // The whole-file rewrite is asserted on every row against the text upstream's own `output` records,
-// transformed the way the harness transforms the input. One upstream case carries an `output` ARRAY
+// transformed the way the harness transforms the input. One upstream case carries an `output` array
 // of two states because its repairs converge over two passes; the harness applies one pass, so that
 // row asserts the first state and is called out at its line.
 func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
@@ -547,7 +547,7 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 				if len(diagnostic.Suggestions) != 0 {
 					test.Fatalf("finding %d: expected a fix, got %d suggestions", position, len(diagnostic.Suggestions))
 				}
-				// One finding carries one or TWO removals: the separator token and the
+				// One finding carries one or two removals: the separator token and the
 				// constituent are removed independently so that the whitespace between them
 				// survives, which is what upstream's recorded outputs show. The exact bytes are
 				// asserted by the whole-file comparison below rather than by counting edits.
@@ -556,10 +556,10 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 				}
 			}
 
-			// An empty wantFixed marks the one case whose two repairs OVERLAP, so there is no
+			// An empty wantFixed marks the one case whose two repairs overlap, so there is no
 			// single-pass rewrite to assert. Both findings remove the same separator inside the
 			// parentheses; upstream's engine applies one per pass and re-runs, which is why the
-			// corpus records that case with an output ARRAY of two states rather than a string.
+			// corpus records that case with an output array of two states rather than a string.
 			// Measured on the installed build: its two fix ranges are [28,36] and [35,43], which
 			// share index 35. The harness refuses to guess which wins, correctly, so this row
 			// asserts the findings and leaves the rewrite to the engine.
@@ -575,7 +575,7 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 // Upstream's corpus is thorough about unions and thin about the TypeScript syntax that can surround
 // one, and this project has twice shipped a fixer that destroyed type information while passing
 // every upstream output case. That cannot happen here for a structural reason worth stating: this
-// repair only REMOVES a separator and a constituent, and never rebuilds a span, so there is no
+// repair only removes a separator and a constituent, and never rebuilds a span, so there is no
 // annotation for it to strand. These cases are what establishes that rather than asserting it.
 //
 // Every verdict, span, message and rewrite below was measured against the installed 8.x build over
@@ -618,7 +618,7 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			},
 		},
 		{
-			// Two structurally identical object literals. The checker gives these DISTINCT type objects, so only the syntactic comparison can see them, which is why upstream runs it first.
+			// Two structurally identical object literals. The checker gives these distinct type objects, so only the syntactic comparison can see them, which is why upstream runs it first.
 			sourceText: "type T = { readonly a: 1 } | { readonly a: 1 };",
 			wantFixed:  "type T = { readonly a: 1 }  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
@@ -755,7 +755,7 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 
 // TestDecodeNoDuplicateTypeConstituentsOptions pins the decoder against its defaults.
 //
-// Both keys default to FALSE, so the generic decoder would be right by coincidence. The
+// Both keys default to false, so the generic decoder would be right by coincidence. The
 // hand-rolled one is tested anyway, because the coincidence is a property of today's defaults
 // rather than of the option surface, and a sibling rule in this package had to be repaired for
 // exactly the inverse case.
@@ -800,7 +800,7 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(test *testing.T) {
 // A rule configured as a bare "error" is handed nil options, and every fixture above reaches the
 // rule through the decoder, so nothing there can see the fallback. Both defaults are false, so the
 // separating input is any duplicate at all: under the fallback it reports, and a rule that had lost
-// its options entirely would too, which is why the controls below turn each half OFF and confirm
+// its options entirely would too, which is why the controls below turn each half off and confirm
 // the silence moves.
 func TestNoDuplicateTypeConstituentsFallsBackToTheDefaultOnNilOptions(test *testing.T) {
 	test.Parallel()

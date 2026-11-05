@@ -16,13 +16,13 @@ import (
 //	invalid: a! = b        reads as `a != b`
 //	invalid: a! in b       reads as `!(a in b)`
 //
-// Every case here is about how the source LOOKS rather than what it does. `a! == b` and `a !== b`
+// Every case here is about how the source looks rather than what it does. `a! == b` and `a !== b`
 // differ by one space and mean opposite things, and `a! in b` reads to most people as a negation of
 // the whole test when the `!` binds only to `a`. The code is correct as written; the next reader is
 // the problem.
 //
 // Five operators, taken from upstream's set verbatim: `=`, `==`, `===`, `in`, `instanceof`. `!=` and
-// `!==` are deliberately absent, which matters more than it looks: `a! != b` is SILENT upstream,
+// `!==` are deliberately absent, which matters more than it looks: `a! != b` is silent upstream,
 // measured, even though it is the shape a naive reading of "confusing bang" would flag first. There
 // is nothing to confuse it with, because the assertion and the operator are already spelled apart.
 //
@@ -35,20 +35,20 @@ import (
 //
 // # Suggestions, never fixes, which is upstream's decision and worth keeping
 //
-// Every repair here changes what the code MEANS. Removing the `!` drops an assertion the author
+// Every repair here changes what the code means. Removing the `!` drops an assertion the author
 // wrote deliberately, and wrapping the left operand in parentheses changes precedence. Upstream
 // declares `hasSuggestions` and no `fixable` for exactly that reason, so nothing is applied
 // unattended, and this port carries the same distinction. A non-null assertion on the left offers
 // removal; anything else offers only the wrap, because there is no `!` node to remove.
 //
-// `in` and `instanceof` offer BOTH suggestions, in upstream's order: remove first, wrap second.
+// `in` and `instanceof` offer both suggestions, in upstream's order: remove first, wrap second.
 //
 // # How the token tests become a text test, and why that is not a shortcut
 //
 // Upstream works at the token level. It asks whether the last token of the left operand is a `!`
 // punctuator, and separately whether the token after the left operand is a `)`. Neither question has
 // a direct answer in our tree, and the structural equivalent turns out to be one test rather than
-// two: whether the left operand's TRIMMED text ends in `!`.
+// two: whether the left operand's trimmed text ends in `!`.
 //
 // That reproduces both halves at once, which is the part worth recording:
 //
@@ -58,7 +58,7 @@ import (
 // \t                                                     assertion, which is why upstream looks at
 // \t                                                     the token rather than the node kind, and
 // \t                                                     why the text test has to as well.
-// \t(a + b!) == c   left text "(a + b!)"  ends in paren  SILENT, and this is upstream's
+// \t(a + b!) == c   left text "(a + b!)"  ends in paren  silent, and this is upstream's
 // \t                                                     `tokenAfterLeft !== ')'` test arriving as
 // \t                                                     a consequence rather than as a second
 // \t                                                     check. Our parser keeps the parenthesized
@@ -67,11 +67,11 @@ import (
 // \ta !in b         left text "a !"       ends in bang   reports, as upstream. Whitespace inside
 // \t                                                     the operand is irrelevant to both.
 //
-// The obvious worry is a `!` that is the last CHARACTER without being the last TOKEN. Probed, and
+// The obvious worry is a `!` that is the last character without being the last token. Probed, and
 // the tree does not produce one: a bang inside a string, a template, or a computed key leaves the
 // closing quote or bracket as the final character, so `'a!' == b`, "`a!` == b" and "x[`!`] == b" all
 // end in something else and are silent here exactly as they are upstream. A trailing comment is
-// excluded because the range is the TRIMMED token range rather than `Pos()` to `End()`.
+// excluded because the range is the trimmed token range rather than `Pos()` to `End()`.
 //
 // `a!!== b` is the one shape where the two tests could disagree and they do not: it parses as `a!`
 // with the operator `!==`, so the text ends in a bang and the operator is not in the set. Silent
@@ -126,7 +126,7 @@ var NoConfusingNonNullAssertion = rule.Rule{
 					},
 				}
 
-				// Upstream branches on whether the left operand IS a non-null assertion, rather
+				// Upstream branches on whether the left operand is a non-null assertion, rather
 				// than merely ending in one. `a + b! == c` ends in a bang and its left is a binary
 				// expression, so there is no `!` node whose removal upstream could describe, and it
 				// offers only the wrap. Removing the trailing character there would delete the bang

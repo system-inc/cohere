@@ -119,7 +119,7 @@ func assertScope(test *testing.T, got []string, want ...string) {
 // repository's own boundary. Writes stay inside one repository (@system_cohere, 2026-10-03), so the
 // declared submodule is formatted by a run inside it and only read from here, by the check (see
 // checkNestedRepositories); it used to be walked into and written.
-// Not parallel: it sets HOME and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
 func TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs(test *testing.T) {
 	fixture := newRecordFixture(test)
 	files, universe, _, description := fixture.scope(test)
@@ -136,7 +136,7 @@ func TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs(test *tes
 	}
 }
 
-// Not parallel: it sets HOME and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
 func TestTheRecordScopesWhatChangedSinceCohereLastLooked(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -166,7 +166,7 @@ func TestTheRecordScopesWhatChangedSinceCohereLastLooked(test *testing.T) {
 	assertScope(test, files, "New.ts")
 }
 
-// Not parallel: it sets HOME and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
 func TestADeletedFileLeavesTheScopeAndTheRecord(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -193,7 +193,7 @@ func TestADeletedFileLeavesTheScopeAndTheRecord(test *testing.T) {
 
 // An unformatted file checked under --no-fix records the text the formatter would write, which is not
 // what is on disk, so the file stays in scope and keeps being reported until it is written.
-// Not parallel: it sets HOME and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
 func TestAnUnformattedFileStaysInScopeUntilItIsWritten(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.engine.format = func(fileName string, text string) (string, error) {
@@ -211,7 +211,7 @@ func TestAnUnformattedFileStaysInScopeUntilItIsWritten(test *testing.T) {
 	assertScope(test, files)
 }
 
-// Not parallel: it sets HOME and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
 func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -226,7 +226,7 @@ func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(test *testing.T) {
 	assertScope(test, files, "B.ts")
 }
 
-// Not parallel: it sets HOME and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
 func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -253,7 +253,7 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 
 // The stat shortcut is only taken once the bytes were read and matched, and a file whose bytes change
 // is caught whether or not its size does.
-// Not parallel: it sets HOME and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
 func TestAVerifiedFileIsAnsweredByStatAndAnEditIsStillSeen(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -387,7 +387,7 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(test *testing.T) {
 // and returns the copy's root. Builds from it cannot see an edit anyone makes to the working tree
 // afterward. The compiler pin (TypeScript, a submodule nobody edits in passing) is linked rather than
 // copied. It is a copy of the working tree rather than of a commit, so the test still builds the code
-// someone is changing: an export of HEAD would quietly test the old record logic instead.
+// someone is changing: an export of `HEAD` would quietly test the old record logic instead.
 //
 // It copies only what `go build` reads: test files and testdata directories are left out, since the
 // build ignores both and no go:embed reaches into either. They were most of the copy's 4,000 files and

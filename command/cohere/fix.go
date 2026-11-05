@@ -57,7 +57,7 @@ func applyProposedFixes(
 	write bool,
 	early *earlyFormat,
 ) (edit.Summary, program.Result, *crlfFiles, error) {
-	// This walk is the run's FIRST walk over the program, and it is returned so the lint phase can
+	// This walk is the run's first walk over the program, and it is returned so the lint phase can
 	// reuse it rather than repeat it.
 	//
 	// An earlier version of this comment said the opposite: that a reporting walk had already

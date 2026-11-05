@@ -306,7 +306,7 @@ func outsideThePool(environment []string) []string {
 
 // A token's run starts its commands with Go held to the token's packages and threads, the token named, and
 // the cores it is worth for a runner that is not Go,
-// replacing any -p and GOMAXPROCS the caller had and keeping its other GOFLAGS, so every go command and test
+// replacing any -p and `GOMAXPROCS` the caller had and keeping its other `GOFLAGS`, so every go command and test
 // binary beneath it stays in its share (#qhg0ntb).
 func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 	test.Parallel()
@@ -316,7 +316,7 @@ func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 	if strings.Join(environment, "|") != strings.Join(want, "|") {
 		test.Errorf("the budget environment is %q, want %q", environment, want)
 	}
-	// A caller with no GOFLAGS, the usual shell, still gets -trimpath: setting GOFLAGS overrides the
+	// A caller with no `GOFLAGS`, the usual shell, still gets -trimpath: setting `GOFLAGS` overrides the
 	// machine's go env, which is how every run dropped it (#system_cohere_tools).
 	bare := budgetEnvironment([]string{"HOME=/home"}, 1, poolShape{tokens: 4, packages: 2, threads: 2})
 	if !slices.Contains(bare, "GOFLAGS=-trimpath -p=2") {
@@ -325,7 +325,7 @@ func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 }
 
 // A test or vet run turns VCS stamping off, which a worktree with TypeScript a symlink needs for any go build
-// a test runs, adding GOFLAGS if there was none, and a caller's own -buildvcs stands.
+// a test runs, adding `GOFLAGS` if there was none, and a caller's own -buildvcs stands.
 func TestATestRunStampsNoVCS(test *testing.T) {
 	test.Parallel()
 	for _, row := range []struct {

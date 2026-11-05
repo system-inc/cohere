@@ -17,8 +17,8 @@ func preferReturnThisTypeCaseName(index int) string {
 // TestPreferReturnThisTypeStaysSilent is upstream's eight passing cases verbatim, plus shapes
 // the corpus does not write whose silence was measured against the installed 8.67.0 build.
 //
-// Each case runs in its OWN program. That is not a stylistic choice: this rule compares types by
-// REFERENCE identity, so a batched program that interned one `Foo` across several case files would
+// Each case runs in its own program. That is not a stylistic choice: this rule compares types by
+// reference identity, so a batched program that interned one `Foo` across several case files would
 // make identity fail and hand back a clean verdict for a case that really reports. RunTyped is one
 // file per call, so the fixtures are safe by construction; the oracle used to measure them had to
 // be built that way deliberately.
@@ -40,7 +40,7 @@ func TestPreferReturnThisTypeStaysSilent(test *testing.T) {
 		// leaves untested, and each would report under a plausible wrong port.
 
 		// An anonymous class expression has no name to match, so the annotation `Foo` names the
-		// const rather than the class. Its named sibling REPORTS and is in the fires list.
+		// const rather than the class. Its named sibling reports and is in the fires list.
 		"const Foo = class {\n  f(): Foo {\n    return this;\n  }\n};\n",
 
 		// An intersection is invisible to upstream's union-only recursion. This is the same
@@ -57,7 +57,7 @@ func TestPreferReturnThisTypeStaysSilent(test *testing.T) {
 		"interface Foo {\n  f(): Foo;\n}\n",
 
 		// An annotated local widens away the `this` type, so the returned value is the class type
-		// rather than the receiver. Its unannotated sibling `const self = this` REPORTS and is
+		// rather than the receiver. Its unannotated sibling `const self = this` reports and is
 		// upstream's own case, which makes this pair the sharpest evidence that the judgment is a
 		// type identity question rather than a syntactic one.
 		"class Foo {\n  f(): Foo {\n    let self: Foo = this;\n    return self;\n  }\n}\n",
@@ -67,7 +67,7 @@ func TestPreferReturnThisTypeStaysSilent(test *testing.T) {
 		// writes a body with both.
 		"class Foo {\n  f(): Foo {\n    if (Math.random()) {\n      return new Foo();\n    }\n    return this;\n  }\n}\n",
 
-		// A `return this` inside a nested arrow returns from the ARROW. Neither upstream's
+		// A `return this` inside a nested arrow returns from the arrow. Neither upstream's
 		// forEachReturnStatement nor ours descends into a nested function, and with the outer
 		// return removed the method returns undefined. Measured silent.
 		"class Foo {\n  f(): Foo | undefined {\n    [1].forEach(() => {\n      return this;\n    });\n  }\n}\n",
@@ -81,7 +81,7 @@ func TestPreferReturnThisTypeStaysSilent(test *testing.T) {
 		// a body, which is the one that could otherwise reach the return walk.
 		"class Foo {\n  f(this: Foo, other: number): Foo {\n    return this;\n  }\n}\n",
 
-		// A parenthesized `this` where the CHECKER declines. These three are the port's sharpest
+		// A parenthesized `this` where the checker declines. These three are the port's sharpest
 		// fixtures, because an earlier revision reported all of them.
 		//
 		// Upstream's `this` keyword test runs on the TypeScript node, which keeps parentheses, so
@@ -90,17 +90,17 @@ func TestPreferReturnThisTypeStaysSilent(test *testing.T) {
 		// is reference-identical to the class's this type, so the comparison declines and the case
 		// is silent. Unwrapping the parentheses before the keyword test made all three report.
 		//
-		// The unparenthesized forms of the same three shapes REPORT and are in the fires list, so
+		// The unparenthesized forms of the same three shapes report and are in the fires list, so
 		// this pair of lists is what holds the distinction in place from both sides.
 		"class Foo {\n  static f(): Foo {\n    return (this);\n  }\n}\n",
 		"class Foo {\n  f = function (): Foo {\n    return (this);\n  };\n}\n",
 		"class Foo {\n  static f = (): Foo => (this);\n}\n",
 
-		// A property initializer that is a TYPE ASSERTION, which is the shape the initializer kind
+		// A property initializer that is a type assertion, which is the shape the initializer kind
 		// gate exists to keep out. It is crash protection rather than a behavioral filter: an
 		// assertion node answers `Type()` (so it passes the return-type gate) and answers nil to
 		// `Body()`, and `Parameters()` on a node that is not function-like dereferences nil. With
-		// the gate removed these two panic, and the cohere walk recovers per FILE rather than per
+		// the gate removed these two panic, and the cohere walk recovers per file rather than per
 		// rule, so one of them would cost every rule its verdict on that file.
 		//
 		// No ExpectFindings assertion can see a panic, which is why the gate survived a mutation
@@ -215,7 +215,7 @@ func TestPreferReturnThisTypeFires(test *testing.T) {
 			wantSpan:   "Foo",
 			wantFixed:  "class Foo {\n  static f(): this {\n    return this;\n  }\n}\n",
 		},
-		// A NAMED class expression has a name to match, so the annotation is that name rather than the
+		// A named class expression has a name to match, so the annotation is that name rather than the
 		// const's. Its anonymous sibling is silent and sits in the other list.
 		{
 			sourceText: "const Foo = class Bar {\n  f(): Bar {\n    return this;\n  }\n};\n",
@@ -231,7 +231,7 @@ func TestPreferReturnThisTypeFires(test *testing.T) {
 			wantSpan:   "Foo",
 			wantFixed:  "class Foo {\n  f(): this {\n    return (this);\n  }\n}\n",
 		},
-		// A parenthesized CONCISE BODY, and this is the case the unwrap exists for. That branch compares
+		// A parenthesized concise body, and this is the case the unwrap exists for. That branch compares
 		// the body's type against the class this type, and without the unwrap the fast path never fires
 		// on a shape upstream reports. Measured on the installed build.
 		{
@@ -245,14 +245,14 @@ func TestPreferReturnThisTypeFires(test *testing.T) {
 			wantSpan:   "Foo",
 			wantFixed:  "class Foo {\n  f = (): this => ((this));\n}\n",
 		},
-		// An overload signature followed by an implementation reports ONCE. The signature has no body,
+		// An overload signature followed by an implementation reports once. The signature has no body,
 		// so it is declined before the return walk, and a port missing that test reports twice.
 		{
 			sourceText: "class Foo {\n  f(): Foo;\n  f(): Foo {\n    return this;\n  }\n}\n",
 			wantSpan:   "Foo",
 			wantFixed:  "class Foo {\n  f(): Foo;\n  f(): this {\n    return this;\n  }\n}\n",
 		},
-		// A type reference carrying type arguments. The span and the replaced range are the WHOLE
+		// A type reference carrying type arguments. The span and the replaced range are the whole
 		// reference, so the repair writes `this` rather than `this<T>`.
 		{
 			sourceText: "class Foo<T> {\n  f(): Foo<T> {\n    return this;\n  }\n}\n",
@@ -266,7 +266,7 @@ func TestPreferReturnThisTypeFires(test *testing.T) {
 			wantSpan:   "Foo",
 			wantFixed:  "class Foo {\n  f(): (this | undefined) | null {\n    return this;\n  }\n}\n",
 		},
-		// The class name twice in one union reports ONCE and rewrites ONCE. Upstream's tester shows
+		// The class name twice in one union reports once and rewrites once. Upstream's tester shows
 		// `this | this` only because cohereAndFix re-lints until the text stops changing; a single
 		// application of the same messages writes `this | Foo`, measured, and this port is one pass.
 		{
@@ -282,7 +282,7 @@ func TestPreferReturnThisTypeFires(test *testing.T) {
 			wantFixed:  "class Foo {\n  f(): this {\n    class Foo {}\n    return this;\n  }\n}\n",
 		},
 
-		// Reaches unionContainsType with a NON-UNION type, which is the crash this rule shipped
+		// Reaches unionContainsType with a non-union type, which is the crash this rule shipped
 		// briefly. `this` inside a plain function expression is `any`, an intrinsic, and
 		// `AsUnionType` on an intrinsic panics rather than returning nil. Upstream's own corpus
 		// writes this exact shape and could not see the defect, because the `this` keyword fast
@@ -299,8 +299,8 @@ func TestPreferReturnThisTypeFires(test *testing.T) {
 			wantFixed:  "class Foo {\n  f = function (): this {\n    return this;\n  };\n}\n",
 		},
 
-		// A setter and a constructor carrying a return type. The GRAMMAR forbids both, and the
-		// PARSER produces both anyway under error recovery, which is the distinction that decided
+		// A setter and a constructor carrying a return type. The grammar forbids both, and the
+		// parser produces both anyway under error recovery, which is the distinction that decided
 		// these two arms. Probed directly: the parser hands back a KindSetAccessor and a
 		// KindConstructor each with a KindTypeReference return type. Upstream reports both,
 		// measured, because its selector is `ClassBody > MethodDefinition` and estree calls all
@@ -363,7 +363,7 @@ func TestPreferReturnThisTypeFires(test *testing.T) {
 // dereferences a nil checker; with it the rule is silent, which is the documented contract for a
 // rule declaring NeedsTypeChecker.
 //
-// The case used here REPORTS under RunTyped and is asserted clean here, so a revert that dropped
+// The case used here reports under RunTyped and is asserted clean here, so a revert that dropped
 // NeedsTypeChecker would fail rather than pass vacuously.
 func TestPreferReturnThisTypeRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()

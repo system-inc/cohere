@@ -20,32 +20,32 @@ import (
 // `function f<T>(x: T): void` could take `unknown` and mean exactly the same thing. The parameter
 // looks like it constrains the caller and does not: nothing downstream is tied to whatever `T`
 // resolves to, so the generic is decoration. `parseYAML<T>(input: string): T` is the dangerous
-// shape rather than merely the useless one, because the single use is in RETURN position, which
+// shape rather than merely the useless one, because the single use is in return position, which
 // makes it an unchecked assertion wearing the syntax of a type-safe call.
 //
-// # This counts USES, and three separate rules decide what a use is
+// # This counts uses, and three separate rules decide what a use is
 //
 // The counting is subtler than it looks, and each of the three rules below is pinned by cases in
 // upstream's corpus that would otherwise pass for the wrong reason.
 //
-// A use inside the parameter's OWN constraint or default does not count. `<T, U extends T>` puts
+// A use inside the parameter's own constraint or default does not count. `<T, U extends T>` puts
 // `T` in the source twice and only one of those is a relating use, so `U` is reported and `T` is
 // not. Upstream implements this as a range test rather than a kind test: a reference whose position
 // falls inside the declaring type parameter's own span is skipped.
 //
-// A use inside the function BODY does not count. This is the rule that surprises, and upstream's
+// A use inside the function body does not count. This is the rule that surprises, and upstream's
 // corpus pins it three times over:
 //
 //	function foo<T>(_: T) { const x: T = null!; const y: T = null!; }        REPORTS
 //
 // Two body uses, and it still reports, because the count stops at the start of the body. The
 // reasoning holds up: a body use is an annotation the author wrote for themselves, and it relates
-// the parameter to nothing the CALLER can see. The signature is still `(_: unknown) => void` from
+// the parameter to nothing the caller can see. The signature is still `(_: unknown) => void` from
 // outside. Upstream's cutoff is the body's start position when there is a body, and the return
 // type's end when there is not, which is why `declare` shapes and interface members count their
 // return annotation while a function with a body does not count past its brace.
 //
-// A use as a TYPE ARGUMENT counts as multiple uses on its own. `Partial<T>` relates `T` to whatever
+// A use as a type argument counts as multiple uses on its own. `Partial<T>` relates `T` to whatever
 // `Partial` does with it, and this rule cannot see inside the alias, so it assumes the worst and
 // stays silent. That is why `type Fn = <T>(input: Partial<T>) => typeof input;` is clean with only
 // one visible mention of `T`. Array and ReadonlyArray are carved out of that exemption and deferred
@@ -55,8 +55,8 @@ import (
 // # Two mechanisms, and the second is the rule
 //
 // Upstream runs an AST pass first and reaches the type checker only when the AST pass is
-// inconclusive. The AST pass can prove a parameter is used ENOUGH; it can never prove a parameter
-// is used too little, because a use can be hiding in an INFERRED type that no syntax mentions:
+// inconclusive. The AST pass can prove a parameter is used enough; it can never prove a parameter
+// is used too little, because a use can be hiding in an inferred type that no syntax mentions:
 //
 //	function foo<T>(_: T) { function withX(): T { return null!; } }
 //
@@ -73,7 +73,7 @@ import (
 // enough to be sure, and over-counting is the safe direction (it produces silence rather than a
 // false report).
 //
-// MAPPED TYPES ARE THE GAP, and it is a substrate limit rather than a judgment. Upstream reads four
+// Mapped types are the GAP, and it is a substrate limit rather than a judgment. Upstream reads four
 // fields off a mapped type (its type parameter, constraint, name type and template type) to count
 // uses inside `{ [K in keyof T]: ... }`. In this tree those four fields are unexported on
 // `checker.MappedType` with no accessor method and no entry in `shim/checker/extra-shim.json`, so
@@ -85,14 +85,14 @@ import (
 // The consequence is confined and it falls in the SAFE direction. Sixteen of upstream's 163 cases
 // involve a mapped type, twelve of them clean and four reporting. Without the mapped-type arm the
 // walk stops descending at a mapped type, so uses hiding inside one are not counted, which can only
-// LOWER a count. A lower count reports where upstream reports and can also report where upstream is
+// lower a count. A lower count reports where upstream reports and can also report where upstream is
 // silent, so the exposure is false positives on the twelve clean shapes rather than missed findings.
 // The four reporting mapped-type cases are covered by the test file and the twelve clean ones are
 // recorded there too, marked with what makes each of them clean.
 //
 // # Why this is a suggestion and not a fix
 //
-// Upstream offers `replaceUsagesWithConstraint` as a SUGGESTION rather than a fix, and that is the
+// Upstream offers `replaceUsagesWithConstraint` as a suggestion rather than a fix, and that is the
 // right line: rewriting every use of the parameter to its constraint and deleting the parameter
 // changes what the signature means to every caller. A human chooses it; the engine does not apply
 // it unattended.
@@ -104,7 +104,7 @@ var NoUnnecessaryTypeParameters = rule.Rule{
 	NeedsTypeChecker: true,
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		// Declared above AND guarded here. NeedsTypeChecker governs the REGISTRATION path only, and
+		// Declared above and guarded here. NeedsTypeChecker governs the registration path only, and
 		// the test harness builds a rule.Context by hand, which is how a typed rule panics with a
 		// nil receiver while its declaration reads as correct. Declining once in Run costs one
 		// comparison per file instead of one per node.
@@ -207,7 +207,7 @@ func checkTypeParameterOwner(ruleContext rule.Context, node *ast.Node, descripto
 //
 // The rule exists because a type parameter used once is usually a cast in disguise: `parse<T>(input:
 // string): T` lets a caller pick any `T` for a value the function made from `input`, and the
-// signature promises a relationship nothing checks. That argument needs something to cast FROM. A
+// signature promises a relationship nothing checks. That argument needs something to cast from. A
 // function with no value parameters at all has nothing a caller hands it, so a type parameter that
 // appears only in its return type is not relating an input to an output. It is a witness: the caller
 // names a type and the function carries it, which is the whole point of the declaration. Kirk's
@@ -286,7 +286,7 @@ func isTypeWitnessParameter(ruleContext rule.Context, owner *ast.Node, typeParam
 		return false
 	}
 	owner.ForEachChild(visit)
-	// SUBSUMED IN PRACTICE, measured, and kept as the principle's own second clause. Dropping
+	// Subsumed in practice, measured, and kept as the principle's own second clause. Dropping
 	// `!outsideReturn` survives every fixture. A parameter only reaches this test after the syntactic
 	// pass counted at most one type-position use outside its own span, so a use in the return leaves
 	// room for an outside use only inside its own constraint or default, and the type walk counts every
@@ -449,7 +449,7 @@ const maximumSourcePosition = int(^uint(0) >> 1)
 //	                                   type phase, where `T[]` is correctly counted as one use.
 //
 // Returning true means "used enough, do not report" and is the only way this pass can conclude
-// anything. It can never prove a parameter is used too LITTLE, because a use can hide in an
+// anything. It can never prove a parameter is used too little, because a use can hide in an
 // inferred type that no syntax mentions, which is what the type phase is for.
 func isTypeParameterRepeatedInSyntax(
 	ruleContext rule.Context,
@@ -504,12 +504,12 @@ func countsAsRelatingUse(
 	// overlap of ranges rather than an ancestor walk, and reproducing the range test rather than
 	// the intent keeps a default (`<T = T[]>`) covered by the same two comparisons a constraint is.
 	//
-	// SUBSUMED BY THE TYPE PHASE, measured rather than assumed, and kept anyway. A mutation
-	// narrowing this overlap so an in-constraint mention COUNTS survives every fixture, and four
+	// Subsumed by the type PHASE, measured rather than assumed, and kept anyway. A mutation
+	// narrowing this overlap so an in-constraint mention counts survives every fixture, and four
 	// rounds of hunting a distinguishing input found none. The reason is not that the branch is
 	// unreachable: a probe confirmed the two versions disagree about real identifiers, in
 	// `<U extends U>`, `<U extends { self: U }>`, `<U extends [U]>` and `<U extends U | string>`.
-	// It is that the only inputs where the disagreement could flip a VERDICT are ones where a type
+	// It is that the only inputs where the disagreement could flip a verdict are ones where a type
 	// parameter appears inside its own constraint, and for every such shape the type phase counts
 	// it 3 times (the use, plus the constraint recursion in visitTypeParameter), which is already
 	// past the report threshold of 2. So both versions reach silence by different routes.
@@ -533,19 +533,19 @@ func countsAsRelatingUse(
 	}
 
 	// Upstream filters on `reference.isTypeReference`, which is the scope manager saying the
-	// identifier stands in TYPE position. Without an equivalent filter a NAME that merely spells
+	// identifier stands in type position. Without an equivalent filter a name that merely spells
 	// the same thing is counted as a use, and the checker will happily resolve it to the type
 	// parameter's own symbol, so symbol identity does not separate the two.
 	//
 	// Measured on upstream's `declare function setItem<T>(T): T;`, where the sole parameter is
-	// written with no annotation so `T` is the PARAMETER's name. All three identifiers resolve to
+	// written with no annotation so `T` is the parameter's name. All three identifiers resolve to
 	// the same symbol, and without this filter the parameter name counts as a second use, the AST
 	// pass concludes "repeated", and the case goes silent while upstream reports it.
 	if !isIdentifierInTypePosition(identifier) {
 		return false
 	}
 
-	// Neither do references that are not to the same type parameter. Matching on TEXT alone would
+	// Neither do references that are not to the same type parameter. Matching on text alone would
 	// count a value-land identifier that happens to share the name, and would count a shadowing
 	// type parameter declared by a nested signature as if it were this one. Upstream separates
 	// those with the scope manager; resolving the symbol answers the same question here.
@@ -569,13 +569,13 @@ func countsAsRelatingUse(
 // makes `const func = <T,>(param: T[]) => null` report: `T[]` is genuinely one use, and the type
 // phase counts it as one. Upstream's comment says the same thing in one line, and the corpus pins
 // both directions, with `Partial<T>` clean and `T[]` reporting.
-// SUBSUMED BY THE TYPE PHASE for the whole-branch case, measured. Forcing this function's caller
+// Subsumed by the type PHASE for the whole-branch case, measured. Forcing this function's caller
 // to ignore it entirely survives every fixture, because the type phase independently declines the
 // same shapes: `Partial<T>` resolves to a type whose alias arguments are visited with
-// assumeMultipleUses, giving a count above the threshold either way. The CARVE-OUT inside it is a
+// assumeMultipleUses, giving a count above the threshold either way. The carve-out inside it is a
 // different matter and is genuinely load-bearing, which the array test file pins.
 func isUsedAsTypeArgument(identifier *ast.Node) bool {
-	// The identifier has to be the NAME of a type reference before it can be an argument to
+	// The identifier has to be the name of a type reference before it can be an argument to
 	// another one. `T` in `Partial<T>` is the type name of the inner reference.
 	reference := identifier.Parent
 	if reference == nil || reference.Kind != ast.KindTypeReference {
@@ -618,12 +618,12 @@ func skipTypeConstituentsUpward(node *ast.Node) *ast.Node {
 
 // containsTypeArgument reports whether `container` passes `argument` as one of its type arguments.
 //
-// CRASH PROTECTION as well as a filter, and the crash is the part no findings fixture can see.
+// Crash protection as well as a filter, and the crash is the part no findings fixture can see.
 // `Node.TypeArguments` panics with "Unhandled case" on any node kind outside its own switch
 // (TypeScript/tsc/internal/ast/ast.go:515), and the kinds reaching here are whatever the parent
 // chain of a type reference happens to be. Measured: without the kind guard the very first valid
 // case, `class ClassyArray<T> { arr: T[]; }`, takes the process down, because `T` in `T[]` has an
-// ArrayType parent that carries no type argument list. The walk recovers per FILE rather than per
+// ArrayType parent that carries no type argument list. The walk recovers per file rather than per
 // rule, so one such panic costs every rule its verdict on that file.
 func containsTypeArgument(container *ast.Node, argument *ast.Node) bool {
 	if !nodeCanCarryTypeArguments(container) {
@@ -669,7 +669,7 @@ func typeReferenceNameText(node *ast.Node) string {
 type typeUsageWalk struct {
 	ctx rule.Context
 
-	// counts is upstream's `foundIdentifierUsages`, keyed on the type parameter DECLARATION node
+	// counts is upstream's `foundIdentifierUsages`, keyed on the type parameter declaration node
 	// rather than on its name identifier. Same identity, one dereference fewer.
 	counts map[*ast.Node]int
 
@@ -734,7 +734,7 @@ func collectTypeParameterUsageCounts(
 		fromClass:            fromClass,
 	}
 
-	// A call signature and a constructor are resolved as SIGNATURES rather than as types, because
+	// A call signature and a constructor are resolved as signatures rather than as types, because
 	// their type at a location is not the thing whose parameters and return type need counting.
 	if node.Kind == ast.KindCallSignature || node.Kind == ast.KindConstructor {
 		walk.functionLikeType = true
@@ -748,7 +748,7 @@ func collectTypeParameterUsageCounts(
 
 // visitType is upstream's `visitType`, branch for branch and in upstream's order.
 //
-// The ORDER is load-bearing rather than stylistic: the catch-all object arm has to come after the
+// The order is load-bearing rather than stylistic: the catch-all object arm has to come after the
 // type-reference arm, or a generic interface such as `Map<K, V>` would be descended into property
 // by property instead of being read as a reference with two type arguments.
 //
@@ -768,11 +768,11 @@ func (walk *typeUsageWalk) visitType(subject *checker.Type, assumeMultipleUses b
 		return
 	}
 
-	// Catch-all for a generic type ALIAS such as `Exclude<T, null>`. The walk does not descend into
+	// Catch-all for a generic type alias such as `Exclude<T, null>`. The walk does not descend into
 	// the alias definition, so it cannot know how many times an argument is used inside and assumes
 	// multiple uses.
 	if alias := checker.Type_alias(subject); alias != nil && len(alias.TypeArguments()) > 0 {
-		// SURVIVES MUTATION. Flipping this to false leaves every probed shape unchanged, including
+		// Survives mutation. Flipping this to false leaves every probed shape unchanged, including
 		// `type Wrapper<X> = { value: X }` and `type Pair<X, Y>` reached through a parameter, since
 		// a type parameter passed to an alias is already treated as repeated by the syntactic pass
 		// before the walk is consulted. Kept because the two passes are independent and upstream's
@@ -800,7 +800,7 @@ func (walk *typeUsageWalk) visitType(subject *checker.Type, assumeMultipleUses b
 
 	// Tuple types like `[K, V]` and generic type references like `Map<K, V>`.
 	//
-	// This guard is CRASH PROTECTION as well as a branch selector. `GetTypeArguments` dereferences
+	// This guard is crash protection as well as a branch selector. `GetTypeArguments` dereferences
 	// the type's reference data (TypeScript/tsc/internal/checker/checker.go:22011) and takes the
 	// process down on a type that is not a reference. Measured with a probe that called it
 	// unguarded on the mapped type reached by upstream's `<T extends string>(t: T) => t as
@@ -828,7 +828,7 @@ func (walk *typeUsageWalk) visitType(subject *checker.Type, assumeMultipleUses b
 		return
 	}
 
-	// Catch-all for inferred object types like `{ K: V }`. This has to stay AFTER the type
+	// Catch-all for inferred object types like `{ K: V }`. This has to stay after the type
 	// reference arm above, or a generic interface would be descended into property by property.
 	if flags&checker.TypeFlagsObject != 0 {
 		walk.visitObjectType(subject)
@@ -851,7 +851,7 @@ func (walk *typeUsageWalk) visitTypeParameter(subject *checker.Type, assumeMulti
 
 	// Upstream reads `getDeclarations()?.[0]`. This is the "what single thing is this" question
 	// rather than the "does any declaration match" one: a type parameter is one declaration, and
-	// upstream records exactly one. Looping would be WIDER than upstream rather than safer.
+	// upstream records exactly one. Looping would be wider than upstream rather than safer.
 	declaration := symbol.Declarations[0]
 	if declaration.Kind != ast.KindTypeParameter {
 		return
@@ -871,7 +871,7 @@ func (walk *typeUsageWalk) visitTypeParameter(subject *checker.Type, assumeMulti
 		}
 	}
 
-	// SURVIVES MUTATION and is kept as upstream's own line. Deleting the default visit leaves every
+	// Survives mutation and is kept as upstream's own line. Deleting the default visit leaves every
 	// verdict and every message unchanged, including on shapes built to reach it: `<T, U = T>`,
 	// `<T, U = T[]>` and `<U = string>` all agree with the installed build either way, because a
 	// default is written in the signature where the syntactic pass has already counted it. No
@@ -937,7 +937,7 @@ func (walk *typeUsageWalk) visitTypeReference(subject *checker.Type, assumeMulti
 // same set.
 //
 // It changes counts, not only recursion. `Extract<Union, { type: Kind }>` distributes over the
-// union, and every constituent's conditional carries the SAME `{ type: Kind }` object as its extends
+// union, and every constituent's conditional carries the same `{ type: Kind }` object as its extends
 // type. Upstream walks its properties once and counts `Kind` once, so a `Kind` used nowhere else in
 // the signature reports. Without the guard each constituent walked them again, `Kind` counted once
 // per union member, and the rule was silent where ESLint reports: Structure's `surveyFieldRendererFor`
@@ -969,12 +969,12 @@ func (walk *typeUsageWalk) visitSignature(signature *checker.Signature) {
 		return
 	}
 
-	// SUBSUMED IN PRACTICE, measured, and kept. Deleting this visit survives every fixture and
+	// Subsumed in practice, measured, and kept. Deleting this visit survives every fixture and
 	// every shape probed against the installed build: `<T>(this: T): T`, `<T>(this: T, other: T)`,
 	// `<T>(this: Record<'p', T>)` and upstream's own two `this` cases all keep their verdict. The
 	// counts really do drop (4 to 2, and 2 to 1 on upstream's `foo<T>(this: T): void`), so the
 	// branch is not inert; the drop simply never crosses the report threshold, because a `this`
-	// parameter is written in the SIGNATURE, where the syntactic pass has already seen it.
+	// parameter is written in the signature, where the syntactic pass has already seen it.
 	//
 	// Kept because it is upstream's own line and the subsumption is arithmetic rather than
 	// structural: it holds only while the threshold is 2 and while every `this` type is also
@@ -1065,7 +1065,7 @@ func isIdentifierInTypePosition(identifier *ast.Node) bool {
 	case ast.KindTypeReference:
 		return parent.AsTypeReferenceNode().TypeName == identifier
 	case ast.KindTypeQuery:
-		// `typeof x` names a VALUE, so the identifier inside it is not a type reference. Upstream's
+		// `typeof x` names a value, so the identifier inside it is not a type reference. Upstream's
 		// scope manager agrees, and upstream's corpus pins the consequence: `<T>(input: T) =>
 		// typeof input` is clean because the parameter is used once in type position, not twice.
 		return false

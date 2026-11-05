@@ -1,9 +1,9 @@
 package typescript
 
-// Code generated from typescript-eslint v8.67.0's tests/rules/await-thenable.test.ts. DO NOT EDIT BY HAND.
+// Code generated from typescript-eslint v8.67.0's tests/rules/await-thenable.test.ts. Do not edit by HAND.
 //
 // Every case was extracted by loading upstream's test file with its RuleTester stubbed, then replayed
-// against the INSTALLED rule (@typescript-eslint/eslint-plugin 8.67.0, one program per case, the
+// against the installed rule (@typescript-eslint/eslint-plugin 8.67.0, one program per case, the
 // fixture tsconfig's libs) on the same bytes this harness writes: the source trimmed plus one
 // newline. All 122 replayed verdicts agreed with the corpus's own annotations. Each finding records
 // the message id and the exact text the installed rule's location covers. TestAwaitThenableUpstreamCorpus

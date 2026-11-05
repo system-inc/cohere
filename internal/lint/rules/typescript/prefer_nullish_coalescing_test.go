@@ -12,7 +12,7 @@ import (
 // verdict against the installed 8.67.0 build rather than read off upstream's defaultOptions block.
 //
 // `ignoreConditionalTests` is the one that matters and the reason this table exists: it defaults
-// TRUE, so a port assuming Go's zero value reports on every `if (a || b)` in the tree. That is the
+// true, so a port assuming Go's zero value reports on every `if (a || b)` in the tree. That is the
 // second non-zero default found in two batches, and both were invisible from the shape of the code.
 func TestPreferNullishCoalescingDefaultsMatchUpstream(test *testing.T) {
 	test.Parallel()
@@ -40,13 +40,13 @@ func TestPreferNullishCoalescingDefaultsMatchUpstream(test *testing.T) {
 
 // TestPreferNullishCoalescingIgnorePrimitivesBothSpellings pins the oneOf.
 //
-// Upstream's schema is an object of four booleans OR the bare literal `true`. Every row here was
-// measured by driving the installed rule BEFORE this decoder was written, which is the order that
+// Upstream's schema is an object of four booleans or the bare literal `true`. Every row here was
+// measured by driving the installed rule before this decoder was written, which is the order that
 // matters: the corpus splits 110 object-form against 25 bare-true, so a decoder handling only the
 // object form passes 110 cases and is wrong on the rest.
 //
 // Three rows are invisible to the corpus entirely. `{}` and the all-true object bracket the object
-// form from both ends, and `false` is REFUSED BY THE SCHEMA rather than meaning "ignore nothing" —
+// form from both ends, and `false` is refused by the schema rather than meaning "ignore nothing" —
 // the row a decoder would most naturally get wrong by accepting it and doing something reasonable.
 func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 	test.Parallel()
@@ -123,7 +123,7 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 
 // TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the boundary.
 //
-// `meta.schema` declares ONE element here, so the cohere spelling and upstream's coincide. Stated
+// `meta.schema` declares one element here, so the cohere spelling and upstream's coincide. Stated
 // rather than assumed, because a fixture hands the decoder bytes the test built and only bytes the
 // config layer sliced reveal a mismatch.
 func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
@@ -212,7 +212,7 @@ func runPreferNullishCoalescing(test *testing.T, testCase preferNullishCoalescin
 		options = decoded
 	} else {
 		// A rule configured as a bare "error" is handed nil, and this rule's ignoreConditionalTests
-		// default is TRUE, so routing the empty case through the decoder is what proves the rule
+		// default is true, so routing the empty case through the decoder is what proves the rule
 		// gets that default rather than Go's zero value.
 		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(nil)
 		if decodePreferNullishCoalescingOptionsError != nil {
@@ -2234,7 +2234,7 @@ type preferNullishCoalescingRendering struct {
 
 // TestPreferNullishCoalescingRenderings is the section 3c and section 8 table.
 //
-// This rule has ONE message id and reports on two arms that render differently, propose different
+// This rule has one message id and reports on two arms that render differently, propose different
 // repair text, and parenthesise differently when chained. A fixture asserting the id and the count
 // cannot see any of that, and the imported corpus asserts nothing more: all 398 cases pass with a
 // rule that renders the wrong arm's message, writes the wrong replacement, and proposes a syntax
@@ -2344,7 +2344,7 @@ func TestPreferNullishCoalescingRenderings(test *testing.T) {
 						asTheTypedPreferNullishHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 
-				// The WHOLE upstream sentence, not a prefix. A prefix assertion cannot separate the
+				// The whole upstream sentence, not a prefix. A prefix assertion cannot separate the
 				// two arms, which is the defect this table exists to catch.
 				if !strings.HasPrefix(diagnostic.Message.Description, expected.message) {
 					test.Errorf("finding %d: expected the message to open with\n  %q\ngot\n  %q",

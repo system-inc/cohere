@@ -303,7 +303,7 @@ func checkDocsData(worktree string, environment func() []string) int {
 	return 0
 }
 
-// gateEnvironment is the budget's environment with GOFLAGS reduced to the pool's own -p, -buildvcs=false and
+// gateEnvironment is the budget's environment with `GOFLAGS` reduced to the pool's own -p, -buildvcs=false and
 // -trimpath, so every landing is gated the same way, whatever its caller's shell has set. A caller's -tags or
 // the like once changed what a gate tested. -trimpath is the pool's own (budgetEnvironment): it once failed
 // tests that found their fixtures from their own source path (2026-10-05), and since they find them from

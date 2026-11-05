@@ -161,7 +161,7 @@ func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(test *testin
 		{"attributes read in whitespace order, lib first and lib defaults to always", "{}", "/// <reference lib=\"foo\" path=\"bar\" />\n"},
 		{"a value containing an equals sign declines the whole comment", "{}", "/// <reference path=\"a=b\" />\n"},
 		{"no-default-lib is not an attribute this rule reads", "{}", "/// <reference no-default-lib=\"true\" />\n"},
-		// A malformed first attribute declines the WHOLE comment rather than falling through to a
+		// A malformed first attribute declines the whole comment rather than falling through to a
 		// later well-formed one. Upstream returns from `get_attr_key_and_value` on the first match
 		// whose split is not exactly two parts, and the loop never continues. Measured on the release
 		// binary: both of these are silent even under a configuration that would report their second

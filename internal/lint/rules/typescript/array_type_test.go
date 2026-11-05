@@ -21,7 +21,7 @@ func arrayTypeCaseName(index int) string {
 // options struct directly.
 //
 // The decoder holds two defaults, neither of which is a Go zero value, and a fallback of `readonly`
-// onto the RESOLVED value of `default`. A fixture constructing ArrayTypeOptions by hand would leave
+// onto the resolved value of `default`. A fixture constructing ArrayTypeOptions by hand would leave
 // both untested, and those are the two lines with no upstream counterpart. An empty configuration
 // is the bare `"error"` case, which the config layer turns into nil options, and it reaches the rule
 // the same way here.
@@ -1183,7 +1183,7 @@ func TestArrayTypeFiresOnUpstreamFailCases(test *testing.T) {
 //
 // Upstream interpolates `className`, `type` and `readonlyPrefix` into six message strings, and the
 // `type` slot is the one that hides a decision: a simple element is rendered as its own source text
-// and everything else COLLAPSES to the single letter `T`. A message-id assertion cannot see that,
+// and everything else collapses to the single letter `T`. A message-id assertion cannot see that,
 // nor can a span, nor can the applied fix, since the repair writes the real type either way.
 //
 // Every expectation here is the triple the installed build produced for that exact input, recovered
@@ -1418,7 +1418,7 @@ func TestArrayTypeDeclinesAGenericWithTheWrongArgumentCount(test *testing.T) {
 //
 // A `readonly` rewrite sitting directly inside another suffix array needs its own parentheses,
 // because `readonly string[][]` would read as an array of readonly arrays only by accident. When the
-// element is ALREADY parenthesized the rewrite must not add a second pair, and the reason it does
+// element is already parenthesized the rewrite must not add a second pair, and the reason it does
 // not is subtle: the node's own range starts inside the existing parentheses, so the fix that
 // replaces it never sees them.
 //
@@ -1481,12 +1481,12 @@ func TestArrayTypeWrapsAReadonlyRewriteOnlyWhenItHasTo(test *testing.T) {
 // exists only because our parser keeps parentheses. Mutants removing each survived the whole
 // imported corpus, which writes neither shape under `array-simple`.
 //
-// The `Array` arm: a reference is simple only when it takes NO type arguments, EXCEPT that `Array`
+// The `Array` arm: a reference is simple only when it takes no type arguments, except that `Array`
 // is simple when its single argument is. So `Array<Array<string>>` is simple all the way down and
 // reports twice under `array-simple`, once per level, while `Foo<string>` is not simple at all.
 //
 // The parenthesis behavior: TSESTree has no parenthesized-type node, so `(string)[]`'s element type
-// IS the string keyword and is simple. Ours produces a real node that would answer false without
+// is the string keyword and is simple. Ours produces a real node that would answer false without
 // the skip, turning a clean case into a reported one.
 //
 // Every field is what the installed 8.67.0 build produced for that exact input.
@@ -1808,7 +1808,7 @@ func TestArrayTypeDeclinesAShadowedName(test *testing.T) {
 // TestArrayTypeDecoderResolvesBothAxes puts the two lines with no upstream counterpart under test.
 //
 // `default` defaults to `array` rather than to the empty string a Go zero value would give, and
-// `readonly` falls back to the RESOLVED `default` rather than to a constant. Both are invisible to
+// `readonly` falls back to the resolved `default` rather than to a constant. Both are invisible to
 // any fixture that builds the options struct directly, which is why every other test in this file
 // routes through the decoder and why this one asserts the decoder's output.
 func TestArrayTypeDecoderResolvesBothAxes(test *testing.T) {
@@ -1867,7 +1867,7 @@ func TestArrayTypeNilOptionsFallsBackToUpstreamDefaults(test *testing.T) {
 //
 // `ast.SkipTypeParentheses` dereferences its argument on the first loop test, so a nil element type
 // reaches it as a panic rather than as a nil result, and error recovery is where a nil element type
-// comes from. The walk recovers per FILE rather than per rule, so one such panic would cost every
+// comes from. The walk recovers per file rather than per rule, so one such panic would cost every
 // rule that file rather than one finding.
 //
 // There is no finding to assert; the assertion is that the run completes. Upstream cannot reach
@@ -1899,7 +1899,7 @@ func TestArrayTypeSurvivesMalformedTypes(test *testing.T) {
 //
 // The switch exists so a fixture can name the arm it expects by upstream's own id rather than by
 // calling one of six Go constructors, which keeps the fixture table readable as the upstream table
-// it came from. It is deliberately NOT a function the rule uses: a test that reached into the rule
+// it came from. It is deliberately not a function the rule uses: a test that reached into the rule
 // for its expectation would move both sides together under mutation and assert nothing.
 func arrayTypeMessageForTest(id string, className string, elementType string, readonlyPrefix string) rule.Message {
 	switch id {

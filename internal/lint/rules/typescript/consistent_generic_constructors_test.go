@@ -31,7 +31,7 @@ func consistentGenericConstructorsSettingsFor(test *testing.T, wire string) any 
 
 // TestConsistentGenericConstructorsStaysSilent is upstream's passing cases verbatim, in both modes.
 //
-// One of upstream's forty six is NOT here and its absence is deliberate: it is clean only because
+// One of upstream's forty six is not here and its absence is deliberate: it is clean only because
 // `isolatedDeclarations` is on, which this harness cannot express. It is recorded in
 // TestConsistentGenericConstructorsCannotExpressIsolatedDeclarations below rather than quietly
 // dropped or forced green.
@@ -89,7 +89,7 @@ func TestConsistentGenericConstructorsStaysSilent(test *testing.T) {
 		{sourceText: "\nconst [a = new Foo<string>()] = [];\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nfunction a([a = new Foo<string>()]) {}\n      ", wire: "\"type-annotation\""},
 
-		// The ARROW function default parameter, which upstream's corpus does not write in either
+		// The arrow function default parameter, which upstream's corpus does not write in either
 		// mode and which its selector excludes. `:matches(FunctionDeclaration,FunctionExpression) >
 		// AssignmentPattern` never reaches an arrow, so both spellings are silent, measured on the
 		// installed build. A port widening the parameter gate to every parent passes the whole
@@ -101,10 +101,10 @@ func TestConsistentGenericConstructorsStaysSilent(test *testing.T) {
 		// A getter is not a construction site at all, so the return annotation is out of scope.
 		{sourceText: "class A {\n  get foo(): Foo<string> {\n    return new Foo();\n  }\n}\n", wire: "\"constructor\""},
 
-		// A function TYPE's parameter annotation has no initializer, so there is nothing to move.
+		// A function type's parameter annotation has no initializer, so there is nothing to move.
 		{sourceText: "declare const f: (a: Foo<string>) => void;\n", wire: "\"constructor\""},
 
-		// Annotations that are NOT a plain type reference, so there is no single name to compare
+		// Annotations that are not a plain type reference, so there is no single name to compare
 		// against the callee and nothing safe to move. Upstream's corpus writes none of these, and
 		// a port dropping the type-reference gate reports all four while passing every imported
 		// case. Each measured silent on the installed build.
@@ -386,7 +386,7 @@ func TestConsistentGenericConstructorsFires(test *testing.T) {
 			wantFixed:  "\nclass Float32Array<T> {}\nconst a = new Float32Array<ArrayBufferLike>();\nexport {};\n      ",
 		},
 
-		// A class METHOD's default parameter, which reports where the arrow above does not. In
+		// A class method's default parameter, which reports where the arrow above does not. In
 		// estree a method is a MethodDefinition whose value is a FunctionExpression, so upstream's
 		// selector reaches it through its second branch. This case and the arrow ones above are the
 		// pair that holds the parameter gate in place from both sides. Upstream writes neither.
@@ -398,7 +398,7 @@ func TestConsistentGenericConstructorsFires(test *testing.T) {
 			wantFixed:  "class A {\n  foo(a = new Foo<string>()) {}\n}\n",
 		},
 
-		// A PARENTHESIZED annotation, which reports upstream and was silent here until the type
+		// A parenthesized annotation, which reports upstream and was silent here until the type
 		// position unwrap existed. estree has no parenthesized-type node so upstream's rule never
 		// sees one; our parser produces a real KindParenthesizedType and the type-reference gate
 		// declined it. The corpus writes no parenthesized annotation anywhere, which is why this
@@ -442,13 +442,13 @@ func TestConsistentGenericConstructorsFires(test *testing.T) {
 // corpus that this harness cannot reproduce, with the controls that establish why.
 //
 // Upstream's forty sixth passing case is `const foo: Foo<string> = new Foo();` under
-// `parserOptions.isolatedDeclarations`. It is clean ONLY because of that setting: without it the
+// `parserOptions.isolatedDeclarations`. It is clean only because of that setting: without it the
 // same source reports, which the first assertion below shows. Under isolated declarations the
 // annotation has to stay explicit, so the repair that deletes it would break the file, and upstream
 // declines rather than proposing it.
 //
 // The rule reads the real compiler option off the program rather than a lint-config field, which is
-// the right instrument here and is why no fixture can set it: rule_testing writes its tsconfig AFTER
+// the right instrument here and is why no fixture can set it: rule_testing writes its tsconfig after
 // the setup hook runs and always with the default settings, so a hook writing its own tsconfig is
 // overwritten. Measured, with a hook writing `"isolatedDeclarations": true` and the rule still
 // observing the option unset.

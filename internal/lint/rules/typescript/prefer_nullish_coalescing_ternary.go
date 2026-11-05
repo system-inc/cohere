@@ -32,7 +32,7 @@ import (
 // expected output on all 221 ternary and if-statement cases. Two behaviours a reader might "fix"
 // are upstream's, measured, and kept:
 //
-//   - `getTextWithParentheses` keeps ONE pair of parentheses around the subject, the innermost, so
+//   - `getTextWithParentheses` keeps one pair of parentheses around the subject, the innermost, so
 //     `((a)) ? ((a)) : b` suggests `(a) ?? b`.
 //   - The if-statement arm accepts any assignment operator in its body, not only `=`, because
 //     ESTree's AssignmentExpression covers `+=` too. `if (!a) a += b` reports and suggests
@@ -78,7 +78,7 @@ func preferNullishCoalescingJudgeTernary(ruleContext rule.Context, node *ast.Nod
 		return preferNullishCoalescingFinding{}, false
 	}
 
-	// upstream's `getBranchNodes`: which branch runs when the subject is NOT nullish.
+	// upstream's `getBranchNodes`: which branch runs when the subject is not nullish.
 	nonNullishBranch, nullishBranch := conditional.WhenTrue, conditional.WhenFalse
 	switch reading.operator {
 	case "", "!=", "!==":
@@ -172,7 +172,7 @@ func preferNullishCoalescingJudgeIf(ruleContext rule.Context, node *ast.Node,
 	if !ok {
 		return preferNullishCoalescingFinding{}, false
 	}
-	// Only the tests that are true when the subject IS nullish guard an assignment that `??=` can
+	// Only the tests that are true when the subject is nullish guard an assignment that `??=` can
 	// replace. `if (a != null) a = b` assigns when `a` is present, the opposite of `??=`.
 	switch reading.operator {
 	case "!", "==", "===":
@@ -475,7 +475,7 @@ func preferNullishCoalescingSimilarMemberAccess(left *ast.Node, right *ast.Node)
 // narrow: `this`, a literal, an identifier, or a member access built from those. Anything else, a
 // call, a non-null assertion, a template, a private name, is never equal, even to itself.
 //
-// A member access compares its property and its object and IGNORES whether the access is computed,
+// A member access compares its property and its object and ignores whether the access is computed,
 // as upstream's does. It is reached only for a property that is itself an access (`a[b.c]` against
 // `a[b.c]`), where that quirk cannot change a verdict on real code, and is kept rather than tidied
 // so the two implementations answer alike.
@@ -499,7 +499,7 @@ func preferNullishCoalescingNodesEqual(left *ast.Node, right *ast.Node) bool {
 	case ast.KindIdentifier, ast.KindStringLiteral, ast.KindBigIntLiteral:
 		return left.Text() == right.Text()
 	case ast.KindNumericLiteral:
-		// ESTree compares the literal's VALUE, so `1` and `1.0` are one key. Parsed rather than
+		// ESTree compares the literal's value, so `1` and `1.0` are one key. Parsed rather than
 		// trusted to arrive normalized; an unparsable spelling falls back to its text.
 		leftValue, leftError := strconv.ParseFloat(left.Text(), 64)
 		rightValue, rightError := strconv.ParseFloat(right.Text(), 64)
@@ -542,7 +542,7 @@ func preferNullishCoalescingUnionFlags(subject *checker.Type) checker.TypeFlags 
 }
 
 // preferNullishCoalescingTextWithParentheses is typescript-eslint's `getTextWithParentheses`: the
-// node's text with the ONE pair of parentheses directly around it, if it has one. Not every pair:
+// node's text with the one pair of parentheses directly around it, if it has one. Not every pair:
 // `((a))` gives `(a)`, measured against the installed build.
 func preferNullishCoalescingTextWithParentheses(ruleContext rule.Context, node *ast.Node) string {
 	spanned := node

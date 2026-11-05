@@ -15,7 +15,7 @@ const noUnsafeEnumComparisonFile = "/repository/source/NoUnsafeEnumComparison.ts
 // byte through a second independent extraction: 85 case bodies, zero mismatches.
 //
 // Every row runs through `RunTyped` rather than `Run`. This rule declares NeedsTypeChecker, and
-// the plain harness hands it a nil checker -- which this rule GUARDS, so it would go completely
+// the plain harness hands it a nil checker -- which this rule guards, so it would go completely
 // silent and every StaysSilent case would pass vacuously while every Fires case failed in a way
 // that looks like a rule bug.
 type noUnsafeEnumComparisonCase struct {
@@ -437,17 +437,17 @@ func TestNoUnsafeEnumComparisonStaysSilent(test *testing.T) {
 }
 
 // The two tests below exist because a mutation sweep found two discriminations upstream's own
-// corpus cannot see. Both were settled against upstream's SOURCE for the helper they exercise, and
+// corpus cannot see. Both were settled against upstream's source for the helper they exercise, and
 // each is written so the mutant that survived the corpus fails here.
 
 // TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive covers the every-versus-some asymmetry.
 //
-// `isNumberLike` and `isStringLike` are EVERY union constituent over SOME intersection constituent.
+// `isNumberLike` and `isStringLike` are every union constituent over some intersection constituent.
 // Flipping the union quantifier to `some` survives all 85 corpus cases, because no case writes a
 // union with a mixed primitive kind: the closest are `Fruit | number` and `Fruit | string`, which
 // gate three excuses before the quantifier is consulted.
 //
-// The distinguishing input is a union that is PARTLY string-like compared against a string enum.
+// The distinguishing input is a union that is partly string-like compared against a string enum.
 // Under `every` it is not string-like, so the comparison is allowed; under `some` it reports.
 // Measured both ways here: the shipped rule is clean and the mutant reports.
 //
@@ -491,7 +491,7 @@ func TestNoUnsafeEnumComparisonUnionsMustBeWhollyPrimitive(test *testing.T) {
 	}
 }
 
-// TestNoUnsafeEnumComparisonGateOneIsACostGuard records an EQUIVALENT mutant rather than killing it.
+// TestNoUnsafeEnumComparisonGateOneIsACostGuard records an equivalent mutant rather than killing it.
 //
 // Upstream's first gate returns early when neither side carries an enum type. Removing it survives
 // the whole corpus, and that is genuine equivalence rather than a fixture gap: with no enum on
@@ -511,7 +511,7 @@ func TestNoUnsafeEnumComparisonGateOneIsACostGuard(test *testing.T) {
 	result := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, source)
 	rule_testing.ExpectClean(test, result)
 
-	// The control: the same shape WITH an enum on one side does report, so the clean verdict above
+	// The control: the same shape with an enum on one side does report, so the clean verdict above
 	// is a decision rather than the rule being inert on this file.
 	const withEnum = "enum SE { FOO = 'foo' }\ndeclare const se: SE;\ndeclare const a: string;\nconst c = a === se;\n"
 	controlResult := rule_testing.RunTyped(test, NoUnsafeEnumComparison, noUnsafeEnumComparisonFile, withEnum)
@@ -522,7 +522,7 @@ func TestNoUnsafeEnumComparisonGateOneIsACostGuard(test *testing.T) {
 // rule needs, because the shelf offers only one of the two and upstream uses both.
 //
 // `enum-utils/shared.ts` imports an `isTypeFlagSet` from `../../util` that decomposes a union and
-// ORs its constituents' flags, AND `tsutils.isTypeFlagSet` which reads a type's own flags. Our
+// ORs its constituents' flags, and `tsutils.isTypeFlagSet` which reads a type's own flags. Our
 // `type_checking.IsTypeFlagSet` is the second. Reaching for it by name at both of upstream's call
 // sites would be wrong at one of them.
 //
@@ -530,7 +530,7 @@ func TestNoUnsafeEnumComparisonGateOneIsACostGuard(test *testing.T) {
 // union constituents and tests each, which is what decomposing means, and `getEnumValueType` is
 // only ever handed a constituent.
 //
-// The input below is the one that separates the readings. A union of two DIFFERENT enums has no
+// The input below is the one that separates the readings. A union of two different enums has no
 // enum-literal flag on the composite type -- our helper answers false for it -- while both of its
 // constituents carry the flag. If this rule ever stops iterating and starts testing the whole type,
 // that union stops being seen as carrying enums at all, gate one exits early, and the finding is

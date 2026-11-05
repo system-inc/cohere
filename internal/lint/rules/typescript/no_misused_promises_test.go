@@ -1568,7 +1568,7 @@ useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
 }
 
 // TestNoMisusedPromisesFires carries eighty-nine of tsgolint's ninety invalid cases and asserts the
-// ORDERED list of message ids each one produces.
+// ordered list of message ids each one produces.
 //
 // An ordered list rather than a count, because twelve of these cases report more than once on one
 // input and four of them mix two different message ids in a single case. A fixture asserting "this
@@ -2887,7 +2887,7 @@ const obj: O = {
 // TestNoMisusedPromisesRequiresTheTypedHarness pins the nil-checker guard as a measured fact.
 //
 // This is the one addition the absorption made to upstream's body, and it exists because the failure
-// it prevents is SILENT rather than loud. Our shim's type queries return nil instead of panicking, so
+// it prevents is silent rather than loud. Our shim's type queries return nil instead of panicking, so
 // a rule that read a nil checker would not crash — it would report nothing, and every one of the one
 // hundred and twenty-three clean cases above would pass having proven nothing at all. A vacuous green
 // suite is indistinguishable from a correct one from the outside, which is why this asserts the shape
@@ -2973,7 +2973,7 @@ const obj = { ...promise };
 // ExpectFindings asserts ids and count and nothing else, so a rule pointing at the wrong node passes
 // a complete fixture pair while being wrong. That is not hypothetical for this rule: several of its
 // report sites choose deliberately between a node and its type annotation — checkProperty reports the
-// return TYPE when the initializer is function-like and has one, and the initializer otherwise — and
+// return type when the initializer is function-like and has one, and the initializer otherwise — and
 // no id assertion can tell those apart.
 //
 // One case per message id the rule can emit, so every arm's anchor is pinned.
@@ -3099,14 +3099,14 @@ class Derived implements Base {
 // TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder routes configuration through the
 // rule's own decoder rather than building the options struct directly.
 //
-// That is what puts the pointer fields under test. Every option on this rule defaults to TRUE — three
+// That is what puts the pointer fields under test. Every option on this rule defaults to true — three
 // top-level checks and six void-return sub-flags, nine fields whose default is not the zero value —
 // so a plain bool anywhere in this surface could not tell "the user wrote false" from "the user wrote
 // nothing", and the whole defaulting block at the top of Run reads exactly that distinction. Handing
 // RunWithOptions a struct built here would leave the JSON binding itself untested, and the binding is
 // the half with no upstream counterpart.
 //
-// The nested case matters most: checksVoidReturn is spelled in JSON as either a boolean OR an object
+// The nested case matters most: checksVoidReturn is spelled in JSON as either a boolean or an object
 // of sub-flags, while the Go struct splits those into two separate fields. This asserts what our
 // decoder actually does with each spelling rather than what the shape suggests.
 func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testing.T) {
@@ -3199,7 +3199,7 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 
 // TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled pins the bare-"error" configuration path.
 //
-// A rule configured as bare "error" is handed NIL options rather than a zero struct, and
+// A rule configured as bare "error" is handed nil options rather than a zero struct, and
 // `options.(NoMisusedPromisesOptions)` on nil yields the zero value with every pointer nil. For a
 // rule whose nine options ALL default to true, getting that wrong would turn the entire rule off for
 // the most common way anyone configures it, while every fixture above — each of which reaches the
@@ -3304,18 +3304,18 @@ func noMisusedPromisesTableSizes(test *testing.T) (silent int, fires int) {
 //
 // Whether a rule reports once per site or once per offending element looks like a data-structure
 // choice and is a behavioral decision. The corpus cannot settle it: its longest multi-finding case
-// carries four, and none of its shapes isolates the axis. So each of these was probed as a TRIPLE and
+// carries four, and none of its shapes isolates the axis. So each of these was probed as a triple and
 // every position was read rather than only the count.
 //
 // The answer is per element, uniformly, across every shape this rule has. That includes the case that
-// could plausibly have gone the other way and did not: ONE async method against THREE heritage types
-// that each declare it reports THREE times, all three at the same span. That is
+// could plausibly have gone the other way and did not: one async method against three heritage types
+// that each declare it reports three times, all three at the same span. That is
 // checkClassLikeOrInterfaceNode looping over heritage types with no bookkeeping to suppress a repeat,
 // so a class implementing several interfaces with a common method gets a finding per interface. It is
 // upstream's behavior, reproduced, and it is the shape a reader would most likely "fix" by accident.
 //
 // The array case is the interesting silence: three async callbacks inside an array literal passed to
-// an `Array<() => void>` parameter reports NOTHING, because the void-return argument check inspects
+// an `Array<() => void>` parameter reports nothing, because the void-return argument check inspects
 // the argument itself, and the argument is one array rather than three functions.
 func TestNoMisusedPromisesReportsPerElementRatherThanPerSite(test *testing.T) {
 	test.Parallel()
@@ -3410,15 +3410,15 @@ f([async () => {}, async () => {}, async () => {}]);
 	}
 }
 
-// TestNoMisusedPromisesDependsOnGlobalsTheFixtureLibraryOmits records the ES2022 hazard for THIS rule,
+// TestNoMisusedPromisesDependsOnGlobalsTheFixtureLibraryOmits records the ES2022 hazard for this rule,
 // measured with a two-file control rather than inherited from a sibling's verdict.
 //
 // The fixture tsconfig pins `lib: ["ES2022"]` with no way to raise it, so a name the DOM or Node
 // would supply resolves to nothing. Whether that changes a rule's answer is a per-rule question: it
 // inverted three `await-thenable` cases and moved nothing at all on `no-implied-eval`.
 //
-// Here it BITES, and it costs findings rather than adding them. `setTimeout(async () => {})` is
-// SILENT under the bare fixture and reports `voidReturnArgument` once a declaration is supplied,
+// Here it bites, and it costs findings rather than adding them. `setTimeout(async () => {})` is
+// silent under the bare fixture and reports `voidReturnArgument` once a declaration is supplied,
 // because voidFunctionArguments walks the callee's signatures to find which parameters take a void
 // return, and an unresolved callee has no signatures to walk. That is the safe direction — a missing
 // global costs a finding rather than inventing one — but it is worth pinning, because a future
@@ -3480,20 +3480,20 @@ export {};
 }
 
 // TestNoMisusedPromisesChecksOnlyTheVoidPositions pins that the argument check reports at the
-// positions voidFunctionArguments selected and NOT at every thenable-returning argument.
+// positions voidFunctionArguments selected and not at every thenable-returning argument.
 //
 // This case exists because a mutant found it. Neutralizing the `slices.Contains(voidArgs, index)`
 // membership test survived all two hundred and twelve imported fixtures, and the reason is structural
 // rather than accidental: `checkArguments` returns early when voidArgs is empty, so a call with no
 // void parameter at all cannot reach the loop either way. The membership test only earns its keep
-// when SOME parameter is void and ANOTHER is not, and upstream's corpus never writes that shape.
+// when some parameter is void and another is not, and upstream's corpus never writes that shape.
 //
 // So each case below mixes one void-returning parameter with one parameter that is not, hands both an
-// async callback, and asserts ONE finding. Under the mutant each reports two. That is different
+// async callback, and asserts one finding. Under the mutant each reports two. That is different
 // output rather than a different internal path, which is what makes this a fixture rather than a
 // guess: the distinguishing input was measured on both versions before it was written down.
 //
-// The last case is the control for the whole set. A Promise-returning parameter FIRST and a void
+// The last case is the control for the whole set. A Promise-returning parameter first and a void
 // parameter second still reports once, which proves the single finding above is about which position
 // was selected and not about the rule reporting at most once per call.
 func TestNoMisusedPromisesChecksOnlyTheVoidPositions(test *testing.T) {
@@ -3535,11 +3535,11 @@ f(async () => {}, async () => {});
 	}
 }
 
-// TestNoMisusedPromisesReportsThePropertyReturnAnnotationWhenThereIsOne pins WHERE the property check
+// TestNoMisusedPromisesReportsThePropertyReturnAnnotationWhenThereIsOne pins where the property check
 // points, which is a decision the message id cannot see.
 //
-// checkProperty chooses between two anchors: when the initializer is function-like AND carries an
-// explicit return type annotation it reports the ANNOTATION, and otherwise it reports the initializer.
+// checkProperty chooses between two anchors: when the initializer is function-like and carries an
+// explicit return type annotation it reports the annotation, and otherwise it reports the initializer.
 // Both produce `voidReturnProperty`, so every fixture asserting the id stayed green over a mutant that
 // collapsed the two branches into one. That is the "fixtures assert the wrong layer" failure — the
 // case was covered, and every assertion over it was about which rule fired rather than where.
@@ -3623,7 +3623,7 @@ const obj: O = {
 }
 
 // TestNoMisusedPromisesSurvivesAttributeValuesThatAreNotExpressionContainers pins a guard whose job is
-// to prevent a CRASH rather than to change a verdict.
+// to prevent a crash rather than to change a verdict.
 //
 // checkJSXAttribute requires the initializer's kind to be KindJsxExpression before calling
 // AsJsxExpression on it, and that call is an unchecked type assertion. Removing the kind check does
@@ -3634,7 +3634,7 @@ const obj: O = {
 // corpus writes no string-valued attribute at all. No ExpectFindings assertion can see a panic, so
 // this asserts the shapes reach the rule and come back clean; the crash is what failure looks like.
 //
-// The control matters here more than usual: without a case that DOES report on the same file shape,
+// The control matters here more than usual: without a case that does report on the same file shape,
 // a suite of three clean assertions would pass just as well against a rule that had stopped running.
 func TestNoMisusedPromisesSurvivesAttributeValuesThatAreNotExpressionContainers(test *testing.T) {
 	test.Parallel()

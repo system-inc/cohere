@@ -18,14 +18,14 @@ import (
 //	invalid: [1, 2, 3].reduce((a, s) => a.concat(s * 2), <number[]>[]);
 //
 // `reduce` is generic in its accumulator, so `reduce<T>(callback, initial)` tells the checker what
-// the accumulator is and then checks the initial value AGAINST it. Writing `initial as T` instead
+// the accumulator is and then checks the initial value against it. Writing `initial as T` instead
 // tells the checker to stop checking: the assertion is believed rather than verified, so a mistake
 // in the initial value survives to run time. The two spellings look equivalent and only one of them
 // is still type-checked.
 //
 // # Why some assertions are left alone, and it is not a style judgment
 //
-// Upstream reports only when the assertion is UNNECESSARY, meaning the un-asserted initial value is
+// Upstream reports only when the assertion is unnecessary, meaning the un-asserted initial value is
 // already assignable to the asserted type. When it is not assignable, the assertion is doing real
 // widening work and rewriting it into a type parameter would produce code that does not compile,
 // so the rule declines rather than proposing a fix it knows is broken.
@@ -73,7 +73,7 @@ import (
 //
 // # Two divergences from the installed build, both measured, both stated
 //
-// A computed member key folded through a variable is a FALSE NEGATIVE here:
+// A computed member key folded through a variable is a false negative here:
 //
 //	const key = 'reduce'; a[key](cb, [] as number[])   REPORTS upstream, SILENT here
 //
@@ -82,7 +82,7 @@ import (
 // key `['reduce']` are both handled, and the corpus exercises the literal form in both lists. The
 // gap is one shape wide and it costs findings rather than inventing them.
 //
-// `[] as const` is a defect upstream ships and this port does NOT reproduce:
+// `[] as const` is a defect upstream ships and this port does not reproduce:
 //
 //	a.reduce(cb, [] as const)   REPORTS upstream, writing `a.reduce<const>(cb, [])`
 //
@@ -170,13 +170,13 @@ var PreferReduceTypeParameter = rule.Rule{
 
 				// `x as const` is a const assertion rather than a type assertion to a named type.
 				// Upstream does not exclude it and its fixer writes `reduce<const>`, which does not
-				// parse. Declined here rather than reproduced, because this rule's repair is a FIX
+				// parse. Declined here rather than reproduced, because this rule's repair is a fix
 				// and a fix is applied with nobody watching.
 				if isConstAssertionType(assertedType) {
 					return
 				}
 
-				// Upstream: report only when the assertion is UNNECESSARY, meaning the value is
+				// Upstream: report only when the assertion is unnecessary, meaning the value is
 				// already assignable to the asserted type. An assertion doing real work is left
 				// alone because rewriting it into a type parameter would stop compiling.
 				initializerType := ruleContext.TypeChecker.GetTypeAtLocation(assertedValue)
@@ -215,7 +215,7 @@ var PreferReduceTypeParameter = rule.Rule{
 				// written rather than gaining a second.
 				if call.TypeArguments == nil {
 					// The asserted type's own source text, copied rather than re-rendered. The
-					// insert anchors on the callee BEFORE parentheses were skipped only in the
+					// insert anchors on the callee before parentheses were skipped only in the
 					// sense that upstream anchors on the member expression; measured, that puts the
 					// text inside a parenthesized callee, which is what the installed build writes.
 					typeText := ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, assertedType).Pos():assertedType.End()]
@@ -262,7 +262,7 @@ func reduceMemberAccessOf(callee *ast.Node) (receiver *ast.Node, memberName stri
 // typeAssertionParts reads either spelling of a type assertion, returning the value and the type.
 //
 // `x as T` and `<T>x` are different nodes with the same meaning, and upstream's `isTypeAssertion`
-// accepts both. `x satisfies T` is deliberately NOT one: it checks without changing the type, so
+// accepts both. `x satisfies T` is deliberately not one: it checks without changing the type, so
 // there is nothing unnecessary to remove, and the installed build is silent on it. Measured.
 func typeAssertionParts(node *ast.Node) (value *ast.Node, assertedType *ast.Node, isAssertion bool) {
 	switch node.Kind {

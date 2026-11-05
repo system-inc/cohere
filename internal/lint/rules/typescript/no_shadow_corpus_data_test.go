@@ -1,12 +1,12 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-shadow/*.test.ts and edge rows. DO NOT EDIT BY HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-shadow/*.test.ts and edge rows. Do not edit by HAND.
 //
 // The 239 upstream rows are every row in the two test files, 139 valid and 100 invalid, extracted by
 // loading the files with RuleTester stubbed. 84 edge rows were added for what they leave open. Before recording,
 // every upstream row was linted untyped, as upstream's RuleTester runs it, and agreed with upstream's own
 // assertions: message ids, lines, columns and the shadowed declaration's place. Every row was then replayed
-// against the INSTALLED rule (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under
+// against the installed rule (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under
 // noShadowCorpusTsconfig, on the bytes this harness writes: the source trimmed plus one newline, in file.ts, or
 // in file.d.ts for a row upstream names a definition file. Upstream's rows are modules, and one with no import
 // or export gets `export {};` appended (exportAppended), since cohere's module is TypeScript's. Each finding

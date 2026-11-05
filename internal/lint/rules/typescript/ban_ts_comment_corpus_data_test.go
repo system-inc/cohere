@@ -1,11 +1,11 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/ban-ts-comment.test.ts and edge rows. DO NOT EDIT BY HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/ban-ts-comment.test.ts and edge rows. Do not edit by HAND.
 //
 // The 52 valid and 62 invalid rows, from all four of the test file's ruleTester.run blocks, were extracted by
 // loading it with RuleTester stubbed, and 40 edge rows were added for what that corpus leaves open: grapheme
 // lengths, the whitespace JavaScript trim does and does not remove, a description failing both checks,
-// three-slash pragmas, block comments, and CRLF. Every row was replayed against the INSTALLED rule
+// three-slash pragmas, block comments, and CRLF. Every row was replayed against the installed rule
 // (@typescript-eslint/eslint-plugin 8.71.0) on the bytes this harness writes: the source trimmed plus one newline.
 // Before recording, every upstream row was replayed on its own bytes and agreed with upstream's own
 // assertions, suggestions included. Each finding records the message id, the exact text the installed

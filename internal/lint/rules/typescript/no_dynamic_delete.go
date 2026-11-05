@@ -26,13 +26,13 @@ import (
 // # What decides a finding
 //
 // The anchor is `KindDeleteExpression`. The operand must be an element access, and its key must not
-// be an ACCEPTABLE INDEX, which upstream defines narrowly:
+// be an acceptable index, which upstream defines narrowly:
 //
 //	a Literal whose runtime value is a number or a string
 //	a unary `-` applied to a Literal whose value is a number
 //
 // Everything else reports, including several shapes that read as static to a human. `+7` is a unary
-// PLUS and upstream accepts only minus, so it reports while `-7` is clean. `-Infinity` and `NaN`
+// plus and upstream accepts only minus, so it reports while `-7` is clean. `-Infinity` and `NaN`
 // are identifiers rather than literals, so both report. A template literal is not a Literal in the
 // estree grammar even when it has no substitutions, so a delete whose key is a backtick-quoted
 // string reports while the same key in single quotes does not.
@@ -53,7 +53,7 @@ import (
 //
 // All four report upstream and all four report here, and none of them appears in the corpus.
 //
-// PARENTHESES ARE INVISIBLE IN ESTREE and are real nodes here, which is the divergence that would
+// Parentheses are invisible in ESTREE and are real nodes here, which is the divergence that would
 // have shipped silently. estree has no parenthesized-expression node at all, so upstream's `Literal`
 // test sees straight through `delete c[(7)]` and stays clean. A port testing our kinds without
 // skipping parentheses would report it. Measured against the installed build, and the corpus writes
@@ -67,7 +67,7 @@ import (
 // So parentheses are skipped in three places: the delete operand, the key, and the minus operand.
 // The last of those is the one no reading of the rule file suggests.
 //
-// AN OPTIONAL CHAIN IS EXCLUDED, and not through the key test. estree wraps `c?.[x]` in a
+// An optional chain is EXCLUDED, and not through the key test. estree wraps `c?.[x]` in a
 // `ChainExpression`, so `node.argument.type !== MemberExpression` is already false and the rule
 // returns before it ever looks at the key. Both spellings are clean upstream regardless of what the
 // key is, which is what proves the exclusion is structural rather than a consequence of the index:
@@ -82,7 +82,7 @@ import (
 // harness compares against upstream, and a finding upstream does not produce is a divergence
 // whichever direction it points.
 //
-// # The span is the KEY, not the delete expression
+// # The span is the key, not the delete expression
 //
 // Upstream reports on `node.argument.property`, so `delete container['aa' + 'b']` underlines
 // `'aa' + 'b'` and nothing else. That is a deliberate choice worth pinning: the surrounding delete

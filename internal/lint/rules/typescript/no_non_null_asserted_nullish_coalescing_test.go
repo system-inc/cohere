@@ -18,7 +18,7 @@ func noNonNullAssertedNullishCoalescingCaseName(index int) string {
 
 // applyNoNonNullAssertedNullishCoalescingSuggestion rewrites source with one suggestion's fixes.
 //
-// The harness applies fixes and has no suggestion support, and this rule's ENTIRE repair surface is
+// The harness applies fixes and has no suggestion support, and this rule's entire repair surface is
 // a suggestion, so without this the thing it offers would go completely unasserted.
 func applyNoNonNullAssertedNullishCoalescingSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()
@@ -194,7 +194,7 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(test *testin
 				test.Fatalf("message id: got %q", diagnostic.Message.Id)
 			}
 
-			// The repair is offered, never applied. Removing the assertion can WIDEN the resulting
+			// The repair is offered, never applied. Removing the assertion can widen the resulting
 			// type and break a return that used to compile, which is why upstream ships a
 			// suggestion and why a fix here would be a defect rather than an improvement.
 			if len(diagnostic.Fixes) != 0 {
@@ -233,7 +233,7 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 		sourceText string
 	}{
 		{
-			// The assertion sits on a RIGHT operand of both, so neither binary matches.
+			// The assertion sits on a right operand of both, so neither binary matches.
 			sourceText: "foo ?? bar! ?? baz;",
 		},
 		{
@@ -245,17 +245,17 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 			sourceText: "foo! && bar;",
 		},
 		{
-			// The same write BELOW the node does not count. This is the pair that makes the end-position comparison load-bearing rather than decorative.
+			// The same write below the node does not count. This is the pair that makes the end-position comparison load-bearing rather than decorative.
 			sourceText: "let x: string;\nx! ?? '';\nfunction g() { x = 'a'; }",
 		},
 		{
-			// A write to a SHADOWED binding of the same name. The outer `x` is never assigned, so
+			// A write to a shadowed binding of the same name. The outer `x` is never assigned, so
 			// the rule must stay silent, and it can only know that by comparing symbols: the walk
 			// pre-filters on the identifier's text, so name matching alone would see the inner
 			// write and report.
 			//
 			// Added after a mutant dropping the symbol comparison survived the whole corpus. The
-			// corpus has shadowing cases, but in all of them the inner binding is never WRITTEN,
+			// corpus has shadowing cases, but in all of them the inner binding is never written,
 			// so the pre-filter and the symbol test agree on every one. Three shapes, measured
 			// clean on the installed build, paired with a reporting control in the firing test.
 			sourceText: "let x: string;\n{ let x = 1; x = 2; }\nx! ?? '';",
@@ -264,12 +264,12 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 			sourceText: "let x: string;\nfunction g() { let x = 1; x = 2; }\nx! ?? '';",
 		},
 		{
-			// The shadow is a PARAMETER rather than a declaration, which reaches the same
+			// The shadow is a parameter rather than a declaration, which reaches the same
 			// comparison through a different node kind.
 			sourceText: "let x: string;\nfunction g(x: number) { x = 2; }\nx! ?? '';",
 		},
 		{
-			// A declaration that carries a value but sits BELOW the assertion. Upstream compares
+			// A declaration that carries a value but sits below the assertion. Upstream compares
 			// end positions on the definition half as well as the reference half, so a hoisted
 			// `var` initialized later does not count as an assignment before this point.
 			//
@@ -293,7 +293,7 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 			sourceText: "function f(x?: string) { return x! ?? ''; }",
 		},
 		{
-			// A shadowing inner binding with no value. Resolving to the OUTER one would see its initializer and report, so this pins that the symbol comparison picks the right binding.
+			// A shadowing inner binding with no value. Resolving to the outer one would see its initializer and report, so this pins that the symbol comparison picks the right binding.
 			sourceText: "let x = 1;\n{ let x: string; x! ?? ''; }",
 		},
 		{
@@ -314,7 +314,7 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 // divergences.
 //
 // The parenthesized row is here because the rule was wrong about it. The doc comment argued that a
-// direct-child selector cannot match through parentheses, which is true of a tree that HAS a
+// direct-child selector cannot match through parentheses, which is true of a tree that has a
 // parenthesized node and false of estree, so upstream reports and this port was silently missing it.
 // The same mistake in the same batch cost a sibling rule a false negative, which is why both now
 // carry a measurement rather than an argument.
@@ -354,7 +354,7 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(te
 			wantSuggestion: "declare const foo: any;\nfoo! ?? 1;\n",
 		},
 		{
-			// The control for the three shadowing rows above: the OUTER binding really is written
+			// The control for the three shadowing rows above: the outer binding really is written
 			// before the node, so the same shape reports. Without this, those three would pass
 			// against a rule that had simply stopped finding writes at all.
 			sourceText:     "let x: string;\nx = 'a';\nx! ?? '';",
@@ -396,7 +396,7 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(te
 // TestNoNonNullAssertedNullishCoalescingNeedsTheTypedHarness pins the checker declaration.
 //
 // Upstream reads its scope manager rather than the type checker, so seeing no `getParserServices`
-// in the rule file is not evidence this question can be answered without types HERE. The assignment
+// in the rule file is not evidence this question can be answered without types here. The assignment
 // test resolves an identifier to its binding, which is a checker call in this tree.
 //
 // Under the plain harness the checker is nil and the assignment test answers false, so every

@@ -593,8 +593,8 @@ func (fixture *runCacheFixture) establishHit(arguments ...string) {
 func isRunCacheReplay(output string) bool { return strings.HasPrefix(output, "cached: ") }
 
 // pinGoEnvironment sets the go command's caches and settings in the environment as the caller has them, before
-// TestMain moves HOME. The go command finds its build cache, its module cache and its settings file under
-// HOME, so every test that built this command under the fake home compiled the whole module cold and lost
+// TestMain moves `HOME`. The go command finds its build cache, its module cache and its settings file under
+// `HOME`, so every test that built this command under the fake home compiled the whole module cold and lost
 // the house's -trimpath: about a minute per package run, the most of command/cohere's wall (#nxgt2ca). A
 // variable the caller already set is left as it is.
 func pinGoEnvironment() {

@@ -24,10 +24,10 @@ const switchExhaustivenessFile = "switchExhaustiveness.ts"
 // the reason the code would be wrong. Every source string and every option value below came out of
 // that parse.
 //
-// FIVE of upstream's valid cases are excluded, and TestSwitchExhaustivenessCheckExclusionsAreStated
+// Five of upstream's valid cases are excluded, and TestSwitchExhaustivenessCheckExclusionsAreStated
 // names each one and why, so that this is a stated trim rather than a quiet one.
 //
-// The set is more pointed than its size suggests, because the OPTIONS are half the corpus: the same
+// The set is more pointed than its size suggests, because the options are half the corpus: the same
 // switch appears here as silent and in the invalid table as reporting, differing only in which
 // option was set. A port that ignored options entirely would fail both tables rather than neither.
 func TestSwitchExhaustivenessCheckStaysSilent(test *testing.T) {
@@ -710,7 +710,7 @@ switch (value) {
 // asserting fifty-one findings in upstream's own order. The fifty-second case needs a second file
 // and has its own test below.
 //
-// FOUR of these inputs report TWICE on one switch statement, once for a missing literal branch and
+// Four of these inputs report twice on one switch statement, once for a missing literal branch and
 // once for the missing default, because `checkSwitchExhaustive` and `checkSwitchNoUnionDefaultCase`
 // are independent checks over one shared metadata value and both can fire on the same node. A
 // fixture asserting a single id per input would have passed while silently dropping half the
@@ -721,7 +721,7 @@ switch (value) {
 // reachable, which TestSwitchExhaustivenessCheckShipsNoRepairs pins from the other direction.
 //
 // Two of these sources are written as interpreted Go strings rather than raw ones, because the
-// TypeScript they contain has BACKTICKS in an enum member name and a Go raw literal cannot hold
+// TypeScript they contain has backticks in an enum member name and a Go raw literal cannot hold
 // one. Upstream writes them as concatenations for the same reason. They are here rather than
 // dropped because an enum key that is a template literal, or one containing an escaped quote, is
 // exactly the shape a name-based implementation would mishandle and a type-identity-based one
@@ -1368,7 +1368,7 @@ switch (value) {
 // TestSwitchExhaustivenessCheckResolvesAnEnumAcrossAModuleBoundary is upstream's one case that a
 // single-file harness cannot pose at all.
 //
-// The discriminant's type is `A.B`, a namespaced enum declared in ANOTHER file, and the single case
+// The discriminant's type is `A.B`, a namespaced enum declared in another file, and the single case
 // covers `A.B.C` while `A.B.D` is missing. Answering that needs the import resolved, the namespace
 // entered, and the enum's members enumerated through the checker, so a finding here proves cross-file
 // type resolution rather than a lucky local guess.
@@ -1494,7 +1494,7 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(test *testing.T) {
 
 // TestSwitchExhaustivenessCheckShipsNoRepairs pins the absence of fixes and suggestions.
 //
-// This is the one rule in the tsgolint family whose repair would WRITE NEW CODE — adding a missing
+// This is the one rule in the tsgolint family whose repair would write new code — adding a missing
 // `case` clause rather than deleting or rewriting an existing one — so the porting brief expected
 // repairs here and warned that `rule_testing` applies fixes but not suggestions. It ships neither.
 // `buildAddMissingCasesMessage` is declared and never called, every one of upstream's expected
@@ -1529,7 +1529,7 @@ switch (literal) {
 	}
 }
 
-// TestSwitchExhaustivenessCheckReportsTheDiscriminantNotTheStatement asserts the SPAN.
+// TestSwitchExhaustivenessCheckReportsTheDiscriminantNotTheStatement asserts the span.
 //
 // `upstream.Adapt` was passing raw `node.Loc`, which includes leading trivia, so an indented
 // finding began at the end of the previous line and carried a newline and the indentation into its
@@ -1538,7 +1538,7 @@ switch (literal) {
 // range shows it. It reaches a user as a caret pointing at the wrong line.
 //
 // The anchor matters as much as the trim. Two of this rule's three checks report on
-// `node.Expression`, the DISCRIMINANT, not on the switch statement and not on the case clause. A
+// `node.Expression`, the discriminant, not on the switch statement and not on the case clause. A
 // port that reported the statement would produce a finding spanning the entire switch body, which
 // no id assertion could see, so this pins the exact text.
 func TestSwitchExhaustivenessCheckReportsTheDiscriminantNotTheStatement(test *testing.T) {
@@ -1567,9 +1567,9 @@ function run() {
 	}
 }
 
-// TestSwitchExhaustivenessCheckReportsTheDefaultClauseForADangerousDefault pins the OTHER anchor.
+// TestSwitchExhaustivenessCheckReportsTheDefaultClauseForADangerousDefault pins the other anchor.
 //
-// `checkSwitchUnnecessaryDefaultCase` reports on the default CLAUSE rather than on the
+// `checkSwitchUnnecessaryDefaultCase` reports on the default clause rather than on the
 // discriminant, so this rule has two distinct report anchors and an id assertion cannot tell them
 // apart. Pinning only the discriminant would leave the second one free to point anywhere.
 //
@@ -1608,17 +1608,17 @@ switch (literal) {
 	}
 }
 
-// TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker pins the declarations AND the nil guard.
+// TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker pins the declarations and the nil guard.
 //
 // The standing advice is that a type-aware listener opens with `if ctx.TypeChecker == nil { return }`.
 // While this rule was adapted that could not be followed: the listener was upstream's vendored code,
 // and editing it was exactly what would have turned a future re-sync from a diff into a merge, so
 // the declaration `upstream.Adapt` set unconditionally was the only guard available. Absorbing the
-// rule made the listener ours to edit and made the nil case REACHABLE, so both halves are asserted.
+// rule made the listener ours to edit and made the nil case reachable, so both halves are asserted.
 //
 // The vacuous direction is the dangerous one and it is worse for this rule than for its siblings.
 // Handed no checker the rule does not panic, it reports nothing — and forty-nine of the
-// ninety-seven imported cases in this file are CLEAN cases, which would all still pass. Half the
+// ninety-seven imported cases in this file are clean cases, which would all still pass. Half the
 // suite would keep proving something and half would be proving nothing, which reads as a healthy
 // suite.
 func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(test *testing.T) {
@@ -1657,10 +1657,10 @@ func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(test *testing.T) {
 // upstream's struct carries no JSON tags. That is a property of the standard library, so it is
 // measured here rather than trusted.
 //
-// The distinction that makes this worth a test rather than a comment is the DEFAULT. Two of the
+// The distinction that makes this worth a test rather than a comment is the default. Two of the
 // three live options default to a value that is not the zero value, so the fields must stay
-// POINTERS: a plain `bool` could not separate "the user wrote false" from "the user wrote nothing",
-// and `allowDefaultCaseForExhaustiveSwitch` defaults to TRUE. Flattening them would silently invert
+// pointers: a plain `bool` could not separate "the user wrote false" from "the user wrote nothing",
+// and `allowDefaultCaseForExhaustiveSwitch` defaults to true. Flattening them would silently invert
 // that option for every user who did not set it.
 func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) {
 	test.Parallel()
@@ -1707,15 +1707,15 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) 
 // Nine of upstream's hundred and six cases are excluded, in two groups, and neither group is a
 // judgment of mine about what matters.
 //
-// SIX are tsgolint's own `Skip: true` cases, every one of them a `DefaultCaseCommentPattern` case
+// Six are tsgolint's own `Skip: true` cases, every one of them a `DefaultCaseCommentPattern` case
 // marked `TODO(port): add support for DefaultCaseCommentPattern`. The feature exists here now
 // (#6esg2nx), and those six are carried, from typescript-eslint 8.71.0's test file and replayed
 // through its rule, in TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment rather than here.
 //
-// THREE need `noUncheckedIndexedAccess`, which changes `x[0]` on a `string[]` from `string` to
+// Three need `noUncheckedIndexedAccess`, which changes `x[0]` on a `string[]` from `string` to
 // `string | undefined` and is therefore the entire point of those cases. `rule_testing`'s tsconfig is a
 // hardcoded constant with no per-test override, so under our config the discriminant is plain
-// `string`, no undefined member is ever missing, and all three would assert the OPPOSITE of
+// `string`, no undefined member is ever missing, and all three would assert the opposite of
 // upstream while looking like ordinary passes. That is exactly the shape the porting brief warns
 // about, arriving through a compiler flag rather than through `lib`. Dropping them is the honest
 // answer; keeping them under a config that changes their meaning is the failure this whole exercise
@@ -1724,7 +1724,7 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) 
 // The three are recorded here as source rather than as prose so a later reader can restore them
 // the moment `rule_testing` grows a per-test tsconfig, and so the claim that they behave differently
 // under our config is checkable rather than asserted. Each one is run below: upstream expects the
-// first two to be SILENT and the third to REPORT, and under our tsconfig the first two are silent
+// first two to be silent and the third to report, and under our tsconfig the first two are silent
 // for the wrong reason and the third is silent outright.
 func TestSwitchExhaustivenessCheckExclusionsAreStated(test *testing.T) {
 	test.Parallel()
@@ -1745,7 +1745,7 @@ function foo(x: string[]) {
 
 	rule_testing.ExpectClean(test, reportsOnlyUnderNoUncheckedIndexedAccess)
 
-	// Upstream's first valid case for the same flag passes here too, and that is the QUIET half of
+	// Upstream's first valid case for the same flag passes here too, and that is the quiet half of
 	// the danger: it is silent for a different reason than upstream's. With the flag, `x[0]` is
 	// `string | undefined` and `case undefined` is what covers the undefined member. Without it,
 	// `x[0]` is plain `string`, there is no undefined member to cover, and the `case undefined` arm
@@ -1763,18 +1763,18 @@ function foo(x: string[]) {
 }
 `, nil))
 
-	// Upstream's second valid case is the LOUD half, and it is the one that justifies this whole
+	// Upstream's second valid case is the loud half, and it is the one that justifies this whole
 	// test existing rather than a paragraph of prose.
 	//
-	// Upstream expects SILENCE. Under our tsconfig it REPORTS. With the flag, `const a = x[0]` is
+	// Upstream expects silence. Under our tsconfig it reports. With the flag, `const a = x[0]` is
 	// `string | undefined`, the `typeof a === 'string'` early return narrows `a` to `undefined` at
 	// the switch, and `case a` therefore covers the `undefined` member of `y`. Without the flag `a`
 	// is plain `string`, the early return narrows it to `never`, `case a` covers nothing, and the
 	// `undefined` member of `string | undefined` is reported missing.
 	//
 	// So this case does not merely prove something different under our config, it asserts the exact
-	// OPPOSITE of upstream. Dropped into the valid table unchanged it would have been a red test
-	// telling a true story badly; dropped into the invalid table it would have been a GREEN test
+	// opposite of upstream. Dropped into the valid table unchanged it would have been a red test
+	// telling a true story badly; dropped into the invalid table it would have been a green test
 	// encoding a behavior upstream does not have. Measured rather than reasoned about, and recorded
 	// here in the direction our harness actually produces.
 	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(

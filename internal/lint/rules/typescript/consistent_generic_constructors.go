@@ -102,9 +102,9 @@ func consistentGenericConstructorsOptionsFor(mode string) (any, error) {
 // # Four anchors, and one of them is not a declaration
 //
 // Upstream's selector matches a variable declarator, a property definition, an accessor property,
-// and a DEFAULT PARAMETER of a function declaration or function expression. That last one is easy to
+// and a default parameter of a function declaration or function expression. That last one is easy to
 // miss and the corpus tests it in both modes: `function foo(a: Foo<string> = new Foo()) {}` reports.
-// A default parameter of an ARROW function is deliberately excluded by that selector, and the
+// A default parameter of an arrow function is deliberately excluded by that selector, and the
 // exclusion is reproduced rather than tidied away.
 //
 // # The two sides must name the same thing, which is the whole guard against reporting nonsense
@@ -119,26 +119,26 @@ func consistentGenericConstructorsOptionsFor(mode string) (any, error) {
 // Nine built-in array types are exempt when the annotation names them: `Uint8Array` and its family.
 // Upstream added this because those types became generic over their buffer, so `const a:
 // Uint8Array = new Uint8Array()` and `new Uint8Array<ArrayBuffer>()` are not interchangeable the way
-// `Map` is. The exemption applies only when the name resolves to the GLOBAL, so a locally declared
+// `Map` is. The exemption applies only when the name resolves to the global, so a locally declared
 // `class Uint8Array` is still reported. Reproduced here through the checker rather than through
 // ESLint's scope analysis, which is the same question asked of a different instrument.
 //
 // # isolatedDeclarations, read from the compiler rather than from the lint config
 //
 // Upstream reads `parserOptions.isolatedDeclarations` and, when it is on, declines to move type
-// arguments ONTO the constructor, because that mode needs the annotation to stay explicit. We do not
+// arguments onto the constructor, because that mode needs the annotation to stay explicit. We do not
 // have that lint-config field, and we do not need it: the real compiler option is on the program, so
 // this reads `ctx.Program.Options().IsolatedDeclarations`. That is the brief's standing instruction
-// that fidelity is to what the rule DECIDES rather than to how it obtains what it needs.
+// that fidelity is to what the rule decides rather than to how it obtains what it needs.
 //
-// It is also the one branch no fixture can reach. `rule_testing` writes its tsconfig AFTER the setup
+// It is also the one branch no fixture can reach. `rule_testing` writes its tsconfig after the setup
 // hook runs and always with the default settings, so a fixture cannot turn the option on; measured,
 // with a setup hook writing its own tsconfig and the rule still seeing the option unset. Recorded in
 // its own test with controls rather than left as an untested claim.
 //
 // # The repair, and the comments it goes out of its way to keep
 //
-// Both directions are FIXES rather than suggestions, matching upstream, because moving type arguments
+// Both directions are fixes rather than suggestions, matching upstream, because moving type arguments
 // between two spellings of the same thing does not change what the code means.
 //
 // Moving them onto the constructor deletes the whole annotation, and an annotation can contain
@@ -166,7 +166,7 @@ var ConsistentGenericConstructors = rule.Rule{
 			// A rule configured as a bare severity reaches here with nil options, so the assertion
 			// fails and the fallback is what `"error"` means.
 			//
-			// EQUIVALENT today, and kept anyway. Measured: a mutant replacing this with the zero
+			// Equivalent today, and kept anyway. Measured: a mutant replacing this with the zero
 			// value changes no verdict, because an empty mode is not the type-annotation mode and
 			// therefore falls into the constructor branch, which is already the default. So the
 			// line is load-bearing only against a future change to which mode is default, and that
@@ -192,19 +192,19 @@ var ConsistentGenericConstructors = rule.Rule{
 				return
 			}
 
-			// When there IS an annotation it has to name the same thing as the callee, otherwise
+			// When there is an annotation it has to name the same thing as the callee, otherwise
 			// moving type arguments across would produce code that does not compile.
 			//
 			// Parentheses are unwrapped first, because estree has no parenthesized-type node and
-			// ours does. Measured: `const a: (Foo<string>) = new Foo();` REPORTS on the installed
+			// ours does. Measured: `const a: (Foo<string>) = new Foo();` reports on the installed
 			// build and was silent here until this unwrap existed. The corpus writes no
 			// parenthesized annotation anywhere, so nothing imported could see it.
 			//
 			// This is the mirror of the same hazard in expression position: unwrap before a
-			// question you put to a node KIND, which this is, and never before one you put to the
+			// question you put to a node kind, which this is, and never before one you put to the
 			// checker.
 			//
-			// The OUTER node is kept for the deletion range and the unwrapped one is used for every
+			// The outer node is kept for the deletion range and the unwrapped one is used for every
 			// question about the type, because the parentheses are part of what gets deleted:
 			// deleting only the inner reference leaves `const a) = new Foo<string>()`.
 			unwrappedAnnotation := skipParenthesesInTypeSafely(typeAnnotation)
@@ -262,7 +262,7 @@ var ConsistentGenericConstructors = rule.Rule{
 
 		checkPropertyLike := func(node *ast.Node) {
 			// A class property attaches its annotation to the property itself rather than to a
-			// separate binding name, so the host for a new annotation is the KEY.
+			// separate binding name, so the host for a new annotation is the key.
 			check(node, node.Name(), node.Type(), node.Initializer())
 		}
 
@@ -272,7 +272,7 @@ var ConsistentGenericConstructors = rule.Rule{
 			ast.KindParameter: func(node *ast.Node) {
 				// Upstream's selector is
 				// `:matches(FunctionDeclaration,FunctionExpression) > AssignmentPattern`, and the
-				// set of parents that names is WIDER than it reads, which cost this port two
+				// set of parents that names is wider than it reads, which cost this port two
 				// fixtures. In estree a class method and a constructor are a MethodDefinition whose
 				// `value` is a FunctionExpression, so a default parameter of either matches the
 				// second branch. Measured against the installed build:
@@ -327,7 +327,7 @@ func reportPreferTypeAnnotation(ruleContext rule.Context, node *ast.Node, annota
 
 // reportPreferConstructor moves the type arguments from the annotation onto the constructor.
 //
-// The annotation is deleted whole, which is why any comment inside it that is NOT inside the type
+// The annotation is deleted whole, which is why any comment inside it that is not inside the type
 // arguments has to be carried over: deleting it would silently drop something a person wrote, and
 // this repair is a fix rather than a suggestion, so nobody is watching when it lands.
 func reportPreferConstructor(ruleContext rule.Context, node *ast.Node, typeAnnotation *ast.Node,
@@ -340,7 +340,7 @@ func reportPreferConstructor(ruleContext rule.Context, node *ast.Node, typeAnnot
 	argumentsRange := typeArgumentListRange(ruleContext, annotationArguments)
 	calleeRange := rule.TokenRange(ruleContext.SourceFile, callee)
 
-	// Everything written after the callee lands at ONE offset, so it is assembled as a single
+	// Everything written after the callee lands at one offset, so it is assembled as a single
 	// string rather than as several insertions. Two separate defects came from not doing that:
 	// appending the parentheses as their own fix wrote `new Foo()<number>`, and appending the
 	// comments as their own fixes put them after the type arguments and in reverse.
@@ -350,11 +350,11 @@ func reportPreferConstructor(ruleContext rule.Context, node *ast.Node, typeAnnot
 	insertion := ""
 
 	// Comments inside the annotation but outside the type arguments. The annotation is deleted
-	// whole, so without this they vanish, and this repair is a FIX rather than a suggestion, so
+	// whole, so without this they vanish, and this repair is a fix rather than a suggestion, so
 	// nobody is watching when it lands.
 	//
 	// `comments.ForFile` rather than `type_checking.GetCommentsInRange`, and that is measured
-	// rather than preferred. The latter reads only the leading and trailing trivia AT its range's
+	// rather than preferred. The latter reads only the leading and trailing trivia at its range's
 	// start position, so over `: /* comment */ Foo/* another */ <string>` it yields nothing and
 	// both of upstream's comment cases lost their comments silently while every message-id
 	// assertion stayed green. `ForFile` is a cached whole-file scan, so the cost is shared with
@@ -393,7 +393,7 @@ func typeReferenceTypeArguments(typeAnnotation *ast.Node) *ast.NodeList {
 	return typeAnnotation.AsTypeReferenceNode().TypeArguments
 }
 
-// typeArgumentListRange spans a type argument list INCLUDING its angle brackets.
+// typeArgumentListRange spans a type argument list including its angle brackets.
 //
 // The list's own positions cover the arguments and not the brackets, and the brackets are exactly
 // what makes the copied text a usable type argument list at its destination. Found by scanning
@@ -423,7 +423,7 @@ func typeArgumentListRange(ruleContext rule.Context, typeArguments *ast.NodeList
 
 // typeAnnotationRangeIncludingColon spans an annotation together with the colon that introduces it.
 //
-// Upstream deletes `lhs.parent`, which in estree is the TSTypeAnnotation node and starts AT the
+// Upstream deletes `lhs.parent`, which in estree is the TSTypeAnnotation node and starts at the
 // colon. Our parser has no such node: the annotation is the type itself, hanging off the declaration,
 // so the colon has to be found by scanning back. Without it the repair leaves a dangling `:`.
 func typeAnnotationRangeIncludingColon(ruleContext rule.Context, typeAnnotation *ast.Node) core.TextRange {
@@ -457,7 +457,7 @@ var consistentGenericConstructorsBuiltInArrays = map[string]struct{}{
 	"Uint8ClampedArray": {},
 }
 
-// isExemptBuiltInArray answers upstream's `isBuiltInArray`: the name is one of the nine AND it
+// isExemptBuiltInArray answers upstream's `isBuiltInArray`: the name is one of the nine and it
 // resolves to the global rather than to something declared in the file.
 //
 // The resolution half is load-bearing rather than defensive. Upstream asks ESLint's scope analysis

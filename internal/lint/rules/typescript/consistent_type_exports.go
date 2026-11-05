@@ -66,14 +66,14 @@ func messageConsistentTypeExportsMultipleExportsAreTypes(names string) rule.Mess
 //	                                           plus    export { valueC };
 //	export { TypeA as 'string-name', valueC }; keeps the quoted form verbatim
 //
-// The second is why the rendering reads a string specifier's RAW text rather than its cooked value:
+// The second is why the rendering reads a string specifier's raw text rather than its cooked value:
 // re-quoting would change `'a'` into `"a"` and could not represent an escape at all.
 //
 // # Two arms, and only one has exposure in this tree
 //
 // The named-export arm judges `export { ... }`. The star arm judges `export * from './x'` by asking
-// what the OTHER module exports. Measured with a control: this tree holds 88 named exports and 59
-// type exports and ZERO export-star statements, so the star arm finds nothing here and is ported for
+// what the other module exports. Measured with a control: this tree holds 88 named exports and 59
+// type exports and zero export-star statements, so the star arm finds nothing here and is ported for
 // correctness rather than for cleanup.
 //
 // # The star arm reproduces an upstream hack, deliberately
@@ -207,14 +207,14 @@ func consistentTypeExportsClassify(
 			// Upstream's `undefined` case: a specifier whose symbol cannot be resolved is left
 			// alone rather than guessed at, so an unresolvable name never produces a finding.
 			//
-			// This branch is UNREACHABLE through this tree's checker and the verdict is recorded
+			// This branch is unreachable through this tree's checker and the verdict is recorded
 			// rather than the branch deleted. A mutant forcing an unresolved specifier to be
 			// bucketed as type-based survives every fixture, including four written for exactly
 			// this shape, and the reason is that nothing here answers unresolved.
 			//
 			// Traced rather than argued. `export { NotDeclaredAnywhere };` still yields a symbol,
 			// carrying the alias flag and one declaration, which is the specifier itself.
-			// `SkipAlias` then resolves it to a DIFFERENT symbol whose flags include the value bit,
+			// `SkipAlias` then resolves it to a different symbol whose flags include the value bit,
 			// so the recursion answers `(false, true)` and the specifier is bucketed as a value.
 			// Upstream is silent on the same input and so is this rule, by a different route.
 			//
@@ -254,7 +254,7 @@ func consistentTypeExportsSymbolIsTypeBased(ruleContext rule.Context, symbol *as
 	// the checker's `unknownSymbol` is an unexported field with no linkname. The nil check above
 	// covers the shape that matters, because an unresolvable name gives no symbol at all here
 	// rather than the placeholder one. Stated rather than silently dropped; the residual gap is a
-	// name that resolves TO the placeholder, which would be read as type-based and reported. No
+	// name that resolves to the placeholder, which would be read as type-based and reported. No
 	// corpus case and no measured shape reaches it, and the failure direction is a false positive
 	// on source that already fails to compile.
 
@@ -287,7 +287,7 @@ func consistentTypeExportsSymbolIsTypeBased(ruleContext rule.Context, symbol *as
 // each declaration type: an import clause spells its own type-only-ness as a phase modifier rather
 // than a boolean, which a hand-written switch gets wrong and this does not.
 //
-// The specifier arms then walk UP as well, because a specifier inside `export type { A }` is
+// The specifier arms then walk up as well, because a specifier inside `export type { A }` is
 // type-only through its parent rather than through its own flag.
 func consistentTypeExportsIsTypeOnlyImportOrExport(node *ast.Node) bool {
 	if node == nil {
@@ -517,7 +517,7 @@ func consistentTypeExportsInlineSpecifierFixes(
 
 // consistentTypeExportsSpecifierList renders a run of specifiers as `a, b as c`.
 func consistentTypeExportsSpecifierList(ruleContext rule.Context, specifiers []*ast.Node) (string, bool) {
-	// BUCKET order rather than source order, which is upstream's and is measured rather than
+	// Bucket order rather than source order, which is upstream's and is measured rather than
 	// assumed. `fixSeparateNamedExports` concatenates `[...typeBasedSpecifiers,
 	// ...inlineTypeSpecifiers]`, so every name the checker found follows in source order and every
 	// name already carrying an inline `type` comes after them all.
@@ -545,11 +545,11 @@ func consistentTypeExportsSpecifierList(ruleContext rule.Context, specifiers []*
 // consistentTypeExportsSpecifierText is upstream's `getSpecifierText`.
 //
 // `local` alone when the two names agree, and `local as exported` when they differ. A string-literal
-// name is rendered from its RAW source text rather than its cooked value, which upstream does with
+// name is rendered from its raw source text rather than its cooked value, which upstream does with
 // `.raw`: re-quoting a cooked value would change the quote character and could not represent an
 // escape at all.
 //
-// The inline `type` keyword is deliberately NOT rendered. A specifier moved into an `export type`
+// The inline `type` keyword is deliberately not rendered. A specifier moved into an `export type`
 // statement no longer needs it, and one left behind was never type-only.
 func consistentTypeExportsSpecifierText(ruleContext rule.Context, specifier *ast.Node) (string, bool) {
 	element := specifier.AsExportSpecifier()
@@ -577,7 +577,7 @@ func consistentTypeExportsSpecifierText(ruleContext rule.Context, specifier *ast
 
 // consistentTypeExportsLocalName is the name upstream puts in the message.
 //
-// Upstream reads `specifier.local`, which is the ORIGINAL name rather than the alias, and takes a
+// Upstream reads `specifier.local`, which is the original name rather than the alias, and takes a
 // string literal's cooked `value` here where the fixer takes its raw text. Both are reproduced as
 // written: the message names what the reader wrote on the left of `as`.
 func consistentTypeExportsLocalName(ruleContext rule.Context, specifier *ast.Node) (string, bool) {
@@ -653,7 +653,7 @@ func consistentTypeExportsModuleSpecifierText(ruleContext rule.Context, statemen
 // reportConsistentTypeExportsStar is upstream's `ExportAllDeclaration` visitor.
 //
 // It asks whether the module being re-exported has any value export at all, and reports when it does
-// not. The question is answered through the module symbol's TYPE rather than through its export
+// not. The question is answered through the module symbol's type rather than through its export
 // table, because that is the only route that distinguishes a type-only star re-export; see the note
 // on the rule.
 func reportConsistentTypeExportsStar(
@@ -698,7 +698,7 @@ func reportConsistentTypeExportsStar(
 
 // consistentTypeExportsStarFix inserts `type ` before the asterisk.
 //
-// The asterisk has to be found as a TOKEN rather than as a byte, and the difference is not
+// The asterisk has to be found as a token rather than as a byte, and the difference is not
 // theoretical: upstream's own corpus writes an export-star with a block comment between `export` and
 // `*`, so the first `*` in the statement belongs to `/* comment 2 */`. Scanning bytes put the
 // keyword inside the comment and produced `/type * comment 2 */ *`, which is neither valid nor what

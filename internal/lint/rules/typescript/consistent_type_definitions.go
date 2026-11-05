@@ -93,7 +93,7 @@ func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
 //	invalid: type T = { x: number };              under 'interface'
 //	invalid: interface I { x: number }            under 'type'
 //
-// # Only an object LITERAL body is interchangeable, which is what the selector says
+// # Only an object literal body is interchangeable, which is what the selector says
 //
 // Upstream's listener key is the esquery selector
 // `TSTypeAliasDeclaration[typeAnnotation.type='TSTypeLiteral']`, and the filter is the whole point:
@@ -104,7 +104,7 @@ func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
 //
 // # The fixer is the port, and its shape is dictated by tokens rather than nodes
 //
-// Both repairs rewrite the KEYWORDS around a declaration rather than any node's own text, so both
+// Both repairs rewrite the keywords around a declaration rather than any node's own text, so both
 // are built from spans computed against the source rather than from `ReplaceNode`. Upstream reaches
 // them through `sourceCode.getTokenBefore`; there is no token list here, so each span is found by
 // scanning the declaration's own text, which cannot run past the declaration.
@@ -118,9 +118,9 @@ func DecodeConsistentTypeDefinitionsOptions(raw []byte) (any, error) {
 // after the body (`interface I extends A {}` -> `type I = {} & A`), and a default-exported
 // interface has to be split, because `export default type I = ...` is not legal syntax.
 //
-// # `declare global` is a deliberate DECLINE, not a missing case
+// # `declare global` is a deliberate decline, not a missing case
 //
-// An interface inside `declare global` is reported and NOT fixed. Upstream returns a null fixer
+// An interface inside `declare global` is reported and not fixed. Upstream returns a null fixer
 // there, citing its own issue 2707: a type alias inside a global augmentation does not do what the
 // interface did, so the repair would change meaning rather than spelling. Two corpus cases carry
 // `output: null` for exactly this, and the installed build was driven over both to confirm the
@@ -160,7 +160,7 @@ func checkConsistentTypeDefinitionsAlias(ruleContext rule.Context, node *ast.Nod
 	// Upstream's `[typeAnnotation.type='TSTypeLiteral']`. A union, a primitive or a reference is not
 	// expressible as an interface and is left alone.
 	//
-	// The parentheses are looked THROUGH, which upstream gets for free and this tree does not.
+	// The parentheses are looked through, which upstream gets for free and this tree does not.
 	// typescript-go keeps `(...)` as a `KindParenthesizedType` node and nests one per pair, where
 	// ESTree drops them entirely -- so upstream's selector sees `TSTypeLiteral` directly on
 	// `type Foo = ({ a: string })` and a kind check here sees `KindParenthesizedType`. Measured with
@@ -218,7 +218,7 @@ func consistentTypeDefinitionsAliasFixes(
 
 	// Everything from the end of whatever precedes the `=` through the start of the body becomes a
 	// single space. Upstream computes this as [beforeEqualsToken.end, typeAnnotation.start] so that
-	// a comment sitting before the `=` survives, which is why the left edge is the token BEFORE the
+	// a comment sitting before the `=` survives, which is why the left edge is the token before the
 	// equals rather than the equals itself.
 	equals := consistentTypeDefinitionsEqualsBefore(text, statement, bodyRange.Pos())
 	if equals < 0 {
@@ -306,7 +306,7 @@ func consistentTypeDefinitionsInterfaceFixes(ruleContext rule.Context, node *ast
 	// An `extends` clause becomes an intersection appended after the body, because a type alias has
 	// no heritage syntax.
 	//
-	// Built as ONE insertion rather than one per heritage type, and that is load-bearing rather than
+	// Built as one insertion rather than one per heritage type, and that is load-bearing rather than
 	// tidy. Upstream emits a separate `insertTextAfter` per type and ESLint applies same-position
 	// insertions in the order proposed; the edit engine here applies fixes back to front so that an
 	// earlier replacement cannot move offsets a later one was computed against, which reverses a run
@@ -457,7 +457,7 @@ func consistentTypeDefinitionsIsWordByte(b byte) bool {
 
 // consistentTypeDefinitionsEqualsBefore finds the `=` that introduces an alias's body.
 //
-// Searched BACKWARD from the body, which is what makes it the right `=`: a default in a type
+// Searched backward from the body, which is what makes it the right `=`: a default in a type
 // parameter list (`type T<U = string> = {...}`) puts an earlier `=` in the statement, and a forward
 // scan would find that one and produce a repair that deletes the parameter list.
 func consistentTypeDefinitionsEqualsBefore(text string, statement core.TextRange, bodyStart int) int {

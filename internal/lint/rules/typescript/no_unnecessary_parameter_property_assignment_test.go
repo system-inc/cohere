@@ -34,8 +34,8 @@ func parameterPropertyCaseName(number int) string {
 // The clean cases are the whole discrimination and each one fails for a different reason.
 //
 // Two are worth naming, because a wrong port passes all the others without them. Case 15
-// (`this.bar = () => { this.foo = foo; }`) is clean because the enclosing ASSIGNMENT is a dead end
-// in upstream's visitor, NOT because arrows are skipped, and reading it the other way is the single
+// (`this.bar = () => { this.foo = foo; }`) is clean because the enclosing assignment is a dead end
+// in upstream's visitor, not because arrows are skipped, and reading it the other way is the single
 // most available wrong conclusion here. Case 23 (a block redeclaring `foo`) is the only case in the
 // corpus that turns on resolving the identifier rather than matching its spelling.
 func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(test *testing.T) {
@@ -135,7 +135,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentFires(test *testing.T) {
 //
 // A repair writing the right string over the wrong span passes a text comparison, so these apply
 // every suggestion back to front and compare the resulting source with upstream's own after-text.
-// Upstream ships these as SUGGESTIONS rather than fixes, which is why `ExpectFixedSource` cannot be
+// Upstream ships these as suggestions rather than fixes, which is why `ExpectFixedSource` cannot be
 // used at all: it applies `Fixes`, and this rule proposes none. The applier is hand-rolled below.
 func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(test *testing.T) {
 	test.Parallel()
@@ -326,7 +326,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *t
 		sourceText string
 	}{
 		{
-			// `override` is in upstream's `has_modifier` and is NOT in
+			// `override` is in upstream's `has_modifier` and is not in
 			// `ModifierFlagsAccessibilityModifier`, so a port reaching for the accessibility flag
 			// alone goes silent here. Measured: reports.
 			"an override parameter",
@@ -343,14 +343,14 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *t
 			"class Foo {\n  constructor(public foo: string) {\n    this.foo = (foo);\n  }\n}\n",
 		},
 		{
-			// A prior write to the PARAMETER does not rescue the assignment, because upstream's
+			// A prior write to the parameter does not rescue the assignment, because upstream's
 			// bookkeeping records only `this.X` targets. The property and the parameter genuinely
 			// differ here and upstream reports anyway. Measured: reports. Reproduced deliberately.
 			"a parameter reassigned before the property assignment",
 			"class Foo {\n  constructor(public foo: string) {\n    foo = foo.trim();\n    this.foo = foo;\n  }\n}\n",
 		},
 		{
-			// The arrow case that the corpus's clean version hides. An arrow NOT under an
+			// The arrow case that the corpus's clean version hides. An arrow not under an
 			// assignment is descended into, because arrows keep `this`. Measured: reports. A port
 			// that skipped arrows passes every imported fixture and goes silent here.
 			"an arrow passed to a call",
@@ -364,20 +364,20 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *t
 		},
 		{
 			// The parenthesized arrow expression body. Upstream unwraps parentheses on the
-			// initializer and on the callee and NOWHERE ELSE, so this assignment is not recognized
-			// by the class body scan and the constructor still reports. Measured: REPORTS, while
+			// initializer and on the callee and nowhere else, so this assignment is not recognized
+			// by the class body scan and the constructor still reports. Measured: reports, while
 			// the identical form without the inner parentheses is silent. A port that helpfully
 			// unwrapped here passes every imported fixture and goes silent on this.
 			"a parenthesized assignment in an arrow expression body",
 			"class Foo {\n  constructor(public foo: number) {\n    this.foo = foo;\n  }\n  init = (() => (this.foo = 1))();\n}\n",
 		},
 		{
-			// The same divergence through the block arm. Measured: REPORTS.
+			// The same divergence through the block arm. Measured: reports.
 			"a parenthesized assignment in an arrow block body",
 			"class Foo {\n  constructor(public foo: number) {\n    this.foo = foo;\n  }\n  init = (() => { (this.foo = 1); })();\n}\n",
 		},
 		{
-			// A sibling method assigning the same property does NOT suppress, because the class
+			// A sibling method assigning the same property does not suppress, because the class
 			// body scan reads property definitions only. Measured: reports.
 			"a sibling method assigning the same property",
 			"class Foo {\n  constructor(public foo: number) {\n    this.foo = foo;\n  }\n  m() { this.foo = 2; }\n}\n",
@@ -400,12 +400,12 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *t
 		{
 			// The other half of the parenthesis measurement, and the direction a free "skip
 			// parentheses everywhere" improvement gets wrong. Upstream matches the `this` object by
-			// kind with no unwrapping. Measured on the release binary: SILENT.
+			// kind with no unwrapping. Measured on the release binary: silent.
 			"a parenthesized this object",
 			"class Foo {\n  constructor(public foo: string) {\n    (this).foo = foo;\n  }\n}\n",
 		},
 		{
-			// The bare arrow expression body, which IS recognized. This is the other half of the
+			// The bare arrow expression body, which is recognized. This is the other half of the
 			// paren measurement above and the reason the divergence is about parentheses rather
 			// than about expression bodies. Measured: silent.
 			"a bare assignment in an arrow expression body",
@@ -417,7 +417,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *t
 			"class Foo {\n  constructor(public foo: number) {\n    this.foo = foo;\n  }\n  init = (() => { this.foo = 1; })();\n}\n",
 		},
 		{
-			// A property definition BELOW the constructor suppresses just as one above it does, so
+			// A property definition below the constructor suppresses just as one above it does, so
 			// the class body scan is position independent. Measured: silent.
 			"a property initializer assigning the same property below the constructor",
 			"class Foo {\n  constructor(public foo: number) {\n    this.foo = foo;\n  }\n  init = (this.foo = 1);\n}\n",
@@ -431,7 +431,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *t
 			// An arrow parameter shadowing the parameter property. Upstream's symbol cross-check
 			// declines this; the corpus writes no such case, and a mutation making arrow parameters
 			// invisible to the shadow walk survived every other fixture here. Measured on the
-			// release binary: SILENT, while the identical body with the arrow parameter renamed
+			// release binary: silent, while the identical body with the arrow parameter renamed
 			// reports. This is the only shape in the rule where an arrow both keeps `this` and
 			// rebinds the name on the right.
 			"an arrow parameter shadowing the parameter property",
@@ -439,7 +439,7 @@ func TestNoUnnecessaryParameterPropertyAssignmentMeasuredAgainstUpstream(test *t
 		},
 		{
 			// An accessor holds a `Function` upstream, so the same override that stops a method
-			// stops it. Measured on the release binary: SILENT. Nothing in the corpus writes an
+			// stops it. Measured on the release binary: silent. Nothing in the corpus writes an
 			// accessor inside a constructor body.
 			"an object literal getter inside the constructor",
 			"class Foo {\n  constructor(private foo: string) {\n    const o = { get x() { this.foo = foo; return 1; } };\n  }\n}\n",

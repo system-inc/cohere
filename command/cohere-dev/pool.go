@@ -22,10 +22,10 @@ import (
 // tests failed, and Kirk's typing lagged.
 //
 // A token is a slot lock (slot-N.lock in the pool directory), taken in arrival order (queueTicket). Go is
-// held to the token's share twice over: GOFLAGS' -p bounds how many packages it compiles and how many test
-// binaries it runs at once, and GOMAXPROCS bounds the threads each of those processes uses, so a token
-// costs about -p times GOMAXPROCS threads. Both are inherited by every go command a test or script starts
-// beneath it. GOMAXPROCS alone is not a budget: go's -p defaults to it, so 8 meant up to eight test binaries
+// held to the token's share twice over: `GOFLAGS`' -p bounds how many packages it compiles and how many test
+// binaries it runs at once, and `GOMAXPROCS` bounds the threads each of those processes uses, so a token
+// costs about -p times `GOMAXPROCS` threads. Both are inherited by every go command a test or script starts
+// beneath it. `GOMAXPROCS` alone is not a budget: go's -p defaults to it, so 8 meant up to eight test binaries
 // at eight threads each, and the measured load stayed at 107 to 140 on sixteen cores (#qhg0ntb).
 // A command that already runs under a token, a test that runs go build, say, runs inside its parent's share
 // and takes no second token, which would also deadlock a pool its parent has already filled.
@@ -35,7 +35,7 @@ import (
 // 2026-10-19 a whole-module gate alone on the machine ran 906 CPU-seconds in 4m05s, an average of 3.7 of 16
 // cores, with three tokens free the whole time. One token is always left, so a run that arrives next starts
 // at once rather than waiting out a borrower, and the threads in use never pass the pool's. Go's -p and
-// GOMAXPROCS are fixed when a process starts, so a borrower keeps what it took until its command ends: a run of
+// `GOMAXPROCS` are fixed when a process starts, so a borrower keeps what it took until its command ends: a run of
 // several commands, the landing gate's, rebalances between them (tokenRun), widening when the pool went idle
 // and giving tokens back to anyone who arrived.
 
@@ -49,7 +49,7 @@ const tokensVariable = "COHERE_DEV_TOKENS"
 // packagesVariable sets how many packages each token's run builds or tests at once: go's -p.
 const packagesVariable = "COHERE_DEV_PACKAGES"
 
-// threadsVariable sets how many threads each of those processes may use: GOMAXPROCS.
+// threadsVariable sets how many threads each of those processes may use: `GOMAXPROCS`.
 const threadsVariable = "COHERE_DEV_THREADS"
 
 // heldTokenVariable is set, to the token's number, in the environment of everything a token's run starts.
@@ -63,7 +63,7 @@ const coresVariable = "COHERE_DEV_CORES"
 // The pool's shape: four runs at once, each two packages at a time on two threads, sixteen threads on a
 // sixteen-core machine. Measured in a quiet window on 2026-10-05 replaying the morning's mix, four gates and
 // two builds started at once: this shape finished in 112s at a mean load of 28, against 113s at 119 for
-// four tokens bounded by GOMAXPROCS alone, 130s at 140 for two of eight, and 125s at 191 with no pool, where
+// four tokens bounded by `GOMAXPROCS` alone, 130s at 140 for two of eight, and 125s at 191 with no pool, where
 // all four gates failed on a test's deadline (#qhg0ntb).
 const (
 	defaultTokens   = 4
@@ -224,7 +224,7 @@ func borrowTokens(directory string, shape poolShape, own int, what string) []*he
 }
 
 // tokenRun is a token's run and what it has borrowed, rebalanced before each of its go commands (#fvbwfvh).
-// Go's -p and GOMAXPROCS are fixed when a process starts, so a run's share can only change between its
+// Go's -p and `GOMAXPROCS` are fixed when a process starts, so a run's share can only change between its
 // commands: one that started on a busy pool with one token widens once the pool goes idle, and one holding
 // borrowed tokens gives them back at its next command when anyone is waiting.
 type tokenRun struct {
@@ -385,13 +385,13 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 }
 
 // budgetEnvironment is the environment a token's run starts its commands in: Go held to the token's packages
-// and threads, the caller's other GOFLAGS kept, -trimpath always, and the token named, so a command started
+// and threads, the caller's other `GOFLAGS` kept, -trimpath always, and the token named, so a command started
 // beneath it runs in this share rather than taking another.
 //
 // -trimpath because without it Go keys every compile on the source's directory, so each member's worktree,
 // and each land gate's, compiled cohere from nothing: a fresh worktree's first fast tier took 211s and 1,630s
 // of CPU at a commit the gate had just tested, and 52 to 63s with -trimpath, every package from the shared
-// cache (2026-11-05). The machine's go env sets it, but setting GOFLAGS here overrides that file, so this
+// cache (2026-11-05). The machine's go env sets it, but setting `GOFLAGS` here overrides that file, so this
 // run dropped it until it was written in (#system_cohere_tools).
 //
 // One cost, found by @system_cohere_go on 2026-11-05: under -trimpath the cache key for a main-module package

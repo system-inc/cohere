@@ -42,7 +42,7 @@ import (
 // `rule.TokenRange` both start at the node's first token and end at its end. No
 // predicate, no tri-state and no traversal was touched.
 //
-// The reported SPANS are unchanged, and that is the part worth naming. While this rule was adapted,
+// The reported spans are unchanged, and that is the part worth naming. While this rule was adapted,
 // `upstream.Adapt` wrapped every node report in `rule.TokenRange(SourceFile, node)` because
 // tsgolint's own runner does the same through `utils.TrimNodeTextRange`. Our native
 // `ctx.ReportNodeWithSuggestions` applies exactly that trim itself, so absorbing the rule preserves
@@ -56,13 +56,13 @@ import (
 //
 // oxc has no implementation. Its rule file declares `AwaitThenable(tsgolint)` and delegates, with
 // fifty seven lines carrying documentation and no algorithm. So the behavior oxlint exhibits for
-// this rule IS tsgolint's, literally: the release binary shells out to a `tsgolint` executable and
+// this rule is tsgolint's, literally: the release binary shells out to a `tsgolint` executable and
 // refuses to run the rule when that binary is absent, which is what it does on this machine. All
 // forty eight of tsgolint's own cases are replayed in the test file and all forty eight agree.
 //
 // # The aggregator arm, which tsgolint never had
 //
-// `@typescript-eslint` 8.67.0 carries a FOURTH listener that tsgolint has no counterpart for: a
+// `@typescript-eslint` 8.67.0 carries a fourth listener that tsgolint has no counterpart for: a
 // `CallExpression` arm reporting `invalidPromiseAggregatorInput` when `Promise.all`, `allSettled`,
 // `race` or `any` receives a value that is not a Thenable. tsgolint registers exactly three
 // listeners and predates the feature, so this file first reproduced its absence as silence, to keep
@@ -77,8 +77,8 @@ import (
 // TestAwaitThenableUpstreamCorpus.
 //
 // Two judgments with different quantifiers, both upstream's. An array literal's element reports
-// only when EVERY union part of its constrained type is never awaitable, so `number | Promise<number>`
-// is fine. Any other argument reports when it is iterable and SOME element type (a tuple's members,
+// only when every union part of its constrained type is never awaitable, so `number | Promise<number>`
+// is fine. Any other argument reports when it is iterable and some element type (a tuple's members,
 // an array-like's number index, an `Iterable<T>`'s first type argument) has a part that is never
 // awaitable, so `Promise.all(values)` over `(number | Promise<number>)[]` reports while the same
 // union written inline does not. The asymmetry is upstream's and is reproduced.

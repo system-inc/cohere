@@ -11,7 +11,7 @@ import (
 
 // NoExtraneousClassOptions is the rule's option surface.
 //
-// All four default to FALSE, so the generic decoder would happen to produce the right zero value for
+// All four default to false, so the generic decoder would happen to produce the right zero value for
 // every one of them. The decoder below is hand-rolled anyway: a decoder that silently dropped all
 // four would be indistinguishable from a correct one on every input, and the next key added here may
 // default to true.
@@ -95,14 +95,14 @@ func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
 // # A superclass exempts unconditionally and a decorator does not
 //
 // `parent.superClass` short-circuits with no option behind it, because a subclass inherits behavior
-// and is not a namespace whatever its own body holds. An `implements` clause is NOT a superclass and
+// and is not a namespace whatever its own body holds. An `implements` clause is not a superclass and
 // does not exempt, which our tree spells as a different heritage token rather than a different
 // field, so the check reads the token instead of asking whether a heritage clause exists.
 //
 // # Where our parser spells things differently, and it is most of the member classification
 //
-// Upstream reads ESTree node TYPES to classify a member. Our parser puts the same information in
-// MODIFIERS on two node kinds, so the mapping is not one to one:
+// Upstream reads ESTree node types to classify a member. Our parser puts the same information in
+// modifiers on two node kinds, so the mapping is not one to one:
 //
 //	upstream                          ours
 //	AccessorProperty                  KindPropertyDeclaration + accessor modifier
@@ -121,7 +121,7 @@ func DecodeNoExtraneousClassOptions(raw []byte) (any, error) {
 // `static abstract` and produces a member carrying both modifiers, so the arm is reachable and
 // removing it makes this rule report where upstream is silent.
 //
-// # The finding anchors on the class NAME, or on the whole class when there is none
+// # The finding anchors on the class name, or on the whole class when there is none
 //
 // `parent.id` when the parent is a declaration with a name, and the parent itself otherwise. That
 // second case is reachable: `export default class { static hello() {} }` has no name and is reported
@@ -147,7 +147,7 @@ var NoExtraneousClass = rule.Rule{
 		}
 
 		// judge is shared by the two class kinds, which differ only in whether a name is required.
-		// Upstream anchors on the class BODY and reads its parent; ours has no body node, so the
+		// Upstream anchors on the class body and reads its parent; ours has no body node, so the
 		// listener is on the class itself and the members are read directly.
 		judge := func(node *ast.Node, name *ast.Node, members *ast.NodeList, heritageClauses *ast.NodeList) {
 			if members == nil {
@@ -163,7 +163,7 @@ var NoExtraneousClass = rule.Rule{
 
 			// Upstream's `parent.type === ClassDeclaration && parent.id ? parent.id : parent`.
 			//
-			// Both halves of that test matter and the second is easy to drop. A class EXPRESSION is
+			// Both halves of that test matter and the second is easy to drop. A class expression is
 			// reported on the whole class even when it has a name, because the type test excludes it
 			// before the name is consulted, so `const Foo = class Named { static x() {} }` reports
 			// across the entire expression rather than on `Named`. Measured against the installed
@@ -424,7 +424,7 @@ func classAnchorRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
 // hasSuperclass is upstream's `parent.superClass`.
 //
 // ESTree carries a superclass in its own field, so upstream reads one property. Ours puts both
-// `extends` and `implements` in the same heritage list and separates them by TOKEN, so the token is
+// `extends` and `implements` in the same heritage list and separates them by token, so the token is
 // what has to be read: an `implements` clause is not a superclass and does not exempt, and a check
 // that merely asked whether a heritage list existed would silently exempt every class implementing
 // an interface.
@@ -462,7 +462,7 @@ func hasDecorator(node *ast.Node) bool {
 //
 // ESTree wraps a parameter carrying an accessibility or readonly modifier in its own node type. Ours
 // leaves it a plain parameter and puts the modifier on it, so the question becomes whether the
-// parameter has any of the modifiers that make it a property. A decorator on a parameter does NOT
+// parameter has any of the modifiers that make it a property. A decorator on a parameter does not
 // make one, which is why this names the modifiers rather than asking whether the list is non-empty.
 func constructorDeclaresParameterProperty(constructor *ast.Node) bool {
 	parameters := constructor.AsConstructorDeclaration().Parameters
@@ -506,7 +506,7 @@ func isInstanceLevelClassMember(member *ast.Node) bool {
 		// abstract node types separately only because it cannot express them through its own static
 		// test, and our static test above would cover them on its own.
 		//
-		// It is not dead, and a mutation sweep is what asked the question. Our parser RECOVERS from
+		// It is not dead, and a mutation sweep is what asked the question. Our parser recovers from
 		// the illegal source rather than refusing the member, and hands back a property carrying both
 		// modifiers, in either written order, for properties, methods and accessors alike. Measured
 		// over five parses. Upstream is silent on all of those and reports on a legal static member in

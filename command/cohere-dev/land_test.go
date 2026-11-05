@@ -236,7 +236,7 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(test *testing.T) {
 	}
 }
 
-// The gate runs the same for every landing, whatever the caller's shell sets: GOFLAGS carries only the pool's
+// The gate runs the same for every landing, whatever the caller's shell sets: `GOFLAGS` carries only the pool's
 // -p and -buildvcs=false. A caller's -trimpath once failed a land gate on tests that find their fixtures by
 // their source path.
 func TestTheLandGateIgnoresTheCallersGoFlags(test *testing.T) {

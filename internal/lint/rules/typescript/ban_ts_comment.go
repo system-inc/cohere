@@ -103,7 +103,7 @@ func messageBanTsCommentDescriptionFormat(directive string, pattern string) rule
 //   - A description's length is counted in characters as a reader sees them (getStringLength:
 //     `Intl.Segmenter` graphemes for anything not ASCII, here `text.GraphemeCount`). oxc counted
 //     bytes, so two accented letters passed a minimum of three.
-//   - The description is trimmed as JavaScript trims, which keeps U+0085 and strips U+FEFF; Go's
+//   - The description is trimmed as JavaScript trims, which keeps `U+0085` and strips `U+FEFF`; Go's
 //     `strings.TrimSpace` does the reverse for both.
 //   - A finding covers the whole comment, delimiters included, where oxc's covered its interior.
 //   - Replacing `@ts-ignore` is a suggestion, not a fix, and it rewrites the first occurrence only:
@@ -380,7 +380,7 @@ type BanTsCommentOptions struct {
 	// TsNoCheck defaults to banned.
 	TsNoCheck BanTsCommentSetting
 
-	// TsCheck defaults to ALLOWED. `@ts-check` turns checking on rather than off, so banning it by
+	// TsCheck defaults to allowed. `@ts-check` turns checking on rather than off, so banning it by
 	// default would be backwards, and this is the one default a reader is likely to guess wrong.
 	TsCheck BanTsCommentSetting
 

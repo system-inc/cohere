@@ -29,7 +29,7 @@ var messageNoRedeclareAsBuiltin = rule.Message{
 // NoRedeclareOptions tunes whether a script may redeclare the standard library's globals, and
 // whether TypeScript's legitimate declaration merges are exempt.
 //
-// The wire fields are pointers because both defaults are TRUE. A plain bool cannot tell an absent
+// The wire fields are pointers because both defaults are true. A plain bool cannot tell an absent
 // key from an explicit `false`, and a zero-valued struct would turn every merge exemption off, which
 // silently converts thirteen of upstream's clean cases into findings.
 type NoRedeclareOptions struct {
@@ -90,7 +90,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 //
 // A second declaration of a name does not add a binding, it replaces what the name reaches. In
 // plain JavaScript that is a typo with no diagnostic; in TypeScript it is worse, because the
-// language deliberately allows some of these pairs to MERGE into one thing and the merging ones are
+// language deliberately allows some of these pairs to merge into one thing and the merging ones are
 // spelled exactly like the mistaken ones. `class A {} interface A {}` is one type with extra
 // members and is correct. `class A {} class A {}` is one class silently replacing another and is
 // not. The whole judgment this rule makes is telling those apart.
@@ -99,7 +99,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 //
 // Upstream is a thin caller over `eslint-scope`: it asks `sourceCode.getScope(node)` for a scope,
 // walks `scope.variables`, and reports any variable holding more than one declaration identifier.
-// The scope partition IS the rule. Without one, `function f1() { var x = 1; } function f2() { var x
+// The scope partition is the rule. Without one, `function f1() { var x = 1; } function f2() { var x
 // = 2; }` and `var x = 1; var x = 2;` are the same two declarations of the same name and no
 // syntactic test separates them.
 //
@@ -113,7 +113,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // # Why the obvious predicate does not work, which is the part worth reading
 //
 // The reflex is to ask the checker how many declarations a name has and report when it holds more
-// than one. That answers wrongly in BOTH directions and a port built on it fails quietly:
+// than one. That answers wrongly in both directions and a port built on it fails quietly:
 //
 //	class E {} class E {}                      symbol.Declarations is 1, and this REPORTS
 //	interface I {} interface I {}              symbol.Declarations is 2, and this is CLEAN
@@ -126,7 +126,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // and stopped. The measurement was right and the conclusion did not follow: the count is the wrong
 // question, not a missing answer.
 //
-// So this rule never asks the checker for a count. It groups the declaration NODES by scope and
+// So this rule never asks the checker for a count. It groups the declaration nodes by scope and
 // name from the tree, which cannot lose one, and then applies upstream's merge arithmetic to the
 // kinds in the group. The checker is still needed for the scope partition itself, which is what
 // `ast.GetLocals` reads.
@@ -134,7 +134,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // # The second wrong predicate, recorded because it is the more convincing one
 //
 // Having found that the count collapses for duplicate classes, the natural next move is to compare
-// SYMBOL IDENTITY instead: two duplicate classes resolve to two distinct symbols while a merging
+// symbol identity instead: two duplicate classes resolve to two distinct symbols while a merging
 // pair resolves to one shared symbol, which reads as exactly the discrimination this rule wants. It
 // is not, and it fails in both directions. Measured over the same 23 shapes, identity disagrees
 // with upstream on 7:
@@ -160,7 +160,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // With `ignoreDeclarationMerge` on, a group is exempt when it is all interfaces, all namespaces, or
 // drawn from one of three merge sets with at most one member from the set's "primary" kind: class
 // with interface and namespace, function with namespace, enum with namespace. Past one primary the
-// exemption lapses and only the PRIMARY declarations report, which is why `class A {} class A {}
+// exemption lapses and only the primary declarations report, which is why `class A {} class A {}
 // namespace A {}` reports once rather than twice: the namespace is still a legitimate merge partner
 // and is not what went wrong.
 //
@@ -188,13 +188,13 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 // # builtinGlobals: a script's top level redeclaring the standard library
 //
 // With `builtinGlobals` on, the default, upstream yields a "builtin" declaration first for any name
-// in the GLOBAL scope that ESLint knows as a read-only global, and then every declaration of the name
+// in the global scope that ESLint knows as a read-only global, and then every declaration of the name
 // in the file after it. Two sources make one, and the replay measured both:
 //
 //   - ESLint's own ECMAScript globals for `ecmaVersion: "latest"`, which its Linter declares in every
 //     run whatever the parser: `NaN`, `parseInt`, `toString` and the rest of eslintLatestGlobals.
 //   - The TypeScript lib, which typescript-eslint's scope manager seeds the global scope with, as the
-//     parser derived it from the program's compiler options: every name a lib file declares as a TYPE
+//     parser derived it from the program's compiler options: every name a lib file declares as a type
 //     (an interface, type alias, class, enum or namespace), so `type NodeListOf = 1;` under lib dom
 //     reports. A lib `declare var` alone is a value with no type and the lib generator leaves it out,
 //     which is why `var top = 0;` and `var self = 1;` are clean.
@@ -211,7 +211,7 @@ func DecodeNoRedeclareOptions(raw []byte) (any, error) {
 //     the lib files first, and on a conflicting user declaration `mergeSymbol` keeps the lib's
 //     symbol, so the lib's declarations are still on the global when the user's is not.
 //
-// The arithmetic is upstream's yield order. The builtin is first, so EVERY surviving syntax
+// The arithmetic is upstream's yield order. The builtin is first, so every surviving syntax
 // declaration reports, each as `redeclaredAsBuiltin`, rather than every one after the first. The
 // merge exemption still runs first: two interfaces augmenting a lib interface merge and nothing
 // reports, while a lone augmenting `interface Window {}` in a script reports, because upstream only
@@ -551,7 +551,7 @@ func varScopeContainer(node *ast.Node) *ast.Node {
 // matches upstream: both are `TSDeclareFunction` to it.
 //
 // Named for functions rather than sharing `isOverloadSignature` with `no-dupe-class-members`, which
-// asks the same-sounding question about a class MEMBER and answers for method and accessor kinds
+// asks the same-sounding question about a class member and answers for method and accessor kinds
 // this rule never sees. One name over two domains would have to widen to cover both and would then
 // answer for kinds neither caller wants.
 func isFunctionOverloadSignature(node *ast.Node) bool {

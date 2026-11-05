@@ -204,7 +204,7 @@ func TestConsistentTypeAssertionsStaysSilentOnUpstreamPassCases(test *testing.T)
 // with their own output. A message id assertion sees none of that, and a wrong repair applied
 // unattended is the failure this project has paid for twice tonight.
 //
-// The fix is the angle-bracket to as conversion and it reasons about operator PRECEDENCE to decide
+// The fix is the angle-bracket to as conversion and it reasons about operator precedence to decide
 // parenthesization, so a case like `<string>(foo + bar)` is where a naive text swap breaks. Those
 // rows are in here rather than left to inference.
 func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(test *testing.T) {
@@ -1228,7 +1228,7 @@ func TestConsistentTypeAssertionsFiresOnUpstreamFailCases(test *testing.T) {
 // source, one program per case.
 //
 // The nested-assertion case is asserted separately, in the test below this one, because two
-// assertions on one expression produce two OVERLAPPING fixes and the harness refuses to apply
+// assertions on one expression produce two overlapping fixes and the harness refuses to apply
 // overlapping edits rather than guessing which wins. That refusal is right: the fix engine has an
 // overlap policy and a fixture reimplementing it would assert a result the real pipeline never
 // produces. So that case is pinned on the fix text it proposes instead.
@@ -1353,16 +1353,16 @@ func TestConsistentTypeAssertionsFallsBackWhenHandedNilOptions(test *testing.T) 
 // TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence pins the one comparison the imported
 // corpus cannot separate, at the layer that decides it.
 //
-// An assertion whose operand is ANOTHER assertion puts the two at equal precedence, and upstream
+// An assertion whose operand is another assertion puts the two at equal precedence, and upstream
 // wraps: measured, `<Foo><Bar>foo` fixes to `(foo as Bar) as Foo`. That is what makes the comparison
 // a strict greater-than rather than greater-or-equal, and relaxing it survives all 186 imported
 // cases because none of them nests two assertions.
 //
-// It cannot go through ExpectFixedSource: the two findings propose OVERLAPPING edits, and the
+// It cannot go through ExpectFixedSource: the two findings propose overlapping edits, and the
 // harness refuses those rather than guessing which wins. That refusal is right, and upstream reaches
 // its final text by running the fixer repeatedly rather than by resolving the overlap in one pass.
 //
-// So the assertion is on what each finding PROPOSES, which is the layer this rule decides. The inner
+// So the assertion is on what each finding proposes, which is the layer this rule decides. The inner
 // assertion is wrapped because its parent is the outer one, at equal precedence: that is the
 // comparison under test. The outer one is not wrapped, because its own parent is a declarator.
 func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(test *testing.T) {
@@ -1406,7 +1406,7 @@ func TestConsistentTypeAssertionsWrapsAnOperandOfEqualPrecedence(test *testing.T
 // every one of upstream's suggestion-bearing cases has an unannotated declarator, so dropping that
 // guard survives all 186 and then offers a repair that writes two types onto one binding.
 //
-// The parameter-position exemption treats a TAGGED template as a parameter and an untagged one as
+// The parameter-position exemption treats a tagged template as a parameter and an untagged one as
 // an ordinary expression, and upstream writes only the tagged form.
 //
 // Measured against the installed 8.x build, one program per case, suggestions included.

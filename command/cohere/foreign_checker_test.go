@@ -76,7 +76,7 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
 
 	reported := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
 	moved := regexp.MustCompile(`foreign checkers: (\d+) of (\d+) files walked`)
-	// threads is the process's GOMAXPROCS, which sets the checker count (one per thread, at most 12).
+	// threads is the process's `GOMAXPROCS`, which sets the checker count (one per thread, at most 12).
 	run := func(test *testing.T, root string, foreign bool, threads string) []string {
 		test.Helper()
 		command := exec.Command(binary, "--verbose", "--no-fix", "--no-cache")

@@ -217,7 +217,7 @@ func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) in
 		return 2
 	}
 	// A commit whose patch main holds counts as landed: a lead brings a hand's unit home by cherry-pick, which
-	// gives it a new hash on main, and main..HEAD would refuse that hand's worktree for good. A patch that
+	// gives it a new hash on main, and main..`HEAD` would refuse that hand's worktree for good. A patch that
 	// differs at all, a conflict resolved, still counts as unlanded, which keeps the refusal on the safe side.
 	unlanded, err := gitOutput(path, "log", "--oneline", "--cherry-pick", "--right-only", "main...HEAD")
 	if err != nil {

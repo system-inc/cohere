@@ -24,10 +24,10 @@ import (
 // thrown away. `find` stops at the first match and allocates nothing. On a long array that is the
 // difference between one comparison and every comparison, and the intent reads better besides.
 //
-// # The repair is a SUGGESTION, and the reason is a real behavior change
+// # The repair is a suggestion, and the reason is a real behavior change
 //
 // `filter(...)[0]` yields `undefined` when nothing matches, and so does `find(...)`, so the value
-// is the same. The TYPE is not: `filter` returns `T[]` and indexing it gives `T` under a
+// is the same. The type is not: `filter` returns `T[]` and indexing it gives `T` under a
 // non-strict index signature, while `find` returns `T | undefined`. Swapping them can therefore
 // turn code that compiled into code that does not, which is why upstream offers the rewrite rather
 // than applying it. Shipping this as a fix would have the edit engine break builds unattended.
@@ -45,7 +45,7 @@ import (
 // because `Number('a')` is not a number at all, which upstream treats as zero.
 //
 // This tree has no scope-analysis constant folder, and it does not need one for the cases that
-// matter. The CHECKER already folds a `const` to its literal type, which is the same answer from a
+// matter. The checker already folds a `const` to its literal type, which is the same answer from a
 // different direction, probed before this rule was written:
 //
 //	const zero = 0;          the index expression's type is the literal `0`
@@ -53,14 +53,14 @@ import (
 //	const n: number = 0;     widened to `number`, so no constant is available
 //
 // So a literal type is read where upstream reads a folded value. That is fidelity to what the rule
-// DECIDES rather than to how upstream obtains it, and it is strictly better on one axis: the
+// decides rather than to how upstream obtains it, and it is strictly better on one axis: the
 // checker resolves the actual binding, where a name-based scan would confuse a shadowed one.
 //
 // # Where it is narrower than upstream, stated rather than silent
 //
 // Three shapes fold upstream and do not fold here, because the checker widens them to `number`
 // rather than keeping a literal: a bigint (`const zero = 0n`), `NaN`, and `-Infinity`. All three
-// are `.at()` arguments that upstream treats as zero, so this port is SILENT where upstream
+// are `.at()` arguments that upstream treats as zero, so this port is silent where upstream
 // reports. Measured on the installed build; the corpus carries three such cases and they are
 // recorded in the test file as divergences rather than deleted.
 //
@@ -69,7 +69,7 @@ import (
 //
 // # A chain of filters is followed through ternaries and sequences
 //
-// `(cond ? a.filter(f) : b.filter(g))[0]` reports, and the repair rewrites BOTH filters, because
+// `(cond ? a.filter(f) : b.filter(g))[0]` reports, and the repair rewrites both filters, because
 // either branch could produce the array being indexed. A ternary reports only when both branches
 // are filter calls; one bare array on either side and the whole thing is silent. A sequence
 // expression contributes only its last operand, since that is the value being indexed.
@@ -88,7 +88,7 @@ var PreferFind = rule.Rule{
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// isArrayish answers upstream's `isArrayish`: a possibly-nullable array or tuple, or a
-		// union of those, where an intersection must be arrayish in EVERY part.
+		// union of those, where an intersection must be arrayish in every part.
 		//
 		// The two composite forms are asymmetric and the corpus pins both. Null and undefined
 		// members of a union are skipped rather than disqualifying, so `string[] | undefined`
@@ -122,7 +122,7 @@ var PreferFind = rule.Rule{
 		// staticStringOf renders the constant an expression denotes, where one is available.
 		//
 		// A literal node supplies it directly; an identifier or any other expression supplies it
-		// through its literal TYPE, which is how a `const` is folded without scope analysis. The
+		// through its literal type, which is how a `const` is folded without scope analysis. The
 		// second return reports whether a constant was found at all, which upstream distinguishes
 		// from a constant that happens to be empty.
 		staticStringOf := func(expression *ast.Node) (string, bool) {
@@ -162,11 +162,11 @@ var PreferFind = rule.Rule{
 			if expressionType == nil {
 				return "", false
 			}
-			// Only a LITERAL type carries a value. A widened `number` or `string` does not, and
+			// Only a literal type carries a value. A widened `number` or `string` does not, and
 			// reading `TypeToString` on one would produce the word "number" and compare it as if it
 			// were the index.
 			//
-			// A BIGINT literal counts, and leaving it out was a real gap rather than a nicety:
+			// A bigint literal counts, and leaving it out was a real gap rather than a nicety:
 			// upstream folds `const zero = 0n` and reports, and the corpus carries two such cases.
 			// The checker gives them `TypeFlagsBigIntLiteral` and renders `0n`, including for
 			// `-0n`, which it normalises to the same text.
@@ -238,7 +238,7 @@ var PreferFind = rule.Rule{
 			// upstream's sequence and ternary cases writes its expression in brackets because the
 			// grammar requires them before an index. Without this step those cases silently found
 			// no filter at all: ten of upstream's twenty-eight failing inputs went quiet, which is
-			// the paren difference in its COSTS-FINDINGS direction rather than its over-reporting
+			// the paren difference in its costs-findings direction rather than its over-reporting
 			// one.
 			//
 			// Written as a loop with its own nil check rather than `ast.SkipParentheses`, which
@@ -259,7 +259,7 @@ var PreferFind = rule.Rule{
 				return collectFilters(node.AsBinaryExpression().Right)
 			}
 
-			// A ternary reports only when BOTH branches are filter calls, since either could be
+			// A ternary reports only when both branches are filter calls, since either could be
 			// the array indexed. One bare array on either side and the whole expression is silent.
 			if node.Kind == ast.KindConditionalExpression {
 				conditional := node.AsConditionalExpression()
@@ -278,7 +278,7 @@ var PreferFind = rule.Rule{
 				return nil
 			}
 			call := node.AsCallExpression()
-			// An optional CALL is excluded: upstream tests `!node.optional`, so `x?.(...)` never
+			// An optional call is excluded: upstream tests `!node.optional`, so `x?.(...)` never
 			// matches even when the callee names filter.
 			if call.QuestionDotToken != nil {
 				return nil
@@ -440,7 +440,7 @@ func isTreatedAsZeroByArrayAt(value string) bool {
 		return true
 	}
 	if math.IsInf(asNumber, 0) {
-		// `Math.trunc(Infinity)` is Infinity rather than zero, so an infinite index is NOT treated
+		// `Math.trunc(Infinity)` is Infinity rather than zero, so an infinite index is not treated
 		// as zero. Go parses "Infinity" to +Inf where JavaScript's Number would too, so the two
 		// agree; spelled out because the truncation below would otherwise read as covering it.
 		return false
@@ -451,7 +451,7 @@ func isTreatedAsZeroByArrayAt(value string) bool {
 // memberAccessTokenAfter finds the `.` or `[` that begins the index access being removed.
 //
 // Trivia is skipped with the scanner rather than by scanning characters, and that is not a
-// refinement. Upstream searches TOKENS, so a comment sitting between the array and its index is
+// refinement. Upstream searches tokens, so a comment sitting between the array and its index is
 // stepped over; a raw character scan stops at the first `.` inside that comment and the repair
 // truncates the file at it.
 //

@@ -172,7 +172,7 @@ func TestNoRedeclareScopesUpstreamNeverExamines(test *testing.T) {
 
 // optionsJSON builds this rule's configuration the way the config layer delivers it, which is the
 // bare object rather than upstream's `[{...}]` tuple. Routing fixtures through the rule's own
-// decoder is what puts the default inversion under test: `ignoreDeclarationMerge` defaults to TRUE,
+// decoder is what puts the default inversion under test: `ignoreDeclarationMerge` defaults to true,
 // so a zero-valued struct silently turns the merge exemptions off and every merge case starts
 // reporting.
 func redeclareOptions(ignoreDeclarationMerge bool) any {
@@ -207,7 +207,7 @@ func TestNoRedeclareRequiresTheTypedHarness(test *testing.T) {
 }
 
 // TestNoRedeclareDefaultsToIgnoringDeclarationMerge is the decoder test, and it exists because both
-// of this rule's options default to TRUE.
+// of this rule's options default to true.
 //
 // A rule written down as a bare "error" is handed nil options, and a generic decoder would yield a
 // zero-valued struct whose false `IgnoreDeclarationMerge` turns every merge exemption off. That does
@@ -256,11 +256,11 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(test *testing.T) {
 		"redeclared")
 }
 
-// TestNoRedeclareSpans asserts WHERE each finding points and what it says, which `ExpectFindings`
+// TestNoRedeclareSpans asserts where each finding points and what it says, which `ExpectFindings`
 // cannot see at all: it compares message ids and a count and nothing else, so a rule anchoring every
 // finding on the wrong node passes a complete fixture pair.
 //
-// The anchor is the redeclared IDENTIFIER rather than the declaration statement, which is upstream's
+// The anchor is the redeclared identifier rather than the declaration statement, which is upstream's
 // choice and is visible in its corpus as a column: the second `var a = 10;` reports at column 5, the
 // `a` rather than the `var`. Anchoring on the statement would put it at column 1 and every message
 // id fixture above would stay green.
@@ -351,7 +351,7 @@ func TestNoRedeclareMergeSetsSubsumeTheAllOneKindCases(test *testing.T) {
 	}
 
 	// The control, and the reason the four silences above are the sets working rather than the rule
-	// being inert on these kinds: add a second CLASS and the class set's primary count passes one,
+	// being inert on these kinds: add a second class and the class set's primary count passes one,
 	// so the exemption lapses and exactly the extra class reports.
 	rule_testing.ExpectFindings(test,
 		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile,

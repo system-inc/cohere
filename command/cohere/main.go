@@ -116,7 +116,7 @@ func run() error {
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.
 	listRules := flag.Bool("rules", false, "print the rules this cohere implements for the project's language, one per line, and exit")
-	// `-rules` answers what the binary CAN run; this answers what it WILL. The two differ by every
+	// `-rules` answers what the binary can run; this answers what it will. The two differ by every
 	// rule the config never names, and that gap is invisible from the outside: a rule the config
 	// cannot resolve passes its own fixtures and lints nothing, which reads exactly like a rule that
 	// found nothing wrong.
@@ -1383,7 +1383,7 @@ func run() error {
 
 		unused_exports.Write(os.Stdout, unusedResult, *unusedAll)
 
-		// Deliberately NOT added to `findings`. The exit code is the gate's verdict, and this phase
+		// Deliberately not added to `findings`. The exit code is the gate's verdict, and this phase
 		// is not part of the gate: an export held for an external consumer is unused and correct, so
 		// failing a build over it would make the report something people route around rather than
 		// read.
@@ -1729,7 +1729,7 @@ func printRuleDiagnostic(out io.Writer, diagnostic rule.Diagnostic, lintConfig *
 	//
 	// Two rules write a second paragraph into their description with an embedded newline, which put
 	// the rule tag on a line carrying no position. Any reader keyed on `position ... [rule]` then
-	// drops those findings silently, and it drops the LONGEST messages, which are the ones carrying
+	// drops those findings silently, and it drops the longest messages, which are the ones carrying
 	// advice. Four of 5,312 findings on the ahra tree wrapped that way, and an extractor that missed
 	// them sent me four hours into a rule that was working correctly.
 	//
@@ -1775,8 +1775,8 @@ func lintConfigSources(path string) []string {
 //
 // This is the inverse of the not-configured count, and it is the failure the rename of every
 // rule to its upstream spelling introduced. The resolver matches a config key exactly, or trims a
-// prefix off it on a `/` boundary, so a key that is LONGER than the rule name resolves and a key
-// that is SHORTER never can. `typescript/no-base-to-string` cannot reach a rule registered as
+// prefix off it on a `/` boundary, so a key that is longer than the rule name resolves and a key
+// that is shorter never can. `typescript/no-base-to-string` cannot reach a rule registered as
 // `@typescript-eslint/no-base-to-string`: there is no prefix to trim, only one to add.
 //
 // Left silent, this reads as the opposite of what happened. The rule reports "nobody has said

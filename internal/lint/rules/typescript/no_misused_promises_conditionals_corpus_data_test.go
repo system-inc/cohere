@@ -1,11 +1,11 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/no-misused-promises.test.ts and edge rows. DO NOT EDIT BY HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/no-misused-promises.test.ts and edge rows. Do not edit by HAND.
 //
 // The 34 upstream rows are every row in the test file whose options set checksConditionals, 22 valid and 12 invalid, extracted by loading it with
 // RuleTester stubbed. 17 edge rows were added for what they leave open. Before recording, every upstream row
 // was linted typed over its own bytes, as upstream's typed RuleTester runs it, and agreed with upstream's own
-// assertions: ids, lines and columns. Every row was then replayed against the INSTALLED rule
+// assertions: ids, lines and columns. Every row was then replayed against the installed rule
 // (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under noMisusedPromisesConditionalsCorpusTsconfig, on the
 // bytes this harness writes: the source trimmed plus one newline, with `export {};` appended to an edge row
 // parsed as a module that has no import or export.

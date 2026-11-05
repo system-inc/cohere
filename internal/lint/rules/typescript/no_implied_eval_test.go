@@ -33,7 +33,7 @@ const noImpliedEvalFile = "noImpliedEval.ts"
 //   - A handler that is any kind of FUNCTION is silent, and "function" is decided by the type
 //     checker rather than by syntax: a declared `() => void`, an object method, a `.bind()`
 //     call, and an element access resolving to a method all pass.
-//   - A callee DECLARED IN THIS FILE is exempt, which is what makes the shadowing cases clean.
+//   - A callee declared in this file is exempt, which is what makes the shadowing cases clean.
 func TestNoImpliedEvalStaysSilent(test *testing.T) {
 	test.Parallel()
 
@@ -153,10 +153,10 @@ func TestNoImpliedEvalFires(test *testing.T) {
 // The case is `import { Function } from './class'; new Function('foo');`, and upstream's fixture
 // directory supplies `class.ts` containing `export class Function {}` — a file whose comments
 // name this rule as the reason it exists. Dropped into `RunTyped` unchanged the import resolves
-// to nothing, `IsBuiltinSymbolLike` cannot rule the type out, and the case REPORTS: it would have
+// to nothing, `IsBuiltinSymbolLike` cannot rule the type out, and the case reports: it would have
 // sat in the clean list above asserting the exact opposite of upstream while passing.
 //
-// The control matters as much as the case. The same source with a class that does NOT shadow
+// The control matters as much as the case. The same source with a class that does not shadow
 // `Function` still reports, so the silence below is the shadowing doing work rather than the
 // multi-file harness swallowing the rule.
 func TestNoImpliedEvalExemptsAShadowingDeclarationFromAnotherFile(test *testing.T) {
@@ -198,11 +198,11 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(test *test
 		{"the window receiver", "declare const window: any;\nwindow.setTimeout('x=1', 0);"},
 		{"the globalThis receiver", "globalThis.setTimeout('x=1', 0);"},
 		{"the global receiver", "declare const global: any;\nglobal.setTimeout('x=1', 0);"},
-		// An element access matches, but only through a string LITERAL key.
+		// An element access matches, but only through a string literal key.
 		{"a string literal element key", "declare const window: any;\nwindow['setTimeout']('x=1', 0);"},
 		// Optional chaining still produces an access node, so it matches.
 		{"an optional chain", "declare const window: any;\nwindow?.setTimeout('x=1', 0);"},
-		// The exemption is FILE-scoped rather than lexical: a declaration nested in a block
+		// The exemption is file-scoped rather than lexical: a declaration nested in a block
 		// exempts nothing, because the symbol it creates is not the global one being called.
 		{"a shadow confined to a nested block", "{\n  function setTimeout(x: string) {}\n}\nsetTimeout('x=1', 0);"},
 	}
@@ -220,7 +220,7 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(test *test
 		// The key must be a string literal node; neither of these is one.
 		{"a variable element key", "declare const window: any;\nconst k = 'setTimeout';\nwindow[k]('x=1', 0);"},
 		{"a template literal element key", "declare const window: any;\nwindow[`setTimeout`]('x=1', 0);"},
-		// The matched access's receiver must BE the candidate identifier, not contain it.
+		// The matched access's receiver must be the candidate identifier, not contain it.
 		{"one level of extra nesting under window", "declare const window: any;\nwindow.a.setTimeout('x=1', 0);"},
 		// Resolution as the negative filter: a declaration anywhere in this file exempts.
 		{"a local function declaration", "function setTimeout(x: string) {}\nsetTimeout('x=1');"},
@@ -268,7 +268,7 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(test *testing.T) 
 
 	silent := []struct{ name, sourceText string }{
 		{"a bind call", "declare function f(): void;\nsetTimeout(f.bind(null), 0);"},
-		// `isBind` keys on the NAME `bind` and never checks the receiver, so any method called
+		// `isBind` keys on the name `bind` and never checks the receiver, so any method called
 		// `bind` exempts regardless of what it returns. Upstream behavior, reproduced.
 		{"a method merely NAMED bind returning a string", "declare const o: { bind(): string };\nsetTimeout(o.bind(), 0);"},
 		{"a call returning a function", "declare function make(): () => void;\nsetTimeout(make(), 0);"},
@@ -292,7 +292,7 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(test *testing.T) 
 // cause is structural: ESTree has no parenthesized-expression node, so ESLint's rule never sees
 // the parens, while typescript-go keeps them and tsgolint's identifier test declines.
 //
-// tsgolint wins because oxlint runs tsgolint, so these fixtures encode the SILENT answer
+// tsgolint wins because oxlint runs tsgolint, so these fixtures encode the silent answer
 // deliberately. Without them a later reader could add a paren skip, believe it a free
 // correctness improvement, and pass every imported fixture while introducing a difference the
 // differential harness would see.
@@ -338,8 +338,8 @@ func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(test *testing.T) {
 // TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText asserts what ExpectFindings cannot.
 //
 // Message ids and counts are satisfied by a finding that points at the wrong node, and this rule
-// reports at TWO different anchors depending on the arm: the HANDLER for an eval-like call, and
-// the WHOLE CALL for the Function constructor. A port that reported the whole call in both cases
+// reports at two different anchors depending on the arm: the handler for an eval-like call, and
+// the whole call for the Function constructor. A port that reported the whole call in both cases
 // would pass every id fixture above.
 //
 // The spans are also the only thing that can see the adapter's trivia trim. Reporting `node.Loc`
@@ -392,7 +392,7 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(test *testing.T
 		}
 	})
 
-	// An INDENTED call is the shape that exposes a raw `node.Loc` report: the node's position
+	// An indented call is the shape that exposes a raw `node.Loc` report: the node's position
 	// begins at the end of the previous line, so an untrimmed range renders with a leading
 	// newline and the indentation. Both anchors are checked because the adapter trims all three
 	// of its node-report forms and a regression could restore any one of them.
@@ -413,18 +413,18 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(test *testing.T
 	})
 }
 
-// TestNoImpliedEvalDeclaresItNeedsTheTypeChecker pins the declarations AND the nil guard.
+// TestNoImpliedEvalDeclaresItNeedsTheTypeChecker pins the declarations and the nil guard.
 //
 // Every listener in this rule reads `ctx.TypeChecker`. While the rule was adapted, the nil guard the
 // house style asks for could not be written, because the listener was upstream's; `upstream.Adapt`
 // set NeedsTypeChecker unconditionally, which made the nil case unreachable through it. Absorbing
-// the rule made the listener ours to edit and made that case REACHABLE, so both halves are asserted.
+// the rule made the listener ours to edit and made that case reachable, so both halves are asserted.
 //
 // The direction that makes this worth a test is not a crash. `GetTypeAtLocation` and
 // `GetSymbolAtLocation` on this shim return nil rather than panicking, and `isFunction` treats a
-// type it cannot call as NOT a function — so a checker-less run of an UNGUARDED listener would
+// type it cannot call as not a function — so a checker-less run of an unguarded listener would
 // report every one of the corpus's valid `setTimeout(fn, 0)` cases while the same-file filter let
-// each one through on a nil symbol. That is a vacuous RED rather than a vacuous green, and it is
+// each one through on a nil symbol. That is a vacuous red rather than a vacuous green, and it is
 // what the guard below prevents.
 func TestNoImpliedEvalDeclaresItNeedsTheTypeChecker(test *testing.T) {
 	test.Parallel()

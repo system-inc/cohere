@@ -33,7 +33,7 @@ import (
 //
 // # An explicit return annotation is a decision, and the rule respects it
 //
-// If the function declares a return type and the returned value's type IS that type, the rule
+// If the function declares a return type and the returned value's type is that type, the rule
 // declines even when the type is `any`. Upstream's comment says why: it is intentional, even if
 // unsafe. The same test runs a second time through `getAwaitedType` for an async function, so
 // `async function f(): Promise<any> { return 1 as any; }` is a decision rather than an accident.
@@ -50,14 +50,14 @@ import (
 //	const foo: () => Set<string> = () => new Set<any>();
 //
 // The arrow's own type is `() => Set<any>`, so asking the function node produces the wrong answer
-// and the rule stays silent on a real finding. Upstream asks for the CONTEXTUAL type instead for a
+// and the rule stays silent on a real finding. Upstream asks for the contextual type instead for a
 // function expression and an arrow, and falls back to the node's own type when there is none.
 //
 // # The `this` branch, and why no fixture in this package can produce its id
 //
 // Upstream runs this rule's whole corpus under `tsconfig.noImplicitThis.json`, and our harness pins
 // `strict: true` with no way for a fixture to override it. Measured on the installed 8.67.0 build
-// under both settings: the corpus's `return this` case reports TWICE either way, and only the id
+// under both settings: the corpus's `return this` case reports twice either way, and only the id
 // moves, from `unsafeReturnThis` under upstream's configuration to `unsafeReturn` under ours. The
 // branch is ported and the fixtures assert the id our harness can actually observe, with the other
 // recorded here rather than dropped.
@@ -82,7 +82,7 @@ var NoUnsafeReturn = rule.Rule{
 				if argument == nil {
 					return
 				}
-				// The finding points at the whole return STATEMENT while the type comes from its
+				// The finding points at the whole return statement while the type comes from its
 				// argument. Upstream passes both, and collapsing them would underline `1 as any`
 				// where upstream underlines `return 1 as any;`.
 				checkUnsafeReturn(ruleContext, argument, node)
@@ -128,7 +128,7 @@ func checkUnsafeReturn(ruleContext rule.Context, returnNode *ast.Node, reporting
 	if functionType == nil {
 		return
 	}
-	// Upstream uses `tsutils.getCallSignaturesOfType`, which FLATTENS a union and an intersection.
+	// Upstream uses `tsutils.getCallSignaturesOfType`, which flattens a union and an intersection.
 	// The shelf's `GetCallSignatures` does not, and the difference is not academic: an arrow passed
 	// to `foo(arg: null | (() => any))` has contextual type `(() => any) | null`, which reports zero
 	// call signatures unflattened. That silently skipped the explicit-annotation check and turned
@@ -190,7 +190,7 @@ func checkUnsafeReturn(ruleContext rule.Context, returnNode *ast.Node, reporting
 			}
 		}
 
-		// A `Promise<any>` returned from a SYNCHRONOUS function is not an unsafe return: the
+		// A `Promise<any>` returned from a synchronous function is not an unsafe return: the
 		// promise is the value, and the `any` inside it is somebody else's problem at the await.
 		if anyType == type_checking.DiscriminatedAnyTypePromiseAny && !isAsync {
 			return
@@ -216,7 +216,7 @@ func checkUnsafeReturn(ruleContext rule.Context, returnNode *ast.Node, reporting
 	}
 
 	// The value is not itself `any`, so the remaining question is whether it carries one in a
-	// generic position. Upstream takes the FIRST call signature here rather than looping, which is
+	// generic position. Upstream takes the first call signature here rather than looping, which is
 	// a narrower question than the loops above: those ask "does any signature excuse this", and
 	// this one asks "what does this function actually return".
 	//

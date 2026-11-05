@@ -25,7 +25,7 @@ type preferFindFinding struct {
 //
 // The harness applies fixes and has no suggestion support, and this rule's entire repair surface is
 // a suggestion, so without this the thing it offers would go unasserted. The ordering is
-// load-bearing here rather than decorative: a ternary case carries THREE edits over three ranges in
+// load-bearing here rather than decorative: a ternary case carries three edits over three ranges in
 // one expression, so applying them front to back would shift the two that follow.
 func applyPreferFindSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()
@@ -288,7 +288,7 @@ func TestPreferFindFiresOnUpstreamFailCases(test *testing.T) {
 				}
 
 				// The repair is offered, never applied. `filter(...)[0]` and `find(...)` produce
-				// the same value and DIFFERENT types, so an unattended rewrite can break a build.
+				// the same value and different types, so an unattended rewrite can break a build.
 				if len(diagnostic.Fixes) != 0 {
 					test.Fatalf("finding %d: the repair must be a suggestion, got %d fixes",
 						position, len(diagnostic.Fixes))

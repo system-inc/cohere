@@ -26,7 +26,7 @@ import (
 // # The name is the configured key with whitespace removed, and so is the type
 //
 // Both sides are stripped, so a key written `Foo<Bar>` matches source written `Foo<  Bar  >`. The
-// message names the STRIPPED form while the finding spans the raw text: measured on the installed
+// message names the stripped form while the finding spans the raw text: measured on the installed
 // 8.67.0 build, `let value: Foo<  Bar  >;` with `Foo<Bar>` banned underlines the whole raw
 // `Foo<  Bar  >` and says "Don't use `Foo<Bar>`".
 //
@@ -34,12 +34,12 @@ import (
 //
 // Upstream needs three separate handlers for a type reference, a class `implements` entry, and an
 // interface `extends` entry, because estree gives those three different node types. Probed here:
-// all three parse as `KindTypeReference`, so ONE handler covers them, and the heritage handlers
+// all three parse as `KindTypeReference`, so one handler covers them, and the heritage handlers
 // upstream writes would be duplicates rather than additions.
 //
 // That equivalence is not an assumption. Driven through the installed build on all four heritage
 // shapes: `implements Bar` and `extends Bar` each report once, on the name; `implements Bar<Baz>`
-// and `extends Bar<Baz>` each report TWICE, once on the name and once on the whole generic, in that
+// and `extends Bar<Baz>` each report twice, once on the name and once on the whole generic, in that
 // order. This port produces the same pairs in the same order from the single handler, because
 // upstream's own type-reference handler already does both halves.
 //
@@ -51,16 +51,16 @@ import (
 //
 // # A fix and a suggestion are different offers, and the configuration chooses
 //
-// `fixWith` produces a FIX, which the edit engine applies unattended. `suggest` produces
+// `fixWith` produces a fix, which the edit engine applies unattended. `suggest` produces
 // suggestions, which a human picks from. Reproducing that split is part of the port rather than a
 // detail: shipping a suggestion as a fix means the edit engine rewrites code upstream would only
 // have offered to rewrite.
 //
-// The two are NOT exclusive and an empty `fixWith` is not a fix, both measured rather than read.
-// Upstream's corpus asserts thirteen fixer outputs and ZERO suggestions, so nothing imported
+// The two are not exclusive and an empty `fixWith` is not a fix, both measured rather than read.
+// Upstream's corpus asserts thirteen fixer outputs and zero suggestions, so nothing imported
 // exercises that half at all, and the first version of this rule got both details wrong while every
 // imported case stayed green. Driven through the installed 8.67.0 build: an entry carrying both
-// produces one finding with a fix AND the suggestions, and `fixWith: ""` produces a finding with no
+// produces one finding with a fix and the suggestions, and `fixWith: ""` produces a finding with no
 // fix rather than one deleting the type.
 //
 // # Cost
@@ -92,12 +92,12 @@ var NoRestrictedTypes = rule.Rule{
 
 			nodeRange := rule.TokenRange(ruleContext.SourceFile, node)
 
-			// A fix and suggestions are NOT exclusive, and the first version of this rule returned
+			// A fix and suggestions are not exclusive, and the first version of this rule returned
 			// after the fix and dropped them. Measured on the installed 8.67.0 build:
-			// `{fixWith: 'Bar', suggest: ['Baz']}` produces a finding carrying BOTH, so a reader who
+			// `{fixWith: 'Bar', suggest: ['Baz']}` produces a finding carrying both, so a reader who
 			// declines the automatic repair still gets the offer.
 			//
-			// An empty `fixWith` produces NO fix. Upstream writes `const fixWith = bannedType.fixWith`
+			// An empty `fixWith` produces no fix. Upstream writes `const fixWith = bannedType.fixWith`
 			// and then `fix: fixWith ? ... : null`, so the empty string is falsy and there is no
 			// repair. Measured: `{fixWith: ''}` reports with no fix rather than deleting the type.
 			// This is the reason the field can be a plain string rather than a pointer, and it is the
@@ -148,7 +148,7 @@ var NoRestrictedTypes = rule.Rule{
 		// upstream's `keywordSelectors` reduction. The keyword's name is passed rather than read
 		// from source, because upstream passes the literal too.
 		//
-		// This registration test is a COST decision and not a correctness one, measured rather than
+		// This registration test is a cost decision and not a correctness one, measured rather than
 		// assumed: a mutant registering every keyword listener unconditionally survives the whole
 		// suite, and it survives because it is equivalent. The lookup inside `checkBannedType`
 		// declines any keyword the configuration did not name, so the extra listeners produce the
@@ -250,12 +250,12 @@ type NoRestrictedTypesOptions struct {
 type NoRestrictedTypesBan struct {
 	// Allowed records an entry the configuration wrote as `false` or `null`, meaning "not banned".
 	//
-	// Upstream's RULE tests `bannedType == null || bannedType === false` and declines, so the
-	// behavior is real in its source. Its SCHEMA rejects both spellings before the rule can see
+	// Upstream's rule tests `bannedType == null || bannedType === false` and declines, so the
+	// behavior is real in its source. Its schema rejects both spellings before the rule can see
 	// them: measured against the installed 8.67.0 build, `{"Foo": null}` and `{"Foo": false}` both
 	// fail configuration validation and the linter refuses to start. So this branch reproduces
 	// upstream's code and is unreachable through upstream's own configuration surface. It is kept
-	// because cohere has no schema layer rejecting those spellings, which means a config here CAN
+	// because cohere has no schema layer rejecting those spellings, which means a config here can
 	// contain one, and silently banning a type somebody wrote `false` against would be the worst
 	// available reading.
 	Allowed bool
@@ -264,7 +264,7 @@ type NoRestrictedTypesBan struct {
 	// object's `message` key.
 	Message string
 
-	// FixWith produces a FIX the edit engine applies unattended.
+	// FixWith produces a fix the edit engine applies unattended.
 	//
 	// A plain string rather than a pointer, deliberately, because upstream cannot distinguish an
 	// absent key from an empty one either: it tests the value's truthiness, so `fixWith: ""` means
@@ -279,7 +279,7 @@ type NoRestrictedTypesBan struct {
 
 // customMessage renders the trailing half of the finding.
 //
-// Upstream returns the empty string for a bare `true` and otherwise a SPACE followed by the message,
+// Upstream returns the empty string for a bare `true` and otherwise a space followed by the message,
 // so the standard sentence and the custom one are separated by exactly one space and a bare ban ends
 // at the period.
 func (b NoRestrictedTypesBan) customMessage() string {

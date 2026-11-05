@@ -40,16 +40,16 @@ import (
 //	                                 written deliberately; the template is protecting it from a
 //	                                 trim-trailing-whitespace editor
 //
-// # Two anchors, because a template literal TYPE is the same shape
+// # Two anchors, because a template literal type is the same shape
 //
-// A template value and a template literal TYPE are separate nodes with nearly the same
+// A template value and a template literal type are separate nodes with nearly the same
 // type side declines a type parameter and an enum member where the value side does not, because
 // those stringify differently in a type position.
 //
 // # The fixer is the dangerous half, and it is all about accidental `${`
 //
 // Removing an interpolation splices its text into the surrounding quasis, and two adjacent pieces
-// that were harmless apart can form `${` together. Upstream walks the interpolations in REVERSE
+// that were harmless apart can form `${` together. Upstream walks the interpolations in reverse
 // carrying one bit of state, `nextCharacterIsOpeningCurlyBrace`, so each removal knows whether what
 // follows it now begins with `{`. Where a `$` would meet that `{`, the `$` is escaped.
 //
@@ -67,8 +67,8 @@ import (
 // # Where the offsets come from, and why upstream's do not transfer
 //
 // Upstream's ESTree gives parallel `quasis` and `expressions` arrays and computes every range by
-// arithmetic on them. Our parser gives a HEAD plus a list of SPANS, where each span carries its
-// expression and the literal that FOLLOWS it. Probed:
+// arithmetic on them. Our parser gives a `HEAD` plus a list of spans, where each span carries its
+// expression and the literal that follows it. Probed:
 //
 //	`head${'mid'}tail`   head=[head] span0={expr:'mid', literal:tail, kind:TemplateTail}
 //	`${1}${2}`           head=[]     span0={expr:1, literal:"", kind:TemplateMiddle}
@@ -188,7 +188,7 @@ func templatePartsOf(ruleContext rule.Context, node *ast.Node, isType bool) (hea
 	return head, parts
 }
 
-// quasiRawRange answers the span of a quasi's RAW body, excluding its delimiters.
+// quasiRawRange answers the span of a quasi's raw body, excluding its delimiters.
 //
 // A head runs from its backtick through `${`, a middle from `}` through `${`, and a tail from `}`
 // through the closing backtick. So the body always starts one character in, and ends two characters
@@ -231,9 +231,9 @@ func reportUnnecessaryTemplateParts(ruleContext rule.Context, node *ast.Node, is
 		return
 	}
 
-	// The single-interpolation case collapses the WHOLE template to its interpolation, which is a
+	// The single-interpolation case collapses the whole template to its interpolation, which is a
 	// different repair from removing one part, so it is decided first and returns.
-	// Upstream returns ONLY when this reports. When the type test fails it falls through to the
+	// Upstream returns only when this reports. When the type test fails it falls through to the
 	// general filter below, which is how `${1}` reports at all: a number is not string-like, so the
 	// whole-template collapse declines, and then the ordinary literal rule catches it. Returning
 	// unconditionally here loses eighteen of upstream's reporting cases, all of them a lone
@@ -327,7 +327,7 @@ func isUnnecessaryInterpolation(ruleContext rule.Context, part templatePart, isT
 
 	interpolation := part.interpolation
 	if isType {
-		// A literal TYPE wraps its literal, and the null and undefined keywords are their own
+		// A literal type wraps its literal, and the null and undefined keywords are their own
 		// nodes rather than literals.
 		if interpolation.Kind == ast.KindLiteralType {
 			interpolation = interpolation.AsLiteralTypeNode().Literal
@@ -405,13 +405,13 @@ func nestedTemplateIsSingleWhitespaceQuasi(ruleContext rule.Context, node *ast.N
 //
 // The fix deletes that whole span, so a comment in it would be deleted with it. Upstream declines
 // rather than moving the comment, and so does this.
-// The scan starts at the INTERPOLATION's Pos rather than at the `${`. `Pos()` includes leading
+// The scan starts at the interpolation's Pos rather than at the `${`. `Pos()` includes leading
 // trivia, so it sits just after the `${` where a leading comment actually is, and the scanner reads
 // trivia from there. Handed the `$` instead it reads the token text and finds nothing: measured, it
 // returned zero comments for twelve of upstream's passing cases, every one of which then reported.
 //
 // A trailing comment (`${ 'bar' /* after */ }`) is not leading trivia of the interpolation, so it
-// needs its own scan from the interpolation's END.
+// needs its own scan from the interpolation's end.
 func commentsBetweenQuasis(ruleContext rule.Context, part templatePart) bool {
 	interpolationStart := rule.TokenRange(ruleContext.SourceFile, part.interpolation).Pos()
 	if type_checking.HasCommentsInRange(ruleContext.SourceFile,
@@ -444,7 +444,7 @@ func reportSingleInterpolation(ruleContext rule.Context, node *ast.Node, part te
 	interpolationText := movedInterpolationText(ruleContext, node, part.interpolation)
 	templateRange := rule.TokenRange(ruleContext.SourceFile, node)
 
-	// Upstream anchors this finding two characters BEFORE the interpolation and one after it,
+	// Upstream anchors this finding two characters before the interpolation and one after it,
 	// rather than on the `${` and `}` themselves. With no whitespace those coincide; with
 	// `${    'a'    }` they do not, and the reported span is `  'a' ` rather than the whole
 	// interpolation. Three corpus cases pin the difference and it is invisible without them.
@@ -483,7 +483,7 @@ func literalValueText(node *ast.Node, raw string) string {
 // compiles, and one corpus fix vector catches it.
 //
 // Two questions, both upstream's. A strong-precedence node never needs parentheses because its
-// binding cannot change. Otherwise the DESTINATION decides: only a parent that could bind more
+// binding cannot change. Otherwise the destination decides: only a parent that could bind more
 // tightly than what is moving in needs them.
 func movedInterpolationText(ruleContext rule.Context, template *ast.Node, interpolation *ast.Node) string {
 	code := ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, interpolation).Pos():interpolation.End()]
@@ -498,7 +498,7 @@ func movedInterpolationText(ruleContext rule.Context, template *ast.Node, interp
 
 // hasWeakPrecedenceParent is upstream's `isWeakPrecedenceParent`.
 //
-// The receiver-position tests matter: `x.y` binds its OBJECT tightly but not its property, and a
+// The receiver-position tests matter: `x.y` binds its object tightly but not its property, and a
 // call binds its callee tightly but not its arguments, so the same parent answers differently
 // depending on which child the template is.
 func hasWeakPrecedenceParent(node *ast.Node) bool {
@@ -576,7 +576,7 @@ var trailingDollarSign = regexp.MustCompile(`\$$`)
 
 // reportTemplateParts emits one finding per removable interpolation.
 //
-// Upstream walks the parts in REVERSE, and the direction is load bearing rather than incidental: it
+// Upstream walks the parts in reverse, and the direction is load bearing rather than incidental: it
 // carries `nextCharacterIsOpeningCurlyBrace` backwards so each removal knows whether the text that
 // will follow it begins with `{`. A `$` meeting that `{` forms a new interpolation in the repaired
 // source, which is a parse change rather than a formatting one.
@@ -613,7 +613,7 @@ func reportTemplateParts(ruleContext rule.Context, parts []templatePart) {
 				// Already a string, so the quotes come off and the interior is the value.
 				spliced = raw[1 : len(raw)-1]
 			} else {
-				// Upstream splices `String(literal.value)`, which is the literal's VALUE rather
+				// Upstream splices `String(literal.value)`, which is the literal's value rather
 				// than its source text, and the two differ for every non-decimal number: `0o25`
 				// stringifies to "21", `0b1010` to "10", `1_0` to "10", `1e21` to "1e+21". Four
 				// corpus fix vectors caught the raw-text version.

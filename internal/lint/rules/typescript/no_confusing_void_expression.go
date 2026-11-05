@@ -113,7 +113,7 @@ var messageInvalidVoidExprWrapVoid = rule.Message{
 // # The judgment is "walk up until the position is decided"
 //
 // Upstream's `findInvalidAncestor` climbs from the void expression through the parents that are
-// TRANSPARENT to this question and stops at the first one that decides it. A statement position is
+// transparent to this question and stops at the first one that decides it. A statement position is
 // valid; anything else is not. Three parents are transparent, and each is transparent for its own
 // reason:
 //
@@ -121,7 +121,7 @@ var messageInvalidVoidExprWrapVoid = rule.Message{
 //	either arm of a conditional          `cond ? f() : f()` likewise
 //	a non-final sequence element         `f(), g()` discards f()'s value by construction
 //
-// The left of a logical operator is NOT transparent, and that asymmetry is real rather than an
+// The left of a logical operator is not transparent, and that asymmetry is real rather than an
 // oversight: `f() && cond` uses the void value as a condition. Measured against the installed rule,
 // which reports it.
 //
@@ -149,7 +149,7 @@ var messageInvalidVoidExprWrapVoid = rule.Message{
 //
 // # The fixes, and the one this port declines
 //
-// Upstream ships a fix on the arrow arm and on both return arms, and a SUGGESTION on the generic
+// Upstream ships a fix on the arrow arm and on both return arms, and a suggestion on the generic
 // arm under `ignoreVoidOperator`. Two of the three fixes are reproduced here and the third is
 // declined; see `noConfusingVoidExpressionReturnFix` for which and why.
 var NoConfusingVoidExpression = rule.Rule{
@@ -194,11 +194,11 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 		return
 	}
 
-	// The type test comes AFTER the ancestor walk, matching upstream's order. It matters for cost
+	// The type test comes after the ancestor walk, matching upstream's order. It matters for cost
 	// rather than for verdicts: the walk is a few pointer hops and the type query is not, so
 	// asking the cheap question first keeps the checker out of the common case.
 	//
-	// Deliberately quieter than upstream, which tests `TypeFlags.VoidLike` (void OR undefined) and so
+	// Deliberately quieter than upstream, which tests `TypeFlags.VoidLike` (void or undefined) and so
 	// reports an `undefined` value as though it were nothing. `void` says there is no result;
 	// `undefined` is a value somebody returned on purpose, and the rule's name and every message are
 	// about void. Upstream's corpus writes no undefined-typed expression, so no imported case moves.
@@ -220,7 +220,7 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 				noConfusingVoidExpressionWrapFix(ruleContext, node))
 			return
 		}
-		// Two void expressions inside one arrow body report twice and would each propose the SAME
+		// Two void expressions inside one arrow body report twice and would each propose the same
 		// repair, which this engine reads as an overlap rather than deduplicating. Upstream's own
 		// vector for `foo => (foo ? a : b)` is a single rewrite against two findings, so the fix
 		// is attached to the first finding for a given arrow and withheld from the rest.
@@ -265,7 +265,7 @@ func checkConfusingVoidExpression(ruleContext rule.Context, node *ast.Node,
 	}
 
 	if settings.IgnoreVoidOperator {
-		// A SUGGESTION rather than a fix upstream, and the distinction is the port: wrapping in
+		// A suggestion rather than a fix upstream, and the distinction is the port: wrapping in
 		// `void` changes what the expression means to a reader, so a human chooses it.
 		ruleContext.ReportNodeWithSuggestions(node, messageInvalidVoidExprWrapVoid, rule.Suggestion{
 			Message: rule.Message{
@@ -304,9 +304,9 @@ func findConfusingVoidInvalidAncestor(node *ast.Node,
 		}
 		switch binary.OperatorToken.Kind {
 		case ast.KindCommaToken:
-			// Upstream's SequenceExpression arm, and it is NOT transparent. A non-final element's
+			// Upstream's SequenceExpression arm, and it is not transparent. A non-final element's
 			// value is discarded by the operator itself, so that position is valid and the walk
-			// stops with nil. The FINAL element falls through to "any other parent is invalid",
+			// stops with nil. The final element falls through to "any other parent is invalid",
 			// which means the comma expression itself is the deciding ancestor rather than
 			// whatever encloses it.
 			//
@@ -317,10 +317,10 @@ func findConfusingVoidInvalidAncestor(node *ast.Node,
 			// installed rule as well as read from the corpus.
 			//
 			// "The last element" cannot be answered by looking one level up, and that is the
-			// difference our parser forces. ESTree gives a comma chain ONE SequenceExpression node
+			// difference our parser forces. ESTree gives a comma chain one SequenceExpression node
 			// with a flat `expressions` array, so upstream compares against its last entry. Ours
-			// nests left-associatively, so `(s, f(), s)` makes the call the RIGHT operand of the
-			// inner comma while that inner comma is the LEFT operand of the outer one.
+			// nests left-associatively, so `(s, f(), s)` makes the call the right operand of the
+			// inner comma while that inner comma is the left operand of the outer one.
 			//
 			// Measured on exactly that shape, which is one of upstream's clean cases. Testing only
 			// the immediate parent reports it, because the call looks final from one level up.
@@ -330,7 +330,7 @@ func findConfusingVoidInvalidAncestor(node *ast.Node,
 			return parent
 
 		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			// Upstream's LogicalExpression arm, and only the RIGHT operand is transparent. The
+			// Upstream's LogicalExpression arm, and only the right operand is transparent. The
 			// left is the condition, so a void value there is used rather than discarded, and
 			// upstream reports it. Measured against the installed rule.
 			if binary.Right == node {
@@ -436,7 +436,7 @@ func confusingVoidParentFunction(node *ast.Node) *ast.Node {
 // noConfusingVoidExpressionWrapFix prepends the `void` operator to the expression.
 //
 // Safe by construction and it is worth saying why, because this is the family that has destroyed
-// type information twice in this tree. The fix INSERTS text before a span rather than replacing
+// type information twice in this tree. The fix inserts text before a span rather than replacing
 // one: the expression's own bytes are untouched, so a type assertion, a `satisfies`, a non-null
 // `!`, type arguments and any comment inside it all survive because nothing rewrites them.
 //
@@ -452,7 +452,7 @@ func noConfusingVoidExpressionWrapFix(ruleContext rule.Context, node *ast.Node) 
 //
 // Two edits rather than one replacement, and that is the whole safety argument. Upstream replaces
 // the gap between the arrow token and the body with ` { `, and the gap after the body with `; }`.
-// The BODY ITSELF is never in either range, so nothing inside it can be lost -- the edits touch
+// The body itself is never in either range, so nothing inside it can be lost -- the edits touch
 // only whitespace on each side of it.
 //
 // Declines when the body's own type is not void-like, which is upstream's `canFix`. The case that
@@ -470,7 +470,7 @@ func noConfusingVoidExpressionArrowFix(ruleContext rule.Context, arrow *ast.Node
 	}
 	// Our parser keeps a parenthesis node upstream's folds away, so the body of
 	// `foo => (foo ? a : b)` is a KindParenthesizedExpression here and the conditional itself
-	// upstream. Unwrapping matters for the OUTPUT rather than for the verdict: upstream's own
+	// upstream. Unwrapping matters for the output rather than for the verdict: upstream's own
 	// vector for that case is `foo => { foo ? a : b; }`, with the parentheses gone, and wrapping
 	// the parenthesized node instead writes `{ (foo ? a : b); }`.
 	//
@@ -519,7 +519,7 @@ func noConfusingVoidExpressionArrowFix(ruleContext rule.Context, arrow *ast.Node
 	}
 
 	return []rule.Fix{
-		// The edits replace the gaps around the WRAPPED body, so a parenthesis pair is removed
+		// The edits replace the gaps around the wrapped body, so a parenthesis pair is removed
 		// along with them, which is what upstream's own vector for `foo => (a ? b : c)` shows.
 		// The body's own bytes are in neither range, so nothing inside it can be lost.
 		rule.ReplaceRange(arrowSpan.WithPos(arrowSpan.End()).WithEnd(bodySpan.Pos()), " { "),
@@ -544,7 +544,7 @@ func confusingVoidGapHoldsComment(gap string) bool {
 // under `ignoreVoidReturningFunctions`.
 //
 // Two routes, in upstream's order. An explicit return annotation is read directly and answers on
-// its own. Failing that, and only for a function EXPRESSION or an arrow, the contextual type is
+// its own. Failing that, and only for a function expression or an arrow, the contextual type is
 // consulted, so `const handler: () => void = () => f()` is exempt while a function declaration
 // with no annotation is not.
 func isConfusingVoidReturningFunction(ruleContext rule.Context, function *ast.Node) bool {
@@ -560,7 +560,7 @@ func isConfusingVoidReturningFunction(ruleContext rule.Context, function *ast.No
 		return false
 	}
 
-	// The CHECKER's own contextual type, not the shelf's `type_checking.GetContextualType`.
+	// The checker's own contextual type, not the shelf's `type_checking.GetContextualType`.
 	//
 	// That shelf helper is a hand-rolled approximation covering the call-argument case and a few
 	// declaration shapes, and it answers nil for every shape upstream's corpus uses here: an arrow
@@ -587,7 +587,7 @@ func isConfusingVoidReturningFunction(ruleContext rule.Context, function *ast.No
 // confusingVoidReturnTypeNode returns a function's explicit return annotation, or nil.
 //
 // The method and accessor kinds are here because of a parser difference rather than a widening.
-// ESTree gives a class method or an object-literal method a `FunctionExpression` VALUE, so
+// ESTree gives a class method or an object-literal method a `FunctionExpression` value, so
 // upstream's three-type walk finds one and reads its annotation. Our parser has no such inner
 // node: `test(): void {}` is a single `KindMethodDeclaration` carrying the annotation itself.
 // Measured: without these arms, upstream's two clean cases for a void-annotated method both
@@ -635,10 +635,10 @@ func confusingVoidTypeIncludesVoid(subject *checker.Type) bool {
 //
 // # Why constructing a span is safe here
 //
-// The replaced span is the whole return STATEMENT, and the text written back contains the
+// The replaced span is the whole return statement, and the text written back contains the
 // argument's own source copied byte for byte. Nothing is rebuilt from node properties, so a type
 // assertion, a `satisfies`, a non-null `!`, type arguments and any comment inside the argument all
-// survive. What does NOT survive is anything between the `return` keyword and the argument, or
+// survive. What does not survive is anything between the `return` keyword and the argument, or
 // between the argument and the semicolon, which is why a comment there declines the repair below.
 //
 // # The semicolon that goes in front
@@ -661,7 +661,7 @@ func noConfusingVoidExpressionReturnFix(ruleContext rule.Context, returnStatemen
 	}
 	argument := statement.Expression
 
-	// Upstream's `canFix`: the ARGUMENT's own type must be void-like. On a final return the
+	// Upstream's `canFix`: the argument's own type must be void-like. On a final return the
 	// argument is what remains, and on a non-final one it becomes its own statement, so a
 	// non-void argument would have its value silently discarded.
 	if ruleContext.TypeChecker == nil {

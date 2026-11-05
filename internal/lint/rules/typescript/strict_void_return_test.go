@@ -167,7 +167,7 @@ func TestStrictVoidReturnStaysSilentOnUpstreamPassCases(test *testing.T) {
 // message ids were never measured; they are named in the rule's doc comment as the one part of the
 // corpus this port has not been checked against.
 //
-// The expected message ids are the INSTALLED BUILD's rather than the corpus's, which matters: the
+// The expected message ids are the installed build's rather than the corpus's, which matters: the
 // corpus records what upstream's own tester asserts, and where the shipped build differs the build
 // is what the differential compares against. All one hundred and seven agree with both here.
 //
@@ -401,7 +401,7 @@ func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(test *testing.T) {
 		})
 	}
 
-	// The control: the same callback with the return as its OWN reports, so the silence above is
+	// The control: the same callback with the return as its own reports, so the silence above is
 	// the nesting rule rather than the rule failing to see block bodies at all.
 	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile,
@@ -414,7 +414,7 @@ func TestStrictVoidReturnDoesNotClaimANestedFunctionsReturns(test *testing.T) {
 	// gate short-circuits before the walk runs; a mutant that descended into nested functions
 	// survived all of them for that reason. This callback genuinely returns a value, so the gate
 	// lets it through, and it also holds a nested function that returns. Upstream reports exactly
-	// ONE finding, for the outer return only. Measured before being written here.
+	// one finding, for the outer return only. Measured before being written here.
 	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile,
 		"declare function takes(cb: () => void): void;\ntakes(() => {\n  function inner() { return 'nested'; }\n  if (Math.random()) { return 1; }\n});",

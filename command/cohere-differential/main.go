@@ -242,8 +242,8 @@ func defaultControls() []differential.Control {
 		// The cohere-only control. Verified against the tree at 03:17 rather than assumed:
 		//
 		//   registry.go:52                 cohere has import-require-path-alias compiled in
-		//   NexusLintConfiguration.ts:31   the ESLINT plugin defines it
-		//   OxlintNexusPlugin.mjs          the OXLINT plugin does not, at all
+		//   NexusLintConfiguration.ts:31   the ESLint plugin defines it
+		//   OxlintNexusPlugin.mjs          the oxlint plugin does not, at all
 		//   .oxlintrc.json                 no mention of the rule
 		//
 		// The gate we diff against runs oxlint, so it is structurally incapable of producing this

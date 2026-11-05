@@ -28,13 +28,13 @@ var onlyThrowErrorSupportingFiles = map[string]string{
 	"class.ts": "export class Error {}\n",
 }
 
-// runOnlyThrowError routes every case through the typed harness, and through the OPTIONS path even
+// runOnlyThrowError routes every case through the typed harness, and through the options path even
 // when the case configures nothing.
 //
 // A case with no options passes nil rather than a zero struct, which is what a rule configured as
 // bare `"error"` is actually handed in production. That is the shape the standing warning names:
 // `options.(OnlyThrowErrorOptions)` on nil yields the zero value, whose three nil pointers the body
-// then defaults to TRUE. Routing the unconfigured cases through here is what puts that defaulting
+// then defaults to true. Routing the unconfigured cases through here is what puts that defaulting
 // under test rather than leaving it to a mutation sweep, and it matters more for this rule than for
 // most: every default is permissive, so a defaulting bug turns an unconfigured rule into one that
 // reports every `any` in the tree.
@@ -63,7 +63,7 @@ func runOnlyThrowError(test *testing.T, sourceText string, options any) rule_tes
 // TypeScript AST walk rather than retyped, and byte-verified against the source afterwards, so a
 // case asserts what upstream asserts rather than what this port believes.
 //
-// Every one of the 42 was additionally replayed against the INSTALLED @typescript-eslint rule
+// Every one of the 42 was additionally replayed against the installed @typescript-eslint rule
 // before being written here, and all 42 agreed with the corpus's own verdict, so these are
 // measured expectations rather than transcribed ones.
 func TestOnlyThrowErrorStaysSilent(test *testing.T) {
@@ -201,7 +201,7 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 	}
 }
 
-// TestOnlyThrowErrorSpans asserts WHERE each finding points, which no message-id fixture can see.
+// TestOnlyThrowErrorSpans asserts where each finding points, which no message-id fixture can see.
 //
 // The span is the throw argument with its parentheses skipped, and both halves of that are
 // measured against the installed rule rather than assumed. Upstream reports `throw ('error')` at
@@ -214,7 +214,7 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 //
 // `rule_testing` writes each fixture as `strings.TrimSpace(contents)+"\n"`, so a source string written
 // with a leading newline is one byte shorter on disk than in the literal here. Every source in
-// this test is therefore written WITHOUT leading whitespace, so the literal and the file agree and
+// this test is therefore written without leading whitespace, so the literal and the file agree and
 // a slice taken against the literal is the slice the rule saw.
 func TestOnlyThrowErrorSpans(test *testing.T) {
 	test.Parallel()
@@ -304,7 +304,7 @@ func TestOnlyThrowErrorMessages(test *testing.T) {
 // `KindParenthesizedExpression`, so a literal port of that guard would decline the rethrow and
 // report a case upstream allows.
 //
-// The second case is the CONTROL, and it is the reason this test proves anything: turning
+// The second case is the control, and it is the reason this test proves anything: turning
 // `allowRethrowing` off makes the same source report, which shows the first case is silent because
 // the rethrow arm fired rather than for some unrelated reason. Both verdicts were measured against
 // the installed rule before being written here.
@@ -329,7 +329,7 @@ func TestOnlyThrowErrorParenthesizedRethrow(test *testing.T) {
 // exactly one thing and watching the verdict move. The corpus covers the rest-parameter row and
 // none of the other three, so without these a port could drop any of them and stay green.
 //
-// Every case here runs with the two throwing escapes OFF, because the handler parameter is typed
+// Every case here runs with the two throwing escapes off, because the handler parameter is typed
 // `any`, and with them on the case would be silent through the `any` arm regardless of what the
 // rethrow arm decided. That is the "change the one thing you think makes it pass" check applied
 // before the fixtures were written rather than after.
@@ -350,18 +350,18 @@ func TestOnlyThrowErrorRethrowShape(test *testing.T) {
 		// The baseline both directions are measured against.
 		{"an arrow catch handler is a rethrow", "Promise.reject('x').catch(e => {\n  throw e;\n});", nil},
 
-		// The handler must be an ARROW function. A function expression binds `this` differently and
+		// The handler must be an arrow function. A function expression binds `this` differently and
 		// upstream's check names the arrow kind explicitly.
 		{"a function expression handler is not a rethrow", "Promise.reject('x').catch(function (e) {\n  throw e;\n});", []string{"object"}},
 
-		// The binding must be the FIRST parameter.
+		// The binding must be the first parameter.
 		{"a second parameter is not the rejection value", "Promise.reject('x').catch((a, e) => {\n  throw e;\n});", []string{"object"}},
 
 		// It must be a plain identifier parameter. A destructuring pattern binds names taken out of
 		// the rejection rather than the rejection itself.
 		{"a destructured parameter is not the rejection value", "Promise.reject('x').catch(({ e }) => {\n  throw e;\n});", []string{"object"}},
 
-		// The RECEIVER must be thenable. Any object may have a method called `catch`, and the name
+		// The receiver must be thenable. Any object may have a method called `catch`, and the name
 		// alone would let a rethrow through on something that never handled a rejection.
 		{"a catch method on a non-thenable is not a rethrow", "declare const o: { catch(cb: (e: string) => void): void };\no.catch(e => {\n  throw e;\n});", []string{"object"}},
 
@@ -369,7 +369,7 @@ func TestOnlyThrowErrorRethrowShape(test *testing.T) {
 		// literal subscript is one of the forms its reader accepts.
 		{"a literal computed catch resolves", "Promise.reject('x')['catch'](e => {\n  throw e;\n});", nil},
 
-		// `.then` puts the rejection handler SECOND, so a one-argument `.then` has none.
+		// `.then` puts the rejection handler second, so a one-argument `.then` has none.
 		{"a two-argument then rethrows from the second handler", "Promise.reject('x').then(() => {}, e => {\n  throw e;\n});", nil},
 
 		// A catch clause binding is the other rethrow shape, and a nested arrow reading the outer
@@ -403,7 +403,7 @@ func TestOnlyThrowErrorRethrowShape(test *testing.T) {
 //	const k = 'catch'; Promise.reject('x')[k](e => { throw e; })   allowRethrowing off  REPORTS
 //
 // So upstream is silent and this port reports. No case in the corpus writes that shape. This test
-// asserts the DIVERGENCE rather than upstream's verdict, so that a later port of the evaluator
+// asserts the divergence rather than upstream's verdict, so that a later port of the evaluator
 // fails here loudly instead of quietly agreeing.
 func TestOnlyThrowErrorConstFoldedKeyDiverges(test *testing.T) {
 	test.Parallel()
@@ -416,12 +416,12 @@ func TestOnlyThrowErrorConstFoldedKeyDiverges(test *testing.T) {
 	}), "object")
 }
 
-// TestOnlyThrowErrorDefaultsArePermissive pins that all three booleans default to TRUE.
+// TestOnlyThrowErrorDefaultsArePermissive pins that all three booleans default to true.
 //
 // This is the arm a nil-options registration reaches, and it is the one most expensive to get
 // wrong: every default here is permissive, so an inverted default turns an unconfigured rule into
 // one that reports every `any` and every rethrow in the tree. The three cases below are each
-// silent ONLY because of their own default, which is shown by the paired strict case reporting.
+// silent only because of their own default, which is shown by the paired strict case reporting.
 func TestOnlyThrowErrorDefaultsArePermissive(test *testing.T) {
 	test.Parallel()
 
@@ -459,10 +459,10 @@ func TestOnlyThrowErrorDefaultsArePermissive(test *testing.T) {
 	}
 }
 
-// TestOnlyThrowErrorUndefBeatsTheEscapes pins the ORDER of the undefined arm.
+// TestOnlyThrowErrorUndefBeatsTheEscapes pins the order of the undefined arm.
 //
 // `throw undefined` reports as `undef` with no options at all, which means the undefined test sits
-// ABOVE the any and unknown escapes even though all three are permissive by default. Moving it
+// above the any and unknown escapes even though all three are permissive by default. Moving it
 // below either one would make this case silent while every other fixture in the file stayed green,
 // because no other case reaches both arms.
 //
@@ -487,7 +487,7 @@ func TestOnlyThrowErrorUndefBeatsTheEscapes(test *testing.T) {
 // TestOnlyThrowErrorNeedsTheTypedHarness asserts the rule declares the checker.
 //
 // Without the declaration the rule is handed a nil checker in production, and its guard makes it go
-// completely SILENT rather than crash, so every clean fixture would pass vacuously while the rule
+// completely silent rather than crash, so every clean fixture would pass vacuously while the rule
 // found nothing at all. A test rather than a comment, so a later revert fails loudly.
 func TestOnlyThrowErrorNeedsTheTypedHarness(test *testing.T) {
 	test.Parallel()
@@ -635,8 +635,8 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 // fixture harness cannot reproduce.
 //
 // The case is `import { createError } from 'errors'; throw createError();` with
-// `allow: [{from: 'package', name: 'ErrorLike', package: 'errors'}]`, and upstream is SILENT.
-// Upstream makes `errors` resolvable with an AMBIENT declaration in a supporting fixture file:
+// `allow: [{from: 'package', name: 'ErrorLike', package: 'errors'}]`, and upstream is silent.
+// Upstream makes `errors` resolvable with an ambient declaration in a supporting fixture file:
 //
 //	// @ts-ignore
 //	declare module 'errors' {
@@ -645,13 +645,13 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 //	}
 //
 // `rule_testing`'s tsconfig pins `moduleDetection: "force"`, which makes every file a module. A
-// `declare module 'errors'` inside a module is a module AUGMENTATION of an existing module rather
+// `declare module 'errors'` inside a module is a module augmentation of an existing module rather
 // than an ambient declaration of a new one, so `errors` never resolves, `createError()` has the
 // error type, and the throw reports.
 //
 // # The measurement, and why this is the harness rather than the rule
 //
-// Reproduced on the INSTALLED @typescript-eslint rule by varying nothing but that one compiler
+// Reproduced on the installed @typescript-eslint rule by varying nothing but that one compiler
 // option, holding source, options and file layout fixed:
 //
 //	moduleDetection: "force"     REPORTS object
@@ -661,13 +661,13 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 // under: with `moduleDetection` unset, all 89 installed-rule verdicts agree with the corpus's own
 // assertions, and with it set, this one case is the only disagreement.
 //
-// Two CONTROLS establish that the module is what fails to resolve, rather than the package
-// specifier being mismatched. Under our harness, the same input is ALSO reported when `allow` is
+// Two controls establish that the module is what fails to resolve, rather than the package
+// specifier being mismatched. Under our harness, the same input is also reported when `allow` is
 // the bare inline name `"ErrorLike"`, which needs no file or package comparison at all and would
 // match on the type's own name; and it is still reported when the supporting file is given an
 // explicit `export {}`. A type that resolved to `ErrorLike` would go clean under the first.
 //
-// So the case is recorded as REPORTING, with the reason at the line, rather than deleted or
+// So the case is recorded as reporting, with the reason at the line, rather than deleted or
 // green-ed by weakening the rule. Changing the shared harness's tsconfig for one case would move
 // every other typed rule's fixtures, which is a far larger blast radius than one documented row.
 func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(test *testing.T) {
@@ -700,12 +700,12 @@ func TestOnlyThrowErrorAmbientPackageIsAHarnessLimit(test *testing.T) {
 		}), "object")
 }
 
-// TestOnlyThrowErrorSurvivesMalformedShapes pins the two guards that prevent a PANIC rather than
+// TestOnlyThrowErrorSurvivesMalformedShapes pins the two guards that prevent a panic rather than
 // deciding a finding.
 //
 // Both were found by the mutation sweep and neither is visible to an `ExpectFindings` fixture,
 // because a panic takes the whole run down rather than producing a wrong verdict: the sweep reports
-// SURVIVED identically whether the guard matters or not. What each one PREVENTS is the question,
+// survived identically whether the guard matters or not. What each one prevents is the question,
 // not what it decides.
 //
 //	len(arguments) < 2 in the `then` arm    without it, a ONE-argument `.then` whose arrow
@@ -729,7 +729,7 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(test *testing.T) {
 
 	test.Run("a one-argument then does not index past its arguments", func(test *testing.T) {
 		test.Parallel()
-		// `.then` puts the rejection handler second, so this arrow is the FULFILLMENT handler and
+		// `.then` puts the rejection handler second, so this arrow is the fulfillment handler and
 		// the throw is not a rethrow. Upstream reports it; the point here is that we get a verdict
 		// at all rather than a panic.
 		rule_testing.ExpectFindings(test, runOnlyThrowError(test,
@@ -743,15 +743,15 @@ func TestOnlyThrowErrorSurvivesMalformedShapes(test *testing.T) {
 	})
 }
 
-// TestOnlyThrowErrorPrivateMethodName pins that a PRIVATE name counts as a static member name.
+// TestOnlyThrowErrorPrivateMethodName pins that a private name counts as a static member name.
 //
 // Upstream's static member reader accepts `Identifier` and `PrivateIdentifier` alike, so a thenable
 // class with a `#catch` method is a catch call and a throw of its handler parameter is a rethrow.
 //
 // This port first restricted the name to `KindIdentifier`, which reads as the careful choice and is
-// a divergence. The mutation dropping that guard SURVIVED the whole fixture set, and re-reading
+// a divergence. The mutation dropping that guard survived the whole fixture set, and re-reading
 // upstream rather than adding a fixture is what found it: measured on the installed rule, the case
-// below is SILENT upstream and the identifier-only version reported.
+// below is silent upstream and the identifier-only version reported.
 //
 // The class is made thenable on purpose. A plain class with a `#catch` method is silent either way,
 // because the receiver test declines it, so it cannot separate the two versions and would have read
@@ -778,7 +778,7 @@ func TestOnlyThrowErrorPrivateMethodName(test *testing.T) {
 			"  }\n"+
 			"}", strict))
 
-	// The control: the same shape on a receiver that is NOT thenable reports, which shows the case
+	// The control: the same shape on a receiver that is not thenable reports, which shows the case
 	// above is clean because the rethrow arm fired rather than because private names are skipped.
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test,
 		"class C {\n"+
@@ -796,7 +796,7 @@ func TestOnlyThrowErrorPrivateMethodName(test *testing.T) {
 // These live in the shelf's `TypeMatchesSomeSpecifier`, and neither recursion was there before this
 // port: `internal/utilities/typecheck/specifier.go` was written against a tsgolint revision that
 // predates them, so a composite type was tested against its own symbol, which is nil, and answered
-// false. Upstream's `typeMatchesSpecifier` recurses both ways and the two directions are OPPOSITE,
+// false. Upstream's `typeMatchesSpecifier` recurses both ways and the two directions are opposite,
 // which is the asymmetry a reader would most likely collapse into one.
 //
 // Upstream's own corpus covers exactly one row of this, valid case 36 against invalid case 36, and
@@ -835,7 +835,7 @@ func TestOnlyThrowErrorSpecifierComposites(test *testing.T) {
 }
 
 // TestOnlyThrowErrorSpecifierDeclinesTheErrorType pins that a specifier never matches the type
-// checker's own ERROR type.
+// checker's own error type.
 //
 // When a module does not resolve, the checker gives the import the intrinsic error type, whose
 // intrinsic name is the string `"error"`. A specifier literally named `error` would otherwise match
@@ -845,14 +845,14 @@ func TestOnlyThrowErrorSpecifierComposites(test *testing.T) {
 // Upstream declines it inside `typeMatchesSpecifier`, and our shelf declined it only at the top
 // level of `TypeMatchesSomeSpecifier`, which the recursion added for this port can now walk past.
 // A mutation removing the guard survived the whole corpus. Measured on the installed rule, all
-// three rows REPORT, and the middle and last are the controls showing the input reports for
+// three rows report, and the middle and last are the controls showing the input reports for
 // ordinary reasons too:
 //
 //	allow [{from: lib, name: "error"}]   REPORTS
 //	allow ["error"]                      REPORTS
 //	no allow                             REPORTS
 //
-// Under the mutation the FIRST row goes silent and the other two do not, which is why the object
+// Under the mutation the first row goes silent and the other two do not, which is why the object
 // form is the one that can see this.
 func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(test *testing.T) {
 	test.Parallel()
@@ -879,16 +879,16 @@ func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(test *testing.T) {
 
 // TestOnlyThrowErrorDeclinesSynthesizedNodes pins that a recovered parse produces no finding.
 //
-// `throw;` and `throw ();` are both "Expression expected" PARSE ERRORS for upstream's parser, so
+// `throw;` and `throw ();` are both "Expression expected" parse errors for upstream's parser, so
 // its rule never runs on either and there is no upstream verdict to be faithful to. Our parser
 // recovers, synthesizing a zero-width `KindIdentifier` whose type is `any`, so both inputs reach
 // the rule. With `allowThrowingAny` at its permissive default they are silent through the `any`
-// arm; with it off, a finding would be emitted with a ZERO-WIDTH span pointing at text the author
+// arm; with it off, a finding would be emitted with a zero-width span pointing at text the author
 // never wrote.
 //
 // The second case is why the guard sits after the parenthesis skip. `throw;` puts the synthesized
 // node directly under the statement, so a check on the raw argument catches it; `throw ();` wraps
-// it in a real parenthesized expression which is NOT itself missing, so the same check misses.
+// it in a real parenthesized expression which is not itself missing, so the same check misses.
 // Measured before the guard moved: `throw ();` reported a zero-width `object` at offset 7 while
 // `throw;` was clean.
 //
@@ -910,7 +910,7 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(test *testing.T) {
 	}
 }
 
-// TestOnlyThrowErrorUndeclaredIdentifier pins an input on which UPSTREAM CRASHES and we do not.
+// TestOnlyThrowErrorUndeclaredIdentifier pins an input on which upstream crashes and we do not.
 //
 // `throw notDeclaredAnywhere;` resolves to no symbol. Upstream's rethrow check reaches for
 // `findVariable(scope, node)` and wraps it in `nullThrows(..., 'Variable ... should exist in scope
@@ -924,10 +924,10 @@ func TestOnlyThrowErrorDeclinesSynthesizedNodes(test *testing.T) {
 // the unresolved identifier's type is the error type. That is the only defensible answer available.
 //
 // It is also a real blind spot the sweep found rather than an unreachable branch. Enumerated over
-// ten malformed and unresolvable shapes, `GetSymbolAtLocation` returned nil for a NON-missing
+// ten malformed and unresolvable shapes, `GetSymbolAtLocation` returned nil for a non-missing
 // identifier only on this one, so nothing else in the fixture set can reach the guard.
 //
-// The DEFAULT case is silent, and that is worth stating because it is not what a first reading
+// The default case is silent, and that is worth stating because it is not what a first reading
 // predicts. An unresolved identifier gets the checker's error type, whose flags report `any`, so
 // the permissive `allowThrowingAny` default swallows it before the `object` arm is reached. Only
 // with that option off does the finding appear, which is why the strict row is the one that puts
@@ -952,7 +952,7 @@ func TestOnlyThrowErrorUndeclaredIdentifier(test *testing.T) {
 // The cross-file case is measured: a class declared in a second module extending the built-in
 // `Error`, thrown from this one. `IsErrorLike` walks the base types and asks whether each
 // declaration's source file is a default library, which this file's bytes cannot answer. Flipping
-// only the OTHER file, from `extends Error` to no heritage, flips the verdict here while this file is
+// only the other file, from `extends Error` to no heritage, flips the verdict here while this file is
 // untouched. The cache honors that through the type fingerprint, which covers other.ts as an import,
 // and the default library through the binary in its key; what the rule reads through ctx.Program is
 // the compiler options and the default library, and nothing else (#b8k3bp6).
@@ -971,7 +971,7 @@ func TestOnlyThrowErrorDependsOnAnotherFile(test *testing.T) {
 		"other.ts":         "export class Wrapped extends Error {}\n",
 	}, onlyThrowErrorFile, nil))
 
-	// Byte-for-byte the same subject file, and the verdict moves because the OTHER file changed.
+	// Byte-for-byte the same subject file, and the verdict moves because the other file changed.
 	rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithOptions(test, OnlyThrowError, map[string]string{
 		onlyThrowErrorFile: subject,
 		"other.ts":         "export class Wrapped {}\n",

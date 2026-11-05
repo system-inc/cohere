@@ -98,7 +98,7 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 // last. A reader would have concluded the 171ms rule was expensive and optimized the wrong thing.
 //
 // Reported by family, which is a cache key up to its first colon, because a key identifies a cache
-// entry and a cache entry is not a line worth reading. The HIR cache keys per function node, by kind
+// entry and a cache entry is not a line worth reading. The `HIR` cache keys per function node, by kind
 // and source offset, which is correct for a cache and once produced 11,150 rows here against three
 // real ones: `--timing` was 17,000 lines, two thirds of them a single derivation reported one
 // function at a time, each costing 0.00ms and none of them actionable. The family is the label the

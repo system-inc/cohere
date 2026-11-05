@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// The corpus below is typescript-eslint's own, extracted by EXECUTING its tester file with a
+// The corpus below is typescript-eslint's own, extracted by executing its tester file with a
 // stubbed rule tester rather than by reading it, so every case carries the bytes upstream wrote.
 // Every extracted string was then checked byte for byte against the tester source; the one case
 // that does not appear verbatim is upstream's `noFormat` template literal, whose backticks and
@@ -638,11 +638,11 @@ func TestNoUnnecessaryTypeParametersFires(test *testing.T) {
 // a real absence from a name nobody guessed.
 //
 // The walk therefore stops at a mapped type instead of counting the uses inside it. That can only
-// LOWER a count, so the exposure is a false positive on a clean shape rather than a missed finding,
+// lower a count, so the exposure is a false positive on a clean shape rather than a missed finding,
 // which is the safe direction for a rule whose repair is a suggestion a human must choose.
 //
 // The blast radius is four cases. Twelve of upstream's sixteen mapped-type cases pass here already,
-// including all four of its REPORTING ones, because the uses that decide them are visible before
+// including all four of its reporting ones, because the uses that decide them are visible before
 // the walk reaches the mapped type. The four below need what is inside it.
 func TestNoUnnecessaryTypeParametersMappedTypeDivergence(test *testing.T) {
 	test.Parallel()
@@ -682,7 +682,7 @@ function inferredMappedReturnType<T extends string>(x: T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
-			// Upstream is SILENT on each of these. This port reports once. Asserting the divergence
+			// Upstream is silent on each of these. This port reports once. Asserting the divergence
 			// rather than the upstream verdict means closing the gap makes this test fail loudly,
 			// which is the point: a divergence nobody is told about becomes permanent.
 			if len(result.Diagnostics) != 1 {
@@ -697,7 +697,7 @@ function inferredMappedReturnType<T extends string>(x: T) {
 //
 // Upstream's case imports AST_NODE_TYPES and TSESTree from '@typescript-eslint/types', which the
 // rule_testing tsconfig cannot resolve, so both names become error types and the walk cannot count
-// through them. The control below is the SAME shape with those two names declared locally: it is
+// through them. The control below is the same shape with those two names declared locally: it is
 // clean, which is upstream's verdict, and that is what establishes the rule is right and the
 // instrument is what differs.
 func TestNoUnnecessaryTypeParametersUnresolvedImportIsAHarnessLimit(test *testing.T) {
@@ -739,16 +739,16 @@ const isNodeOfType =
 	rule_testing.ExpectClean(test, resolved)
 }
 
-// TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter asserts WHERE each finding points and
-// WHAT its message says, neither of which ExpectFindings can see.
+// TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter asserts where each finding points and
+// what its message says, neither of which ExpectFindings can see.
 //
 // The span matters here because the natural wrong answer is defensible: a reader could reasonably
 // expect the finding on the declaration that owns the parameter, or on the parameter's name rather
 // than the whole parameter. Upstream reports the esTypeParameter node, which is the parameter
-// INCLUDING its constraint, so `K extends keyof T` reports across the whole of `K extends keyof T`
+// including its constraint, so `K extends keyof T` reports across the whole of `K extends keyof T`
 // and not across `K`. An id-only fixture is green over either choice.
 //
-// The message text is asserted by EQUALITY on a literal typed here, not against the rule's own
+// The message text is asserted by equality on a literal typed here, not against the rule's own
 // message constant: comparing a finding to the constant it was built from moves both sides together
 // under mutation and proves nothing.
 func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(test *testing.T) {
@@ -790,7 +790,7 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(test *testing.T) {
 				test.Fatalf("expected %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
 
-			// Slice the source the HARNESS wrote rather than the literal above: RunTyped trims the
+			// Slice the source the harness wrote rather than the literal above: RunTyped trims the
 			// fixture and appends a newline, so a span sliced from the Go literal is off by one on
 			// any case carrying a leading newline.
 			written := strings.TrimSpace(testCase.source) + "\n"
@@ -809,9 +809,9 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(test *testing.T) {
 	}
 }
 
-// TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion asserts the repair SURFACE.
+// TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion asserts the repair surface.
 //
-// Upstream ships `replaceUsagesWithConstraint` as a SUGGESTION rather than a fix, and that
+// Upstream ships `replaceUsagesWithConstraint` as a suggestion rather than a fix, and that
 // distinction is part of what is being ported: rewriting every use of a parameter to its constraint
 // and deleting the parameter changes what the signature means to callers, so a human chooses it and
 // the engine never applies it unattended. A rule that shipped this as a fix would pass every
@@ -843,7 +843,7 @@ func TestNoUnnecessaryTypeParametersOffersTheConstraintSuggestion(test *testing.
 
 // TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker pins the nil guard in Run.
 //
-// NeedsTypeChecker governs the REGISTRATION path only; the harness builds a rule.Context by hand,
+// NeedsTypeChecker governs the registration path only; the harness builds a rule.Context by hand,
 // which is how a typed rule panics with a nil receiver while its declaration reads as correct. The
 // assertion is here so a later revert fails loudly rather than going vacuously green.
 func TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker(test *testing.T) {
@@ -862,7 +862,7 @@ func TestNoUnnecessaryTypeParametersDeclinesWithoutATypeChecker(test *testing.T)
 // TestNoUnnecessaryTypeParametersArrayCarveOut covers the one discrimination upstream's corpus
 // leaves untested, found by a mutation that survived all 158 imported cases.
 //
-// The syntactic fast path treats a type parameter passed as a type ARGUMENT as repeated on sight,
+// The syntactic fast path treats a type parameter passed as a type argument as repeated on sight,
 // because it cannot see inside the alias to count the uses. Array and ReadonlyArray are carved out
 // of that and deferred to the type phase, where `T[]` is correctly counted as a single use.
 //
@@ -891,7 +891,7 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(test *testing.T) {
 		{name: "array shorthand", source: "declare function d<T>(param: T[]): void;\n", wantFindings: 1},
 		{name: "readonly array shorthand", source: "declare function g<T>(param: readonly T[]): void;\n", wantFindings: 1},
 
-		// The other side of the same branch: a generic that is NOT an array stays exempt, so these
+		// The other side of the same branch: a generic that is not an array stays exempt, so these
 		// are silent. Without them a mutation deleting the whole type-argument test would be
 		// indistinguishable from one deleting only the carve-out.
 		{name: "Partial is exempt", source: "declare function a<T>(param: Partial<T>): void;\n", wantFindings: 0},
@@ -913,9 +913,9 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(test *testing.T) {
 // TestNoUnnecessaryTypeParametersConstraintRecursion covers the constraint recursion inside the
 // type walk, found by a mutation that survived all 158 imported cases plus every fixture above.
 //
-// When the walk arrives at a type parameter it also visits that parameter's CONSTRAINT, so a
+// When the walk arrives at a type parameter it also visits that parameter's constraint, so a
 // parameter mentioned only in a sibling's constraint still accumulates a count. Deleting the
-// recursion leaves every verdict unchanged and changes the MESSAGE, from "used only once" to
+// recursion leaves every verdict unchanged and changes the message, from "used only once" to
 // "never used", because the count falls from 2 to 1 while staying under the report threshold.
 //
 // That is why this test asserts the rendered text rather than the count. A message-id fixture and a
@@ -984,14 +984,14 @@ func TestNoUnnecessaryTypeParametersConstraintRecursion(test *testing.T) {
 // TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice covers the two index-signature visits in
 // the object arm, each found by a mutation that survived every fixture above.
 //
-// A type reached through an index signature is counted as TWO uses rather than one, because the
+// A type reached through an index signature is counted as two uses rather than one, because the
 // walk cannot tell how many values the index stands for. Counting it once instead makes each of
 // these shapes report while upstream is silent, which is a false positive rather than a missed
 // finding, and no imported case covers it.
 //
 // Upstream's corpus does carry index-signature cases, and they pass either way: they place the
 // parameter somewhere else in the signature as well, so the count clears the threshold without help
-// from this arm. The shapes below put the parameter ONLY behind the index, which is what separates
+// from this arm. The shapes below put the parameter only behind the index, which is what separates
 // the two versions.
 //
 // The number-index and string-index visits are separate lines and were mutated separately, because
@@ -1022,7 +1022,7 @@ func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(test *testing.T) {
 // quieter than ESLint.
 //
 // `(<T>() => T extends L ? 1 : 2) extends <T>() => T extends R ? 1 : 2` asks whether L and R are
-// IDENTICAL, not merely mutually assignable: the checker defers a conditional type whose check type
+// identical, not merely mutually assignable: the checker defers a conditional type whose check type
 // is an unresolved type parameter, and relates two deferred conditionals only when their extends
 // types are identical. `T` used once is the whole point, and the rule's suggestion, replacing it
 // with its constraint, makes both conditionals resolve eagerly and destroys the comparison. Neither
@@ -1164,7 +1164,7 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 		{name: "a method cloning its receiver as its type parameter", source: "export class Entity {\n    clone<T extends this>(): T {\n        return Object.create(this) as T;\n    }\n}\n", ids: []string{"sole"}},
 		{name: "a method widening a field with its type parameter", source: "interface Base { a: string }\nexport class Environment {\n    private variables: Base = { a: '' };\n    getEnvironmentVariables<T>(): Base & T {\n        return this.variables as Base & T;\n    }\n}\n", ids: []string{"sole"}},
 		{name: "a parameterless method signature", source: "interface Store { current<T>(): T }\n", ids: []string{"sole"}},
-		// The default spelling of the row above. A use inside a parameter's OWN constraint has no control:
+		// The default spelling of the row above. A use inside a parameter's own constraint has no control:
 		// the type walk counts every self-constrained shape (`<T extends Array<T>>(): T`) three times,
 		// past the threshold, so it is silent before the witness test is ever asked.
 		{name: "used in another parameter's default, outside the return", source: "declare function pick<T, U = T>(): U;\n", ids: []string{"sole"}},
@@ -1216,7 +1216,7 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(test *testing.T) {
 		{name: "an ordinary property", source: "export class Holder<M> {\n  readonly value: M | undefined = undefined;\n}\n", ids: []string{"sole"}},
 		{name: "a member of an ambient class", source: "export declare class Ambient<M> {\n  brand: M;\n}\n", ids: []string{"sole"}},
 		{name: "a brand naming something else", source: "export class BrandElsewhere<M> {\n  declare readonly brand: string;\n  take(message: M): void {\n    void message;\n  }\n}\n", ids: []string{"sole"}},
-		// The brand names a TYPE this time, so only resolving the identifier, not spotting one, tells it
+		// The brand names a type this time, so only resolving the identifier, not spotting one, tells it
 		// apart from a brand carrying M.
 		{name: "a brand naming another type", source: "export class BrandOther<M> {\n  declare readonly brand: Date;\n  take(message: M): void {\n    void message;\n  }\n}\n", ids: []string{"sole"}},
 	}

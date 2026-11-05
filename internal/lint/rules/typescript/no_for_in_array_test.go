@@ -15,11 +15,11 @@ const noForInArrayFile = "/repository/source/ForIn.ts"
 //
 // The harness tsconfig pins `lib: ["ES2022"]` with no way to raise it, and its own comment says it
 // omits the DOM on purpose. Two of upstream's failing cases name `HTMLCollection` and `NodeList`,
-// which therefore resolve to the ERROR type. Probed rather than assumed: dropped into the
+// which therefore resolve to the error type. Probed rather than assumed: dropped into the
 // single-file table unchanged, both go silent while upstream reports them.
 //
 // That is the dangerous direction, and it is only visible because the whole corpus was replayed
-// rather than read. Note which upstream types did NOT need this: `RegExpExecArray` and the
+// rather than read. Note which upstream types did not need this: `RegExpExecArray` and the
 // `arguments` object are both in ES2022 and both report under the plain harness, so the second file
 // is scoped to the two cases that genuinely need it rather than applied to everything DOM-shaped.
 //
@@ -87,7 +87,7 @@ func TestNoForInArrayFires(test *testing.T) {
 // TestNoForInArrayStaysSilent carries all four of tsgolint's passing inputs, verbatim.
 //
 // The fourth is the one worth naming. `{ [key: number]: number }` has the number index signature
-// the rule looks for and NO `length`, so it passes; the same object with `length: 1` added is a
+// the rule looks for and no `length`, so it passes; the same object with `length: 1` added is a
 // failing case in the table above. That pair is the only thing in either corpus proving the length
 // half of the predicate is load-bearing rather than decorative.
 func TestNoForInArrayStaysSilent(test *testing.T) {
@@ -113,19 +113,19 @@ func TestNoForInArrayStaysSilent(test *testing.T) {
 
 // TestNoForInArrayNeedsBothHalvesOfThePredicate covers what upstream's corpus does not.
 //
-// The rule reports only when BOTH hold: the type has a number index signature, AND it has a
+// The rule reports only when both hold: the type has a number index signature, and it has a
 // `length` whose type is number-like. Upstream's twenty four cases never separate the two, because
 // every array-like thing they write satisfies both at once and everything else satisfies neither.
 // Dropping either test therefore passed the entire imported corpus, and both dropped tests survived
 // the mutation sweep.
 //
-// These six inputs split them. The first three carry a numeric `length` and NO number index, so
+// These six inputs split them. The first three carry a numeric `length` and no number index, so
 // they report if the index test is dropped. The last three carry a number index and a `length` that
 // is not number-like, so they report if the flag test is dropped. All six are silent under the real
 // rule, and each triple was confirmed to flip its own mutant and only its own.
 //
 // They are inventions rather than imported cases, so each was measured against `@typescript-eslint`
-// 8.67.0 on a real program BEFORE becoming a fixture rather than after: all six are silent there
+// 8.67.0 on a real program before becoming a fixture rather than after: all six are silent there
 // too, alongside a plain-array control that fires, so the zero is a verdict rather than a broken
 // harness. tsgolint could not be run directly for the same reason oxlint cannot, but the two
 // implementations are line-for-line the same predicate.
@@ -159,7 +159,7 @@ func TestNoForInArrayNeedsBothHalvesOfThePredicate(test *testing.T) {
 // does not supply, run against a two-file program.
 //
 // Splitting them out is what keeps them honest. Run under the single-file harness both pass too, by
-// reporting nothing where a finding IS expected, so they would have sat in the clean list asserting
+// reporting nothing where a finding is expected, so they would have sat in the clean list asserting
 // the exact opposite of upstream while the suite stayed green.
 func TestNoForInArrayDomCollections(test *testing.T) {
 	test.Parallel()
@@ -183,7 +183,7 @@ func TestNoForInArrayDomCollections(test *testing.T) {
 	}
 }
 
-// TestNoForInArrayReportsTheLoopHead asserts WHERE each finding points, which no message-id fixture
+// TestNoForInArrayReportsTheLoopHead asserts where each finding points, which no message-id fixture
 // can see.
 //
 // Upstream reports `GetForStatementHeadLoc`: from the `for` keyword to the start of the loop body,
@@ -325,13 +325,13 @@ func TestNoForInArrayMessageText(test *testing.T) {
 	}
 }
 
-// TestNoForInArrayRequiresTheTypedHarness pins the checker declaration AND the nil guard.
+// TestNoForInArrayRequiresTheTypedHarness pins the checker declaration and the nil guard.
 //
 // While this rule was adapted, the `if ctx.TypeChecker == nil { return }` guard could not live in
 // the rule file, because the listener was upstream's and editing it would have turned re-syncing
 // into a merge; `upstream.Adapt` set NeedsTypeChecker unconditionally instead, so the nil case was
 // unreachable through it. Absorbing the rule made the listener ours to edit and made that case
-// REACHABLE, so both halves are asserted here.
+// reachable, so both halves are asserted here.
 //
 // The declaration is the half that matters for registration. The guard is the half that matters for
 // the harness path, where a Context can be built by hand — and it matters more than a crash would,

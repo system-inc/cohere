@@ -120,7 +120,7 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 		requireProcessEnded(test, childFile)
 	})
 
-	// SIGTERM rather than an interrupt, because a POSIX shell starts a background job with interrupts
+	// `SIGTERM` rather than an interrupt, because a POSIX shell starts a background job with interrupts
 	// ignored, and the stand-in's child must be one the signal can end.
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a signal cohere receives is passed to the engine and everything it started", func(test *testing.T) {

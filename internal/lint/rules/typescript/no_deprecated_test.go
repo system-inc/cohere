@@ -41,9 +41,9 @@ type noDeprecatedCase struct {
 
 	// withInstalledTypes links a real node_modules beside the fixture so an import resolves.
 	//
-	// Some cases take their deprecation FROM a @types package rather than from their own text, and
+	// Some cases take their deprecation from a @types package rather than from their own text, and
 	// without the link they report nothing, which is indistinguishable from the rule declining them.
-	// The link is enough for a NAMED import whose types the fixture reaches directly; it is not
+	// The link is enough for a named import whose types the fixture reaches directly; it is not
 	// enough for anything the harness's own tsconfig excludes, which writes `"types": []` after the
 	// setup hook runs and so admits no ambient declarations at all. Those cases are marked
 	// harnessBound instead.
@@ -58,7 +58,7 @@ type noDeprecatedCase struct {
 
 // noDeprecatedSharedFixture is upstream's `tests/fixtures/deprecated.ts`, verbatim.
 //
-// Copied rather than summarized because the three tag POSITIONS in it are the whole point: on the
+// Copied rather than summarized because the three tag positions in it are the whole point: on the
 // declaration, on an export specifier over an untagged declaration, and on one overload of several.
 const noDeprecatedSharedFixture = "" +
 	"/** @deprecated */\n" +
@@ -2723,7 +2723,7 @@ func TestNoDeprecatedAgainstUpstreamOrdinaryCases(test *testing.T) {
 //
 // This is where the rule's difficulty lives and where the shim's alias accessors earn their place.
 // The shared fixture writes tags in three positions that a one-hop answer confuses: on the
-// declaration, on an export specifier that re-exports an UNTAGGED declaration, and on one overload
+// declaration, on an export specifier that re-exports an untagged declaration, and on one overload
 // of a function whose other overloads are clean. The middle position is invisible to a resolve,
 // which jumps to the declaration and finds nothing, and is why deprecationInAliasChain walks.
 func TestNoDeprecatedAcrossFiles(test *testing.T) {
@@ -3332,7 +3332,7 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 
 // TestNoDeprecatedInJsx covers the two JSX arms: a deprecated component and a deprecated prop.
 //
-// A prop's tag is on a property of the element name's CONTEXTUAL type rather than on anything the
+// A prop's tag is on a property of the element name's contextual type rather than on anything the
 // attribute itself resolves to, so this arm shares no code with the identifier arm and would be
 // silent if only that one worked.
 func TestNoDeprecatedInJsx(test *testing.T) {
