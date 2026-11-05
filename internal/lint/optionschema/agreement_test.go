@@ -48,9 +48,9 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 	var falseRefusals, falseAccepts []string
 	accepted, refused := 0, 0
 	for _, sample := range samples.Samples {
-		schema, found, optionschemaForError := For(sample.Rule)
-		if optionschemaForError != nil {
-			test.Fatalf("%s: %v", sample.Rule, optionschemaForError)
+		schema, found, optionSchemaForError := For(sample.Rule)
+		if optionSchemaForError != nil {
+			test.Fatalf("%s: %v", sample.Rule, optionSchemaForError)
 		}
 		if !found {
 			test.Fatalf("%s has a sample and no schema", sample.Rule)
@@ -138,8 +138,8 @@ func TestEveryEmbeddedSchemaCompiles(test *testing.T) {
 	test.Parallel()
 
 	for _, name := range RuleNames() {
-		if _, _, optionschemaForError := For(name); optionschemaForError != nil {
-			test.Errorf("%s: %v", name, optionschemaForError)
+		if _, _, optionSchemaForError := For(name); optionSchemaForError != nil {
+			test.Errorf("%s: %v", name, optionSchemaForError)
 		}
 	}
 	if count := len(RuleNames()); count != 384 {
@@ -211,9 +211,9 @@ func TestEverySchemaAcceptsTheBareSeverity(test *testing.T) {
 	test.Parallel()
 
 	for _, name := range RuleNames() {
-		schema, found, optionschemaForError := For(name)
-		if optionschemaForError != nil {
-			test.Fatalf("%s: %v", name, optionschemaForError)
+		schema, found, optionSchemaForError := For(name)
+		if optionSchemaForError != nil {
+			test.Fatalf("%s: %v", name, optionSchemaForError)
 		}
 		if found {
 			if violation := schema.Validate(nil); violation != nil {

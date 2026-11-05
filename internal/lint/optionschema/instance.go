@@ -61,9 +61,9 @@ var Extensions = []Extension{
 // Check validates a rule's option elements, the list after the severity, against upstream's schema. A
 // rule with no schema here, either not a port or one whose upstream opts out, passes unchecked.
 func Check(ruleName string, elements []json.RawMessage) error {
-	schema, found, optionschemaForError := For(ruleName)
-	if optionschemaForError != nil || !found {
-		return optionschemaForError
+	schema, found, optionSchemaForError := For(ruleName)
+	if optionSchemaForError != nil || !found {
+		return optionSchemaForError
 	}
 	return schema.Validate(withoutExtensions(ruleName, elements))
 }
