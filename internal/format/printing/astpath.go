@@ -171,9 +171,7 @@ func (path *AstPath[N, S]) nodeFrameIndex(count int) int {
 }
 
 // descend pushes a frame for each property name in turn, upstream's `value?.[name]` from the current
-// value, and returns the last value reached.
-//
-// Mutates: path a frame is pushed for each name, for the caller to cut back
+// value, and returns the last value reached. The frames stay pushed, for the caller to cut back.
 func (path *AstPath[N, S]) descend(names []string) Value[N] {
 	value := path.current().Value
 	for _, name := range names {
