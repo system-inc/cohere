@@ -22,10 +22,11 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 }
 
 // The flagged fixtures carry a want for every line past 120 columns that could wrap: code, a string after code or
-// before more code, a comment of words, and a line of 121 with tabs. analysistest fails on a finding no want expects
-// as much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on what cannot
-// wrap (an import path, a //go: directive, a raw string's body, a lone string, a URL too long for
-// a line of its own) and on a line of exactly 120 with tabs or past 120 only in bytes.
+// before more code, a keyed or named string with code or a comment around it, a comment of words, and a line of 121
+// with tabs. analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and
+// lookalike fixtures prove the rule stays quiet on what cannot wrap (an import path, a //go: directive, a raw string's
+// body, a lone string, a string after only a key or a name and its operator, a URL too long for a line of its own)
+// and on a line of exactly 120 with tabs or past 120 only in bytes.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(
