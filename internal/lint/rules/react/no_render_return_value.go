@@ -140,6 +140,31 @@ var NoRenderReturnValue = rule.Rule{
 	},
 }
 
+// The one receiver and the one method this rule is about. `React.render` is a deliberate upstream
+// pass; see the doc comment on the rule.
+const (
+	reactDOMReceiver = "ReactDOM"
+	renderMethod     = "render"
+)
+
+// reactDOMRenderAcceptedKeys is the set of key spellings that can name `render` the way upstream
+// reads one.
+//
+// `Numeric` and `Private` are excluded because no number and no `#name` can render as `render`, so
+// including them would change no answer while overstating what was checked. `Computed` is excluded
+// because there are no brackets in the tree to see through here: `AccessedName` reads an element
+// access's subscript directly, and a bare identifier subscript names whatever the variable holds,
+// which upstream declines too. Measured on oxlint: `ReactDOM[render](...)` is silent.
+//
+// Widening this to `property.Static` survives every fixture, and that survivor is equivalent rather
+// than a blind spot. Distinguishing the two versions needs a key that is numeric, private, or a
+// computed-property-name node whose text is nonetheless `render`, and no such input exists: the
+// first two spellings cannot produce those letters, and `AccessedName` never routes a
+// `KindComputedPropertyName` into `Name` at all, reading a property access's name node and an
+// element access's subscript expression directly. Read out of the accessor's body rather than
+// inferred from the flag's name, since the flag reads as though it should apply here.
+const reactDOMRenderAcceptedKeys = property.Named | property.Quoted | property.Templated
+
 // reactDOMRenderCallee returns the member access when a callee reads `render` off `ReactDOM`, and
 // nil otherwise.
 //
@@ -190,31 +215,6 @@ func reactDOMRenderCallee(callee *ast.Node) *ast.Node {
 	}
 	return callee
 }
-
-// The one receiver and the one method this rule is about. `React.render` is a deliberate upstream
-// pass; see the doc comment on the rule.
-const (
-	reactDOMReceiver = "ReactDOM"
-	renderMethod     = "render"
-)
-
-// reactDOMRenderAcceptedKeys is the set of key spellings that can name `render` the way upstream
-// reads one.
-//
-// `Numeric` and `Private` are excluded because no number and no `#name` can render as `render`, so
-// including them would change no answer while overstating what was checked. `Computed` is excluded
-// because there are no brackets in the tree to see through here: `AccessedName` reads an element
-// access's subscript directly, and a bare identifier subscript names whatever the variable holds,
-// which upstream declines too. Measured on oxlint: `ReactDOM[render](...)` is silent.
-//
-// Widening this to `property.Static` survives every fixture, and that survivor is equivalent rather
-// than a blind spot. Distinguishing the two versions needs a key that is numeric, private, or a
-// computed-property-name node whose text is nonetheless `render`, and no such input exists: the
-// first two spellings cannot produce those letters, and `AccessedName` never routes a
-// `KindComputedPropertyName` into `Name` at all, reading a property access's name node and an
-// element access's subscript expression directly. Read out of the accessor's body rather than
-// inferred from the flag's name, since the flag reads as though it should apply here.
-const reactDOMRenderAcceptedKeys = property.Named | property.Quoted | property.Templated
 
 // isReturnValueConsumingParent reports whether the call's parent is one of the five node kinds
 // upstream matches.

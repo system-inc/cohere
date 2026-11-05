@@ -24,7 +24,7 @@ func DefaultSortDefaultPropsOptions() SortDefaultPropsOptions {
 // DecodeSortDefaultPropsOptions reads this rule's configuration from the config layer.
 //
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
-// OBJECT rather than upstream's one-element array. Empty input is a rule configured as a bare
+// object rather than upstream's one-element array. Empty input is a rule configured as a bare
 // `"error"` and resolves to the default.
 func DecodeSortDefaultPropsOptions(raw []byte) (any, error) {
 	options := DefaultSortDefaultPropsOptions()
@@ -68,7 +68,7 @@ var messageDefaultPropsNotSorted = rule.Message{
 // through the plugin's metadata. It is recorded here because it is the kind of thing a later reader
 // deserves to know before building on this rule.
 //
-// # The comparison is on RAW SOURCE TEXT, not on the resolved key
+// # The comparison is on raw source text, not on the resolved key
 //
 // Upstream's `getKey` calls `getText` on the key node, so the string being compared includes any
 // quotes the source wrote. That produces an ordering nobody would design:
@@ -83,14 +83,14 @@ var messageDefaultPropsNotSorted = rule.Message{
 //
 // # A spread restarts the comparison rather than being skipped
 //
-// Upstream's reduce returns `decls[idx + 1]` when it meets a spread, so the element AFTER the
+// Upstream's reduce returns `decls[idx + 1]` when it meets a spread, so the element after the
 // spread becomes the accumulator without being compared to anything. That means a spread splits the
 // object into independently sorted runs, and `{b: 1, ...x, a: 2}` is clean. Measured.
 //
 // # Which objects are reached
 //
 // A class field or an assignment named `defaultProps` or `getDefaultProps`, whose value is either
-// an object literal directly or an identifier naming one. A `getDefaultProps` METHOD returning an
+// an object literal directly or an identifier naming one. A `getDefaultProps` method returning an
 // object is silent, because the rule looks at the value rather than at a return statement, measured
 // against the installed build even though the name suggests otherwise.
 //
@@ -200,15 +200,15 @@ func sortDefaultPropsInitializerOf(declaration *ast.Node) *ast.Node {
 // This is upstream's `reduce`, written as a loop. Three behaviours in it are load-bearing and none
 // is obvious from the shape:
 //
-// The accumulator starts at element ZERO and element zero is also the first thing compared, so the
+// The accumulator starts at element zero and element zero is also the first thing compared, so the
 // first property is compared against itself. That comparison can never fail, so it costs nothing,
 // and it is kept rather than skipped because skipping it would change which element the spread
 // handling below sees first.
 //
-// A spread does not advance the accumulator to itself; it advances to the element AFTER it, which
+// A spread does not advance the accumulator to itself; it advances to the element after it, which
 // is then never compared to anything. So a spread splits the object into independently sorted runs.
 //
-// When a property IS out of order the accumulator does NOT advance past it. So `{c, b, a}` reports
+// When a property is out of order the accumulator does not advance past it. So `{c, b, a}` reports
 // twice, both against `c`, rather than reporting once and resyncing. Measured.
 func sortDefaultPropsReportUnsorted(
 	ruleContext rule.Context,
@@ -231,7 +231,7 @@ func sortDefaultPropsReportUnsorted(
 			// iteration's `getKey` would then read. It never gets the chance, because there is no
 			// next iteration when the spread is last.
 			//
-			// Setting the accumulator to the spread ITSELF is an EQUIVALENT mutation, verified by
+			// Setting the accumulator to the spread itself is an equivalent mutation, verified by
 			// enumeration over nine spread arrangements rather than argued: a spread has no name
 			// node, so its key text is the empty string, and the empty string is less than every
 			// other string, so the next key can never report against it and then becomes the
@@ -259,7 +259,7 @@ func sortDefaultPropsReportUnsorted(
 	}
 }
 
-// sortDefaultPropsKeyText renders the text upstream compares, which is the RAW SOURCE of the key.
+// sortDefaultPropsKeyText renders the text upstream compares, which is the raw source of the key.
 //
 // Upstream calls `getText(context, node.key || node.argument)`, so quotes, whitespace inside a
 // computed key, and everything else the author wrote is part of the comparison. Reading the source
@@ -273,7 +273,7 @@ func sortDefaultPropsKeyText(ruleContext rule.Context, property *ast.Node) strin
 		return ""
 	}
 	// A computed key is where the two trees disagree about what "the key node" is. ESTree's `key`
-	// for `{[x]: 1}` is the INNER expression `x`, and upstream renders that, while our parser wraps
+	// for `{[x]: 1}` is the inner expression `x`, and upstream renders that, while our parser wraps
 	// it in a ComputedPropertyName whose own text carries the brackets. Rendering the wrapper would
 	// compare `[x]`, and the bracket sorts between uppercase and lowercase, so `{[x]: 1, a: 2}`
 	// would go silent where upstream reports. Measured against the installed build: that input
@@ -285,9 +285,9 @@ func sortDefaultPropsKeyText(ruleContext rule.Context, property *ast.Node) strin
 	}
 	// `Pos()` includes leading trivia, so a raw slice carries the newline, the indentation and any
 	// comment written before the key. Whitespace and `/` sort below every letter, so an untrimmed
-	// key compares as less than almost anything and a correctly SORTED object reports. Upstream's
+	// key compares as less than almost anything and a correctly sorted object reports. Upstream's
 	// `getText(node)` returns the node's own text with trivia already excluded, which is what
-	// `rule.TokenRange` reproduces; trimming whitespace by hand is NOT enough, because a comment
+	// `rule.TokenRange` reproduces; trimming whitespace by hand is not enough, because a comment
 	// between two keys survives it. Both shapes measured silent upstream and both reported here
 	// before this used the token range.
 	keyRange := rule.TokenRange(ruleContext.SourceFile, name)

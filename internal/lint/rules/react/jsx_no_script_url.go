@@ -39,8 +39,8 @@ type JsxNoScriptUrlOptions struct {
 	// Legacy is the list of component-and-attribute pairs to check, from the array arm.
 	//
 	// Order matters and later entries win, which the corpus does not state and which was measured
-	// against the installed build both ways. An entry naming a component twice keeps the LAST
-	// entry's attribute list, and an entry naming `a` REPLACES the built-in `href` default rather
+	// against the installed build both ways. An entry naming a component twice keeps the last
+	// entry's attribute list, and an entry naming `a` replaces the built-in `href` default rather
 	// than adding to it.
 	Legacy []JsxNoScriptUrlComponent
 }
@@ -126,24 +126,24 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 }
 
 // jsxNoScriptUrlDecodeStrictly decodes one element and refuses keys its schema does not declare.
-func jsxNoScriptUrlDecodeStrictly(element json.RawMessage, into any) error {
+func jsxNoScriptUrlDecodeStrictly[Target any](element json.RawMessage, into *Target) error {
 	decoder := json.NewDecoder(bytes.NewReader(element))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(into)
 }
 
-// jsxNoScriptUrlIsInterleavingWhitespace reports whether a character may sit BETWEEN the letters of
+// jsxNoScriptUrlIsInterleavingWhitespace reports whether a character may sit between the letters of
 // the protocol.
 //
 // Upstream's regex writes a carriage-return, newline and tab class between every letter, so only
-// those three are accepted there. A plain space inside the word does NOT match, which is the
+// those three are accepted there. A plain space inside the word does not match, which is the
 // distinction a port is most likely to get wrong by reusing the wider prefix class below. Measured
 // against the installed build: a space inside the word is clean and a newline inside it reports.
 func jsxNoScriptUrlIsInterleavingWhitespace(character byte) bool {
 	return character == '\r' || character == '\n' || character == '\t'
 }
 
-// jsxNoScriptUrlIsLeadingWhitespace reports whether a character may sit BEFORE the protocol.
+// jsxNoScriptUrlIsLeadingWhitespace reports whether a character may sit before the protocol.
 //
 // Upstream's prefix class spans every code unit from zero through 0x1F, plus the space, which is
 // wider than the interleaving class. Measured at the edges against the installed build: 0x01, 0x09,
@@ -300,13 +300,13 @@ var JsxNoScriptUrl = rule.Rule{
 				// tree has no attribute-list node in between. Walking two levels here reaches the
 				// same element rather than a different one.
 				//
-				// The KIND half of this guard is unreachable and is kept as crash protection
+				// The kind half of this guard is unreachable and is kept as crash protection
 				// rather than as a filter, which is why a mutant removing it survives every
 				// fixture. Probed with a rule collecting the parent kind of every JsxAttribute
 				// over nine attributes across eight sources, including a spread beside an
 				// attribute, a nested element inside an attribute value, and four malformed
 				// inputs the parser recovers from: the parent is `KindJsxAttributes` in all nine
-				// and nothing else appeared. The NIL half is what earns its place, since the line
+				// and nothing else appeared. The `nil` half is what earns its place, since the line
 				// below dereferences this node.
 				//
 				// The enumeration is what makes the verdict expire: it names error recovery and a

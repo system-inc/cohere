@@ -10,7 +10,7 @@ import (
 //
 // A rule wired here but absent from `ShippedRules` would run and then have its fixtures classified
 // as `no rule shipped`, so it would score nothing while appearing to work. The reverse is allowed
-// and expected: `ShippedRules` is what cohere HAS, `Rules` is what this harness has WIRED, and the
+// and expected: `ShippedRules` is what cohere has, `Rules` is what this harness has wired, and the
 // gap between them is the honest measure of what is left to do.
 func TestEveryWiredRuleIsAShippedRule(test *testing.T) {
 	test.Parallel()

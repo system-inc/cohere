@@ -55,8 +55,12 @@ func TestFrameworkFunctionalUtilitiesMatchTheEngine(test *testing.T) {
 func expectFrameworkFunctionalUtilitiesMatch(test *testing.T, fixture wave1Fixture, system *LoadedDesignSystem) {
 	test.Helper()
 
-	var agreed, bothDeclined, goSilent, engineSilent int
-	var disagreements, silentNames []string
+	var agreed int
+	var bothDeclined int
+	var goSilent int
+	var engineSilent int
+	var disagreements []string
+	var silentNames []string
 
 	for _, testCase := range fixture.Cases {
 		utility, known := FrameworkFunctionalUtilities[testCase.Root]

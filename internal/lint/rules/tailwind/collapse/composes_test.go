@@ -14,7 +14,9 @@ import (
 // the two are independent measurements of one fact and are forced to agree here.
 func TestComposesForAgreesWithTheGeneratedTable(test *testing.T) {
 	test.Parallel()
-	var agreed, disagreed, unanswerable int
+	var agreed int
+	var disagreed int
+	var unanswerable int
 	var disagreements []string
 
 	for root := range composingRootsTheGeneratorFound {
@@ -54,7 +56,8 @@ func TestComposesForAgreesWithTheGeneratedTable(test *testing.T) {
 // upstream joins the population instead of being missed by a list nobody updates.
 func TestComposesForRefusesRootsTheTableOmits(test *testing.T) {
 	test.Parallel()
-	var checked, wronglyComposing int
+	var checked int
+	var wronglyComposing int
 	var wrong []string
 
 	for root := range FrameworkMultiDeclarationUtilities {
@@ -113,8 +116,10 @@ func TestComposesForRefusesRootsTheTableOmits(test *testing.T) {
 // of the property fixed both.
 func TestComposesForAnswersGapRootsAndTheirControls(test *testing.T) {
 	test.Parallel()
-	var composingAnswered, composingAgreed int
-	var controlAnswered, controlWrong int
+	var composingAnswered int
+	var composingAgreed int
+	var controlAnswered int
+	var controlWrong int
 	var wrong []string
 
 	for root := range gapEmitters {
@@ -414,7 +419,8 @@ func TestSelectorShapesAgreeWithTheGeneratedTable(test *testing.T) {
 // root added upstream is checked rather than needing to be added here.
 func TestUnwrappedRootsReadAsABareClass(test *testing.T) {
 	test.Parallel()
-	var checked, wrong int
+	var checked int
+	var wrong int
 	var wrongNames []string
 
 	check := func(root string) {

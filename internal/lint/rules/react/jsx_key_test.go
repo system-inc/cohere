@@ -8,7 +8,7 @@ import (
 
 // jsxKeyFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because every case is JSX and needs a parser that reads it. It is NOT load-bearing:
+// A `.tsx` name because every case is JSX and needs a parser that reads it. It is not load-bearing:
 // this rule has no file gate, and `TestJsxKeyHasNoFileGate` pins that by running one reporting
 // source under three JSX-capable extensions.
 const jsxKeyFile = "/repository/source/JsxKey.tsx"
@@ -21,10 +21,10 @@ const jsxKeyFile = "/repository/source/JsxKey.tsx"
 // a second time through an independent path that writes raw bytes rather than JSON. All 67 codes
 // were byte-identical across the two extractions.
 //
-// # This rule's two authorities DISAGREE, and the corpus wins
+// # This rule's two authorities disagree, and the corpus wins
 //
 // All 67 were run against the installed build, version 7.37.5, and it disagreed with the corpus on
-// SIX of them. Every one is a block-bodied callback returning a conditional or a logical: the clone
+// six of them. Every one is a block-bodied callback returning a conditional or a logical: the clone
 // descends into those and the installed build does not. The clone carries unreleased commits on top
 // of the 7.37.5 tag while still reporting that version string, so the installed build is a snapshot
 // that is behind rather than a different opinion.
@@ -33,18 +33,18 @@ const jsxKeyFile = "/repository/source/JsxKey.tsx"
 // this repository currently runs should expect exactly those six shapes to differ, in the direction
 // of us reporting and ESLint being silent. The full reasoning is on the rule.
 //
-// The ARROW-BODY twins of those same shapes agree on both builds and are in the tables unmarked,
+// The arrow-body twins of those same shapes agree on both builds and are in the tables unmarked,
 // which is what makes the divergence easy to misread as a defect here.
 //
 // # Five cases carry a pragma through settings, and every one of them moves
 //
 // Upstream configures `pragma: Act, fragment: Frag` on five cases. cohere reads no React
 // settings, so neither can reach a rule here. Each was re-run against the installed build
-// with its settings REMOVED and the table records that answer. Four of the five report the same
+// with its settings removed and the table records that answer. Four of the five report the same
 // thing under either configuration; `valid-33` is the one that genuinely moves, because its
 // `Act.Children.toArray` suppression depends on the pragma being `Act`.
 //
-// # The options column is RAW JSON
+// # The options column is raw JSON
 //
 // Every default here is false, so no inversion is needed, but the tables still route through
 // `DecodeJsxKeyOptions` because that is the function the config calls and because it has a nil path
@@ -65,10 +65,10 @@ func TestJsxKeyFires(test *testing.T) {
 		wantIds    []string
 	}{
 		{"upstream valid-33", "\n        import Act from 'react';\n        import { Children as ReactChildren } from 'react';\n\n        const { Children } = Act;\n        const { toArray } = Children;\n\n        Act.Children.toArray([1, 2 ,3].map(x => <App />));\n        Act.Children.toArray(Array.from([1, 2 ,3], x => <App />));\n        Children.toArray([1, 2 ,3].map(x => <App />));\n        Children.toArray(Array.from([1, 2 ,3], x => <App />));\n        // ReactChildren.toArray([1, 2 ,3].map(x => <App />));\n        // ReactChildren.toArray(Array.from([1, 2 ,3], x => <App />));\n        // toArray([1, 2 ,3].map(x => <App />));\n        // toArray(Array.from([1, 2 ,3], x => <App />));\n      ", "", []string{"missingIterKey", "missingIterKey"}}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-0", "\n        [1, 2, 3].map((item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                           // CLONE behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-1", "\n        [1, 2, 3].map(function(item) {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                      // CLONE behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-2", "\n        Array.from([1, 2, 3], (item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                   // CLONE behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-3", "\n        import { Fragment } from 'react';\n\n        const ITEMS = ['bar', 'foo'];\n\n        export default function BugIssue() {\n          return (\n            <Fragment>\n              {ITEMS.map((item) => {\n                return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n              })}\n            </Fragment>\n          );\n        }\n      ", "", []string{"missingIterKey", "missingIterKey"}}, // CLONE behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{"upstream invalid-0", "\n        [1, 2, 3].map((item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                           // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{"upstream invalid-1", "\n        [1, 2, 3].map(function(item) {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                      // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{"upstream invalid-2", "\n        Array.from([1, 2, 3], (item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                   // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{"upstream invalid-3", "\n        import { Fragment } from 'react';\n\n        const ITEMS = ['bar', 'foo'];\n\n        export default function BugIssue() {\n          return (\n            <Fragment>\n              {ITEMS.map((item) => {\n                return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n              })}\n            </Fragment>\n          );\n        }\n      ", "", []string{"missingIterKey", "missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
 		{"upstream invalid-4", "[<App />];", "", []string{"missingArrayKey"}},
 		{"upstream invalid-5", "[<App {...key} />];", "", []string{"missingArrayKey"}},
 		{"upstream invalid-6", "[<App key={0}/>, <App />];", "", []string{"missingArrayKey"}},
@@ -93,8 +93,8 @@ func TestJsxKeyFires(test *testing.T) {
 		{"upstream invalid-25", "\n        const TestO = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) {\n                  return <div>{item}</div>;\n                } else if (item < 5) {\n                  return <div></div>\n                }  else {\n                  return <div></div>\n                }\n\n                return <div />;\n              })}\n            </div>\n          );\n        };\n      ", "", []string{"missingIterKey", "missingIterKey", "missingIterKey", "missingIterKey"}},
 		{"upstream invalid-26", "\n        const TestCase = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) return <div>{item}</div>;\n                else if (item < 5) return <div />;\n                else return <div />;\n              })}\n            </div>\n          );\n        };\n      ", "", []string{"missingIterKey", "missingIterKey", "missingIterKey"}},
 		{"upstream invalid-27", "\n        const TestCase = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(x => <div {...spread} key={x} />)}\n            </div>\n          );\n        };\n      ", "{\"checkKeyMustBeforeSpread\": true}", []string{"keyBeforeSpread"}},
-		{"upstream invalid-28", "[1, 2, 3].map(x => { return x && <App />; });", "", []string{"missingIterKey"}},      // CLONE behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-29", "[1, 2, 3].map(x => { return x || y || <App />; });", "", []string{"missingIterKey"}}, // CLONE behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{"upstream invalid-28", "[1, 2, 3].map(x => { return x && <App />; });", "", []string{"missingIterKey"}},      // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{"upstream invalid-29", "[1, 2, 3].map(x => { return x || y || <App />; });", "", []string{"missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 		//
@@ -102,7 +102,7 @@ func TestJsxKeyFires(test *testing.T) {
 		// they are marked. Their verdict here is the clone's, derived from the same rule the six
 		// marked corpus cases above establish, rather than from a run: the installed build reports
 		// nothing for any block-bodied return of a conditional or a logical.
-		// An element writing `key` TWICE reports twice, because upstream's loop runs once per
+		// An element writing `key` twice reports twice, because upstream's loop runs once per
 		// matching attribute rather than once per element. Written for a mutant that returned only
 		// the first match, which survived the whole imported corpus because nothing in it doubles
 		// an attribute.
@@ -128,8 +128,8 @@ func TestJsxKeyFires(test *testing.T) {
 		{"dup span", "[<span key=\"a\"/>, <span key=\"a\"/>];", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
 		{"block if return", "[1,2,3].map(x => { if (x) { return <App />; } return <B />; });", "", []string{"missingIterKey", "missingIterKey"}},
 		{"block if else return", "[1,2,3].map(x => { if (x) return <A />; else return <B />; });", "", []string{"missingIterKey", "missingIterKey"}},
-		{"block ternary return", "[1,2,3].map(x => { return x ? <A /> : <B />; });", "", []string{"missingIterKey", "missingIterKey"}}, // CLONE behavior; the installed 7.37.5 is silent here
-		{"block logical return", "[1,2,3].map(x => { return x && <A />; });", "", []string{"missingIterKey"}},                          // CLONE behavior; the installed 7.37.5 is silent here
+		{"block ternary return", "[1,2,3].map(x => { return x ? <A /> : <B />; });", "", []string{"missingIterKey", "missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here
+		{"block logical return", "[1,2,3].map(x => { return x && <A />; });", "", []string{"missingIterKey"}},                          // Clone behavior; the installed 7.37.5 is silent here
 		{"arrow ternary body", "[1,2,3].map(x => x ? <A /> : <B />);", "", []string{"missingIterKey", "missingIterKey"}},
 		{"arrow logical body", "[1,2,3].map(x => x && <A />);", "", []string{"missingIterKey"}},
 		{"block nested fn return", "[1,2,3].map(x => { function f() { return <A />; } return <B />; });", "", []string{"missingIterKey"}},
@@ -151,7 +151,7 @@ func TestJsxKeyFires(test *testing.T) {
 		{"paren element in array", "[(<App />)];", "", []string{"missingArrayKey"}},
 		{"paren return arg", "[1,2,3].map(x => { return (<App />); });", "", []string{"missingIterKey"}},
 		{"paren arrow body", "[1,2,3].map(x => (<App />));", "", []string{"missingIterKey"}},
-		{"paren conditional return", "[1,2,3].map(x => { return (c ? <A/> : <B/>); });", "", []string{"missingIterKey", "missingIterKey"}}, // CLONE behavior; the installed 7.37.5 is silent here
+		{"paren conditional return", "[1,2,3].map(x => { return (c ? <A/> : <B/>); });", "", []string{"missingIterKey", "missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here
 	}
 
 	for _, testCase := range cases {
@@ -215,27 +215,27 @@ func TestJsxKeyStaysSilent(test *testing.T) {
 		// they are marked. Their verdict here is the clone's, derived from the same rule the six
 		// marked corpus cases above establish, rather than from a run: the installed build reports
 		// nothing for any block-bodied return of a conditional or a logical.
-		// A BARE call is never an iterator here. Upstream's selectors require a member-expression
+		// A bare call is never an iterator here. Upstream's selectors require a member-expression
 		// callee, so `map(...)` and `from(...)` written as free functions match nothing. Written
 		// for a mutant that accepted a bare identifier callee, which survived the imported corpus
 		// because every case in it calls through a member.
 		{"bare map call", "map(x => <App />);", ""},
 		{"bare from call", "from(a, x => <App />);", ""},
 
-		// Only the FIRST argument of `map` is inspected, and only the SECOND of `Array.from`.
+		// Only the first argument of `map` is inspected, and only the second of `Array.from`.
 		// `map` takes a `thisArg` second argument, so a callback written there is not the iteratee
 		// and upstream does not look at it. Written for a mutant that read the last argument
 		// instead, which survived the whole imported corpus because nothing in it calls `map` with
 		// two arguments.
 		{"map with a thisArg second argument", "[1,2,3].map(someFn, x => <App />);", ""},
 
-		// A logical whose RIGHT side is not JSX falls through to nothing rather than to the general
+		// A logical whose right side is not JSX falls through to nothing rather than to the general
 		// arm, because upstream's chain is `else if (isLogical && isJSX(right))` followed by an
-		// `else`. So a JSX element on the LEFT is invisible. Written for a mutant that removed the
+		// `else`. So a JSX element on the left is invisible. Written for a mutant that removed the
 		// `continue`, letting the general arm see the whole logical expression.
 		{"logical with jsx on the left only", "[1,2,3].map(x => { return <App /> && y; });", ""},
 
-		// A nullish coalescing IS a logical expression to espree, and in a block-bodied return it
+		// A nullish coalescing is a logical expression to espree, and in a block-bodied return it
 		// therefore takes the logical arm. Its right side is JSX here, so under the clone it
 		// reports; recorded as reporting in the fires table rather than here.
 		{"array literal has key", "[<App key={1} />];", ""},
@@ -302,16 +302,16 @@ func decodeJsxKeyOptionsForTest(test *testing.T, raw string) any {
 	return options
 }
 
-// TestJsxKeySpans pins WHERE each of the six findings points, and three of them are surprising.
+// TestJsxKeySpans pins where each of the six findings points, and three of them are surprising.
 //
 // `ExpectFindings` asserts ids and counts and nothing else, and this rule has six ids across four
 // listeners, so there is a lot of room for a finding to be correct and anchored wrong. Three spans
 // here are not the element the reader would guess:
 //
-//   - `keyBeforeSpread` from the COLLECTION arm points at the CONTAINER, so the whole array literal
-//     or the whole parent element, while the same id from the ITERATOR arm points at the element.
+//   - `keyBeforeSpread` from the collection arm points at the container, so the whole array literal
+//     or the whole parent element, while the same id from the iterator arm points at the element.
 //     One id, two anchors, and only a span assertion can tell them apart.
-//   - `nonUniqueKeys` points at the KEY ATTRIBUTE rather than at the element carrying it.
+//   - `nonUniqueKeys` points at the key attribute rather than at the element carrying it.
 //
 // Every want below is the slice upstream underlines, taken from the installed build's reported
 // columns rather than from reading the source.
@@ -380,7 +380,7 @@ func TestJsxKeySpans(test *testing.T) {
 // TestJsxKeyDuplicateOrderIsStable pins that repeated findings come out in source order.
 //
 // The duplicate arm groups elements by their key's source text, and a Go map has no order. Reading
-// the groups straight out of the map would leave the COUNT fixed and the ORDER varying run to run,
+// the groups straight out of the map would leave the count fixed and the order varying run to run,
 // which no fixture asserting ids can see because every id in the group is the same. The rule keeps
 // an insertion-ordered list of keys beside the map for exactly this, and this test is what would
 // catch its removal.
@@ -428,7 +428,7 @@ func TestJsxKeyHandlesNilOptions(test *testing.T) {
 	result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, "[<App />];", nil)
 	rule_testing.ExpectFindings(test, result, "missingArrayKey")
 
-	// And the three option-gated judgments stay OFF, which is the half a nil-options bug would
+	// And the three option-gated judgments stay off, which is the half a nil-options bug would
 	// turn on rather than off.
 	for _, source := range []string{
 		"[1,2,3].map(x => <>{x}</>);",

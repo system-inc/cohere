@@ -2,7 +2,7 @@
 //
 // This is the seam between `internal/tailwind`, which knows how to build a design system and
 // nothing about when, and the rules, which need one on every file and must not each build their
-// own. No rule reads it yet — swapping the rules over is #4q5dsn3 and #3r6cxrb. What lands here is
+// own. No rule reads it yet: swapping the rules over is #4q5dsn3 and #3r6cxrb. What lands here is
 // the seam and the proof that it is built once.
 //
 // # The pattern, and the failure history it carries
@@ -31,7 +31,7 @@
 // The design system build is the same shape. Measured on both corpus repositories: 0.68ms per build
 // on ~/Projects/ahra, over a 9-file `@import` graph resolving 744 theme entries and 37 `@utility`
 // blocks, and 0.64ms on www-connected-app for 748 entries. Per-file across 1,862 files that is 1.27
-// seconds, and across the 3,416-file tree the rule catalog is measured on, about 2.3 seconds —
+// seconds, and across the 3,416-file tree the rule catalog is measured on, about 2.3 seconds,
 // against a lint phase that currently runs in 0.19s. The tool would get twelve times slower and
 // every test would stay green.
 //
@@ -202,7 +202,7 @@ func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocat
 func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS, location DesignSystemLocation) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
-		return DesignSystemResult{Err: fmt.Errorf("could not determine the project root from the program")}
+		return DesignSystemResult{Err: fmt.Errorf("determining the project root from the program")}
 	}
 	if !location.isDefault() {
 		return loadConfiguredDesignSystem(projectRoot, fileSystem, location)

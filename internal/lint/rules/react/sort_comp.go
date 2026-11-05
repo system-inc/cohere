@@ -18,7 +18,7 @@ import (
 // dispatch, so the decoder receives that object directly rather than upstream's one-element array.
 //
 // Both fields are pointers to slices/maps rather than plain ones, because upstream distinguishes
-// ABSENT from EMPTY on `order`: `userConfig.order || defaultConfig.order` falls back only when the
+// absent from empty on `order`: `userConfig.order || defaultConfig.order` falls back only when the
 // field is missing or null, so an explicitly empty `order: []` is a real configuration meaning "no
 // group matches anything". A plain `[]string` cannot tell those apart and would silently restore
 // the default for a user who asked for nothing.
@@ -28,7 +28,7 @@ type SortCompOptions struct {
 	// member name, as one of the built-in shape predicates, or as a `/regex/flags` pattern.
 	Order *[]string `json:"order"`
 
-	// Groups maps a group name to the member names it contains. Upstream merges this OVER the
+	// Groups maps a group name to the member names it contains. Upstream merges this over the
 	// default groups rather than replacing them, so a user who defines `customGroup` still has
 	// `lifecycle` available, and a user who redefines `lifecycle` replaces only that one.
 	Groups *map[string][]string `json:"groups"`
@@ -76,10 +76,10 @@ var sortCompDefaultLifecycle = []string{
 }
 
 // sortCompKnownLifecycleNames is upstream's inline `arrayIncludes([...])` list in
-// `getRefPropIndexes`, which is the default lifecycle list PLUS `render`.
+// `getRefPropIndexes`, which is the default lifecycle list plus `render`.
 //
 // It is a separate list from `sortCompDefaultLifecycle` and the difference matters. This one
-// decides whether an order entry is treated as a LITERAL MEMBER NAME rather than as a regex or a
+// decides whether an order entry is treated as a literal member name rather than as a regex or a
 // shape predicate; the other decides what the `lifecycle` group expands to. `render` is in this
 // list and not in that one, because `render` is its own top-level entry in the default order.
 //
@@ -96,7 +96,7 @@ var sortCompKnownLifecycleNames = func() map[string]bool {
 // sortCompRegexPattern is upstream's `regExpRegExp`, matching a `/body/flags` order entry.
 //
 // Upstream writes `/\/(.*)\/([gimsuy]*)/` and applies it with `String.prototype.match`, which is
-// UNANCHORED: an entry like `foo/on.*/bar` matches, capturing `on.*`. That is reproduced with
+// unanchored: an entry like `foo/on.*/bar` matches, capturing `on.*`. That is reproduced with
 // `FindStringSubmatch` rather than tightened to a full-string match, because tightening it would
 // make a rule that silently disagrees with upstream on an input no corpus case writes. The captured
 // body is compiled as JavaScript reads it (see `sortCompCompilePattern`), and one that still fails to
@@ -176,9 +176,9 @@ func sortCompUnsortedProps(propertyA string, position string, propertyB string) 
 //
 // # What upstream's algorithm actually is, and why it is not a sort
 //
-// The name says sort and the implementation is a pairwise vote. For each ORDERED PAIR of members
+// The name says sort and the implementation is a pairwise vote. For each ordered pair of members
 // upstream asks whether their relative position is defensible, and records a violation against the
-// FIRST member of any pair that is not. So a single misplaced member in a class of six can
+// first member of any pair that is not. So a single misplaced member in a class of six can
 // accumulate five votes against it, and every other member accumulates one.
 //
 // The votes are then reconciled twice over, and both reconciliations are load-bearing:
@@ -198,19 +198,19 @@ func sortCompUnsortedProps(propertyA string, position string, propertyB string) 
 // # Map iteration order is the one place Go could disagree with itself
 //
 // Upstream's `errors` is a JavaScript object keyed by index, and both `dedupeErrors` and
-// `reportErrors` walk it with `Object.entries`, which for integer-like keys iterates in ASCENDING
-// NUMERIC ORDER. Go's map iteration is randomised, and `dedupeErrors` MUTATES the collection it
+// `reportErrors` walk it with `Object.entries`, which for integer-like keys iterates in ascending
+// numeric order. Go's map iteration is randomised, and `dedupeErrors` mutates the collection it
 // walks, so an unordered walk makes the surviving finding depend on which entry was visited first.
 //
 // That is not a theoretical hazard: with two conflicting members of equal score, the two orders
 // delete different entries, so the rule would report a different member run to run. A flaky rule
 // reads as green most of the time and blames something unrelated on the run where it does not, so
-// the determinism is put in the RULE rather than trusted to a fixture: `sortCompSortedIndexes`
+// the determinism is put in the rule rather than trusted to a fixture: `sortCompSortedIndexes`
 // walks the keys in ascending numeric order at both sites, matching `Object.entries`.
 //
 // # Two shapes upstream's corpus cannot express, and how they are decided here
 //
-// `type-annotations` selects a member that carries a type annotation and NO value, which upstream
+// `type-annotations` selects a member that carries a type annotation and no value, which upstream
 // spells `!!node.typeAnnotation && node.value === null`. In our AST a property declaration's `Type`
 // is a sibling of the name rather than part of it, and `Initializer` is what upstream calls
 // `value`, so the predicate is `declaration.Type != nil && declaration.Initializer == nil`. The
@@ -220,7 +220,7 @@ func sortCompUnsortedProps(propertyA string, position string, propertyB string) 
 //
 // `getters` and `setters` read `node.kind === 'get'` / `'set'`, which are distinct node kinds here
 // rather than a discriminant field, so they are matched on `ast.KindGetAccessor` and
-// `ast.KindSetAccessor`. An accessor in an OBJECT LITERAL is the same two kinds, which is why the
+// `ast.KindSetAccessor`. An accessor in an object literal is the same two kinds, which is why the
 // factory-component arm reaches them too.
 var SortComp = rule.Rule{
 	Name: "react/sort-comp",
@@ -266,7 +266,7 @@ type sortCompMember struct {
 	node *ast.Node
 
 	// name is upstream's `getPropertyName`, with the two accessor kinds replaced by the literal
-	// strings upstream substitutes. Those strings reach the MESSAGE as well as the matching, which
+	// strings upstream substitutes. Those strings reach the message as well as the matching, which
 	// is why they are stored rather than derived at report time.
 	name string
 
@@ -284,7 +284,7 @@ type sortCompMember struct {
 // Groups are merged over the defaults rather than replacing them, and each order entry is either
 // expanded (if it names a group) or passed through. Note that the expansion is one level deep:
 // upstream concatenates the group's contents without re-expanding them, so a group naming another
-// group produces that group's NAME as a literal member name to match, not its contents.
+// group produces that group's name as a literal member name to match, not its contents.
 func sortCompMethodsOrder(options SortCompOptions) []string {
 	groups := map[string][]string{"lifecycle": sortCompDefaultLifecycle}
 	if options.Groups != nil {
@@ -359,7 +359,7 @@ func sortCompComponentMembers(component *ast.Node) []sortCompMember {
 // The asymmetry in the third column is upstream's, not a transcription slip: `staticMethod` accepts
 // `MethodDefinition` while `instanceMethod` does not, so a plain `foo() {}` in a class is neither a
 // static method nor an instance method by these flags and falls through to `everything-else`. A
-// `static foo() {}` IS matched by `static-methods`. Verified against the installed build rather
+// `static foo() {}` is matched by `static-methods`. Verified against the installed build rather
 // than read: a class whose only members are `render` and a non-static `onClick() {}` under an order
 // naming `instance-methods` does not place `onClick` in that group.
 func sortCompMemberFor(node *ast.Node) sortCompMember {
@@ -384,31 +384,31 @@ func sortCompMemberFor(node *ast.Node) sortCompMember {
 	initializer, isPropertyLike := sortCompPropertyInitializer(node)
 	initializedToFunction := isPropertyLike && initializer != nil && isFunctionLikeExpression(initializer)
 
-	// `isMethodDeclaration` names only the method kind, and NOT the constructor kind, which reads as
+	// `isMethodDeclaration` names only the method kind, and not the constructor kind, which reads as
 	// an omission and is not. A constructor is ESTree's `MethodDefinition` too, so including it here
 	// looks right; but this variable is read on exactly one line below, guarded by `isStatic`, and a
 	// constructor can never be static. Adding the constructor kind is therefore unreachable, which a
 	// mutation confirmed: including it and excluding it both survive the whole suite.
 	//
-	// The constructor is still handled, in the two places where it is reachable. Its NAME comes from
+	// The constructor is still handled, in the two places where it is reachable. Its name comes from
 	// `sortCompMemberName`, which special-cases the kind because `Name()` is nil for it, and it is
 	// kept out of the variable flags below by `isPropertyLike`, which a constructor is not.
 	isMethodDeclaration := node.Kind == ast.KindMethodDeclaration
 
 	// Upstream writes the method arms as `(isPropertyLike || isMethodDeclaration) && node.value &&
-	// isFunctionLikeExpression(node.value)`, and transcribing that shape here produces a DEAD
+	// isFunctionLikeExpression(node.value)`, and transcribing that shape here produces a dead
 	// clause, because our `initializedToFunction` already requires `isPropertyLike` -- an initializer
 	// only exists on a property. Two mutation runs established it rather than reading: removing
-	// `|| isMethodDeclaration` from the static arm SURVIVED the whole suite, while replacing the
-	// instance arm's predicate with a genuinely different one was CAUGHT by 7 assertions.
+	// `|| isMethodDeclaration` from the static arm survived the whole suite, while replacing the
+	// instance arm's predicate with a genuinely different one was caught by 7 assertions.
 	//
 	// The difference upstream is expressing is real, so it is spelled out below rather than dropped:
 	// a `MethodDefinition`'s `node.value` is the FunctionExpression holding the body, which is always
-	// present and always function-like, so the conjunction is simply TRUE for every method. Here a
+	// present and always function-like, so the conjunction is simply true for every method. Here a
 	// method has no initializer at all, so the same fact has to be stated as its own arm.
 	//
-	// The asymmetry between the two arms is upstream's and is load-bearing: `static foo() {}` IS a
-	// `static-methods` member, while a non-static `foo() {}` is NOT an `instance-methods` member and
+	// The asymmetry between the two arms is upstream's and is load-bearing: `static foo() {}` is a
+	// `static-methods` member, while a non-static `foo() {}` is not an `instance-methods` member and
 	// falls through to `everything-else`. Measured on the installed build with a control that fires:
 	// a plain `classMethod()` placed after `render` under an `instance-methods`-first order is clean,
 	// while an arrow property `foo = () => {}` in the same position reports.
@@ -467,12 +467,12 @@ func sortCompHasBareTypeAnnotation(node *ast.Node) bool {
 //
 // Upstream returns the empty string when there is no readable name node, and an empty name matches
 // no order entry, so a computed or otherwise unreadable member falls through to `everything-else`.
-// That is reproduced rather than skipped, because skipping the member would change the INDEXES the
+// That is reproduced rather than skipped, because skipping the member would change the indexes the
 // pairwise comparison runs over and move findings on unrelated members.
 //
 // The kind guard before the text read is load-bearing rather than defensive: `Node.Text()` panics
 // on several kinds rather than returning empty, and a computed member name like `[key]` reaches
-// here. The walk recovers per FILE rather than per rule, so one such member would cost every rule
+// here. The walk recovers per file rather than per rule, so one such member would cost every rule
 // in this package its verdict on that file.
 func sortCompMemberName(node *ast.Node) string {
 	// A constructor is a distinct node kind here with a nil `Name()`, while in ESTree it is a
@@ -499,7 +499,7 @@ func sortCompMemberName(node *ast.Node) string {
 // sortCompGroupMatches answers whether one order entry selects one member.
 //
 // The if/else chain follows upstream's order exactly, and the order matters at one place: the
-// literal-name test against `sortCompKnownLifecycleNames` comes BEFORE the regex branch, so an
+// literal-name test against `sortCompKnownLifecycleNames` comes before the regex branch, so an
 // order entry spelled `render` is a member name rather than a pattern. Reordering these two changes
 // the answer for any project whose order names a lifecycle method directly.
 func sortCompGroupMatches(group string, member sortCompMember) bool {
@@ -527,7 +527,7 @@ func sortCompGroupMatches(group string, member sortCompMember) bool {
 	// Upstream's `currentGroup.match(regExpRegExp)` is unanchored, so this reproduces the same
 	// permissiveness. A pattern that does not compile is treated as matching nothing rather than
 	// panicking: upstream's `new RegExp` would throw and take the run down, and a rule that crashes
-	// costs every OTHER rule its verdict on that file because the walk recovers per file.
+	// costs every other rule its verdict on that file because the walk recovers per file.
 	//
 	// The pattern is read as JavaScript reads it, so lookaround and backreferences compile and take
 	// effect (#7mztrdd). Upstream's invalid[9] orders by
@@ -566,7 +566,7 @@ func sortCompCompilePattern(body string, flags string) (*esregexp.RegExp, bool) 
 // A member can match several entries, which is why this returns a list rather than an index. When
 // nothing matches, the `everything-else` position is used, and when there is no `everything-else`
 // entry either, upstream pushes `Infinity`, which sorts after everything. That is reproduced with
-// `math.MaxInt` rather than a sentinel like -1, because the value is COMPARED with `<` and `>`
+// `math.MaxInt` rather than a sentinel like -1, because the value is compared with `<` and `>`
 // against real indexes and a negative sentinel would invert every comparison it took part in.
 func sortCompRefIndexes(methodsOrder []string, member sortCompMember) []int {
 	indexes := []int{}
@@ -596,12 +596,12 @@ type sortCompComparison struct {
 
 // sortCompComparePropsOrder reproduces upstream's `comparePropsOrder`.
 //
-// A pair is correct when ANY combination of their allowed positions is defensible: the two share a
+// A pair is correct when any combination of their allowed positions is defensible: the two share a
 // position, or their reference order agrees with their source order. Only if no combination works
 // is the pair a violation.
 //
 // The indexes it returns differ by branch, and that asymmetry is upstream's and is load-bearing.
-// On success it returns the members' SOURCE positions; on failure it returns the last REFERENCE
+// On success it returns the members' source positions; on failure it returns the last reference
 // positions the loops considered. Those failure indexes are what `storeError` keys the error map on
 // and what `dedupeErrors` looks entries up by, so returning source positions there would change
 // which findings survive deduplication.
@@ -610,7 +610,7 @@ func sortCompComparePropsOrder(methodsOrder []string, members []sortCompMember, 
 	refIndexesB := sortCompRefIndexes(methodsOrder, members[indexB])
 
 	// Upstream computes these with `propertiesInfos.indexOf(propA)`, an identity lookup that returns
-	// the FIRST structurally-equal element in some engines' terms but is reference equality here.
+	// the first structurally-equal element in some engines' terms but is reference equality here.
 	// We are handed the positions directly, which is the same answer without the lookup.
 	classIndexA := indexA
 	classIndexB := indexB
@@ -660,23 +660,23 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 		}
 		existing.score++
 
-		// Upstream compares the NAMES rather than the nodes here, and the comment above it says
+		// Upstream compares the names rather than the nodes here, and the comment above it says
 		// "stop here if we already have pushed another node at this position". Two different
 		// members can land on the same reference index, and only the first one's message is kept.
 		//
-		// # A REPORTED mutation survivor, with what was and was not established
+		// # A reported mutation survivor, with what was and was not established
 		//
 		// Replacing this condition with `false` survives the whole suite. It is kept, and the
 		// survival is reported rather than argued away, because the two halves of the question came
 		// out differently.
 		//
 		// Reachability: measured, not assumed. Counting both sides across every corpus case gives
-		// REACHED=46, FIRED=1 -- the branch is live, and the one firing is `invalid-12`, where `bar`
+		// reached=46, fired=1 -- the branch is live, and the one firing is `invalid-12`, where `bar`
 		// and `classMethod` share a reference index. An earlier attempt to measure this with
-		// `println` reported 0 for both the guard AND its control, which is the broken-instrument
+		// `println` reported 0 for both the guard and its control, which is the broken-instrument
 		// zero this repository keeps finding; the counter version has a live control at 46.
 		//
-		// Effect: NOT established. On that one firing, and on five hand-built variations of its
+		// Effect: not established. On that one firing, and on five hand-built variations of its
 		// shape (more plain methods, more statics, a reordered class), the guarded and unguarded
 		// rules produce byte-identical findings, because `dedupeErrors` resolves the pair the same
 		// way either side of this early return. So the guard is reachable and, on every input
@@ -715,7 +715,7 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 	}
 
 	// dedupeErrors, walked in ascending numeric key order to match `Object.entries` on an
-	// integer-keyed JavaScript object. The walk MUTATES the map, so an unordered one would make the
+	// integer-keyed JavaScript object. The walk mutates the map, so an unordered one would make the
 	// surviving finding depend on Go's map randomisation; see the rule doc.
 	for _, index := range sortCompSortedIndexes(errors) {
 		current, stillPresent := errors[index]
@@ -754,7 +754,7 @@ func sortCompCheckOrder(ruleContext rule.Context, methodsOrder []string, members
 
 // sortCompSortedIndexes returns the map's keys in ascending numeric order.
 //
-// This is the determinism the rule doc argues for, and it is a property of the RULE rather than of
+// This is the determinism the rule doc argues for, and it is a property of the rule rather than of
 // any fixture: `Object.entries` on an integer-keyed JavaScript object iterates ascending, both
 // call sites walk while deleting, and Go's map order is randomised.
 func sortCompSortedIndexes(errors map[int]*sortCompError) []int {

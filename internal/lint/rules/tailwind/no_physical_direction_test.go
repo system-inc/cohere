@@ -100,7 +100,7 @@ func TestNoPhysicalDirectionStaysSilent(test *testing.T) {
 		{"a sentence", physicalDirectionFile, "export const message = 'Align the text to the left side';\n"},
 		// Strings that are not classes at all, which is what the shape test exists for. The rule
 		// visits every literal in the file, so these are the population it has to stay quiet on.
-		// These three are what the shape test alone stands on. Each contains a token that IS a
+		// These three are what the shape test alone stands on. Each contains a token that is itself a
 		// physical-direction class by name, so the mapping table matches it, and each is rejected
 		// because no token in the string passes the class-shape test. Without them, deleting the
 		// shape test kills no fixture, and the one guard between this rule and 139,000 string

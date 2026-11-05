@@ -677,32 +677,9 @@ func (canonicalizer *Canonicalizer) arbitraryFallback(candidate ParsedCandidate,
 		}
 		tries = append(tries, root+"-["+value+"]")
 
-		rootMatch := ""
-	tries:
-		for _, try := range tries {
-			for _, reading := range ParseCandidate(canonicalizer.prefixed(try), canonicalizer.system) {
-				printed := PrintCandidate(reading, canonicalizer.system.Prefix())
-				signature, state := canonicalizer.classSignature(printed)
-				switch state {
-				case SignatureExact:
-					if signature != targetSignature {
-						continue
-					}
-					used, known := canonicalizer.allVariablesAreUsed(value, printed)
-					if !known {
-						return candidate, false
-					}
-					if used {
-						rootMatch = printed
-						break tries
-					}
-				case SignatureUnknown:
-					// possible-match: a try this port cannot sign could be upstream's winner.
-					if compiler.ClassSignatureBound(printed, canonicalizer.features).Admits(properties) {
-						return candidate, false
-					}
-				}
-			}
+		rootMatch, declined := canonicalizer.firstMatchingTry(compiler, tries, value, targetSignature, properties)
+		if declined {
+			return candidate, false
 		}
 		if rootMatch == "" {
 			continue
@@ -716,6 +693,40 @@ func (canonicalizer *Canonicalizer) arbitraryFallback(candidate ParsedCandidate,
 		return candidate, true
 	}
 	return canonicalizer.replacedWith(candidate, value, matched)
+}
+
+// firstMatchingTry is one root's tries for arbitraryFallback, in order: the first reading that signs as
+// targetSignature and uses every variable of value, printed, or "" when no try does. declined is true when the
+// fallback must decline instead, because a try's variables cannot be told used or a try this port cannot sign
+// could be upstream's winner.
+func (canonicalizer *Canonicalizer) firstMatchingTry(
+	compiler *SignatureCompiler, tries []string, value string, targetSignature string, properties map[string]bool,
+) (rootMatch string, declined bool) {
+	for _, try := range tries {
+		for _, reading := range ParseCandidate(canonicalizer.prefixed(try), canonicalizer.system) {
+			printed := PrintCandidate(reading, canonicalizer.system.Prefix())
+			signature, state := canonicalizer.classSignature(printed)
+			switch state {
+			case SignatureExact:
+				if signature != targetSignature {
+					continue
+				}
+				used, known := canonicalizer.allVariablesAreUsed(value, printed)
+				if !known {
+					return "", true
+				}
+				if used {
+					return printed, false
+				}
+			case SignatureUnknown:
+				// possible-match: a try this port cannot sign could be upstream's winner.
+				if compiler.ClassSignatureBound(printed, canonicalizer.features).Admits(properties) {
+					return "", true
+				}
+			}
+		}
+	}
+	return "", false
 }
 
 // rootCouldSign is the possible-match relation for a whole root: a framework root whose probed universe

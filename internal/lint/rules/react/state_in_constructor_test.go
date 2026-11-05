@@ -479,7 +479,7 @@ func TestStateInConstructorNeverTargets(test *testing.T) {
 		// Some other property on this.
 		{"other property", `this.baz = {};`, nil},
 
-		// Upstream's `inConstructor` walks the SCOPE chain, so a callback declared in the
+		// Upstream's `inConstructor` walks the scope chain, so a callback declared in the
 		// constructor is still in the constructor. Measured: this reports upstream.
 		{"inside a callback", `go(() => { this.state = {}; });`, []string{"stateInitClassProp"}},
 	}
@@ -516,7 +516,7 @@ class Foo extends React.Component {
 
 // TestStateInConstructorNearestClassDecides pins that an inner class is not rescued by an outer one.
 //
-// Upstream's `getParentES6Component` walks to the NEAREST class scope and asks whether that class
+// Upstream's `getParentES6Component` walks to the nearest class scope and asks whether that class
 // is a component, so a plain class nested inside a real component keeps its own verdict. Reaching
 // for `react.EnclosingComponent` instead would skip past the plain class to the outer component and
 // report on both of these, which is why this rule walks to the nearest class itself. Both measured
@@ -540,7 +540,7 @@ class Foo extends React.Component {
 
 	test.Run("plain class inside a component constructor, Never", func(test *testing.T) {
 		test.Parallel()
-		// Silent because the NEAREST class is Inner, and Inner is not a component. This is the
+		// Silent because the nearest class is Inner, and Inner is not a component. This is the
 		// component gate declining, not the constructor walk: see TestStateInConstructorWalkCrosses
 		// a class boundary for the proof that the walk itself goes straight through.
 		source := `
@@ -575,7 +575,7 @@ class Foo extends React.Component {
 //
 // The heritage clause is what decides, and the parenthesized row is the one worth stating: the
 // shelf helper skips parentheses on the heritage receiver, and its doc comment flags that skip as a
-// possible divergence measured on a different rule. Measured against THIS rule's authority,
+// possible divergence measured on a different rule. Measured against this rule's own authority,
 // `extends (React.Component)` reports, so the skip is correct here rather than a divergence.
 func TestStateInConstructorComponentGate(test *testing.T) {
 	test.Parallel()
@@ -710,7 +710,7 @@ func TestStateInConstructorSpans(test *testing.T) {
 				test.Fatalf("wanted exactly one finding, got %d", len(result.Diagnostics))
 			}
 			// `rule_testing.Run` writes the source verbatim, unlike `RunTyped` which trims it, so
-			// the literal here IS the file on disk and slicing it directly is correct. Asserting
+			// the literal here is the file on disk and slicing it directly is correct. Asserting
 			// that rather than assuming it: an accidental TrimSpace transform here shifts every
 			// span by one byte and reads exactly like an off-by-one in the rule.
 			diagnostic := result.Diagnostics[0]
@@ -805,7 +805,7 @@ func TestDecodeStateInConstructorOptions(test *testing.T) {
 // TestStateInConstructorWalkCrossesAClassBoundary pins that the constructor walk does not stop at a
 // class.
 //
-// Upstream's `inConstructor` walks the SCOPE chain, and a class body creates no barrier scope, so
+// Upstream's `inConstructor` walks the scope chain, and a class body creates no barrier scope, so
 // an enclosing constructor is reached straight through an intervening class. This rule stopped at
 // the first class for a whole revision on the plausible reasoning that a nested class owns its own
 // members. Nothing in the imported corpus could see it: the corpus writes no nested class at all.

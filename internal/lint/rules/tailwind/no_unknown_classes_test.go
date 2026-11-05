@@ -500,7 +500,7 @@ func TestExistenceComesFromTheRepositoryRatherThanATable(test *testing.T) {
 //
 // The migration fixed one direction of the repository/framework confusion and not the other, and the
 // half that remains is in a component this task does not own. Pinned as a failing-shaped assertion
-// on the CURRENT behaviour, so closing it upstream breaks this test deliberately rather than leaving
+// on the current behaviour, so closing it upstream breaks this test deliberately rather than leaving
 // a comment nobody reads.
 //
 // # What is fixed
@@ -512,7 +512,7 @@ func TestExistenceComesFromTheRepositoryRatherThanATable(test *testing.T) {
 //
 // # What was not fixed here, and now is
 //
-// `KnownStatics` and `KnownRoots` were enumerated from `designSystem.getClassList()` on a LOADED
+// `KnownStatics` and `KnownRoots` were enumerated from `designSystem.getClassList()` on a loaded
 // design system, which returns the repository's `@utility` classes alongside the framework's. The
 // generator ran against ahra's `theme.css`, so ahra's own tokens sat in tables headed
 // `Source: Tailwind 4.3.3`, and `HasUtility` consulted them as its framework fallback.
@@ -570,7 +570,7 @@ func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(test *testing.T) {
 //
 // Every fixture above skips when no installed tailwindcss can be found, and a skip is the honest
 // answer for a machine that genuinely has none. The problem is that `go test` prints `ok` for a
-// package whose every case skipped, so a mistake in where the walk STARTS looks identical to a
+// package whose every case skipped, so a mistake in where the walk starts looks identical to a
 // machine that lacks the package. That was not hypothetical for the class-order fixtures and the
 // same helper shape is used here.
 //

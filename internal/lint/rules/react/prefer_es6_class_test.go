@@ -229,7 +229,7 @@ func TestPreferEs6ClassFactoryNames(test *testing.T) {
 
 // TestPreferEs6ClassArgumentPosition pins that the rule asks about the object's parent.
 //
-// Upstream anchors on the object expression and tests whether its PARENT is a matching call, so the
+// Upstream anchors on the object expression and tests whether its parent is a matching call, so the
 // object's position among the arguments does not matter and a nested object is clean because its
 // parent is the enclosing object. A port asking "is this the factory's first argument" would pass
 // the whole corpus and get both rows below wrong. Both measured.
@@ -409,7 +409,7 @@ func TestPreferEs6ClassArmsAreDisjoint(test *testing.T) {
 // TestPreferEs6ClassSpans asserts where each finding points.
 //
 // The two arms report different node kinds and therefore different spans, which is the one thing a
-// message-id assertion cannot see. The Always arm reports the OBJECT EXPRESSION, so the span starts
+// message-id assertion cannot see. The Always arm reports the object expression, so the span starts
 // at the brace and excludes `createReactClass(` entirely; the Never arm reports the whole class
 // declaration. Measured by reading the reported columns from the installed build.
 func TestPreferEs6ClassSpans(test *testing.T) {

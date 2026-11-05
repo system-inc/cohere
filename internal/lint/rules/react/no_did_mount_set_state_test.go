@@ -30,7 +30,7 @@ const didMountFile = "/repository/source/DidMount.tsx"
 // files rather than by assuming the totals lined up.
 //
 // The second block is the same rule under `["disallow-in-func"]`, which decodes to
-// `DisallowInFunc: true`. Three of its four failing cases are byte-identical to cases that PASS in
+// `DisallowInFunc: true`. Three of its four failing cases are byte-identical to cases that pass in
 // the first block, which is the single most useful thing the corpus says about this rule: the
 // option is not an edge refinement, it is the switch that moves half the passing set into the
 // failing one.
@@ -489,7 +489,7 @@ class Hello extends React.Component {
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
-		// The computed lifecycle key REPORTS. An earlier version of this file asserted silence
+		// The computed lifecycle key reports. An earlier version of this file asserted silence
 		// here and defended it in a doc comment as a deliberate divergence; it was a defect. oxc's
 		// `key.static_name()` resolves a computed string key, and the release oxlint binary reports
 		// on this exact source. Measured, not reasoned.
@@ -518,7 +518,7 @@ var Hello = createReactClass({
   }
 });
 `, didMountFile, false, nil},
-		// A getter REPORTS. oxc matches `MethodDefinition` without asking the method kind, and a
+		// A getter reports. oxc matches `MethodDefinition` without asking the method kind, and a
 		// getter is one in its tree. An earlier version excluded accessors on a guess and its doc
 		// comment said upstream had no such node, which was wrong. Confirmed on the release binary.
 		{"getter named for the lifecycle method", `
@@ -537,7 +537,7 @@ class Hello extends React.Component {
   }
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
-		// A method the walk merely PASSES THROUGH is a function scope too. This shipped as a false
+		// A method the walk merely passes through is a function scope too. This shipped as a false
 		// positive: the latch counted the lifecycle method's own scope by hand, and `isFunctionScope`
 		// omitted method kinds entirely, so `setState` inside an object method declared in the
 		// lifecycle body came out one scope shallow and reported. Silent at the release binary,
@@ -583,7 +583,7 @@ class Hello extends React.Component {
 }
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
-		// The ES5 factory name set, which is NARROWER than the shelf helper this rule calls.
+		// The ES5 factory name set, which is narrower than the shelf helper this rule calls.
 		// `internal/utilities/react.IsEs5ComponentCall` accepts `createClass` as well, and oxc's
 		// `CREATE_CLASS` at `oxc_linter/src/utils/react.rs:554` is the single constant
 		// `createReactClass`. Both of these are clean on the release binary and a port following
@@ -602,7 +602,7 @@ var Hello = React.createClass({
   }
 });
 `, didMountFile, false, nil},
-		// The namespaced spelling that IS accepted, so the narrowing above is a name check rather
+		// The namespaced spelling that is accepted, so the narrowing above is a name check rather
 		// than the member arm being dropped wholesale.
 		{"React.createReactClass is accepted", `
 var Hello = React.createReactClass({
@@ -622,7 +622,7 @@ var Hello = (createReactClass)({
 });
 `, didMountFile, false, []string{"noDidMountSetState"}},
 
-		// A parenthesized `this` is SILENT, the opposite answer to the parenthesized factory above,
+		// A parenthesized `this` is silent, the opposite answer to the parenthesized factory above,
 		// because oxc destructures `Expression::ThisExpression` and a parenthesis is a different
 		// variant. Both directions were measured rather than reasoned.
 		{"parenthesized this", `
@@ -641,7 +641,7 @@ class Hello extends React.Component {
 `, didMountFile, false, nil},
 
 		// The component gate is looser than it looks: nothing requires the lifecycle property to be
-		// a member OF the component, only that a component is somewhere further out. A plain object
+		// a member of the component, only that a component is somewhere further out. A plain object
 		// literal declared inside a real component's render method reports on the release binary.
 		// Reproduced rather than improved on.
 		{"plain object literal nested inside a component", `

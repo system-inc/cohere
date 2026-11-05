@@ -21,12 +21,12 @@ func (d declineEverything) Analyze(Fixture) (Result, error) {
 //
 // It is deliberately run against an implementation that answers nothing, and that is not a
 // placeholder. Wiring cohere's rule engine in here would require building a TypeScript program per
-// fixture — roughly a second each, so about five minutes for the corpus — inside a suite whose
+// fixture (roughly a second each, so about five minutes for the corpus) inside a suite whose
 // stated design property is that it costs 0.3 to 0.8 seconds and therefore never gets gated behind
 // a tag. Paying that to watch 293 fixtures land in a decline bucket that is already decidable from
 // the corpus alone would buy one number, `failed`, at the cost of the suite being run.
 //
-// What is asserted instead is every number that does NOT depend on running a rule: which fixtures
+// What is asserted instead is every number that does not depend on running a rule: which fixtures
 // any shipped rule could even be asked about, and why each of the others cannot be. That is the
 // part that was never measured, and it is the part that decides whether a raw score would have
 // lied.
@@ -83,12 +83,12 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(test *testing.T) {
 		test.Errorf("fixtures a shipped rule could be asked about = %d, want 189", answerable)
 	}
 
-	// This test scores `NothingImplemented`, so it measures the CATEGORISATION rather than any rule:
+	// This test scores `NothingImplemented`, so it measures the categorisation rather than any rule:
 	// 18 fixtures carry a stated divergence, and every other addressable fixture lands in
 	// `not scored` because the implementation handed in here declines everything.
 	//
 	// That is deliberate and it is why this package still depends on nothing in the rule engine.
-	// The same partition WITH real rules running is
+	// The same partition with real rules running is
 	// `react_conformance_score.TestAggregateWithTheRuleEngineWired`, and the two are meant to differ:
 	// this one answers "what could be asked", that one answers "what did the rules say".
 	if got := report.Counts[VerdictStatedDivergence]; got != 18 {
@@ -143,7 +143,7 @@ func TestNoRuleShippedIsTheCorpusRatherThanTheRules(test *testing.T) {
 	//
 	// `todo` moved 36 -> 30 in the same change, and the six are enumerated rather than retyped,
 	// because a pinned number that is edited to match whatever the code now says has stopped being
-	// a pin. Each is a fixture whose diagnostics span `todo` AND a now-shipped rule, so it leaves
+	// a pin. Each is a fixture whose diagnostics span `todo` and a now-shipped rule, so it leaves
 	// the set of fixtures no shipped rule claims at all: `error.todo-reassign-const.js`,
 	// `fault-tolerance/error.try-finally-and-mutation-of-props.js`,
 	// `fault-tolerance/error.try-finally-and-ref-access.js`,
@@ -251,7 +251,7 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 			// `preserve-manual-memoization` rather than `immutability`, which this case used until
 			// `immutability` shipped on 2026-08-24. The case needs a rule cohere genuinely does not
 			// implement, so picking one that is being actively ported makes the calibration expire
-			// the day the port lands — which is exactly what happened here.
+			// the day the port lands, which is exactly what happened here.
 			Name: "declined: no rule shipped",
 			Fixture: Fixture{
 				Name:   "reachability.preserve-manual-memoization.js",
@@ -366,7 +366,7 @@ func TestUnresolvableTypesIsNotAnExcuseForSyntaxRules(test *testing.T) {
 //
 // The count that justifies `VerdictUnresolvableTypes` is "128 of 202 hook-using fixtures do not
 // import react", and it is only as good as this predicate. A substring test for `react` would match
-// `react-dom` and `./react-utils`, shrinking the category and moving those fixtures into `failed` —
+// `react-dom` and `./react-utils`, shrinking the category and moving those fixtures into `failed`:
 // an error in the direction that looks more rigorous, which is the direction least likely to be
 // questioned.
 func TestReactImportDetectionDoesNotOverMatch(test *testing.T) {
@@ -403,8 +403,12 @@ func TestCorpusTypeResolutionIsMeasured(test *testing.T) {
 	// and a combined number would hide it: 63% of hook-using error fixtures omit the import against
 	// 13% of the clean ones. Summing them reports 51%, a figure describing neither population and
 	// moving with the mix rather than with anything about React.
-	var importing, hookUsing, hookUsingWithoutImport int
-	var cleanImporting, cleanHookUsing, cleanHookUsingWithoutImport int
+	var importing int
+	var hookUsing int
+	var hookUsingWithoutImport int
+	var cleanImporting int
+	var cleanHookUsing int
+	var cleanHookUsingWithoutImport int
 	for _, fixture := range fixtures {
 		base := filepath.Base(fixture.Name)
 		errorNamed := strings.HasPrefix(base, "error.") || strings.HasPrefix(base, "todo.error.")

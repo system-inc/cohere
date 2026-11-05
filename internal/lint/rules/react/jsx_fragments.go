@@ -113,7 +113,7 @@ var messagePreferFragmentPragma = rule.Message{
 // Upstream reads both halves from `settings.react.pragma` and `settings.react.fragment`, and
 // cohere reads no React settings, so both are unreachable by any route. Upstream's entire
 // corpus configures them to `Act` and `Frag`, which is why every imported case below was replayed
-// against the installed build under the DEFAULT settings before being written down; nineteen of
+// against the installed build under the default settings before being written down; nineteen of
 // the twenty two reproduced exactly, including the fixer output, and the three that did not are
 // the version cases described next.
 //
@@ -129,7 +129,7 @@ var messagePreferFragmentPragma = rule.Message{
 //
 // # No fix, and this is the deliberate half of the port
 //
-// Upstream ships a fixer for both directions and it DESTROYS TYPE ARGUMENTS. A JSX tag may carry
+// Upstream ships a fixer for both directions and it destroys type arguments. A JSX tag may carry
 // them, and they sit inside the opening tag but outside the attributes list, so upstream's only
 // guard, `attrs && attrs.length > 0`, cannot see them. Measured against the installed build with
 // the TypeScript parser on 2026-08-27:
@@ -142,7 +142,7 @@ var messagePreferFragmentPragma = rule.Message{
 // is the same structural failure as `no-undef-init` stranding a type annotation and
 // `no-arrow-function-lifecycle` dropping a return type, arriving through a third door.
 //
-// The repair is withheld ENTIRELY rather than withheld only for the type-argument shape. Declining
+// The repair is withheld entirely rather than withheld only for the type-argument shape. Declining
 // per-shape would ship a fixer whose safety rests on my enumeration of what can appear inside a JSX
 // tag being complete, and the two rules above are both cases where that enumeration was wrong by
 // exactly one item. The finding still tells a reader what to change and the edit is two characters;
@@ -231,6 +231,23 @@ func jsxFragmentsHasAttributes(attributes *ast.Node) bool {
 	return len(list.Properties.Nodes) > 0
 }
 
+// jsxFragmentsPragmaName is the object half of the namespaced spelling.
+//
+// Fixed rather than configurable. `settings.react.pragma` has no counterpart in `internal/config`,
+// and a `/** @jsx */` comment is readable through `comments.ForFile` but is not read, matching the
+// stated decline in `checked-requires-onchange-or-readonly` for the same question. The cost is a
+// false negative on a file that renames the pragma by hand, which is the safe direction.
+const jsxFragmentsPragmaName = "React"
+
+// jsxFragmentsFragmentName is the property half, upstream's `settings.react.fragment`.
+const jsxFragmentsFragmentName = "Fragment"
+
+// jsxFragmentsModuleName is the module an import or a require must name.
+//
+// Upstream compares against the literal `'react'` in both arms, with no lowercasing, so `React` as
+// a module specifier is a decline. Measured: `import {Fragment} from 'preact'` is silent.
+const jsxFragmentsModuleName = "react"
+
 // jsxFragmentsNameIsFragment reports whether a tag name denotes the React fragment.
 //
 // Two accepting routes, both upstream's. The namespaced spelling is matched structurally, and a
@@ -262,17 +279,6 @@ func jsxFragmentsNameIsFragment(ruleContext rule.Context, tagName *ast.Node) boo
 	}
 	return false
 }
-
-// jsxFragmentsPragmaName is the object half of the namespaced spelling.
-//
-// Fixed rather than configurable. `settings.react.pragma` has no counterpart in `internal/config`,
-// and a `/** @jsx */` comment is readable through `comments.ForFile` but is not read, matching the
-// stated decline in `checked-requires-onchange-or-readonly` for the same question. The cost is a
-// false negative on a file that renames the pragma by hand, which is the safe direction.
-const jsxFragmentsPragmaName = "React"
-
-// jsxFragmentsFragmentName is the property half, upstream's `settings.react.fragment`.
-const jsxFragmentsFragmentName = "Fragment"
 
 // jsxFragmentsIdentifierBindsToFragment answers whether a bare tag name resolves to the fragment.
 //
@@ -307,7 +313,7 @@ func jsxFragmentsDeclarationIsFragment(declaration *ast.Node) bool {
 	switch declaration.Kind {
 	case ast.KindImportSpecifier:
 		// `import {Fragment} from 'react'` and `import {Fragment as F} from 'react'`. Upstream
-		// keys on the IMPORTED name matching the fragment pragma and records the LOCAL name, so
+		// keys on the imported name matching the fragment pragma and records the local name, so
 		// the alias is what the tag writes and the export is what is checked.
 		specifier := declaration.AsImportSpecifier()
 		imported := specifier.PropertyName
@@ -379,12 +385,6 @@ func jsxFragmentsInitializerIsFragmentSource(initializer *ast.Node) bool {
 	}
 	return false
 }
-
-// jsxFragmentsModuleName is the module an import or a require must name.
-//
-// Upstream compares against the literal `'react'` in both arms, with no lowercasing, so `React` as
-// a module specifier is a decline. Measured: `import {Fragment} from 'preact'` is silent.
-const jsxFragmentsModuleName = "react"
 
 // jsxFragmentsImportModuleName reads the module specifier text off an import specifier.
 //

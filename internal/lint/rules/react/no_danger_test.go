@@ -10,20 +10,20 @@ import (
 
 // noDangerFile is where the fixtures pretend to live.
 //
-// A .tsx extension because the rule reads JSX, and NO file-suffix gate exists in this rule. Three
+// A .tsx extension because the rule reads JSX, and no file-suffix gate exists in this rule. Three
 // shipped react rules here gate on .tsx or .jsx, which is oxc-era residue rather than upstream
 // behavior, and TestNoDangerHasNoFileSuffixGate below pins the absence so nobody reintroduces it by
 // pattern-matching a neighbour.
 const noDangerFile = "/repository/source/Danger.tsx"
 
-// runNoDanger routes every option fixture through the rule's OWN exported decoder rather than
+// runNoDanger routes every option fixture through the rule's own exported decoder rather than
 // building the options struct directly.
 //
 // That is what puts the decoder under test, and it is the one line with no upstream counterpart.
 // A fixture handing RunWithOptions a struct would leave both the default fallback and the JSON tag
 // untested, and either could be wrong while every fixture stayed green.
 //
-// The raw JSON here is the BARE object, not upstream's [{...}] array. cohere's config layer unwraps
+// The raw JSON here is the bare object, not upstream's [{...}] array. cohere's config layer unwraps
 // the [severity, options] tuple before dispatch, so copying ESLint's spelling into a fixture fails
 // on every row.
 func runNoDanger(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
@@ -50,11 +50,11 @@ func runNoDanger(test *testing.T, sourceText string, rawOptions string) rule_tes
 // case was retyped and no escape could be cooked on the way in. 6 valid and 7 invalid.
 //
 // The options column matters more here than in most corpora: four of the 6 valid cases and six of
-// the 7 invalid ones carry customComponentNames, and one input appears in BOTH lists separated
+// the 7 invalid ones carry customComponentNames, and one input appears in both lists separated
 // only by its pattern. <TextMUI> is clean under ["MUI*"] and reports under ["*MUI"], which is the
 // single best case in this corpus because it pins the glob dialect rather than the rule's shape.
 //
-// The last invalid case names THREE entries in its errors array, so its finding count is upstream's
+// The last invalid case names three entries in its errors array, so its finding count is upstream's
 // statement rather than my inference.
 func TestNoDangerFires(test *testing.T) {
 	test.Parallel()
@@ -108,7 +108,7 @@ func TestNoDangerStaysSilent(test *testing.T) {
 // eslint-plugin-react through the Linter API before being written here, except where noted as a
 // deliberate divergence.
 
-// TestNoDangerElementNameBoundary pins WHICH tags count as DOM elements.
+// TestNoDangerElementNameBoundary pins which tags count as DOM elements.
 //
 // Upstream renders the tag to a string and tests /^[a-z]/ against it, so this is a first-character
 // test on a rendered name rather than a check for an intrinsic element. The dotted and namespaced
@@ -139,9 +139,9 @@ func TestNoDangerElementNameBoundary(test *testing.T) {
 	}
 }
 
-// TestNoDangerAttributeNameBoundary pins WHICH attribute spellings count.
+// TestNoDangerAttributeNameBoundary pins which attribute spellings count.
 //
-// The comparison is exact and case-sensitive, and the attribute's VALUE is never examined. The last
+// The comparison is exact and case-sensitive, and the attribute's value is never examined. The last
 // two lines matter for a reason no fixture makes obvious: reaching for the attribute's expression
 // would be the natural way to write this rule and would panic on the string-valued form, which the
 // port brief names as a crash class that costs a whole file.
@@ -174,11 +174,11 @@ func TestNoDangerAttributeNameBoundary(test *testing.T) {
 
 // TestNoDangerCustomComponentNames pins the glob dialect and the two declined upstream defects.
 //
-// The first four rows are the dialect, and MUI* against TextMUI is the one that looks wrong: both
-// minimatch and filepath.Match say false, and upstream's corpus has exactly that pair in its VALID
+// The first four rows are the dialect, and `MUI*` against `TextMUI` is the one that looks wrong: both
+// minimatch and filepath.Match say false, and upstream's corpus has exactly that pair in its valid
 // list, so a port that "fixed" it would break an imported clean case.
 //
-// The last three rows are DELIBERATE DIVERGENCES, not measurements of agreement, and each is stated
+// The last three rows are deliberate divergences, not measurements of agreement, and each is stated
 // at the line. Upstream compares against a name it builds with a shallow expression that is not the
 // one it renders elsewhere, and the two shapes below are where that expression breaks.
 func TestNoDangerCustomComponentNames(test *testing.T) {
@@ -199,24 +199,24 @@ func TestNoDangerCustomComponentNames(test *testing.T) {
 		{"an absent key behaves as an empty list", "<App dangerouslySetInnerHTML={{__html:''}} />;", `{}`, nil},
 		{"a DOM element still reports whatever the option says", "<div dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Nothing"]}`, []string{"dangerousProp"}},
 
-		// DIVERGENCE. Upstream builds the compared name with an expression that does not recurse
+		// Divergence. Upstream builds the compared name with an expression that does not recurse
 		// through a nested member, so <A.B.C /> renders as "undefined.C" there. Measured
-		// behaviorally: with ["A.B.C"] upstream is SILENT and with ["undefined.C"] it REPORTS.
+		// behaviorally: with ["A.B.C"] upstream is silent and with ["undefined.C"] it reports.
 		// Declined, because carrying it means matching a pattern nobody would write.
 		{"a nested member renders fully here, which upstream does not", "<A.B.C dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["A.B.C"]}`, []string{"dangerousProp"}},
 		{"a two-part member matches under both", "<A.B dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["A.B"]}`, []string{"dangerousProp"}},
 
-		// DIVERGENCE, and this one is a CRASH upstream rather than a wrong answer. The same
-		// expression yields the name NODE for a namespaced tag, minimatch calls split on an object
+		// Divergence, and this one is a crash upstream rather than a wrong answer. The same
+		// expression yields the name node for a namespaced tag, minimatch calls split on an object
 		// and throws a TypeError that takes down the lint run for that file. Reproduced directly
 		// against the installed build. Declined, because reproducing it would take a file away
 		// from every rule, the walk recovering per file rather than per rule.
 		//
-		// The tag has to carry a CAPITAL namespace to reach the option path at all, which is a
+		// The tag has to carry a capital namespace to reach the option path at all, which is a
 		// distinction I got wrong first and the fixture caught. A lowercase one renders as
 		// "ns:App", whose first character is lowercase, so it is a DOM element by the regex above
 		// and reports with no options set. Both lines measured on the installed build: <ns:App>
-		// with no options REPORTS, and <Ns:App> with any customComponentNames CRASHES.
+		// with no options reports, and <Ns:App> with any customComponentNames crashes.
 		{"a lowercase namespace is a DOM element and needs no option", "<ns:App dangerouslySetInnerHTML={{__html:''}} />;", "", []string{"dangerousProp"}},
 		{"a capital namespace is not, and is silent unconfigured", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", "", nil},
 		{"and matches its rendered name rather than crashing, which is where upstream throws", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Ns:App"]}`, []string{"dangerousProp"}},
@@ -289,14 +289,14 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		test.Parallel()
 		// This bypasses the decoder entirely, which is the one path every other fixture misses.
 		//
-		// The COMPONENT is the case that measures anything, and a first version of this used a
+		// The component is the case that measures anything, and a first version of this used a
 		// <div>. That was a fixture over a distinction it could not see: a div reports under the
-		// real default AND under a wrong fallback of ["*"], so both paths reach the same verdict
-		// and a mutation of the fallback SURVIVED. A component separates them, because it reports
+		// real default and under a wrong fallback of ["*"], so both paths reach the same verdict
+		// and a mutation of the fallback survived. A component separates them, because it reports
 		// only if the fallback wrongly matches everything.
 		//
 		// This is the port brief's point that a survivor needs an input on which the two versions
-		// produce different OUTPUT rather than merely take different internal paths.
+		// produce different output rather than merely take different internal paths.
 		component := rule_testing.RunWithOptions(test, NoDanger, noDangerFile, "<App dangerouslySetInnerHTML={{__html:''}} />;", nil)
 		rule_testing.ExpectClean(test, component)
 
@@ -305,7 +305,7 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 	})
 }
 
-// TestNoDangerSpanAndMessage asserts WHERE the finding points and WHAT it says.
+// TestNoDangerSpanAndMessage asserts where the finding points and what it says.
 //
 // Upstream reports on the JSXAttribute rather than on the element, measured: the span for
 // <div dangerouslySetInnerHTML={{__html:'}} /> runs columns 6 to 43, which is the attribute alone.
@@ -359,8 +359,8 @@ func TestNoDangerSpanAndMessage(test *testing.T) {
 // TestNoDangerDoesNotPanicOnUnusualTagNames is crash protection, not a behavioral fixture.
 //
 // ast.Node.Text panics on a PropertyAccessExpression, measured with a probe, so a rule rendering an
-// arbitrary tag name through it would take the whole FILE down for all of this package's rules. No
-// ExpectFindings fixture can see a panic, so the sweep reports SURVIVED identically whether the
+// arbitrary tag name through it would take the whole file down for all of this package's rules. No
+// ExpectFindings fixture can see a panic, so the sweep reports `SURVIVED` identically whether the
 // part-by-part rendering matters or not. This names what it prevents.
 func TestNoDangerDoesNotPanicOnUnusualTagNames(test *testing.T) {
 	test.Parallel()
@@ -381,7 +381,7 @@ func TestNoDangerDoesNotPanicOnUnusualTagNames(test *testing.T) {
 	}
 }
 
-// TestNoDangerHasNoFileSuffixGate pins the ABSENCE of a suffix gate.
+// TestNoDangerHasNoFileSuffixGate pins the absence of a suffix gate.
 //
 // Three shipped react rules in this package gate on .tsx or .jsx, which is oxc-era residue rather
 // than upstream behavior, and it blinds them to most of this tree. Measured against

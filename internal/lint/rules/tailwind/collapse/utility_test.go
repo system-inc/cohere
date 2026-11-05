@@ -252,7 +252,9 @@ func TestUtilityMatchesEngine(test *testing.T) {
 	test.Parallel()
 	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
 
-		var compared, agreedCompiling, agreedRejecting int
+		var compared int
+		var agreedCompiling int
+		var agreedRejecting int
 		var disagreements []string
 
 		for _, aCase := range fixture.Cases {
@@ -569,7 +571,8 @@ func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
 
 		designSystem := &utilityTestDesignSystem{evaluator: evaluator}
 
-		var compared, agreed int
+		var compared int
+		var agreed int
 		var disagreements []string
 		for _, aCase := range fixture.Cases {
 			if aCase.CandidateKind != string(ParsedCandidateKindFunctional) || !evaluator.Has(aCase.Root) {
@@ -737,7 +740,9 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 		test.Fatal("the fixture holds no synthetic cases; four ported branches then have no test at all")
 	}
 
-	var totalCompared, totalCompiling, totalRejecting int
+	var totalCompared int
+	var totalCompiling int
+	var totalRejecting int
 	for _, syntheticCase := range fixture.SyntheticCases {
 		// Not parallel: its subtests add to totals the test checks after them, and a parallel subtest would run
 		// only after the test had returned, so the check would pass on nothing.

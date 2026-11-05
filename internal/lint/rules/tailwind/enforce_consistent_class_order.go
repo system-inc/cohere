@@ -184,7 +184,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 		// The two failures are told apart rather than collapsed, which is what `ErrNoTailwindEntryPoint`
 		// exists for. A project with no Tailwind at all is silence with nothing wrong: this rule is
 		// registered unconditionally, so reporting there would put a finding on every file of every
-		// repository that does not use Tailwind. A project that HAS Tailwind and whose CSS would not
+		// repository that does not use Tailwind. A project that does have Tailwind and whose CSS would not
 		// read is the loud case, and it is reported once per file rather than swallowed, because a
 		// rule reporting zero findings over unreadable CSS is indistinguishable from a clean tree
 		// and that is the one failure cohere exists to remove.

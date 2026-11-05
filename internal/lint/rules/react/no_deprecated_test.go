@@ -8,7 +8,7 @@ import (
 
 // noDeprecatedFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because several cases write JSX and need a parser that reads it. It is NOT
+// A `.tsx` name because several cases write JSX and need a parser that reads it. It is not
 // load-bearing: this rule has no file gate, and `TestNoDeprecatedHasNoFileGate` pins that by
 // running one reporting source under four extensions.
 const noDeprecatedFile = "/repository/source/NoDeprecated.tsx"
@@ -30,7 +30,7 @@ const noDeprecatedFile = "/repository/source/NoDeprecated.tsx"
 // Upstream configures a React version on five cases and a pragma on two. cohere reads
 // no React settings, so neither can reach a rule here by any route, and the faithful
 // reading is to reproduce the answer upstream gives when nothing is configured. Each of the six was
-// re-run against the installed build with its settings REMOVED, and the verdict below is that run:
+// re-run against the installed build with its settings removed, and the verdict below is that run:
 //
 //	valid-11   version 0.11.0     -> reports; unconfigured means 999.999.999
 //	valid-12   version 15.4.0     -> reports
@@ -46,7 +46,7 @@ const noDeprecatedFile = "/repository/source/NoDeprecated.tsx"
 // There are no `options` and no `output` columns because `meta.schema` is `[]` and `meta.fixable`
 // is unset.
 
-// TestNoDeprecatedFires asserts the RENDERED message, not the id.
+// TestNoDeprecatedFires asserts the rendered message, not the id.
 //
 // This rule has exactly one `messages` entry and interpolates four slots into it, so the id
 // separates nothing: every finding in this file carries `deprecated`. A mutation that moved a slot,
@@ -102,7 +102,7 @@ func TestNoDeprecatedFires(test *testing.T) {
 		// inner `React.PropTypes`, and both slices are keys.
 		{"m5", "React.PropTypes.component", []string{"React.PropTypes.component is deprecated since React 0.12.0, use React.PropTypes.element instead", "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"}},
 
-		// The two entries with NO replacement. Their message must end at the version with no trailing
+		// The two entries with no replacement. Their message must end at the version with no trailing
 		// comma, which is the clause upstream builds in the report call rather than in the template.
 		{"m6", "React.isValidClass()", []string{"React.isValidClass is deprecated since React 0.12.0"}},
 		{"m7", "React.addons.LinkedStateMixin", []string{"React.addons.LinkedStateMixin is deprecated since React 15.0.0"}},
@@ -112,17 +112,17 @@ func TestNoDeprecatedFires(test *testing.T) {
 		{"m8", "var {printDOM} = Perf;", []string{"Perf.printDOM is deprecated since React 15.0.0, use Perf.printOperations instead"}},
 		{"m9", "var {printDOM} = ReactPerf;", []string{"ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"}},
 
-		// An alias reports under the IMPORTED name, not the local one, and the span covers the whole
+		// An alias reports under the imported name, not the local one, and the span covers the whole
 		// specifier including the alias.
 		{"m10", "import {createClass as cc} from 'react';", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
 
-		// The destructuring twin of the above: the KEY decides, and the span is the whole property.
+		// The destructuring twin of the above: the key decides, and the span is the whole property.
 		{"m11", "var {createClass: cc} = require('react');", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
 
 		// A rest element is filtered out and the named sibling still reports.
 		{"m12", "var {createClass, ...rest} = require('react');", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
 
-		// A getter, a static, and a field holding a number all report. This arm tests the NAME only.
+		// A getter, a static, and a field holding a number all report. This arm tests the name only.
 		{"m19", "class F extends React.Component { get componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
 		{"m20", "class F extends React.Component { static componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
 		{"m21", "class F extends React.Component { componentWillMount = 1 }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
@@ -137,13 +137,13 @@ func TestNoDeprecatedFires(test *testing.T) {
 		// The ES5 factory callee in parentheses, same mechanism.
 		{"m26", "var F = (createReactClass)({ componentWillMount: function() {} })", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
 
-		// The namespaced factory, which IS `React.createReactClass` and not `React.createClass`.
+		// The namespaced factory, which is `React.createReactClass` and not `React.createClass`.
 		{"m28", "var F = React.createReactClass({ componentWillMount: function() {} })", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
 
 		// The `@jsx` pragma renames React for the whole file.
 		{"m29", "/** @jsx Foo */ Foo.renderComponent()", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
 
-		// A LINE comment carries the pragma too; the scan is not restricted to block comments.
+		// A line comment carries the pragma too; the scan is not restricted to block comments.
 		{"m31", "// @jsx Foo\nFoo.renderComponent()", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
 
 		// Only the part before the first dot is taken.
@@ -158,7 +158,7 @@ func TestNoDeprecatedFires(test *testing.T) {
 		// The pragma name written flush against the block comment's closing delimiter.
 		//
 		// This is the input that separates stripping the trailing `*/` from not stripping it. ESLint
-		// hands a rule the comment's VALUE, delimiters already removed, so upstream's `[^\s]+`
+		// hands a rule the comment's value, delimiters already removed, so upstream's `[^\s]+`
 		// captures `Foo`. Keeping the delimiter would capture `Foo*/`, which fails the identifier
 		// check and falls back to React, and this case would go silent while its React twin below
 		// started reporting. Measured on the installed build: this reports as `Foo.renderComponent`.
@@ -248,11 +248,11 @@ func TestNoDeprecatedStaysSilent(test *testing.T) {
 		{"m18", "class F extends React.Component { 'componentWillMount'() {} }"},
 
 		// The bare `createClass` factory. Upstream's createClass pragma defaults to `createReactClass`
-		// ALONE, and the shelf helper `react.IsEs5ComponentCall` accepts both. This is the case that
+		// alone, and the shelf helper `react.IsEs5ComponentCall` accepts both. This is the case that
 		// separates them, and it is why this rule does not use the shelf helper.
 		{"m27", "var F = createClass({ componentWillMount: function() {} })"},
 
-		// Under a `Foo` pragma, `React.renderComponent` is nothing. The pragma REPLACES rather than adds.
+		// Under a `Foo` pragma, `React.renderComponent` is nothing. The pragma replaces rather than adds.
 		{"m30", "/** @jsx Foo */ React.renderComponent()"},
 
 		// The twin of the flush-delimiter case above. Under a `Foo` pragma however it is spelled,
@@ -283,7 +283,7 @@ func TestNoDeprecatedStaysSilent(test *testing.T) {
 	}
 }
 
-// TestNoDeprecatedSpans pins WHERE each of the four arms points.
+// TestNoDeprecatedSpans pins where each of the four arms points.
 //
 // `ExpectFindings` asserts ids and counts and nothing else, and the fires test above additionally
 // asserts the rendered message, but neither can see a finding anchored on the wrong node. Each arm
@@ -310,7 +310,7 @@ func TestNoDeprecatedSpans(test *testing.T) {
 
 		{"import specifier", "import {createClass} from 'react';", []string{"createClass"}},
 
-		// The alias is INSIDE the span. Reporting the imported name node alone would underline
+		// The alias is inside the span. Reporting the imported name node alone would underline
 		// eleven characters where upstream underlines seventeen.
 		{"aliased import specifier", "import {createClass as cc} from 'react';",
 			[]string{"createClass as cc"}},
@@ -321,7 +321,7 @@ func TestNoDeprecatedSpans(test *testing.T) {
 		{"aliased destructured property", "var {createClass: cc} = require('react');",
 			[]string{"createClass: cc"}},
 
-		// The KEY, not the method. Reporting the member would underline the body too.
+		// The key, not the method. Reporting the member would underline the body too.
 		{"class member key", "class F extends React.Component { componentWillMount() {} }",
 			[]string{"componentWillMount"}},
 		{"object member key", "var F = createReactClass({ componentWillMount: function() {} });",

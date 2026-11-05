@@ -32,21 +32,21 @@ var messageUseSetStateCallback = rule.Message{
 //	var v = this.state.x; this.setState({value: v}) a variable holding this.state, used in the argument
 //	nextState() where nextState reads this.state    a method reading this.state, called in the argument
 //
-// # Only the FIRST argument counts, and this is the whole valid/invalid split
+// # Only the first argument counts, and this is the whole valid/invalid split
 //
 // `this.setState({}, () => console.log(this.state))` is clean and
 // `this.setState(this.state, () => console.log(this.state))` reports once. The second argument is
 // the completion callback, which runs after the update and is the correct place to read state.
 // Upstream walks up from the finding to the `setState` call and asks whether the ancestor it came
-// through IS `arguments[0]`, which is what makes the two cases differ. Both measured.
+// through is `arguments[0]`, which is what makes the two cases differ. Both measured.
 //
-// A callback FIRST argument is not exempt: `this.setState(() => ({value: this.state.value + 1}))`
+// A callback first argument is not exempt: `this.setState(() => ({value: this.state.value + 1}))`
 // reports, because the callback receives the pending state as a parameter and reading `this.state`
 // inside it defeats the point. Measured against the installed build.
 //
 // # The scope comparison on the variable route, which is stricter than it reads
 //
-// Upstream keeps each recorded variable's SCOPE and reports only when the use site's scope is the
+// Upstream keeps each recorded variable's scope and reports only when the use site's scope is the
 // same object. That is block-level identity rather than resolution, measured three ways on the
 // installed build:
 //
@@ -55,7 +55,7 @@ var messageUseSetStateCallback = rule.Message{
 //	{ var v = this.state.x; } this.setState({value: v})                    SILENT, different scope
 //
 // The third is the surprising one, because `var` hoists to the function and the name genuinely
-// resolves. Upstream is comparing where each site SITS rather than what the name binds to, so a
+// resolves. Upstream is comparing where each site sits rather than what the name binds to, so a
 // block moves the answer. Reproduced rather than corrected: the direction is a false negative,
 // which is visible to nobody but also harms nobody, and correcting it would report code upstream
 // calls clean.
@@ -70,7 +70,7 @@ var messageUseSetStateCallback = rule.Message{
 // written in the `React.createClass` spelling and are therefore dead against the version this
 // repository runs; they are recorded below in the reachable spelling, with every verdict replayed.
 //
-// # The method route matches on a BARE name
+// # The method route matches on a bare name
 //
 // Upstream's corpus reports `this.setState(nextState())` for a component whose method is
 // `nextState`, even though the call is unqualified and would be a reference error at runtime. The
@@ -85,7 +85,7 @@ var NoAccessStateInSetstate = rule.Rule{
 		}
 
 		// Both lists accumulate as the walk proceeds and are read by later visits, which is
-		// upstream's design. A method or variable declared AFTER the `setState` that would have
+		// upstream's design. A method or variable declared after the `setState` that would have
 		// used it is therefore not seen, and that ordering is part of the behaviour.
 		methods := []noAccessStateMethod{}
 		variables := []noAccessStateVariable{}
@@ -145,6 +145,8 @@ type noAccessStateVariable struct {
 //
 // Two jobs. It propagates the "reads this.state" mark from a called method up to the method doing
 // the calling, and it reports when a marked method is called inside a `setState` first argument.
+//
+// Mutates: methods gains each method that calls a marked method, so later visits see the mark propagated
 func noAccessStateVisitCall(ruleContext rule.Context, node *ast.Node, methods *[]noAccessStateMethod) {
 	if enclosingComponentOf(node) == nil {
 		return
@@ -152,7 +154,7 @@ func noAccessStateVisitCall(ruleContext rule.Context, node *ast.Node, methods *[
 	callee := node.AsCallExpression().Expression
 	calleeName := noAccessStateCalleeName(callee)
 
-	// Propagation. A method calling a marked method becomes marked itself, carrying the ORIGINAL
+	// Propagation. A method calling a marked method becomes marked itself, carrying the original
 	// method's reported node forward, so a two-hop chain still points at the `this.state` access.
 	//
 	// Upstream appends to the same slice it is iterating, which in JavaScript means the new entries
@@ -192,6 +194,9 @@ func noAccessStateVisitCall(ruleContext rule.Context, node *ast.Node, methods *[
 //
 // One walk upward from the access, taking the first of four exits: report, record as a method,
 // record as a variable, or fall off the top.
+//
+// Mutates: methods gains the enclosing method when the access sits in one, for the call arm to propagate and report
+// Mutates: variables gains the declared name when the access initializes a variable, for the identifier arm to match
 func noAccessStateVisitStateAccess(
 	ruleContext rule.Context,
 	node *ast.Node,
@@ -242,8 +247,8 @@ func noAccessStateVisitStateAccess(
 // noAccessStateVisitIdentifier handles upstream's Identifier arm, the variable route's use site.
 //
 // Upstream first walks past any enclosing binary expressions, then requires the identifier to be
-// either the VALUE of a property or the OBJECT of a member access. That pair is what keeps a
-// property KEY and a bare argument from matching: `{value: v}` matches on `v` as the value, and
+// either the value of a property or the object of a member access. That pair is what keeps a
+// property key and a bare argument from matching: `{value: v}` matches on `v` as the value, and
 // `v.value` matches on `v` as the object.
 func noAccessStateVisitIdentifier(ruleContext rule.Context, node *ast.Node, variables []noAccessStateVariable) {
 	current := node
@@ -254,7 +259,7 @@ func noAccessStateVisitIdentifier(ruleContext rule.Context, node *ast.Node, vari
 		return
 	}
 
-	// Upstream does NOT break out of this loop after reporting, so an identifier nested inside two
+	// Upstream does not break out of this loop after reporting, so an identifier nested inside two
 	// `setState` calls reports once per enclosing call. Reproduced; no corpus case nests them.
 	for walk := current; walk != nil; walk = walk.Parent {
 		if !noAccessStateIsFirstArgumentOfSetState(walk, node) {
@@ -273,6 +278,8 @@ func noAccessStateVisitIdentifier(ruleContext rule.Context, node *ast.Node, vari
 //
 // `var {state, ...rest} = this` records `state` as a variable holding the component state, so a
 // later `state.value` inside a `setState` argument reports. The initializer must be exactly `this`.
+//
+// Mutates: variables gains a `state` binding destructured from `this`, for the identifier arm to match
 func noAccessStateVisitObjectPattern(node *ast.Node, variables *[]noAccessStateVariable) {
 	parent := node.Parent
 	if parent == nil || parent.Kind != ast.KindVariableDeclaration {
@@ -290,7 +297,7 @@ func noAccessStateVisitObjectPattern(node *ast.Node, variables *[]noAccessStateV
 		if element.Kind != ast.KindBindingElement {
 			continue
 		}
-		// Upstream reads the property's KEY, which for a shorthand `{state}` is the same identifier
+		// Upstream reads the property's key, which for a shorthand `{state}` is the same identifier
 		// as the local name. A renaming `{state: s}` records the key `state` while the usable local
 		// is `s`, so the recorded name matches nothing later; that is upstream's behaviour and the
 		// property name is what is read here for the same reason.
@@ -314,7 +321,7 @@ func noAccessStateVisitObjectPattern(node *ast.Node, variables *[]noAccessStateV
 // argument, where `candidate` is a `this.setState(...)` call.
 //
 // Upstream walks the node's ancestors up to the candidate and asks whether the child it arrived
-// through IS `arguments[0]`. That is the test which separates the first argument from the
+// through is `arguments[0]`. That is the test which separates the first argument from the
 // completion callback, and it is why the same `this.state` access is a finding in one position and
 // clean in the other.
 func noAccessStateIsFirstArgumentOfSetState(candidate *ast.Node, node *ast.Node) bool {
@@ -399,7 +406,7 @@ func noAccessStateScopeOf(node *ast.Node) *ast.Node {
 // noAccessStateCalleeName reads the bare name a call expression invokes, if it has one.
 //
 // Upstream reads `node.callee.name`, which is present only for a plain identifier callee, so
-// `this.nextState()` contributes no name to the propagation half. The REPORTING half compares that
+// `this.nextState()` contributes no name to the propagation half. The reporting half compares that
 // same possibly-empty name, which is why upstream's own corpus writes an unqualified `nextState()`.
 func noAccessStateCalleeName(callee *ast.Node) string {
 	if callee == nil || callee.Kind != ast.KindIdentifier {
@@ -409,13 +416,13 @@ func noAccessStateCalleeName(callee *ast.Node) string {
 }
 
 // noAccessStateEnclosingMethodName returns the name of the method a node sits inside, for the
-// PROPAGATION arm only.
+// propagation arm only.
 //
 // This deliberately accepts fewer shapes than `noAccessStateDeclaringMethodName`, and the asymmetry
 // is upstream's rather than an oversight. Upstream's propagation walk tests `current.type ===
-// 'MethodDefinition'` and nothing else, while its `this.state` walk tests MethodDefinition AND a
+// 'MethodDefinition'` and nothing else, while its `this.state` walk tests MethodDefinition and a
 // FunctionExpression sitting under a property. So a method chain propagates inside an ES6 class and
-// does NOT propagate inside a `createReactClass` object literal, where every method is a function
+// does not propagate inside a `createReactClass` object literal, where every method is a function
 // expression under a property.
 //
 // Measured on the installed build, and this port reported the object form until the probe was run:
@@ -435,7 +442,7 @@ func noAccessStateEnclosingMethodName(node *ast.Node) string {
 		if current.Kind == ast.KindSourceFile {
 			return ""
 		}
-		// A CLASS method specifically. Our parser gives an object literal's method shorthand the
+		// A class method specifically. Our parser gives an object literal's method shorthand the
 		// same kind, while ESTree spells it as a Property holding a FunctionExpression and reserves
 		// MethodDefinition for a class member. Without the parent check this arm would accept the
 		// shorthand and propagate a chain upstream does not, measured: the object shorthand two-hop

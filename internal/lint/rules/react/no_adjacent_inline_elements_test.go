@@ -116,7 +116,7 @@ func TestNoAdjacentInlineElementsHasNoFileSuffixGate(test *testing.T) {
 //
 // Six of upstream's passing cases separate two anchors with whitespace, so they read as a whitespace
 // test. Applying the discipline of changing the one thing the shape suggests matters, the verdict
-// does NOT move: a single non-space character is just as clean. Text written inside a tag is
+// does not move: a single non-space character is just as clean. Text written inside a tag is
 // `JSXText` in the tree upstream walks, its `isInline` names no such arm, so it falls through to
 // false and breaks the adjacency run whatever it holds.
 //
@@ -158,7 +158,7 @@ func TestNoAdjacentInlineElementsIgnoresWhitespaceInJsx(test *testing.T) {
 // TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement covers the arm where the regex is
 // reachable.
 //
-// In a children array a string IS a Literal, so `/(?:^\s|\s$)/` decides. The corpus writes two of
+// In a children array a string is a Literal, so `/(?:^\s|\s$)/` decides. The corpus writes two of
 // these and the rest were measured, including the empty string, which is the sharp one: it has no
 // whitespace to find, so it counts as inline and adjacency holds.
 func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(test *testing.T) {
@@ -201,7 +201,7 @@ func TestNoAdjacentInlineElementsWhitespaceMattersInCreateElement(test *testing.
 //
 // This port guards and reaches the verdict upstream would have reached: a call with no arguments is
 // not inline. Reproducing the crash would cost far more than the divergence, because the walk
-// recovers per FILE rather than per rule, so one panic takes every rule's findings for that file.
+// recovers per file rather than per rule, so one panic takes every rule's findings for that file.
 //
 // The crash is unreachable from the JSX arm, where a call only appears inside an expression
 // container, which upstream never inspects. The third case pins that.
@@ -236,7 +236,7 @@ func TestNoAdjacentInlineElementsDoesNotCrashWhereUpstreamDoes(test *testing.T) 
 
 // TestNoAdjacentInlineElementsReportsOncePerContainer pins upstream's early return.
 //
-// `validate` returns as soon as it reports, so a run of three inline elements yields ONE finding and
+// `validate` returns as soon as it reports, so a run of three inline elements yields one finding and
 // a container holding two separated pairs also yields one. Both measured. A loop that kept going
 // would report twice on inputs upstream reports once, and the corpus's longest failing case holds a
 // single pair, so nothing in it could see the difference.
@@ -303,7 +303,7 @@ func TestNoAdjacentInlineElementsNameMatching(test *testing.T) {
 // TestNoAdjacentInlineElementsCreateElementShapes covers the outer call's gates.
 //
 // The outer call must be a createElement call and its third argument must be an array. Neither is
-// stated by the corpus beyond one case, and the asymmetry with the INNER children is the surprising
+// stated by the corpus beyond one case, and the asymmetry with the inner children is the surprising
 // part: upstream gates the outer call and never checks the inner ones at all.
 func TestNoAdjacentInlineElementsCreateElementShapes(test *testing.T) {
 	test.Parallel()
@@ -339,7 +339,7 @@ func TestNoAdjacentInlineElementsCreateElementShapes(test *testing.T) {
 
 // TestNoAdjacentInlineElementsAnchorsOnTheContainer asserts where the finding points.
 //
-// The corpus asserts message ids only. Upstream reports on the CONTAINER rather than on either of
+// The corpus asserts message ids only. Upstream reports on the container rather than on either of
 // the two adjacent children, which is a real choice: the reader is being told about a relationship,
 // and neither child is wrong on its own.
 func TestNoAdjacentInlineElementsAnchorsOnTheContainer(test *testing.T) {

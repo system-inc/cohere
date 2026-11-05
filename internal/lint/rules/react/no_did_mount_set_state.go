@@ -86,7 +86,7 @@ var messageNoDidMountSetState = rule.Message{
 // resolves in the opposite direction. This rule really does ask about components.
 //
 // But it asks a *looser* question than it looks, and this was measured on the release binary rather
-// than reasoned about. Nothing checks that the lifecycle property is a member OF the component: the
+// than reasoned about. Nothing checks that the lifecycle property is a member of the component: the
 // walk only requires that some ancestor further out is one. So a plain object literal carrying a
 // `componentDidMount`, declared inside the render method of a real component, reports. That is
 // upstream being loose rather than upstream being right, and it is reproduced rather than improved
@@ -156,7 +156,7 @@ var NoDidMountSetState = rule.Rule{
 // declined, the second because its object is a property access rather than the `this` keyword.
 // Neither appears in the corpus and both are pinned by an invented fixture below.
 //
-// Note what this does NOT do: it never reads `Text()` on the callee node. A property access
+// Note what this does not do: it never reads `Text()` on the callee node. A property access
 // expression panics outright on `Text()` in our shim, and `this.setState` is exactly that kind, so
 // the name is taken off the access's own name node after checking that node's kind.
 func isThisSetStateCallee(callee *ast.Node) bool {
@@ -240,7 +240,7 @@ func staticSetStateName(argument *ast.Node) bool {
 // # Where our AST loses a count that oxc has, which is the whole reason this function exists
 //
 // oxc's `MethodDefinition` is a wrapper whose `value` is a separate `Function` node
-// (`oxc_ast/src/ast/js.rs:2247`), so a class method contributes TWO ancestors to its walk and the
+// (`oxc_ast/src/ast/js.rs:2247`), so a class method contributes two ancestors to its walk and the
 // inner one is function-like. Our `KindMethodDeclaration` is a single node carrying its own body,
 // so the same source contributes one ancestor and it is not in the counted set. Measured rather
 // than reasoned, by logging every ancestor kind of `this.setState` in each of the four shapes the
@@ -311,7 +311,7 @@ func isFunctionScope(node *ast.Node) bool {
 	// A method is a function scope too, and leaving it out was a live false positive. oxc splits a
 	// `MethodDefinition` into two nodes and counts the inner `Function`; our `KindMethodDeclaration`
 	// fuses them, so the latch above counts the lifecycle method's own scope by hand. That handled
-	// the method the walk STOPS at and silently skipped every method it merely passes through, so
+	// the method the walk stops at and silently skipped every method it merely passes through, so
 	// `setState` inside an object method declared in the lifecycle body came out one scope shallow
 	// and reported where upstream is silent. Measured against the release binary with a control:
 	//

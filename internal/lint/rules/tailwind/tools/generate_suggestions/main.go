@@ -101,12 +101,14 @@ func main() {
 		if !bytes.Equal(existing, source) {
 			fail("%s is stale: the engine's recipes changed, so regenerate it and read the diff", *output)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_suggestions: %s is current\n", *output)
 		return
 	}
 	if writeError := os.WriteFile(*output, source, 0o644); writeError != nil {
 		fail("write %s: %v", *output, writeError)
 	}
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(os.Stderr, "generate_suggestions: %d functional roots, %d statics\n", len(file.Functional), len(file.Statics))
 }
 
@@ -238,6 +240,7 @@ func stringSlice(values []string) string {
 }
 
 func fail(format string, arguments ...any) {
+	// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 	fmt.Fprintf(os.Stderr, "generate_suggestions: "+format+"\n", arguments...)
 	os.Exit(1)
 }

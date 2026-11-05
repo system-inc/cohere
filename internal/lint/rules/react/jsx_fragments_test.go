@@ -14,7 +14,7 @@ import (
 // One mechanical transformation was applied and it is the reason this file needs a note. Upstream
 // configures `settings.react.pragma` to `Act` and `settings.react.fragment` to `Frag`, and every
 // one of its cases writes those names. cohere reads no React settings, so the two names were
-// rewritten to `React` and `Fragment` by a whole-word substitution, and then ALL TWENTY TWO cases
+// rewritten to `React` and `Fragment` by a whole-word substitution, and then all twenty-two cases
 // were replayed against the installed build under default settings before anything was written
 // down. Nineteen reproduced their upstream verdict exactly, including the fixer output on all
 // thirteen `output` assertions. The three that did not are upstream's `fragmentsNotSupported`
@@ -22,7 +22,7 @@ import (
 // build answers `preferFragment` for the two named forms and silence for the shorthand, and those
 // are the verdicts recorded below.
 //
-// So every row here is a MEASURED verdict from the installed build rather than a copied assertion,
+// So every row here is a measured verdict from the installed build rather than a copied assertion,
 // which is what makes the pragma substitution safe to have made.
 const jsxFragmentsFile = "/repository/source/JsxFragments.tsx"
 
@@ -85,7 +85,7 @@ func TestJsxFragmentsFires(test *testing.T) {
 
 // TestJsxFragmentsTypeArgumentsAreReportedAndNotRewritten pins the deliberate decline of the fixer.
 //
-// Upstream ships a repair for both directions and it DELETES TYPE ARGUMENTS. A JSX tag can carry
+// Upstream ships a repair for both directions and it deletes type arguments. A JSX tag can carry
 // them, they live inside the opening tag but outside the attributes list, and upstream's only guard
 // is `attrs && attrs.length > 0`, which cannot see them. Measured against the installed build with
 // the TypeScript parser on 2026-08-27:
@@ -220,7 +220,7 @@ func TestJsxFragmentsMessageText(test *testing.T) {
 
 // TestDecodeJsxFragmentsOptions routes configuration through the rule's own decoder.
 //
-// The option is a bare enum STRING rather than an object, which is the line most likely to have no
+// The option is a bare enum string rather than an object, which is the line most likely to have no
 // upstream counterpart: our config layer unwraps the severity tuple, so what arrives is `"element"`
 // on its own rather than upstream's `["element"]`. Building the options struct directly in a
 // fixture would leave that untested.
@@ -300,7 +300,7 @@ func TestJsxFragmentsRequiresTheTypedHarness(test *testing.T) {
 //
 // Every verdict below was measured on 2026-08-27 rather than reasoned about. The nested pair is the
 // one that matters most: upstream's corpus never nests two fragments, and the installed build
-// reports BOTH, so a rule that stopped descending after the outer one would pass every imported
+// reports both, so a rule that stopped descending after the outer one would pass every imported
 // case.
 func TestJsxFragmentsShapesUpstreamDoesNotWrite(test *testing.T) {
 	test.Parallel()
@@ -393,7 +393,7 @@ func TestJsxFragmentsShapesUpstreamDoesNotWrite(test *testing.T) {
 // `testReactVersion` comparison passes and the arm is unreachable.
 //
 // Measured on the installed build with no react settings, which is upstream's three version cases
-// replayed: `<><Foo /></>` is SILENT and both named forms answer `preferFragment` rather than
+// replayed: `<><Foo /></>` is silent and both named forms answer `preferFragment` rather than
 // `fragmentsNotSupported`. Those are the verdicts the imported rows above record, and this test
 // exists so the substitution is stated where a reader will look rather than inferred from three
 // rows whose upstream ids do not match.
@@ -446,14 +446,14 @@ func TestJsxFragmentsVersionArmIsNotPorted(test *testing.T) {
 // Neither shape appears in upstream's corpus, and each was measured against the installed build
 // before the fixture was written rather than after.
 //
-// The MERGED case is the index-zero trap this tree names for six other rules. Declaration merging
+// The merged case is the index-zero trap this tree names for six other rules. Declaration merging
 // puts an `interface Fragment` written above the import at declaration index 0, so a rule reading
 // `symbol.Declarations[0]` instead of looping goes silent on it. Measured: the installed build
 // reports `preferFragment` for both orderings, so the loop is what reproduces upstream and the
 // index would be a silent false negative. Both orderings are pinned because only one of them can
 // distinguish the two versions.
 //
-// The MEMBER ACCESS case pins the pragma name itself. `<Foo.Fragment>` is silent upstream, measured,
+// The member access case pins the pragma name itself. `<Foo.Fragment>` is silent upstream, measured,
 // because upstream compares the rendered element type against the string `React.Fragment` rather
 // than checking only the property half. A guard that dropped the object comparison would report
 // every `Something.Fragment` in the tree.

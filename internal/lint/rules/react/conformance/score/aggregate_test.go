@@ -42,7 +42,7 @@ func (e engineImplementation) Analyze(fixture react_conformance.Fixture) (react_
 // contribution of this file.
 //
 // The assertions are two-sided on purpose. A pass floor alone is satisfied by a harness that cannot
-// see, and a failure count alone is satisfied by one that is broken; requiring BOTH to be non-zero,
+// see, and a failure count alone is satisfied by one that is broken; requiring both to be non-zero,
 // plus the partition check, is what makes the number a measurement.
 func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 	test.Parallel()
@@ -75,7 +75,7 @@ func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 	}
 
 	// The pinned numbers. Exact rather than floors, because the whole point of the wiring is that
-	// this number can now be WRONG, and a floor cannot tell an improvement from a regression.
+	// this number can now be wrong, and a floor cannot tell an improvement from a regression.
 	//
 	// Measured 2026-08-24 against facebook/react@bd6ea412c673.
 	for _, want := range []struct {

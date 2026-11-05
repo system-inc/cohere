@@ -283,7 +283,7 @@ func TestJsxNoCommentTextnodesLineAnchoring(test *testing.T) {
 		// `\s*` allows leading whitespace, so indentation does not hide it.
 		{"an indented comment", "const a = <div>\n      // invalid\n</div>;\n", []string{"putCommentInBraces"}},
 
-		// `^` is the whole reason this is clean: the line does not BEGIN with the slashes. A port
+		// `^` is the whole reason this is clean: the line does not begin with the slashes. A port
 		// scanning for `//` anywhere in the text would report here, and every corpus case would
 		// still pass.
 		{"slashes after other text on the same line", "const a = <div>hello // not a comment</div>;\n", nil},

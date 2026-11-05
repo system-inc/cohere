@@ -9,7 +9,7 @@ import (
 
 // requireOptimizationFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because several cases carry JSX. It is NOT load-bearing and there is no file gate:
+// A `.tsx` name because several cases carry JSX. It is not load-bearing and there is no file gate:
 // `TestRequireOptimizationHasNoFileGate` reports on a `.ts` file too. Three shipped rules in this
 // package used to gate on the suffix through an `isJsxFileName` helper, which was oxc residue rather
 // than upstream behavior and blinded them across every `.ts` file; the gate and the helper are both
@@ -27,7 +27,7 @@ const requireOptimizationFile = "/repository/source/RequireOptimization.tsx"
 // TypeScript parser, and the clone and the installed build agreed on every one. Five cases use
 // decorators, which the TypeScript parser reads natively.
 //
-// # The options column is RAW JSON, on purpose
+// # The options column is raw JSON, on purpose
 //
 // Every case routes through `DecodeRequireOptimizationOptions`, the same function the config layer
 // calls, so the decoder's empty-input path is under test rather than bypassed. An empty string means
@@ -121,7 +121,7 @@ func runRequireOptimization(test *testing.T, sourceText string, rawOptions strin
 // `createReactClass({})` reports and `createReactClass({ foo: function () {} })` does not, and the
 // difference has nothing to do with `shouldComponentUpdate`. Upstream's `FunctionExpression` and
 // `ArrowFunctionExpression` listeners mark their enclosing component as already optimized, and for a
-// `createReactClass` call that component is the OBJECT, so any function value anywhere in it exempts
+// `createReactClass` call that component is the object, so any function value anywhere in it exempts
 // the whole thing.
 //
 // The corpus cannot see this. Both of its reporting object cases contain no function at all, so a
@@ -276,12 +276,12 @@ func TestRequireOptimizationDecoratorArms(test *testing.T) {
 	}
 }
 
-// TestRequireOptimizationSpans asserts WHERE each finding points.
+// TestRequireOptimizationSpans asserts where each finding points.
 //
-// `ExpectFindings` asserts ids and count and nothing else, so a rule reporting on the class NAME or
+// `ExpectFindings` asserts ids and count and nothing else, so a rule reporting on the class name or
 // on the heritage clause passes every fixture above while pointing somewhere the reader was never
 // shown. Upstream reports on the component node, which is the whole class declaration for the class
-// arm and the whole OBJECT for the call arm, and those are two different anchors that no id
+// arm and the whole object for the call arm, and those are two different anchors that no id
 // assertion can tell apart.
 //
 // The text is sliced from the source the harness wrote rather than from the literal, and `Run` does
@@ -315,7 +315,7 @@ func TestRequireOptimizationSpans(test *testing.T) {
 			"declare function createReactClass(spec: any): any;\ndeclare const RandomMixin: any;\ncreateReactClass({ mixins: [RandomMixin] });",
 			[]string{"{ mixins: [RandomMixin] }"},
 		},
-		// Decorators are INCLUDED where `export` is excluded, and the two are the same kind of node
+		// Decorators are included where `export` is excluded, and the two are the same kind of node
 		// here: our parser makes both modifiers on the class, while upstream's puts `export` on a
 		// wrapping declaration and keeps decorators on the class itself. Measured on the installed
 		// build, the decorated class reports from the first decorator. A mutant neutralizing the
@@ -330,10 +330,10 @@ func TestRequireOptimizationSpans(test *testing.T) {
 			"declare const bar: any;\ndeclare const pure: any;\ndeclare const foo: any;\ndeclare const Component: any;\n@bar\n@pure\n@foo\nclass C extends Component {}",
 			[]string{"@bar\n@pure\n@foo\nclass C extends Component {}"},
 		},
-		// A decorator written BEFORE `export` is attached to the export declaration upstream, not
+		// A decorator written before `export` is attached to the export declaration upstream, not
 		// to the class, so upstream drops it from the span. Measured: it reports `class C extends
 		// Component {}` alone. Written the other way round, `export @bar class`, the decorator is
-		// on the class and IS included. Two arrangements, two answers, and only measurement
+		// on the class and is included. Two arrangements, two answers, and only measurement
 		// separates them; the intuitive reading is that a decorator is a decorator.
 		{
 			"a decorator BEFORE export is not part of the span",
@@ -460,7 +460,7 @@ func TestRequireOptimizationRejectsMalformedOptions(test *testing.T) {
 // TestRequireOptimizationHandlesNilOptions covers the path the fixtures cannot reach.
 //
 // The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the zero value. Here that IS the default, an empty allow list, so nil must behave exactly
+// yields the zero value. Here that is the default, an empty allow list, so nil must behave exactly
 // like an absent option object. Asserted rather than assumed, because a rule whose default was not
 // the zero value would be silently inverted on this path.
 func TestRequireOptimizationHandlesNilOptions(test *testing.T) {
@@ -529,15 +529,15 @@ func TestRequireOptimizationHasNoFileGate(test *testing.T) {
 
 // TestRequireOptimizationSurvivesShapesThatWouldPanic drives the shapes with nothing to read.
 //
-// The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
+// The walk recovers per file rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic. These are ordinary
 // code that reaches the two listeners with a missing piece: a call with no arguments, an argument
 // that is not an object, a heritage clause that is `implements` rather than `extends`, and callees
 // that are bare keywords.
 //
-// Every verdict here was measured on the installed build rather than assumed, and THREE of the
+// Every verdict here was measured on the installed build rather than assumed, and three of the
 // original expectations in this test were wrong in the same direction: a spread-only object, a
-// `mixins` that is not an array, and an empty `mixins` array all REPORT upstream, because the object
+// `mixins` that is not an array, and an empty `mixins` array all report upstream, because the object
 // arm exempts only on a function value, a `shouldComponentUpdate` key, or `PureRenderMixin` in the
 // list. They are in the reporting test above now. Writing them here as clean would have been the
 // port brief's exact failure: a fixture encoding my belief rather than upstream's behavior, sitting
@@ -593,7 +593,7 @@ func TestRequireOptimizationObjectArmReportsWithoutAFunction(test *testing.T) {
 // TestRequireOptimizationCreateReactClassSpellings pins which factory names count.
 //
 // The shelf's `react.IsEs5ComponentCall` accepts `createClass` and `React.createClass` as well, and
-// upstream's `require-optimization` accepts NEITHER: its `createClass` pragma defaults to
+// upstream's `require-optimization` accepts neither: its `createClass` pragma defaults to
 // `createReactClass` and cohere reads no React settings to change it. A mutant dropping the gate
 // entirely survived the rest of this suite, because nothing in the corpus writes a call to anything
 // other than `createReactClass`. Every verdict below was measured on the installed build.

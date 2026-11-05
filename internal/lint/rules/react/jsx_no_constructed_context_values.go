@@ -133,7 +133,7 @@ func jsxNoConstructedContextValuesMessage(
 // Upstream calls `utils.getParentComponent(node)`, which is the plugin's 959-line component
 // detector. That detector is not in this tree, and reproducing it would be a substrate build rather
 // than a rule port. It does not have to be reproduced here, and the reason is specific to this rule:
-// the node being classified is ALREADY a JSX element, so every question the detector would ask
+// the node being classified is already a JSX element, so every question the detector would ask
 // about whether a function returns JSX is answered before it is asked. What is left is the name and
 // the class heritage.
 //
@@ -161,7 +161,7 @@ func jsxNoConstructedContextValuesMessage(
 //	React.forwardRef(() => ...)                      REPORTS
 //
 // Two of those rows are where the shelf disagrees with upstream and this rule cannot use it
-// directly. `scope.NameOf` prefers a function expression's OWN name over its binding, which is the
+// directly. `scope.NameOf` prefers a function expression's own name over its binding, which is the
 // opposite of rows eight and nine; and it answers a method's name, where rows ten through sixteen
 // show the class is what decides. Both are correct for the rules `scope.NameOf` was lifted from and
 // wrong here, so the walk below is written out rather than delegated. That is a divergence in
@@ -187,7 +187,7 @@ func jsxNoConstructedContextValuesMessage(
 //
 // # Where the finding points, and it is not the value expression
 //
-// Every finding is anchored on the CONSTRUCTION, which for an indirect case is somewhere else
+// Every finding is anchored on the construction, which for an indirect case is somewhere else
 // entirely: `const v = {x:1}` two lines above the provider reports on `{x:1}`, not on `v`. Measured
 // by slicing the reported range on twenty-six inputs. A message-id fixture cannot see this and the
 // corpus does not assert it, so the span cases below do.
@@ -238,7 +238,7 @@ var JsxNoConstructedContextValues = rule.Rule{
 				return
 			}
 
-			// The component test runs LAST, matching upstream, which calls getParentComponent only
+			// The component test runs last, matching upstream, which calls getParentComponent only
 			// after a construction has been found. Order is not observable in the verdict but it is
 			// observable in cost, and this is the cheaper arrangement on a tree where most
 			// providers are fine.
@@ -248,7 +248,7 @@ var JsxNoConstructedContextValues = rule.Rule{
 
 			// `rule.TokenRange` rather than `node.Pos()`. A node's Pos includes its leading
 			// trivia, so a declaration written on its own line after a blank line or a comment
-			// reports the line the trivia STARTS on rather than the line the reader sees. Measured:
+			// reports the line the trivia starts on rather than the line the reader sees. Measured:
 			// `function v() {}` on line 2 of its component rendered "at line 1" through Pos, where
 			// upstream renders line 2. The span assertions could not see it, because
 			// `ctx.ReportNode` already routes through TokenRange and so was pointing correctly all
@@ -429,7 +429,7 @@ const jsxNoConstructedContextValuesRecursionLimit = 16
 //
 // Every arm was measured against the installed build; see the rule doc for the table. The arms that
 // recurse rather than answer are the interesting ones, and the order inside a conditional or a
-// logical expression is observable: the LEFT side is tried first, so `c ? {a:1} : {b:2}` reports on
+// logical expression is observable: the left side is tried first, so `c ? {a:1} : {b:2}` reports on
 // `{a:1}`.
 func jsxNoConstructedContextValuesConstructionOf(
 	ruleContext rule.Context,
@@ -530,7 +530,7 @@ func jsxNoConstructedContextValuesConstructionOf(
 		if found == nil {
 			return nil
 		}
-		// Upstream sets the usage to the OBJECT rather than to the whole member expression.
+		// Upstream sets the usage to the object rather than to the whole member expression.
 		return &jsxNoConstructedContextValuesConstruction{
 			kind:  found.kind,
 			node:  found.node,
@@ -562,7 +562,7 @@ func jsxNoConstructedContextValuesIsLogicalOperator(kind ast.Kind) bool {
 // jsxNoConstructedContextValuesFollowIdentifier resolves an identifier to what it was declared as
 // and recurses into that.
 //
-// Upstream reads its scope's binding, takes the LAST definition, and bails out unless that
+// Upstream reads its scope's binding, takes the last definition, and bails out unless that
 // definition is a variable or a function name. A parameter is the case that bail-out exists for and
 // it is measured silent.
 //
@@ -584,7 +584,7 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 		return nil
 	}
 
-	// Upstream takes the LAST definition rather than the first, which matters for a name declared
+	// Upstream takes the last definition rather than the first, which matters for a name declared
 	// more than once. Reproduced rather than looped, because this arm asks "what single thing is
 	// this name" and a loop would be wider than upstream.
 	declaration := declarations[len(declarations)-1]
@@ -642,7 +642,7 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 // `scope.NameOf` cannot be used: it prefers a function expression's own name over its binding, and
 // it answers a method's name where the enclosing class is what decides.
 //
-// The walk stops at the FIRST function-like ancestor, which is upstream's behaviour rather than an
+// The walk stops at the first function-like ancestor, which is upstream's behaviour rather than an
 // optimization: a provider inside a lowercase helper nested in a real component is silent, measured.
 func jsxNoConstructedContextValuesInComponent(node *ast.Node) bool {
 	for current := node.Parent; current != nil; current = current.Parent {

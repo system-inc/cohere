@@ -57,7 +57,7 @@ var messageNoAdjacentInlineElements = rule.Message{
 // `isInline` returns true for a `Literal` with no leading or trailing whitespace, and for a
 // `JSXElement` whose name is on the inline list. Text written directly inside a tag is neither: its
 // node type is `JSXText`, which no arm names, so it falls through to `return false`. A non-inline
-// child breaks the adjacency run, so ANY text at all separates two elements, whitespace or not.
+// child breaks the adjacency run, so any text at all separates two elements, whitespace or not.
 // Measured, changing the one thing the case's shape suggests matters:
 //
 //	<div><a></a> <a></a></div>       clean
@@ -75,7 +75,7 @@ var messageNoAdjacentInlineElements = rule.Message{
 //
 // # The whitespace regex is reachable only through createElement, where children are real literals
 //
-// In a `createElement` children array a string IS a `Literal`, so the regex decides:
+// In a `createElement` children array a string is a `Literal`, so the regex decides:
 //
 //	[a, " ", a]     clean, the space is at both ends
 //	[a, "x ", a]    clean, trailing whitespace is enough
@@ -90,8 +90,8 @@ var messageNoAdjacentInlineElements = rule.Message{
 // # Upstream crashes here, and this port declines to
 //
 // `isInline`'s third arm is `astUtil.isCallExpression(node) && inlineNames.indexOf(node.arguments[0].value) > -1`.
-// It tests that the node is a call and then indexes argument zero WITHOUT checking there is one and
-// WITHOUT checking it is a createElement call. Any other call among the children takes it down:
+// It tests that the node is a call and then indexes argument zero without checking there is one and
+// without checking it is a createElement call. Any other call among the children takes it down:
 //
 //	React.createElement("div", undefined, [foo(), React.createElement("a")])
 //	React.createElement("div", undefined, [React.createElement("a"), bar()])
@@ -101,7 +101,7 @@ var messageNoAdjacentInlineElements = rule.Message{
 // judgment, and reproducing it here would be worse than useless: a panic in one rule costs every
 // rule that whole file, because the walk recovers per file rather than per rule.
 //
-// So the arm is written with the guards upstream omits, and the resulting VERDICT is the one
+// So the arm is written with the guards upstream omits, and the resulting verdict is the one
 // upstream would reach if it had not crashed: a call with no arguments, or whose first argument is
 // not a string naming an inline element, is not inline. That is a divergence and it is stated
 // rather than silent. Nothing else in the port improves on upstream.
@@ -111,14 +111,14 @@ var messageNoAdjacentInlineElements = rule.Message{
 //
 // # Which calls count as createElement, and where that is asked
 //
-// The rule asks twice and upstream asks DIFFERENTLY in the two places. The outer call, the one
+// The rule asks twice and upstream asks differently in the two places. The outer call, the one
 // whose children are being examined, goes through `isCreateElement`, so the namespace must be React
-// or the name must resolve to a react import. The inner children do not: `isInline` accepts ANY
+// or the name must resolve to a react import. The inner children do not: `isInline` accepts any
 // call whose first argument names an inline element. Measured, both halves:
 //
 //	NotReact.createElement("div", undefined, [NotReact.createElement("a"), NotReact.createElement("span")])
 //
-// is clean, because the OUTER call is not a createElement call, and the rule never looks inside. But
+// is clean, because the outer call is not a createElement call, and the rule never looks inside. But
 // with a React outer call and foreign inner calls the inner ones still count as inline, since
 // nothing checks them. Reproduced as written: the outer gate uses this package's
 // `isPragmaCreateElementCall` and the inner test looks only at the first argument.
@@ -138,7 +138,7 @@ var messageNoAdjacentInlineElements = rule.Message{
 //
 // # Only the first adjacent pair reports
 //
-// `validate` returns as soon as it reports, so a run of three inline elements produces ONE finding
+// `validate` returns as soon as it reports, so a run of three inline elements produces one finding
 // and a container holding two separated pairs also produces one. Both measured. A loop that kept
 // going would report twice on inputs upstream reports once.
 var NoAdjacentInlineElements = rule.Rule{
@@ -182,7 +182,7 @@ var NoAdjacentInlineElements = rule.Rule{
 		// and the whitespace test is reachable.
 		isInlineCreateElementChild := func(child *ast.Node) bool {
 			if noAdjacentInlineElementsIsUpstreamLiteral(child) {
-				// `/(?:^\s|\s$)/` over `String(value)`. Whitespace at EITHER end makes it not
+				// `/(?:^\s|\s$)/` over `String(value)`. Whitespace at either end makes it not
 				// inline; an empty string has neither and so counts as inline.
 				text := noAdjacentInlineElementsLiteralText(child)
 				return !noAdjacentInlineElementsHasEdgeWhitespace(text)
@@ -207,7 +207,7 @@ var NoAdjacentInlineElements = rule.Rule{
 
 		// validate walks a child list and reports the first adjacent inline pair.
 		//
-		// Upstream reports on the CONTAINER rather than on either child, and returns immediately,
+		// Upstream reports on the container rather than on either child, and returns immediately,
 		// so one container yields at most one finding however many pairs it holds.
 		validate := func(reported *ast.Node, children []*ast.Node, isInline func(*ast.Node) bool) {
 			previousIsInline := false
@@ -297,7 +297,7 @@ func noAdjacentInlineElementsLiteralText(node *ast.Node) string {
 // noAdjacentInlineElementsHasEdgeWhitespace is upstream's `/(?:^\s|\s$)/`.
 //
 // An alternation of two anchored tests rather than a trim comparison, which matters at one input:
-// a string that is ENTIRELY whitespace matches the first alternative, and so does a trim test, so
+// a string that is entirely whitespace matches the first alternative, and so does a trim test, so
 // the two agree there. They differ on the empty string, where a trim comparison also finds no
 // change and would answer the same. Written as the two anchor tests anyway, because that is the
 // shape upstream wrote and the equivalence is an argument rather than a measurement.

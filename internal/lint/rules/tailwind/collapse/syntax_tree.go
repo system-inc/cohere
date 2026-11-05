@@ -13,7 +13,7 @@
 //
 // # What was deliberately not ported, and why
 //
-// `ast.ts` is 1,582 lines. This is a few hundred, and the gap is not abbreviation — it is every
+// `ast.ts` is 1,582 lines. This is a few hundred, and the gap is not abbreviation. It is every
 // part of the file that exists to turn a tree back into text, which cohere never does:
 //
 //   - `toCss` (~200 lines) and all printing. Nothing here renders. The reading of a candidate is
@@ -37,7 +37,7 @@
 //
 // The node kinds are not abbreviated, and that is deliberate. All six upstream kinds are here even
 // though only four carry data the reading uses, because the two structural wrappers change the
-// answer by existing — see PropertySort.
+// answer by existing (see PropertySort).
 package tailwind
 
 // NodeKind identifies which of the six CSS AST node shapes a Node holds.
@@ -129,7 +129,7 @@ func AtRule(name, params string, nodes ...*Node) *Node {
 
 // Declaration builds a KindDeclaration node with a value present.
 //
-// To build one whose value is absent — the `undefined` case that PropertySort skips — set
+// To build one whose value is absent (the `undefined` case that PropertySort skips), set
 // ValuePresent to false on the result rather than passing a sentinel string, since the empty string
 // is itself a meaningful value.
 func Declaration(property, value string) *Node {

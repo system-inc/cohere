@@ -47,8 +47,12 @@ func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(test *testing.T) {
 
 func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, system *LoadedDesignSystem) {
 
-	var agreed, bothDeclined, tableSilent, engineSilent int
-	var disagreements, silentNames []string
+	var agreed int
+	var bothDeclined int
+	var tableSilent int
+	var engineSilent int
+	var disagreements []string
+	var silentNames []string
 
 	for _, testCase := range fixture.Cases {
 		utility, known := FrameworkMultiDeclarationUtilities[testCase.Root]

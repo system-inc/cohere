@@ -9,7 +9,7 @@ import (
 
 // noInvalidHtmlAttributeFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because every JSX case needs a parser that reads JSX. It is NOT load-bearing:
+// A `.tsx` name because every JSX case needs a parser that reads JSX. It is not load-bearing:
 // this rule has no file gate, and TestNoInvalidHtmlAttributeHasNoFileGate pins that by running
 // one reporting createElement source under two extensions.
 const noInvalidHtmlAttributeFile = "/repository/source/NoInvalidHtmlAttribute.tsx"
@@ -1265,7 +1265,7 @@ func TestNoInvalidHtmlAttributeReportsWhereItSays(test *testing.T) {
 			span:   "\"canonical\"",
 		},
 		{
-			// A bare attribute anchors on the NAME, not the whole attribute.
+			// A bare attribute anchors on the name, not the whole attribute.
 			name:   "emptyIsMeaningless-anchors-on-the-name",
 			source: "<a rel></a>;\n",
 			id:     "emptyIsMeaningless",
@@ -1330,7 +1330,7 @@ func TestNoInvalidHtmlAttributeRendersTheTagListInUpstreamOrder(test *testing.T)
 //
 // The JSX arm splits a value on whitespace and judges each token, so
 // `rel="alternate alternatex"` reports once for the bad token alone. The createElement arm looks the
-// WHOLE string up in the table, so the same value reports once naming the entire string. That is
+// whole string up in the table, so the same value reports once naming the entire string. That is
 // upstream's, not a simplification here, and corpus cases invalid[4] through invalid[8] pin both
 // halves; this test states the contrast in one place because reading it out of eight scattered rows
 // is how a later reader "fixes" one arm to match the other.
@@ -1364,7 +1364,7 @@ func TestNoInvalidHtmlAttributeSeparatesTheTwoValueArms(test *testing.T) {
 
 // TestNoInvalidHtmlAttributeSurvivesAMemberItCannotName covers the shapes whose names cannot be read.
 //
-// `Node.Text()` panics on several kinds rather than returning empty, and the walk recovers per FILE
+// `Node.Text()` panics on several kinds rather than returning empty, and the walk recovers per file
 // rather than per rule, so one unguarded read costs every rule in this package its verdict on that
 // file. Each shape below reaches a different name read: a computed property key, a namespaced JSX
 // attribute, a member-expression tag name, and a spread with no name at all.
@@ -1402,7 +1402,7 @@ func TestNoInvalidHtmlAttributeSurvivesAMemberItCannotName(test *testing.T) {
 //
 // Measured on the installed build with a control that fires: `Preact.createElement`,
 // `h.createElement` and a bare `createElement` are all silent on a value that reports under
-// `React.createElement`. This is deliberately NARROWER than this package's shared
+// `React.createElement`. This is deliberately narrower than this package's shared
 // `isPragmaCreateElementCall`, which accepts the bare form; the difference is upstream's.
 func TestNoInvalidHtmlAttributeChecksTheCreateElementReceiver(test *testing.T) {
 	test.Parallel()
@@ -1429,7 +1429,7 @@ func TestNoInvalidHtmlAttributeChecksTheCreateElementReceiver(test *testing.T) {
 
 // TestNoInvalidHtmlAttributeGatesTheCreateElementElementName covers a real defect this sweep found.
 //
-// Upstream's HTML-element gate is guarded by a STRING test:
+// Upstream's HTML-element gate is guarded by a string test:
 //
 //	if (typeof elemNameArg.value === 'string' && !HTML_ELEMENTS.has(elemNameArg.value))
 //
@@ -1437,7 +1437,7 @@ func TestNoInvalidHtmlAttributeChecksTheCreateElementReceiver(test *testing.T) {
 // against the attribute's permitted tags. An earlier version of this port required a string literal
 // and went silent on `React.createElement(5, ...)`, which upstream reports.
 //
-// Dropping the gate entirely SURVIVED the whole 265-case corpus, so the survivor was investigated
+// Dropping the gate entirely survived the whole 265-case corpus, so the survivor was investigated
 // rather than written off. Driving the installed build on the three shapes the corpus does not
 // write settled it, and the numeric one is where the two disagreed.
 func TestNoInvalidHtmlAttributeGatesTheCreateElementElementName(test *testing.T) {
@@ -1475,14 +1475,14 @@ func TestNoInvalidHtmlAttributeGatesTheCreateElementElementName(test *testing.T)
 // TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace pins the predicate that one corpus case
 // caught and that two mutants could not.
 //
-// `invalid[23]` separates two valid tokens with NO-BREAK SPACEs, so nothing else reports and the
+// `invalid[23]` separates two valid tokens with no-break spaces, so nothing else reports and the
 // whole finding is lost if the predicate is ASCII-only. An earlier version of this rule scanned
 // bytes with an ASCII predicate and documented the gap as a deliberate narrowing; the corpus proved
 // that reasoning wrong.
 //
-// Two mutants on this predicate SURVIVE and both are equivalent rather than uncaught: U+00A0 is in
+// Two mutants on this predicate survive and both are equivalent rather than uncaught: U+00A0 is in
 // `unicode.Zs`, so removing it from the explicit list leaves the category fallback catching it, and
-// removing only the fallback leaves the explicit entry. Removing BOTH is caught by 5 assertions,
+// removing only the fallback leaves the explicit entry. Removing both is caught by 5 assertions,
 // which is what establishes the predicate is load-bearing.
 //
 // Every code point below is written as an escape rather than as a literal character, because the
@@ -1512,8 +1512,8 @@ func TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace(test *testing.T)
 
 	// The controls. Without these an always-true predicate would pass everything above.
 	//
-	// U+200B ZERO WIDTH SPACE is the sharp one: it looks like whitespace, is named like whitespace,
-	// and is NOT matched by JavaScript's `\s`, because it is in category Cf rather than Zs.
+	// U+200B `ZERO WIDTH SPACE` is the sharp one: it looks like whitespace, is named like whitespace,
+	// and is not matched by JavaScript's `\s`, because it is in category Cf rather than Zs.
 	test.Run("control-these-are-not-javascript-whitespace", func(test *testing.T) {
 		test.Parallel()
 		for _, character := range []rune{'a', '-', '\u200b', '\u0085'} {
@@ -1524,11 +1524,11 @@ func TestNoInvalidHtmlAttributeWhitespaceIsJavaScriptWhitespace(test *testing.T)
 	})
 }
 
-// TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText records an EQUIVALENT mutant and pins the
+// TestNoInvalidHtmlAttributeTreatsAJsxEscapeAsLiteralText records an equivalent mutant and pins the
 // behaviour that makes it equivalent.
 //
 // Replacing this rule's raw-source read with the cooked `Text()` survives the whole corpus and every
-// input written to break it. That is not a fixture gap: a JSX attribute value is NOT
+// input written to break it. That is not a fixture gap: a JSX attribute value is not
 // escape-processed, so `rel="a\tb"` holds a literal backslash and a literal `t`, and raw and cooked
 // are the same string for every JSX attribute there is.
 //

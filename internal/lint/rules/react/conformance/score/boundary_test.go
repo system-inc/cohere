@@ -50,7 +50,7 @@ func TestConfigFixturesNeedAModuleTypeProvider(test *testing.T) {
 // TestOptInPragmaFixturesAreEnumerated holds the feature-flag divergences in place.
 //
 // Three goldens in the wired set were recorded under an upstream flag defaulting to false. The
-// assertion is the ENUMERATION rather than a count: if a fourth such fixture appears, or one of
+// assertion is the enumeration rather than a count: if a fourth such fixture appears, or one of
 // these loses its pragma, this fails rather than the score quietly absorbing it.
 //
 // The defaults were read from React's own unminified bundle

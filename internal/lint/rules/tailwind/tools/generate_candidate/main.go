@@ -46,12 +46,14 @@ func main() {
 	flag.Parse()
 
 	if *packageRoot == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "-package-root is required")
 		os.Exit(2)
 	}
 
 	generated, enumerateError := enumerate(*packageRoot, *corpusRoot, *themeEntry)
 	if enumerateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "enumerate: %v\n", enumerateError)
 		os.Exit(1)
 	}
@@ -59,19 +61,23 @@ func main() {
 	if *check {
 		committed, readError := os.ReadFile(*output)
 		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "read committed fixture: %v\n", readError)
 			os.Exit(1)
 		}
 		// Go whitespace: the tool's own fixture file against its own output, a trailing newline at most.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "%s is out of date; rerun without -check\n", *output)
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "%s is up to date\n", *output)
 		return
 	}
 
 	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", *output, writeError)
 		os.Exit(1)
 	}
@@ -88,6 +94,7 @@ func main() {
 		Cases                    []json.RawMessage `json:"cases"`
 	}
 	if decodeError := json.Unmarshal(generated, &summary); decodeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "summarize: %v\n", decodeError)
 		os.Exit(1)
 	}
@@ -96,6 +103,7 @@ func main() {
 	if summary.ThemeEntry != nil {
 		entry = *summary.ThemeEntry
 	}
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(
 		os.Stderr,
 		"wrote %s: tailwind %s via %s, %d utility roots and %d variant roots; "+
@@ -131,7 +139,8 @@ func enumerate(packageRoot, corpusRoot, themeEntry string) ([]byte, error) {
 	arguments := []string{script, packageRoot, corpusRoot, themeEntry}
 
 	command := exec.Command("node", arguments...)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 

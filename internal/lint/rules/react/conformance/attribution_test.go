@@ -10,7 +10,7 @@ import (
 // The failure it guards is the one this package was already built around, one level up: a map that
 // covers most of the corpus produces a per-rule table that looks entirely reasonable. Earlier
 // revisions of this map left 110, then 79, then 53 of the 429 unattributed, and at every one of
-// those stages the per-rule breakdown read as a plausible result — the categories were the ones you
+// those stages the per-rule breakdown read as a plausible result: the categories were the ones you
 // would expect, in roughly the proportions you would expect. Nothing about a 376-of-429 map looks
 // partial from its output.
 //
@@ -52,11 +52,11 @@ func TestEveryDiagnosticIsAttributed(test *testing.T) {
 // printer assigns exactly one heading per category over a switch closed by `assertExhaustive`
 // (`CompilerError.ts:565`), transcribed here as HeadingForCategory. So running each attributed
 // category through that switch and comparing to the heading actually printed is two measurements of
-// the same quantity that were not derived from each other — the same shape as
+// the same quantity that were not derived from each other, the same shape as
 // `TestDeclaredCountMatchesParsedErrors`, and the same reason it works.
 //
 // This check was not used to build the map. It is applied to a finished map, so a misattribution
-// across a heading boundary — a Todo scored as an Immutability, an Invariant scored as a Refs —
+// across a heading boundary (a Todo scored as an Immutability, an Invariant scored as a Refs)
 // cannot survive it.
 //
 // What it cannot catch is stated rather than left implicit: twenty categories share the heading
@@ -100,7 +100,7 @@ func TestAttributionReproducesTheGoldensOwnHeadings(test *testing.T) {
 //
 // categoryByMessage and ruleByCategory were transcribed from different upstream functions. A
 // category that appears in one and not the other is a transcription slip, and its symptom would be
-// a fixture silently belonging to no rule — which reads as "no rule covers this" rather than as a
+// a fixture silently belonging to no rule, which reads as "no rule covers this" rather than as a
 // defect.
 func TestEveryCategoryMapsToARule(test *testing.T) {
 	test.Parallel()

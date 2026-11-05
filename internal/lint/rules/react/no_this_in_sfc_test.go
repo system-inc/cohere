@@ -196,7 +196,7 @@ func TestNoThisInSfcMessageText(test *testing.T) {
 // In this tree directives live in `internal/suppression`, a layer above the rule, and
 // `rule_testing.Run` walks the rule alone and never consults it. Leaving the case in the clean table
 // would therefore have asserted that this rule declines an input it must report, and the only way
-// to make it green would have been to break the port. It is pinned here as REPORTING instead, which
+// to make it green would have been to break the port. It is pinned here as reporting instead, which
 // is what the rule genuinely decides, and the suppression layer is what upstream's version of this
 // assertion belongs to.
 func TestNoThisInSfcReportsUnderADisableDirective(test *testing.T) {
@@ -408,7 +408,7 @@ func TestNoThisInSfcClassComponentAncestor(test *testing.T) {
 // the release binary: only the strict spellings exempt, and the two loose ones report. No imported
 // fixture can see this, because the corpus never nests a component inside an ES5 factory.
 //
-// Upstream's `React.createClass` PASS case looks like evidence for the opposite and is not: it
+// Upstream's `React.createClass` pass case looks like evidence for the opposite and is not: it
 // passes because its `render: function () {...}` is anonymous, so no name can be read and the walk
 // ends at the function. Removing the factory leaves it passing, which was measured. That is why
 // this test writes a component-named arrow inside each factory rather than reusing that shape.
@@ -442,7 +442,7 @@ func TestNoThisInSfcEs5FactoryNameIsStrict(test *testing.T) {
 // The accessor split, which our AST spells with one node kind where oxc has two.
 //
 // oxc's `PropertyDefinition` exempts unconditionally and its `AccessorProperty` exempts only when
-// the value contains the `this`, so a computed KEY on an accessor is not exempt while everything
+// the value contains the `this`, so a computed key on an accessor is not exempt while everything
 // about a plain property is. Both accessor rows are in the corpus, one passing and one failing, so
 // this is the one part of the exemption the imported fixtures can see; the two plain rows are
 // measured and pin that the unconditional arm is really unconditional.
@@ -488,10 +488,10 @@ func TestNoThisInSfcReportsUnderAnySuffix(test *testing.T) {
 	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisInSfc, "/repository/source/Thing.ts", sourceText), "noThisInSfc")
 }
 
-// A `this` in the ARGUMENT of an element access, which the parent-kind check accepts.
+// A `this` in the argument of an element access, which the parent-kind check accepts.
 //
 // Upstream tests `is_member_expression_kind` on the parent alone and never asks whether the `this`
-// is the OBJECT of that member expression. So `a[this]` inside a component satisfies the anchor
+// is the object of that member expression. So `a[this]` inside a component satisfies the anchor
 // even though nothing is being read off `this`. Measured on the release binary rather than assumed,
 // because it looks like a case a port would narrow away as obviously unintended.
 func TestNoThisInSfcAcceptsAnElementAccessArgument(test *testing.T) {

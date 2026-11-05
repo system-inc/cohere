@@ -65,7 +65,7 @@ import (
 //     exemption, and it is reproduced rather than improved on.
 //
 //   - **A back edge is invisible.** `let C = Known; for (...) { C = makeIt(); } return <C />;` does
-//     NOT report, while moving the dynamic assignment above the loop does. The pass walks blocks
+//     not report, while moving the dynamic assignment above the loop does. The pass walks blocks
 //     once in reverse postorder, so taint arriving on an edge from a block it has already visited
 //     is never seen. This looked like a defect in our lowering; the representation turned out to
 //     place the loop phi correctly with its back edge, and running upstream showed identical
@@ -76,12 +76,12 @@ import (
 //
 // `const C = makeIt(); const render = () => <C />;` is silent, and upstream is silent on it too,
 // measured on the exact input. The mechanism is the compilation gate below: the tag lives in a
-// function that is not a unit, and the function that IS a unit does not contain the tag.
+// function that is not a unit, and the function that is a unit does not contain the tag.
 //
 // This comment previously said the silence came from `FunctionExpression.Captures` being empty, so
 // taint could not cross a function boundary at all. That was true when this rule was written and
 // stopped being true one commit later, when lowering learned to resolve a closed-over variable to
-// the binding it captures. Captures now populate and `LoadContext` is emitted. The BEHAVIOUR did
+// the binding it captures. Captures now populate and `LoadContext` is emitted. The behaviour did
 // not change and neither did the agreement with upstream; only the reason did. It is corrected
 // here rather than left, because a stale reason is worse than no reason: the next reader would
 // have gone looking for a substrate gap that no longer exists.
@@ -136,7 +136,7 @@ var StaticComponents = rule.Rule{
 //
 // A node that turns out not to be a component or a hook is still visited: the caller's gate
 // declines it, and lowering has already inlined whatever it contains into the graph of whichever
-// enclosing function IS a unit. The one shape that needs care is a non-component wrapper around a
+// enclosing function is a unit. The one shape that needs care is a non-component wrapper around a
 // component, `function outer() { function Widget() {...} }`, where the wrapper is not a unit and the
 // component inside it is. That is handled by lowering rather than here: `Lower` builds the nested
 // function into the parent's arena, and the gate walks that arena.
@@ -243,13 +243,13 @@ func reportDynamicComponents(ruleContext rule.Context, function *high_level_inte
 //
 // The React Compiler does not analyse every function. `getReactFunctionType` in its `Program.ts`,
 // transcribed by oxc at `react_compiler/entrypoint/program.rs`, admits a function only when its
-// name looks like a component or a hook AND its body actually creates JSX or calls a hook. Anything
+// name looks like a component or a hook and its body actually creates JSX or calls a hook. Anything
 // else is never a compilation unit, so the validator never runs over it; when such a function is
-// nested inside one that IS compiled, its body is analysed as part of the parent rather than on its
+// nested inside one that is compiled, its body is analysed as part of the parent rather than on its
 // own terms.
 //
 // Without this gate the rule analysed every function-like node in the file, and the difference is
-// not theoretical. A dry run over 3,407 files produced seven findings, and ALL SEVEN were the same
+// not theoretical. A dry run over 3,407 files produced seven findings, and all seven were the same
 // shape: a render callback defined inside a component, of the form
 //
 //	function Widget() {
@@ -287,7 +287,7 @@ func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_inte
 	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
 
-	// The OUTERMOST component or hook is the compilation unit, and the walk stops here. A function
+	// The outermost component or hook is the compilation unit, and the walk stops here. A function
 	// nested inside it is not a second subject: upstream lowers it into this graph and analyses it
 	// as part of this function, so descending would report its body twice.
 	//
@@ -295,7 +295,7 @@ func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_inte
 	//
 	//	function Outer() { function Inner() { const C = mk(); return <C />; } return <Inner />; }
 	//
-	// upstream reports ONCE, at `<Inner />`, and never at the inner `<C />`. Descending into
+	// upstream reports once, at `<Inner />`, and never at the inner `<C />`. Descending into
 	// `Inner` as its own unit produced two findings where upstream gives one.
 	//
 	// The apparent counter-example resolves the same way. When the outer function returns `Inner`
@@ -309,7 +309,7 @@ func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_inte
 //
 // This is the seam `Identifier.Node` exists for. Reporting through it rather than through
 // `Place.Range` is not a stylistic choice: a Place's range is the range of the node that produced
-// the INSTRUCTION, and for a JSX tag that node is the whole element, so `<Component />` yields a
+// the instruction, and for a JSX tag that node is the whole element, so `<Component />` yields a
 // span starting at the `<`. Handing the node to `ctx.ReportNode` routes through `rule.TokenRange`,
 // which trims leading trivia at the harness and is the mechanism every other rule here relies on.
 //
@@ -377,7 +377,7 @@ func isCompilationUnit(function *high_level_intermediate_representation.Function
 	return createsJsx(function.Node)
 }
 
-// createsJsx reports whether a function body creates JSX, WITHOUT descending into nested functions.
+// createsJsx reports whether a function body creates JSX, without descending into nested functions.
 //
 // The non-descent is the whole point rather than an optimization. A component whose body is only a
 // callback that returns JSX is not itself a component to upstream, which is what separates
@@ -390,11 +390,11 @@ func isCompilationUnit(function *high_level_intermediate_representation.Function
 //
 // # Why the hook half of upstream's test is absent, rather than forgotten
 //
-// `getReactFunctionType` admits a function that creates JSX OR calls a hook. Only the first half is
+// `getReactFunctionType` admits a function that creates JSX or calls a hook. Only the first half is
 // asked here, and a mutant deleting the hook half survived every fixture, which is the signal that
 // sent this back to the code rather than to another test.
 //
-// The branch is unreachable for THIS rule. A finding requires a JSX tag naming a tainted value, so
+// The branch is unreachable for this rule. A finding requires a JSX tag naming a tainted value, so
 // every reportable input contains JSX. The question is whether that JSX can be somewhere this walk
 // does not look, and the only such place is inside a nested function. A tag there is never reported
 // anyway: the enclosing function is not a compilation unit, so nothing analyses it, and the unit

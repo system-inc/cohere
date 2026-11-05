@@ -87,7 +87,8 @@ func TestDescriptorRowsAgreeWithTheEmitters(test *testing.T) {
 	}
 
 	sort.Strings(disagreements)
-	var totalCompared, totalAgreed int
+	var totalCompared int
+	var totalAgreed int
 	for _, kind := range []string{"ByType", "ByNamespace", "Fallback", "Empty"} {
 		totalCompared += counts[kind].compared
 		totalAgreed += counts[kind].agreed
@@ -317,7 +318,8 @@ func TestModifierAxesAgreeWithTheEmitters(test *testing.T) {
 	}
 
 	sort.Strings(disagreements)
-	var totalCompared, totalAgreed int
+	var totalCompared int
+	var totalAgreed int
 	for _, name := range []string{"Alpha", "Themed"} {
 		totalCompared += counts[name].compared
 		totalAgreed += counts[name].agreed

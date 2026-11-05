@@ -59,7 +59,7 @@ type EnforceConsistentVariableSyntaxOptions struct {
 // guard. `[color:red]` names a property rather than reads one, and rewriting its brackets would
 // change what it means rather than how it is spelled.
 //
-// A bracket whose contents are a function CALL other than `var` is not a custom property at all.
+// A bracket whose contents are a function call other than `var` is not a custom property at all.
 // Upstream's own test is `/^_*--(?![\w-]+\()/`, whose lookahead exists to decline exactly that, so
 // `w-[calc(var(--x)*2)]` is silent: the outer brackets hold arithmetic, not a property reference.
 //

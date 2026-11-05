@@ -13,7 +13,8 @@ import (
 // this whole port is guarded against.
 func TestFrameworkStaticsReproduceTheBaseTable(test *testing.T) {
 	test.Parallel()
-	var missing, disagreeing []string
+	var missing []string
+	var disagreeing []string
 
 	for name, expected := range baseStatics {
 		actual, found := FrameworkStaticReading(name)

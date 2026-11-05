@@ -320,7 +320,7 @@ func classOrderTable(test *testing.T, system *classOrderSystem) *Table {
 // Phase 0 measured the modifier as three states and recorded that its *value* is otherwise not
 // consulted, so `/25`, `/[0.5]` and `/[var(--a)]` are one bucket. That holds on 28,963 of 28,986
 // probed registry classes and fails on 23, all in the shadow families, identically on both design
-// systems — which is what says the mechanism belongs to Tailwind rather than to either repository.
+// systems, which is what says the mechanism belongs to Tailwind rather than to either repository.
 //
 // It is visible in the emitted CSS. A statically resolvable alpha lets the engine fold the colour at
 // build time into one declaration:
@@ -539,7 +539,8 @@ func classOrderAssertReport(test *testing.T, fixture *classOrderFixture, source 
 	// The split is by predicate and both halves are asserted. An unexplained disagreement fails, and
 	// so does an explained one that stopped appearing: an acknowledgement covering nothing is an
 	// acknowledgement that has quietly become a suppression of some other class.
-	var unexplainedDisagreements, unresolvableAlpha []Divergence
+	var unexplainedDisagreements []Divergence
+	var unresolvableAlpha []Divergence
 	for _, divergence := range grouped[OutcomeDisagreed] {
 		if classOrderUnresolvableAlpha(divergence.ClassName) {
 			unresolvableAlpha = append(unresolvableAlpha, divergence)
@@ -654,7 +655,7 @@ func classOrderUntrustworthyReasons(report Report) []string {
 // 407 of ahra's 408 declines are per-declaration roots, and connected has one more,
 // `max-w-screen-sm`. `max-w-screen` is registered as both a static and a functional utility, the
 // parser correctly reads the class as functional rooted there, and the descriptor table carries no
-// functional row for it — it recorded the root as a static and stopped. Thirteen further roots are
+// functional row for it: it recorded the root as a static and stopped. Thirteen further roots are
 // registered functional with no descriptor row and produce no visible defect yet only because their
 // registry classes happen to parse to other roots.
 //
@@ -778,7 +779,7 @@ const classOrderExpectedPerDeclarationDeclines = 300
 // stripping the final segment reads `fade-in-translate-full` as rooted at `fade-in-translate`, when
 // the engine and the parser both root it at `fade-in`, a per-declaration root. That mis-grouping
 // turned 18 correctly-declined classes into 18 phantom "missing table rows", which is precisely the
-// kind of confident wrong answer this whole tier exists to catch — arriving, fittingly, in the
+// kind of confident wrong answer this whole tier exists to catch, arriving, fittingly, in the
 // harness itself.
 //
 // So the parser is asked. It is the component that owns the question, it is already wired into this

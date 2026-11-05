@@ -57,7 +57,7 @@ type EnforceConsistentImportantPositionOptions struct {
 //
 // The negative sign is handled as upstream handles it, which is a case a reader would get wrong:
 // `-!mt-4` and `!-mt-4` both report, and both correct to `-mt-4!`. Upstream strips the leading `-`
-// FIRST and looks for `!` after it, so a marker written on either side of the sign is found, and the
+// first and looks for `!` after it, so a marker written on either side of the sign is found, and the
 // rebuild always puts the sign outside. That is why the two spellings collapse onto one answer.
 //
 // A class carrying the marker on both ends is left alone, because the trailing one already
@@ -164,7 +164,7 @@ func correctedImportantPosition(className string, position string) (string, bool
 	if position == importantPositionLegacy {
 		rebuilt = "!" + rebuilt
 	} else {
-		rebuilt = rebuilt + "!"
+		rebuilt += "!"
 	}
 
 	if prefix != "" {

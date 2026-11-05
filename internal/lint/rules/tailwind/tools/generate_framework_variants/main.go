@@ -5,8 +5,8 @@
 //	go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root <tailwindcss package> [-output <file.go>] [-check]
 //
 // The table it writes is what lets `LoadDesignSystem` build a registry that knows `hover`. Without
-// it a run-scoped design system registers only the repository's own `@custom-variant` names —
-// measured on this repository, one registration against the engine's 88 — and the consequence is
+// it a run-scoped design system registers only the repository's own `@custom-variant` names:
+// measured on this repository, one registration against the engine's 88. And the consequence is
 // not degraded ranking but refusal to parse: `ParseVariant` returns nil for an unregistered root
 // and `ParseCandidate` then yields zero candidates for the whole class. Every rule reading it would
 // decline on every class carrying a variant, and a differential would score that as agreement
@@ -227,18 +227,22 @@ func main() {
 	flag.Parse()
 
 	if *packageRoot == "" {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_framework_variants: -package-root is required")
+		// Ignored: the rest of the same message, and the same exit code says it either way.
 		fmt.Fprintln(os.Stderr, "  example: go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root ~/Projects/ahra/node_modules/tailwindcss")
 		os.Exit(2)
 	}
 
 	result, err := enumerate(*packageRoot, *designSystem)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
 		os.Exit(1)
 	}
 
 	if validateError := validate(result); validateError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", validateError)
 		os.Exit(1)
 	}
@@ -260,18 +264,24 @@ func main() {
 	for _, entryPoint := range invarianceInputs {
 		otherResult, enumerateError := enumerate(*packageRoot, entryPoint)
 		if enumerateError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_framework_variants: enumerating %s for the invariance check: %v\n", entryPoint, enumerateError)
 			os.Exit(1)
 		}
 		if validateError := validate(otherResult); validateError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s: %v\n", entryPoint, validateError)
 			os.Exit(1)
 		}
 
 		if difference := registrationDifference(result.Entries, otherResult.Entries); difference != "" {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintln(os.Stderr, "generate_framework_variants: the registrations are NOT repository-invariant.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintf(os.Stderr, "  %s\n", difference)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  A repository that moves a framework registration cannot be linted from a baked table.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  This finding is worth more than the confirmation.")
 			os.Exit(1)
 		}
@@ -281,6 +291,7 @@ func main() {
 
 	rendered, err := render(result)
 	if err != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", err)
 		os.Exit(1)
 	}
@@ -288,21 +299,27 @@ func main() {
 	if *check {
 		committed, readError := os.ReadFile(*output)
 		if readError != nil {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_framework_variants: cannot read %s to check it: %v\n", *output, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, rendered) {
+			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s is stale for Tailwind %s.\n", *output, result.TailwindVersion)
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  The installed Tailwind registers a different set of variants, or registers them in a different order.")
+			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  Regenerate it and read the diff: what changed is what this upgrade changed.")
 			os.Exit(1)
 		}
+		// Ignored: the check has passed, and the exit code says so whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_framework_variants: %s is current for Tailwind %s (%d registrations).\n",
 			*output, result.TailwindVersion, len(result.Entries))
 		return
 	}
 
 	if writeError := os.WriteFile(*output, rendered, 0o644); writeError != nil {
+		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintf(os.Stderr, "generate_framework_variants: %v\n", writeError)
 		os.Exit(1)
 	}
@@ -311,9 +328,10 @@ func main() {
 	for _, entry := range result.Entries {
 		distinct[entry.Order] = true
 	}
+	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
 	fmt.Fprintf(
 		os.Stderr,
-		"generate_framework_variants: wrote %s — Tailwind %s, %d registrations over %d distinct orders, %d carrying a comparison.\n",
+		"generate_framework_variants: wrote %s \u2014 Tailwind %s, %d registrations over %d distinct orders, %d carrying a comparison.\n",
 		*output, result.TailwindVersion, len(result.Entries), len(distinct), len(result.Comparisons),
 	)
 	for _, comparison := range result.Comparisons {
@@ -321,6 +339,7 @@ func main() {
 		if comparison.Ascending != nil && *comparison.Ascending {
 			direction = "ascending"
 		}
+		// Ignored: the rest of the same summary, which changes nothing already written.
 		fmt.Fprintf(os.Stderr, "  order %d %s: %s\n", comparison.Order, direction, strings.Join(comparison.Members, ", "))
 	}
 }

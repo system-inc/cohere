@@ -187,7 +187,7 @@ func decodeNoUnescapedEntitiesOptionsForTest(test *testing.T, raw string) any {
 // Upstream reports a zero-width point: every diagnostic comes back carrying `line` and `column`
 // with `endLine` and `endColumn` absent, measured through the ESLint Linter API on the installed
 // build. Our Diagnostic has no way to express a point, so this reports the character itself. The
-// START is identical to upstream's; the end is one byte later. That is the divergence, and this is
+// start is identical to upstream's; the end is one byte later. That is the divergence, and this is
 // where it is pinned, so a later change to the span fails loudly rather than drifting.
 func TestNoUnescapedEntitiesPointsAtTheCharacter(test *testing.T) {
 	test.Parallel()
@@ -231,7 +231,7 @@ func TestNoUnescapedEntitiesRendersUpstreamsMessageText(test *testing.T) {
 // A bare-string `forbid` entry produces `unescapedEntity`, which offers nothing and reads
 // differently. Upstream renders "HTML entity, `&` , must be escaped." with the stray space before
 // the comma, an artifact of its `{{entity}}` placeholder sitting between two spaces. That spacing
-// is NOT reproduced: the id is what suppressions and metrics resolve against, and the sentence is
+// is not reproduced: the id is what suppressions and metrics resolve against, and the sentence is
 // ours to write clearly. The divergence is stated here rather than left for a reader to find.
 func TestNoUnescapedEntitiesRendersTheBareStringMessage(test *testing.T) {
 	test.Parallel()
@@ -325,7 +325,7 @@ func TestNoUnescapedEntitiesRepairsTheRightLineOfAMultiLineNode(test *testing.T)
 //
 // Upstream emits entity-major, so it would emit the `>` in `'>x` before the `'`. That order is not
 // observable through ESLint, which sorts diagnostics by position; measured by reversing the
-// `forbid` array on the same input and watching the reported order not move. Emission order IS
+// `forbid` array on the same input and watching the reported order not move. Emission order is
 // observable here, so the loops emit in source order, which is also what upstream's own corpus
 // asserts for its three-finding case.
 //
@@ -398,7 +398,7 @@ func TestNoUnescapedEntitiesSeparatesAnAbsentForbidFromAnEmptyOne(test *testing.
 // A multi-character string can never match, because upstream compares one character against the
 // whole string; measured clean on `{forbid: ["oo"]}` over `<div>foo bar</div>`. An object with no
 // `char` never matches either, measured clean. An object with no `alternatives` is the deliberate
-// divergence: upstream CRASHES on it with "Cannot read properties of undefined (reading 'map')",
+// divergence: upstream crashes on it with "Cannot read properties of undefined (reading 'map')",
 // measured, and this drops it instead.
 func TestNoUnescapedEntitiesDeclinesTheForbidEntriesUpstreamCannotUse(test *testing.T) {
 	test.Parallel()
@@ -537,7 +537,7 @@ func applyOneSuggestion(test *testing.T, source string, suggestion rule.Suggesti
 	return rewritten
 }
 
-// TestNoUnescapedEntitiesRepairsCoverTheWholeNode pins the ONE thing that separates upstream's edit
+// TestNoUnescapedEntitiesRepairsCoverTheWholeNode pins the one thing that separates upstream's edit
 // from the obvious simplification.
 //
 // Replacing just the offending character produces byte-identical output for any single applied
@@ -545,7 +545,7 @@ func applyOneSuggestion(test *testing.T, source string, suggestion rule.Suggesti
 // fix to the character survived the entire suite for exactly that reason.
 //
 // The difference is overlap. Upstream replaces the whole JsxText node, so two findings inside one
-// node carry the SAME range and the engine sees them as mutually exclusive. Measured on the
+// node carry the same range and the engine sees them as mutually exclusive. Measured on the
 // installed rule: `<div>a'b"c</div>` yields two findings whose first suggestions both carry
 // range [13,18], the node's own span. Character-scoped fixes would be disjoint and independently
 // applicable, which is a different proposal to an engine that reasons about overlap.
@@ -560,7 +560,8 @@ func TestNoUnescapedEntitiesRepairsCoverTheWholeNode(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "unescapedEntityAlts", "unescapedEntityAlts")
 
 	// The JsxText node is `a'b"c`, which the parser places at offsets 15..20.
-	const wantPos, wantEnd = 15, 20
+	const wantPos = 15
+	const wantEnd = 20
 	for findingIndex, diagnostic := range result.Diagnostics {
 		for suggestionIndex, suggestion := range diagnostic.Suggestions {
 			if len(suggestion.Fixes) != 1 {

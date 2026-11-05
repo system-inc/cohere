@@ -179,14 +179,14 @@ func TestNoWillUpdateSetStateStaysSilent(test *testing.T) {
 		{"a lifecycle property on a bare object literal at the top level", "var Hello = {\n  componentWillUpdate: function() { this.setState({}); }\n};\n", ""},
 		{"a lifecycle property in a call that is not createReactClass", "var Hello = somethingElse({\n  componentWillUpdate: function() { this.setState({}); }\n});\n", ""},
 
-		// `createClass` and `React.createClass` are NOT components to this rule, which is why the
+		// `createClass` and `React.createClass` are not components to this rule, which is why the
 		// ES5 predicate is spelled in the rule file rather than taken from the shelf. Both are
 		// clean on the release binary and `utilsreact.IsEs5ComponentCall` accepts both, so reaching
 		// for it would report where upstream says nothing and no imported fixture could see it.
 		{"the createClass factory name, which this rule's upstream does not accept", "var Hello = createClass({\n  componentWillUpdate: function() { this.setState({}); }\n});\n", ""},
 		{"the React.createClass factory name, which this rule's upstream does not accept", "var Hello = React.createClass({\n  componentWillUpdate: function() { this.setState({}); }\n});\n", ""},
 
-		// The lifecycle name is one string plus its UNSAFE prefix, and the two neighbouring rules
+		// The lifecycle name is one string plus its `UNSAFE_` prefix, and the two neighbouring rules
 		// in this package differ from this one in exactly that string. These two matter more here
 		// than anywhere else because all three rules live in the same file tree.
 		{"setState directly inside componentDidUpdate", "class Hello extends React.Component {\n  componentDidUpdate() { this.setState({}); }\n}\n", ""},
@@ -211,15 +211,15 @@ func TestNoWillUpdateSetStateStaysSilent(test *testing.T) {
 		{"a parenthesized this receiver", "class Hello extends React.Component {\n  componentWillUpdate() { (this).setState({}); }\n}\n", ""},
 		{"a parenthesized setState callee", "class Hello extends React.Component {\n  componentWillUpdate() { (this.setState)({}); }\n}\n", ""},
 
-		// The nesting judgment applies to the UNSAFE spelling identically; the prefix changes which
+		// The nesting judgment applies to the `UNSAFE_` spelling identically; the prefix changes which
 		// names latch and nothing else.
 		{"a callback inside an UNSAFE prefixed lifecycle method", "class Hello extends React.Component {\n  UNSAFE_componentWillUpdate() { on(function(){ this.setState({}); }); }\n}\n", ""},
 
 		// A nested member that carries its own function scope still counts as a function, and this
 		// block is here because a mutation sweep found the rule reporting on all four of these
 		// while upstream is silent on all four. The cause is the one place our tree fuses two of
-		// oxc's nodes into one: a `MethodDeclaration` is both the name that latches AND the
-		// function scope, so counting it only at the latch left every method NOT on the latch
+		// oxc's nodes into one: a `MethodDeclaration` is both the name that latches and the
+		// function scope, so counting it only at the latch left every method not on the latch
 		// uncounted, and a `setState` two scopes deep read as one scope deep. oxc has a separate
 		// `Function` node under its `MethodDefinition` and its walk counts that node either way.
 		// All four report under `disallow-in-func` and all four are clean by default, on the
@@ -229,7 +229,7 @@ func TestNoWillUpdateSetStateStaysSilent(test *testing.T) {
 		{"a method on a class declared inside the lifecycle method", "class Hello extends React.Component {\n  componentWillUpdate() {\n    class Inner { m() { this.setState({}); } }\n  }\n}\n", ""},
 		{"a nested object getter inside the lifecycle method", "class Hello extends React.Component {\n  componentWillUpdate() {\n    var o = { get g() { this.setState({}); return 1; } };\n  }\n}\n", ""},
 
-		// An arrow callback in default mode. Upstream's corpus writes arrow callbacks ONLY under
+		// An arrow callback in default mode. Upstream's corpus writes arrow callbacks only under
 		// `disallow-in-func`, so nothing imported covers the arrow being counted at all, and a
 		// mutation dropping `KindArrowFunction` from the counted set survived the whole suite
 		// until these two were added. Both measured silent by default and reporting under the

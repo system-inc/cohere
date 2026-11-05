@@ -49,7 +49,7 @@ type EnforceConsistentVariantOrderOptions struct {
 //
 // This is the part a reader is most likely to get wrong, and it was measured against
 // eslint-plugin-better-tailwindcss 4.7.0 rather than inferred. Upstream's `compareVariantOrder`
-// returns 0 when BOTH variants sort below its `GLOBAL` flag, so two element-scoped variants are
+// returns 0 when both variants sort below its `GLOBAL` flag, so two element-scoped variants are
 // left exactly as written: `hover:focus:` and `focus:hover:` are both accepted, and reporting
 // either would be a divergence.
 //
@@ -234,7 +234,7 @@ func sortedVariantSpelling(className string, system *tailwindengine.LoadedDesign
 //
 // The two branches that return 0 are the rule's whole restraint: two variants below the global flag
 // are left in the order they were written, whatever their registration numbers say. Above it the
-// sort is DESCENDING, which is upstream's `orderB > orderA` returning +1.
+// sort is descending, which is upstream's `orderB > orderA` returning +1.
 func compareVariantOrder(left int, right int) int {
 	if left == right {
 		return 0
@@ -270,7 +270,7 @@ const globalVariantFlag = 65536
 // rather than a media query, and neither is `max-md` or `@lg`, which are functional variants whose
 // generated rule keeps its element scope.
 //
-// The named breakpoints are deliberately ABSENT from this map even though they are global, and that
+// The named breakpoints are deliberately absent from this map even though they are global, and that
 // is the one place a static set would have been wrong rather than merely incomplete. `sm` and `md`
 // are not special names: they are whatever `--breakpoint-*` keys the theme declares, and
 // `registerThemeBreakpointVariants` registers each of them at the framework breakpoint group's
@@ -317,7 +317,7 @@ var globalSelectorVariants = map[string]bool{
 // set. Everything else comes from globalSelectorVariants.
 //
 // A compound or arbitrary variant is never global: `group-hover` wraps a selector, and an arbitrary
-// `[@media(hover)]` has no registration to look up. Both are still ORDERED, through the dense rank
+// `[@media(hover)]` has no registration to look up. Both are still ordered, through the dense rank
 // the caller already has; they simply carry no flag, which is what puts them after every media
 // variant and matches upstream on both.
 func isGlobalVariant(variant tailwindengine.ParsedVariant, system *tailwindengine.LoadedDesignSystem) bool {
@@ -367,7 +367,7 @@ func splitVariantSegments(prefix string) []string {
 
 // splitVariantPrefix separates the variant segments from the utility they modify.
 //
-// Splits on the LAST colon that is not inside brackets, because an arbitrary variant and an
+// Splits on the last colon that is not inside brackets, because an arbitrary variant and an
 // arbitrary value both carry colons of their own: `[&:hover]:flex` has one variant, not two.
 func splitVariantPrefix(className string) (string, string, bool) {
 	depth := 0

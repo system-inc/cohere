@@ -110,7 +110,7 @@ var messagePreferEs6ClassShouldUseCreateClass = rule.Message{
 //
 // `getCreateClassFromContext` defaults to the single name `createReactClass`, configurable through
 // a shared setting this tree does not set. So `createClass({...})` and `React.createClass({...})`
-// are both CLEAN, which is the opposite of what the shelf's `IsEs5ComponentCall` answers: that
+// are both clean, which is the opposite of what the shelf's `IsEs5ComponentCall` answers: that
 // helper deliberately accepts `createClass` too, on the reasoning that rules meet both halves of
 // the ecosystem. Following the shelf here would report on code upstream leaves alone.
 //
@@ -129,16 +129,16 @@ var messagePreferEs6ClassShouldUseCreateClass = rule.Message{
 //
 // # The object need not be the first argument, and nesting does not matter
 //
-// Upstream anchors on the object expression and asks whether its PARENT is a matching call. So the
+// Upstream anchors on the object expression and asks whether its parent is a matching call. So the
 // question is "is this object an argument to the factory", not "is this the factory's first
 // argument". Measured: `createReactClass(x, {...})` reports, and an object nested inside the
 // factory's argument does not, because its parent is the outer object rather than the call. A
 // factory call with a nested object reports exactly once.
 //
-// # The Never arm anchors on a class DECLARATION only
+// # The Never arm anchors on a class declaration only
 //
 // Upstream registers `ClassDeclaration` and not `ClassExpression`, so
-// `const Hello = class extends React.Component {}` is SILENT. Measured, and it is worth stating
+// `const Hello = class extends React.Component {}` is silent. Measured, and it is worth stating
 // because the sibling `state-in-constructor` in this package goes the other way: its scope walk
 // finds a class expression and reports there. Two rules in one package, one authority, opposite
 // answers, and the difference is which node the rule registers.
@@ -178,7 +178,7 @@ var messagePreferEs6ClassShouldUseCreateClass = rule.Message{
 // # Where the findings point
 //
 // The two arms report different node kinds and therefore different spans. The Always arm reports
-// the OBJECT EXPRESSION, so the span starts at the brace and excludes `createReactClass(`. The
+// the object expression, so the span starts at the brace and excludes `createReactClass(`. The
 // Never arm reports the whole class declaration. Measured by reading the reported columns, and
 // asserted by the span fixtures rather than left to a message id.
 var PreferEs6Class = rule.Rule{
@@ -224,7 +224,7 @@ var PreferEs6Class = rule.Rule{
 // preferEs6ClassIsFactoryArgument reports whether an object literal is an argument to the
 // `createReactClass` factory.
 //
-// Upstream asks whether the object's PARENT is a call whose callee matches, which is why the
+// Upstream asks whether the object's parent is a call whose callee matches, which is why the
 // object's position among the arguments does not matter and why a nested object is clean: a nested
 // object's parent is the enclosing object rather than the call.
 //
@@ -257,7 +257,7 @@ func preferEs6ClassIsFactoryArgument(node *ast.Node) bool {
 //
 // Written here rather than reaching for `react.IsEs6ComponentClass` for two reasons that pull in
 // opposite directions, so neither alone would justify it. The shelf helper accepts a class
-// EXPRESSION, which this rule must not, and it declines a parenthesized base expression, which this
+// expression, which this rule must not, and it declines a parenthesized base expression, which this
 // rule must accept. Wrapping it would need both a narrowing and a widening, at which point the
 // direct test is the shorter and more readable of the two.
 //

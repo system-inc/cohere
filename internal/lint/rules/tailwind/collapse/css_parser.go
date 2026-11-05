@@ -15,8 +15,8 @@
 // # Why not tdewolff/parse/v2/css
 //
 // It was evaluated by running it, not by reading it. `tdewolff/parse/v2/css` matches at-rule names
-// against a whitelist of known at-rules, and every at-rule Tailwind v4 cares about — `@theme`,
-// `@utility`, `@custom-variant`, `@variant` — misses that whitelist and falls through to
+// against a whitelist of known at-rules, and every at-rule Tailwind v4 cares about (`@theme`,
+// `@utility`, `@custom-variant`, `@variant`) misses that whitelist and falls through to
 // `parseAtRuleUnknown`, which yields a flat token run and no block structure:
 //
 //	@theme (unknown)   Declaration=0  Token=6  BeginRuleset=0
@@ -129,7 +129,8 @@ func ParseCSS(input string) ([]*Node, error) {
 
 	// bufferLast reports the final byte of buffer, or 0 when it is empty. strings.Builder cannot be
 	// read back, and the loop needs the last byte in one branch and the first in three.
-	var bufferFirst, bufferLastByte byte
+	var bufferFirst byte
+	var bufferLastByte byte
 	appendToBuffer := func(text string) {
 		if len(text) == 0 {
 			return
@@ -233,7 +234,7 @@ func ParseCSS(input string) ([]*Node, error) {
 		//
 		// Two consequences are easy to miss and both were measured against the engine rather than
 		// reasoned about. The value is taken by slicing the input directly, so it keeps its
-		// original interior whitespace including newlines — the whitespace-collapsing branches
+		// original interior whitespace including newlines: the whitespace-collapsing branches
 		// above never run over it. `--font-sans` in a real Structure theme comes back from the
 		// engine holding a literal `\n        `, and a parser that routed these bytes through the
 		// normal buffer path returns the same value with a single space instead: still plausible,
@@ -344,8 +345,8 @@ func ParseCSS(input string) ([]*Node, error) {
 			resetBuffer()
 			node = nil
 
-		// End of an ordinary declaration. The `)` guard keeps a `;` inside parentheses — which is
-		// legal inside, for example, a `url()` — from ending the declaration early.
+		// End of an ordinary declaration. The `)` guard keeps a `;` inside parentheses (which is
+		// legal inside, for example, a `url()`) from ending the declaration early.
 		case currentChar == byteSemicolon && topOfStack(closingBracketStack) != byteCloseParen:
 			declaration := parseCSSDeclaration(buffer.String(), strings.Index(buffer.String(), ":"))
 			if declaration == nil {
@@ -404,7 +405,7 @@ func ParseCSS(input string) ([]*Node, error) {
 			// with a `;`.
 			if buffer.Len() > 0 {
 				if bufferFirst == byteAtSign {
-					// `@layer foo { @tailwind utilities }` — a body-less at-rule closing out a block.
+					// `@layer foo { @tailwind utilities }`: a body-less at-rule closing out a block.
 					node = ParseAtRule(buffer.String())
 
 					if parent != nil {
@@ -416,7 +417,7 @@ func ParseCSS(input string) ([]*Node, error) {
 					resetBuffer()
 					node = nil
 				} else {
-					// `.foo { color: red }` — a declaration with no trailing semicolon. Comments are
+					// `.foo { color: red }`: a declaration with no trailing semicolon. Comments are
 					// already stripped, so the first `:` is the real separator.
 					colonIndex := strings.Index(buffer.String(), ":")
 
@@ -559,7 +560,7 @@ func ParseAtRule(buffer string, nodes ...*Node) *Node {
 // that into the appropriate syntax error, since the two call sites word it differently.
 //
 // `!important` is searched for after the colon only, so a property named `--!important` is not
-// mistaken for a flag, and the value is cut at it rather than around it — upstream slices to the
+// mistaken for a flag, and the value is cut at it rather than around it. Upstream slices to the
 // marker and discards everything from there to the end, so trailing text after `!important` is
 // dropped rather than kept.
 func parseCSSDeclaration(buffer string, colonIndex int) *Node {

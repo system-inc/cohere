@@ -57,7 +57,7 @@
 //
 // A generated table knows the repository it was generated from. Measured: 29 of ahra's roots and 27
 // of www-connected-app's were absent from `RootDeclaredProperties`, and 8 of ahra's own `@utility`
-// blocks were captured INTO `StaticDeclaredProperties` as though they were Tailwind's. Computing the
+// blocks were captured into `StaticDeclaredProperties` as though they were Tailwind's. Computing the
 // framework half and compiling the repository half puts each answer with the source that owns it.
 //
 // One answer changed, and it is a correction. `RootDeclaredProperties` stored
@@ -90,7 +90,7 @@
 // independent system. Both produce the same 8 entries, same roots, same shapes, none on either side
 // alone.
 //
-// That measurement is necessary and NOT sufficient, and the second one says why. A repository
+// That measurement is necessary but not sufficient, and the second one says why. A repository
 // `@utility` block can declare a nested selector, and a synthetic one that does contributes a ninth
 // entry: `@utility gutter-*` wrapping `& > :not(:last-child)` enumerates as
 // `gutter -> .CLASS > :not(:last-child)`. So the table is repository-invariant across the systems
@@ -123,8 +123,8 @@ import (
 //
 // Returns false for a class neither source can read, which is a decline rather than a failure:
 // `reportConflicts` skips it, so it participates in no pair. Measured on the corpus, 16 classes
-// reach that state — `container`, the gradient stops, `[font:inherit]` and the two
-// `data-[show=*]:fade-*` classes — each one a class whose properties no per-root table can state,
+// reach that state (`container`, the gradient stops, `[font:inherit]` and the two
+// `data-[show=*]:fade-*` classes), each one a class whose properties no per-root table can state,
 // and each unchanged by this migration.
 func resolveClassFactsIn(className string, designSystem DesignSystemResult) (classFacts, bool) {
 	if designSystem.System == nil {
@@ -171,7 +171,7 @@ func resolveClassFactsIn(className string, designSystem DesignSystemResult) (cla
 
 	// The name the shape and the composition flag are keyed on. A static is keyed on its whole name
 	// and a functional class on its root, which is the same split the deleted tables made: `flex` is
-	// the static `display: flex` AND the root of `flex-4`, and one key cannot serve both.
+	// the static `display: flex` and also the root of `flex-4`, and one key cannot serve both.
 	shapeKey := base
 	if candidate.Kind == tailwindengine.ParsedCandidateKindFunctional {
 		shapeKey = candidate.Root
@@ -256,7 +256,7 @@ func valueResolutionIn(
 // Custom properties are stripped, matching what the conflict tables do and for the same reason their
 // doc comment gives: two classes both setting `--tw-border-style` are not in conflict about anything
 // an author sees. A block that declares nothing else is therefore not resolvable here and falls
-// through to the framework half, which is correct — `fade-in` is exactly that, an `@utility` block
+// through to the framework half, which is correct: `fade-in` is exactly that, an `@utility` block
 // setting only `--enter-opacity`, and it has no visible property to collide on.
 func repositoryClassFacts(
 	className string,
@@ -305,7 +305,7 @@ func repositoryClassFacts(
 		ClassName: className,
 		Variants:  variants,
 		// A repository `@utility` block emits under a bare class selector. The non-default shapes
-		// the framework has — `divide-*` under `:where(.CLASS > :not(:last-child))` — come from its
+		// the framework has (`divide-*` under `:where(.CLASS > :not(:last-child))`) come from its
 		// own handlers, and a repository block has no way to declare one: `@utility` takes a
 		// declaration list, not a selector.
 		SelectorShape: ".CLASS",
@@ -317,9 +317,9 @@ func repositoryClassFacts(
 // functionalRootIn returns the root a class reads as, when the design system reads it functionally.
 //
 // This replaces `functionalRootOf`'s longest-prefix walk over the deleted root table. The walk's
-// own comment records why longest-wins was needed — `border-l-4` has root `border-l` rather than
+// own comment records why longest-wins was needed (`border-l-4` has root `border-l` rather than
 // `border`, and the shorter match gives it `border-width` instead of `border-left-width`, which
-// changes what it conflicts with — and the parser answers the same question without re-deriving it.
+// changes what it conflicts with), and the parser answers the same question without re-deriving it.
 //
 // Returns false when the class reads as static or arbitrary, which the caller handles separately:
 // a static's properties are keyed on its whole name rather than on a root.

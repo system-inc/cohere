@@ -11,8 +11,8 @@ import (
 
 // noUnknownPropertyDomAttributeNames maps a lowercase DOM spelling to its React property name.
 //
-// Extracted mechanically from the CLONE at /tmp/lint-sources/eslint-plugin-react, by evaluating
-// the module's own constants and emitting Go. Nothing here was retyped: the casing IS the rule,
+// Extracted mechanically from the clone at /tmp/lint-sources/eslint-plugin-react, by evaluating
+// the module's own constants and emitting Go. Nothing here was retyped: the casing is the rule,
 // since `strokeWidth` and `stroke-width` are different answers, so a transcription slip would be
 // a silent behaviour change. All 783 distinct strings were verified present verbatim in the
 // clone source before this file was written.
@@ -264,10 +264,10 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 //
 // Upstream concatenates its two-word list, its one-word list, and version-gated additions, and
 // which additions apply depends on `settings.react.version`, a shared-settings surface cohere does
-// not have. So this list reproduces the answer upstream gives with NO settings, which was
+// not have. So this list reproduces the answer upstream gives with no settings, which was
 // established by bisection rather than by reading the source.
 //
-// Reading the source gave the WRONG answer here and it is worth recording why. The default version
+// Reading the source gave the wrong answer here and it is worth recording why. The default version
 // constant is `999.999.999`, which reads as "every gate passes", and this port was first written
 // that way. Measured with three names whose gates differ:
 //
@@ -277,7 +277,7 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 //	precedence          >= 19       report   report   accept   report
 //
 // The no-settings column matches 18.0.0, not the latest: `onPointerDown` is accepted and
-// `precedence` is REPORTED. So the first two gates pass, the `>= 19` gate does NOT, and
+// `precedence` is reported. So the first two gates pass, the `>= 19` gate does not, and
 // `precedence` must be absent from this list. An earlier revision included it on the strength of
 // the source reading, and one of upstream's own corpus cases exposed the mistake.
 //
@@ -285,8 +285,8 @@ var noUnknownPropertyAriaProperties = map[string]bool{
 // filename accessor, a warning-text space and a Flow require, none of which touch the default, so
 // this measurement holds for both artifacts.
 //
-// The one name an older version would ADD, `allowTransparency`, is correctly absent. Upstream's
-// `valid 46` sets `version: 16.0.99` to accept it, and that case is carried as REPORTING with the
+// The one name an older version would add, `allowTransparency`, is correctly absent. Upstream's
+// `valid 46` sets `version: 16.0.99` to accept it, and that case is carried as reporting with the
 // reason at its row, because this port cannot express that setting.
 var noUnknownPropertyNames = []string{
 	`accessKey`,
@@ -910,7 +910,7 @@ func noUnknownPropertyDataLowercaseRequired(name string, lowerCaseName string) r
 
 // NoUnknownPropertyOptions is the decoded option object.
 type NoUnknownPropertyOptions struct {
-	// Ignore names attributes the rule skips entirely, matched against the ACTUAL source spelling
+	// Ignore names attributes the rule skips entirely, matched against the actual source spelling
 	// before any case normalisation. Upstream tests `ignoreNames.indexOf(actualName)`, so an entry
 	// has to be written the way the attribute is written.
 	Ignore []string
@@ -1004,16 +1004,16 @@ func noUnknownPropertyStandardName(name string) (string, bool) {
 
 // noUnknownPropertyAttributeNameText returns a JSX attribute's name as written in source.
 //
-// Deliberately NOT `jsx.AttributeName`, and this is measured rather than a preference. That shelf
+// Deliberately not `jsx.AttributeName`, and this is measured rather than a preference. That shelf
 // helper declines a namespaced name by design, matching oxc, and upstream reads
-// `getText(context, node.name)`, which returns the source text of ANY name shape. Measured on the
+// `getText(context, node.name)`, which returns the source text of any name shape. Measured on the
 // installed build: `xlink:href` reports `unknownPropWithStandardName`, `xmlns:xlink` and a bogus
 // `foo:bar` both report `unknownProp`. Reaching for the shelf here would silently drop every
 // namespaced attribute, which is a false-negative class no imported fixture could see, because
-// upstream's corpus writes namespaced attributes as PASSING cases whose silence looks identical.
+// upstream's corpus writes namespaced attributes as passing cases whose silence looks identical.
 //
 // Probed for the panic hazard as well: `Text()` is safe on all four shapes this rule meets. A
-// hyphenated name such as `data-foo` or `aria-hidden` is a plain `KindIdentifier` here, NOT a
+// hyphenated name such as `data-foo` or `aria-hidden` is a plain `KindIdentifier` here, not a
 // namespaced node, and only a real colon produces `KindJsxNamespacedName`. That was the opposite of
 // the expectation this port started from, and it matters because `data-*` and `aria-*` are two of
 // the rule's four branches. The probe asserted the exact returned string for eight shapes and was
@@ -1110,16 +1110,16 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // and `stroke-width` are different answers, so a transcription slip would be a silent behaviour
 // change that no fixture would obviously catch.
 //
-// # The tables come from the CLONE, which is ahead of the installed build on four entries
+// # The tables come from the clone, which is ahead of the installed build on four entries
 //
 // All 125 corpus cases were replayed against the installed build, version 7.37.5, and 121 agreed.
-// The four disagreements are table CONTENT rather than logic: the clone adds `onScrollEnd`,
+// The four disagreements are table content rather than logic: the clone adds `onScrollEnd`,
 // `onScrollEndCapture` and `closedby`, and widens `onLoad` to include `body`.
 //
 // This port takes the clone, and the reasoning is worth recording because the brief's usual
 // guidance points the other way. Both artifacts declare version 7.37.5: the clone is unreleased
 // commits on the same tag, not a newer release we lag, and its changelog carries all four under
-// "Unreleased". Every one is an `allow` or `add` entry, so the clone is a strict SUPERSET of the
+// "Unreleased". Every one is an `allow` or `add` entry, so the clone is a strict superset of the
 // installed table with no removals and no behaviour reversals, which was verified by diffing the
 // two extractions rather than assumed.
 //
@@ -1141,18 +1141,18 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // `settings.react.version`, which cohere has no surface for, so this port reproduces the
 // no-settings answer.
 //
-// That answer is NOT "every gate passes", though the source reads that way: the default constant is
+// That answer is not "every gate passes", though the source reads that way: the default constant is
 // `999.999.999`. Bisected against the running rule with three names whose gates differ, the
 // no-settings behaviour matches 18.0.0, so the first two gates pass and `>= 19` does not.
 // `precedence` is therefore absent from the property list, and an earlier revision of this port
 // included it on the strength of the reading until one of upstream's own corpus cases caught it.
 // The table above carries the measurement.
 //
-// The one name an OLDER version would add, `allowTransparency`, is correctly absent.
+// The one name an older version would add, `allowTransparency`, is correctly absent.
 //
 // # The decision order is load-bearing and each step was measured
 //
-// The ignore list is consulted against the ACTUAL spelling before normalisation; a member tag is
+// The ignore list is consulted against the actual spelling before normalisation; a member tag is
 // skipped whole; a data attribute short-circuits, reporting only under `requireDataLowercase`; a
 // known ARIA name passes; `fbt` and `fbs` tags are skipped; a non-HTML-like tag passes; the
 // tag-restricted table returns either way once matched; and only then does the standard-name search

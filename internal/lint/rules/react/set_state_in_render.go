@@ -124,7 +124,7 @@ var setStateInUseMemoMessage = rule.Message{
 // # Two message ids from one validator
 //
 // Upstream's `validate_no_set_state_in_render` emits two diagnostics, and the branch order matters:
-// the `useMemo` arm is checked BEFORE the unconditional test, so a setter called inside a `useMemo`
+// the `useMemo` arm is checked before the unconditional test, so a setter called inside a `useMemo`
 // reports even when the call is conditional within that callback. Measured, `useMemo(() => { if
 // (props.c) { setX(1); } return 1; }, [])` reports.
 //
@@ -236,20 +236,22 @@ func analyzeSetStateSubject(ruleContext rule.Context, function *high_level_inter
 //
 // `emit` separates reporting from detecting, and the separation is upstream's rather than an
 // optimization. `validate_impl` calls itself, binds the result to `inner_errors`, and then uses
-// only `!inner_errors.is_empty()`: the inner findings are DISCARDED and the finding that survives
+// only `!inner_errors.is_empty()`: the inner findings are discarded and the finding that survives
 // is the one at the outer call site. Measured on React, `const foo = () => { setX(1); }; foo();`
 // produces exactly one finding, pointing at `foo` and never at `setX`.
 //
 // Transcribing the recursion without this reports twice, which is what the lambda fixture caught.
 // The reason upstream does it is worth stating: the inner function is not itself render, so the
-// call inside it is not a call during render; what makes it a defect is that the OUTER call invokes
+// call inside it is not a call during render; what makes it a defect is that the outer call invokes
 // it unconditionally while rendering, and that is where a reader has to make the edit.
 //
-// `compiledUnit` stays pinned to the OUTERMOST component or hook across the recursion rather than
+// `compiledUnit` stays pinned to the outermost component or hook across the recursion rather than
 // following `function`. It is only used as the outer boundary for shadow resolution on a `useMemo`
 // callee, and that boundary is upstream's compiled unit: a `useMemo` binding at module scope does
 // not shadow, while one inside the component does. Passing the nested function instead would stop
 // the scope walk early and make a binding in the component invisible to a callback inside it.
+//
+// Mutates: unconditionalSetStateFunctions gains every value here proven to call a setter unconditionally.
 func reportSetStateInRender(
 	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
@@ -276,7 +278,7 @@ func reportSetStateInRender(
 				if unconditionalSetStateFunctions[value.Place.Identifier] {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
-			// Reading a CAPTURED binding carries the property too. Upstream has no counterpart to
+			// Reading a captured binding carries the property too. Upstream has no counterpart to
 			// this arm, because its captures are ordinary values in one shared arena and a read of
 			// one is a `LoadLocal`. Here a capture is its own instruction, so a nested function
 			// calling something it closed over reaches the setter through `LoadContext` and nothing
@@ -301,14 +303,14 @@ func reportSetStateInRender(
 				if nested == nil {
 					continue
 				}
-				// The nested function names its captures with its OWN identifier ids, so the set
+				// The nested function names its captures with its own identifier ids, so the set
 				// built in this function's namespace means nothing inside it. Translate across the
 				// boundary rather than passing the map down; see setterCapturesOf.
 				nestedSetters, capturesOne := setterCapturesOf(ruleContext, function, value, nested, unconditionalSetStateFunctions)
 
 				// A `useMemo` callback is analysed whatever it captures, and this is not an
 				// optimization waiver. Upstream inlines that callback into the render graph before
-				// validating, so a setter DECLARED INSIDE it is an ordinary value of the enclosing
+				// validating, so a setter declared inside it is an ordinary value of the enclosing
 				// function and needs no capture to be seen. Measured on React:
 				//
 				//	useMemo(() => { const [a, setA] = useState(1); setA(2); return a; }, [])
@@ -327,7 +329,7 @@ func reportSetStateInRender(
 				}
 				// A `useMemo` callback is the one nested function whose own findings survive, and
 				// it is not an exception to upstream's rule so much as a consequence of upstream
-				// never recursing into it at all: the callback is REPLACED by a direct call to
+				// never recursing into it at all: the callback is replaced by a direct call to
 				// itself before validation, so its body is inlined into the render graph and its
 				// setter call is an ordinary instruction of the enclosing function. There is no
 				// inner walk to discard. Reproduced here by emitting from the recursion for this
@@ -385,14 +387,14 @@ func nestedFunction(function *high_level_intermediate_representation.Function, v
 
 // setterCapturesOf translates the known-setter set across a function boundary.
 //
-// It returns the set expressed in the NESTED function's identifier namespace, plus whether that set
+// It returns the set expressed in the nested function's identifier namespace, plus whether that set
 // is non-empty, which is upstream's `has_set_state_operand` guard.
 //
 // # Two identifier namespaces, and why passing the map down is wrong
 //
 // Upstream shares one arena across every function in a compilation, so an `IdentifierId` means the
 // same value everywhere and `unconditional_set_state_functions` can simply be threaded through the
-// recursion. This IR gives each `Function` its OWN tables, which the package comment names as its
+// recursion. This IR gives each `Function` its own tables, which the package comment names as its
 // main deliberate divergence, so the same integer denotes different values in a parent and a child.
 // Passing the parent's map into the child asks about ids that happen to collide, which is not a
 // milder version of the right question but an unrelated one.
@@ -445,7 +447,7 @@ func setterCapturesOf(
 
 // isStateSetter reports whether a value's type is a React state setter.
 //
-// The predicate is the type's ALIAS, for the reasons in the rule comment: `Dispatch` is a type
+// The predicate is the type's alias, for the reasons in the rule comment: `Dispatch` is a type
 // alias so it lands there, while a ref's `RefObject` is an interface and lands in the symbol
 // instead. Reading the wrong field reports a genuine `useRef` as neither.
 //

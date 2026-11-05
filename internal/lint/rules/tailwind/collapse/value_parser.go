@@ -7,7 +7,7 @@
 // # What this is for
 //
 // `segment.go` already carries a value splitter, and the two are not redundant. `segment` answers
-// one question — where are the top-level separators — and answers it over a flat string, which is
+// one question (where are the top-level separators) and answers it over a flat string, which is
 // all `inferDataType` needs. This answers the structural question: what is the tree. The `@utility`
 // evaluator needs the tree to read a `--value(--percentage-*, [*])` argument list, where the
 // arguments are nodes rather than substrings, and callers downstream depend on the node shapes

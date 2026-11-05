@@ -153,7 +153,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // The first version of this rule carried an `isReadReference` predicate excluding a property name,
 // a member access's name half, a declared binding's own identifier, an import specifier and a
 // class member, on the reasoning that none of those is a reference to the global. It read as
-// obviously load-bearing and a mutation disabling it entirely SURVIVED the whole fixture suite.
+// obviously load-bearing and a mutation disabling it entirely survived the whole fixture suite.
 //
 // Probed rather than patched with another fixture. Over six shapes, printing the guard's answer
 // and the symbol lookup's answer side by side, the two columns were identical everywhere: every
@@ -180,7 +180,7 @@ var messageUnsupportedInlineClass = rule.Message{
 // oxc could not reach it. The rule is therefore wider than oxlint on TypeScript input and exactly
 // as wide as React, which is the right side to land on.
 //
-// # An inline class is a DECLARATION, and the corpus says so
+// # An inline class is a declaration, and the corpus says so
 //
 // `oxc::Statement::ClassDeclaration` and React's `case 'ClassDeclaration'` both sit in the statement
 // dispatch, so a class **expression** is untouched: `const Foo = class {};` inside a component is

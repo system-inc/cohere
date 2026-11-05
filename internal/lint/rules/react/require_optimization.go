@@ -23,14 +23,14 @@ type RequireOptimizationOptions struct {
 	// AllowDecorators names decorators that exempt a class from the rule.
 	//
 	// Matched against the decorator expression's own identifier text, so `@pure` exempts and
-	// `@pure()` does NOT, because upstream reads `expression.name` and a call expression has none.
+	// `@pure()` does not, because upstream reads `expression.name` and a call expression has none.
 	// Measured on the installed build; both spellings are pinned by fixture.
 	AllowDecorators []string `json:"allowDecorators"`
 }
 
 // DecodeRequireOptimizationOptions decodes the option object.
 //
-// Hand-written rather than `rule.DecodeOptionsInto` because the generic helper errors on EMPTY
+// Hand-written rather than `rule.DecodeOptionsInto` because the generic helper errors on empty
 // input, which is what a bare `"error"` configuration hands a rule, and upstream accepts that as
 // the defaults. The one default here is the zero value, so nothing else needs translating.
 func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
@@ -64,7 +64,7 @@ func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
 // every shape as already optimized: every `FunctionDeclaration`, `FunctionExpression` and
 // `ArrowFunctionExpression` outside a class calls `markSCUAsDeclared` with the comment "Stateless
 // Functional Components cannot be optimized (yet)". So the registry's function-component detection,
-// which is the expensive half and which this tree does not have, decides NOTHING here: a function
+// which is the expensive half and which this tree does not have, decides nothing here: a function
 // component is exempt whether or not anything detects it, and failing to detect one produces exactly
 // the silence upstream produces.
 //
@@ -80,10 +80,10 @@ func DecodeRequireOptimizationOptions(raw []byte) (any, error) {
 //
 // # The object arm is an upstream accident and is reproduced as one
 //
-// `createReactClass({})` reports and `createReactClass({ foo: function () {} })` does NOT, and the
+// `createReactClass({})` reports and `createReactClass({ foo: function () {} })` does not, and the
 // difference has nothing to do with `shouldComponentUpdate`. The `FunctionExpression` and
 // `ArrowFunctionExpression` listeners mark their enclosing component as optimized, and for a
-// `createReactClass` call that component IS the object, so ANY function value anywhere in the
+// `createReactClass` call that component is itself the object, so any function value anywhere in the
 // object exempts the whole thing. Measured:
 //
 //	createReactClass({})                                  reports
@@ -146,7 +146,7 @@ var RequireOptimization = rule.Rule{
 //
 // A `PureComponent` base, a `reactMixin.decorate(PureRenderMixin)` decorator, or a decorator whose
 // bare name is in `allowDecorators`. Upstream also exempts a class carrying a `shouldComponentUpdate`
-// METHOD, through a separate `MethodDefinition` listener; that is folded in here because our walk
+// method, through a separate `MethodDefinition` listener; that is folded in here because our walk
 // gives the class its members directly and a second listener would have to resolve back to the
 // enclosing class.
 func requireOptimizationClassIsExempt(node *ast.Node, settings RequireOptimizationOptions) bool {
@@ -161,16 +161,16 @@ func requireOptimizationClassIsExempt(node *ast.Node, settings RequireOptimizati
 
 // requireOptimizationExtendsPureComponent reports whether the class extends a PureComponent base.
 //
-// Upstream renders the superclass to TEXT and tests it against `^(React\.)?PureComponent$`, so
+// Upstream renders the superclass to text and tests it against `^(React\.)?PureComponent$`, so
 // exactly two spellings pass and `Foo.PureComponent` does not. Measured: `Foo.PureComponent` reports
 // and both accepted spellings are silent.
 //
 // The parentheses question was measured rather than assumed, because the shelf's
 // `IsEs6ComponentClass` skips them and the port brief records that skip as a divergence on a
-// different rule. Here it is not one: `class C extends (React.Component) {}` REPORTS upstream, which
+// different rule. Here it is not one: `class C extends (React.Component) {}` reports upstream, which
 // means upstream considers it a component, and the shelf agreeing is the correct answer. The text
 // comparison below does not skip, which matches upstream's `getText` on the raw superclass node, so
-// `extends (React.PureComponent)` is NOT exempt in either implementation.
+// `extends (React.PureComponent)` is not exempt in either implementation.
 func requireOptimizationExtendsPureComponent(node *ast.Node) bool {
 	heritage := node.AsClassDeclaration().HeritageClauses
 	if heritage == nil {
@@ -201,7 +201,7 @@ func requireOptimizationExtendsPureComponent(node *ast.Node) bool {
 
 // requireOptimizationIsPureComponentBase matches upstream's two accepted spellings.
 //
-// The pragma test in the PropertyAccess arm is SUBSUMED by the component gate above this function,
+// The pragma test in the PropertyAccess arm is subsumed by the component gate above this function,
 // and that is measured rather than argued. A mutant dropping it survived every fixture, so the
 // reachability was probed directly: `IsEs6ComponentClass` accepts only `React.Component`,
 // `React.PureComponent`, `Component` and `PureComponent`, so a class extending `Foo.PureComponent`
@@ -210,7 +210,7 @@ func requireOptimizationExtendsPureComponent(node *ast.Node) bool {
 //
 // The line stays because the subsumption rests on a helper this rule does not own: widening
 // `IsEs6ComponentClass` to accept another namespace would make this the only thing standing between
-// `Foo.PureComponent` and a wrong exemption. The INVERSE mutation, making the test always fail, is
+// `Foo.PureComponent` and a wrong exemption. The inverse mutation, making the test always fail, is
 // caught by six failing lines, which is what proves the line is reached rather than dead.
 func requireOptimizationIsPureComponentBase(expression *ast.Node) bool {
 	if expression == nil {
@@ -234,7 +234,7 @@ func requireOptimizationIsPureComponentBase(expression *ast.Node) bool {
 
 // requireOptimizationDeclaresShouldComponentUpdate reports whether the class has the method.
 //
-// A METHOD only, which is upstream's `MethodDefinition` listener, and this is narrower than it
+// A method only, which is upstream's `MethodDefinition` listener, and this is narrower than it
 // looks. Measured on the installed build, all four of these are the rule's actual answers:
 //
 //	shouldComponentUpdate() {}                          exempt, a method
@@ -271,7 +271,7 @@ func requireOptimizationDeclaresShouldComponentUpdate(node *ast.Node) bool {
 // Measured, both of them.
 //
 // The configured one compares the decorator expression's own `name`, which only an Identifier has.
-// So `@pure` exempts when `pure` is listed and `@pure()` does NOT, because a call expression has no
+// So `@pure` exempts when `pure` is listed and `@pure()` does not, because a call expression has no
 // `name` property in upstream's AST and the comparison is against `undefined`. Measured on the
 // installed build; both are pinned by fixture.
 func requireOptimizationHasExemptingDecorator(node *ast.Node, settings RequireOptimizationOptions) bool {
@@ -390,7 +390,7 @@ func requireOptimizationIsPureRenderMixinsProperty(property *ast.Node) bool {
 // This is the accident arm. Upstream reaches it through its `FunctionExpression` and
 // `ArrowFunctionExpression` listeners marking the enclosing component, not through any test on the
 // object, so the three shapes that count are exactly the three those listeners see: a method
-// shorthand, a function expression, and an arrow. A property holding a function DECLARATION is not
+// shorthand, a function expression, and an arrow. A property holding a function declaration is not
 // expressible in an object literal, so there is no fourth.
 func requireOptimizationPropertyHoldsAFunction(property *ast.Node) bool {
 	if property.Kind == ast.KindMethodDeclaration {
@@ -408,7 +408,7 @@ func requireOptimizationPropertyHoldsAFunction(property *ast.Node) bool {
 
 // requireOptimizationClassRange is the span upstream reports, which excludes `export`.
 //
-// Upstream's parser puts `export` on an ExportNamedDeclaration that WRAPS the class, so the class
+// Upstream's parser puts `export` on an ExportNamedDeclaration that wraps the class, so the class
 // node it reports on begins at the `class` keyword, or at the first decorator when there is one.
 // Measured on the installed build:
 //
@@ -416,9 +416,9 @@ func requireOptimizationPropertyHoldsAFunction(property *ast.Node) bool {
 //	export default class C extends React.Component {}   reported at column 16, likewise
 //	@reactMixin.decorate(SomeOtherMixin)\nclass C ...    reported from the DECORATOR, not the class
 //
-// Our parser makes `export` and `default` modifiers ON the class node, so `ctx.ReportNode` would
+// Our parser makes `export` and `default` modifiers on the class node, so `ctx.ReportNode` would
 // include them and the finding would point at a wider span than upstream's. Decorators are also
-// modifiers here, and upstream DOES include those, so the two cannot be handled the same way: this
+// modifiers here, and upstream does include those, so the two cannot be handled the same way: this
 // walks the modifier list and starts at the first decorator if one exists, otherwise at the first
 // token that is not a modifier.
 //
@@ -432,11 +432,11 @@ func requireOptimizationClassRange(ruleContext rule.Context, node *ast.Node) cor
 		return full
 	}
 
-	// Our modifier list is in SOURCE ORDER, probed over all three arrangements, so the span is
+	// Our modifier list is in source order, probed over all three arrangements, so the span is
 	// decided by walking it once and keeping only the leading run of decorators.
 	//
-	// A decorator is part of the class upstream and a keyword is not, and ORDER decides which:
-	// upstream's parser attaches a decorator written BEFORE `export` to the wrapping export
+	// A decorator is part of the class upstream and a keyword is not, and order decides which:
+	// upstream's parser attaches a decorator written before `export` to the wrapping export
 	// declaration rather than to the class, so it falls outside the reported node there. Measured on
 	// the installed build, all four arrangements:
 	//
@@ -445,7 +445,7 @@ func requireOptimizationClassRange(ruleContext rule.Context, node *ast.Node) cor
 	//	@bar export class C ...   reported from `class`, the decorator is NOT included
 	//	export @bar class C ...   reported from `@bar`
 	//
-	// The span therefore begins at the first decorator that has no keyword AFTER it: a decorator
+	// The span therefore begins at the first decorator that has no keyword after it: a decorator
 	// followed by `export` belongs to the export declaration upstream, while one written after every
 	// keyword belongs to the class. Scanning from the end finds it in one pass, and stopping at the
 	// last keyword handles the no-decorator case with the same walk.
@@ -457,7 +457,7 @@ func requireOptimizationClassRange(ruleContext rule.Context, node *ast.Node) cor
 	//	export default @bar class C ...    reported from `@bar`
 	//
 	// So the walk skips the leading run of export keywords, and any decorator caught inside that
-	// run, and starts at the first thing that is neither. Scanning from the END finds that boundary
+	// run, and starts at the first thing that is neither. Scanning from the end finds that boundary
 	// in one pass; scanning forward returns at the first export keyword and lands in the middle of
 	// the run, which differs on `export default @bar class`.
 	for index := len(modifiers.Nodes) - 1; index >= 0; index-- {
@@ -500,7 +500,7 @@ func requireOptimizationScanPastTrivia(sourceFile *ast.SourceFile, from int) int
 // requireOptimizationIsCreateReactClassCall reports whether a call is `createReactClass(...)`.
 //
 // Written inline rather than calling the shelf's `react.IsEs5ComponentCall`, because that helper
-// accepts THREE spellings this rule's upstream rejects. Measured on the installed build, all three
+// accepts three spellings this rule's upstream rejects. Measured on the installed build, all three
 // are silent and only the bare `createReactClass` reports:
 //
 //	createReactClass({})       reports

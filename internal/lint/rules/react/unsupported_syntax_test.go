@@ -223,7 +223,7 @@ func TestUnsupportedSyntaxFires(test *testing.T) {
 			wantIds: []string{"unsupportedEval"},
 		},
 		{
-			// A plain function may sit BETWEEN the compilation root and the finding. `Outer` is the
+			// A plain function may sit between the compilation root and the finding. `Outer` is the
 			// root, `mid` is simply part of what it lowers, and the eval inside the innermost arrow
 			// still reports. This is the case that rules out a "every enclosing function must
 			// qualify" formulation of the gate, which an earlier version of this rule used.
@@ -272,7 +272,7 @@ func TestUnsupportedSyntaxFires(test *testing.T) {
 			// A redundant parenthesis around the arrow. Our parser keeps a KindParenthesizedExpression
 			// between the declarator and the function where Babel's tree has already dropped it, so
 			// the name lookup has to walk out through it. Measured on React's rule, this reports,
-			// and it was the ONE disagreement in a 111-input differential run before the skip was
+			// and it was the one disagreement in a 111-input differential run before the skip was
 			// added in both directions.
 			name: "parenthesizedArrowComponent",
 			sourceText: `const Component = ((props) => {
@@ -283,7 +283,7 @@ func TestUnsupportedSyntaxFires(test *testing.T) {
 			wantIds: []string{"unsupportedEval"},
 		},
 		{
-			// A type reference is a VALID props annotation, which is what makes the disqualifying
+			// A type reference is a valid props annotation, which is what makes the disqualifying
 			// list a list rather than an "is it an object type" test. Paired with the annotation
 			// cases in the silent suite, this is the half proving the list is not simply
 			// rejecting everything annotated.
@@ -301,7 +301,7 @@ function Component(props: Props) {
 		{
 			// The hook branch ignores parameter shape entirely, which upstream gets by asking
 			// isValidComponentParams only inside the component branch. A rest parameter, three
-			// parameters, and a primitive-annotated first parameter each disqualify a COMPONENT
+			// parameters, and a primitive-annotated first parameter each disqualify a component
 			// and none of them disqualifies a hook. A mutation adding the parameter test to the
 			// hook branch survived the whole suite until these four cases were added.
 			name: "hookWithRestParameter",
@@ -390,7 +390,7 @@ function Component(props: Props) {
 		},
 		{
 			// The inner arrow is not named through a path this port recognizes, and the finding still
-			// appears because the OUTER function qualifies and the walk goes outward until something
+			// appears because the outer function qualifies and the walk goes outward until something
 			// does. Without the outward walk this would be a false negative.
 			name: "nestedComponentInsideComponent",
 			sourceText: `function Outer(props) {
@@ -483,7 +483,7 @@ func TestUnsupportedSyntaxStaysSilent(test *testing.T) {
 		},
 		{
 			// The gate on the `with` arm specifically. Every other clean case here reaches the gate
-			// through the eval arm, so a mutation removing the gate from THIS arm survived the
+			// through the eval arm, so a mutation removing the gate from this arm survived the
 			// whole suite until this case was added. Measured silent under React's own rule.
 			name: "withInPlainFunction",
 			sourceText: `function helper(props) {
@@ -611,7 +611,7 @@ func TestUnsupportedSyntaxStaysSilent(test *testing.T) {
 `,
 		},
 		{
-			// Both upstreams dispatch on the STATEMENT, so a class expression is untouched. This is the
+			// Both upstreams dispatch on the statement, so a class expression is untouched. This is the
 			// pass case that separates the declaration arm from a naive `class` keyword search.
 			name: "classExpressionInComponent",
 			sourceText: `function Component(props) {
@@ -893,7 +893,7 @@ func TestUnsupportedSyntaxPointsAtTheRightNode(test *testing.T) {
 //
 // A `rule.Message` is `{Id, Description}` with no interpolation layer, so there is no rendered text
 // to guard and nothing a format string can get wrong. What is still worth pinning is that the three
-// arms report three DIFFERENT messages: a mutation routing all three to one message would leave
+// arms report three different messages: a mutation routing all three to one message would leave
 // every count assertion green while telling a reader the wrong thing about their code.
 func TestUnsupportedSyntaxMessagesAreDistinct(test *testing.T) {
 	test.Parallel()

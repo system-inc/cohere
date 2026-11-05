@@ -452,7 +452,7 @@ const seeded=%s(()=>field.value ? {value:field.value.value} : {value:undefined},
 const [value]=React.useState(seeded.value);
 return <div>{value}</div>;
 }`
-	const imports = `import React from 'react'; import {useField} from './field';` + "\n"
+	const imports = "import React from 'react'; import {useField} from './field';\n"
 	for _, testCase := range []struct {
 		name, source string
 	}{
@@ -628,7 +628,7 @@ func TestPreserveManualMemoizationSpans(test *testing.T) {
 // nothing, so every finding disappears while the suite stays green.
 //
 // The silence check below is weaker than it looks, and saying so is the honest version. Handed a
-// nil checker the pipeline does NOT panic -- measured: `Lower` returns a function, the analysis
+// nil checker the pipeline does not panic -- measured: `Lower` returns a function, the analysis
 // runs, and it reports zero -- so this assertion passes with the guard in `Run` and passes without
 // it, and a mutation removing that guard survives. The guard is a cost decline rather than a
 // correctness one; the reasoning is recorded at the guard itself.
@@ -711,7 +711,7 @@ func TestPreserveManualMemoizationNilNodeGuardIsCrashProtection(test *testing.T)
 //
 // Written as an assertion rather than a comment for two reasons. It fails if the substrate ever
 // carries a range on the finding, which is the fix, and whoever sees it then gets told what the old
-// behaviour was instead of having to reconstruct it. And it fails if the COUNT ever drifts, which
+// behaviour was instead of having to reconstruct it. And it fails if the count ever drifts, which
 // would be a real defect hiding behind a divergence that is currently only cosmetic.
 func TestPreserveManualMemoizationCollapsesAnchorsAcrossMemoBlocks(test *testing.T) {
 	test.Parallel()
@@ -739,7 +739,7 @@ function Foo(props) {
 	}
 	// Three, not four, and the shape of the collapse is the informative part rather than the
 	// number. The two callbacks are distinct syntax, so they keep distinct anchors; the shared
-	// DEPENDENCY is one declaration named by both blocks, so its two findings land on one anchor.
+	// dependency is one declaration named by both blocks, so its two findings land on one anchor.
 	// The first expectation written here said two and was wrong, which is why this asserts the
 	// distribution rather than only the count.
 	if len(anchors) != 3 {

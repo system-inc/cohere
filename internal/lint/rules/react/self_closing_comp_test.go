@@ -8,7 +8,7 @@ import (
 
 // The corpus is upstream's, extracted by stubbing its RuleTester and capturing what the test file
 // hands it, so no case was retyped and no escape was typed by hand. All 47 cases were replayed
-// against the installed build first, INCLUDING running its fixer and comparing the rewritten
+// against the installed build first, including running its fixer and comparing the rewritten
 // source against each case's own `output`, and every one reproduced.
 const selfClosingCompFile = "/repository/source/SelfClosingComp.tsx"
 
@@ -64,7 +64,7 @@ func TestSelfClosingCompStaysSilent(test *testing.T) {
 	}
 }
 
-// TestSelfClosingCompFires asserts the finding AND the repair. Every invalid case upstream ships
+// TestSelfClosingCompFires asserts the finding and the repair. Every invalid case upstream ships
 // carries an `output`, which is the exact text its fixer must write, and those are the highest
 // value artifact in a fixable rule's corpus: a fixer that repairs the right span with the wrong
 // text passes any message-id assertion.
@@ -101,7 +101,7 @@ func TestSelfClosingCompFires(test *testing.T) {
 // TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite is a differential table.
 //
 // Every row was run against the installed `eslint-plugin-react` build on 2026-08-27, and both the
-// finding count AND the rewritten source are what that build produced. The rows exist because
+// finding count and the rewritten source are what that build produced. The rows exist because
 // upstream's corpus is silent on all of them, and they pin four things it cannot see:
 //
 //	which half a tag falls in    the split is the regular expression `/^[a-z]/` over the rendered
@@ -179,7 +179,7 @@ func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(tes
 				test.Fatalf("installed build reports %d findings, this rule reports %d",
 					testCase.wantFindings, len(result.Diagnostics))
 			}
-			// The repair is asserted on every REPORTING row. `ExpectFixedSource` refuses a result
+			// The repair is asserted on every reporting row. `ExpectFixedSource` refuses a result
 			// carrying no fixes rather than treating it as an unchanged file, so the silent rows
 			// assert their zero count above and nothing more; their `wantFixed` is the input, which
 			// is what an unapplied fix would leave.
@@ -192,11 +192,11 @@ func TestSelfClosingCompMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(tes
 
 // TestSelfClosingCompDoesNotPanicOnJsxText pins a crash shape that no findings assertion can see.
 //
-// `ast.Node.Text()` PANICS on a JsxText node with "Unhandled case in Node.Text", and this rule has
+// `ast.Node.Text()` panics on a JsxText node with "Unhandled case in Node.Text", and this rule has
 // to read exactly that node to decide whether a whitespace-only child counts as empty. The first
 // draft called `Text()` and took the whole test binary down on upstream's own passing case 6.
 //
-// The cost of getting this wrong in production is larger than one rule: the walk recovers per FILE
+// The cost of getting this wrong in production is larger than one rule: the walk recovers per file
 // rather than per rule, so one such call loses every rule's findings in that file while the run
 // still prints a plausible summary. The field is read directly instead.
 //
@@ -227,7 +227,7 @@ func TestSelfClosingCompDoesNotPanicOnJsxText(test *testing.T) {
 //
 // The tables above build the options struct directly, which leaves the decoder entirely untested,
 // and a mutation sweep confirmed that: inverting both of its nil checks survived every fixture in
-// this file. The decoder is where this rule's most dangerous line lives, because BOTH options
+// this file. The decoder is where this rule's most dangerous line lives, because both options
 // default to true. A generic `rule.DecodeOptionsInto` would hand back a zero-value struct on absent
 // input, both halves false, and the rule would silently report nothing while every struct-built
 // fixture kept passing.
@@ -283,7 +283,7 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 // TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn bypasses the decoder entirely.
 //
 // A rule configured as a bare `"error"` can reach `Run` with nil options rather than a decoded
-// struct, and `options.(T)` on nil yields the ZERO value, which for this rule means both halves off
+// struct, and `options.(T)` on nil yields the zero value, which for this rule means both halves off
 // and a rule that reports nothing. The explicit fallback is what prevents that, and nothing else in
 // this file would notice if it were removed.
 func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(test *testing.T) {
@@ -307,7 +307,7 @@ func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(test *testing.T) {
 // # Why `.ts` is absent from this list, and why that is not the gate
 //
 // Measured on 2026-08-27, the same source under four suffixes: `.tsx`, `.jsx` and `.js` all report,
-// and `.ts` reports nothing. That zero is the PARSER rather than a rule gate: in a `.ts` file
+// and `.ts` reports nothing. That zero is the parser rather than a rule gate: in a `.ts` file
 // `<div>` is a type assertion and no JSX node is produced at all, so there is nothing for any JSX
 // rule to see. The `.js` row is what proves the absence of a gate, since an oxc-style
 // `isJsxFileName` check would decline it while the parser happily produces JSX there. Three other

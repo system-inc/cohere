@@ -12,7 +12,7 @@ import (
 //
 // All 103 cases were replayed against the installed build before anything was written down. 101
 // reproduced their upstream verdict exactly, with zero verdict mismatches and no substitution of
-// any kind. The two that are absent below both fail to PARSE as TypeScript, and both are tagged
+// any kind. The two that are absent below both fail to parse as TypeScript, and both are tagged
 // `flow` in upstream's own corpus: they use Flow's type cast expression, `(expr: any)`, which our
 // parser cannot produce at all. That is what upstream's `uncast` helper exists for, and it is why
 // this port has no counterpart to it. Excluding a case our parser cannot express is a fact about
@@ -155,7 +155,7 @@ func TestNoUnusedStateFires(test *testing.T) {
 // TestNoUnusedStateGiveUpConditions pins the four inputs that abandon the whole class.
 //
 // This is the rule's most important behaviour and the reason people keep it enabled. When an access
-// cannot be resolved to a key, upstream reports NOTHING for that component rather than guessing.
+// cannot be resolved to a key, upstream reports nothing at all for that component rather than guessing.
 // Reporting a field that is genuinely read through a computed access is a false positive nobody can
 // act on, because the read is visible in the source and the rule simply cannot see it.
 //
@@ -253,7 +253,7 @@ func TestNoUnusedStateComputedLiteralIsARead(test *testing.T) {
 // Our parser gives a shorthand `{foo}` a binding element whose PropertyName is nil and whose Name is
 // the identifier, while a renaming `{foo: bar}` fills both. ESTree carries `key` and `value`
 // separately in both cases. So the property being read is PropertyName when present and Name
-// otherwise, and reading Name unconditionally would record the LOCAL name of a renamed binding.
+// otherwise, and reading Name unconditionally would record the local name of a renamed binding instead of its key.
 //
 // The renaming row is the one that separates the two designs: reading Name would record `z` rather
 // than `a`, so `a` would report as unused. Measured silent upstream.
@@ -293,9 +293,9 @@ func TestNoUnusedStateDestructuringIsARead(test *testing.T) {
 
 // TestNoUnusedStateDoesNotPanicOnBindingPatterns is a crash guard, not a behaviour fixture.
 //
-// `Node.Text()` PANICS on a binding pattern rather than returning a name, measured directly in a
+// `Node.Text()` panics on a binding pattern rather than returning a name, measured directly in a
 // probe: an object pattern and an array pattern both panic while a plain identifier is safe. The
-// walk recovers per FILE rather than per rule, so one such panic costs every rule in the tree its
+// walk recovers per file rather than per rule, so one such panic costs every rule in the tree its
 // verdict on that file. That is the 167-file class this project has already paid for once.
 //
 // Every place this rule reads a name off a binding is kind-guarded. These rows drive each of them
@@ -340,11 +340,11 @@ func TestNoUnusedStateDoesNotPanicOnBindingPatterns(test *testing.T) {
 //
 // Both carry a decision that reads as an oversight and is reproduced rather than corrected.
 //
-// The updater alias only applies to an ARROW function: upstream tests that node type specifically,
+// The updater alias only applies to an arrow function: upstream tests that node type specifically,
 // so `this.setState(function(prev) {...})` aliases nothing and its reads are lost. Measured, the
 // arrow form is silent and the function-expression form reports.
 //
-// The lifecycle list is EXACT. A method with the same two-parameter shape and a different name does
+// The lifecycle list is matched exactly. A method with the same two-parameter shape and a different name does
 // not alias its second parameter, so a read through it does not count. Measured.
 func TestNoUnusedStateUpdaterAndLifecycleParameters(test *testing.T) {
 	test.Parallel()
@@ -406,7 +406,7 @@ func TestNoUnusedStateUpdaterAndLifecycleParameters(test *testing.T) {
 //
 // Upstream renders a key with `String(node.value)` over an estree Literal, and an estree Literal
 // covers more than a string and a number. Our parser gives `true`, `false` and `null` their own
-// keyword kinds, so a port that stopped at string and numeric goes silent on two of upstream's OWN
+// keyword kinds, so a port that stopped at string and numeric goes silent on two of upstream's own
 // failing cases, which is how this was found rather than reasoned about.
 //
 // All five measured against the installed build on 2026-08-27.
@@ -459,13 +459,13 @@ func TestNoUnusedStateLiteralKeyKinds(test *testing.T) {
 // TestNoUnusedStateTypeAssertionsAreUnwrapped pins the six positions where a TypeScript assertion
 // changes the verdict.
 //
-// Upstream strips its assertion node in eight places; ours has to strip a PARENTHESIS as well,
+// Upstream strips its assertion node in eight places; ours has to strip a parenthesis as well,
 // because our parser keeps `KindParenthesizedExpression` as a real node and the tree upstream walks
 // folds it away. `(this as unknown).state` therefore arrives as an access whose object is a
 // parenthesized assertion, two wrappers deep.
 //
 // Two of these were found only by a corpus case failing rather than by reading: the assertion on an
-// updater's arrow BODY, and the assertion on the setState RECEIVER inside an already-unwrapped
+// updater's arrow body, and the assertion on the setState receiver inside an already-unwrapped
 // callee. Each row was measured reporting against the installed build.
 func TestNoUnusedStateTypeAssertionsAreUnwrapped(test *testing.T) {
 	test.Parallel()
@@ -507,7 +507,7 @@ func TestNoUnusedStateTypeAssertionsAreUnwrapped(test *testing.T) {
 
 // TestNoUnusedStateSpanAndMessage asserts where the finding points and what it says.
 //
-// The finding anchors on the PROPERTY that declared the field rather than on the class or the
+// The finding anchors on the property that declared the field rather than on the class or the
 // assignment, so a reader is shown the declaration to delete. The key name is interpolated, so the
 // text is asserted in full against a literal typed here rather than against the rule's own builder,
 // which would move both sides together under mutation.
@@ -653,7 +653,7 @@ func TestNoUnusedStateStateAssignmentOnlyCountsInTheConstructor(test *testing.T)
 // Each distinguishing input was measured against the installed build before the row was written,
 // and each is a shape upstream's corpus does not contain.
 //
-// The `getDerivedStateFromProps` hook only receives state when it is STATIC, so a non-static method
+// The `getDerivedStateFromProps` hook only receives state when it is static, so a non-static method
 // of the same name and shape does not alias its second parameter. And both it and the ordinary
 // lifecycle methods need at least two parameters before the second one exists to alias; a
 // one-parameter hook reads nothing.
@@ -701,12 +701,12 @@ func TestNoUnusedStateLifecycleParameterGates(test *testing.T) {
 	}
 }
 
-// TestNoUnusedStateDerivedStateAsAClassProperty covers the OTHER spelling of the same hook.
+// TestNoUnusedStateDerivedStateAsAClassProperty covers the other spelling of the same hook.
 //
 // This test exists because two mutants survived after fixtures written for them, which the port
 // brief says means the hypothesis was wrong rather than the input. It was: upstream handles
-// `getDerivedStateFromProps` through TWO separate paths, and so does this port. The METHOD spelling
-// resolves through the lifecycle parameter walk, while the CLASS PROPERTY spelling has its own arm
+// `getDerivedStateFromProps` through two separate paths, and so does this port. The method spelling
+// resolves through the lifecycle parameter walk, while the class property spelling has its own arm
 // that reads the parameter's uses directly. The rows above only ever drove the first one, so the
 // second one's three guards were never reached by any fixture.
 //
@@ -755,7 +755,7 @@ func TestNoUnusedStateDerivedStateAsAClassProperty(test *testing.T) {
 
 // TestNoUnusedStateGetInitialStateReadsOnlyTheLastStatement pins a real under-report in upstream.
 //
-// Upstream reads the LAST statement of `getInitialState` and looks for a return of an object
+// Upstream reads the last statement of `getInitialState` and looks for a return of an object
 // literal there. A function returning early therefore contributes only the fields of its final
 // return, and the early object's keys are never recorded as written at all.
 //
@@ -764,7 +764,7 @@ func TestNoUnusedStateDerivedStateAsAClassProperty(test *testing.T) {
 // it is reproduced rather than corrected because widening it would report on code upstream calls
 // clean.
 //
-// A mutation reading the FIRST statement instead survived the whole imported corpus, because every
+// A mutation reading the first statement instead survived the whole imported corpus, because every
 // one of upstream's factory cases has a single-statement body.
 func TestNoUnusedStateGetInitialStateReadsOnlyTheLastStatement(test *testing.T) {
 	test.Parallel()
@@ -827,7 +827,7 @@ func TestNoUnusedStateClassPropertyGates(test *testing.T) {
 //
 // A mutation dropping the receiver check survived every other fixture here, because nothing else in
 // this file writes `something.state` on a receiver that is not `this`. Both rows measured against
-// the installed build, and the direction matters: without the check a read of ANOTHER object's
+// the installed build, and the direction matters: without the check a read of another object's
 // `state` would silence this rule, which is a false negative rather than a false positive and
 // therefore invisible in a findings count.
 func TestNoUnusedStateReceiverMustBeThis(test *testing.T) {

@@ -199,7 +199,7 @@ func TestDeclaredPropertiesCoverBothReadings(test *testing.T) {
 			test.Errorf("%q declares %v as a static utility, want display", name, staticProperties)
 		}
 
-		// The functional reading should also be present, and should NOT be display.
+		// The functional reading should also be present, and should not be display.
 		if functionalProperties, hasFunctional := declaredPropertiesOfRoot(name); hasFunctional {
 			if containsProperty(functionalProperties, "display") {
 				test.Errorf("%q as a functional root declares display, which means the static reading "+
@@ -376,7 +376,7 @@ func TestPropertiesExcludeAtRuleDescriptors(test *testing.T) {
 //
 //	`.slide-in-from-end:dir(ltr) { --enter-translate-x: 100%; }`
 //
-// declares only a custom property, and the regex matched the SELECTOR `slide-in-from-end` out of
+// declares only a custom property, and the regex matched the selector `slide-in-from-end` out of
 // `:dir(ltr)` as if it were a property name. A class declaring nothing was recorded as declaring
 // itself, and any two such classes would have read as conflicting.
 //
@@ -545,7 +545,7 @@ func TestValueDependentReadingsAreRecorded(test *testing.T) {
 // registry matches the first, which is the guard that makes an invariance claim mean something.
 //
 // This test asserts the property-shorthand structure rather than the count, so a family added upstream
-// that is NOT a shorthand relationship fails here and reopens the question.
+// that is not a shorthand relationship fails here and reopens the question.
 func TestCollapseFamiliesAreCssShorthandRelationships(test *testing.T) {
 	test.Parallel()
 	withProperties := 0

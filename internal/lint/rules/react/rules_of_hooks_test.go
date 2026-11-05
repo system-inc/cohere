@@ -1305,7 +1305,7 @@ func TestRulesOfHooksFires(test *testing.T) {
 // TestRulesOfHooksSpans pins where each arm points.
 //
 // Upstream points two different places and `ExpectFindings` cannot see the difference: the
-// `notComponent` arm covers the CALLEE alone while every other arm covers the whole call expression.
+// `notComponent` arm covers the callee alone while every other arm covers the whole call expression.
 // Measured on the release oxlint binary with `--format=json` rather than read from the Rust, and
 // then confirmed against `call.callee.span()` in `function_error` versus `call.span` elsewhere. A
 // port that pointed at the call in every arm passes the whole 150-case fixture set above.
@@ -1549,6 +1549,8 @@ func TestRulesOfHooksBeyondTheCorpus(test *testing.T) {
 	}
 }
 
+const rulesOfHooksOptionFile = "/repository/source/RulesOfHooksOption.tsx"
+
 // TestRulesOfHooksAdditionalHooksChangesNothing pins upstream's inert option: the decoder accepts it,
 // and the findings with it are the findings without it, which is what the installed build does.
 func TestRulesOfHooksAdditionalHooksChangesNothing(test *testing.T) {
@@ -1569,5 +1571,3 @@ func TestRulesOfHooksAdditionalHooksChangesNothing(test *testing.T) {
 		test.Error("the settings key decoded as an option; upstream's schema has only additionalHooks")
 	}
 }
-
-const rulesOfHooksOptionFile = "/repository/source/RulesOfHooksOption.tsx"

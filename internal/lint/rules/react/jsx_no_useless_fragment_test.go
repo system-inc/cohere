@@ -10,7 +10,7 @@ import (
 
 // jsxNoUselessFragmentFile is where the fixtures pretend to live.
 //
-// A `.tsx` name, and here that IS load-bearing rather than incidental: every case is JSX, and JSX in
+// A `.tsx` name, and here that is load-bearing rather than incidental: every case is JSX, and JSX in
 // a `.ts` file is a syntax error, so a `.ts` fixture would be silent because the parser read `<div>`
 // as a type assertion rather than because any rule declined. That is a different zero from a file
 // gate, and it is why this rule ships no gate test: there is no gate, and no fixture could tell the
@@ -25,12 +25,12 @@ const jsxNoUselessFragmentFile = "/repository/source/JsxNoUselessFragment.tsx"
 // generator. No case was typed by hand.
 //
 // All 30 were run against the installed build, 7.37.5, through the ESLint Linter API with the
-// TypeScript parser, driving `cohereAndFix` as well as `cohere` so the REPAIR was measured and not
+// TypeScript parser, driving `cohereAndFix` as well as `cohere` so the repair was measured and not
 // only the judgment.
 //
 // # One case is held back, and it is a duplicate with an opposite verdict
 //
-// `<div><>{"a"}{"b"}</></div>` appears TWICE in the corpus: once with an output and once with
+// `<div><>{"a"}{"b"}</></div>` appears twice in the corpus: once with an output and once with
 // `output: null`. They are not a contradiction, they are a parser-version gate. The second carries
 // `features: ["ts-old", "no-ts-new"]`, so it is asserted only under a TypeScript parser old enough
 // that a fragment node lacked its opening and closing tokens, which made upstream's `canFix` decline.
@@ -38,12 +38,12 @@ const jsxNoUselessFragmentFile = "/repository/source/JsxNoUselessFragment.tsx"
 // The extractor is the only place that difference is visible; read as prose the two look like an
 // error in the corpus.
 //
-// # The fix column is the REPAIRED SOURCE, and an empty string means the fixer declined
+// # The fix column is the repaired source, and an empty string means the fixer declined
 //
 // `ExpectFindings` cannot see what a fix writes, and the port brief records a rule whose flag was
 // forced always-on while thirty fixtures stayed green, because every one asserted an id and none
 // asserted the repair. So every reporting row carries the exact source the installed build's fixer
-// produced, and the rows where it produced nothing carry an empty string, which asserts the DECLINE
+// produced, and the rows where it produced nothing carry an empty string, which asserts the decline
 // rather than skipping the question.
 
 // TestJsxNoUselessFragmentFires asserts ids, count, and the repaired source.
@@ -160,7 +160,7 @@ func runJsxNoUselessFragment(test *testing.T, sourceText string, rawOptions stri
 // applyJsxNoUselessFragmentFixes replays the repair the way the edit engine would.
 //
 // `rule_testing.ExpectFixedSource` cannot be used directly here for two reasons, and both are
-// correct refusals rather than harness gaps. It fatals when a rule proposed NO fix, which is exactly
+// correct refusals rather than harness gaps. It fatals when a rule proposed no fix, which is exactly
 // what this rule's declines produce and exactly what those rows need to assert. And it fatals on
 // overlapping fixes, which this rule produces whenever both arms report on one node: they carry the
 // same replacement over the same range, so the overlap is a duplicate rather than a conflict a
@@ -215,7 +215,7 @@ func applyJsxNoUselessFragmentFixes(test *testing.T, result rule_testing.Result)
 //
 // A spread can carry `key`, so the second changes behavior rather than spelling, and neither tells
 // the reader anything was removed. This port reports both and withholds the repair. The rows below
-// assert BOTH halves of that decision: the finding still appears, and the source is unchanged.
+// assert both halves of that decision: the finding still appears, and the source is unchanged.
 //
 // The decline is mutation-tested. Disabling `jsxNoUselessFragmentHasNonKeyAttributes` makes these
 // rows fail, which is what separates a real guard from a comment claiming one.
@@ -318,7 +318,7 @@ func TestJsxNoUselessFragmentFixKeepsTypeScript(test *testing.T) {
 	}
 }
 
-// TestJsxNoUselessFragmentSpans asserts WHERE each finding points.
+// TestJsxNoUselessFragmentSpans asserts where each finding points.
 //
 // Upstream reports on the fragment node itself for both ids, and the fix is anchored on the same
 // node. The port brief notes that a fix which is right and anchored wrong is worse than no fix,
@@ -407,7 +407,7 @@ func TestJsxNoUselessFragmentMessagesReadAsWritten(test *testing.T) {
 //
 // Each row was run against the installed build before it was written here. The lowercase-letters
 // rows are the surprising ones: upstream's html test is `/^[a-z]+$/`, letters only, so `<h1>` and
-// `<my-tag>` are NOT html elements to this rule and a fragment inside either reports only one arm.
+// `<my-tag>` are not html elements to this rule and a fragment inside either reports only one arm.
 func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
 	test.Parallel()
 
@@ -423,7 +423,7 @@ func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(test *testing
 		},
 		{
 			// A tag name outside ASCII. Upstream's `/^[a-z]+$/` rejects it, and every byte of it is
-			// ABOVE the letter z, so this is the input that separates the upper bound of the byte
+			// above the letter z, so this is the input that separates the upper bound of the byte
 			// test from its lower bound. A mutant dropping only the upper bound survived an
 			// uppercase fixture, because an uppercase letter is below `a` and the lower bound
 			// already rejects it; this is what actually kills that mutant.
@@ -559,7 +559,7 @@ func TestJsxNoUselessFragmentAllowExpressionsSilencesOneArmOnly(test *testing.T)
 // TestJsxNoUselessFragmentHandlesNilOptions covers the path the fixtures cannot reach.
 //
 // The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the zero value, which here IS the default. Asserted rather than assumed.
+// yields the zero value, which here is the default. Asserted rather than assumed.
 func TestJsxNoUselessFragmentHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
@@ -581,7 +581,7 @@ func TestJsxNoUselessFragmentNeedsNoChecker(test *testing.T) {
 
 // TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic drives shapes with pieces missing.
 //
-// The walk recovers per FILE rather than per rule, so one nil dereference here takes the file away
+// The walk recovers per file rather than per rule, so one nil dereference here takes the file away
 // from every rule in the tree, and no `ExpectFindings` fixture can see a panic. The unclosed forms
 // are the ones that matter: they reach the listeners through error recovery with a nil opener or
 // closer, which is exactly what the fix's bounds function guards against.
@@ -609,9 +609,9 @@ func TestJsxNoUselessFragmentSurvivesShapesThatWouldPanic(test *testing.T) {
 
 // TestJsxNoUselessFragmentPragmaIsFixedAtReact records the corpus case a settings surface would change.
 //
-// Upstream reads BOTH pragmas from settings: `settings.react.pragma` for the namespace and
+// Upstream reads both pragmas from settings: `settings.react.pragma` for the namespace and
 // `settings.react.fragment` for the name. cohere reads no React settings, so both are the fixed
-// `React` and `Fragment` here, and a project renaming either gets a false NEGATIVE.
+// `React` and `Fragment` here, and a project renaming either gets a false negative.
 //
 // The case is upstream's own invalid-7, held out of the imported table because it is not
 // reproducible rather than because it disagrees. Measured on the installed build: with
@@ -624,7 +624,7 @@ func TestJsxNoUselessFragmentPragmaIsFixedAtReact(test *testing.T) {
 	const source = "declare const SomeReact: any;\ndeclare const foo: any;\nconst a = <SomeReact.SomeFragment>{foo}</SomeReact.SomeFragment>;\n"
 	rule_testing.ExpectClean(test, runJsxNoUselessFragment(test, source, ""))
 
-	// The control: the same shape under the fixed pragma pair DOES report, so the silence above is
+	// The control: the same shape under the fixed pragma pair does report, so the silence above is
 	// the pragma comparison rather than anything else declining.
 	const control = "declare const React: any;\ndeclare const foo: any;\nconst a = <React.Fragment>{foo}</React.Fragment>;\n"
 	rule_testing.ExpectFindings(test, runJsxNoUselessFragment(test, control, ""), "NeedsMoreChildren")

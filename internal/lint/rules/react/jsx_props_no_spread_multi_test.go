@@ -40,10 +40,10 @@ func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
 		// Beyond upstream. Each exists because the imported corpus cannot see the distinction, and
 		// each was measured on the release oxlint binary before being written down.
 
-		// THE COUNT ASYMMETRY, and the single most important case in this file.
+		// The count asymmetry, and the single most important case in this file.
 		//
-		// Three copies of a member expression report THREE times, because the member half compares
-		// every unordered pair, while three copies of an identifier report ONCE, because the
+		// Three copies of a member expression report three times, because the member half compares
+		// every unordered pair, while three copies of an identifier report once, because the
 		// identifier half groups by name. Upstream never writes a third copy of a member
 		// expression, so all five imported fail cases pass under either arithmetic and the corpus
 		// cannot tell the two readings apart. Measured: the release binary prints three findings
@@ -86,7 +86,7 @@ func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
 			[]string{"jsxPropsNoSpreadMultiMemberExpression"},
 		},
 
-		// A VARIABLE subscript compares equal to itself, which is where this rule departs from
+		// A variable subscript compares equal to itself, which is where this rule departs from
 		// every other same-reference judgment in the tree. `property.AccessedName` declines a
 		// variable subscript by design and `no_self_assign.go` returns false for `a[i]` against
 		// itself; both are right for their question and wrong for this one, because nothing can run
@@ -122,7 +122,7 @@ func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
 			[]string{"jsxPropsNoSpreadMultiIdentifier"},
 		},
 
-		// A PARENTHESIZED PREFIX terminates the optional chain, so the outer access is ordinary and
+		// A parenthesized prefix terminates the optional chain, so the outer access is ordinary and
 		// this reports where the unparenthesized spelling is silent. Nothing in either corpus writes
 		// this, and the rule's first version was silent here. Measured: reports.
 		{
@@ -131,7 +131,7 @@ func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
 			[]string{"jsxPropsNoSpreadMultiMemberExpression"},
 		},
 
-		// And a terminated chain compares EQUAL to the non-optional spelling, because the
+		// And a terminated chain compares equal to the non-optional spelling, because the
 		// comparison unwraps it. Measured: reports.
 		{
 			"a parenthesized optional prefix against the plain spelling",
@@ -139,7 +139,7 @@ func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
 			[]string{"jsxPropsNoSpreadMultiMemberExpression"},
 		},
 
-		// A chain NESTED in a subscript is ordinary structure. The exclusion applies to the spread
+		// A chain nested in a subscript is ordinary structure. The exclusion applies to the spread
 		// argument alone, which is the whole reason isSameExpression uses a plain access check.
 		// Measured: reports.
 		{
@@ -157,7 +157,7 @@ func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
 			[]string{"jsxPropsNoSpreadMultiMemberExpression"},
 		},
 
-		// A LITERAL RECEIVER, which is the only position where the literal comparison arm is
+		// A literal receiver, which is the only position where the literal comparison arm is
 		// reachable. A nested literal subscript never falls through to it, because the tagged name
 		// reader accepts every literal kind, so without a literal receiver that whole arm is dead
 		// code that no fixture exercises. Found by mutation. Measured: reports.
@@ -209,13 +209,13 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 		{"parenthesized member spreads whose receivers differ", "\n        const props = {};\n        <App {...(props.foo).baz} {...(props.y.baz)} />\n      "},
 		// Beyond upstream, each measured silent on the release binary.
 
-		// OPTIONAL CHAINING, and the only case here where reproducing upstream costs an extra
+		// Optional chaining, and the only case here where reproducing upstream costs an extra
 		// condition rather than one fewer. oxc wraps an optional chain in a `ChainExpression`, a
 		// sibling of `MemberExpression`, so the spread never enters the collection. Our parser
 		// produces a plain KindPropertyAccessExpression, so a literal translation of oxc's code
-		// REPORTS here. Measured: the release binary prints nothing for this input.
+		// reports here. Measured: the release binary prints nothing for this input.
 		//
-		// The intuitive reading is that this IS the same double spread and should report. That
+		// The intuitive reading is that this is the same double spread and should report. That
 		// reading is wrong about upstream and is recorded here so it is not helpfully restored.
 		{"an optional chain spread twice", "const a = <App {...props?.foo} {...props?.foo} />;\n"},
 
@@ -224,7 +224,7 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 		// so this is silent there too. Measured: silent.
 		{"an optional chain with the question-dot deeper in", "const a = <App {...props?.a.b} {...props?.a.b} />;\n"},
 
-		// Parenthesizing the WHOLE chain wraps the ChainExpression and changes nothing, unlike
+		// Parenthesizing the whole chain wraps the ChainExpression and changes nothing, unlike
 		// parenthesizing a prefix. Measured: silent.
 		{"a wholly parenthesized optional chain", "const a = <App {...(props?.a.b)} {...(props?.a.b)} />;\n"},
 
@@ -245,24 +245,24 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 		// the receivers are.
 		{"a static subscript against a variable one", "const a = <App {...props[\"k\"]} {...props[k]} />;\n"},
 
-		// Two DIFFERENT variable subscripts, which is the discrimination the non-static compare
+		// Two different variable subscripts, which is the discrimination the non-static compare
 		// exists for. Without that compare, every pair of non-static subscripts reads as equal and
 		// this reports. No imported fixture writes two different variable subscripts, so the blind
 		// spot was found by mutation rather than by the corpus. Measured: silent.
 		{"two different variable subscripts", "const a = <App {...props[x]} {...props[y]} />;\n"},
 
-		// Two DIFFERENT nested string subscripts. Without comparing literal TEXT, every pair of
+		// Two different nested string subscripts. Without comparing literal text, every pair of
 		// same-kind literals reads as equal and this reports. Found by mutation: no imported
 		// fixture writes two literals that differ. Measured: silent.
 		{"different nested string subscripts", "const a = <App {...props[o[\"x\"]]} {...props[o[\"y\"]]} />;\n"},
 
 		// A numeric literal against a string literal whose text matches. Without the kind-equality
 		// guard these compare equal on text alone and this reports, which is the second blind spot
-		// mutation found. oxc keys its literal arms on matched PAIRS of variants, so a number and a
+		// mutation found. oxc keys its literal arms on matched pairs of variants, so a number and a
 		// string never meet. Measured: silent.
 		{"a numeric subscript against a string one with the same text", "const a = <App {...props[o[1]]} {...props[o[\"1\"]]} />;\n"},
 
-		// Two DIFFERENT string-literal receivers. Without comparing literal TEXT every pair of
+		// Two different string-literal receivers. Without comparing literal text every pair of
 		// same-kind literals reads as equal and this reports. Measured: silent.
 		{"different string-literal receivers", "const a = <App {...\"abc\".length} {...\"abd\".length} />;\n"},
 
@@ -301,7 +301,7 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 // Where the finding points, which ExpectFindings cannot see.
 //
 // A rule reporting the right message id at the wrong node passes every case above. oxc passes both
-// spreads as labels and the FIRST is the diagnostic's primary position, read from the snapshot's
+// spreads as labels and the first is the diagnostic's primary position, read from the snapshot's
 // caret row and confirmed against the release binary's json output, whose first label on
 // `<App {...props} {...props} />` is offset 211 length 10, the earlier spread. So the earlier spread
 // is what is reported here, and the reported text is the whole `{...expression}` attribute rather
@@ -364,7 +364,7 @@ func TestJsxPropsNoSpreadMultiReportsTheEarlierSpread(test *testing.T) {
 	}
 }
 
-// The three copies of one member expression must point at three DIFFERENT spreads, which the test
+// The three copies of one member expression must point at three different spreads, which the test
 // above cannot see because all three attributes render the same text.
 //
 // The pairs are (1,2), (1,3) and (2,3), and each reports its left member, so the offsets are those

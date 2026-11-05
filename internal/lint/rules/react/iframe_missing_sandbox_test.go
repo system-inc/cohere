@@ -70,7 +70,7 @@ func TestIframeMissingSandboxStaysSilent(test *testing.T) {
 	}{
 		{"valid 0 a different element entirely", `<div sandbox="__unknown__" />;`},
 		{"valid 1 an empty sandbox", `<iframe sandbox="" />;`},
-		// Present but unreadable: the value IS a literal and upstream still declines it, because
+		// Present but unreadable: the value is a literal and upstream still declines it, because
 		// the attribute's value node is a JSXExpressionContainer rather than a Literal. Present is
 		// what matters, so nothing reports.
 		{"valid 2 an empty string inside an expression container", `<iframe sandbox={""} />`},
@@ -162,7 +162,7 @@ func TestIframeMissingSandboxAnchorsOnTheOpeningTag(test *testing.T) {
 	}{
 		{"a paired tag points at the opening tag only", `<iframe></iframe>;`, []string{`<iframe>`}},
 		{"a self closing tag points at the whole tag", `<iframe/>;`, []string{`<iframe/>`}},
-		// The invalid-value finding is reported on the ELEMENT rather than on the attribute, which
+		// The invalid-value finding is reported on the element rather than on the attribute, which
 		// is upstream's choice: `report(context, ..., { node })` where `node` is the opening
 		// element passed down from the listener, not the attribute the token came from.
 		{"an invalid token points at the element, not the attribute", `<iframe sandbox="__unknown__"/>;`, []string{`<iframe sandbox="__unknown__"/>`}},
@@ -216,7 +216,7 @@ func TestIframeMissingSandboxRendersTheRejectedToken(test *testing.T) {
 	if !strings.HasPrefix(got, "`__unknown__` is not a sandbox token,") {
 		test.Errorf("message does not name the rejected token: %q", got)
 	}
-	// The token that was ACCEPTED must not appear, which is what separates naming the offender from
+	// The token that was accepted must not appear, which is what separates naming the offender from
 	// naming the whole attribute.
 	if strings.Contains(got, "allow-popups") {
 		test.Errorf("message names an accepted token: %q", got)
@@ -272,7 +272,7 @@ func TestIframeMissingSandboxSeparatesPresentFromReadable(test *testing.T) {
 // Each case here was measured against the installed build before it was written, and the two
 // directions are what makes this a real discrimination rather than a preference:
 //
-//   - a tab-joined pair is ONE token upstream, and it is not in the allowed list, so it reports
+//   - a tab-joined pair is one token upstream, and it is not in the allowed list, so it reports
 //     `invalidValue` with the tab inside the rendered value. A whitespace split would see two known
 //     tokens and stay silent, losing the finding.
 //   - `allow-scripts` tab `allow-same-origin` reports `invalidValue` rather than
@@ -326,7 +326,7 @@ func TestIframeMissingSandboxSplitsOnSpacesOnly(test *testing.T) {
 // TestIframeMissingSandboxReadsOnlyIdentifierKeys covers the createElement arm's key handling.
 //
 // Upstream reads `x.key.name`, defined only on an identifier key, so a quoted or computed key does
-// not count as supplying `sandbox` and the whole call reports as missing. A shorthand DOES count,
+// not count as supplying `sandbox` and the whole call reports as missing. A shorthand does count,
 // and its value is an identifier rather than a literal, so it is present and unvalidated. All
 // measured against the installed build; none of these shapes is in the corpus.
 func TestIframeMissingSandboxReadsOnlyIdentifierKeys(test *testing.T) {

@@ -34,7 +34,7 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(test *testing.T) {
 	}
 }
 
-// TestNoObjectTypeAsDefaultPropFires asserts the count AND the rendered message text of every
+// TestNoObjectTypeAsDefaultPropFires asserts the count and the rendered message text of every
 // finding. The message interpolates the property name and the forbidden type, and names the type
 // twice, so a message-id assertion could not see an interpolation defect at all: the id and the
 // count stay right while the text goes wrong. Each expected string was captured from the
@@ -264,14 +264,14 @@ func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(test *testing.T) {
 // the message text.
 //
 // Measured on 2026-08-27, all four rows against the installed build. A string key, a numeric key
-// and a computed key all REPORT, exactly as a plain identifier key does, so which inputs produce a
+// and a computed key all report, exactly as a plain identifier key does, so which inputs produce a
 // finding is reproduced with no divergence at all.
 //
 // What differs is the rendered name. Upstream reads `prop.key.name`, which a string or numeric key
 // node does not have, so its message says literally "undefined has a/an object literal as default
 // prop". Our node carries the real key, and rendering the word "undefined" into text a person reads
 // is a defect this port can see, so these say "str" and "1" instead. The computed key renders as
-// "k" in both, because upstream's key node for that shape IS the inner identifier.
+// "k" in both, because upstream's key node for that shape is the inner identifier.
 //
 // The divergence is deliberate, one-directional, and confined to the human-readable half of the
 // finding. If this is ever judged wrong, the fix is in `destructuredPropertyName` and this test is

@@ -9,7 +9,7 @@ import (
 
 // sortCompFile is where the fixtures pretend to live.
 //
-// A `.tsx` name because most cases are JSX and 24 of the 53 carry TypeScript syntax. It is NOT
+// A `.tsx` name because most cases are JSX and 24 of the 53 carry TypeScript syntax. It is not
 // load-bearing: this rule has no file gate, and TestSortCompHasNoFileGate pins that by running
 // one reporting source under two extensions.
 const sortCompFile = "/repository/source/SortComp.tsx"
@@ -23,7 +23,7 @@ type sortCompCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through DecodeSortCompOptions
+	// options is the raw JSON of upstream's options object, routed through DecodeSortCompOptions
 	// rather than built as a struct, so the decoder's own nil path and defaults are under test.
 	options string
 
@@ -185,7 +185,7 @@ var sortCompFiresCases = []sortCompCase{
 		},
 	},
 	// #7mztrdd: an order pattern is upstream's `new RegExp(body, flags)`, read as JavaScript reads
-	// it. Each group below sits AFTER render, so a member the pattern claims reports, and a member
+	// it. Each group below sits after render, so a member the pattern claims reports, and a member
 	// it does not claim falls to `everything-else` and is clean. Their silent counterparts are at
 	// the end of sortCompSilentCases.
 	{
@@ -505,7 +505,7 @@ func TestSortCompHasNoFileGate(test *testing.T) {
 // TestSortCompSurvivesNilOptions covers the path a bare `"error"` configuration takes.
 //
 // A rule configured without options is handed nil rather than the decoded default, and `options.(T)`
-// on nil yields the zero value silently. For this rule the zero value is an EMPTY order, which
+// on nil yields the zero value silently. For this rule the zero value is an empty order, which
 // matches nothing and reports nothing, so without the explicit fallback in `Run` this rule would
 // register on every file in the tree and judge none of them. That is the inert-rule shape that
 // reads exactly like a clean tree, so it is pinned here rather than trusted.
@@ -545,7 +545,7 @@ func TestSortCompReportsWhereItSays(test *testing.T) {
 // TestSortCompDeclinesAMemberItCannotName covers a computed member key.
 //
 // `Node.Text()` panics on several name kinds rather than returning empty, and the walk recovers per
-// FILE rather than per rule, so one such member costs every rule in this package its verdict on that
+// file rather than per rule, so one such member costs every rule in this package its verdict on that
 // file. Upstream reads an unreadable key as the empty string, which matches no order entry and falls
 // through to `everything-else`, so the member stays in the comparison rather than being skipped.
 func TestSortCompDeclinesAMemberItCannotName(test *testing.T) {
@@ -566,7 +566,7 @@ func TestSortCompDeclinesAMemberItCannotName(test *testing.T) {
 
 // TestSortCompNamesTheFirstMemberAtAReferenceIndex covers `storeError`'s name guard.
 //
-// Upstream stops updating an error's named partner once a DIFFERENT member has been recorded at the
+// Upstream stops updating an error's named partner once a different member has been recorded at the
 // same reference index: `getPropertyName(errors[propA.index].node) !== getPropertyName(propA.node)`
 // returns early. Reaching it needs two or more members that share a reference index, which upstream's
 // corpus never writes, so deleting the guard survived all 52 imported cases.
@@ -624,13 +624,13 @@ func TestSortCompNamesTheFirstMemberAtAReferenceIndex(test *testing.T) {
 // and is not, so collapsing the two is the obvious "cleanup" a later reader would make.
 //
 // Measured on the installed build, with a control that fires: a class whose plain `classMethod()`
-// sits AFTER `render` under an `instance-methods`-first order is CLEAN, while the same shape with an
-// arrow property `foo = () => {}` REPORTS. So upstream genuinely does not count a plain method.
+// sits after `render` under an `instance-methods`-first order is clean, while the same shape with an
+// arrow property `foo = () => {}` reports. So upstream genuinely does not count a plain method.
 //
 // Mutation-checked, and the first attempt at this test proved nothing. Widening the instance arm to
 // `(isPropertyLike || isMethodDeclaration) && initializedToFunction` survives, and re-running it
 // against these cases showed why: `initializedToFunction` already requires `isPropertyLike`, so that
-// mutant is EQUIVALENT rather than uncaught. The predicate that genuinely differs -- dropping the
+// mutant is equivalent rather than uncaught. The predicate that genuinely differs -- dropping the
 // initializer requirement -- is caught by 7 assertions, these two among them.
 func TestSortCompDoesNotTreatAPlainMethodAsAnInstanceMethod(test *testing.T) {
 	test.Parallel()
@@ -655,10 +655,10 @@ func TestSortCompDoesNotTreatAPlainMethodAsAnInstanceMethod(test *testing.T) {
 	})
 }
 
-// TestSortCompLifecycleNamesCannotReachTheRegexBranch records an EQUIVALENT mutant rather than
+// TestSortCompLifecycleNamesCannotReachTheRegexBranch records an equivalent mutant rather than
 // killing it, because the equivalence is provable.
 //
-// `sortCompGroupMatches` tests membership in the known-lifecycle-name list BEFORE trying the regex
+// `sortCompGroupMatches` tests membership in the known-lifecycle-name list before trying the regex
 // production, and reordering those two survived the whole corpus. That is not a fixture gap: the
 // production is `/(.*)/([gimsuy]*)`, which requires a literal `/`, and no lifecycle name contains
 // one, so no input can take a different path under either ordering.

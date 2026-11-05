@@ -377,6 +377,8 @@ func (surfaces *ClassLiteralSurfaces) bind() *ClassLiteralReader {
 func (s ClassLiteralSettings) key() string {
 	encoded, encodeError := json.Marshal(s.Selectors)
 	if encodeError != nil {
+		// Invariant: a Selector holds only strings, slices of matchers and targets whose MarshalJSON writes a
+		// string or an int, none of which json.Marshal can fail on.
 		panic(fmt.Sprintf("selectors that decoded do not encode: %v", encodeError))
 	}
 	return string(encoded)

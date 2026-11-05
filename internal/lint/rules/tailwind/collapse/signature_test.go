@@ -54,7 +54,8 @@ func TestSignatureAgreesWithTailwind(test *testing.T) {
 
 			collapsedFeatures := SignatureFeaturesFor(true, true)
 			uncollapsedFeatures := SignatureFeaturesFor(false, true)
-			var disagreements, outOfBound []string
+			var disagreements []string
+			var outOfBound []string
 			unknownByRoot := map[string]int{}
 			disagreeByRoot := map[string]int{}
 			outOfBoundByRoot := map[string]int{}
