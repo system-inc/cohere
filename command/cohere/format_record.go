@@ -391,6 +391,7 @@ func declaredSubmodules(directory string) (map[string]struct{}, error) {
 	if openError != nil {
 		return nil, fmt.Errorf("reading the submodules %s declares: %w", directory, openError)
 	}
+	// Ignored: only read, so its close loses nothing.
 	defer file.Close()
 	lines := bufio.NewScanner(file)
 	for lines.Scan() {

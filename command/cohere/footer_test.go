@@ -253,7 +253,9 @@ func TestCoheredIsTheListAboveTheFooter(test *testing.T) {
 		said := 0
 		if index := strings.Index(got, " cohered"); index >= 0 {
 			fields := strings.Fields(got[:index])
-			fmt.Sscanf(fields[len(fields)-1], "%d", &said)
+			if _, scanError := fmt.Sscanf(fields[len(fields)-1], "%d", &said); scanError != nil {
+				test.Errorf("the footer's cohered count is not a number (%v): %s", scanError, got)
+			}
 		}
 		if said != listed || said != count {
 			test.Errorf("%d files rewritten: the list accounts for %d and the footer says %d cohered (%s)", count, listed, said, got)

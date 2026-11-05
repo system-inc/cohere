@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // engineContractVersion is the version of swift/Contract.md this front door speaks.
@@ -192,8 +193,11 @@ var engineOutcomes = map[string]phaseOutcome{
 // record is a finding nobody sees. And every count the stream states twice is compared, because two
 // numbers that should agree and do not are a defect in one of them, and printing either would be
 // printing a number nobody can vouch for.
+//
+// out is shown after each finding and each phase's line, so a person sees what the engine found as it arrives,
+// and a slow phase's line before its wait rather than when the run ends.
 type engineRun struct {
-	out  io.Writer
+	out  *bufio.Writer
 	mode engineMode
 
 	// language is the words this run prints for its engine, so a sentence never names a language the run
@@ -256,7 +260,7 @@ type engineRun struct {
 // newEngineRun starts rendering one engine's run, naming the step nothing can skip by what the engine
 // describes first, its package, module or workspace.
 func newEngineRun(
-	out io.Writer,
+	out *bufio.Writer,
 	mode engineMode,
 	language engineLanguage,
 	rootNote string,
@@ -366,6 +370,7 @@ func (r *engineRun) acceptProject(record *engineProjectRecord) error {
 		line += fmt.Sprintf(", %d in scope (%s)", record.FilesInScope, record.ScopeDescription)
 	}
 	fmt.Fprintln(accountOutput(r.out), line)
+	streams.Show(r.out)
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, record.FilesInScope
 	activeSummary.Gaps.NothingToCheck = record.FilesInScope == 0
 
@@ -580,6 +585,7 @@ func (r *engineRun) acceptFix(record *engineFixRecord) error {
 	// An engine from before the list sends none, and the run then states the counts alone: the footer
 	// leaves out a cohered count it was not given, rather than print a zero it does not know.
 	if record.ChangedFiles == nil {
+		streams.Show(r.out)
 		return nil
 	}
 	changed, changedFilesError := r.changedFiles(*record.ChangedFiles, record.FilesRewritten)
@@ -588,6 +594,7 @@ func (r *engineRun) acceptFix(record *engineFixRecord) error {
 	}
 	activeSummary.Changed = changed
 	printChangedFiles(r.out, changed)
+	streams.Show(r.out)
 	return nil
 }
 
@@ -646,6 +653,7 @@ func (r *engineRun) acceptTypes(record *engineTypesRecord) error {
 		fmt.Fprintf(accountOutput(r.out), "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
 	}
 	r.filesWithoutRecord += len(record.FilesWithoutRecord)
+	streams.Show(r.out)
 	return nil
 }
 
@@ -684,6 +692,7 @@ func (r *engineRun) acceptLint(record *engineLintRecord) error {
 		fmt.Fprintf(accountOutput(r.out), "  %s\n", record.ConfigNote)
 	}
 	r.writeExcluded()
+	streams.Show(r.out)
 	return nil
 }
 

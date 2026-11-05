@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 
@@ -55,7 +55,7 @@ const crlfReason = ". It has CRLF line endings, and the house format is LF. If g
 	"(core.autocrlf, the default on Windows), add `* text=auto eol=lf` to the repository's .gitattributes"
 
 // report prints the note once, after the fix phase, when any file arrived with CRLF.
-func (c *crlfFiles) report(out io.Writer, write bool) {
+func (c *crlfFiles) report(out *bufio.Writer, write bool) {
 	if len(c.files) == 0 {
 		return
 	}

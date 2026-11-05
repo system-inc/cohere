@@ -195,7 +195,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		test.Errorf("other file's settings/sourceType = %+v", otherDoc)
 	}
 	help := exec.Command(binary, "--help")
-	helpText, _ := help.CombinedOutput()
+	helpText, helpError := help.CombinedOutput()
+	requireChildRan(test, helpError)
 	for _, phrase := range []string{"plugin package versions", "parser names", "settings.react"} {
 		if !strings.Contains(string(helpText), phrase) {
 			test.Errorf("help does not explain %s", phrase)

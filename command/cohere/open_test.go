@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -157,7 +158,9 @@ func TestOpenReport(test *testing.T) {
 			var output bytes.Buffer
 			var opened []string
 			calls := 0
-			report.open(&output, func(paths []string) error { calls++; opened = append(opened, paths...); return testCase.launchError })
+			stream := bufio.NewWriter(&output)
+			report.open(stream, func(paths []string) error { calls++; opened = append(opened, paths...); return testCase.launchError })
+			flushStream(test, stream)
 			var want []string
 			for _, path := range testCase.wantPaths {
 				absolute, absolutePathError := filepath.Abs(path)

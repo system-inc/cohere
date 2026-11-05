@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 
 	"github.com/system-inc/cohere/internal/edit"
 )
@@ -61,7 +61,7 @@ func nestedUnchecked(check nestedDriftCheck) []uncheckedFile {
 }
 
 // printUnchecked reports each file as a finding, in the shape every other finding prints.
-func printUnchecked(out io.Writer, unchecked []uncheckedFile) {
+func printUnchecked(out *bufio.Writer, unchecked []uncheckedFile) {
 	for _, file := range unchecked {
 		if file.FileName == "" {
 			printFinding(out,

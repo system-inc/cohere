@@ -85,7 +85,8 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
 		if foreign {
 			command.Env = append(command.Env, "COHERE_TEST_FOREIGN_CHECKERS=1")
 		}
-		output, _ := command.CombinedOutput()
+		output, runError := command.CombinedOutput()
+		requireChildRan(test, runError)
 		if foreign {
 			// The instrument has to have moved the files, or an identical run proves nothing.
 			if match := moved.FindStringSubmatch(string(output)); match == nil || match[1] == "0" || match[1] != match[2] {

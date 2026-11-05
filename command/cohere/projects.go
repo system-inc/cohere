@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -95,11 +96,11 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings
 		for _, note := range found.notes() {
-			fmt.Fprintf(accountOutput(os.Stderr), "cohere: %s\n", note)
+			fmt.Fprintf(accountOutput(streams.Errors), "cohere: %s\n", note)
 		}
 		return 0, false, nil
 	}
-	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), os.Stdout), true, nil
+	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), streams.Output), true, nil
 }
 
 // childArguments are the arguments every project's run gets: this run's, with a named lint config made
@@ -206,12 +207,12 @@ type projectRun struct {
 // At most projectRunsAtOnce run together. Each builds a whole type graph and checks it on every core, so
 // TanStack Query's 95 projects started at once were 95 graphs in memory, and more children than that buys no
 // time the cores do not already give one.
-func runProjects(found discovery, arguments []string, out io.Writer) int {
+func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// failures is where this run's own failure lines go: with the report in the human views, and on stderr
 	// under `--json`, whose stdout is records only.
 	failures := out
 	if activeOutput.Mode == outputJSON {
-		failures = os.Stderr
+		failures = streams.Errors
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -225,6 +226,7 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 			sentence.FromError(fmt.Errorf("making a place for what each project yields: %w", err)))
 		return 1
 	}
+	// Ignored: a temporary directory that outlives the run costs only its space, and nothing reads it again.
 	defer os.RemoveAll(yieldDirectory)
 
 	children := forwardSignalsToChildren()
@@ -287,7 +289,7 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		}
 		// Under `--json` stdout is records only, so what a child wrote to stderr, an engine's note or a
 		// file it could not format, goes to stderr, where a single project's run puts it too.
-		os.Stderr.Write(checked.standardError)
+		streams.Errors.Write(checked.standardError)
 		if checked.err != nil {
 			fmt.Fprintf(failures, "cohere: %s\n",
 				sentence.FromError(fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.err)))

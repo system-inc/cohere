@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -14,17 +16,15 @@ import (
 func TestJSONLines(test *testing.T) {
 	test.Parallel()
 	var out bytes.Buffer
+	stream := bufio.NewWriter(&out)
 	finding := runFinding{Path: "/repo/a.ts", Line: 3, Column: 7, Severity: "error", Rule: "prefer-const", MessageID: "useConst", Message: "Use const."}
-	if writeJSONLineError := writeJSONLine(&out, findingAsJSON(finding)); writeJSONLineError != nil {
-		test.Fatal(writeJSONLineError)
-	}
+	writeJSONLine(stream, findingAsJSON(finding))
 	for _, line := range changedFilesAsJSON([]changedFile{
 		{Path: "b.ts", Fixed: true, Formatted: true, FixedBy: map[string]int{"prefer-const": 2, "object-shorthand": 1}},
 	}) {
-		if writeJSONLineError := writeJSONLine(&out, line); writeJSONLineError != nil {
-			test.Fatal(writeJSONLineError)
-		}
+		writeJSONLine(stream, line)
 	}
+	flushStream(test, stream)
 	want := `{"kind":"finding","path":"/repo/a.ts","line":3,"column":7,"severity":"error","rule":"prefer-const","messageId":"useConst","message":"Use const."}
 {"kind":"fixed","path":"b.ts","rules":["object-shorthand","prefer-const"]}
 {"kind":"formatted","path":"b.ts"}
@@ -152,4 +152,13 @@ func schemaPropertyNames(properties map[string]schemaObject) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// A value that does not encode is no line at all rather than a broken one. jsonLine also reports it to package
+// streams, which ends the run nonzero; that report is the process's, and no test here finishes the process.
+func TestAValueThatDoesNotEncodeIsNoLine(test *testing.T) {
+	test.Parallel()
+	if line := jsonLine(map[string]float64{"seconds": math.NaN()}); line != "" {
+		test.Errorf("a value JSON cannot hold printed %q", line)
+	}
 }

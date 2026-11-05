@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
-	"io"
+	"fmt"
 	"sort"
+
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // `--json` is the run for a program to read: newline-delimited JSON, one object per line, each with a
@@ -150,11 +153,18 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 }
 
 // writeJSONLine writes one object as one line.
-func writeJSONLine(out io.Writer, value any) error {
-	line, err := json.Marshal(value)
-	if err != nil {
-		return err
+func writeJSONLine(out *bufio.Writer, value any) {
+	fmt.Fprint(out, jsonLine(value))
+}
+
+// jsonLine is one object as one line, newline included. A value that does not encode is a line the reader never
+// gets, so it is reported to package streams, and the run exits nonzero saying so, rather than printing a
+// stream with a record missing; the line is then empty.
+func jsonLine(value any) string {
+	line, marshalError := json.Marshal(value)
+	if marshalError != nil {
+		streams.Report(fmt.Errorf("encoding a line of --json: %w", marshalError))
+		return ""
 	}
-	_, err = out.Write(append(line, '\n'))
-	return err
+	return string(line) + "\n"
 }

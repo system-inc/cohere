@@ -28,20 +28,23 @@ func TestMain(m *testing.M) {
 	if temporaryDirectoryError != nil {
 		panic(temporaryDirectoryError)
 	}
-	os.Setenv("HOME", home)
-	os.Setenv("XDG_CACHE_HOME", "")
+	// Ignored: Setenv fails only for a name holding "=" or a NUL, and neither name here does.
+	_ = os.Setenv("HOME", home)
+	_ = os.Setenv("XDG_CACHE_HOME", "") // Ignored: as the line above.
 	// See held_output_guard_test.go: a command whose output never closes fails the binary with its holder
 	// named, rather than at -timeout with nothing said.
 	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, failHeldOutput)
 	code := m.Run()
 	stopWatching()
-	os.RemoveAll(home)
+	// Ignored: a temporary directory of this test binary's own, which costs only its space if it outlives the
+	// run, and the run's verdict is already decided. So for each removal below.
+	_ = os.RemoveAll(home)
 	if sharedBinary.directory != "" {
-		os.RemoveAll(sharedBinary.directory)
+		_ = os.RemoveAll(sharedBinary.directory) // Ignored: as home's, above.
 	}
 	for _, stamped := range stampedBinaries.byVersion {
 		if stamped.directory != "" {
-			os.RemoveAll(stamped.directory)
+			_ = os.RemoveAll(stamped.directory) // Ignored: as home's, above.
 		}
 	}
 	os.Exit(code)
@@ -55,7 +58,9 @@ var nodeCounts = regexp.MustCompile(`(\d+) nodes visited(?:, (\d+) more covered 
 func foldNodeCounts(output string) string {
 	return nodeCounts.ReplaceAllStringFunc(output, func(account string) string {
 		parts := nodeCounts.FindStringSubmatch(account)
+		// Ignored: the pattern captures digits.
 		visited, _ := strconv.Atoi(parts[1])
+		// Ignored: digits, or nothing when no file was replayed, which reads as the 0 it means.
 		replayed, _ := strconv.Atoi(parts[2])
 		return fmt.Sprintf("%d nodes visited", visited+replayed)
 	})
@@ -363,12 +368,19 @@ func TestRunCacheEndToEnd(test *testing.T) {
 		if len(tables) == 0 {
 			test.Fatalf("no cache table in the project %s", fixture.root)
 		}
-		filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, err error) error {
-			if err == nil && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
+		// A walk that cannot read the home fails the test, rather than reading as a home with no table in it.
+		walkError := filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
 				test.Errorf("a cache table landed in the user's fixture.home: %s", path)
 			}
 			return nil
 		})
+		if walkError != nil {
+			test.Fatal(walkError)
+		}
 		// Every run here leaves formatting out (see run), so the bare run is recorded as `--no-format`.
 		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
 			test.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
@@ -606,7 +618,8 @@ func pinGoEnvironment() {
 	}
 	for name, value := range settings {
 		if _, set := os.LookupEnv(name); !set && value != "" {
-			os.Setenv(name, value)
+			// Ignored: Setenv fails only for a name holding "=" or a NUL, and go env names none that way.
+			_ = os.Setenv(name, value)
 		}
 	}
 }

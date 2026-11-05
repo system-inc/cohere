@@ -19,7 +19,7 @@ func startProfile(path string) error {
 		return fmt.Errorf("creating the profile: %w", createError)
 	}
 	if startCPUProfileError := pprof.StartCPUProfile(file); startCPUProfileError != nil {
-		file.Close()
+		_ = file.Close() // Ignored: the profile never started, so nothing was written, and its start error is returned.
 		return fmt.Errorf("starting the profile: %w", startCPUProfileError)
 	}
 	profileFile = file

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // How a run prints. The default is the human view: the files cohere rewrote, the findings, and one
@@ -41,19 +43,28 @@ var activeOutput = outputSettings{Mode: outputHuman}
 // accountOutput is where a line that accounts for the run goes: the phase lines, the coverage block, the
 // scopes and notes. Under `--verbose` that is out; in the human view and under `--json` it is nowhere,
 // since the footer says what a reader needs and `--json` prints nothing a program did not ask for.
-func accountOutput(out io.Writer) io.Writer {
+func accountOutput(out *bufio.Writer) *bufio.Writer {
 	if activeOutput.Mode == outputVerbose {
 		return out
 	}
-	return io.Discard
+	return discardedOutput()
+}
+
+// discardedOutput is a stream for a line no one reads, a stream rather than io.Discard so that every print through
+// accountOutput writes to a *bufio.Writer (see package streams). A fresh one each time rather than one shared,
+// because io.Discard was safe from any goroutine and a shared buffer is not, and the printers' tests render in
+// parallel. Its buffer is small, since nothing it holds is ever read.
+func discardedOutput() *bufio.Writer {
+	return bufio.NewWriterSize(io.Discard, 16)
 }
 
 // activeSummary is the run's summary, filled as the phases finish and rendered at the end.
 var activeSummary runSummary
 
 // printFinding prints one finding in the view the run asked for: as it always printed under `--verbose`,
-// as `path:line:col severity rule message` in the human view, as a line of JSON under `--json`.
-func printFinding(out io.Writer, finding runFinding, verboseLine string) {
+// as `path:line:col severity rule message` in the human view, as a line of JSON under `--json`. Each is shown
+// as it is printed, since what follows a finding is often seconds of work, and a person watches them arrive.
+func printFinding(out *bufio.Writer, finding runFinding, verboseLine string) {
 	activeOpen.add(finding.Path)
 	switch activeOutput.Mode {
 	case outputVerbose:
@@ -63,6 +74,7 @@ func printFinding(out io.Writer, finding runFinding, verboseLine string) {
 	default:
 		fmt.Fprintln(out, findingLine(finding, activeOutput.Style))
 	}
+	streams.Show(out)
 }
 
 // compilerFinding is a type error as a runFinding: its rule is its TypeScript code.
@@ -108,7 +120,7 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) r
 // account, then the footer; in the human view the footer; under `--json` the summary line. The footer is
 // written as describing this invocation, since its time is this run's, so the run cache never replays it
 // as recorded; a replay renders its own from the stored summary.
-func writeRunEnd(report *pipelineReport, out io.Writer) {
+func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	summary := activeSummary
 	summary.Phases = report.records
 	summary.Graph = report.graph
@@ -150,13 +162,14 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 	case outputVerbose:
 		report.Write(out)
 		if line := summary.Cache.missLine(); line != "" {
-			fmt.Fprintln(invocationOutput(out), line)
+			printInvocation(out, "%s\n", line)
 		}
-		fmt.Fprintln(invocationOutput(out), footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
+		printInvocation(out, "%s\n",
+			footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
 	case outputJSON:
-		writeJSONLine(invocationOutput(out), summaryAsJSON(summary))
+		printInvocation(out, "%s", jsonLine(summaryAsJSON(summary)))
 	default:
-		fmt.Fprintln(invocationOutput(out), footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
+		printInvocation(out, "%s\n", footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
 	}
 }
 
@@ -185,7 +198,7 @@ func changedFilesFrom(files []edit.ChangedFile, root string) []changedFile {
 
 // printChangedFiles lists the files the fix phase rewrote, above the findings, in the human view, and as
 // lines of JSON under `--json`. `--verbose` has the fix phase's own line for it instead.
-func printChangedFiles(out io.Writer, changed []changedFile) {
+func printChangedFiles(out *bufio.Writer, changed []changedFile) {
 	switch activeOutput.Mode {
 	case outputJSON:
 		for _, line := range changedFilesAsJSON(changed) {
