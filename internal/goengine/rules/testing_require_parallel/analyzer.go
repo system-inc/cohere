@@ -122,8 +122,9 @@ func judgeSubtests(pass *analysis.Pass, file *ast.File, declarations map[*types.
 }
 
 // subtestFunction is the body, *testing.T parameter, and doc comment of the function a Run call runs, when the rule
-// can see it: a function literal, or a function or method declared in this package. Otherwise body is nil, since a
-// closure held in a variable or built by a call has a body the rule would have to guess at.
+// can see it: a function literal, or a function or method declared in this package, an instantiation of a generic
+// one included. Otherwise body is nil, since a closure held in a variable or built by a call has a body the rule
+// would have to guess at.
 func subtestFunction(
 	pass *analysis.Pass,
 	argument ast.Expr,
@@ -136,6 +137,15 @@ func subtestFunction(
 			return nil, nil, nil
 		}
 		return literal.Body, signature.Params().At(0), nil
+	}
+	// An instantiated generic function, helper[int] or helper[int, string], runs the generic function's body, so the
+	// type arguments are set aside and the name they instantiate is resolved. An index into a slice or map of
+	// functions unwraps to a variable, which is no function and so is never judged.
+	switch instantiated := argument.(type) {
+	case *ast.IndexExpr:
+		argument = ast.Unparen(instantiated.X)
+	case *ast.IndexListExpr:
+		argument = ast.Unparen(instantiated.X)
 	}
 	var object types.Object
 	switch named := argument.(type) {
@@ -153,6 +163,10 @@ func subtestFunction(
 	if !isFunc {
 		return nil, nil, nil
 	}
+	// A method of an instantiated generic type, suite.serial on a *Suite[int], is an object of its own that no
+	// declaration defines. Its origin is the one the declaration defines, and whose parameter the body's identifiers
+	// resolve to, so both the lookup and the parameter go through it.
+	function = function.Origin()
 	declaration, declared := declarations[function]
 	if !declared || declaration.Body == nil || function.Signature().Params().Len() != 1 {
 		return nil, nil, nil

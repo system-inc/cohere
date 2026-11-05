@@ -55,6 +55,36 @@ func parallelSubtest(subtest *testing.T) {
 	subtest.Parallel()
 }
 
+// A subtest started in a helper that is no test is judged, and this one runs in parallel.
+func runCases(test *testing.T) {
+	test.Run("case", func(subtest *testing.T) {
+		subtest.Parallel()
+	})
+}
+
+// A generic function or method resolves to its declaration, whose parameter is the one its body calls Parallel on.
+func TestGenericParallelSubtests(test *testing.T) {
+	test.Parallel()
+	test.Run("one type argument", parallelGeneric[int])
+	test.Run("two type arguments", parallelGenericPair[int, string])
+	suite := &genericSuite[int]{}
+	test.Run("generic method", suite.parallel)
+}
+
+func parallelGeneric[Value any](subtest *testing.T) {
+	subtest.Parallel()
+}
+
+func parallelGenericPair[Key comparable, Value any](subtest *testing.T) {
+	subtest.Parallel()
+}
+
+type genericSuite[Value any] struct{}
+
+func (suite *genericSuite[Value]) parallel(subtest *testing.T) {
+	subtest.Parallel()
+}
+
 // A subtest that shadows the outer name is still its own parameter.
 func TestShadowedSubtest(test *testing.T) {
 	test.Parallel()
