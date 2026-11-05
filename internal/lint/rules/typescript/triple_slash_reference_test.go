@@ -573,8 +573,8 @@ func TestDecodeTripleSlashReferenceOptions(test *testing.T) {
 // separated this from an unwired rule; the finding count is what said it was broken anyway.
 //
 // The nil case is the one the config actually produces. A value of the wrong type must not silently
-// disable the rule either, and since #qmvkf83 it cannot: rule.OptionsAs panics on it, which
-// TestTripleSlashReferenceRefusesOptionsOfTheWrongType holds.
+// disable the rule either, and since #ymag4q6 it cannot be written: the rule and its decoder meet in
+// rule.Registration[TripleSlashReferenceOptions], so options of another type are a compile error.
 func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(test *testing.T) {
 	test.Parallel()
 
@@ -648,32 +648,5 @@ func TestTripleSlashReferenceScansEveryDirectiveBeforeTheCutoff(test *testing.T)
 		if got != want {
 			test.Fatalf("finding %d: expected %q, got %q", index, want, got)
 		}
-	}
-}
-
-// Options of a type the decoder never returns are a disagreement between the registration and the
-// rule, and that fails loudly rather than defaulting: these used to fall back to the defaults, which
-// is the silence that let unified-signatures ignore its options (#qmvkf83).
-func TestTripleSlashReferenceRefusesOptionsOfTheWrongType(test *testing.T) {
-	test.Parallel()
-
-	cases := []struct {
-		name    string
-		options any
-	}{
-		{"a value of some other type", "error"},
-		{"a pointer rather than the value", &TripleSlashReferenceOptions{}},
-	}
-	for _, testCase := range cases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			defer func() {
-				if recover() == nil {
-					test.Fatal("expected options of the wrong type to panic rather than default")
-				}
-			}()
-			rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
-				"/// <reference path=\"foo\" />\n", testCase.options)
-		})
 	}
 }
