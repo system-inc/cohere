@@ -60,7 +60,7 @@ func tailwindDecoders(test *testing.T) map[string]func(raw []byte, base rule.Opt
 }
 
 // decodedKey re-encodes decoded options and returns one key's value, compacted.
-func decodedKey(test *testing.T, decoded any, key string) string {
+func decodedKey[Options any](test *testing.T, decoded Options, key string) string {
 	test.Helper()
 	encoded, encodeError := json.Marshal(decoded)
 	if encodeError != nil {
@@ -79,7 +79,10 @@ func compactJsonForTest(test *testing.T, raw json.RawMessage) string {
 	if decodeError := json.Unmarshal(raw, &value); decodeError != nil {
 		return string(raw)
 	}
-	compacted, _ := json.Marshal(value)
+	compacted, encodeError := json.Marshal(value)
+	if encodeError != nil {
+		test.Fatalf("re-encoding %s: %v", raw, encodeError)
+	}
 	return string(compacted)
 }
 

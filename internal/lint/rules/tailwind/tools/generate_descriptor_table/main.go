@@ -504,6 +504,9 @@ func writeAxis(
 // and false of everything else. Pass a nil fallback to keep every entry, which is what ByNamespace
 // and ByLiteral need: a miss in either continues the bare-value precedence to a later step that
 // answers differently, so an elided entry is not the same answer as an absent one.
+//
+// Mutates: stats every bucket read and every bucket kept is counted into the caller's totals, which the
+// summary prints as what the elision dropped
 func writeStringReadingMap(
 	out *bytes.Buffer,
 	name string,

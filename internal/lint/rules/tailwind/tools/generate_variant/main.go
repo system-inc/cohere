@@ -289,8 +289,8 @@ func harvestClassLists(sourceRoot string, maximum int) ([][]string, error) {
 			return nil
 		}
 
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			return nil //nolint:nilerr
 		}
 

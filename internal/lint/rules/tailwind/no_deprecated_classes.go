@@ -311,6 +311,13 @@ func buildClass(variants string, base string, important bool) string {
 	return rebuilt
 }
 
+// tailwindVersionForDeprecations is indirected so a test can pin a version.
+//
+// It reads the version the collapse table was generated against rather than asking the filesystem,
+// so both tables describe the same Tailwind. A rule reporting renames from a newer release than the
+// one the tables were built from would be reporting an engine nobody here is running.
+var tailwindVersionForDeprecations = func() string { return tailwindengine.TailwindVersion }
+
 // tailwindAtLeast reports whether the Tailwind this table was generated against is new enough for a
 // deprecation to apply.
 //
@@ -324,13 +331,6 @@ func tailwindAtLeast(major int, minor int) bool {
 	}
 	return installedMinor >= minor
 }
-
-// tailwindVersionForDeprecations is indirected so a test can pin a version.
-//
-// It reads the version the collapse table was generated against rather than asking the filesystem,
-// so both tables describe the same Tailwind. A rule reporting renames from a newer release than the
-// one the tables were built from would be reporting an engine nobody here is running.
-var tailwindVersionForDeprecations = func() string { return tailwindengine.TailwindVersion }
 
 // parseTailwindVersion reads the leading major and minor out of a semantic version.
 //

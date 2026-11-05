@@ -109,7 +109,8 @@ func enumerate(packageRoot string) ([]byte, error) {
 
 	var parsed struct {
 		TailwindVersion string `json:"tailwindVersion"`
-		Cases           []any  `json:"cases"`
+		// Cases is only counted here, so each case stays undecoded.
+		Cases []json.RawMessage `json:"cases"`
 	}
 	if decodeError := json.Unmarshal(out, &parsed); decodeError != nil {
 		return nil, fmt.Errorf("parse enumeration: %w", decodeError)

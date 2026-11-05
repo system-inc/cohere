@@ -88,7 +88,7 @@ func runUnknownFixtureWithOptions(
 	test *testing.T,
 	fileName string,
 	source string,
-	options any,
+	options *NoUnknownClassesOptions,
 ) rule_testing.Result {
 	test.Helper()
 
@@ -116,7 +116,7 @@ func runUnknownFixtureWithOptions(
 		return rule_testing.RunTypedFilesWithSetup(test, NoUnknownClasses, files, fileName, plantPackage)
 	}
 	return rule_testing.RunTypedFilesWithSetupAndOptions(
-		test, NoUnknownClasses, files, fileName, options, plantPackage)
+		test, NoUnknownClasses, files, fileName, *options, plantPackage)
 }
 
 func TestNoUnknownClassesReportsTypos(test *testing.T) {
@@ -317,7 +317,7 @@ func TestUnknownIgnoreExemptsProjectClasses(test *testing.T) {
 	options := NoUnknownClassesOptions{Ignore: []string{`^ahralia-`}}
 
 	exempted := runUnknownFixtureWithOptions(test, "Component.tsx",
-		`const element = <div className="ahralia-splash flex" />;`, options)
+		`const element = <div className="ahralia-splash flex" />;`, &options)
 	if len(exempted.Diagnostics) != 0 {
 		test.Errorf("an ignored class should not be reported, got %d findings", len(exempted.Diagnostics))
 	}
@@ -331,7 +331,7 @@ func TestUnknownIgnoreExemptsProjectClasses(test *testing.T) {
 
 	// And the exemption must not swallow real typos alongside it.
 	stillReported := runUnknownFixtureWithOptions(test, "Component.tsx",
-		`const element = <div className="ahralia-splash flx" />;`, options)
+		`const element = <div className="ahralia-splash flx" />;`, &options)
 	if len(stillReported.Diagnostics) != 1 {
 		test.Errorf("the ignore pattern should exempt only what it matches, got %d findings",
 			len(stillReported.Diagnostics))

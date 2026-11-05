@@ -407,6 +407,18 @@ func main() {
 	}
 }
 
+// variantKindConstants maps the engine's kind strings onto the Go port's constants.
+//
+// Written out rather than derived by casing, because the mapping is a claim about two independent
+// vocabularies and a silent mismatch would render a table naming a constant that happens to exist
+// and mean something else.
+var variantKindConstants = map[string]string{
+	"static":     "ParsedVariantKindStatic",
+	"functional": "ParsedVariantKindFunctional",
+	"compound":   "ParsedVariantKindCompound",
+	"arbitrary":  "ParsedVariantKindArbitrary",
+}
+
 // validate refuses an enumeration that would render a plausible-looking wrong table.
 //
 // Each check exists because its failure is silent at the far end. A short registry renders a table
@@ -480,18 +492,6 @@ func validate(result *enumeration) error {
 		}
 	}
 	return nil
-}
-
-// variantKindConstants maps the engine's kind strings onto the Go port's constants.
-//
-// Written out rather than derived by casing, because the mapping is a claim about two independent
-// vocabularies and a silent mismatch would render a table naming a constant that happens to exist
-// and mean something else.
-var variantKindConstants = map[string]string{
-	"static":     "ParsedVariantKindStatic",
-	"functional": "ParsedVariantKindFunctional",
-	"compound":   "ParsedVariantKindCompound",
-	"arbitrary":  "ParsedVariantKindArbitrary",
 }
 
 // render produces the generated Go file.

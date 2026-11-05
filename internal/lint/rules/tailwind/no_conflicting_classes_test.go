@@ -38,7 +38,7 @@ func runConflictFixtureWithOptions(
 	test *testing.T,
 	fileName string,
 	source string,
-	options any,
+	options *NoConflictingClassesOptions,
 ) rule_testing.Result {
 	test.Helper()
 
@@ -66,7 +66,7 @@ func runConflictFixtureWithOptions(
 		return rule_testing.RunTypedFilesWithSetup(test, NoConflictingClasses, files, fileName, plantPackage)
 	}
 	return rule_testing.RunTypedFilesWithSetupAndOptions(
-		test, NoConflictingClasses, files, fileName, options, plantPackage)
+		test, NoConflictingClasses, files, fileName, *options, plantPackage)
 }
 
 // Expectations measured by running `better-tailwindcss/no-conflicting-classes` over probe fixtures
