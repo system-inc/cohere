@@ -24,6 +24,8 @@ var ruleTypes = gotypes.Product{
 
 // Not parallel: it builds the product the option walks read, so it finishes before they resume. A runner of
 // prebuilt tests skips it and finds the product Workshop built.
+//
+//cohere:ignore consistency-no-screaming-snake-case loom finds product tests by the name TestProduct_<name>
 func TestProduct_RuleTypes(test *testing.T) {
 	exports, buildError := ruleTypes.Build()
 	if buildError != nil {
