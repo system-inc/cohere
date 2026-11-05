@@ -70,7 +70,7 @@ var (
 //
 // The original ships none and none is possible: the repair is either to widen the type or to add
 // the sentinel, and which one is right depends on what the field means.
-var CorrectnessRequireVerifyOptionalParity = rule.Rule{
+var CorrectnessRequireVerifyOptionalParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-verify-optional-parity",
 
 	// The judgment is about the resolved type of the property, not about its annotation. A property
@@ -79,7 +79,7 @@ var CorrectnessRequireVerifyOptionalParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				checkVerifyOptionalParity(ruleContext, node, node.Name())

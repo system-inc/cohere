@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // belongs to api-phi-health's base layer, which has no VerifySettings.json, and ahra's config
 // carries no base/ keys. Where it gets enabled is a decision for Kirk.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireVerifyArrayParity})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireVerifyArrayParity})
 }

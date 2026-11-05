@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // layer, which has no VerifySettings.json, and ahra's config carries no base/ keys because base is
 // that project's layer rather than this one's. Where it gets enabled is a decision for Kirk.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessRequireVerifyOptionalParity})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessRequireVerifyOptionalParity})
 }

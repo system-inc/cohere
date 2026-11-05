@@ -69,7 +69,7 @@ const expectedReturnTypeBrand = "__expectedReturnType"
 //
 // A mismatch means reconciling the method with the token's contract, which is a judgment about what
 // the method should return rather than a spelling change.
-var CorrectnessRequireMatchingProviderReturn = rule.Rule{
+var CorrectnessRequireMatchingProviderReturn = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-matching-provider-return",
 
 	// Every judgment in this rule is a question for the checker: what type the decorator has, what
@@ -77,7 +77,7 @@ var CorrectnessRequireMatchingProviderReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

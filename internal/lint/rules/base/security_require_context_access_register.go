@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // empty `requiresAny` would be a requirement nothing could satisfy, reporting on every injection of
 // that key with a message naming no decorator to add.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[SecurityRequireContextAccessOptions]{
 		Rule:   SecurityRequireContextAccess,
 		Decode: DecodeContextRequiresAccessOptions,
 	})

@@ -63,7 +63,7 @@ var graphQlOperationDecorators = map[string]struct{}{
 // The original ships none and neither does this. The two ways to satisfy the rule are to change the
 // generic or to change the return type, and which one is right depends on what the resolver is
 // meant to do, which is not recoverable from the source.
-var GraphQlOperationContextMatchesReturn = rule.Rule{
+var GraphQlOperationContextMatchesReturn = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-matching-operation-context",
 
 	// Both halves are type questions: what the parameter's generic resolves to, and what the
@@ -71,7 +71,7 @@ var GraphQlOperationContextMatchesReturn = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

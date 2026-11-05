@@ -630,11 +630,7 @@ func TestDecodeContextRequiresAccessOptions(test *testing.T) {
 		if decodeContextRequiresAccessOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeContextRequiresAccessOptionsError)
 		}
-		options, isOptions := decoded.(SecurityRequireContextAccessOptions)
-		if !isOptions {
-			test.Fatalf("nil input decoded to a %T, want SecurityRequireContextAccessOptions", decoded)
-		}
-		if len(options.Requirements) != 0 {
+		if len(decoded.Requirements) != 0 {
 			test.Error("nil input produced requirements")
 		}
 	})

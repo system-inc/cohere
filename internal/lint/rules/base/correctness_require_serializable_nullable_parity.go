@@ -58,14 +58,14 @@ import (
 //
 // Anchored on a decorator, and the checker is consulted only after the name, the `defaultValue`
 // absence and the `optional` value have all been settled syntactically.
-var CorrectnessRequireSerializableNullableParity = rule.Rule{
+var CorrectnessRequireSerializableNullableParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-serializable-nullable-parity",
 
 	// The property's type decides every finding.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDecorator: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

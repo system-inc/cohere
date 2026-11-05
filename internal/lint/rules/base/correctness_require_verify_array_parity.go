@@ -122,7 +122,7 @@ var correctnessRequireVerifyArrayParityText = policy.MessageOf(
 //
 // The original ships none and says why: which array-level decorator to add is a judgment call, and
 // `@VerifyIsArray()` is only the most common answer rather than the right one everywhere.
-var CorrectnessRequireVerifyArrayParity = rule.Rule{
+var CorrectnessRequireVerifyArrayParity = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-verify-array-parity",
 
 	// Whether the property is array-typed is a question only the checker can answer, since the
@@ -130,7 +130,7 @@ var CorrectnessRequireVerifyArrayParity = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				checkVerifyArrayParity(ruleContext, node, node.Name())
