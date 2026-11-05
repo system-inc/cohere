@@ -51,6 +51,13 @@ var Upstreams = []Upstream{
 		Reach:   Compiled, LicenseFile: "rslint.txt",
 	},
 	{
+		// x/tools' LICENSE is the Go license word for word, so the text is go.txt.
+		Name: "golang.org/x/tools go/analysis/checker", URL: "https://pkg.go.dev/golang.org/x/tools@v0.50.0/go/analysis/checker",
+		License: "BSD-3-Clause", Version: "v0.50.0",
+		Carries: "The analysis driver copied into internal/goengine/check/checker, with the helpers it calls from internal/analysis/driverutil.",
+		Reach:   Compiled, LicenseFile: "go.txt",
+	},
+	{
 		Name: "Prettier", URL: "https://github.com/prettier/prettier", License: "MIT",
 		Carries: "The formatter in internal/format: its document model and printers are ported from Prettier's.",
 		Reach:   Compiled, LicenseFile: "prettier.txt",
