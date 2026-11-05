@@ -40,10 +40,10 @@ var singleSpreadText = policy.MessageOf("adamic/single-spread", "laterSpread")
  *
  * The repair is a different construction of the object, and only the author knows which keys it needs.
  */
-var SingleSpread = rule.Rule{
+var SingleSpread = rule.Rule[rule.NoOptions]{
 	Name: "adamic/single-spread",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
 				// `({ x, ...rest } = point)` is a pattern: its rest collects, it copies over nothing.

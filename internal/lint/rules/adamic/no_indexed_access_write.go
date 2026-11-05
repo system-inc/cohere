@@ -17,10 +17,10 @@ var indexedAccessWriteText = policy.MessageOf("adamic/no-indexed-access-write", 
 // tsc 6.0.3 / Node 24 probe instantiates 1, stores 2, and throws reading names[one].
 // This is a separate rule: a readonly primitive slot has no mutable container to widen.
 // The wider ruling about all parameter-retaining relations awaits a Node probe per shape.
-var NoIndexedAccessWrite = rule.Rule{
+var NoIndexedAccessWrite = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-indexed-access-write",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}

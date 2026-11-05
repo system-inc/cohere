@@ -6,23 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// Resolve by registration so the same fixtures expose the hole on the old engine.
-func crossEnumSubject() rule.Rule {
-	for _, entry := range rule.Registered() {
-		if entry.Rule.Name == "adamic/no-cross-enum-narrowing" {
-			return entry.Rule
-		}
-	}
-	return rule.Rule{Name: "adamic/no-cross-enum-narrowing", Run: func(rule.Context, any) rule.Listeners { return nil }}
-}
-
 func crossEnumRun(test *testing.T, source string) rule_testing.Result {
 	test.Helper()
-	return rule_testing.RunTypedFilesWithSetup(test, crossEnumSubject(), map[string]string{
+	return rule_testing.RunTypedFilesWithSetup(test, NoCrossEnumNarrowing, map[string]string{
 		"Case.ts": source,
 	}, "Case.ts", func(directory string) {
 		// Enum syntax is the subject here; Adamic's shared harness forbids all enum syntax.

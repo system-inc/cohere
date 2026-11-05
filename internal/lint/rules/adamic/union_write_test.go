@@ -7,19 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
-
-// Resolving by name lets the same fixtures expose the missing rule on origin/main.
-func unionWriteSubject() rule.Rule {
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == "adamic/union-write" {
-			return registration.Rule
-		}
-	}
-	return rule.Rule{Name: "adamic/union-write", Run: func(rule.Context, any) rule.Listeners { return nil }}
-}
 
 func TestUnionWriteRefused(test *testing.T) {
 	test.Parallel()
@@ -90,7 +79,7 @@ func TestUnionWriteRefused(test *testing.T) {
 			if count := typeErrorCount(test, source); count != 0 {
 				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			result := runAdamic(test, unionWriteSubject(), source)
+			result := runAdamic(test, UnionWrite, source)
 			rule_testing.ExpectFindings(test, result, "unionWrite")
 			expectSpans(test, source, result, slot)
 			messageSlot := slot
@@ -489,12 +478,12 @@ func TestUnionWriteLegalNeighbours(test *testing.T) {
 			if count := typeErrorCount(test, fixture.source); count != 0 {
 				test.Fatalf("tsgo diagnostics: %d, want 0", count)
 			}
-			rule_testing.ExpectClean(test, runAdamic(test, unionWriteSubject(), fixture.source))
+			rule_testing.ExpectClean(test, runAdamic(test, UnionWrite, fixture.source))
 			plant := strings.Replace(fixture.source, fixture.old, fixture.plant, 1)
 			if plant == fixture.source {
 				test.Fatal("plant did not change source")
 			}
-			rule_testing.ExpectFindings(test, runAdamic(test, unionWriteSubject(), plant), "unionWrite")
+			rule_testing.ExpectFindings(test, runAdamic(test, UnionWrite, plant), "unionWrite")
 		})
 	}
 }
@@ -509,9 +498,9 @@ func TestUnionWriteDeleteStaysQuiet(test *testing.T) {
 	if count := typeErrorCount(test, source); count != 0 {
 		test.Fatalf("tsgo diagnostics: %d, want 0", count)
 	}
-	rule_testing.ExpectClean(test, runAdamic(test, unionWriteSubject(), source))
+	rule_testing.ExpectClean(test, runAdamic(test, UnionWrite, source))
 	plant := strings.Replace(source, "delete cell.value", "cell.value = 'text'", 1)
-	rule_testing.ExpectFindings(test, runAdamic(test, unionWriteSubject(), plant), "unionWrite")
+	rule_testing.ExpectFindings(test, runAdamic(test, UnionWrite, plant), "unionWrite")
 	run := func(source string) string {
 		file := filepath.Join(test.TempDir(), "probe.mts")
 		if writeError := os.WriteFile(file, []byte(source), 0o600); writeError != nil {

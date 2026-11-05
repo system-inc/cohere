@@ -7,19 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
-
-func ambientSubject() rule.Rule {
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == "adamic/no-ambient-declarations" {
-			return registration.Rule
-		}
-	}
-	return rule.Rule{Name: "adamic/no-ambient-declarations", Run: func(rule.Context, any) rule.Listeners { return nil }}
-}
 
 func ambientFixture(test *testing.T, name string) map[string]string {
 	test.Helper()
@@ -70,7 +60,7 @@ func TestNoAmbientDeclarations(test *testing.T) {
 			ambientCheckTypes(test, files)
 			result := rule_testing.RunTypedFilesWithSetup(
 				test,
-				ambientSubject(),
+				NoAmbientDeclarations,
 				files,
 				"Case.ts",
 				ambientSetup(test, files),
@@ -132,7 +122,7 @@ func TestNoAmbientDeclarationsNeighbours(test *testing.T) {
 			ambientCheckTypes(test, files)
 			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
 				test,
-				ambientSubject(),
+				NoAmbientDeclarations,
 				files,
 				"Case.ts",
 				ambientSetup(test, files),
@@ -143,7 +133,7 @@ func TestNoAmbientDeclarationsNeighbours(test *testing.T) {
 			ambientCheckTypes(test, files)
 			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(
 				test,
-				ambientSubject(),
+				NoAmbientDeclarations,
 				files,
 				"Case.ts",
 				ambientSetup(test, files),
@@ -181,7 +171,7 @@ func TestNoAmbientDeclarationsFileScope(test *testing.T) {
 			}
 			result := rule_testing.RunTypedFilesWithSetup(
 				test,
-				ambientSubject(),
+				NoAmbientDeclarations,
 				map[string]string{filename: source},
 				filename,
 				setup,
@@ -193,7 +183,7 @@ func TestNoAmbientDeclarationsFileScope(test *testing.T) {
 				// The same declaration in a source .ts file must report.
 				rule_testing.ExpectFindings(
 					test,
-					runAdamic(test, ambientSubject(), runtimeSource),
+					runAdamic(test, NoAmbientDeclarations, runtimeSource),
 					"ambientDeclaration",
 				)
 			}
@@ -250,7 +240,7 @@ func TestNoAmbientDeclarationFields(test *testing.T) {
 			run := func() rule_testing.Result {
 				return rule_testing.RunTypedFilesWithSetup(
 					test,
-					ambientSubject(),
+					NoAmbientDeclarations,
 					files,
 					"Case.ts",
 					ambientSetup(test, files),
@@ -299,7 +289,7 @@ func TestNoAmbientDeclarationTypeOnlyBindings(test *testing.T) {
 			ambientCheckTypes(test, files)
 			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
 				test,
-				ambientSubject(),
+				NoAmbientDeclarations,
 				files,
 				"Case.ts",
 				ambientSetup(test, files),
@@ -317,7 +307,7 @@ func TestNoAmbientDeclarationTypeOnlyBindings(test *testing.T) {
 			ambientCheckTypes(test, files)
 			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(
 				test,
-				ambientSubject(),
+				NoAmbientDeclarations,
 				files,
 				"Case.ts",
 				ambientSetup(test, files),
@@ -338,7 +328,7 @@ func TestNoAmbientDeclarationTypeOnlyBindings(test *testing.T) {
 			if name == "brand-type-import" {
 				rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
 					test,
-					ambientSubject(),
+					NoAmbientDeclarations,
 					files,
 					"Case.ts",
 					ambientSetup(test, files),
@@ -348,7 +338,7 @@ func TestNoAmbientDeclarationTypeOnlyBindings(test *testing.T) {
 			}
 			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(
 				test,
-				ambientSubject(),
+				NoAmbientDeclarations,
 				files,
 				"Case.ts",
 				ambientSetup(test, files),
