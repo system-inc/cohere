@@ -19,6 +19,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/goengine/check/checker"
+	"github.com/system-inc/cohere/internal/goengine/copied"
 	"github.com/system-inc/cohere/internal/goengine/rule"
 )
 
@@ -82,10 +83,10 @@ type Crash struct {
 // that listened to no file at all, is the engine's to name, since only it knows which rules the config kept from
 // every file before they reached this run; a run over no files leaves every rule it was given silent.
 type Result struct {
-	// Findings are every diagnostic of every rule that finished, but a house rule's in a generated file (see
-	// WithheldAsGenerated), each once by rule, position and message, sorted by file, line, column and rule. A rule
-	// that crashed on a package contributes no findings for it, since what it reported before it stopped is not
-	// what it would have reported.
+	// Findings are every diagnostic of every rule that finished, but a house rule's in a generated or copied file
+	// (see WithheldAsGenerated and WithheldAsCopied), each once by rule, position and message, sorted by file, line,
+	// column and rule. A rule that crashed on a package contributes no findings for it, since what it reported
+	// before it stopped is not what it would have reported.
 	Findings []Finding
 
 	// Crashes are each rule that did not finish on a package, once each, sorted by file.
@@ -112,6 +113,12 @@ type Result struct {
 	// engine writes these counts into the lint record, so a run over generated files never reads as clean when it
 	// withheld what it found there.
 	WithheldAsGenerated map[string]int
+
+	// WithheldAsCopied is the same count for files that declare themselves copies of upstream source (see package
+	// copied). A copy is foreign code we carry until upstream ships the fix, and restyling it to the house would bury
+	// its diff against upstream, the one thing about it a reader needs; vet, tools and staticcheck still judge it.
+	// A file both generated and copied is counted as generated.
+	WithheldAsCopied map[string]int
 
 	Elapsed time.Duration
 }
@@ -156,11 +163,13 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		RulesRun:            len(rules),
 		FindingsByRule:      make(map[string]int, len(rules)),
 		WithheldAsGenerated: map[string]int{},
+		WithheldAsCopied:    map[string]int{},
 	}
 	for _, enabled := range rules {
 		result.FindingsByRule[enabled.Name] = 0
 	}
 	generated := generatedFiles(analyzed)
+	copies := copiedFiles(analyzed)
 	seenFindings := map[findingKey]bool{}
 	seenCrashes := map[Crash]bool{}
 	for _, action := range graph.Roots {
@@ -189,6 +198,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			seenFindings[key] = true
 			if actionRule.Origin == rule.OriginHouse && generated[found.File] {
 				result.WithheldAsGenerated[found.Rule]++
+				continue
+			}
+			if actionRule.Origin == rule.OriginHouse && copies[found.File] {
+				result.WithheldAsCopied[found.Rule]++
 				continue
 			}
 			result.Findings = append(result.Findings, found)
@@ -313,6 +326,20 @@ func generatedFiles(analyzed []*packages.Package) map[string]bool {
 		}
 	}
 	return generated
+}
+
+// copiedFiles is every file of the analyzed packages whose header declares it a copy of upstream source, judged,
+// as generatedFiles judges, on the syntax the rules were given.
+func copiedFiles(analyzed []*packages.Package) map[string]bool {
+	copies := map[string]bool{}
+	for _, analyzedPackage := range analyzed {
+		for _, file := range analyzedPackage.Syntax {
+			if copied.IsCopied(file) {
+				copies[analyzedPackage.Fset.PositionFor(file.FileStart, false).Filename] = true
+			}
+		}
+	}
+	return copies
 }
 
 // walk counts the distinct files the rules were given, the syntax trees go/packages parsed from each package's

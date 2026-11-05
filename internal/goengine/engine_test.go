@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/printf"
 
 	"github.com/system-inc/cohere/internal/goengine/contract"
 	"github.com/system-inc/cohere/internal/goengine/rule"
@@ -85,7 +86,7 @@ var panickingRule = rule.Rule{
 }
 
 // everyFileRule is a planted house rule that reports at every file's package clause, so a run shows which files
-// a house rule's findings are written for and which the driver withholds as generated.
+// a house rule's findings are written for and which the driver withholds as generated or copied.
 var everyFileRule = rule.Rule{
 	Name:   rule.Namespace + "consistency-report-every-file",
 	Origin: rule.OriginHouse,
@@ -147,6 +148,16 @@ var generatedFileRules = []rule.Rule{
 	security_no_interpolated_shell_command.Rule,
 	security_no_interpolated_sql_string.Rule,
 }
+
+// copiedFileRules are a planted house rule that reports every file and vet's printf, so the copied-rules-withheld
+// case shows the driver withholding and counting a house finding in a copied file while vet's finding there reports.
+var copiedFileRules = []rule.Rule{everyFileRule, {
+	Name:         rule.Namespace + printf.Analyzer.Name,
+	Origin:       rule.OriginVet,
+	UpstreamName: printf.Analyzer.Name,
+	TypeAware:    true,
+	Analyzer:     printf.Analyzer,
+}}
 
 // limitRule is a planted rule with an option, which reports the value it read, so a run shows the option the
 // settings gave it reached its analyzer.
@@ -225,6 +236,10 @@ var endToEndCases = []endToEndCase{
 	{
 		name: "generated-rules-withheld", exitCode: 0, rules: generatedFileRules,
 		verify: unchanged("generated.go", "generated-rules-withheld"),
+	},
+	{
+		name: "copied-rules-withheld", exitCode: 1, rules: copiedFileRules,
+		verify: unchanged("copied.go", "copied-rules-withheld"),
 	},
 	{name: "options", exitCode: 1, rules: []rule.Rule{limitRule, unconfiguredRule}},
 	{name: "option-unknown", exitCode: 2, rules: []rule.Rule{limitRule}},

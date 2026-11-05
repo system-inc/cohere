@@ -35,7 +35,7 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
-	KindLint: {"withheldBySuppression", "withheldAsGenerated"},
+	KindLint: {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied"},
 }
 
 // dictionaryFields are objects keyed by data (a reason, a rule name) rather than by field names, so their
@@ -49,6 +49,7 @@ var dictionaryFields = map[string]bool{
 	"skipped":               true,
 	"withheldBySuppression": true,
 	"withheldAsGenerated":   true,
+	"withheldAsCopied":      true,
 }
 
 // shape is a JSON object's field names, each with the shape of its value: nil for a value with no fields,
@@ -258,7 +259,8 @@ func populatedRecords() []Record {
 		LintRecord{Findings: 1, RulesRun: 4, FilesWalked: 2, NodesVisited: 640, ElapsedMilliseconds: 12, ReusedFrom: "fix",
 			RulesSilent: []string{"cohere-go/copylock"}, RulesWatchedAndQuiet: 2, Crashes: []Crash{{File: "/project/a.go", Error: "a panic"}},
 			RulesScopedOff: map[string]int{"cohere-go/printf": 1}, RulesNotConfigured: []string{"cohere-go/SA4006"}, ConfigNote: "a note",
-			WithheldBySuppression: map[string]int{"cohere-go/printf": 1}, WithheldAsGenerated: map[string]int{"cohere-go/x": 2}},
+			WithheldBySuppression: map[string]int{"cohere-go/printf": 1}, WithheldAsGenerated: map[string]int{"cohere-go/x": 2},
+			WithheldAsCopied: map[string]int{"cohere-go/y": 3}},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1},
@@ -420,7 +422,7 @@ func TestLintRecordWritesEmptyWithheldCountsAsObjects(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	for _, field := range []string{`"withheldBySuppression":{}`, `"withheldAsGenerated":{}`} {
+	for _, field := range []string{`"withheldBySuppression":{}`, `"withheldAsGenerated":{}`, `"withheldAsCopied":{}`} {
 		if !strings.Contains(output.String(), field) {
 			test.Errorf("an empty lint record wrote %s, want %s in it", output.String(), field)
 		}

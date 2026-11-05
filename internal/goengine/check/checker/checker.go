@@ -1,38 +1,15 @@
-// Copyright 2024 The Go Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// Package checker provides an analysis driver based on the
-// [golang.org/x/tools/go/packages] representation of a set of
-// packages and all their dependencies, as produced by
-// [packages.Load].
+// cohere:copied golang.org/x/tools@v0.50.0 go/analysis/checker/checker.go
+// cohere:until x/tools resolves the TODO(adonovan) in Analyze, "opt: clear
+// them earlier, so we can release large data structures like SSA sooner",
+// and lets a dependency's syntax go. Then this copy goes away and check
+// imports golang.org/x/tools/go/analysis/checker again.
 //
-// It is the core of multichecker (the multi-analyzer driver),
-// singlechecker (the single-analyzer driver often used to provide a
-// convenient command alongside each analyzer), and analysistest, the
-// test driver.
-//
-// By contrast, the 'go vet' command is based on unitchecker, an
-// analysis driver that uses separate analysis--analogous to separate
-// compilation--with file-based intermediate results. Like separate
-// compilation, it is more scalable, especially for incremental
-// analysis of large code bases. Commands based on multichecker and
-// singlechecker are capable of detecting when they are being invoked
-// by "go vet -vettool=exe" and instead dispatching to unitchecker.
-//
-// Programs built using this package will, in general, not be usable
-// in that way. This package is intended only for use in applications
-// that invoke the analysis driver as a subroutine, and need to insert
-// additional steps before or after the analysis.
-//
-// See the Example of how to build a complete analysis driver program.
-//
-// cohere: this file is a copy of golang.org/x/tools@v0.50.0's
-// go/analysis/checker/checker.go, the version cohere links. go.mod pins
+// cohere: v0.50.0 is the version cohere links. go.mod pins
 // v0.49.0, but that is not what links: go.work's TypeScript/tsc
 // requires v0.50.0, and minimal version selection takes it. Diff this
 // file against that upstream path to bump it; every change is marked
-// "cohere:".
+// "cohere:", and a test in internal/goengine/copied holds every other
+// line to upstream's, byte for byte.
 //
 // The changes are three.
 //
@@ -77,21 +54,45 @@
 // Peak RSS is the cap's either way, about 5.6 GB, since with collection
 // off the heap grows to the limit before the first cycle.
 //
-// When x/tools resolves that TODO and lets a dependency's syntax go, this
-// copy goes away and check imports golang.org/x/tools/go/analysis/checker
-// again.
-//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gave analysistest access to Action.pass, through
 //     go/analysis/internal, is dropped; nothing here uses analysistest.
 //   - The helpers from internal/analysis/driverutil that this file
 //     calls (ReadFileFunc, CheckedReadFile, ResolveURL, ValidateFixes)
-//     are copied unchanged into driverutil.go beside it.
+//     are copied unchanged into the driverutil package beside it, one
+//     file to each upstream file, so here only its import path differs.
 //   - codeFact's type assertion is the comma-ok form, as cohere's own
 //     rules require of the code they check.
-//   - Graph and its All method are in graph.go, unchanged, since the
-//     house keeps one type with methods to a file.
+
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package checker provides an analysis driver based on the
+// [golang.org/x/tools/go/packages] representation of a set of
+// packages and all their dependencies, as produced by
+// [packages.Load].
+//
+// It is the core of multichecker (the multi-analyzer driver),
+// singlechecker (the single-analyzer driver often used to provide a
+// convenient command alongside each analyzer), and analysistest, the
+// test driver.
+//
+// By contrast, the 'go vet' command is based on unitchecker, an
+// analysis driver that uses separate analysis--analogous to separate
+// compilation--with file-based intermediate results. Like separate
+// compilation, it is more scalable, especially for incremental
+// analysis of large code bases. Commands based on multichecker and
+// singlechecker are capable of detecting when they are being invoked
+// by "go vet -vettool=exe" and instead dispatching to unitchecker.
+//
+// Programs built using this package will, in general, not be usable
+// in that way. This package is intended only for use in applications
+// that invoke the analysis driver as a subroutine, and need to insert
+// additional steps before or after the analysis.
+//
+// See the Example of how to build a complete analysis driver program.
 package checker
 
 import (
@@ -100,17 +101,24 @@ import (
 	"fmt"
 	"go/types"
 	"io"
+	"iter"
 	"log"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+	// cohere: atomic counts the readers releaseInputs and releaseSyntax wait on.
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/tools/go/analysis"
+	// cohere: no go/analysis/internal, which only the init dropped below used.
 	"golang.org/x/tools/go/packages"
+
+	// cohere: x/tools' internal/analysis/driverutil, copied beside this file, since
+	// this module cannot import x/tools' internal packages.
+	"github.com/system-inc/cohere/internal/goengine/check/checker/driverutil"
 )
 
 // Options specifies options that control the analysis driver.
@@ -123,7 +131,50 @@ type Options struct {
 	// TODO(adonovan): expose ReadFile so that an Overlay specified
 	// in the [packages.Config] can be communicated via
 	// Pass.ReadFile to each Analyzer.
-	readFile ReadFileFunc
+	readFile driverutil.ReadFileFunc
+}
+
+// Graph holds the results of a round of analysis, including the graph
+// of requested actions (analyzers applied to packages) plus any
+// dependent actions that it was necessary to compute.
+type Graph struct {
+	// Roots contains the roots of the action graph.
+	// Each node (a, p) in the action graph represents the
+	// application of one analyzer a to one package p.
+	// (A node thus corresponds to one analysis.Pass instance.)
+	// Roots holds one action per element of the product
+	// of the analyzers × packages arguments to Analyze,
+	// in unspecified order.
+	//
+	// Each element of Action.Deps represents an edge in the
+	// action graph: a dependency from one action to another.
+	// An edge of the form (a, p) -> (a, p2) indicates that the
+	// analysis of package p requires information ("facts") from
+	// the same analyzer applied to one of p's dependencies, p2.
+	// An edge of the form (a, p) -> (a2, p) indicates that the
+	// analysis of package p requires information ("results")
+	// from a different analyzer a2 applied to the same package.
+	// These two kind of edges are called "vertical" and "horizontal",
+	// respectively.
+	Roots []*Action
+}
+
+// All returns an iterator over the action graph in depth-first postorder.
+//
+// Example:
+//
+//	for act := range graph.All() {
+//		...
+//	}
+func (g *Graph) All() iter.Seq[*Action] {
+	return func(yield func(*Action) bool) {
+		forEach(g.Roots, func(act *Action) error {
+			if !yield(act) {
+				return io.EOF // any error will do
+			}
+			return nil
+		}) // ignore error
+	}
 }
 
 // An Action represents one unit of analysis work by the driver: the
@@ -199,8 +250,8 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 		opts = new(Options)
 	}
 
-	if validateError := analysis.Validate(analyzers); validateError != nil {
-		return nil, validateError
+	if err := analysis.Validate(analyzers); err != nil {
+		return nil, err
 	}
 
 	// Construct the action graph.
@@ -298,6 +349,10 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 
 	return &Graph{Roots: roots}, nil
 }
+
+// cohere: upstream's init, which gave analysistest access to Action.pass
+// through go/analysis/internal, is dropped: this module cannot import x/tools'
+// internal packages, and nothing here uses analysistest.
 
 type objectFactKey struct {
 	obj types.Object
@@ -456,8 +511,8 @@ func (act *Action) execOnce() {
 		ResultOf: inputs,
 		Report: func(d analysis.Diagnostic) {
 			// Assert that SuggestedFixes are well formed.
-			if validateFixesError := ValidateFixes(act.Package.Fset, act.Analyzer, d.SuggestedFixes); validateFixesError != nil {
-				panic(validateFixesError)
+			if err := driverutil.ValidateFixes(act.Package.Fset, act.Analyzer, d.SuggestedFixes); err != nil {
+				panic(err)
 			}
 			act.Diagnostics = append(act.Diagnostics, d)
 		},
@@ -472,7 +527,7 @@ func (act *Action) execOnce() {
 	if act.opts.readFile != nil {
 		readFile = act.opts.readFile
 	}
-	pass.ReadFile = CheckedReadFile(pass, readFile)
+	pass.ReadFile = driverutil.CheckedReadFile(pass, readFile)
 	act.pass = pass
 
 	act.Result, act.Err = func() (any, error) {
@@ -494,9 +549,9 @@ func (act *Action) execOnce() {
 
 		// resolve diagnostic URLs
 		for i := range act.Diagnostics {
-			url, resolveURLError := ResolveURL(act.Analyzer, act.Diagnostics[i])
-			if resolveURLError != nil {
-				return nil, resolveURLError
+			url, err := driverutil.ResolveURL(act.Analyzer, act.Diagnostics[i])
+			if err != nil {
+				return nil, err
 			}
 			act.Diagnostics[i].URL = url
 		}
@@ -571,9 +626,9 @@ func inheritFacts(act, dep *Action) {
 		// Optionally serialize/deserialize fact
 		// to verify that it works across address spaces.
 		if act.opts.SanityCheck {
-			encodedFact, codeFactError := codeFact(fact)
-			if codeFactError != nil {
-				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, codeFactError)
+			encodedFact, err := codeFact(fact)
+			if err != nil {
+				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, err)
 			}
 			fact = encodedFact
 		}
@@ -605,9 +660,9 @@ func inheritFacts(act, dep *Action) {
 		// to verify that it works across address spaces
 		// and is deterministic.
 		if act.opts.SanityCheck {
-			encodedFact, codeFactError := codeFact(fact)
-			if codeFactError != nil {
-				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, codeFactError)
+			encodedFact, err := codeFact(fact)
+			if err != nil {
+				log.Panicf("internal error: encoding of %T fact failed in %v: %v", fact, act, err)
 			}
 			fact = encodedFact
 		}
@@ -626,15 +681,15 @@ func codeFact(fact analysis.Fact) (analysis.Fact, error) {
 	// A real modular driver would emit all facts
 	// into one encoder to improve gob efficiency.
 	var buf bytes.Buffer
-	if encodeError := gob.NewEncoder(&buf).Encode(fact); encodeError != nil {
-		return nil, encodeError
+	if err := gob.NewEncoder(&buf).Encode(fact); err != nil {
+		return nil, err
 	}
 
 	// Encode it twice and assert that we get the same bits.
 	// This helps detect nondeterministic Gob encoding (e.g. of maps).
 	var buf2 bytes.Buffer
-	if encodeError := gob.NewEncoder(&buf2).Encode(fact); encodeError != nil {
-		return nil, encodeError
+	if err := gob.NewEncoder(&buf2).Encode(fact); err != nil {
+		return nil, err
 	}
 	if !bytes.Equal(buf.Bytes(), buf2.Bytes()) {
 		return nil, fmt.Errorf("encoding of %T fact is nondeterministic", fact)
@@ -646,8 +701,8 @@ func codeFact(fact analysis.Fact) (analysis.Fact, error) {
 	if !isFact {
 		return nil, fmt.Errorf("decoding a %T fact: a new value of its type is not a fact", fact)
 	}
-	if decodeError := gob.NewDecoder(&buf).Decode(new); decodeError != nil {
-		return nil, decodeError
+	if err := gob.NewDecoder(&buf).Decode(new); err != nil {
+		return nil, err
 	}
 	return new, nil
 }
