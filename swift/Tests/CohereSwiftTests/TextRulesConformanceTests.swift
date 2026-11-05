@@ -340,6 +340,7 @@ struct TextRulesConformanceTests {
         )
         let rules = RuleRegistry.fileRules(
             vocabulary: try AbbreviationVocabulary.compiledIn(),
+            shoutingVocabulary: try ShoutingVocabulary.compiledIn(),
             configuration: configuration,
         )
         guard let found = rules.first(where: { $0.name == name }) else {

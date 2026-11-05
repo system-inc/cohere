@@ -154,7 +154,26 @@ public struct Pipeline {
                 )
             }
         }
-        let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary, configuration: configuration)
+        /* The shouting rule's words, by the same reasoning: with none, every acronym with a vowel would read as shouting. */
+        var shoutingVocabulary = ShoutingVocabulary()
+        if configuration.severity(of: ConsistencyNoShouting.ruleName) != .off
+            && (options.proposeFixes || options.runLint)
+        {
+            do {
+                shoutingVocabulary = try ShoutingVocabulary.compiledIn()
+            }
+            catch {
+                throw RunFailure(
+                    description:
+                        "the shouting rule's compiled-in words (policy/Shouting.json) could not be loaded, so nothing was checked: \(error)"
+                )
+            }
+        }
+        let fileRules = RuleRegistry.fileRules(
+            vocabulary: vocabulary,
+            shoutingVocabulary: shoutingVocabulary,
+            configuration: configuration,
+        )
 
         let describeStart = Date()
         let (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)

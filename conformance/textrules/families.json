@@ -24,9 +24,7 @@
     "shouting": {
         "typescript": "nexus/consistency-no-shouting",
         "go": "cohere-go/consistency-no-shouting",
-        "swift": {
-            "missing": true
-        }
+        "swift": "cohere-swift/consistency-no-shouting"
     },
     "utils-folder": {
         "typescript": "nexus/consistency-no-utils-folder",

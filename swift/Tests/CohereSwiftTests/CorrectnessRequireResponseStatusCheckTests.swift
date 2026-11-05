@@ -106,7 +106,7 @@ struct CorrectnessRequireResponseStatusCheckTests {
 
     /*
      ahraos-macos `Sources/AhraOs/ProfileImageCache.swift:169` on 2026-10-03, `fetchImage(from:using:)`: the portrait
-     GET, which returns nil on a non-2xx so the caller negative-caches it. `check` is the guard on the cast and its
+     `GET`, which returns nil on a non-2xx so the caller negative-caches it. `check` is the guard on the cast and its
      status; the unchecked version drops it and names the response `_`.
      */
     static func portrait(response: String, check: String) -> String {
@@ -158,7 +158,7 @@ struct CorrectnessRequireResponseStatusCheckTests {
     }
 
     /*
-     ahraos-macos `Sources/AhraOs/AhraOsHttpClient.swift:303` on 2026-10-03, the lifecycle POST: the body is read only
+     ahraos-macos `Sources/AhraOs/AhraOsHttpClient.swift:303` on 2026-10-03, the lifecycle `POST`: the body is read only
      to describe a failure, on the branch the status check opened. `call` is the request's line.
      */
     static func lifecyclePost(_ call: String, check: Bool) -> String {

@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)"
     },
-    "count": 551,
+    "count": 552,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -5725,6 +5725,17 @@
             ]
         },
         {
+            "name": "cohere-swift/consistency-no-shouting",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-shouting"
+            ]
+        },
+        {
             "name": "cohere-swift/consistency-no-stuttering-name",
             "language": "Swift",
             "namespace": "cohere-swift",
@@ -7502,7 +7513,8 @@
                 }
             ],
             "swift": {
-                "verdict": "Port"
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-shouting"
             }
         },
         {

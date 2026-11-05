@@ -242,7 +242,7 @@ struct CorrectnessNoIdenticalBranchesTests {
 
     /*
      macOS `Sources/AhraOsServices/OscParser.swift:402` on 2026-10-03, the one finding on either proving ground: the
-     last two arms of the OSC parameter chain both `reset()`, each with its own comment, so the terminator test
+     last two arms of the `OSC` parameter chain both `reset()`, each with its own comment, so the terminator test
      chooses nothing. Merged into one `else` that keeps both reasons, the chain is silent.
      */
     static func oscParameter(tail: String) -> String {

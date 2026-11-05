@@ -60,6 +60,8 @@ var unreadOptionFields = map[string]string{
 	"abbreviationEntry.Reason":          "why an entry exists, for the vocabulary's editors",
 	"allowedAbbreviatedName.Reason":     "why a name is allowed, for the vocabulary's editors",
 	"allowedAbbreviationSegment.Reason": "why a segment is allowed, for the vocabulary's editors",
+	// The shouting vocabulary is the same kind of file; its groups' reasons are checked present when it loads.
+	"shoutingVocabularyFile.About": "the vocabulary file's own description, for its editors",
 }
 
 // optionField is one struct field reachable from an option decode.

@@ -6,12 +6,6 @@
         "reason": "no TypeScript rule judges the casing of declared names beyond a `const`'s screaming snake case"
     },
     {
-        "engine": "swift",
-        "family": "shouting",
-        "task": "y8whqbe",
-        "reason": "Swift has no shouting rule"
-    },
-    {
         "engine": "typescript",
         "family": "abbreviated-identifier",
         "case": "ab01",
@@ -78,22 +72,6 @@
     {
         "engine": "typescript",
         "family": "shouting",
-        "case": "sh02",
-        "kind": "verdict",
-        "task": "34fejeq",
-        "reason": "reports `SSA`, which its allowlist lacks"
-    },
-    {
-        "engine": "typescript",
-        "family": "shouting",
-        "case": "sh03",
-        "kind": "verdict",
-        "task": "34fejeq",
-        "reason": "reports `WHATWG`, which its allowlist lacks"
-    },
-    {
-        "engine": "typescript",
-        "family": "shouting",
         "case": "sh04",
         "kind": "verdict",
         "task": "34fejeq",
@@ -106,6 +84,14 @@
         "kind": "verdict",
         "task": "34fejeq",
         "reason": "masks each `//` comment alone, so the fence masks nothing and the `MAKE BUILD` line reports"
+    },
+    {
+        "engine": "typescript",
+        "family": "shouting",
+        "case": "sh14",
+        "kind": "verdict",
+        "task": "34fejeq",
+        "reason": "masks each `//` comment alone, so the fence masks nothing and `STOP`, after the stray backtick, reports"
     },
     {
         "engine": "typescript",

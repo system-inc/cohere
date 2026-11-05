@@ -10,7 +10,7 @@ import SwiftSyntax
  URLSession throws only when no response arrives at all. A 401, a 404 or a 500 is a response like any other, so
  its body (an error page, a JSON error envelope) comes back as the data, and code that decodes it, returns it or
  caches it treats the failure as the answer: an error object decoded into a model that happens to accept it, an
- image cache storing a 404 page, a POST reported as saved when the server refused it. The repair casts the
+ image cache storing a 404 page, a `POST` reported as saved when the server refused it. The repair casts the
  response to `HTTPURLResponse` and reads `statusCode` before the body is trusted, and throws or returns the
  failure when it is not a success.
 

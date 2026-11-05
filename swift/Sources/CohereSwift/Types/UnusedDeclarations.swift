@@ -37,7 +37,7 @@ import SwiftSyntax
  `hash(into:)` compare, so removing one nothing names makes two values that differed by it equal; a stored
  property of a type a macro may expand; an instance's stored property whose initializer runs
  code, which may be held for what it does or keeps alive (a subscription, an observer token); a field of a
- struct made only of numbers and SIMD vectors, whose bytes a shader or C may read whole, so an unread field is
+ struct made only of numbers and `SIMD` vectors, whose bytes a shader or C may read whole, so an unread field is
  padding that holds the layout (found on Presence, where LockerBloom's `unused: Int32` pads the constants its
  Metal shader reads); a case of an enum that may be reached through its conformances or raw values
  (`CaseIterable`, `init(rawValue:)`).
@@ -474,7 +474,7 @@ struct UnusedDeclarations {
             /* A public enum, whose cases are public without saying so. */
             var casesPublic = false
             var typeName: String?
-            /* A struct whose stored properties are all plain numbers or SIMD vectors: its bytes may be its meaning. */
+            /* A struct whose stored properties are all plain numbers or `SIMD` vectors: its bytes may be its meaning. */
             var isLayout = false
             var conformances: Set<String> = []
             var attributes: Set<String> = []
@@ -828,7 +828,7 @@ struct UnusedDeclarations {
 
         /*
          A struct made only of numbers: every instance stored property is typed as an integer, a float, a `Bool` or a
-         SIMD vector or matrix, or untyped and given a number. Such a struct is how Swift spells a C struct or a
+         `SIMD` vector or matrix, or untyped and given a number. Such a struct is how Swift spells a C struct or a
          shader's constants, and its fields are read by offset, not by name.
          */
         static func isLayout(_ structure: StructDeclSyntax) -> Bool {
@@ -862,7 +862,7 @@ struct UnusedDeclarations {
             "CGFloat", "Bool",
         ]
 
-        /* SIMD vectors and the simd module's vector and matrix types, by how their names begin: `SIMD4<Float>`, `simd_float4x4`. */
+        /* `SIMD` vectors and the simd module's vector and matrix types, by how their names begin: `SIMD4<Float>`, `simd_float4x4`. */
         static let numericGenerics = ["SIMD2<", "SIMD3<", "SIMD4<", "SIMD8<", "SIMD16<", "simd_", "matrix_", "packed_"]
 
         /* A value that runs no code of anyone's to make: a literal, a collection of them, a member like `.zero`. */

@@ -10,9 +10,10 @@
 
 ## What it checks
 
-An uppercase token in a comment is shouting unless it is on the safe list (`allowedUppercaseTokens`
-plus the `ISO` 4217 currency codes), carries a digit or an underscore, is a two-letter abbreviation,
-or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
+An uppercase token in a comment is shouting unless it is on the safe list (`policy/Shouting.json`'s
+allowed groups: acronyms, file names and the `ISO` 4217 currency codes, the one list Swift's
+`cohere-swift/consistency-no-shouting` reads too), carries a digit or an underscore, is a two-letter
+abbreviation, or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
 tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 
 Kirk's ruling on the 2026-10-01 review: all caps belongs in backticks, single quotes or double quotes
