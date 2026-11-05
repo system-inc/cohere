@@ -317,30 +317,6 @@
     },
     {
         "engine": "swift",
-        "family": "long-file",
-        "case": "lf01",
-        "kind": "span",
-        "task": "7aa7d3y",
-        "reason": "reports at 1:1 with zero width rather than from line 2001 to the end"
-    },
-    {
-        "engine": "swift",
-        "family": "long-file",
-        "case": "lf03",
-        "kind": "verdict",
-        "task": "7aa7d3y",
-        "reason": "silent, since it ends a line only at a line feed and not at a lone carriage return"
-    },
-    {
-        "engine": "swift",
-        "family": "long-file",
-        "case": "lf05",
-        "kind": "span",
-        "task": "7aa7d3y",
-        "reason": "reports at 1:1 with zero width rather than from line 11 to the end"
-    },
-    {
-        "engine": "swift",
         "family": "utils-folder",
         "case": "uf02",
         "kind": "verdict",
