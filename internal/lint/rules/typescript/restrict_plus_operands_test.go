@@ -1616,21 +1616,29 @@ func TestRestrictPlusOperandsDecoder(test *testing.T) {
 		// came off the wire.
 		const source = "let foo = '1' + 1;"
 
-		permissive := decode(test, `{}`)
-		strict := decode(test, `{"allowNumberAndString": false}`)
-		if permissive.allowNumberAndString == strict.allowNumberAndString {
+		// The rule is handed exactly what the decoder returned, never a struct built here, so a decoder that
+		// dropped the field would leave both runs clean and fail this.
+		decodeOptions := func(raw string) RestrictPlusOperandsOptions {
+			decoded, decodeError := rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()(json.RawMessage(raw))
+			if decodeError != nil {
+				test.Fatalf("decoding %s: %v", raw, decodeError)
+			}
+			return decoded
+		}
+		permissive := decodeOptions(`{}`)
+		strict := decodeOptions(`{"allowNumberAndString": false}`)
+		if restrictPlusOperandsSettingsFrom(rule.Configured(permissive)).allowNumberAndString ==
+			restrictPlusOperandsSettingsFrom(rule.Configured(strict)).allowNumberAndString {
 			test.Fatal("the two configurations decode the same, so this proves nothing")
 		}
 
 		rule_testing.ExpectClean(
 			test,
-			rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, source,
-				RestrictPlusOperandsOptions{}),
+			rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, source, permissive),
 		)
 		rule_testing.ExpectFindings(
 			test,
-			rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, source,
-				RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
+			rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile, source, strict),
 			"mismatched",
 		)
 	})
