@@ -37,6 +37,7 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	if startError := run.Start(); startError != nil {
 		test.Fatal(startError)
 	}
+	// Ignored: a run already ended, as the test means it to, is what the kill asks for.
 	defer run.Process.Kill()
 
 	readPID := func(path string) int {
@@ -80,6 +81,7 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 		if syscall.Kill(pid, 0) == nil {
+			// Ignored: a process gone by now is what the kill asks for, and the test fails below either way.
 			_ = syscall.Kill(pid, syscall.SIGKILL)
 			test.Errorf("the %s (pid %d) outlived the terminated run", name, pid)
 		}

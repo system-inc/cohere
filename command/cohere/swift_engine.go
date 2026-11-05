@@ -9,6 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // swiftFlags are the flags a Swift run takes. The pass-through switches are the ones the Swift engine reads
@@ -48,6 +49,9 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 
 	// Building the engine is a step the launcher's progress shows: in full under --verbose, otherwise one
 	// line on a terminal, cleared before the report (#ytqqv8v).
+	// The progress writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(given["verbose"] && flagValue("verbose") == "true")
 	binaryPath, sourceCommit, err := resolveSwiftEngineBinary(location, release.Current())
 	dispatch.Report.Clear()
@@ -55,7 +59,7 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 		return 1, err
 	}
 
-	run := newEngineRun(os.Stdout, mode, swiftLanguage, location.rootNote(), processStart)
+	run := newEngineRun(streams.Output, mode, swiftLanguage, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.engineSourceCommit = sourceCommit
 	run.requested = engineRequestedPhases(given, flagValue)
@@ -94,7 +98,7 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		if !isRegularFile(named) {
 			return "", "", fmt.Errorf("%s names %s, which is not a file, so nothing was checked", dispatch.SwiftEngineOverrideVariable, named)
 		}
-		fmt.Fprintf(os.Stderr, "cohere: running the Swift engine %s named by %s, not one built from the sources on disk\n",
+		fmt.Fprintf(streams.Errors, "cohere: running the Swift engine %s named by %s, not one built from the sources on disk\n",
 			named, dispatch.SwiftEngineOverrideVariable)
 		return named, "", nil
 	}

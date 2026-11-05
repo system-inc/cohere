@@ -78,7 +78,11 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
 	if output := formatting(); isRunCacheReplay(output) {
 		test.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict whose walk never saw it:\n%s", output)
 	}
-	if contents, _ := os.ReadFile(late); string(contents) == unformatted {
+	contents, readError := os.ReadFile(late)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if string(contents) == unformatted {
 		test.Errorf("the file created after discovery's listing was never formatted:\n%s", contents)
 	}
 }

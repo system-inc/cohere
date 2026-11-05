@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,10 @@ import (
 // was correct, and the sentence they composed was wrong. A fragment check cannot see that.
 func render(report *pipelineReport) string {
 	builder := &strings.Builder{}
-	report.Write(builder)
+	stream := bufio.NewWriter(builder)
+	report.Write(stream)
+	// Ignored: a stream over a strings.Builder cannot fail to flush, since the builder's writes never do.
+	_ = stream.Flush()
 	return builder.String()
 }
 
@@ -345,13 +349,17 @@ func TestProvenanceWarningFiresOnlyOnAModifiedTree(test *testing.T) {
 	report := &pipelineReport{}
 
 	modified := &strings.Builder{}
-	report.writeProvenanceWarning(modified, true)
+	modifiedStream := bufio.NewWriter(modified)
+	report.writeProvenanceWarning(modifiedStream, true)
+	flushStream(test, modifiedStream)
 	if !strings.Contains(modified.String(), "no commit reproduces these findings") {
 		test.Errorf("a modified tree should disclose itself: %q", modified.String())
 	}
 
 	clean := &strings.Builder{}
-	report.writeProvenanceWarning(clean, false)
+	cleanStream := bufio.NewWriter(clean)
+	report.writeProvenanceWarning(cleanStream, false)
+	flushStream(test, cleanStream)
 	if clean.String() != "" {
 		test.Errorf("a clean build should say nothing: %q", clean.String())
 	}

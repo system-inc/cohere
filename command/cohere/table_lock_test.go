@@ -160,6 +160,8 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 		default:
 		}
 		release, _ := holdTableReadLock(directory, 10*time.Second)
+		// Ignored: a table not read, before the first write or for any other reason, holds neither file and is
+		// skipped below, and a reader that never reads fails the test on its count of reads.
 		table, _ := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{"--no-fix"}, Findings: true}, program.PathAnchor{})
 		release()
 		run := table.Runs["--no-fix"]

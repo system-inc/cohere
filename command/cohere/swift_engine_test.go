@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -31,8 +32,10 @@ func runFakeSwiftEngine(test *testing.T, body string, mode engineMode) (string, 
 	test.Helper()
 	var out bytes.Buffer
 	var standardError bytes.Buffer
-	run := newEngineRun(&out, mode, swiftLanguage, "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, mode, swiftLanguage, "", time.Now())
 	exitCode, runEngineBinaryError := runEngineBinary(fakeSwiftEngine(test, body), []string{"--contract", "1"}, run, &standardError)
+	flushStream(test, stream)
 	return out.String(), standardError.String(), exitCode, runEngineBinaryError
 }
 
@@ -129,7 +132,8 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 		interrupts := make(chan os.Signal, 1)
 		var out bytes.Buffer
 		var standardError bytes.Buffer
-		run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
 		go func() {
 			waitForFile(test, childFile)
 			interrupts <- syscall.SIGTERM
@@ -138,6 +142,7 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 		exitCode, runEngineBinaryUntilError := runEngineBinaryUntil(
 			fakeSwiftEngine(test, "sleep 30 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait"),
 			[]string{"--contract", "1"}, run, &standardError, interrupts)
+		flushStream(test, stream)
 		if runEngineBinaryUntilError == nil || exitCode != 1 || !strings.Contains(runEngineBinaryUntilError.Error(), "was killed by") {
 			test.Fatalf("an engine signalled through cohere exited %d, err %v\n%s", exitCode, runEngineBinaryUntilError, out.String())
 		}
@@ -176,6 +181,7 @@ func requireProcessEnded(test *testing.T, path string) {
 			return
 		}
 	}
+	// Ignored: a child gone by now is what the kill asks for, and the test fails below either way.
 	_ = syscall.Kill(child, syscall.SIGKILL)
 	test.Errorf("the engine's child %d outlived it", child)
 }

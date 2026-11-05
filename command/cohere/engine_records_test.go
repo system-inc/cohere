@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -42,14 +43,17 @@ func renderRecordsIn(
 ) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
-	run := newEngineRun(&out, mode, language, "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, mode, language, "", time.Now())
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
 			run.writeUnfinished(language.theEngine() + " broke its contract")
+			flushStream(test, stream)
 			return out.String(), 1, &recordError{index: index, err: acceptError}
 		}
 	}
 	exitCode, finishError := run.finish(engineExit, "exited "+string(rune('0'+engineExit)))
+	flushStream(test, stream)
 	return out.String(), exitCode, finishError
 }
 
@@ -127,13 +131,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("FindingsWithCoverage", func(test *testing.T) {
 		var out bytes.Buffer
-		run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
 		run.details = true
 		for _, line := range contractFixture(test, "Findings.jsonl") {
 			if acceptError := run.accept([]byte(line)); acceptError != nil {
 				test.Fatal(acceptError)
 			}
 		}
+		flushStream(test, stream)
 		output := out.String()
 		requireLines(test, output,
 			"  listened to no files (1): nothing gave it a file, or it declined every one",
@@ -455,7 +461,11 @@ func TestSwiftEngineArguments(test *testing.T) {
 		test.Errorf("arguments %q mode %s, want %q", strings.Join(arguments, " "), mode, want)
 	}
 
-	_, mode, _ = engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"rules": true}, value, nil)
+	_, mode, rulesError := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"rules": true}, value,
+		nil)
+	if rulesError != nil {
+		test.Fatal(rulesError)
+	}
 	if mode != engineModeRules {
 		test.Errorf("--rules ran in mode %s", mode)
 	}
@@ -568,12 +578,14 @@ func TestEngineRunLabelsAGoCompilerFindingGo(test *testing.T) {
 	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
 
 	var out bytes.Buffer
-	run := newEngineRun(&out, engineModeCheck, goLanguage("module"), "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, engineModeCheck, goLanguage("module"), "", time.Now())
 	record := &engineFindingRecord{Source: "compiler", File: "internal/thing/thing.go", Line: 3, Column: 7,
 		Severity: "error", Message: "undefined: missing"}
 	if acceptFindingError := run.acceptFinding(record); acceptFindingError != nil {
 		test.Fatal(acceptFindingError)
 	}
+	flushStream(test, stream)
 	if want := "internal/thing/thing.go:3:7 error go undefined: missing\n"; out.String() != want {
 		test.Errorf("finding:\n got  %q\n want %q", out.String(), want)
 	}
@@ -588,7 +600,8 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 
 	render := func(provenanceLine string, sourceCommit string) string {
 		var out bytes.Buffer
-		run := newEngineRun(&out, engineModeVersion, goLanguage("module"), "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeVersion, goLanguage("module"), "", time.Now())
 		run.engineSourceCommit = sourceCommit
 		if acceptError := run.accept([]byte(provenanceLine)); acceptError != nil {
 			test.Fatal(acceptError)
@@ -596,6 +609,7 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 		if _, finishError := run.finish(0, "exited 0"); finishError != nil {
 			test.Fatal(finishError)
 		}
+		flushStream(test, stream)
 		return out.String()
 	}
 

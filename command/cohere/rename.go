@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/rename"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -53,12 +54,15 @@ func runRenameVerb(arguments []string) error {
 	singleThreaded := flags.Bool("single-threaded", false, "use one checker instead of several")
 	write := flags.Bool("write", false, "apply the rename; without it nothing is written")
 	dryRun := flags.Bool("dry-run", false, "print the plan and write nothing (the default; accepted so it can be stated explicitly)")
+	// The flag set's own lines, its defaults and a refused flag, go through the stream its usage does, so they
+	// arrive in the order they were written.
+	flags.SetOutput(streams.Errors)
 	flags.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: cohere %s <file>:<line>:<column> <newName>\n", renameVerbName)
-		fmt.Fprintf(os.Stderr, "       cohere %s <name> <newName>\n\n", renameVerbName)
-		fmt.Fprintf(os.Stderr, "Renames a symbol everywhere the type graph says it is used.\n")
-		fmt.Fprintf(os.Stderr, "The position form is primary; a bare name is refused when it is ambiguous.\n")
-		fmt.Fprintf(os.Stderr, "Nothing is written without --write.\n\n")
+		fmt.Fprintf(streams.Errors, "usage: cohere %s <file>:<line>:<column> <newName>\n", renameVerbName)
+		fmt.Fprintf(streams.Errors, "       cohere %s <name> <newName>\n\n", renameVerbName)
+		fmt.Fprintf(streams.Errors, "Renames a symbol everywhere the type graph says it is used.\n")
+		fmt.Fprintf(streams.Errors, "The position form is primary; a bare name is refused when it is ambiguous.\n")
+		fmt.Fprintf(streams.Errors, "Nothing is written without --write.\n\n")
 		flags.PrintDefaults()
 	}
 	if parseError := flags.Parse(arguments); parseError != nil {
@@ -121,7 +125,7 @@ func runRenameVerb(arguments []string) error {
 			)
 		}
 		if len(symbols) > 1 {
-			rename.WriteCandidates(os.Stdout, target, candidates)
+			rename.WriteCandidates(streams.Output, target, candidates)
 			return fmt.Errorf("%q is ambiguous, so nothing was renamed", target)
 		}
 		position = rename.Position{
@@ -137,24 +141,25 @@ func runRenameVerb(arguments []string) error {
 	}
 
 	if len(plan.Refusals) > 0 {
-		rename.Write(os.Stdout, plan, false)
+		rename.Write(streams.Output, plan, false)
 		return fmt.Errorf("the rename was refused, so nothing was written")
 	}
 
 	if !*write {
-		rename.Write(os.Stdout, plan, false)
+		rename.Write(streams.Output, plan, false)
 		return nil
 	}
 
 	// Printed before applying, so the record of what was about to happen exists even if the write
 	// fails partway. A summary printed only on success cannot explain a tree that was half-written.
-	rename.Write(os.Stdout, plan, true)
+	rename.Write(streams.Output, plan, true)
+	streams.Show(streams.Output)
 
 	written, err := rename.Apply(plan)
 	if err != nil {
 		return fmt.Errorf("applying the rename: %w", err)
 	}
-	fmt.Printf("\nwrote %d files.\n", written)
+	fmt.Fprintf(streams.Output, "\nwrote %d files.\n", written)
 	return nil
 }
 

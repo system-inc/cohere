@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,7 +16,10 @@ import (
 // details.
 func renderLintReport(report lintReport) string {
 	var out strings.Builder
-	writeLintReport(&out, report)
+	stream := bufio.NewWriter(&out)
+	writeLintReport(stream, report)
+	// Ignored: a stream over a strings.Builder cannot fail to flush, since the builder's writes never do.
+	_ = stream.Flush()
 	return out.String()
 }
 
@@ -317,7 +321,10 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 	// Not parallel: it drives the Swift record stream through renderRecords, whose acceptors set the package-level
 	// activeSummary
 	test.Run("unreadable files", func(test *testing.T) {
-		output, _, _ := renderRecords(test, engineModeCheck, contractFixture(test, "Unreadable.jsonl"), 1)
+		output, _, renderError := renderRecords(test, engineModeCheck, contractFixture(test, "Unreadable.jsonl"), 1)
+		if renderError != nil {
+			test.Fatal(renderError)
+		}
 		requireLines(test, output, "  not checked: /project/Sources/Example/Latin1.swift (could not be read:")
 	})
 
@@ -420,7 +427,9 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 	test.Run("the modified-tree warning", func(test *testing.T) {
 		test.Parallel()
 		var out strings.Builder
-		(&pipelineReport{}).writeProvenanceWarning(&out, true)
+		stream := bufio.NewWriter(&out)
+		(&pipelineReport{}).writeProvenanceWarning(stream, true)
+		flushStream(test, stream)
 		requireLines(test, out.String(), "this binary was built from a modified tree")
 	})
 
@@ -444,7 +453,9 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 			}(),
 		} {
 			var out strings.Builder
-			report.Write(&out)
+			stream := bufio.NewWriter(&out)
+			report.Write(stream)
+			flushStream(test, stream)
 			if !strings.Contains(out.String(), "this run did not check everything") {
 				test.Errorf("%s: no warning:\n%s", name, out.String())
 			}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"strings"
@@ -13,14 +14,17 @@ import (
 func renderRequested(test *testing.T, lines []string, requested map[phaseName]bool, engineExit int) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
-	run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, engineModeCheck, swiftLanguage, "", time.Now())
 	run.requested = requested
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
+			flushStream(test, stream)
 			return out.String(), 1, &recordError{index: index, err: acceptError}
 		}
 	}
 	exitCode, finishError := run.finish(engineExit, "exited")
+	flushStream(test, stream)
 	return out.String(), exitCode, finishError
 }
 

@@ -1,14 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // openReport keeps only findings that actually reached the report, after fixes. Children return
@@ -55,10 +56,13 @@ func launchEditor(paths []string) error {
 	command := exec.Command(editor, append([]string{"--"}, paths...)...)
 	command.Stdout = os.Stderr
 	command.Stderr = os.Stderr
+	// The editor's launcher writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
 	return command.Run()
 }
 
-func (report *openReport) open(out io.Writer, launch func([]string) error) {
+func (report *openReport) open(out *bufio.Writer, launch func([]string) error) {
 	if len(report.Paths) == 0 {
 		if report.Checked && !report.HasFindings {
 			fmt.Fprintln(out, "No findings.")
@@ -83,11 +87,11 @@ func finishOpen() {
 			err = os.WriteFile(path, contents, 0o600)
 		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(fmt.Errorf("returning files to open: %w", err)))
+			fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(fmt.Errorf("returning files to open: %w", err)))
 		}
 		return
 	}
-	report.open(os.Stderr, launchEditor)
+	report.open(streams.Errors, launchEditor)
 }
 
 func readOpenReport(path string) *openReport {

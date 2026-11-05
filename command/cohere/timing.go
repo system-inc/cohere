@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"runtime"
 	"sort"
 	"strings"
@@ -25,7 +25,7 @@ import (
 //
 // Every cost here is the walk threads' own CPU clock (see program.Timings), so a rule that waits costs
 // nothing and the first line says so.
-func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Duration) {
+func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time.Duration) {
 	sorted := timings.Sorted()
 	if len(sorted) == 0 {
 		// A timing table with no rows is the instrument measuring nothing, which must not print as
@@ -103,7 +103,7 @@ func printTimings(out io.Writer, timings *program.Timings, lintDuration time.Dur
 // real ones: `--timing` was 17,000 lines, two thirds of them a single derivation reported one
 // function at a time, each costing 0.00ms and none of them actionable. The family is the label the
 // fill's CPU carries, so the collapse happens where it is measured.
-func printSharedFills(out io.Writer, timings *program.Timings) {
+func printSharedFills(out *bufio.Writer, timings *program.Timings) {
 	shared := timings.SharedCPU()
 	if len(shared) == 0 {
 		return
@@ -125,7 +125,7 @@ func printSharedFills(out io.Writer, timings *program.Timings) {
 //
 // The coverage line already reports a rule that listened to nothing. These are the other two the
 // brief asked for: a rule that listens to everything, and work duplicated across rules.
-func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
+func printTimingNotes(out *bufio.Writer, sorted []program.RuleTiming) {
 	mostOffered := 0
 	for _, timing := range sorted {
 		if timing.NodesOffered > mostOffered {
@@ -269,7 +269,7 @@ func formatMilliseconds(duration time.Duration) string {
 // derivations and the measurement itself are read inside it, and the walk is what of the worker's CPU
 // lay outside every call: a difference between readings of one thread's clock, which holds no waiting.
 // The process's CPU outside the workers is read the same way.
-func printCoverage(out io.Writer, timings *program.Timings) {
+func printCoverage(out *bufio.Writer, timings *program.Timings) {
 	account := timings.Account
 	ruleCPU := timings.TotalCPU()
 	var sharedCPU time.Duration
@@ -307,7 +307,7 @@ func printCoverage(out io.Writer, timings *program.Timings) {
 // loader, and a number for either would be a guess presented as a measurement. What the loads and the
 // disk leave of the program's wall is resolution and the loader's bookkeeping together, and the last
 // line says so.
-func printGraphTiming(out io.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration, checkers int) {
+func printGraphTiming(out *bufio.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration, checkers int) {
 	accounted := contentPackOpened + timing.Config + timing.Program + timing.Verify
 	builds := ""
 	if timing.Builds > 1 {

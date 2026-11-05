@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -339,7 +339,7 @@ func narrowedNote(record phaseRecord) string {
 // run which checked nothing must not be able to print like a run that checked everything and found
 // it clean, and a phase summary that only appears when something went wrong reintroduces exactly
 // that ambiguity for the successful case.
-func (r *pipelineReport) Write(out io.Writer) {
+func (r *pipelineReport) Write(out *bufio.Writer) {
 	parts := make([]string, 0, len(r.records))
 	for _, name := range phaseOrder {
 		for _, record := range r.records {
@@ -366,13 +366,13 @@ func (r *pipelineReport) Write(out io.Writer) {
 		}
 	}
 
-	fmt.Fprintf(invocationOutput(out), "phases: %s\n", strings.Join(parts, " · "))
+	printInvocation(out, "phases: %s\n", strings.Join(parts, " · "))
 
 	r.writeAccounting(out)
 	// Under the same condition as the total: both describe the process, and a report with no process
 	// behind it has neither.
 	if !r.processStart.IsZero() {
-		fmt.Fprintf(invocationOutput(out), "  %s\n", activeMemoryPolicy.line())
+		printInvocation(out, "  %s\n", activeMemoryPolicy.line())
 	}
 
 	// The explicit sentence for the case that matters most. A reader who takes only the last line
@@ -440,7 +440,7 @@ func (r *pipelineReport) Write(out io.Writer) {
 //
 // It prints nothing when the process start was never recorded, because a computed total that is
 // silently measuring from the zero time would be worse than no line at all.
-func (r *pipelineReport) writeAccounting(out io.Writer) {
+func (r *pipelineReport) writeAccounting(out *bufio.Writer) {
 	if r.processStart.IsZero() {
 		return
 	}
@@ -451,7 +451,7 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		graphLabel, graphNotBuiltSentence = r.graphLabel, r.graphNotBuiltSentence
 	}
 	if r.graphNotBuilt {
-		fmt.Fprintf(invocationOutput(out), "  total %s: %s\n", round(total), graphNotBuiltSentence)
+		printInvocation(out, "  total %s: %s\n", round(total), graphNotBuiltSentence)
 		return
 	}
 	if r.graphSkipped {
@@ -461,7 +461,7 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 				phases += record.Elapsed
 			}
 		}
-		fmt.Fprintf(invocationOutput(out), "  total %s: no graph built (formatting reads none), phases %s, %s outside any phase\n",
+		printInvocation(out, "  total %s: no graph built (formatting reads none), phases %s, %s outside any phase\n",
 			round(total), round(phases), round(max(total-phases, 0)))
 		return
 	}
@@ -480,12 +480,12 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 		// The phases run concurrently with each other in places, so a sum can exceed the wall
 		// clock. Reporting a negative remainder would be nonsense; reporting the overlap honestly
 		// is the useful reading.
-		fmt.Fprintf(invocationOutput(out), "  total %s: %s %s plus phases, overlapping by %s\n",
+		printInvocation(out, "  total %s: %s %s plus phases, overlapping by %s\n",
 			round(total), graphLabel, round(r.graph), round(-unaccounted))
 		return
 	}
 
-	fmt.Fprintf(invocationOutput(out), "  total %s: %s %s, phases %s, %s outside any phase\n",
+	printInvocation(out, "  total %s: %s %s, phases %s, %s outside any phase\n",
 		round(total), graphLabel, round(r.graph), round(accounted-r.graph), round(unaccounted))
 }
 
@@ -494,7 +494,7 @@ func (r *pipelineReport) writeAccounting(out io.Writer) {
 // Takes the flag rather than reading it, so a fixture can hold both directions. `Current()` reads
 // stamps the linker wrote, which a test cannot vary, and a test that could only observe the build
 // it happens to run under would assert nothing.
-func (r *pipelineReport) writeProvenanceWarning(out io.Writer, sourceTreeModified bool) {
+func (r *pipelineReport) writeProvenanceWarning(out *bufio.Writer, sourceTreeModified bool) {
 	if !sourceTreeModified {
 		return
 	}

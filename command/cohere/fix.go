@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/suppression"
 	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 )
@@ -200,7 +202,8 @@ func applyProposedFixes(
 		}
 	}
 	reportWithheld(withheld, writable)
-	reportInNestedRepositories(accountOutput(os.Stderr), inNestedRepository)
+	reportInNestedRepositories(accountOutput(streams.Errors), inNestedRepository)
+	showWarning()
 
 	// The file set is the union of "something proposed a fix here" and "this file can be formatted",
 	// and the union rather than the intersection is the whole point. Fixing is driven by findings, so
@@ -311,6 +314,9 @@ func applyProposedFixes(
 	// A speculative result stands for a file only where the parallel pass below would have computed the
 	// same one: no proposal, and the bytes the walk read. The rest are formatted here, as before.
 	speculated := speculation.keepable(byFileName, graph)
+	// A file's stall notice writes to the terminal itself, from a timer of its own, so what this run said first
+	// is delivered first. See watchedFile.
+	streams.Show(streams.Errors)
 	attempts := formatInParallel(fileNames, byFileName, speculated, func(fileName string) (edit.FileResult, error) {
 		return watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
 			return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
@@ -321,6 +327,8 @@ func applyProposedFixes(
 	for index, fileName := range fileNames {
 		fileResult, err := attempts[index].result, attempts[index].err
 		if !attempts[index].done {
+			// Again for each file this loop formats, since a file before it may have failed and said so.
+			streams.Show(streams.Errors)
 			fileResult, err = watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
 				return process(fileName, propose(fileName, serially), transform, maxPasses)
 			})
@@ -328,7 +336,8 @@ func applyProposedFixes(
 		if err != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
-			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(err))
+			fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(err))
+			showWarning()
 
 			// A failure is its own category rather than a flavor of "did not converge". The two send a
 			// reader somewhere different: not-converged means the pass budget ran out with work still
@@ -342,7 +351,8 @@ func applyProposedFixes(
 		results = append(results, fileResult)
 	}
 
-	lineEndings.report(accountOutput(os.Stderr), write)
+	lineEndings.report(accountOutput(streams.Errors), write)
+	showWarning()
 
 	summary := edit.Summarize(results)
 	summary.Checked = !write
@@ -352,11 +362,19 @@ func applyProposedFixes(
 // watchedFile runs one file's fix and format, and names the file on out if it is still running after after.
 // The run goes on: the notice says which file to report, or to leave out, while it is still happening rather
 // than after a wait nobody can explain.
+//
+// The notice is written from the timer's own goroutine, so out is never one of package streams' buffered
+// streams, which only the main goroutine writes: it is the real stderr, unbuffered, and a write to it that
+// fails is reported to package streams, which counts it in the exit code. The caller shows streams.Errors
+// first, so the notice cannot arrive ahead of what was said before it.
 func watchedFile(out io.Writer, after time.Duration, fileName string, process func() (edit.FileResult, error)) (edit.FileResult, error) {
 	notice := time.AfterFunc(after, func() {
-		fmt.Fprintf(out, "cohere: %s is still being fixed and formatted after %s, which no file should take. This is "+
-			"likely a bug in cohere, not in your code: please report it at %s with the output of `cohere --version` "+
-			"and the file.\n", fileName, after, reportBugsAt)
+		_, writeError := fmt.Fprintf(out, "cohere: %s is still being fixed and formatted after %s, which no file "+
+			"should take. This is likely a bug in cohere, not in your code: please report it at %s with the output "+
+			"of `cohere --version` and the file.\n", fileName, after, reportBugsAt)
+		if writeError != nil {
+			streams.Report(fmt.Errorf("saying which file the fix phase is stuck on: %w", writeError))
+		}
 	})
 	defer notice.Stop()
 	return process()
@@ -445,7 +463,7 @@ func formatInParallel(fileNames []string, byFileName map[string][]edit.Proposal,
 // A file that arrived with CRLF says so, with the .gitattributes line that stops git writing it that way:
 // the run's CRLF note prints only under --verbose, and without the cause a fresh Windows checkout reads
 // as a tree of unformatted files (#dr78rt8).
-func printWouldChange(out io.Writer, changed []edit.ChangedFile, lineEndings *crlfFiles) {
+func printWouldChange(out *bufio.Writer, changed []edit.ChangedFile, lineEndings *crlfFiles) {
 	for _, file := range changed {
 		message := "--fix would rewrite this file: " + strings.Join(file.Changers, ", ")
 		if lineEndings.has(file.FileName) {
@@ -491,9 +509,10 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 	if len(names) == 1 {
 		verb = "was"
 	}
-	fmt.Fprintf(accountOutput(os.Stderr),
+	fmt.Fprintf(accountOutput(streams.Errors),
 		"note: %d file%s outside %s had fixable findings and %s not rewritten, because only what was stated is written: %s%s\n",
 		len(names), plural(len(names)), stated, verb, strings.Join(listed, ", "), more)
+	showWarning()
 }
 
 // reportInNestedRepositories says, per repository, how many fixes a whole-tree run did not apply
@@ -502,7 +521,7 @@ func reportWithheld(withheld map[string]struct{}, writable formatScope) {
 //
 // Said every time there are any, because the alternative is the defect this replaces in reverse: a
 // run that quietly leaves fixable findings in place reads as a run that fixed everything it could.
-func reportInNestedRepositories(out io.Writer, fixesByRepository map[string]int) {
+func reportInNestedRepositories(out *bufio.Writer, fixesByRepository map[string]int) {
 	repositories := make([]string, 0, len(fixesByRepository))
 	for repository := range fixesByRepository {
 		repositories = append(repositories, repository)

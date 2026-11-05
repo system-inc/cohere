@@ -222,6 +222,8 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, err
 	}
 	fromRepository := func(relative string) string {
+		// Ignored: repository is root or a directory above it, both absolute, and Rel fails only between paths
+		// with no relative way from one to the other.
 		inRepository, _ := filepath.Rel(repository, filepath.Join(root, relative))
 		inRepository = filepath.ToSlash(inRepository)
 		if inRepository == "." {

@@ -21,12 +21,14 @@ func holdTableLock(directory string) func() {
 		return func() { /* No lock was taken, so there is nothing to release. */ }
 	}
 	if flockError := syscall.Flock(int(file.Fd()), syscall.LOCK_EX); flockError != nil {
-		file.Close()
+		_ = file.Close() // Ignored: never written, and never locked.
 		return func() { /* No lock was taken, so there is nothing to release. */ }
 	}
 	return func() {
-		syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-		file.Close()
+		// Ignored: the lock belongs to the open file, so the close below drops it whether or not the unlock took,
+		// and the process's exit drops it either way.
+		_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+		_ = file.Close() // Ignored: nothing was written through it, and the exit closes it either way.
 	}
 }
 
@@ -47,12 +49,13 @@ func holdTableReadLock(directory string, bound time.Duration) (func(), bool) {
 		flockError := syscall.Flock(int(file.Fd()), syscall.LOCK_SH|syscall.LOCK_NB)
 		if flockError == nil {
 			return func() {
-				syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
-				file.Close()
+				// Ignored: as holdTableLock's release.
+				_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+				_ = file.Close() // Ignored: as holdTableLock's release.
 			}, true
 		}
 		if !errors.Is(flockError, syscall.EWOULDBLOCK) || time.Now().After(deadline) {
-			file.Close()
+			_ = file.Close() // Ignored: opened only to lock, never written, and never locked.
 			return func() { /* No lock was taken, so there is nothing to release. */ }, false
 		}
 		time.Sleep(2 * time.Millisecond)

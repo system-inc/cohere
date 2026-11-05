@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 
@@ -19,7 +19,7 @@ import (
 // Rules that did nothing are printed rather than omitted, which is the whole reason this exists. A
 // rule absent from the output and a rule that looked and found nothing are indistinguishable, and
 // four rules in the gate this tool replaces were silently dead for months underneath exactly that.
-func printExplanation(out io.Writer, explanation *program.Explanation) {
+func printExplanation(out *bufio.Writer, explanation *program.Explanation) {
 	fmt.Fprintf(out, "\nexplain: %s\n", explanation.FileName)
 
 	if explanation.FileIgnored {
