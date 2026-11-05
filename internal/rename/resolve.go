@@ -31,7 +31,8 @@ func resolveAnchor(
 	}
 	if target == nil {
 		return nil, nil, fmt.Errorf(
-			"%s is not in the program — the position must name a file the tsconfig includes",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"%s is not in the program \u2014 the position must name a file the tsconfig includes",
 			at.FileName,
 		)
 	}
@@ -67,7 +68,7 @@ func resolveAnchor(
 				//
 				// An identifier is a leaf token, so two identifier spans can never contain the same
 				// offset. Measured on the fixture rather than argued: 25 identifiers across two
-				// files, and every offset is inside at most one identifier span — zero overlaps. The
+				// files, and every offset is inside at most one identifier span (zero overlaps). The
 				// intuition that `value.toUpperCase()` nests is about the enclosing property-access
 				// expression, which this walk never records because it only looks at identifiers.
 				//
@@ -84,7 +85,9 @@ func resolveAnchor(
 
 	if found == nil {
 		return nil, nil, fmt.Errorf(
-			"no identifier at %s:%d:%d — the position must point at a name, not at whitespace, a keyword, or a string",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"no identifier at %s:%d:%d \u2014 the position must point at a name, not at whitespace, a keyword, "+
+				"or a string",
 			at.FileName, at.Line, at.Column,
 		)
 	}
@@ -158,7 +161,7 @@ func ResolveBareName(
 				symbol := fileChecker.GetSymbolAtLocation(node)
 				// An import specifier declares a local binding whose target lives elsewhere. Both
 				// are legitimate rename anchors and they are different acts, so the alias is not
-				// followed here — otherwise an imported name and its export would collapse into one
+				// followed here. Otherwise an imported name and its export would collapse into one
 				// candidate and the ambiguity the user needs to see would be hidden.
 				if symbol != nil && !seen[symbol] {
 					seen[symbol] = true

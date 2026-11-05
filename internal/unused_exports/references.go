@@ -61,8 +61,8 @@ type Report struct {
 	// depend on the root set being complete.
 	Islands []Island
 
-	// DeclarationsAnalyzed is the closure's population — every declaration, not only the exported
-	// ones — printed for the same reason as the others: a cluster count with no denominator cannot be
+	// DeclarationsAnalyzed is the closure's population (every declaration, not only the exported
+	// ones), printed for the same reason as the others: a cluster count with no denominator cannot be
 	// told apart from a broken inventory.
 	DeclarationsAnalyzed int
 
@@ -78,7 +78,7 @@ type Report struct {
 //
 // It replaced a plain `map[*ast.Symbol]bool` that recorded only that a symbol was used. The walk is
 // identical and costs the same; what changed is what it stores. Recording the edge is what makes
-// the transitive question answerable, and the transitive question is the one that finds an island —
+// the transitive question answerable, and the transitive question is the one that finds an island:
 // an abandoned export plus the private world that existed only to serve it.
 type referenceIndex struct {
 	// referencedBy maps a symbol to the declarations that reference it. A symbol present with an
@@ -92,7 +92,7 @@ type referenceIndex struct {
 }
 
 // record adds one edge. A nil `from` means the reference sits at module top level, which is a root
-// and not an absent referrer — the distinction the whole closure turns on.
+// and not an absent referrer: the distinction the whole closure turns on.
 func (index *referenceIndex) record(to *ast.Symbol, from *ast.Symbol) {
 	index.referenced[to] = true
 	index.referencedBy[to] = append(index.referencedBy[to], from)
@@ -121,7 +121,7 @@ func (index *referenceIndex) record(to *ast.Symbol, from *ast.Symbol) {
 //	             That is the answer this analysis wants: if the class is dead its decorator's
 //	             reference should die with it, rather than escaping to module level as a root.
 //	default      `export default function defaultFn()` attributes to `defaultFn`. The anonymous
-//	exports      `export default arrow` form lands on the ExportAssignment, which has no name — see
+//	exports      `export default arrow` form lands on the ExportAssignment, which has no name. See
 //	             `symbolOfDeclaration` for why that case still resolves.
 //
 // Returning nil at `KindSourceFile` rather than falling out of the loop is deliberate: a module-top
@@ -156,7 +156,7 @@ func enclosingDeclarationNode(node *ast.Node) *ast.Node {
 // # Why this is not a second GetSymbolAtLocation
 //
 // The checker call is the expensive primitive in this phase, and resolving "who is doing the
-// referencing" the obvious way — walk to the enclosing declaration, take its name, ask the checker —
+// referencing" the obvious way (walk to the enclosing declaration, take its name, ask the checker)
 // roughly doubles how many are made. `node.Symbol()` is populated by the binder when the program is
 // built, which is exactly the situation this phase runs in, so the answer is already sitting on the
 // node.
@@ -193,7 +193,7 @@ func symbolOfDeclaration(node *ast.Node) *ast.Symbol {
 // rather than one file, and there is no cheaper tier that is correct: name matching cannot tell an
 // unused `Button` from a used one in another file, and per-file symbol comparison cannot answer a
 // whole-program question at all. The cost the rule comment refuses to hide behind an import is
-// stated here instead — this is a phase, run when asked for, not a rule that every file pays for.
+// stated here instead: this is a phase, run when asked for, not a rule that every file pays for.
 //
 // # What the index is keyed on
 //
@@ -218,7 +218,7 @@ func FindUnreferenced(
 	// Pass one: every symbol that anything anywhere refers to, and who refers to it.
 	//
 	// Built from identifier positions rather than from import statements, because a reference is a
-	// use wherever it appears — a call, a type position, a JSX tag, a re-export — and enumerating the
+	// use wherever it appears (a call, a type position, a JSX tag, a re-export), and enumerating the
 	// forms would miss whichever one nobody thought of. Resolving every identifier is more work and
 	// it cannot have that class of gap.
 	//
@@ -243,7 +243,7 @@ func FindUnreferenced(
 			}
 			if node.Kind == ast.KindIdentifier {
 				// A declaration's own name is not a use of it. Without this the index marks
-				// everything referenced and the report finds nothing — the exact broken-probe shape
+				// everything referenced and the report finds nothing: the exact broken-probe shape
 				// that reads as a clean codebase.
 				if !isDeclarationName(node) {
 					if symbol := checker.GetSymbolAtLocation(node); symbol != nil {

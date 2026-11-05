@@ -35,7 +35,9 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 	}
 	if anchor == nil {
 		return nil, fmt.Errorf(
-			"no symbol at %s:%d:%d — check the position names an identifier, and that the file is in the program",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"no symbol at %s:%d:%d \u2014 check the position names an identifier, and that the file is in the "+
+				"program",
 			at.FileName, at.Line, at.Column,
 		)
 	}
@@ -55,7 +57,7 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 	// cursor on a local binding and gets a local rename.
 	//
 	// The consequence is stated rather than hidden. Renaming the local half of `import { err }`
-	// produces `import { err as error }`, which this does not yet write — see the refusal below.
+	// produces `import { err as error }`, which this does not yet write. See the refusal below.
 	inProject := projectFileNames(files)
 	declarationFile, declarationLine, declarationRefusal := describeDeclaration(anchor, inProject)
 	plan.DeclarationFile = declarationFile
@@ -69,7 +71,7 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 
 	// The new name being taken in a scope the rename reaches is a collision, and a collision is a
 	// refusal rather than something to write and let the type phase find. A rename that produces a
-	// duplicate binding may still compile — a shadowing collision does — so this cannot be left to a
+	// duplicate binding may still compile (a shadowing collision does), so this cannot be left to a
 	// downstream check.
 	if collision := findCollision(ctx, graph, files, anchor, newName, plan); collision != "" {
 		plan.Refusals = append(plan.Refusals, collision)
@@ -100,7 +102,7 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 // heuristic: `ProjectFiles` is already the distinction between our code and the declarations the
 // compiler pulled in, measured at roughly 3,400 files out of 9,530 on the ahra tree. A path check
 // for `node_modules` would have been the obvious implementation and would be wrong in both
-// directions — it would miss a linked dependency outside that directory, and it would refuse a
+// directions: it would miss a linked dependency outside that directory, and it would refuse a
 // legitimately vendored path that happens to contain the string.
 func projectFileNames(files []*ast.SourceFile) map[string]bool {
 	names := make(map[string]bool, len(files))
@@ -137,7 +139,9 @@ func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string,
 		}
 		if !inProject[fileName.AsString()] {
 			return firstFile, firstLine, fmt.Sprintf(
-				"%s is declared outside this project, at %s:%d — renaming a declaration we do not own would break every other consumer of that package",
+				// The dash is written as its escape, the same bytes, so the refusal reads as it always has.
+				"%s is declared outside this project, at %s:%d \u2014 renaming a declaration we do not own "+
+					"would break every other consumer of that package",
 				symbol.Name, fileName, line,
 			)
 		}
@@ -191,8 +195,8 @@ func collectEdits(ctx context.Context, graph *program.Graph, files []*ast.Source
 //
 // The name filter above this is an optimization and not the decision: only symbol identity decides,
 // so a same-named identifier bound to something else is declined here rather than being renamed by
-// coincidence. That is the trap the brief calls out for declaration-anchor rules — identity alone
-// over-reports and name matching under-discriminates — and the shadowing fixture pins it.
+// coincidence. That is the trap the brief calls out for declaration-anchor rules (identity alone
+// over-reports and name matching under-discriminates), and the shadowing fixture pins it.
 func editFor(
 	fileChecker *checker.Checker,
 	file *ast.SourceFile,
@@ -266,7 +270,7 @@ func editFor(
 	// The source half is classified here rather than inside the alias branch above, and the
 	// difference is not cosmetic. In `import { err as failure }` the `err` half resolves through
 	// `GetSymbolAtLocation` directly to the anchor, so `matched` is already true and the alias branch
-	// never runs — which left the source half labelled an ordinary reference. The bytes were right
+	// never runs, which left the source half labelled an ordinary reference. The bytes were right
 	// and the preview was wrong, and since the preview is the whole safety mechanism of this verb, a
 	// preview that misdescribes what it is about to do is a real defect. Caught by a fixture
 	// asserting the kind rather than the count.
@@ -339,7 +343,7 @@ func isOwnDeclarationName(node *ast.Node) bool {
 // The check is deliberately over-eager and says so in its message: it asks whether any file this
 // rename touches already contains a binding declared with the new name. That will refuse some
 // renames that would have been fine, because a binding in an unrelated function of the same file
-// cannot actually collide. The asymmetry is the point — a false refusal costs the user a message
+// cannot actually collide. The asymmetry is the point: a false refusal costs the user a message
 // they can read and work around, while a missed collision produces either a duplicate binding or a
 // silent shadow, and a silent shadow compiles. Refusing loudly beats guessing, which is the line
 // this codebase already holds elsewhere.
@@ -377,7 +381,10 @@ func findCollision(
 				if existing != nil && existing != anchor {
 					line, column := lineColumnOf(text, tokenSpan(file, node).Pos())
 					found = fmt.Sprintf(
-						"%s is already declared at %s:%d:%d, and this rename writes into that file — renaming into a name that is taken produces a duplicate binding or a silent shadow, and a silent shadow compiles",
+						// The dash is written as its escape, the same bytes, so the refusal reads as it always has.
+						"%s is already declared at %s:%d:%d, and this rename writes into that file \u2014 "+
+							"renaming into a name that is taken produces a duplicate binding or a silent shadow, "+
+							"and a silent shadow compiles",
 						newName, file.FileName(), line, column,
 					)
 				}
@@ -399,7 +406,7 @@ func findCollision(
 // This does not decide anything and it does not block the rename. It exists so the user is told
 // what the tool could not answer, because the alternative is a completeness claim the tool cannot
 // support. `t["err"]` is a property access the checker does not connect to the symbol, and a rename
-// that misses one produces a codebase that compiles and is broken at runtime — which no phase after
+// that misses one produces a codebase that compiles and is broken at runtime, which no phase after
 // this one will catch.
 //
 // Scoped to files the rename touches plus files that mention the name at all, and reported with
@@ -450,7 +457,7 @@ func collectBlindness(files []*ast.SourceFile, plan *Plan) {
 //
 // Distinguished from a real declaration because both satisfy `parent.Name() == node`, measured on
 // the fixture: `import { err }` gives an ImportSpecifier whose Name is `err` and whose PropertyName
-// is nil, so a plain declaration check calls it a declaration. It is not one — the declaration lives
+// is nil, so a plain declaration check calls it a declaration. It is not one: the declaration lives
 // in the other file, and calling it one would tell a reader the symbol is declared in as many
 // places as it is imported.
 func isImportBindingName(node *ast.Node) bool {

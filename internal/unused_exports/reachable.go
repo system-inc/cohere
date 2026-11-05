@@ -28,8 +28,8 @@ type TextSpan struct {
 
 // FindUnreachable reports the statements in one file that control cannot arrive at.
 //
-// It builds one control-flow graph per code path root — the file itself, each function, each class
-// static block, each property initializer — because that is the unit the graph is defined over. A
+// It builds one control-flow graph per code path root (the file itself, each function, each class
+// static block, each property initializer), because that is the unit the graph is defined over. A
 // statement is reported when it is laid out in a block whose Reachable is false.
 //
 // # Why this leans on the graph rather than pattern-matching a `return`
@@ -44,7 +44,7 @@ type TextSpan struct {
 //
 // `Block.Reachable`'s doc claims code after an abrupt exit is laid out in unreachable blocks rather
 // than dropped, so a consumer's hooks still run there. That claim is the whole basis of this
-// function, and it was probed on this substrate before anything was built on it — after `return`,
+// function, and it was probed on this substrate before anything was built on it: after `return`,
 // after `throw`, after `break`, after `continue`, both-branches-return, and the `do…while` shape the
 // vendoring report flagged as a known deviation. All eight answered as documented.
 func FindUnreachable(sourceFile *ast.SourceFile) []Unreachable {
@@ -84,7 +84,7 @@ func unreachableInRoot(root *ast.Node) []Unreachable {
 	//
 	// # The duplicate-layout trap, measured on this substrate
 	//
-	// The CFG lays a `finally` block out twice — once for normal completion, once for the path that
+	// The CFG lays a `finally` block out twice: once for normal completion, once for the path that
 	// leaves the `try` through `return`, `throw`, or a suspended `yield`. Both copies carry the same
 	// source positions, and the second copy is unreachable exactly when nothing takes the abrupt
 	// path. So `try { return 1; } finally { beta(); }` puts `beta()` in a reachable block and in an
@@ -93,7 +93,7 @@ func unreachableInRoot(root *ast.Node) []Unreachable {
 	//
 	// This was not hypothetical and not caught by reading: it was a live false positive that the
 	// silent-half fixtures caught on the first run. The same shape appears for a `catch` body when
-	// the `try` returns — `try { return 1; } catch (e) { gamma(); } finally {...}` lays `gamma()` out
+	// the `try` returns: `try { return 1; } catch (e) { gamma(); } finally {...}` lays `gamma()` out
 	// unreachable, and that catch is reachable code.
 	//
 	// Keying liveness by source position rather than by block is what makes both correct, because
@@ -141,7 +141,7 @@ func unreachableInRoot(root *ast.Node) []Unreachable {
 			//
 			// Reporting it would be defensible as a literal reading of the graph and wrong as a
 			// report: the reader is told to delete error handling, and the analysis is asserting that
-			// nothing in the `try` can throw — a claim about every callee's behaviour that this
+			// nothing in the `try` can throw, a claim about every callee's behaviour that this
 			// analysis has not established and the graph is explicitly approximating. So catch bodies
 			// are out of scope, stated rather than silently missing, and a genuinely dead `catch` is a
 			// finding this report gives up in exchange for never condemning live error handling.
@@ -195,7 +195,7 @@ func isHoistedVariableStatement(node *ast.Node) bool {
 // itself, and each function, static block, and property initializer inside it.
 //
 // The graph is built per root rather than once per file because a function's body is its own code
-// path — a `return` inside it ends that path and not the file's.
+// path: a `return` inside it ends that path and not the file's.
 func codePathRoots(sourceFile *ast.SourceFile) []*ast.Node {
 	roots := []*ast.Node{sourceFile.AsNode()}
 

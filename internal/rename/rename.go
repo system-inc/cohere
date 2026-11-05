@@ -6,7 +6,7 @@
 // Every other write in this tool is reactive. A rule finds something wrong and proposes a repair,
 // the blast radius is one file, and the engine's parse guard is a sufficient backstop because the
 // rule already decided the edit was safe. A rename is the opposite shape: the user asserts an
-// intention, nothing is wrong with the code, and the blast radius is wherever the symbol lives —
+// intention, nothing is wrong with the code, and the blast radius is wherever the symbol lives,
 // which is a program-wide answer no rule is in a position to give. `internal/rule/rule.go` states
 // the consequence at length and from experience: a rename that updates a usage and misses its
 // declaration produces a file that parses and does not compile, and the engine's guard has no
@@ -113,7 +113,7 @@ const (
 //
 // This exists because of the failure it prevents, which is the worst one available here: a rename
 // that silently misses a string-keyed use produces a codebase that compiles and is broken at
-// runtime. Nothing downstream catches that — not the parse guard, not the type phase, not the
+// runtime. Nothing downstream catches that: not the parse guard, not the type phase, not the
 // tests, until something reads the property at runtime and gets undefined.
 type Blindness struct {
 	FileName string
