@@ -25,3 +25,13 @@ holds data with its own line structure, so a line of it past the limit is the da
 and its closing line may run past the limit too, since the overflow is still the data, not code and so on and so on and sox`),
 	}
 }
+
+// Record carries a struct tag past the limit, which cannot wrap, since a tag is one literal.
+type Record struct {
+	Name string `json:"name" description:"a struct field's tag past the limit, after only a short name and typeand so on and"`
+}
+
+// describe returns a string past the limit, which cannot wrap, since a newline after return ends it.
+func describe() string {
+	return "a returned string past the limit, which cannot move to the next line, as return ends thereand so on and so on and"
+}
