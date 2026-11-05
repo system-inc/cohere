@@ -368,3 +368,29 @@ func contractDirectory(test *testing.T) string {
 	}
 	return directory
 }
+
+// TestTheCoveredPackagesQueryKeepsANoCacheRunsPromise: describing a package writes SwiftPM's cache, which the
+// engine keeps in the package unless told the run writes nothing, so a `--no-cache` run passes the flag to the
+// query, and a run with its cache on leaves the engine its own. A `--no-cache` run of two Swift packages once
+// left `.cache/cohere/swift` in each, since the query alone never heard the flag.
+func TestTheCoveredPackagesQueryKeepsANoCacheRunsPromise(test *testing.T) {
+	test.Parallel()
+	for _, noCache := range []bool{true, false} {
+		test.Run(map[bool]string{true: "under --no-cache", false: "with the cache on"}[noCache], func(test *testing.T) {
+			test.Parallel()
+			arguments := filepath.Join(test.TempDir(), "arguments")
+			engine := fakeSwiftEngine(test, "echo \"$@\" > '"+arguments+"'\n"+
+				`echo '{"kind":"coveredPackages","root":"/r","checked":["/r"],"vendored":[]}'`)
+			if _, queryError := queryCoveredPackages(engine, test.TempDir(), noCache); queryError != nil {
+				test.Fatalf("the query failed: %v", queryError)
+			}
+			passed, readError := os.ReadFile(arguments)
+			if readError != nil {
+				test.Fatalf("the stand-in engine never ran: %v", readError)
+			}
+			if got := strings.Contains(string(passed), "--no-cache"); got != noCache {
+				test.Errorf("the engine was given --no-cache %t, expected %t: %s", got, noCache, passed)
+			}
+		})
+	}
+}

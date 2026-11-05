@@ -184,7 +184,7 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 		go func() {
 			defer group.Done()
 			querying <- struct{}{}
-			record, queryCoveredPackagesError := queryCoveredPackages(binaryPath, directories[index])
+			record, queryCoveredPackagesError := queryCoveredPackages(binaryPath, directories[index], cacheOff)
 			<-querying
 			answer := coverageAnswer{err: queryCoveredPackagesError}
 			if queryCoveredPackagesError == nil {
@@ -209,15 +209,17 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 //
 // It stays in this process's group, unlike a checking run's engine, so an interrupt from the terminal reaches
 // it and whatever SwiftPM command it started, before any project's run has begun.
-func queryCoveredPackages(binaryPath string, directory string) (coveredPackagesRecord, error) {
-	command := exec.Command(
-		binaryPath,
-		"--contract",
-		fmt.Sprint(engineContractVersion),
-		"--root",
-		directory,
-		"--covered-packages",
-	)
+//
+// noCache is the run's `--no-cache`, passed on: describing a package writes SwiftPM's cache, which the engine
+// keeps in the package's `.cache/cohere/swift` unless it is told the run promised to write nothing, and then in
+// a scratch of its own that it removes. Without it, a `--no-cache` run of several Swift packages left that
+// cache in each of them.
+func queryCoveredPackages(binaryPath string, directory string, noCache bool) (coveredPackagesRecord, error) {
+	arguments := []string{"--contract", fmt.Sprint(engineContractVersion), "--root", directory, "--covered-packages"}
+	if noCache {
+		arguments = append(arguments, "--no-cache")
+	}
+	command := exec.Command(binaryPath, arguments...)
 	command.Dir = directory
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
