@@ -1566,7 +1566,10 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		options := decoded.(ForbidPropTypesOptions)
+		options, ok := decoded.(ForbidPropTypesOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
+		}
 		if options.Forbid != nil {
 			test.Errorf("Forbid = %v, wanted nil so the defaults apply", options.Forbid)
 		}
@@ -1581,7 +1584,11 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		if got := decoded.(ForbidPropTypesOptions).forbiddenTypes(); len(got) != 3 {
+		options, ok := decoded.(ForbidPropTypesOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
+		}
+		if got := options.forbiddenTypes(); len(got) != 3 {
 			test.Errorf("effective list = %v, wanted the three defaults", got)
 		}
 	})
@@ -1592,7 +1599,10 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		options := decoded.(ForbidPropTypesOptions)
+		options, ok := decoded.(ForbidPropTypesOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
+		}
 		if options.Forbid == nil {
 			test.Fatal("Forbid is nil, so an explicit empty list was indistinguishable from absent")
 		}
@@ -1607,7 +1617,11 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		got := decoded.(ForbidPropTypesOptions).forbiddenTypes()
+		options, ok := decoded.(ForbidPropTypesOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
+		}
+		got := options.forbiddenTypes()
 		if len(got) != 1 || got[0] != "string" {
 			test.Errorf("effective list = %v, wanted exactly [string]", got)
 		}
@@ -1619,7 +1633,10 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		options := decoded.(ForbidPropTypesOptions)
+		options, ok := decoded.(ForbidPropTypesOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidPropTypesOptions", decoded)
+		}
 		if !options.CheckContextTypes || !options.CheckChildContextTypes {
 			test.Errorf("flags = %v/%v, wanted both true", options.CheckContextTypes, options.CheckChildContextTypes)
 		}

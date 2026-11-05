@@ -239,10 +239,8 @@ func checkDefaultPropsAgainstPropTypes(
 						switch innerName.Text() {
 						case "propTypes":
 							addSinglePropType(declarationsFor(owner), member.Text(), binary.Right)
-							break
 						case "defaultProps", "getDefaultProps":
 							addSingleDefaultProp(declarationsFor(owner), member.Text(), node)
-							break
 						}
 					}
 				}

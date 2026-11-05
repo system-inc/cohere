@@ -100,10 +100,7 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 			return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url element 1: %w", err)
 		}
 		for _, entry := range legacy {
-			options.Legacy = append(options.Legacy, JsxNoScriptUrlComponent{
-				Name:  entry.Name,
-				Props: entry.Props,
-			})
+			options.Legacy = append(options.Legacy, JsxNoScriptUrlComponent(entry))
 		}
 		if len(elements) < 2 {
 			return options, nil
