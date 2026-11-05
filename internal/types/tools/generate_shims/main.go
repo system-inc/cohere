@@ -282,10 +282,9 @@ func main() {
 				shimBuilder.WriteString("\n")
 			}
 
-			switch object.(type) {
+			switch typedObject := object.(type) {
 			case *types.TypeName:
-				typeName := object.(*types.TypeName)
-				t := typeName.Type()
+				t := typedObject.Type()
 				named, isNamed := t.(*types.Named)
 				if isNamed {
 					_, nameWithTypeParams, _ := strings.Cut(types.TypeString(named, qualifierOnlyPackageName), ".")
@@ -359,9 +358,6 @@ func main() {
 					importPackage("unsafe", true)
 
 					matchedExtraFields[name] = true
-					if err != nil {
-						log.Fatalf("error formatting %v struct body: %v", name, err)
-					}
 					mirrorStructName := "extra_" + name
 
 					var emitExtraStruct func(name string, s *types.Struct)
@@ -455,8 +451,7 @@ func main() {
 				printReexport("var")
 			case *types.Func:
 				if !slices.Contains(extraShim.IgnoreFunctions, name) {
-					funcType := object.(*types.Func)
-					emitLinkedFunction(funcType)
+					emitLinkedFunction(typedObject)
 				}
 			}
 		}
