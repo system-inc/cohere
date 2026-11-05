@@ -28,13 +28,15 @@ func NewAnalyzer() *analysis.Analyzer {
 		Name: "consistency_no_long_file",
 		Doc: "Flags a file of more than 2,000 lines once, at the start of its 2,001st line. Every line counts, " +
 			"comments and blank lines included, and a final newline ends the last line rather than adding one, " +
-			"so a file of 2,000 lines ending in a newline is not over. The limit option sets a stricter limit.",
+			"so a file of 2,000 lines ending in a newline is not over. The limit option sets a stricter limit, and a " +
+			"looser one is refused.",
 		Run: run,
 	}
-	// A repository may hold its files to fewer lines than the house does, so the limit is an option. Its value is
-	// refused below one when it is set, so a bad setting fails the run's configuration rather than this rule.
+	// A repository may hold its files to fewer lines than the house does, so the limit is an option. It may only
+	// make the rule stricter: the house limit is a ruling, not a default to raise. Its value is refused below one or
+	// above the house limit when it is set, so a bad setting fails the run's configuration rather than this rule.
 	limit := lineLimit(defaultLimit)
-	analyzer.Flags.Var(&limit, limitOption, "the most lines a file may hold, at least 1")
+	analyzer.Flags.Var(&limit, limitOption, "the most lines a file may hold, from 1 to 2000")
 	return analyzer
 }
 
@@ -53,7 +55,8 @@ const limitOption = "limit"
 const defaultLimit = 2000
 
 // lineLimit is the limit option's value. It is a flag.Value of its own, rather than flag.Int, so a limit below one,
-// which would flag every file or name a line no file has, is refused when it is set.
+// which would flag every file or name a line no file has, and a limit above the house's, which would let a file grow
+// past the ruling, are refused when it is set.
 type lineLimit int
 
 // String is the limit as the flag package prints it, in usage and as the default it compares against.
@@ -62,7 +65,8 @@ func (limit *lineLimit) String() string {
 }
 
 // Set takes the limit from the text the engine's configuration hands it, refusing what is not a whole number of
-// lines, one or more.
+// lines from one to the house limit. The engine wraps a refusal with the rule's name, and the refusal names the
+// option and the value itself, so it reads whole wherever it is printed.
 func (limit *lineLimit) Set(text string) error {
 	value, parseError := strconv.Atoi(text)
 	if parseError != nil {
@@ -70,6 +74,10 @@ func (limit *lineLimit) Set(text string) error {
 	}
 	if value < 1 {
 		return fmt.Errorf("refusing a limit of %d lines, since a file holds at least one", value)
+	}
+	if value > defaultLimit {
+		return fmt.Errorf("refusing a %s option of %d lines, since it may only be stricter than the house limit of %d",
+			limitOption, value, defaultLimit)
 	}
 	*limit = lineLimit(value)
 	return nil

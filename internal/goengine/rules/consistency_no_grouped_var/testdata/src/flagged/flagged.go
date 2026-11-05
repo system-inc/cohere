@@ -22,13 +22,31 @@ func groupedVarOfOne() {
 	use(width)
 }
 
-// iota makes an enum at package level; inside a function the block is judged like any other.
-func groupedConstWithIota() {
+// A const block that does not count with iota is a group like a var block.
+func groupedConst() {
+	const ( // want "groups declarations inside a function"
+		low  = 1
+		high = 2
+	)
+	use(low, high)
+}
+
+// A local named iota is an ordinary constant, so the block counts nothing and splitting it changes no value.
+func groupedConstWithShadowedIota() {
+	const iota = 7
 	const ( // want "groups declarations inside a function"
 		first = iota
 		second
 	)
 	use(first, second)
+}
+
+// An iota block keeps its parentheses, but a spec in it that lists two names is still a list of names.
+func iotaBlockWithSeveralNames() {
+	const (
+		low, high = iota, iota + 10 // want "declares .low, high. in one statement"
+	)
+	use(low, high)
 }
 
 func severalNamesWithType() {

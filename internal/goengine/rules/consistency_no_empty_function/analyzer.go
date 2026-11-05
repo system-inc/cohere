@@ -2,8 +2,9 @@
 //
 // An empty body reads the same whether it is a deliberate no-op, a method an interface asks for that this type has
 // nothing to do in, a callback that ignores what it is handed, or work someone meant to write and forgot. Only its
-// author knows which, so the body says so in a comment inside its braces, where the next reader looks first. An empty
-// test is the sharpest case: it passes every run and can never fail.
+// author knows which, so the body says so in a comment inside its braces, where the next reader looks first. A doc
+// comment above the function does not count: it tells a caller what the function is for, not why its body is empty,
+// as the TypeScript twin reads it. An empty test is the sharpest case: it passes every run and can never fail.
 package consistency_no_empty_function
 
 import (
@@ -26,8 +27,9 @@ const Name = "cohere-go/consistency-no-empty-function"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_empty_function",
 	Doc: "Flags a function, method or function literal whose body holds no statement and no comment with words in " +
-		"it between its braces, tests included, since an empty test can never fail. A declaration with no body, " +
-		"implemented in assembly or linked by name, has nothing to judge.",
+		"it between its braces, tests included, since an empty test can never fail. A doc comment above the " +
+		"function does not count. A declaration with no body, implemented in assembly or linked by name, has " +
+		"nothing to judge.",
 	Run: run,
 }
 

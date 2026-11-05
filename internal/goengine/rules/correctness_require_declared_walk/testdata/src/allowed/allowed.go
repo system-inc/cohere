@@ -62,6 +62,13 @@ func declaredBelowAReason() {
 	_ = walkUnder(filepath.Join("..", ".."))
 }
 
+// A marker with no glob beside one that names a glob leaves the walk declared by the one that does.
+func declaredBesideAnEmptyMarker() {
+	// Reads:
+	// Reads: internal/**/*.go
+	_ = filepath.WalkDir("../..", visit)
+}
+
 func declaredWalkUp(test *testing.T) {
 	// Reads: **/*_test.go
 	_ = walkUnder(repositoryRoot(test))

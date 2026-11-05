@@ -8,6 +8,17 @@ func (recorder *recorder) Close() {
 	// Nothing to release: a recorder holds no file or connection.
 }
 
+type Noop struct{}
+
+// The reason may open on the brace's own line, since that comment sits inside the braces.
+func (Noop) Close() { // Holds no resources, so there is nothing to release.
+}
+
+// Or on a line of its own between them.
+func (Noop) Flush() {
+	// Holds no buffer, so there is nothing to write out.
+}
+
 func inline() { /* Nothing to do: importing this package is the point. */ }
 
 type box[Element any] struct{}

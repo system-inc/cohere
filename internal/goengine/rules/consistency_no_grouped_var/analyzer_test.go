@@ -24,8 +24,9 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // The flagged fixtures carry a // want on every grouped block and every list of names inside a function, in methods,
 // closures, generic functions and a package-level literal, and analysistest fails on a finding no want expects as much
 // as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on package-level
-// groups, a multi-return call or comma-ok read, := declarations, and names listed in a parameter,
-// a struct field or an assignment.
+// groups, a function-level const block counting with iota, a multi-return call or comma-ok read, := declarations, and
+// names listed in a parameter, a struct field or an assignment. A block whose iota is a local constant counts nothing
+// and is flagged.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

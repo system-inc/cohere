@@ -1,6 +1,7 @@
 package consistency_no_long_file_test
 
 import (
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis/analysistest"
@@ -56,6 +57,29 @@ func TestLimitRefusesWhatIsNotALineCount(test *testing.T) {
 		analyzer := consistency_no_long_file.NewAnalyzer()
 		if setError := analyzer.Flags.Set("limit", text); setError == nil {
 			test.Errorf("setting the limit to %q was accepted", text)
+		}
+	}
+}
+
+// The limit may only make the rule stricter, so 2,001 is refused with an error naming the option and the value,
+// which the engine prints as the run's refusal, while 1,500 and the house limit itself are taken and read back.
+func TestLimitRefusesALooserLimit(test *testing.T) {
+	test.Parallel()
+	looser := consistency_no_long_file.NewAnalyzer()
+	setError := looser.Flags.Set("limit", "2001")
+	if setError == nil {
+		test.Fatal("setting the limit to 2001 was accepted")
+	}
+	if !strings.Contains(setError.Error(), "limit option of 2001 lines") {
+		test.Errorf("the refusal does not name the option and the value: %v", setError)
+	}
+	for _, text := range []string{"1500", "2000"} {
+		stricter := consistency_no_long_file.NewAnalyzer()
+		if setError := stricter.Flags.Set("limit", text); setError != nil {
+			test.Fatalf("setting the limit to %s was refused: %v", text, setError)
+		}
+		if read := stricter.Flags.Lookup("limit").Value.String(); read != text {
+			test.Errorf("the limit set to %s reads back as %s", text, read)
 		}
 	}
 }

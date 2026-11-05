@@ -1,10 +1,18 @@
 // Package marker reads the reasoned marker comments that excuse a house rule's finding, `// Not parallel: <reason>`,
-// `// Ignored: <reason>`, `// Invariant: <reason>` and their kin, the one way every rule that accepts one reads it.
+// `// Ignored: <reason>`, `// Invariant: <reason>` and their kin, the one way every rule that accepts one reads it,
+// save the two named below.
 //
 // A marker counts only where it opens a comment line, so a sentence that merely mentions it excuses nothing, and a
 // marker with nothing after its colon is told apart from one that gives a reason, since it tells the next reader
 // nothing. A comment speaks for a node from directly above it, on lines of its own, or from the end of the node's
 // last line. A comment trailing the code on the line above a node belongs to that line, not to the node below it.
+//
+// Two rules keep a reading of their own on purpose and do not use this package: concurrency-no-buffered-wait-delay's
+// `// WaitDelay:` and correctness-require-declared-walk's `// Reads:`. Each is a port of an Adamic rule, and keeps
+// Adamic's line reading, in which a marker covers its own line and the line after its group, so
+// `work() // WaitDelay: why` still excuses the line below. Their ports are held to excuse exactly what Adamic's rules
+// excuse, and a `Reads:` glob feeds a planner that reads it the same way, so that reading is not drift for this
+// package to absorb.
 package marker
 
 import (
