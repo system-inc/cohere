@@ -52,19 +52,28 @@ func noUnusedVarsFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase) str
 	if !row.jsx {
 		return noUnusedVarsOptionsCorpusTsconfig
 	}
+	// Each compiler option is kept as the JSON it was written as, so the ones this does not set pass through
+	// untouched, whatever their type.
 	var configuration struct {
-		CompilerOptions map[string]any `json:"compilerOptions"`
-		Include         []string       `json:"include"`
+		CompilerOptions map[string]json.RawMessage `json:"compilerOptions"`
+		Include         []string                   `json:"include"`
 	}
 	if decodeError := json.Unmarshal([]byte(noUnusedVarsOptionsCorpusTsconfig), &configuration); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	configuration.CompilerOptions["jsx"] = "react"
+	setOption := func(name string, text string) {
+		encoded, encodeError := json.Marshal(text)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		configuration.CompilerOptions[name] = encoded
+	}
+	setOption("jsx", "react")
 	if row.jsxFactory != "" {
-		configuration.CompilerOptions["jsxFactory"] = row.jsxFactory
+		setOption("jsxFactory", row.jsxFactory)
 	}
 	if row.jsxFragmentFactory != "" {
-		configuration.CompilerOptions["jsxFragmentFactory"] = row.jsxFragmentFactory
+		setOption("jsxFragmentFactory", row.jsxFragmentFactory)
 	}
 	configuration.Include = []string{"file.tsx"}
 	encoded, encodeError := json.Marshal(configuration)
