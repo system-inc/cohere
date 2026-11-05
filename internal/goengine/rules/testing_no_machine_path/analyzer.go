@@ -5,8 +5,9 @@
 // A literal that only looks like a home path, such as the input to a function that trims one, says so where a reader
 // will see it.
 //
-// It is the port of internal/testpolicy's HomePaths and finds what that finds, no more and no fewer: the same
-// regular expressions, and the same reading of where a marker excuses.
+// It is the port of internal/testpolicy's HomePaths and finds the same home directories by the same regular
+// expression. Its marker is read as every house rule reads one, stricter than testpolicy: the marker opens a comment
+// line, spelled as written, and a comment trailing the code on the line above a statement speaks for that line alone.
 package testing_no_machine_path
 
 import (
@@ -19,6 +20,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -29,8 +31,9 @@ const Name = "cohere-go/testing-no-machine-path"
 var Analyzer = &analysis.Analyzer{
 	Name: "testing_no_machine_path",
 	Doc: "Flags a string literal in a _test.go file that names a home directory, /Users/<name>/ or /home/<name>/, " +
-		"since a test reading one developer's machine covers nothing anywhere else, unless a // Not a machine path: " +
-		"<reason> comment ends the literal's line or sits directly above the statement or declaration holding it.",
+		"since a test reading one developer's machine covers nothing anywhere else, unless a comment opening with " +
+		"// Not a machine path: <reason> ends the literal's line or sits on lines of its own directly above the " +
+		"statement or declaration holding it.",
 	Run: run,
 }
 
@@ -45,17 +48,9 @@ var machinePathWithoutReasonMessage = policy.MessageOf(Name, "machinePathWithout
 // notAMachinePathMarker opens the comment that excuses a literal, spelled as testpolicy's NotAMachinePathMarker.
 const notAMachinePathMarker = "Not a machine path:"
 
-var (
-	// homeDirectory is testpolicy's expression as written: a /Users/ or /home/ that no word character runs into,
-	// followed by a name and the slash after it, so /Users/ alone and /AllUsers/x/ are not home directories.
-	homeDirectory = regexp.MustCompile(`(^|[^A-Za-z0-9_])/(Users|home)/[^/\s"']+/`)
-	// reasonAfterPathMarker is testpolicy's reading of a reasoned marker: anywhere in the comment group's text, in
-	// any case, with something other than space after the colon, which may sit on the group's next line.
-	reasonAfterPathMarker = regexp.MustCompile(`(?i)` + regexp.QuoteMeta(notAMachinePathMarker) + `\s*\S`)
-	// pathMarker is the marker with or without a reason, so a group holding only the bare marker gets the message
-	// that asks for the reason, while it still excuses nothing.
-	pathMarker = regexp.MustCompile(`(?i)` + regexp.QuoteMeta(notAMachinePathMarker))
-)
+// homeDirectory is testpolicy's expression as written: a /Users/ or /home/ that no word character runs into, followed
+// by a name and the slash after it, so /Users/ alone and /AllUsers/x/ are not home directories.
+var homeDirectory = regexp.MustCompile(`(^|[^A-Za-z0-9_])/(Users|home)/[^/\s"']+/`)
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
@@ -63,12 +58,8 @@ func run(pass *analysis.Pass) (any, error) {
 		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
-		excused := linesCoveredBy(pass, file, func(text string) bool {
-			return reasonAfterPathMarker.MatchString(text)
-		})
-		markedWithoutReason := linesCoveredBy(pass, file, func(text string) bool {
-			return pathMarker.MatchString(text) && !reasonAfterPathMarker.MatchString(text)
-		})
+		comments := marker.NewIndex(pass.Fset, file)
+		coveredAbove := linesCoveredAbove(pass, file, comments)
 		ast.Inspect(file, func(node ast.Node) bool {
 			literal, isLiteral := node.(*ast.BasicLit)
 			if !isLiteral || literal.Kind != token.STRING {
@@ -79,13 +70,19 @@ func run(pass *analysis.Pass) (any, error) {
 			if unquoteError != nil || !homeDirectory.MatchString(value) {
 				return true
 			}
-			line := pass.Fset.PositionFor(literal.Pos(), false).Line
-			if excused[line] {
-				return true
+			// The marker above the statement or declaration holding the literal, or one at the end of the literal's
+			// own last line.
+			given := coveredAbove[pass.Fset.PositionFor(literal.Pos(), false).Line]
+			for _, group := range comments.Trailing(literal) {
+				given = max(given, marker.Read(group, notAMachinePathMarker))
 			}
 			message := machinePathMessage
-			if markedWithoutReason[line] {
+			switch given {
+			case marker.WithReason:
+				return true
+			case marker.WithoutReason:
 				message = machinePathWithoutReasonMessage
+			case marker.None:
 			}
 			pass.Report(analysis.Diagnostic{
 				Pos:      literal.Pos(),
@@ -99,31 +96,24 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// linesCoveredBy is every line of file that a comment group whose text matches speaks for, read as testpolicy reads
-// it: the line the group starts on, for a comment at the end of a literal's line, and every line of each node that
-// starts on the line below the group's end, for a comment directly above a statement or declaration.
-func linesCoveredBy(pass *analysis.Pass, file *ast.File, matches func(text string) bool) map[int]bool {
-	covered := map[int]bool{}
-	nodesStartingOn := map[int]bool{}
-	for _, group := range file.Comments {
-		if !matches(group.Text()) {
-			continue
-		}
-		covered[pass.Fset.PositionFor(group.Pos(), false).Line] = true
-		nodesStartingOn[pass.Fset.PositionFor(group.End(), false).Line+1] = true
-	}
-	// Every node starting on that line, not only the outermost, as testpolicy walks it; an inner node lies within
-	// the outer one's lines, so the lines covered are the outermost node's.
+// linesCoveredAbove is the excuse each line of file takes from a marker directly above a node: every line of each node
+// with a marker comment directly above it, so a marker above a statement or declaration speaks for every literal in
+// it, over as many lines as it runs.
+func linesCoveredAbove(pass *analysis.Pass, file *ast.File, comments *marker.Index) map[int]marker.Excuse {
+	covered := map[int]marker.Excuse{}
+	// Every node, not only the outermost, as testpolicy walks it; an inner node lies within the outer one's lines, so
+	// the lines covered are the outermost node's.
 	ast.Inspect(file, func(node ast.Node) bool {
 		if node == nil {
 			return true
 		}
-		firstLine := pass.Fset.PositionFor(node.Pos(), false).Line
-		if !nodesStartingOn[firstLine] {
+		given := marker.Read(comments.Above(node), notAMachinePathMarker)
+		if given == marker.None {
 			return true
 		}
-		for line := firstLine; line <= pass.Fset.PositionFor(node.End(), false).Line; line++ {
-			covered[line] = true
+		lastLine := pass.Fset.PositionFor(node.End(), false).Line
+		for line := pass.Fset.PositionFor(node.Pos(), false).Line; line <= lastLine; line++ {
+			covered[line] = max(covered[line], given)
 		}
 		return true
 	})

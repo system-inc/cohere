@@ -40,6 +40,12 @@ func reasonSeparated() {
 	panic("separated") // want `This panic stops the process`
 }
 
+// A reason trailing the code on the line above speaks for that line, not for the panic below it.
+func reasonTrailingTheLineAbove(value int) {
+	_ = value         // Invariant: this speaks for the line it ends.
+	panic("trailing") // want `This panic stops the process`
+}
+
 func markerMidSentence() {
 	// This once held an Invariant: the marker sits mid-sentence here, so it is no excuse.
 	panic("mid-sentence") // want `This panic stops the process`

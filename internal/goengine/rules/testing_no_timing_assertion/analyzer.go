@@ -19,6 +19,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -57,29 +58,19 @@ var failureMethods = map[string]bool{
 	"FailNow": true,
 }
 
-// excuse is what the comment above an if says about why its deadline holds.
-type excuse int
-
-const (
-	excuseNone excuse = iota
-	// excuseWithoutReason is a marker with nothing after its colon, which tells the next reader nothing.
-	excuseWithoutReason
-	excuseWithReason
-)
-
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
 		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
 		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
-		commentAbove := commentsOnTheirOwnLines(pass, file)
+		comments := marker.NewIndex(pass.Fset, file)
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
 			if !isFunction || !isTest(pass, function) {
 				continue
 			}
-			judgeTest(pass, function.Body, commentAbove)
+			judgeTest(pass, function.Body, comments)
 		}
 	}
 	return nil, nil
@@ -87,7 +78,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 // judgeTest reports every timing assertion in one test's body, its subtests' function literals included, since a
 // subtest's deadline is as much at the pool's mercy as its parent's.
-func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, commentAbove map[int]*ast.CommentGroup) {
+func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, comments *marker.Index) {
 	measured := measuredLocals(pass, body)
 	ast.Inspect(body, func(node ast.Node) bool {
 		statement, isIf := node.(*ast.IfStmt)
@@ -98,7 +89,9 @@ func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, commentAbove map[int]*a
 		if len(comparisons) == 0 {
 			return true
 		}
-		given := excuseOf(commentAbove[pass.Fset.PositionFor(statement.Pos(), false).Line-1])
+		// Only the comment directly above the if, on lines of its own, speaks for it. One trailing code above the if,
+		// `work() // Timing assertion: ...`, speaks for that code.
+		given := marker.Read(comments.Above(statement), timingAssertionMarker)
 		for _, comparison := range comparisons {
 			report(pass, comparison, given)
 		}
@@ -349,81 +342,15 @@ func isNamed(candidate types.Type, packagePath string, name string) bool {
 	return named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == packagePath && named.Obj().Name() == name
 }
 
-// commentsOnTheirOwnLines is file's comment groups that have their lines to themselves, by the line each ends on, so
-// the group ending on the line above an if is the comment directly above it. A group that trails code, `work() //
-// Timing assertion: ...`, speaks for that code, and one that code follows on its last line speaks for what follows,
-// so neither is found. Code is found by where the file's nodes begin and end, read from the AST.
-func commentsOnTheirOwnLines(pass *analysis.Pass, file *ast.File) map[int]*ast.CommentGroup {
-	firstCode := map[int]token.Pos{}
-	lastCode := map[int]token.Pos{}
-	ast.Inspect(file, func(node ast.Node) bool {
-		switch node.(type) {
-		case nil:
-			return true
-		case *ast.Comment, *ast.CommentGroup:
-			return false
-		}
-		for _, position := range []token.Pos{node.Pos(), node.End()} {
-			line := pass.Fset.PositionFor(position, false).Line
-			if earliest, seen := firstCode[line]; !seen || position < earliest {
-				firstCode[line] = position
-			}
-			if latest, seen := lastCode[line]; !seen || position > latest {
-				lastCode[line] = position
-			}
-		}
-		return true
-	})
-	ending := map[int]*ast.CommentGroup{}
-	for _, group := range file.Comments {
-		startLine := pass.Fset.PositionFor(group.Pos(), false).Line
-		endLine := pass.Fset.PositionFor(group.End(), false).Line
-		// A node ending where the comment starts, `work()// note`, is code before it as much as one ending earlier.
-		if earliest, seen := firstCode[startLine]; seen && earliest <= group.Pos() {
-			continue
-		}
-		if latest, seen := lastCode[endLine]; seen && latest > group.End() {
-			continue
-		}
-		ending[endLine] = group
-	}
-	return ending
-}
-
-// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a block
-// comment no part of the reason. A nil group says nothing.
-func excuseOf(group *ast.CommentGroup) excuse {
-	if group == nil {
-		return excuseNone
-	}
-	found := excuseNone
-	for _, comment := range group.List {
-		for _, line := range strings.Split(comment.Text, "\n") {
-			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
-			// mentions it, "this was a Timing assertion: once", excuses nothing.
-			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
-			reason, hasMarker := strings.CutPrefix(opening, timingAssertionMarker)
-			if !hasMarker {
-				continue
-			}
-			if strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(reason), "*/")) != "" {
-				return excuseWithReason
-			}
-			found = excuseWithoutReason
-		}
-	}
-	return found
-}
-
 // report flags comparison unless its excuse gives a reason, with the message that names what is missing.
-func report(pass *analysis.Pass, comparison *ast.BinaryExpr, given excuse) {
+func report(pass *analysis.Pass, comparison *ast.BinaryExpr, given marker.Excuse) {
 	message := timingAssertionMessage
 	switch given {
-	case excuseWithReason:
+	case marker.WithReason:
 		return
-	case excuseWithoutReason:
+	case marker.WithoutReason:
 		message = timingAssertionWithoutReasonMessage
-	case excuseNone:
+	case marker.None:
 	}
 	pass.Report(analysis.Diagnostic{
 		Pos:      comparison.Pos(),

@@ -11,12 +11,12 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -93,16 +93,6 @@ var (
 // so the Write of any type implementing hash.Hash is exempt.
 const hashPackagePath = "hash"
 
-// excuse is what the comments at a statement say about why its error is dropped.
-type excuse int
-
-const (
-	excuseNone excuse = iota
-	// excuseWithoutReason is a marker with nothing after its colon, which tells the next reader nothing.
-	excuseWithoutReason
-	excuseWithReason
-)
-
 // checker holds what every judgment in one package reads.
 type checker struct {
 	pass *analysis.Pass
@@ -120,42 +110,26 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	checker := checker{pass: pass, errorInterface: errorInterface, hashInterface: findHashInterface(pass.Pkg)}
 	for _, file := range pass.Files {
-		// A comment excuses a statement from directly above it, the group ending on the line before, or from the end
-		// of its line, a group starting there after the statement ends.
-		commentEndingOnLine := map[int]*ast.CommentGroup{}
-		commentsStartingOnLine := map[int][]*ast.CommentGroup{}
-		for _, group := range file.Comments {
-			commentEndingOnLine[pass.Fset.PositionFor(group.End(), false).Line] = group
-			startLine := pass.Fset.PositionFor(group.Pos(), false).Line
-			commentsStartingOnLine[startLine] = append(commentsStartingOnLine[startLine], group)
-		}
-		excuseAt := func(statement ast.Node) excuse {
-			given := excuseOf(commentEndingOnLine[pass.Fset.PositionFor(statement.Pos(), false).Line-1])
-			for _, group := range commentsStartingOnLine[pass.Fset.PositionFor(statement.End(), false).Line] {
-				if group.Pos() >= statement.End() {
-					given = max(given, excuseOf(group))
-				}
-			}
-			return given
-		}
+		// A comment excuses a statement from directly above it, on lines of its own, or from the end of its last line.
+		comments := marker.NewIndex(pass.Fset, file)
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch statement := node.(type) {
 			case *ast.ExprStmt:
 				if call, isCall := ast.Unparen(statement.X).(*ast.CallExpr); isCall && checker.returnsError(call) {
-					checker.report(call, excuseAt(statement))
+					checker.report(call, comments.ExcuseFor(statement, ignoredMarker))
 				}
 			case *ast.DeferStmt:
 				// A deferred or started call's results go nowhere, whatever they are.
 				if checker.returnsError(statement.Call) {
-					checker.report(statement.Call, excuseAt(statement))
+					checker.report(statement.Call, comments.ExcuseFor(statement, ignoredMarker))
 				}
 			case *ast.GoStmt:
 				if checker.returnsError(statement.Call) {
-					checker.report(statement.Call, excuseAt(statement))
+					checker.report(statement.Call, comments.ExcuseFor(statement, ignoredMarker))
 				}
 			case *ast.AssignStmt:
 				for _, call := range checker.callsDroppingError(statement.Lhs, statement.Rhs) {
-					checker.report(call, excuseAt(statement))
+					checker.report(call, comments.ExcuseFor(statement, ignoredMarker))
 				}
 			case *ast.ValueSpec:
 				// `var value, _ = strconv.Atoi(text)` drops the error as an assignment does.
@@ -164,7 +138,7 @@ func run(pass *analysis.Pass) (any, error) {
 					names = append(names, name)
 				}
 				for _, call := range checker.callsDroppingError(names, statement.Values) {
-					checker.report(call, excuseAt(statement))
+					checker.report(call, comments.ExcuseFor(statement, ignoredMarker))
 				}
 			}
 			return true
@@ -405,40 +379,15 @@ func (checker checker) calleeName(call *ast.CallExpr) string {
 	return function.Pkg().Name() + "." + function.Name()
 }
 
-// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a
-// block comment no part of the reason. A nil group says nothing.
-func excuseOf(group *ast.CommentGroup) excuse {
-	if group == nil {
-		return excuseNone
-	}
-	found := excuseNone
-	for _, comment := range group.List {
-		for _, line := range strings.Split(comment.Text, "\n") {
-			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
-			// mentions it, "this was Ignored: once", excuses nothing.
-			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
-			reason, hasMarker := strings.CutPrefix(opening, ignoredMarker)
-			if !hasMarker {
-				continue
-			}
-			if strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(reason), "*/")) != "" {
-				return excuseWithReason
-			}
-			found = excuseWithoutReason
-		}
-	}
-	return found
-}
-
 // report flags call unless its excuse gives a reason, with the message that names what is missing.
-func (checker checker) report(call *ast.CallExpr, given excuse) {
+func (checker checker) report(call *ast.CallExpr, given marker.Excuse) {
 	message := unhandledErrorMessage
 	switch given {
-	case excuseWithReason:
+	case marker.WithReason:
 		return
-	case excuseWithoutReason:
+	case marker.WithoutReason:
 		message = unhandledErrorWithoutReasonMessage
-	case excuseNone:
+	case marker.None:
 	}
 	checker.pass.Report(analysis.Diagnostic{
 		Pos:      call.Pos(),

@@ -20,6 +20,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -48,16 +49,6 @@ var mustOutsideInitializationMessage = policy.MessageOf(Name, "mustOutsideInitia
 // invariantMarker opens the comment that says why a panic can never happen, matched as written.
 const invariantMarker = "Invariant:"
 
-// excuse is what the comments beside a panic say about why it cannot happen.
-type excuse int
-
-const (
-	excuseNone excuse = iota
-	// excuseWithoutReason is a marker with nothing after its colon, which tells the next reader nothing.
-	excuseWithoutReason
-	excuseWithReason
-)
-
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
 		// The file's own name, not one a //line directive gives it: a test's panic and Must calls fail one test, not
@@ -73,7 +64,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 // judgePanics reports every builtin panic in file that is not a re-panic and whose comments give no reason.
 func judgePanics(pass *analysis.Pass, file *ast.File) {
-	comments := commentsOf(pass, file)
+	comments := marker.NewIndex(pass.Fset, file)
 	written := writtenVariables(pass, file)
 	ast.Inspect(file, func(node ast.Node) bool {
 		// Each function is judged on its own, so a recover in one never excuses a panic in a closure it holds.
@@ -94,7 +85,7 @@ func judgePanics(pass *analysis.Pass, file *ast.File) {
 func judgeFunctionPanics(
 	pass *analysis.Pass,
 	body *ast.BlockStmt,
-	comments fileComments,
+	comments *marker.Index,
 	written map[*types.Var]bool,
 ) {
 	recovered := recoveredVariables(pass, body, written)
@@ -116,12 +107,13 @@ func judgeFunctionPanics(
 			return
 		}
 		message := unexplainedPanicMessage
-		switch comments.excuseFor(pass, node) {
-		case excuseWithReason:
+		// The comment directly above the statement, on lines of its own, or at the end of its last line.
+		switch comments.ExcuseFor(node, invariantMarker) {
+		case marker.WithReason:
 			return
-		case excuseWithoutReason:
+		case marker.WithoutReason:
 			message = invariantWithoutReasonMessage
-		case excuseNone:
+		case marker.None:
 		}
 		pass.Report(analysis.Diagnostic{
 			Pos:      call.Pos(),
@@ -234,61 +226,6 @@ func isRecoveredValue(pass *analysis.Pass, argument ast.Expr, recovered map[*typ
 func isBuiltin(pass *analysis.Pass, call *ast.CallExpr, name string) bool {
 	callee := typeutil.Callee(pass.TypesInfo, call)
 	return callee != nil && callee == types.Universe.Lookup(name)
-}
-
-// fileComments is file's comment groups found by line: the group ending on a line, for a comment directly above a
-// statement, and the groups starting on it, for a comment at the end of one.
-type fileComments struct {
-	endingOn   map[int]*ast.CommentGroup
-	startingOn map[int][]*ast.CommentGroup
-}
-
-func commentsOf(pass *analysis.Pass, file *ast.File) fileComments {
-	comments := fileComments{endingOn: map[int]*ast.CommentGroup{}, startingOn: map[int][]*ast.CommentGroup{}}
-	for _, group := range file.Comments {
-		comments.endingOn[pass.Fset.PositionFor(group.End(), false).Line] = group
-		startLine := pass.Fset.PositionFor(group.Pos(), false).Line
-		comments.startingOn[startLine] = append(comments.startingOn[startLine], group)
-	}
-	return comments
-}
-
-// excuseFor is the best excuse the comments give statement: a group ending on the line above its first line, or one
-// starting after it on its last line.
-func (comments fileComments) excuseFor(pass *analysis.Pass, statement ast.Node) excuse {
-	found := excuseOf(comments.endingOn[pass.Fset.PositionFor(statement.Pos(), false).Line-1])
-	for _, group := range comments.startingOn[pass.Fset.PositionFor(statement.End(), false).Line] {
-		// A comment before the statement on its own line, `/* note */ panic(value)`, is not at the end of it.
-		if group.Pos() >= statement.End() {
-			found = max(found, excuseOf(group))
-		}
-	}
-	return found
-}
-
-// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a block
-// comment no part of the reason. A nil group says nothing.
-func excuseOf(group *ast.CommentGroup) excuse {
-	if group == nil {
-		return excuseNone
-	}
-	found := excuseNone
-	for _, comment := range group.List {
-		for _, line := range strings.Split(comment.Text, "\n") {
-			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
-			// mentions it, "this held an Invariant: once", excuses nothing.
-			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
-			reason, hasMarker := strings.CutPrefix(opening, invariantMarker)
-			if !hasMarker {
-				continue
-			}
-			if strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(reason), "*/")) != "" {
-				return excuseWithReason
-			}
-			found = excuseWithoutReason
-		}
-	}
-	return found
 }
 
 // judgeMustCalls reports every call to a Must function in file that is not directly in a package-level var's

@@ -113,6 +113,13 @@ func TestSubtestReasonSeparated(test *testing.T) {
 	test.Run("separated", func(subtest *testing.T) {}) // want `This test runs alone`
 }
 
+// A reason trailing the code on the line above speaks for that line, not for the subtest below it.
+func TestSubtestReasonTrailingTheLineAbove(test *testing.T) {
+	test.Parallel()
+	test.Log("setup")                                 // Not parallel: this speaks for the line it ends.
+	test.Run("trailing", func(subtest *testing.T) {}) // want `This test runs alone`
+}
+
 // Not parallel:
 func TestEmptyReason(test *testing.T) {} // want `^This test says it is not parallel and gives no reason\.`
 

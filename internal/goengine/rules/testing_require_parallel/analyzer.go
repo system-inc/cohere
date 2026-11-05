@@ -15,6 +15,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -40,16 +41,6 @@ var notParallelWithoutReasonMessage = policy.MessageOf(Name, "notParallelWithout
 // notParallelMarker opens the comment that excuses a test from running in parallel. It is matched as written, the
 // spelling every excused test in cohere already uses.
 const notParallelMarker = "Not parallel:"
-
-// excuse is what the comments above a test say about why it is serial.
-type excuse int
-
-const (
-	excuseNone excuse = iota
-	// excuseWithoutReason is a marker with nothing after its colon, which tells the next reader nothing.
-	excuseWithoutReason
-	excuseWithReason
-)
 
 func run(pass *analysis.Pass) (any, error) {
 	// A subtest may name a function rather than spell a literal, and a function declared in this package has a body
@@ -78,7 +69,7 @@ func run(pass *analysis.Pass) (any, error) {
 			if parameter == nil || firstStatementCallsParallel(pass, function.Body, parameter) {
 				continue
 			}
-			report(pass, function.Name, excuseOf(function.Doc))
+			report(pass, function.Name, marker.Read(function.Doc, notParallelMarker))
 		}
 		judgeSubtests(pass, file, declarations)
 	}
@@ -87,11 +78,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 // judgeSubtests reports every (*testing.T).Run in file whose subtest is serial and does not say why.
 func judgeSubtests(pass *analysis.Pass, file *ast.File, declarations map[*types.Func]*ast.FuncDecl) {
-	// The comment directly above a Run call is the group ending on the line before it.
-	commentEndingOnLine := map[int]*ast.CommentGroup{}
-	for _, group := range file.Comments {
-		commentEndingOnLine[pass.Fset.PositionFor(group.End(), false).Line] = group
-	}
+	comments := marker.NewIndex(pass.Fset, file)
 	ast.Inspect(file, func(node ast.Node) bool {
 		call, isCall := node.(*ast.CallExpr)
 		if !isCall || len(call.Args) != 2 {
@@ -113,10 +100,10 @@ func judgeSubtests(pass *analysis.Pass, file *ast.File, declarations map[*types.
 		if body == nil || firstStatementCallsParallel(pass, body, parameter) {
 			return true
 		}
-		callLine := pass.Fset.PositionFor(call.Pos(), false).Line
 		// A named function may carry the reason on its own doc comment, which then excuses every Run that names
-		// it; the comment above the call speaks for this one subtest.
-		report(pass, selector, max(excuseOf(commentEndingOnLine[callLine-1]), excuseOf(doc)))
+		// it; the comment directly above the call speaks for this one subtest.
+		above := marker.Read(comments.Above(call), notParallelMarker)
+		report(pass, selector, max(above, marker.Read(doc, notParallelMarker)))
 		return true
 	})
 }
@@ -264,40 +251,15 @@ func isPointerToTestingT(candidate types.Type) bool {
 	return named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == "testing" && named.Obj().Name() == "T"
 }
 
-// excuseOf reads a comment group for the marker: opening any line of any comment in it, with the */ that closes a block
-// comment no part of the reason. A nil group says nothing.
-func excuseOf(group *ast.CommentGroup) excuse {
-	if group == nil {
-		return excuseNone
-	}
-	found := excuseNone
-	for _, comment := range group.List {
-		for _, line := range strings.Split(comment.Text, "\n") {
-			// The marker opens the line, after the comment's own slashes, stars and spaces, so a sentence that only
-			// mentions it, "this was Not parallel: once", excuses nothing.
-			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
-			reason, hasMarker := strings.CutPrefix(opening, notParallelMarker)
-			if !hasMarker {
-				continue
-			}
-			if strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(reason), "*/")) != "" {
-				return excuseWithReason
-			}
-			found = excuseWithoutReason
-		}
-	}
-	return found
-}
-
 // report flags node unless its excuse gives a reason, with the message that names what is missing.
-func report(pass *analysis.Pass, node ast.Node, given excuse) {
+func report(pass *analysis.Pass, node ast.Node, given marker.Excuse) {
 	message := notParallelMessage
 	switch given {
-	case excuseWithReason:
+	case marker.WithReason:
 		return
-	case excuseWithoutReason:
+	case marker.WithoutReason:
 		message = notParallelWithoutReasonMessage
-	case excuseNone:
+	case marker.None:
 	}
 	pass.Report(analysis.Diagnostic{
 		Pos:      node.Pos(),
