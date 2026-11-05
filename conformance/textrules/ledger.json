@@ -1,0 +1,170 @@
+[
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc01",
+        "kind": "span",
+        "task": "jmx59gd",
+        "reason": "reports the whole comment, `// TODO: fix this`, rather than the word"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc02",
+        "kind": "verdict",
+        "task": "jmx59gd",
+        "reason": "reports lowercase `todo`, since it matches its terms case-insensitively"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc03",
+        "kind": "span",
+        "task": "jmx59gd",
+        "reason": "reports the whole comment rather than the word `XXX`"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc04",
+        "kind": "verdict",
+        "task": "jmx59gd",
+        "reason": "silent, since under the house's start location it matches only a term opening the comment"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc05",
+        "kind": "verdict",
+        "task": "jmx59gd",
+        "reason": "silent, since `TODO` opens the block comment's second line rather than the comment"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc07",
+        "kind": "span",
+        "task": "jmx59gd",
+        "reason": "reports the whole trailing comment rather than the word"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc08",
+        "kind": "span",
+        "task": "jmx59gd",
+        "reason": "reports the whole comment rather than the word `FIXME`"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc09",
+        "kind": "span",
+        "task": "jmx59gd",
+        "reason": "reports the whole block comment from its first line rather than the word on its second"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc11",
+        "kind": "verdict",
+        "task": "jmx59gd",
+        "reason": "reports the `TODO` line inside the fence, since it reads each `//` line alone and masks no fence"
+    },
+    {
+        "engine": "typescript",
+        "family": "warning-comments",
+        "case": "wc13",
+        "kind": "verdict",
+        "task": "jmx59gd",
+        "reason": "silent, since `café` opens the comment and only a term opening it is matched"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc01",
+        "kind": "span",
+        "task": "47s5j9h",
+        "reason": "reports at the comment's start with no end, rather than on the word"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc03",
+        "kind": "verdict",
+        "task": "47s5j9h",
+        "reason": "silent, since its words are `TODO` and `FIXME` only"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc04",
+        "kind": "verdict",
+        "task": "47s5j9h",
+        "reason": "silent, since it matches only the first word of a comment line"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc05",
+        "kind": "span",
+        "task": "47s5j9h",
+        "reason": "reports at the block comment's start on line 1 with no end, rather than on the word on line 2"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc06",
+        "kind": "verdict",
+        "task": "47s5j9h",
+        "reason": "reports `TODO_LIST`, since only a letter after the word continues it, not `_`"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc07",
+        "kind": "verdict",
+        "task": "47s5j9h",
+        "reason": "silent, since it reads only leading trivia and a trailing comment is trailing trivia"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc08",
+        "kind": "span",
+        "task": "47s5j9h",
+        "reason": "reports at the comment's start with no end, rather than on the word"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc09",
+        "kind": "span",
+        "task": "47s5j9h",
+        "reason": "reports at the block comment's start with no end, rather than on the word on line 2"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc11",
+        "kind": "verdict",
+        "task": "47s5j9h",
+        "reason": "reports the `TODO` line inside the fence, since it masks no fence"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc12",
+        "kind": "verdict",
+        "task": "47s5j9h",
+        "reason": "reports `TODO2`, since only a letter after the word continues it, not a digit"
+    },
+    {
+        "engine": "swift",
+        "family": "warning-comments",
+        "case": "wc13",
+        "kind": "verdict",
+        "task": "47s5j9h",
+        "reason": "silent, since `café` is the comment's first word and only a first word is matched"
+    }
+]

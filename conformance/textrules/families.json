@@ -1,0 +1,7 @@
+{
+    "warning-comments": {
+        "typescript": "no-warning-comments",
+        "go": "cohere-go/consistency-no-warning-comment",
+        "swift": "cohere-swift/todo"
+    }
+}

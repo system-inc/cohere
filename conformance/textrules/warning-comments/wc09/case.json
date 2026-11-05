@@ -1,0 +1,16 @@
+{
+    "why": "wc09: a `TODO` on a decorated line of a block comment is reported, on the word",
+    "expect": [
+        {
+            "covers": "TODO",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
