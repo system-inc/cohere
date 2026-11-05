@@ -489,15 +489,16 @@ func requireOptimizationClassRange(ruleContext rule.Context, node *ast.Node) cor
 // and comments before that are leading trivia of the same node.
 func requireOptimizationScanPastTrivia(sourceFile *ast.SourceFile, from int) int {
 	text := sourceFile.Text()
-	for from < len(text) {
-		switch text[from] {
+	position := from
+	for position < len(text) {
+		switch text[position] {
 		case ' ', '\t', '\n', '\r':
-			from++
+			position++
 		default:
-			return from
+			return position
 		}
 	}
-	return from
+	return position
 }
 
 // requireOptimizationIsCreateReactClassCall reports whether a call is `createReactClass(...)`.
