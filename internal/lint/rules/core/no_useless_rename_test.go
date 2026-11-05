@@ -585,7 +585,10 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("the decoder refused an absent option: %v", err)
 		}
-		settings := decoded.(NoUselessRenameSettings)
+		settings, ok := decoded.(NoUselessRenameSettings)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoUselessRenameSettings", decoded)
+		}
 		if settings.IgnoreDestructuring || settings.IgnoreImport || settings.IgnoreExport {
 			test.Errorf("expected every option to default to false, got %+v", settings)
 		}
@@ -598,7 +601,10 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("the decoder refused a partial object: %v", err)
 		}
-		settings := decoded.(NoUselessRenameSettings)
+		settings, ok := decoded.(NoUselessRenameSettings)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoUselessRenameSettings", decoded)
+		}
 		if !settings.IgnoreImport || settings.IgnoreDestructuring || settings.IgnoreExport {
 			test.Errorf("expected only ignoreImport to be set, got %+v", settings)
 		}

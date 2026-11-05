@@ -340,7 +340,11 @@ func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		if !decoded.(NoUnneededTernaryOptions).resolve() {
+		options, ok := decoded.(NoUnneededTernaryOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoUnneededTernaryOptions", decoded)
+		}
+		if !options.resolve() {
 			test.Error("defaultAssignment resolved to false, which turns the second judgment on")
 		}
 	})
@@ -351,7 +355,11 @@ func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		if decoded.(NoUnneededTernaryOptions).resolve() {
+		options, ok := decoded.(NoUnneededTernaryOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoUnneededTernaryOptions", decoded)
+		}
+		if options.resolve() {
 			test.Error("an explicit false was read as the default true")
 		}
 	})
