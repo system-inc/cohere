@@ -662,6 +662,11 @@ func (r *swiftRun) acceptLint(record *swiftLintRecord) error {
 	}
 	writeCoverage(accountOutput(r.out), summary, r.details)
 	r.crashes += len(record.Crashes)
+	// Named for the human view and `--json` as a TypeScript run's are, from the same crashes the coverage notes
+	// named, so every view says the engine's words, and appended as the count is added to, so the list stays as
+	// long as the count.
+	activeSummary.Gaps.Crashes = append(activeSummary.Gaps.Crashes, summary.Crashes...)
+	printCrashGroups(r.out, summary.Crashes)
 
 	if record.ConfigNote != "" {
 		fmt.Fprintf(accountOutput(r.out), "  %s\n", record.ConfigNote)
@@ -732,7 +737,7 @@ func classifySwiftCoverage(record *swiftLintRecord) (coverageSummary, error) {
 	sort.Strings(summary.PartialFacts)
 
 	for _, crash := range record.Crashes {
-		summary.Crashes = append(summary.Crashes, coverageCrash{File: crash.File, Cause: crash.Error})
+		summary.Crashes = append(summary.Crashes, runCrash{Path: crash.File, Cause: crash.Error, SwiftEngine: true})
 	}
 	summary.sortEntries()
 	return summary, nil
