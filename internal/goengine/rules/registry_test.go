@@ -2,6 +2,8 @@ package rules
 
 import (
 	"fmt"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -9,6 +11,9 @@ import (
 	"golang.org/x/tools/go/analysis/passes/nilness"
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"golang.org/x/tools/go/analysis/suite/vet"
+	"honnef.co/go/tools/simple"
+	"honnef.co/go/tools/staticcheck"
+	"honnef.co/go/tools/stylecheck"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
 )
@@ -79,44 +84,18 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 	}
 }
 
-// TestVetsSuiteOpensTheRegistryInItsOwnOrder holds the promise that `cohere` is never weaker than
-// `go vet`: every pass vet runs is a rule, under vet's name, in vet's order, running vet's own analyzer.
-func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
-	test.Parallel()
-	if len(registry) < len(vet.Suite) {
-		test.Fatalf("the registry has %d rules, fewer than vet's %d passes", len(registry), len(vet.Suite))
-	}
-	for index, analyzer := range vet.Suite {
-		registeredRule := registry[index]
-		if registeredRule.Analyzer != analyzer {
-			test.Errorf("rule %d runs %q, expected vet's pass %q", index, registeredRule.Analyzer.Name, analyzer.Name)
-			continue
-		}
-		if registeredRule.Name != rule.Namespace+analyzer.Name {
-			test.Errorf("vet's pass %q is registered as %q", analyzer.Name, registeredRule.Name)
-		}
-		if registeredRule.Origin != rule.OriginVet {
-			test.Errorf("vet's pass %q has origin %q", analyzer.Name, registeredRule.Origin)
-		}
-		if registeredRule.UpstreamName != analyzer.Name {
-			test.Errorf("vet's pass %q names upstream %q", analyzer.Name, registeredRule.UpstreamName)
-		}
-	}
-}
-
-// TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
-// after vet's suite, as tools rules running their own analyzers.
-func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
-	test.Parallel()
-	expected := []*analysis.Analyzer{nilness.Analyzer, unusedwrite.Analyzer}
-	if len(registry) != len(vet.Suite)+len(expected) {
+// expectBlock holds the registry, from offset on, to one rule per analyzer in order, each named for its
+// analyzer, of the given origin, and running that very analyzer rather than a copy that could drift.
+func expectBlock(test *testing.T, offset int, analyzers []*analysis.Analyzer, origin rule.Origin) {
+	test.Helper()
+	if len(registry) < offset+len(analyzers) {
 		test.Fatalf(
-			"the registry has %d rules, expected vet's %d passes and %d more",
-			len(registry), len(vet.Suite), len(expected),
+			"the registry has %d rules, too few to hold %d %s rules from rule %d",
+			len(registry), len(analyzers), origin, offset,
 		)
 	}
-	for offset, analyzer := range expected {
-		index := len(vet.Suite) + offset
+	for position, analyzer := range analyzers {
+		index := offset + position
 		registeredRule := registry[index]
 		if registeredRule.Analyzer != analyzer {
 			test.Errorf("rule %d runs %q, expected %q", index, registeredRule.Analyzer.Name, analyzer.Name)
@@ -128,11 +107,125 @@ func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 				analyzer.Name, registeredRule.Name, registeredRule.UpstreamName,
 			)
 		}
-		if registeredRule.Origin != rule.OriginTools {
-			test.Errorf("%q has origin %q, expected %q", analyzer.Name, registeredRule.Origin, rule.OriginTools)
+		if registeredRule.Origin != origin {
+			test.Errorf("%q has origin %q, expected %q", analyzer.Name, registeredRule.Origin, origin)
 		}
-		if !registeredRule.TypeAware {
+	}
+}
+
+// ruledStylecheck is the ST checks ruled on, written out here rather than read from the registry's own
+// table, so a check added to or dropped from that table by mistake fails the test.
+var ruledStylecheck = []string{
+	"ST1001", "ST1006", "ST1008", "ST1011", "ST1012", "ST1013", "ST1015", "ST1016", "ST1017", "ST1018", "ST1019",
+}
+
+// staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order
+// they follow the x/tools passes in.
+func staticcheckAnalyzers() []*analysis.Analyzer {
+	analyzers := []*analysis.Analyzer{}
+	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+			continue
+		}
+		analyzers = append(analyzers, wrapped.Analyzer)
+	}
+	return analyzers
+}
+
+// stylecheckAnalyzers is the ruled ST checks, in stylecheck's order, which is the order they follow the SA
+// and S checks in.
+func stylecheckAnalyzers() []*analysis.Analyzer {
+	analyzers := []*analysis.Analyzer{}
+	for _, wrapped := range stylecheck.Analyzers {
+		if slices.Contains(ruledStylecheck, wrapped.Analyzer.Name) {
+			analyzers = append(analyzers, wrapped.Analyzer)
+		}
+	}
+	return analyzers
+}
+
+// TestVetsSuiteOpensTheRegistryInItsOwnOrder holds the promise that `cohere` is never weaker than
+// `go vet`: every pass vet runs is a rule, under vet's name, in vet's order, running vet's own analyzer.
+func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
+	test.Parallel()
+	expectBlock(test, 0, vet.Suite, rule.OriginVet)
+}
+
+// TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
+// after vet's suite, as tools rules running their own analyzers.
+func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
+	test.Parallel()
+	expected := []*analysis.Analyzer{nilness.Analyzer, unusedwrite.Analyzer}
+	expectBlock(test, len(vet.Suite), expected, rule.OriginTools)
+	for _, analyzer := range expected {
+		registeredRule, found := registeredRuleNamed(rule.Namespace + analyzer.Name)
+		if found && !registeredRule.TypeAware {
 			test.Errorf("%q reads SSA built from type information, so it is type aware", analyzer.Name)
+		}
+	}
+}
+
+// TestStaticcheckFollowsTheToolsPasses holds the registry, after the x/tools passes, to every default SA
+// and S check, then the ruled ST checks, then U1000 last through the analyzer that reports it, and nothing
+// else, which also keeps out every QF check, since a quick fix is not a finding.
+func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
+	test.Parallel()
+	offset := len(vet.Suite) + 2
+	checks := staticcheckAnalyzers()
+	expectBlock(test, offset, checks, rule.OriginStaticcheck)
+	styleChecks := stylecheckAnalyzers()
+	expectBlock(test, offset+len(checks), styleChecks, rule.OriginStaticcheck)
+
+	expectedCount := offset + len(checks) + len(styleChecks) + 1
+	if len(registry) != expectedCount {
+		test.Fatalf("the registry has %d rules, expected %d", len(registry), expectedCount)
+	}
+	expectedUnused := rule.Rule{
+		Name:         "cohere-go/U1000",
+		Origin:       rule.OriginStaticcheck,
+		UpstreamName: "U1000",
+		TypeAware:    true,
+		Analyzer:     unusedReport,
+	}
+	// reflect.DeepEqual because ConfiguredBy is a slice, which leaves rule.Rule without ==.
+	if last := registry[len(registry)-1]; !reflect.DeepEqual(last, expectedUnused) {
+		test.Errorf("the last rule is %+v, expected %+v", last, expectedUnused)
+	}
+}
+
+// TestExactlyTheRuledStylecheckChecksAreRegistered holds the ST rules to the ruling, both ways: every ruled
+// check is registered, and no other ST check is, the ruled-off ST1003 and ST1005 above all.
+func TestExactlyTheRuledStylecheckChecksAreRegistered(test *testing.T) {
+	test.Parallel()
+	registeredStylecheck := []string{}
+	for _, registeredRule := range registry {
+		if strings.HasPrefix(registeredRule.UpstreamName, "ST") {
+			registeredStylecheck = append(registeredStylecheck, registeredRule.UpstreamName)
+		}
+	}
+	slices.Sort(registeredStylecheck)
+	if !slices.Equal(registeredStylecheck, ruledStylecheck) {
+		test.Errorf("the registered ST checks are %q, expected exactly %q", registeredStylecheck, ruledStylecheck)
+	}
+}
+
+// TestNoDefaultOffSAOrSCheckIsRegistered holds the registry to staticcheck's own defaults for SA and S: a
+// check its documentation marks NonDefault stays off until it is ruled on. SA9003 is named, so the test
+// cannot pass by staticcheck marking nothing.
+func TestNoDefaultOffSAOrSCheckIsRegistered(test *testing.T) {
+	test.Parallel()
+	nonDefault := []string{}
+	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+			nonDefault = append(nonDefault, wrapped.Analyzer.Name)
+		}
+	}
+	if !slices.Contains(nonDefault, "SA9003") {
+		test.Errorf("staticcheck's default-off SA and S checks are %q, which no longer holds SA9003", nonDefault)
+	}
+	for _, code := range nonDefault {
+		if _, found := registeredRuleNamed(rule.Namespace + code); found {
+			test.Errorf("%s is registered, and staticcheck leaves it off by default", code)
 		}
 	}
 }
@@ -156,7 +249,14 @@ func TestTheRegisteredAnalyzersValidateTogether(test *testing.T) {
 // rename upstream left a decision about nothing.
 func TestTypeAwareFollowsTheSyntaxOnlyTable(test *testing.T) {
 	test.Parallel()
-	expected := map[string]bool{"cohere-go/printf": true, "cohere-go/buildtag": false}
+	expected := map[string]bool{
+		"cohere-go/printf":   true,
+		"cohere-go/buildtag": false,
+		"cohere-go/SA4006":   true,
+		"cohere-go/SA9009":   false,
+		"cohere-go/ST1008":   true,
+		"cohere-go/ST1018":   false,
+	}
 	for name, typeAware := range expected {
 		registeredRule, found := registeredRuleNamed(name)
 		if !found {

@@ -3,18 +3,25 @@
 package rules
 
 import (
+	"slices"
+
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/nilness"
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"golang.org/x/tools/go/analysis/suite/vet"
+	"honnef.co/go/tools/simple"
+	"honnef.co/go/tools/staticcheck"
+	"honnef.co/go/tools/stylecheck"
+	"honnef.co/go/tools/unused"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
-// x/tools v0.49.0. Every other pass in vet's suite reads pass.TypesInfo, and nilness and unusedwrite read
-// the SSA form built from it. A pass missing from this table counts as type aware, so a pass a newer
-// x/tools adds is never described as running without types before someone has read it.
+// x/tools v0.49.0 and staticcheck v0.8.1. Every other pass in vet's suite reads pass.TypesInfo, nilness and
+// unusedwrite read the SSA form built from it, and staticcheck's checks read it through the helpers they
+// share (analysis/code, pattern, buildir). A pass missing from this table counts as type aware, so a pass a
+// newer release adds is never described as running without types before someone has read it.
 var syntaxOnly = map[string]bool{
 	// buildtag reads build constraint lines from the files' comments and text.
 	"buildtag": true,
@@ -25,6 +32,39 @@ var syntaxOnly = map[string]bool{
 	"framepointer": true,
 	// unreachable walks the syntax tree for statements after a terminating one.
 	"unreachable": true,
+	// SA9009 reads comments for a directive indented out of effect.
+	"SA9009": true,
+	// ST1001 reads import declarations for a dot import, and of a file only its name, to allow one in a test.
+	"ST1001": true,
+	// ST1015 reads the order of a switch's clauses for a default in the middle.
+	"ST1015": true,
+	// ST1018 reads string literals for control and format characters.
+	"ST1018": true,
+	// ST1019 reads import declarations for a package imported twice.
+	"ST1019": true,
+}
+
+// stylecheckRuledOn is the ST checks ruled on for cohere, from a census of what each found in cohere's own
+// code. ST1016 is among them although staticcheck leaves it off by default.
+//
+// Ruled off: ST1003, whose initialisms (`ID`, `JSON`) contradict the house's `Id` and `Json` and whose
+// underscores are this repository's package names, and ST1005.
+//
+// Off until ruled: ST1000, ST1020, ST1021 and ST1022, the form of package and exported declarations'
+// comments, and ST1023, a declared type the right-hand side would infer. Comment form and declared types
+// are style no one has judged yet.
+var stylecheckRuledOn = map[string]bool{
+	"ST1001": true,
+	"ST1006": true,
+	"ST1008": true,
+	"ST1011": true,
+	"ST1012": true,
+	"ST1013": true,
+	"ST1015": true,
+	"ST1016": true,
+	"ST1017": true,
+	"ST1018": true,
+	"ST1019": true,
 }
 
 // All is every rule the Go engine knows, in the order `--rules` lists them before sorting.
@@ -32,7 +72,13 @@ var syntaxOnly = map[string]bool{
 // vet's suite comes first, read from vet.Suite rather than retyped, so `cohere` in a Go repository is
 // never weaker than `go vet`, and a newer x/tools that adds a pass adds its rule here with no edit. Then
 // two of x/tools' own passes that vet leaves out, which find real bugs: a nil dereference or a comparison
-// with nil whose answer is already known, and a write to a struct or array nothing reads again.
+// with nil whose answer is already known, and a write to a struct or array nothing reads again. Then
+// staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 through an
+// analyzer that reports what it finds. staticcheck's QF checks are quick fixes an editor offers, not
+// findings.
+//
+// An SA or S check staticcheck leaves off by default (its documentation's NonDefault) is left off here
+// too, until it is ruled on: at staticcheck v0.8.1 that is SA9003, an empty if or else branch.
 func All() []rule.Rule {
 	registered := []rule.Rule{}
 	for _, analyzer := range vet.Suite {
@@ -40,10 +86,28 @@ func All() []rule.Rule {
 	}
 	registered = append(registered, portedRule(nilness.Analyzer, rule.OriginTools))
 	registered = append(registered, portedRule(unusedwrite.Analyzer, rule.OriginTools))
+	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
+		if wrapped.Doc != nil && wrapped.Doc.NonDefault {
+			continue
+		}
+		registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+	}
+	for _, wrapped := range stylecheck.Analyzers {
+		if stylecheckRuledOn[wrapped.Analyzer.Name] {
+			registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+		}
+	}
+	registered = append(registered, rule.Rule{
+		Name:         rule.Namespace + unused.Analyzer.Analyzer.Name,
+		Origin:       rule.OriginStaticcheck,
+		UpstreamName: unused.Analyzer.Analyzer.Name,
+		TypeAware:    true,
+		Analyzer:     unusedReport,
+	})
 	return registered
 }
 
-// portedRule is the rule that runs one of x/tools' passes under its own name.
+// portedRule is the rule that runs an upstream analyzer under the name it has upstream.
 func portedRule(analyzer *analysis.Analyzer, origin rule.Origin) rule.Rule {
 	return rule.Rule{
 		Name:         rule.Namespace + analyzer.Name,
