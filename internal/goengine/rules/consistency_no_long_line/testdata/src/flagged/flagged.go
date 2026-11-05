@@ -5,6 +5,8 @@ package flagged
 import (
 	// A comment in the import block is prose like any other, so this one, past the limit, wraps and so on and so on and so o. // want `This line is \d+ columns, a tab counted as four, and the house limit is 120\.`
 	"strings"
+
+	"representation"
 )
 
 func use(arguments ...any) string { return strings.Repeat("", len(arguments)) }
@@ -115,4 +117,28 @@ func keyed(entry *Entry, other string) []any {
 			use(other): "a keyed string past the limit after a key built by a call and so on and so on and so on and so o",
 		},
 	}
+}
+
+// transform takes parameters past the limit with something in them that could wrap. Each expectation sits on the line
+// above its case, so no trailing comment is what makes the case a finding.
+func transform(
+	// A func type, which could wrap inside its parameter list.
+	// want +1 `the house limit is 120`
+	rewrite func(representation.IdentifierOfAValueInStaticSingleAssignmentForm) *representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation,
+	// Two names sharing the type, which could wrap after their comma.
+	// want +1 `the house limit is 120`
+	left, right map[representation.IdentifierOfAValueInStaticSingleAssignmentForm]*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation,
+	// An index of two type arguments, which could wrap after their comma.
+	// want +1 `the house limit is 120`
+	pairs representation.Pair[representation.IdentifierOfAValueInStaticSingleAssignmentForm, *representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation],
+	// A field that could not wrap alone, with a trailing comment that could sit above it instead.
+	// want +1 `the house limit is 120`
+	candidateDependencies map[representation.IdentifierOfAValueInStaticSingleAssignmentForm]*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation, // a note
+) {
+}
+
+// Tagged carries a field past the limit before its tag opens, which the tag's exemption does not cover.
+type Tagged struct {
+	// want +1 `the house limit is 120`
+	dependencies map[representation.IdentifierOfAValueInStaticSingleAssignmentForm]*representation.ArrayExpressionOfTheHighLevelIntermediateRepresentation `json:"dependencies"`
 }
