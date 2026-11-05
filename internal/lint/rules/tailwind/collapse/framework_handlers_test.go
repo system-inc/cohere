@@ -38,8 +38,8 @@ func TestEmittedDeclarationsAgreeWithTheMeasuredProperty(test *testing.T) {
 		measured := PropertySort([]*Node{Declaration(utility.Property, sentinel)})
 		computed := PropertySort(emitted)
 
-		measuredReading := Reading{Order: measured.Order, Count: measured.Count}
-		computedReading := Reading{Order: computed.Order, Count: computed.Count}
+		measuredReading := Reading(measured)
+		computedReading := Reading(computed)
 		if readingsEqual(measuredReading, computedReading) {
 			agreed++
 			continue

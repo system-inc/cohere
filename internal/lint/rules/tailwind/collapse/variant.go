@@ -195,11 +195,7 @@ func (registry *VariantRegistry) RegisterFrameworkVariants(registrations []Frame
 			registry.registrations[registration.Name] = existing
 			continue
 		}
-		registry.registrations[registration.Name] = VariantRegistration{
-			Name:  registration.Name,
-			Order: registration.Order,
-			Kind:  registration.Kind,
-		}
+		registry.registrations[registration.Name] = VariantRegistration(registration)
 		if registration.Order > registry.lastOrder {
 			registry.lastOrder = registration.Order
 		}

@@ -31,7 +31,7 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(test *testing.T) {
 		}
 
 		sorted := PropertySort(emitted)
-		computed := Reading{Order: sorted.Order, Count: sorted.Count}
+		computed := Reading(sorted)
 		if readingsEqual(utility.Reading, computed) {
 			agreed++
 			continue
@@ -88,7 +88,7 @@ func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(test *testing.T) 
 				divergent++
 			}
 			sorted := PropertySort(emitted)
-			computed := Reading{Order: sorted.Order, Count: sorted.Count}
+			computed := Reading(sorted)
 			if readingsEqual(measured, computed) {
 				agreed++
 				continue
@@ -136,7 +136,7 @@ func TestMultiDeclarationLiteralsAreOnlyListedWhenTheyDiffer(test *testing.T) {
 			listed++
 			ordinary := PropertySort(utility.Emit(root, "", ResolvedUtilityValue{Value: sentinel}))
 			override := PropertySort(emitter(ResolvedUtilityValue{Value: sentinel}))
-			if readingsEqual(Reading{Order: ordinary.Order, Count: ordinary.Count}, Reading{Order: override.Order, Count: override.Count}) {
+			if readingsEqual(Reading(ordinary), Reading(override)) {
 				test.Errorf("%s-%s is listed as an override and reads the same as its root, so the entry restates a fact rather than correcting one", root, literal)
 			}
 			if _, measured := utility.LiteralReadings[literal]; !measured {

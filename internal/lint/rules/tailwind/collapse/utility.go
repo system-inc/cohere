@@ -150,7 +150,7 @@ func (evaluator *UtilityEvaluator) Reading(candidate *ParsedCandidate) (Reading,
 		return Reading{}, false
 	}
 	sort := PropertySort(nodes)
-	return Reading{Order: sort.Order, Count: sort.Count}, true
+	return Reading(sort), true
 }
 
 // Compile evaluates a candidate against its `@utility` definition and returns the surviving body.

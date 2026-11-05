@@ -115,8 +115,6 @@ func engineStaticNames(test *testing.T, system *LoadedDesignSystem) []string {
 	for name := range FrameworkStaticDeclarations {
 		names = append(names, name)
 	}
-	for _, name := range system.RepositoryStaticUtilityNames() {
-		names = append(names, name)
-	}
+	names = append(names, system.RepositoryStaticUtilityNames()...)
 	return names
 }

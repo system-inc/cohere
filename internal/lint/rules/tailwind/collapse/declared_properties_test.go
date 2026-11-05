@@ -1,9 +1,6 @@
 package tailwind
 
-import (
-	"sort"
-	"testing"
-)
+import "testing"
 
 // TestEmitterSlicesDoNotOverlap pins the assumption emitFunctionalRoot's dispatch rests on.
 //
@@ -31,28 +28,6 @@ func TestEmitterSlicesDoNotOverlap(test *testing.T) {
 		owner[root] = "gap"
 	}
 	test.Logf("emitter slices partition %d functional roots", len(owner))
-}
-
-// equalPropertySets compares two property lists as sets.
-//
-// Order is not part of the answer here. A declaration list has an emission order and a conflict
-// comparison asks only which properties are shared, so two lists differing in order are the same
-// answer to this question. The deleted tables were themselves generated sorted, which would make an
-// order-sensitive comparison fail on a difference that means nothing.
-func equalPropertySets(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	leftSorted := append([]string(nil), left...)
-	rightSorted := append([]string(nil), right...)
-	sort.Strings(leftSorted)
-	sort.Strings(rightSorted)
-	for index := range leftSorted {
-		if leftSorted[index] != rightSorted[index] {
-			return false
-		}
-	}
-	return true
 }
 
 // TestComputedPropertiesMakeTheDistinctionsTheOverrideTablesHeld is what survives the deletion.

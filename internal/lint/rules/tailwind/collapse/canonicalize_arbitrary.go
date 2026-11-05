@@ -320,7 +320,11 @@ func (canonicalizer *Canonicalizer) classSignature(className string) (string, Si
 		state     SignatureState
 	}
 	if remembered, found := canonicalizer.signatures.Load(className); found {
-		answer := remembered.(signed)
+		answer, isSigned := remembered.(signed)
+		if !isSigned {
+			// Invariant: signatures holds only the signed classSignature stores below.
+			panic("tailwind: the signature memo holds something other than a signature")
+		}
 		return answer.signature, answer.state
 	}
 	signature, state := canonicalizer.shared.classIndex().compiler.ClassSignature(className, canonicalizer.features)
@@ -332,7 +336,12 @@ func (canonicalizer *Canonicalizer) classSignature(className string) (string, Si
 func (canonicalizer *Canonicalizer) pool(properties map[string]bool) *signaturePool {
 	key := propertySetKey(properties)
 	if remembered, found := canonicalizer.pools.Load(key); found {
-		return remembered.(*signaturePool)
+		typed, isPool := remembered.(*signaturePool)
+		if !isPool {
+			// Invariant: pools holds only the *signaturePool pool stores below.
+			panic("tailwind: the pool memo holds something other than a signature pool")
+		}
+		return typed
 	}
 	index := canonicalizer.shared.classIndex()
 	pool := &signaturePool{exact: map[string][]string{}}
@@ -357,7 +366,12 @@ func (canonicalizer *Canonicalizer) pool(properties map[string]bool) *signatureP
 		}
 	}
 	stored, _ := canonicalizer.pools.LoadOrStore(key, pool)
-	return stored.(*signaturePool)
+	typed, isPool := stored.(*signaturePool)
+	if !isPool {
+		// Invariant: pools holds only the *signaturePool pool stores here and above.
+		panic("tailwind: the pool memo holds something other than a signature pool")
+	}
+	return typed
 }
 
 // groupAdmits is the possible-match relation at group level: a group can hold a class signing to these
