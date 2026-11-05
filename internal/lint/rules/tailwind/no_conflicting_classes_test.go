@@ -38,11 +38,11 @@ func runConflictFixtureWithOptions(
 	test *testing.T,
 	fileName string,
 	source string,
-	options any,
+	options *NoConflictingClassesOptions,
 ) rule_testing.Result {
 	test.Helper()
 
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than a conflict")
@@ -66,7 +66,7 @@ func runConflictFixtureWithOptions(
 		return rule_testing.RunTypedFilesWithSetup(test, NoConflictingClasses, files, fileName, plantPackage)
 	}
 	return rule_testing.RunTypedFilesWithSetupAndOptions(
-		test, NoConflictingClasses, files, fileName, options, plantPackage)
+		test, NoConflictingClasses, files, fileName, *options, plantPackage)
 }
 
 // Expectations measured by running `better-tailwindcss/no-conflicting-classes` over probe fixtures
@@ -349,7 +349,7 @@ func TestPropertyLookupUsesTheLongestRoot(test *testing.T) {
 // this repository contains the name.
 func TestRepositoryUtilitiesAreCompiledRatherThanLookedUp(test *testing.T) {
 	test.Parallel()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine")
 	}
@@ -449,12 +449,12 @@ func TestStaticRepositoryUtilitiesStillReadFromTheFrameworkTables(test *testing.
 // machine that lacks the package.
 func TestConflictFixturesActuallyRan(test *testing.T) {
 	test.Parallel()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Fatalf(
 			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
 				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
-			vendored.TailwindPackageRoot(),
+			vendored.TailwindPackageRootForTest(test),
 		)
 	}
 
@@ -504,7 +504,7 @@ func TestVariantsAreComparedNotStripped(test *testing.T) {
 // asserting its absence.
 func TestSelectorShapeCannotProduceAWrongFinding(test *testing.T) {
 	test.Parallel()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine")
 	}

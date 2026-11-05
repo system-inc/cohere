@@ -20,7 +20,7 @@ func publicThemeSystem(test *testing.T) *LoadedDesignSystem {
 		test.Fatalf("resolving the public theme: %v", err)
 	}
 	system, err := LoadDesignSystem(
-		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()},
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRootForTest(test)},
 	)
 	if err != nil {
 		test.Fatalf("loading the public theme: %v", err)

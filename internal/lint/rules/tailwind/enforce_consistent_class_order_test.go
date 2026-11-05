@@ -80,8 +80,9 @@ const classOrderFixtureStylesheetPath = "app/_theme/styles/theme.css"
 // classOrderFixturePackageRoot is the installed tailwindcss the fixture stylesheets import: the vendored
 // snapshot of 4.3.3, the version the class-order corpus in collapse/testdata was captured against, so the
 // fixtures and the corpus agree on which engine they mean, on any machine (#sycrdr6).
-func classOrderFixturePackageRoot() string {
-	return vendored.TailwindPackageRoot()
+func classOrderFixturePackageRoot(test *testing.T) string {
+	test.Helper()
+	return vendored.TailwindPackageRootForTest(test)
 }
 
 // classOrderFixtureStylesheet is the fixture's root stylesheet.
@@ -101,7 +102,7 @@ const classOrderFixtureStylesheet = `@import "tailwindcss";`
 func runClassOrderFixture(test *testing.T, fileName string, source string) rule_testing.Result {
 	test.Helper()
 
-	packageRoot := classOrderFixturePackageRoot()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an order")
@@ -731,12 +732,12 @@ func classOrderLiveSort(test *testing.T, designSystem DesignSystemResult, classe
 // every other fixture in this file silently depends on.
 func TestClassOrderFixturesActuallyRan(test *testing.T) {
 	test.Parallel()
-	packageRoot := classOrderFixturePackageRoot()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Fatalf(
 			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
 				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
-			vendored.TailwindPackageRoot(),
+			vendored.TailwindPackageRootForTest(test),
 		)
 	}
 

@@ -57,7 +57,7 @@ func runCanonicalFixtureWithStylesheet(
 ) rule_testing.Result {
 	test.Helper()
 
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than a collapse")
@@ -509,12 +509,12 @@ func TestRebuiltClassIsWritable(test *testing.T) {
 // file uses the same helper shape.
 func TestCanonicalFixturesActuallyRan(test *testing.T) {
 	test.Parallel()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Fatalf(
 			"the vendored tailwindcss at %s is missing, so every fixture in this file would skip and the "+
 				"package still report ok; restore it (internal/lint/rules/tailwind/vendored)",
-			vendored.TailwindPackageRoot(),
+			vendored.TailwindPackageRootForTest(test),
 		)
 	}
 

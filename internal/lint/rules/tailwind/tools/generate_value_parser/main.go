@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_value_parser -package-root <tailwindcss package> [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_value_parser \
+//	    -package-root <tailwindcss package> [-output <file.json>] [-check]
 //
 // The distinction this tool exists to enforce is the same one generate_data_type enforces:
 // reading the source and asking the engine are different claims. For this parser they disagree in
@@ -113,7 +114,8 @@ func enumerate(packageRoot string) ([]byte, error) {
 	var parsed struct {
 		TailwindVersion string `json:"tailwindVersion"`
 		ParseSymbol     string `json:"parseSymbol"`
-		Cases           []any  `json:"cases"`
+		// Cases is only counted here, so each case stays undecoded.
+		Cases []json.RawMessage `json:"cases"`
 	}
 	if decodeError := json.Unmarshal(out, &parsed); decodeError != nil {
 		return nil, fmt.Errorf("parse enumeration: %w", decodeError)

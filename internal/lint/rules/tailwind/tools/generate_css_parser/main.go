@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_css_parser -package-root <tailwindcss package> [-stylesheets <corpus.json>] [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_css_parser \
+//	    -package-root <tailwindcss package> [-stylesheets <corpus.json>] [-output <file.json>] [-check]
 //
 // The distinction this tool enforces is the one generate_data_type and generate_syntax_tree enforce,
 // and for this component it lands on the custom-property branch. A `--foo` declaration keeps the

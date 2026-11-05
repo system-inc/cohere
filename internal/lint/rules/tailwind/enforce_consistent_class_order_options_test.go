@@ -16,7 +16,7 @@ func runClassOrderFixtureWithOptions(
 ) rule_testing.Result {
 	test.Helper()
 
-	packageRoot := classOrderFixturePackageRoot()
+	packageRoot := classOrderFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so the rule's design system cannot be " +
 			"built and these fixtures would measure a decline rather than an order")
