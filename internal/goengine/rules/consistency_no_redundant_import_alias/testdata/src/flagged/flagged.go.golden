@@ -1,0 +1,22 @@
+// Package flagged holds imports renamed to the name they already have, each of which the rule must report and offer
+// to unalias.
+package flagged
+
+import "fmt" // want "`fmt` renames the import of `\"fmt\"` to the name it already has"
+
+// A group, where a nested path and a fixture's own package still leave the alias saying what the path says.
+import (
+	"os"
+
+	"path/filepath" // want "`filepath` renames the import of `\"path/filepath\"`"
+	"plain"         // want "`plain` renames"
+)
+
+// Multi-byte runes before the alias on its line, so the fix's offsets are bytes, not characters.
+import /* 世界 */ "bytes" // want "`bytes` renames"
+
+// A comment between the alias and the path, which the fix keeps where the writer put it.
+import /* the standard one */ "strings" // want "`strings` renames"
+
+// Exported uses every import, so the fixture compiles, and is what the external test reaches through its own alias.
+var Exported = fmt.Sprint(os.Args, bytes.MinRead, filepath.Separator, plain.Greeting, strings.ToUpper("a"))
