@@ -16,7 +16,8 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 	if validateError := consistency_no_use_before_define.Rule.Validate(); validateError != nil {
 		test.Fatal(validateError)
 	}
-	if _, parseError := policy.Naming.ParseRuleName("cohere-go", "consistency-no-use-before-define"); parseError != nil {
+	_, parseError := policy.Naming.ParseRuleName("cohere-go", "consistency-no-use-before-define")
+	if parseError != nil {
 		test.Fatal(parseError)
 	}
 }
