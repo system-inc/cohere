@@ -31,7 +31,7 @@ const forbidDomPropsFile = "/repository/source/ForbidDomProps.tsx"
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
 // the string-or-object union and the absent-versus-empty distinction under test. An empty body is
-// the nil-options case: an unconfigured rule declines everything.
+// the bare-severity case: a rule configured without options declines everything.
 func forbidDomPropsOptions(test *testing.T, raw string) ForbidDomPropsOptions {
 	test.Helper()
 	decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(raw))

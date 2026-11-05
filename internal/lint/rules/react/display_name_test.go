@@ -1151,9 +1151,9 @@ func TestDecodeDisplayNameOptions(test *testing.T) {
 
 // TestDisplayNameNilOptionsFallsBackToTheDefault bypasses the decoder entirely.
 //
-// A rule configured as a bare `"error"` can reach `Run` with nil options, where `options.(T)` yields
-// the zero value. Both defaults are false so the zero value is right, and this pins that rather
-// than leaving it to luck.
+// A rule configured as a bare `"error"` can reach `Run` with the zero `rule.Given`, whose `Read` returns
+// false and the zero value. Both defaults are false so the zero value is right, and this pins that
+// rather than leaving it to luck.
 func TestDisplayNameNilOptionsFallsBackToTheDefault(test *testing.T) {
 	test.Parallel()
 

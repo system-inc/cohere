@@ -257,9 +257,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 }
 
 // TestNoUnstableNestedComponentsNilOptions covers the path a bare "error" takes into Run, which
-// bypasses the decoder entirely: config.OptionsRegistry hands a non-required rule nil, and a type
-// assertion on nil yields the zero value. Without the fallback in Run the empty pattern would match
-// no prop name and every render prop would start reporting.
+// bypasses the decoder entirely: configuration.OptionsRegistry hands a non-required rule the zero
+// `rule.Given`, whose `Read` returns false and the zero value. Without the fallback in Run the empty
+// pattern would match no prop name and every render prop would start reporting.
 func TestNoUnstableNestedComponentsNilOptions(test *testing.T) {
 	test.Parallel()
 

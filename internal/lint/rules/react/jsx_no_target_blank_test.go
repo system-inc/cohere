@@ -43,7 +43,7 @@ const jsxNoTargetBlankFile = "/repository/source/JsxNoTargetBlank.tsx"
 // `DecodeJsxNoTargetBlankOptions`, the same function the config calls.
 //
 // An empty string in that column means the rule was configured as a bare severity, which is what
-// hands a real rule nil options.
+// hands a real rule's decoder empty input.
 
 // TestJsxNoTargetBlankFires asserts ids, count, and the repaired source where upstream ships one.
 //
@@ -962,7 +962,7 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 		raw  string
 		want JsxNoTargetBlankOptions
 	}{
-		// The nil path, which is what a rule configured as a bare `"error"` is handed.
+		// The empty-input path, which is what the decoder of a rule configured as a bare `"error"` is handed.
 		{"empty input keeps upstream defaults", "", JsxNoTargetBlankOptions{Links: true}},
 		{"empty object keeps upstream defaults", "{}", JsxNoTargetBlankOptions{Links: true}},
 
@@ -1004,8 +1004,8 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 
 // TestJsxNoTargetBlankHandlesNilOptions pins the path that bypasses the decoder entirely.
 //
-// A rule can reach `Run` with nil, and the comma-ok assertion then yields the zero struct whose
-// `Links` is false rather than upstream's true. Nothing reads `Links` today, so this cannot change
+// A rule can reach `Run` with the zero `rule.Given`, whose `Read` then returns false and the zero struct,
+// whose `Links` is false rather than upstream's true. Nothing reads `Links` today, so this cannot change
 // a verdict; the test exists because the rule restores the default explicitly and a later reader
 // deleting that restoration should fail here rather than ship a silent change.
 func TestJsxNoTargetBlankHandlesNilOptions(test *testing.T) {
@@ -1015,7 +1015,7 @@ func TestJsxNoTargetBlankHandlesNilOptions(test *testing.T) {
 		"<a target=\"_blank\" href=\"http://x.com\"></a>")
 	rule_testing.ExpectFindings(test, result, "noTargetBlankWithoutNoreferrer")
 
-	// And the dynamic-href arm, which is the one the absent enum turns on. A nil-options rule that
+	// And the dynamic-href arm, which is the one the absent enum turns on. An unconfigured rule that
 	// read the enum as "never" would be silent here.
 	dynamic := rule_testing.Run(test, JsxNoTargetBlank, jsxNoTargetBlankFile,
 		"<a target=\"_blank\" href={dynamicLink}></a>")

@@ -1331,8 +1331,8 @@ func TestDecodeBooleanPropNamingOptions(test *testing.T) {
 // rule is entirely inert when configured as a bare `"error"`.
 //
 // This rule is registered with `RequiresOptions` so the config layer refuses that state rather than
-// reproducing it. The harness can still reach `Run` with nil, and declining there is what keeps the
-// rule from inventing a default nobody configured.
+// reproducing it. The harness can still run it unconfigured, handed the zero `rule.Given` whose `Read`
+// returns false, and declining there is what keeps the rule from inventing a default nobody configured.
 func TestBooleanPropNamingDeclinesWithoutOptions(test *testing.T) {
 	test.Parallel()
 

@@ -34,7 +34,7 @@ const noUnknownPropertyFile = "/repository/source/NoUnknownProperty.tsx"
 // noUnknownPropertyOptions decodes a raw option body the way the config layer does.
 //
 // Fixtures route through the exported decoder rather than building the struct, which is what puts
-// the defaults under test. An empty body is the nil-options case.
+// the defaults under test. An empty body is the bare-severity case.
 func noUnknownPropertyOptions(test *testing.T, raw string) NoUnknownPropertyOptions {
 	test.Helper()
 	decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions([]byte(raw))
@@ -766,7 +766,7 @@ func TestNoUnknownPropertyHasNoFileSuffixGate(test *testing.T) {
 	}
 }
 
-// TestDecodeNoUnknownPropertyOptions covers both options and the nil-options path.
+// TestDecodeNoUnknownPropertyOptions covers both options and the empty-body path.
 func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 	test.Parallel()
 

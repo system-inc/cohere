@@ -737,8 +737,8 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 
 // TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn bypasses the decoder entirely.
 //
-// A rule configured as a bare `"error"` can reach `Run` with nil options rather than a decoded
-// struct, and `options.(T)` on nil yields the zero value, which for this rule means both halves off
+// A rule configured as a bare `"error"` can reach `Run` with the zero `rule.Given` rather than a decoded
+// struct, and its `Read` returns false and the zero value, which for this rule means both halves off
 // and a rule that reports nothing. The explicit fallback is what prevents that, and nothing else in
 // this file would notice if it were removed.
 func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(test *testing.T) {
