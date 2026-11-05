@@ -13,7 +13,7 @@ const preferAsConstFile = "/repository/source/Thing.ts"
 // Upstream ships twenty failing inputs and its snapshot holds twenty entries, but three of those
 // entries are `Unexpected token` parse errors rather than rule diagnostics: the tester runs .tsx,
 // where `<'bar'>'bar'` is a JSX fragment opening rather than a type assertion. That is the whole
-// of the extractor's DISCREPANCY warning, 17 diagnostics against 20 inputs, and it resolves to
+// of the extractor's discrepancy warning, 17 diagnostics against 20 inputs, and it resolves to
 // exactly one finding per reporting input with nothing left to recover.
 func TestPreferAsConstFires(test *testing.T) {
 	test.Parallel()

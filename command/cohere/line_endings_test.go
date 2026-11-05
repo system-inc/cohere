@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"strings"
 	"sync"
@@ -36,21 +37,27 @@ func TestCRLFFilesAreNamedOnceWithTheFix(test *testing.T) {
 	group.Wait()
 
 	var checked bytes.Buffer
-	lineEndings.report(&checked, false)
+	checkedStream := bufio.NewWriter(&checked)
+	lineEndings.report(checkedStream, false)
+	flushStream(test, checkedStream)
 	if got := checked.String(); !strings.HasPrefix(got, "note: 2 files have CRLF line endings, and the house format is LF, so --no-fix reports them as unformatted.") ||
 		!strings.Contains(got, "add `* text=auto eol=lf` to the repository's .gitattributes") {
 		test.Fatalf("the note reads %q", got)
 	}
 
 	var written bytes.Buffer
-	lineEndings.report(&written, true)
+	writtenStream := bufio.NewWriter(&written)
+	lineEndings.report(writtenStream, true)
+	flushStream(test, writtenStream)
 	if !strings.Contains(written.String(), "so --fix rewrote them to LF.") {
 		test.Fatalf("a writing run's note reads %q", written.String())
 	}
 
 	var none crlfFiles
 	var quiet bytes.Buffer
-	none.report(&quiet, false)
+	quietStream := bufio.NewWriter(&quiet)
+	none.report(quietStream, false)
+	flushStream(test, quietStream)
 	if quiet.Len() != 0 {
 		test.Fatalf("a tree with no CRLF printed %q", quiet.String())
 	}

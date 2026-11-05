@@ -113,7 +113,7 @@ func TestNoThisAliasStaysSilent(test *testing.T) {
 		// Cases upstream does not write.
 		//
 		// The five below are the initializer's narrowness, which is the half of the parenthesis
-		// question that has to be got right by NOT skipping. Each is silent on the release binary
+		// question that has to be got right by not skipping. Each is silent on the release binary
 		// and each would report under a `SkipParentheses` on the right-hand side.
 		{"a parenthesized initializer", "const self = (this);", "{}"},
 		{"an initializer through a type assertion", "const self = this as any;", "{}"},

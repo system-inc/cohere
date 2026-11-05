@@ -29,7 +29,7 @@ func noUnnecessaryBooleanLiteralCompareOnDisk(sourceText string) string {
 
 // decodeNoUnnecessaryBooleanLiteralCompareOptions runs a configuration through the real decoder.
 //
-// Two of this rule's three options default to TRUE, so a fixture building the options struct by hand
+// Two of this rule's three options default to true, so a fixture building the options struct by hand
 // would leave the one line most likely to be wrong untested: a zero-valued struct turns both
 // allowances off and makes the rule report two families upstream allows. An empty configuration is
 // the bare `"error"` case, which the config layer turns into nil options.
@@ -563,7 +563,7 @@ func TestNoUnnecessaryBooleanLiteralCompareFiresOnUpstreamFailCases(test *testin
 // eight declarations, another dropped a return annotation it could not see.
 //
 // It is safe here for a structural reason rather than a careful one: the replacement is built from
-// the expression's OWN SOURCE TEXT, so nothing inside it is re-rendered and nothing inside it can be
+// the expression's own source text, so nothing inside it is re-rendered and nothing inside it can be
 // lost. The span being replaced holds only the comparison operator and the boolean literal.
 //
 // These rows are what proves it. Upstream's corpus is TypeScript and does carry some of these, but
@@ -688,7 +688,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 			reason:        "a wholly nullish union has no non-nullish part",
 		},
 		{
-			// The same three shapes again with BOTH allowances turned off, which is what makes the
+			// The same three shapes again with both allowances turned off, which is what makes the
 			// union test decide them rather than the allowance check above it.
 			//
 			// With the default options every nullable comparison is allowed, so a mutant breaking
@@ -725,7 +725,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 		},
 		{
 			// The control for the four rows above: with the allowances off, a genuine nullable
-			// boolean DOES report, so their silence is the union test rather than the options.
+			// boolean does report, so their silence is the union test rather than the options.
 			configuration: "{\"allowComparingNullableBooleansToTrue\": false, \"allowComparingNullableBooleansToFalse\": false}",
 			sourceText:    "declare const b: boolean | undefined;\nconst z = b === true;",
 			wantIds:       []string{"comparingNullableToTrueDirect"},
@@ -799,7 +799,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDiscriminatesOnCasesUpstreamDoesNotWr
 
 // TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue is the option trap.
 //
-// Two of the three options default to TRUE. A generic decode over a non-pointer struct yields false
+// Two of the three options default to true. A generic decode over a non-pointer struct yields false
 // for every absent key, which turns both allowances off and makes the rule report two families of
 // comparison upstream allows by default. That inversion is invisible to any fixture that builds the
 // options struct directly, which is why every other test in this file routes through the decoder and
@@ -852,7 +852,7 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(test *tes
 // TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies bypasses the decoder.
 //
 // A rule configured as a bare `"error"` is handed nil, and a bare type assertion on nil yields the
-// zero value, which for this rule turns both allowances OFF rather than merely silencing the rule.
+// zero value, which for this rule turns both allowances off rather than merely silencing the rule.
 // That is worse than the usual inert shape: the rule would report where upstream is silent, and
 // every decoder-routed fixture would stay green.
 func TestNoUnnecessaryBooleanLiteralCompareNilOptionsAllowsTheNullishFamilies(test *testing.T) {
@@ -893,14 +893,14 @@ func TestNoUnnecessaryBooleanLiteralCompareRequiresTheTypedHarness(test *testing
 //
 // Upstream reports once per file when `strictNullChecks` is off and the escape option is not set.
 // That arm is reproduced in the rule and it cannot be reached through `rule_testing`: the harness
-// writes its own tsconfig AFTER the setup hook runs, so a fixture cannot turn the option off.
+// writes its own tsconfig after the setup hook runs, so a fixture cannot turn the option off.
 //
 // Probed directly rather than assumed. A hook writing `strict:false` and `strictNullChecks:false`
 // into the fixture directory produced a program whose resolved option was still true, identically to
 // the default path. So this is the brief's unreachable-through-the-harness category, and the honest
 // response is to pin the predicate rather than weaken the rule to make a fixture green.
 //
-// What IS asserted here is the resolution `GetStrictOptionValue` performs, which is the whole of the
+// What is asserted here is the resolution `GetStrictOptionValue` performs, which is the whole of the
 // decision: an explicit value wins, an unset one falls back to `strict`, and `strict: false` with no
 // explicit value resolves to off.
 func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(test *testing.T) {
@@ -944,12 +944,12 @@ func TestNoUnnecessaryBooleanLiteralCompareStrictNullChecksArmIsHarnessBlocked(t
 // TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule records the other
 // case the harness cannot reproduce.
 //
-// Upstream ships this as a PASSING case and it is silent there only because of the
+// Upstream ships this as a passing case and it is silent there only because of the
 // `eslint-disable-next-line` comment inside it. `rule_testing.Run` never consults
 // `internal/suppression`, so no rule test can reproduce that silence, and recording it in the clean
 // list would assert a property of a layer this test cannot reach.
 //
-// So it is pinned at the layer that actually decides it: the rule REPORTS, and the suppression layer
+// So it is pinned at the layer that actually decides it: the rule reports, and the suppression layer
 // is what makes it clean in a real run. Confirmed by removing the comment and watching the same
 // source report identically.
 func TestNoUnnecessaryBooleanLiteralCompareSuppressionCaseIsDecidedAboveTheRule(test *testing.T) {

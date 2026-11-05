@@ -18,7 +18,7 @@ func returnAwaitCaseName(index int) string {
 // returnAwaitOptionsFor routes a case through the rule's own decoder.
 //
 // Building the options struct directly would leave the decoder untested, and the decoder is where
-// the DEFAULT lives. That default is `in-try-catch` rather than `always`, so a rule configured as
+// the default lives. That default is `in-try-catch` rather than `always`, so a rule configured as
 // a plain "error" arrives with nil options and must land on it; the zero value is an empty mode
 // matching no arm, which would make the rule silently inert.
 func returnAwaitOptionsFor(test *testing.T, optionsJson string) any {
@@ -274,8 +274,8 @@ type returnAwaitFinding struct {
 // separated only by whether the position affects error handling, and `nonPromiseAwait` is a third
 // answer about the type rather than the context.
 //
-// Cases whose repair upstream ships as a FIX assert the rewritten file in TestReturnAwaitFixes
-// below. Cases whose repair is a SUGGESTION are asserted separately, because the harness applies
+// Cases whose repair upstream ships as a fix assert the rewritten file in TestReturnAwaitFixes
+// below. Cases whose repair is a suggestion are asserted separately, because the harness applies
 // fixes and not suggestions, and collapsing the two would have the edit engine rewriting which
 // frame catches a rejection.
 func TestReturnAwaitFires(test *testing.T) {
@@ -952,10 +952,10 @@ func TestReturnAwaitFires(test *testing.T) {
 // TestReturnAwaitFixes asserts the repair on every case upstream applies unattended.
 //
 // These go through rule_testing.ExpectFixedSource, which replays the fixes into the source and
-// compares the WHOLE rewritten file, so a repair that edits the right span with the wrong text or
+// compares the whole rewritten file, so a repair that edits the right span with the wrong text or
 // the wrong span with the right text both fail here and neither is visible to a message id.
 //
-// Four rows below take their expected output from the CLONE rather than from the installed build,
+// Four rows below take their expected output from the clone rather than from the installed build,
 // and they are the only four where the two disagree. Enumerated rather than assumed: every other
 // fix vector is byte-identical between 8.67 and 8.68.
 //
@@ -1162,13 +1162,13 @@ func TestReturnAwaitFixes(test *testing.T) {
 
 // TestReturnAwaitOffersSuggestionsRatherThanFixes covers the half the harness cannot apply.
 //
-// Where the position affects error handling, upstream ships the same edit as a SUGGESTION rather
+// Where the position affects error handling, upstream ships the same edit as a suggestion rather
 // than a fix, because adding or removing the await changes which frame catches a rejection. That
 // distinction is the whole safety property of this rule: shipping these as fixes would have the
 // edit engine silently rewriting control flow.
 //
 // ExpectFixedSource cannot see a suggestion, so these rows assert that the finding carries a
-// suggestion and NO fix, plus the suggestion text. A row that arrived as a fix would pass every
+// suggestion and no fix, plus the suggestion text. A row that arrived as a fix would pass every
 // message-id assertion in the firing test above.
 func TestReturnAwaitOffersSuggestionsRatherThanFixes(test *testing.T) {
 	test.Parallel()

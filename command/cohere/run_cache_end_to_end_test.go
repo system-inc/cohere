@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -27,20 +30,23 @@ func TestMain(m *testing.M) {
 	if temporaryDirectoryError != nil {
 		panic(temporaryDirectoryError)
 	}
-	os.Setenv("HOME", home)
-	os.Setenv("XDG_CACHE_HOME", "")
+	// Ignored: Setenv fails only for a name holding "=" or a NUL, and neither name here does.
+	_ = os.Setenv("HOME", home)
+	_ = os.Setenv("XDG_CACHE_HOME", "") // Ignored: as the line above.
 	// See held_output_guard_test.go: a command whose output never closes fails the binary with its holder
 	// named, rather than at -timeout with nothing said.
 	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, failHeldOutput)
 	code := m.Run()
 	stopWatching()
-	os.RemoveAll(home)
+	// Ignored: a temporary directory of this test binary's own, which costs only its space if it outlives the
+	// run, and the run's verdict is already decided. So for each removal below.
+	_ = os.RemoveAll(home)
 	if sharedBinary.directory != "" {
-		os.RemoveAll(sharedBinary.directory)
+		_ = os.RemoveAll(sharedBinary.directory) // Ignored: as home's, above.
 	}
 	for _, stamped := range stampedBinaries.byVersion {
 		if stamped.directory != "" {
-			os.RemoveAll(stamped.directory)
+			_ = os.RemoveAll(stamped.directory) // Ignored: as home's, above.
 		}
 	}
 	os.Exit(code)
@@ -54,7 +60,9 @@ var nodeCounts = regexp.MustCompile(`(\d+) nodes visited(?:, (\d+) more covered 
 func foldNodeCounts(output string) string {
 	return nodeCounts.ReplaceAllStringFunc(output, func(account string) string {
 		parts := nodeCounts.FindStringSubmatch(account)
+		// Ignored: the pattern captures digits.
 		visited, _ := strconv.Atoi(parts[1])
+		// Ignored: digits, or nothing when no file was replayed, which reads as the 0 it means.
 		replayed, _ := strconv.Atoi(parts[2])
 		return fmt.Sprintf("%d nodes visited", visited+replayed)
 	})
@@ -99,12 +107,9 @@ func TestRunCacheEndToEnd(test *testing.T) {
 	}
 	keepLines := func(output string, drop ...string) string {
 		kept := []string{}
-	line:
 		for _, line := range strings.Split(output, "\n") {
-			for _, prefix := range drop {
-				if strings.HasPrefix(line, prefix) {
-					continue line
-				}
+			if slices.ContainsFunc(drop, func(prefix string) bool { return strings.HasPrefix(line, prefix) }) {
+				continue
 			}
 			kept = append(kept, line)
 		}
@@ -365,12 +370,19 @@ func TestRunCacheEndToEnd(test *testing.T) {
 		if len(tables) == 0 {
 			test.Fatalf("no cache table in the project %s", fixture.root)
 		}
-		filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, err error) error {
-			if err == nil && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
+		// A walk that cannot read the home fails the test, rather than reading as a home with no table in it.
+		walkError := filepath.WalkDir(fixture.home, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".gob") {
 				test.Errorf("a cache table landed in the user's fixture.home: %s", path)
 			}
 			return nil
 		})
+		if walkError != nil {
+			test.Fatal(walkError)
+		}
 		// Every run here leaves formatting out (see run), so the bare run is recorded as `--no-format`.
 		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
 			test.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
@@ -593,8 +605,8 @@ func (fixture *runCacheFixture) establishHit(arguments ...string) {
 func isRunCacheReplay(output string) bool { return strings.HasPrefix(output, "cached: ") }
 
 // pinGoEnvironment sets the go command's caches and settings in the environment as the caller has them, before
-// TestMain moves HOME. The go command finds its build cache, its module cache and its settings file under
-// HOME, so every test that built this command under the fake home compiled the whole module cold and lost
+// TestMain moves `HOME`. The go command finds its build cache, its module cache and its settings file under
+// `HOME`, so every test that built this command under the fake home compiled the whole module cold and lost
 // the house's -trimpath: about a minute per package run, the most of command/cohere's wall (#nxgt2ca). A
 // variable the caller already set is left as it is.
 func pinGoEnvironment() {
@@ -608,7 +620,52 @@ func pinGoEnvironment() {
 	}
 	for name, value := range settings {
 		if _, set := os.LookupEnv(name); !set && value != "" {
-			os.Setenv(name, value)
+			// Ignored: Setenv fails only for a name holding "=" or a NUL, and go env names none that way.
+			_ = os.Setenv(name, value)
 		}
+	}
+}
+
+// TestAReplayThatCannotBeWrittenFailsTheRun: a replay whose stdout cannot be written exits nonzero and says so,
+// as a run that computed its report does. A replay used to write straight to the terminal's files and drop every
+// error, so the review's `cohere --no-fix 1</dev/null`, run three times, exited 1 on the miss and 0 on both
+// replays, with nothing said. Here stdout is a file opened for reading only, which every write fails on, as on
+// that descriptor.
+func TestAReplayThatCannotBeWrittenFailsTheRun(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		"tsconfig.json": fixScopeTsconfig,
+		".gitignore":    ".cache/\n",
+		"Clean.ts":      "export const clean = 1;\n",
+	})
+	arguments := []string{"--no-fix", "--no-format", "--verbose"}
+	unwritable, openError := os.Open(filepath.Join(root, "Clean.ts"))
+	if openError != nil {
+		test.Fatal(openError)
+	}
+	// Ignored: opened only to be handed to the child as an output it cannot write, and never written here.
+	defer unwritable.Close()
+
+	// The first is the miss, which records the run; the other two replay it.
+	for _, run := range []string{"the miss", "the first replay", "the second replay"} {
+		var standardError bytes.Buffer
+		command := exec.Command(binary, arguments...)
+		command.Dir = root
+		command.Stdout, command.Stderr = unwritable, &standardError
+		runError := command.Run()
+		var exitError *exec.ExitError
+		if !errors.As(runError, &exitError) || childExitCode(test, exitError) == 0 {
+			test.Fatalf("%s, into output it could not write, ended with %v, want a nonzero exit:\n%s", run, runError,
+				standardError.String())
+		}
+		if !strings.Contains(standardError.String(), "Writing the output failed") {
+			test.Errorf("%s does not say its output did not arrive:\n%s", run, standardError.String())
+		}
+	}
+	// And the runs above had a recorded run to replay: the tree, unchanged, replays now.
+	if output, _ := runCohere(test, binary, root, arguments...); !isRunCacheReplay(output) {
+		test.Fatalf("an unchanged tree did not replay, so the runs above may not have been replays:\n%s", output)
 	}
 }

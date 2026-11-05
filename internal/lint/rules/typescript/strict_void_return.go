@@ -13,7 +13,7 @@ import (
 type StrictVoidReturnOptions struct {
 	// AllowReturnAny permits a function returning `any` where a void function is expected.
 	//
-	// Defaults to FALSE. The generic decoder would be correct by coincidence here; the hand-rolled
+	// Defaults to false. The generic decoder would be correct by coincidence here; the hand-rolled
 	// one keeps an absent key distinguishable from an explicit false.
 	AllowReturnAny bool
 }
@@ -55,7 +55,7 @@ func DecodeStrictVoidReturnOptions(raw []byte) (any, error) {
 // async callback passed to `addEventListener` produces a floating promise whose rejection nobody
 // handles, and a value-returning callback passed to `forEach` reads as though the value matters.
 //
-// # The whole rule turns on the CONTEXTUAL type
+// # The whole rule turns on the contextual type
 //
 // Every listener finds a position where a value is being placed, asks what type is expected there,
 // and reports when that expectation is a void-returning function while the value supplied is not.
@@ -132,7 +132,7 @@ var StrictVoidReturn = rule.Rule{
 				}
 				// Upstream checks every AssignmentExpression and notes that arithmetic compounds
 				// like `+=` fall out on their own, because their contextual type is never a
-				// function. The LOGICAL compounds do not fall out: `foo ??= cb` places `cb` in a
+				// function. The logical compounds do not fall out: `foo ??= cb` places `cb` in a
 				// position typed by `foo`, so a void-returning `foo` makes it this rule's question.
 				// Measured, three corpus cases turn on exactly that and were silent when this arm
 				// accepted only a plain `=`.
@@ -174,7 +174,7 @@ var StrictVoidReturn = rule.Rule{
 
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				// A class property is checked against the same-named member of every base type
-				// FIRST, because a subclass narrowing an inherited void callback to a value-
+				// first, because a subclass narrowing an inherited void callback to a value-
 				// returning one is the mistake this arm exists for. Only if no base expects a void
 				// function does the ordinary contextual-type path apply.
 				if state.checkAgainstBaseTypes(node) {
@@ -231,7 +231,7 @@ func (s *strictVoidReturnState) isVoidReturningFunctionType(subject *checker.Typ
 	if subject == nil {
 		return false
 	}
-	// The contextual type is split into union constituents BEFORE signatures are read, and leaving
+	// The contextual type is split into union constituents before signatures are read, and leaving
 	// that out was a real defect rather than a nicety. `let foo: (() => void) | null` gives a
 	// contextual type of `(() => void) | null`, and asking a union for its own call signatures
 	// returns none, so the whole rule went silent on every optional or nullable callback position.
@@ -257,7 +257,7 @@ func (s *strictVoidReturnState) isVoidReturningFunctionType(subject *checker.Typ
 // checkAgainstBaseTypes answers upstream's `getBaseTypesOfClassMember` loop.
 //
 // A class member that overrides or implements one declared elsewhere is judged against what the
-// BASE declared rather than against a contextual type, because there is no contextual position: the
+// base declared rather than against a contextual type, because there is no contextual position: the
 // member simply sits in a class body. `class Bar extends Foo { cb = Math.random }` reports when
 // `Foo.cb` is typed `() => void`.
 //
@@ -351,7 +351,7 @@ func strictVoidReturnHeritageClauses(node *ast.Node) *ast.NodeList {
 // reportIfNonVoidFunctionAtProperty checks a shorthand method against its property's expected type.
 //
 // A method has no initializer expression, so `getContextualType` has nothing to ask about. The
-// expected type is read from the property NAME instead, which the checker resolves against the
+// expected type is read from the property name instead, which the checker resolves against the
 // contextual object type, and the method itself is then judged exactly as a function literal would
 // be. Upstream reaches the same place through its own object-property path.
 func (s *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.Node) {
@@ -362,7 +362,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.
 	if name == nil {
 		return
 	}
-	// The property's expected type comes from the enclosing OBJECT's contextual type, looked up by
+	// The property's expected type comes from the enclosing object's contextual type, looked up by
 	// name. Asking the method's own name for a contextual type answers nil, measured, because a
 	// method name is a declaration rather than a value position.
 	object := property.Parent
@@ -479,7 +479,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 
 	// A sync function literal.
 
-	// A concise arrow body is its own return, and it reports on the BODY rather than on the
+	// A concise arrow body is its own return, and it reports on the body rather than on the
 	// function or on a `return` keyword there is none of. This branch sits before the annotation
 	// check, which matters: a shorthand arrow with a non-void annotation reports here rather than
 	// at the annotation. Missing it cost 54 of 107 reporting cases on the first writing, all of
@@ -493,7 +493,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 		return
 	}
 
-	// An explicit non-void return annotation is reported at the ANNOTATION rather than at the
+	// An explicit non-void return annotation is reported at the annotation rather than at the
 	// function.
 	if annotation := strictVoidReturnTypeAnnotation(node); annotation != nil {
 		if annotation.Kind != ast.KindVoidKeyword {
@@ -524,7 +524,7 @@ func (s *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 // checkCall is upstream's `checkFunctionCallNode`.
 //
 // It does not simply ask the contextual type of each argument, and the reason is overloads:
-// `getContextualType` resolves to the FIRST overload's parameter type even when another overload is
+// `getContextualType` resolves to the first overload's parameter type even when another overload is
 // the one that matches, so a call like `addEventListener` whose overloads differ in callback return
 // type would be judged against the wrong one. Upstream therefore collects the expected return type
 // from every signature and only trusts the contextual type when there is a single signature or when
@@ -679,7 +679,7 @@ func strictVoidReturnBody(node *ast.Node) *ast.Node {
 
 // strictVoidReturnHeadRange is upstream's `getFunctionHeadLoc`.
 //
-// The reported span for an async or generator function literal is its HEAD rather than the whole
+// The reported span for an async or generator function literal is its `HEAD` rather than the whole
 // function, so a multi-line callback underlines its first line instead of its body. The head runs
 // from the function's first token through the closing parenthesis of its parameter list.
 func strictVoidReturnHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {

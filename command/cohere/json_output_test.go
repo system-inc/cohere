@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -14,17 +16,15 @@ import (
 func TestJSONLines(test *testing.T) {
 	test.Parallel()
 	var out bytes.Buffer
+	stream := bufio.NewWriter(&out)
 	finding := runFinding{Path: "/repo/a.ts", Line: 3, Column: 7, Severity: "error", Rule: "prefer-const", MessageID: "useConst", Message: "Use const."}
-	if writeJSONLineError := writeJSONLine(&out, findingAsJSON(finding)); writeJSONLineError != nil {
-		test.Fatal(writeJSONLineError)
-	}
+	writeJSONLine(stream, findingAsJSON(finding))
 	for _, line := range changedFilesAsJSON([]changedFile{
 		{Path: "b.ts", Fixed: true, Formatted: true, FixedBy: map[string]int{"prefer-const": 2, "object-shorthand": 1}},
 	}) {
-		if writeJSONLineError := writeJSONLine(&out, line); writeJSONLineError != nil {
-			test.Fatal(writeJSONLineError)
-		}
+		writeJSONLine(stream, line)
 	}
+	flushStream(test, stream)
 	want := `{"kind":"finding","path":"/repo/a.ts","line":3,"column":7,"severity":"error","rule":"prefer-const","messageId":"useConst","message":"Use const."}
 {"kind":"fixed","path":"b.ts","rules":["object-shorthand","prefer-const"]}
 {"kind":"formatted","path":"b.ts"}
@@ -46,29 +46,45 @@ func TestJSONSummary(test *testing.T) {
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
-	var decoded map[string]any
+	// The line is read back under the names a reader reads it by, spelled here apart from summaryJSON's tags, so
+	// a field written under another name reads as zero and fails the comparison, and one written as another kind
+	// fails the decode.
+	type phaseLine struct {
+		Name string `json:"name"`
+	}
+	type gapsLine struct {
+		CrashedFiles int `json:"crashedFiles"`
+	}
+	type summaryLine struct {
+		Kind              string      `json:"kind"`
+		SchemaVersion     int         `json:"schemaVersion"`
+		Verdict           string      `json:"verdict"`
+		Seconds           float64     `json:"seconds"`
+		Findings          int         `json:"findings"`
+		FilesFixed        int         `json:"filesFixed"`
+		FilesFormatted    int         `json:"filesFormatted"`
+		Cohered           int         `json:"cohered"`
+		Checked           int         `json:"checked"`
+		Cached            int         `json:"cached"`
+		FilesInScope      int         `json:"filesInScope"`
+		Rules             int         `json:"rules"`
+		FormattingSeconds float64     `json:"formattingSeconds"`
+		Gaps              gapsLine    `json:"gaps"`
+		Phases            []phaseLine `json:"phases"`
+	}
+	var decoded summaryLine
 	if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	for key, want := range map[string]any{
-		"kind": "summary", "schemaVersion": float64(outputSchemaVersion), "verdict": "fail", "seconds": 0.7,
-		"findings": float64(2), "filesFixed": float64(1), "filesFormatted": float64(2),
-		"cohered": float64(2), "checked": float64(3), "cached": float64(3923), "filesInScope": float64(3926), "rules": float64(480), "formattingSeconds": 0.02,
-	} {
-		if decoded[key] != want {
-			test.Errorf("summary %s = %v, want %v", key, decoded[key], want)
-		}
+	want := summaryLine{
+		Kind: "summary", SchemaVersion: outputSchemaVersion, Verdict: "fail", Seconds: 0.7,
+		Findings: 2, FilesFixed: 1, FilesFormatted: 2,
+		Cohered: 2, Checked: 3, Cached: 3923, FilesInScope: 3926, Rules: 480, FormattingSeconds: 0.02,
+		Gaps:   gapsLine{CrashedFiles: 1},
+		Phases: []phaseLine{{Name: "fix"}, {Name: "types"}, {Name: "lint"}},
 	}
-	if gaps, isObject := decoded["gaps"].(map[string]any); !isObject || gaps["crashedFiles"] != float64(1) {
-		test.Errorf("the summary's gaps dropped the crashed file: %v", decoded["gaps"])
-	}
-	// A nil first phase reads no name, so a missing or misshapen phase list fails the comparison below.
-	var firstPhase map[string]any
-	if phases, isList := decoded["phases"].([]any); isList && len(phases) == 3 {
-		firstPhase, _ = phases[0].(map[string]any)
-	}
-	if firstPhase["name"] != "fix" {
-		test.Errorf("phases: %v", decoded["phases"])
+	if !reflect.DeepEqual(decoded, want) {
+		test.Errorf("the summary line:\n got %+v\nwant %+v", decoded, want)
 	}
 	if replay := summaryAsJSON(runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}}); !replay.Cache.Replayed || replay.Verdict != "pass" {
 		test.Errorf("a replay's summary: %+v", replay)
@@ -152,4 +168,13 @@ func schemaPropertyNames(properties map[string]schemaObject) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// A value that does not encode is no line at all rather than a broken one. jsonLine also reports it to package
+// streams, which ends the run nonzero; that report is the process's, and no test here finishes the process.
+func TestAValueThatDoesNotEncodeIsNoLine(test *testing.T) {
+	test.Parallel()
+	if line := jsonLine(map[string]float64{"seconds": math.NaN()}); line != "" {
+		test.Errorf("a value JSON cannot hold printed %q", line)
+	}
 }

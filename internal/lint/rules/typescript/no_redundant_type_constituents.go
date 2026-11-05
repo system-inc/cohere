@@ -25,8 +25,8 @@ import (
 //
 // # The absorption is directional, and the direction flips between the two containers
 //
-// In a UNION the wider type wins, so `'a' | string` is `string` and the LITERAL is reported. In an
-// INTERSECTION the narrower type wins, so `'a' & string` is `'a'` and the PRIMITIVE is reported.
+// In a union the wider type wins, so `'a' | string` is `string` and the literal is reported. In an
+// intersection the narrower type wins, so `'a' & string` is `'a'` and the primitive is reported.
 // Same pair of members, opposite finding. Getting this backwards names the wrong member while
 // reading entirely plausible, which is why the two arms are written separately below rather than
 // shared behind a flag.
@@ -45,7 +45,7 @@ import (
 // # Our parser inserts a node upstream never sees, and it changes the walk
 //
 // estree has no parenthesized type, so upstream's handler receives `(string | any) | number` as two
-// members whose first has a union TYPE. Ours inserts a `KindParenthesizedType` between, and without
+// members whose first has a union type. Ours inserts a `KindParenthesizedType` between, and without
 // unwrapping it the member reads as opaque and the finding is lost.
 //
 // Measured against the installed 8.67.0 build before this rule was written, because the corpus
@@ -59,7 +59,7 @@ import (
 //
 // The two findings in the first case come from two different listener calls: the outer union
 // reports the member whose type is a union, and the inner union reports `any` on its own. So the
-// unwrap is for member IDENTITY only and the spans fall out; a probe predicting exactly that agreed
+// unwrap is for member identity only and the spans fall out; a probe predicting exactly that agreed
 // with all five measured shapes, and disabling the unwrap took it to two of five.
 //
 // # `boolean` is stored as a union and must not be split
@@ -183,6 +183,8 @@ func redundantKeywordFlags(node *ast.Node) (checker.TypeFlags, bool) {
 //
 // Cached per node, because a member that is a type reference to a large union would otherwise be
 // re-resolved once for every sibling it is compared against.
+//
+// Mutates: cache the caller keeps one cache across every member it compares, so each resolves once
 func typePartsOf(ruleContext rule.Context, node *ast.Node, cache map[*ast.Node][]redundantTypePart) []redundantTypePart {
 	if existing, seen := cache[node]; seen {
 		return existing
@@ -259,8 +261,8 @@ func unionPartsUnlessBoolean(subject *checker.Type) []*checker.Type {
 		return []*checker.Type{subject}
 	}
 	members := subject.Types()
-	// Matched by FLAG rather than through the shelf's true/false predicates. Those require an
-	// INTRINSIC type, and a boolean reached through an alias is not one: measured on
+	// Matched by flag rather than through the shelf's true/false predicates. Those require an
+	// intrinsic type, and a boolean reached through an alias is not one: measured on
 	// `type B = boolean; type T = B | false`, both members report the BooleanLiteral flag while
 	// IsFalseLiteralType answers false for each. With the predicate version the guard never fired,
 	// `B` split into two literals, no primitive was ever seen, and the case reported nothing.
@@ -319,11 +321,11 @@ func describeTypeNodeName(ruleContext rule.Context, node *ast.Node) string {
 
 // describeResolvedType renders a member the checker resolved, which is upstream's describeLiteralType.
 func describeResolvedType(ruleContext rule.Context, subject *checker.Type) string {
-	// The ERROR type first, and this ordering is load-bearing rather than tidy. An unresolvable
+	// The error type first, and this ordering is load-bearing rather than tidy. An unresolvable
 	// name carries the `any` flag as well as being the error type, so an `IsTypeAnyType` test
 	// placed above this one answers "any" and the caller's `typeName != "any"` check never fires,
 	// which silently downgrades `errorTypeOverrides` to `overrides`. Measured on `NotKnown | 0`:
-	// any=true AND errorType=true on the same type.
+	// any=true and errorType=true on the same type.
 	if type_checking.IsIntrinsicErrorType(subject) {
 		return ruleContext.TypeChecker.TypeToString(subject)
 	}
@@ -339,7 +341,7 @@ func describeResolvedType(ruleContext rule.Context, subject *checker.Type) strin
 	if type_checking.IsTypeFlagSet(subject, checker.TypeFlagsTemplateLiteral) {
 		return "template literal type"
 	}
-	// A boolean literal is matched by FLAG rather than through the shelf's true/false predicates.
+	// A boolean literal is matched by flag rather than through the shelf's true/false predicates.
 	// Those require an intrinsic type, and one reached through an alias is not: measured on
 	// `type B = false; type T = B & boolean`, the member reports BooleanLiteral set while
 	// IsFalseLiteralType answers false, which sent the name to "literal type" and the message to
@@ -386,7 +388,7 @@ func isInsideReturnType(node *ast.Node) bool {
 		return false
 	}
 	// A return annotation hangs directly off the function-like declaration, so the union's parent
-	// IS the function rather than a separate annotation node the way estree models it.
+	// is the function rather than a separate annotation node the way estree models it.
 	if !ast.IsFunctionLike(parent) {
 		return false
 	}
@@ -510,7 +512,7 @@ func checkRedundantIntersection(ruleContext rule.Context, node *ast.Node, cache 
 		parts := typePartsOf(ruleContext, member, cache)
 
 		for _, part := range parts {
-			// `any` and `never` swallow an intersection; `unknown` is swallowed BY it. That
+			// `any` and `never` swallow an intersection; `unknown` is swallowed by it. That
 			// asymmetry against the union arm is upstream's and is the reason the two arms are
 			// written out rather than shared.
 			handled := false

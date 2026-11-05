@@ -73,8 +73,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 		}
 		described := summary.String()
 		for _, changed := range summary.ChangedFiles {
-			relative, _ := filepath.Rel(directory, changed.FileName)
-			described += fmt.Sprintf("\n%s: %v", relative, changed.Changers)
+			described += fmt.Sprintf("\n%s: %v", relativeIn(test, directory, changed.FileName), changed.Changers)
 		}
 		// Absolute paths differ between the two trees, so the summary is compared with the root taken out.
 		described = stripRoot(described, directory)

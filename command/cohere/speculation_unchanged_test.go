@@ -104,6 +104,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 	if !kept || attempt.err != nil || attempt.result.Changed {
 		test.Fatalf("the unchanged file was not kept as formatted: kept %v, %+v", kept, attempt)
 	}
+	// Unsafe: each pointer is only compared, to tell one string's memory from another's, never followed.
 	if unsafe.StringData(attempt.result.Text) != unsafe.StringData(graph.Program.GetSourceFile(tspath.RootedFilePath(unchanged)).Text()) {
 		test.Errorf("the unchanged file's result is not the program's copy, so it was read again")
 	}

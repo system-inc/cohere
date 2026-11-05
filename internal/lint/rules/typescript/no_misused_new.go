@@ -58,13 +58,13 @@ var messageNoMisusedNewClassNew = rule.Message{
 //	    anchored on the CLASS, and only a named one
 //
 // The corpus pins the asymmetry directly and it reads as a contradiction until the anchors are
-// laid out: `type T = { new (): T };` is a PASS while `type T = { constructor(): void;};` is a
-// FAIL. Both are members of a type literal. The first is unreachable because the construct-
+// laid out: `type T = { new (): T };` is a pass while `type T = { constructor(): void;};` is a
+// fail. Both are members of a type literal. The first is unreachable because the construct-
 // signature arm only ever walks an interface's own body, and the second is reachable because the
 // `constructor` arm listens for the signature wherever it lives. Reproducing this faithfully means
 // resisting the urge to make the two arms symmetric.
 //
-// # The return type is compared by NAME TEXT, never by resolution
+// # The return type is compared by name text, never by resolution
 //
 // oxc reads the written identifier out of the type annotation and compares its text to the
 // declaration's own name. There is no symbol lookup anywhere in the rule, so this needs no type
@@ -93,7 +93,7 @@ var messageNoMisusedNewClassNew = rule.Message{
 // would go silent on a getter named `new`, and no corpus case could see it: the corpus's only
 // getter is `get new()` with no return type, which passes under either reading.
 //
-// Measured: `declare abstract class C { get new(): C; }` REPORTS. The getter is handled.
+// Measured: `declare abstract class C { get new(): C; }` reports. The getter is handled.
 //
 // A setter is also a MethodDefinition upstream and is handled here too, but it can never match,
 // because a setter has no return type annotation to compare. That is upstream's behavior rather
@@ -107,7 +107,7 @@ var messageNoMisusedNewClassNew = rule.Message{
 //
 // This is the one place `ast.TryGetTextOfPropertyName` is the wrong tool despite being the shelf's
 // recommended answer for reading a property key. Probed on our own parse, it answers
-// `("constructor", true)` for the identifier key, the string literal key, AND the computed key, so
+// `("constructor", true)` for the identifier key, the string literal key, and the computed key, so
 // building on it over-reports on two inputs the corpus does not write. The kind is checked
 // directly instead.
 //

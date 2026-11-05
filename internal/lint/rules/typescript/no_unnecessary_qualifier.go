@@ -23,7 +23,7 @@ import (
 //
 // A qualifier is unnecessary only when all three hold. The qualifier resolves to a symbol whose
 // declaration is one of the namespaces or enums this node is lexically inside. The accessed name
-// resolves to a symbol. And the name the checker finds in scope AT THE QUALIFIER is the same symbol
+// resolves to a symbol. And the name the checker finds in scope at the qualifier is the same symbol
 // the access resolved to, compared through `GetExportSymbolOfSymbol` because a namespace member's
 // local symbol and its exported symbol are different objects.
 //
@@ -31,7 +31,7 @@ import (
 //
 //	namespace X { export type T = number; namespace Y { type T = string; const x: X.T = 0; } }
 //
-// `T` IS in scope at that point, and it is the wrong `T`. Measured with a probe: the scope lookup
+// `T` is in scope at that point, and it is the wrong `T`. Measured with a probe: the scope lookup
 // finds a `T` and the export-symbol comparison answers false, so dropping the comparison would
 // report a qualifier that is load-bearing and the fix would change what the code means.
 //
@@ -49,7 +49,7 @@ import (
 //
 //	namespace A { export type B<T> = T; export type C = number; const x: A.B<A.C> = 3; }
 //
-// Measured: both report, because a type reference's arguments are children of the TYPE REFERENCE
+// Measured: both report, because a type reference's arguments are children of the type reference
 // and not of the qualified name, in our parser as in estree. So the subtree of a reported
 // `KindQualifiedName` or `KindPropertyAccessExpression` holds nothing but its own chain, and
 // skipping it is exactly upstream's suppression.
@@ -58,8 +58,8 @@ import (
 //
 // Upstream's ninth reporting case is `import * as Foo from './foo'; declare module './foo' { const
 // x: Foo.T = 3; }`, which needs `./foo` to resolve so the namespace import aliases to a real module
-// symbol. Driven through the installed 8.67.0 build with no `./foo` on disk, UPSTREAM IS SILENT
-// TOO, so this is a case whose verdict depends on a module existing rather than a shape our harness
+// symbol. Driven through the installed 8.67.0 build with no `./foo` on disk, upstream is silent
+// too, so this is a case whose verdict depends on a module existing rather than a shape our harness
 // cannot express. The alias branch it exercises is reached by a different fixture, recorded there.
 //
 // # Cost, and why the walk starts at the outermost enum or namespace
@@ -118,7 +118,7 @@ var NoUnnecessaryQualifier = rule.Rule{
 					}
 					// A type-position qualifier cannot itself be parenthesized in the grammar
 					// (`A.(B)` is not a type), so there is nothing to unwrap on the left. The
-					// parenthesized TYPE case `const x: (A.T) = 3` puts the parens around the
+					// parenthesized type case `const x: (A.T) = 3` puts the parens around the
 					// whole type reference, above this node, and reaches here unwrapped.
 					if unnecessaryQualifierReport(ruleContext, namespacesInScope,
 						qualifiedName.Left, qualifiedName.Right) {
@@ -192,7 +192,7 @@ func unnecessaryQualifierReport(
 		return false
 	}
 
-	// The scope lookup is anchored at the QUALIFIER rather than at the name, which is upstream's
+	// The scope lookup is anchored at the qualifier rather than at the name, which is upstream's
 	// choice and is load-bearing: asking at the name would ask what is visible after the dot, which
 	// is the namespace's own member table and would answer yes for every qualifier.
 	scopeSymbols := ruleContext.TypeChecker.GetSymbolsInScope(qualifier, accessedSymbol.Flags)
@@ -234,7 +234,7 @@ func unnecessaryQualifierReport(
 	//	(A.T)     ->  `const x: (T) = 3;` fine, same reason
 	//
 	// A fix is applied unattended, so shipping the first two would rewrite working code into a
-	// syntax error with nobody watching. The FINDING is upstream's and is reproduced; only the
+	// syntax error with nobody watching. The finding is upstream's and is reproduced; only the
 	// repair is withheld, and only on the shapes where upstream's own repair is broken. The test
 	// for it is positional rather than a paren count: if an open parenthesis lies between the
 	// qualifier's start and the enclosing expression's start, its partner is outside the removal.
@@ -295,7 +295,7 @@ func qualifierSymbolIsNamespaceInScope(
 // report. Probed over fourteen shapes that can sit left of a dot: call, element access, `as`, angle
 // assertion, non-null, conditional, comma, nullish coalesce, await, array index, object literal,
 // optional chain, `this`, and a property access on a literal. Every one of them either resolves to
-// NO SYMBOL, which the `namespaceSymbol == nil` guard declines, or resolves to something whose
+// no symbol, which the `namespaceSymbol == nil` guard declines, or resolves to something whose
 // declarations are not in the stack, which the identity loop declines.
 //
 // So it is redundant against this parser today. It is kept because it is upstream's, because the

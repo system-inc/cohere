@@ -23,7 +23,7 @@ type noFloatingPromisesSuggestion struct {
 	output    string
 }
 
-// runNoFloatingPromises routes every case through the typed harness, and through the OPTIONS path
+// runNoFloatingPromises routes every case through the typed harness, and through the options path
 // even when the case configures nothing.
 //
 // A case with no options passes nil rather than a zero struct, which is what a rule configured as
@@ -33,16 +33,16 @@ type noFloatingPromisesSuggestion struct {
 // assignments are what keep that from panicking, and routing the sixty-one unconfigured invalid
 // cases through here is what puts that arm under test rather than leaving it to a mutation sweep.
 //
-// # Why the FILENAME is a parameter of this rule rather than a constant
+// # Why the filename is a parameter of this rule rather than a constant
 //
-// A `TypeOrValueSpecifier` with `From: file` and a `Path` matches by comparing the DECLARING
+// A `TypeOrValueSpecifier` with `From: file` and a `Path` matches by comparing the declaring
 // file's absolute name against that path resolved from the program's current directory, in
 // `typecheck`'s `typeDeclaredInFile`. Upstream's own runner writes every fixture as `file.ts` under
 // `tests/fixtures`, so a `Path: "file.ts"` case is only clean because of what upstream named the
 // file, and one upstream case relies on exactly that while three others rely on the same
-// comparison FAILING for `tests/fixtures/file.ts`.
+// comparison failing for `tests/fixtures/file.ts`.
 //
-// Dropped in under one constant filename, upstream valid case 57 REPORTS, and it would have sat
+// Dropped in under one constant filename, upstream valid case 57 reports, and it would have sat
 // in the clean list asserting the opposite of upstream while looking like a rule defect. Measured
 // on the one input, holding source and options fixed and varying only the name:
 //
@@ -72,7 +72,7 @@ func runNoFloatingPromises(test *testing.T, sourceText string, options any) rule
 // applyNoFloatingPromisesSuggestion rewrites source with one suggestion's fixes, latest range
 // first.
 //
-// Back to front matters here rather than being defensive: the parenthesizing repairs carry TWO
+// Back to front matters here rather than being defensive: the parenthesizing repairs carry two
 // fixes, an insert before the statement and an insert after the expression, and applying them in
 // source order would shift the second one's offset by the length of the first.
 func applyNoFloatingPromisesSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
@@ -416,11 +416,11 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 }
 
 // TestNoFloatingPromisesMeasuredParentheses pins the paren axis, which the imported corpus writes
-// nowhere and which falls THREE different ways in this one rule.
+// nowhere and which falls three different ways in this one rule.
 //
 // The listener runs `ast.SkipParentheses` over the statement's expression, so parens around the
-// WHOLE expression are transparent. They are not skipped again once the descent has started, so a
-// parenthesized CALLEE is opaque: `ast.IsAccessExpression(callee)` declines and the `.catch` /
+// whole expression are transparent. They are not skipped again once the descent has started, so a
+// parenthesized callee is opaque: `ast.IsAccessExpression(callee)` declines and the `.catch` /
 // `.then` / `.finally` handling never runs. Measured, holding everything else fixed:
 //
 //	(p.catch(() => {}));       SILENT    parens around the statement expression, skipped
@@ -429,11 +429,11 @@ func TestNoFloatingPromisesSuggestionsRewriteTheSource(test *testing.T) {
 //
 // The first of those is the case that separates the skip from its absence. Dropping the skip leaves
 // `(p.catch(() => {}))` reporting, and every one of the 169 imported cases stays green, because
-// none of them writes a parenthesis. It was measured against BOTH references before being written
+// none of them writes a parenthesis. It was measured against both references before being written
 // here: `@typescript-eslint` is silent on it too, so this is shared behavior rather than a choice.
 //
 // The third row is a real divergence and it is recorded in the rule's doc comment: `@typescript-
-// eslint` is SILENT on `(p.catch)(() => {})` because ESTree has no parenthesized-expression node,
+// eslint` is silent on `(p.catch)(() => {})` because ESTree has no parenthesized-expression node,
 // and tsgolint reports because typescript-go keeps one. tsgolint wins, so the report is deliberate.
 func TestNoFloatingPromisesMeasuredParentheses(test *testing.T) {
 	test.Parallel()
@@ -465,13 +465,13 @@ func TestNoFloatingPromisesMeasuredParentheses(test *testing.T) {
 	}
 }
 
-// TestNoFloatingPromisesReportsOncePerStatement pins that an array of floating promises is ONE
+// TestNoFloatingPromisesReportsOncePerStatement pins that an array of floating promises is one
 // finding against the whole statement rather than one per element.
 //
 // The anchor is `KindExpressionStatement`, so per-element reporting is not a close call the corpus
 // happens not to cover, it is structurally impossible. The corpus's array cases are all single
 // statements, so nothing in it separates "reports once because it groups" from "reports once
-// because there is one statement". A TRIPLE does, and every position is read rather than the count
+// because there is one statement". A triple does, and every position is read rather than the count
 // alone.
 func TestNoFloatingPromisesReportsOncePerStatement(test *testing.T) {
 	test.Parallel()
@@ -495,14 +495,14 @@ func TestNoFloatingPromisesReportsOncePerStatement(test *testing.T) {
 		}
 	}
 
-	// Promise.all of a triple is ONE floating CALL, not a promise array: the argument is handled by
+	// Promise.all of a triple is one floating call, not a promise array: the argument is handled by
 	// Promise.all and the call's own result is what floats.
 	aggregated := runNoFloatingPromises(test, "Promise.all([Promise.resolve(1), Promise.resolve(2), Promise.resolve(3)]);\n", nil)
 	rule_testing.ExpectFindings(test, aggregated, "floatingVoid")
 }
 
 // sourceOf slices the trimmed source with a finding's own range, which is the only assertion that
-// can see WHERE a finding points.
+// can see where a finding points.
 func sourceOf(test *testing.T, sourceText string, result rule_testing.Result, index int) string {
 	test.Helper()
 	trimmed := strings.TrimSpace(sourceText)
@@ -561,16 +561,16 @@ func TestNoFloatingPromisesMessagesReadAsUpstreamWrote(test *testing.T) {
 // TestNoFloatingPromisesRequiresTheTypedHarness pins the checker declaration and the nil guard
 // together, so a later revert fails loudly rather than going green.
 //
-// This rule is the SILENT kind rather than the panicking kind. Every type question it asks routes
+// This rule is the silent kind rather than the panicking kind. Every type question it asks routes
 // through `ctx.TypeChecker`, and on this shim `GetTypeAtLocation` returns nil rather than crashing,
 // so a rule whose guard was dropped would not blow up: `isPromiseLike` would answer false for
 // everything and the whole corpus would go quiet. Ninety-seven reporting fixtures would fail in a
-// way that reads like a rule defect, and seventy-two clean ones would pass VACUOUSLY. The count
+// way that reads like a rule defect, and seventy-two clean ones would pass vacuously. The count
 // below is what makes the difference visible.
 //
 // The guard could not be written while this rule lived behind the tsgolint adapter, because the
 // adapter set NeedsTypeChecker on everything it wrapped and the listener was upstream's. Absorbing
-// the rule made the nil case reachable AND made the listener ours, so the guard is written here.
+// the rule made the nil case reachable and made the listener ours, so the guard is written here.
 func TestNoFloatingPromisesRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
@@ -593,7 +593,7 @@ func TestNoFloatingPromisesRequiresTheTypedHarness(test *testing.T) {
 // the thenable test, which the imported corpus does not separate from a plain "has a then".
 //
 // Upstream's own comment says it: this is `tsutils.isThenable()` modified "to only consider
-// thenables which can be rejected/caught via a second parameter". A `then` taking ONE function is
+// thenables which can be rejected/caught via a second parameter". A `then` taking one function is
 // not something this rule can tell you to handle, because there is nowhere to put the rejection
 // handler, so it is left alone. Both parameters must be callable; a second parameter that is not a
 // function does not count either.
@@ -631,7 +631,7 @@ func TestNoFloatingPromisesThenableNeedsTwoFunctionParameters(test *testing.T) {
 }
 
 // TestNoFloatingPromisesResolvesAStaticMemberName pins the one place this rule genuinely diverges
-// from `@typescript-eslint`, and pins that the resolution reaches ACROSS FILES.
+// from `@typescript-eslint`, and pins that the resolution reaches across files.
 //
 // tsgolint uses `checker.Checker_getAccessedPropertyName`, which resolves a computed member key
 // through the type checker. `@typescript-eslint` uses `getStaticMemberAccessValue`, which reads
@@ -674,7 +674,7 @@ func TestNoFloatingPromisesResolvesAStaticMemberName(test *testing.T) {
 // fields, and `from` moving from a string to an integer enum whose zero value is `file`, are both
 // invisible from a struct literal.
 //
-// The `ignoreVoid` rows are the ones that matter most. Its default is TRUE, so a decoder binding it
+// The `ignoreVoid` rows are the ones that matter most. Its default is true, so a decoder binding it
 // to a plain bool would turn every unconfigured run into an explicit `ignoreVoid: false`, inverting
 // almost the whole corpus. It stays a pointer end to end so that absent and false stay different.
 func TestDecodeNoFloatingPromisesOptions(test *testing.T) {

@@ -57,7 +57,7 @@ var messagePreferRegexpExecOverStringMatch = rule.Message{
 // tracking, and the two agree on every shape the corpus and the tree contain.
 //
 // Where the answer is genuinely unknowable -- a regex built from a runtime value, a `let` reassigned
-// elsewhere -- upstream's rule is to stay SILENT, and that direction matters: the guard is
+// elsewhere -- upstream's rule is to stay silent, and that direction matters: the guard is
 // `definitelyDoesNotContainGlobalFlag`, so an unproven absence of `g` is treated as a possible `g`
 // and nothing is reported. A port that inverted this would rewrite global matches and change
 // behaviour, which is why the helper below is named for what it proves rather than for what it
@@ -90,6 +90,18 @@ var PreferRegexpExec = rule.Rule{
 		}
 	},
 }
+
+// preferRegexpExecArgumentClass is upstream's `ArgumentType` bitset, reduced to the three answers
+// the switch below distinguishes.
+type preferRegexpExecArgumentClass int
+
+const (
+	// preferRegexpExecArgumentOther is upstream's `Other` and its `Both`: neither is reported,
+	// because a union of a string and a regex has no single correct repair.
+	preferRegexpExecArgumentOther preferRegexpExecArgumentClass = iota
+	preferRegexpExecArgumentString
+	preferRegexpExecArgumentRegExp
+)
 
 // checkPreferRegexpExec is upstream's `CallExpression[arguments.length=1] > MemberExpression`
 // listener.
@@ -131,7 +143,7 @@ func checkPreferRegexpExec(ruleContext rule.Context, node *ast.Node) {
 		return
 	}
 
-	// A regex that may carry `g` must stay a `match`. The direction is upstream's: only a PROVEN
+	// A regex that may carry `g` must stay a `match`. The direction is upstream's: only a proven
 	// absence of the flag allows a report.
 	if !preferRegexpExecDefinitelyHasNoGlobalFlag(ruleContext, argument) {
 		return
@@ -164,18 +176,6 @@ func checkPreferRegexpExec(ruleContext rule.Context, node *ast.Node) {
 			preferRegexpExecWrappingFixTwo(ruleContext, node, "RegExp(", argument, ").exec(", receiver, ")"))
 	}
 }
-
-// preferRegexpExecArgumentClass is upstream's `ArgumentType` bitset, reduced to the three answers
-// the switch below distinguishes.
-type preferRegexpExecArgumentClass int
-
-const (
-	// preferRegexpExecArgumentOther is upstream's `Other` and its `Both`: neither is reported,
-	// because a union of a string and a regex has no single correct repair.
-	preferRegexpExecArgumentOther preferRegexpExecArgumentClass = iota
-	preferRegexpExecArgumentString
-	preferRegexpExecArgumentRegExp
-)
 
 // preferRegexpExecArgumentKind classifies the argument's type across its union constituents.
 //
@@ -210,7 +210,7 @@ func preferRegexpExecArgumentKind(
 // preferRegexpExecDefinitelyHasNoGlobalFlag proves the argument cannot carry a `g` flag.
 //
 // The name states the direction, which is the load-bearing part: an argument this cannot prove
-// anything about answers FALSE and the rule stays silent. Reporting an unproven case would rewrite
+// anything about answers false and the rule stays silent. Reporting an unproven case would rewrite
 // a global match into an `exec`, which returns one match where the original returned all of them.
 //
 // Upstream reaches the same answer through `getStaticValue`, a general constant folder with its own
@@ -237,7 +237,7 @@ func preferRegexpExecDefinitelyHasNoGlobalFlag(ruleContext rule.Context, argumen
 		return preferRegexpExecConstructionHasNoGlobalFlag(ruleContext, argument)
 
 	case ast.KindIdentifier:
-		// A reference is settled by evaluating it to an actual value, NOT by recursing into
+		// A reference is settled by evaluating it to an actual value, not by recursing into
 		// whatever it was initialised with. The distinction is upstream's and it is observable:
 		//
 		//	const r = /x/;                    a.match(r)   REPORTS, the value is a known RegExp
@@ -248,7 +248,7 @@ func preferRegexpExecDefinitelyHasNoGlobalFlag(ruleContext rule.Context, argumen
 		// Upstream reaches that split through two separate guards. `getStaticValue` evaluates the
 		// argument, and a construction from a runtime value evaluates to nothing; only when that
 		// fails does it fall back to `definitelyDoesNotContainGlobalFlag`, which handles a call or
-		// a `new` expression and NOTHING ELSE -- an identifier reaching it answers false.
+		// a `new` expression and nothing else -- an identifier reaching it answers false.
 		//
 		// So a bound identifier is reportable only when it evaluates to a real regex, and a
 		// construction is reportable only when written inline. A first draft here recursed from the
@@ -275,7 +275,7 @@ func preferRegexpExecDefinitelyHasNoGlobalFlag(ruleContext rule.Context, argumen
 //	const r = new RegExp(t);   clean     a construction is not a computable value
 //
 // The last two are the ones that separate this from the intuitive implementation. Upstream evaluates
-// the reference with `getStaticValue` and requires an actual VALUE back; a declaration with no
+// the reference with `getStaticValue` and requires an actual value back; a declaration with no
 // initializer and a construction from a runtime pattern both yield nothing, so the rule stays
 // silent. Recursing into the initializer instead -- asking "could this construction carry a g" --
 // reports both, and over-reported 8 real sites in this repository.
@@ -300,7 +300,7 @@ func preferRegexpExecEvaluatesToNonGlobalRegex(ruleContext rule.Context, referen
 		return preferRegexpExecIsComputableConstruction(ruleContext, initializer)
 	}
 
-	// A computable STRING is safe: the repair wraps it in `RegExp(...)`, which carries no flags.
+	// A computable string is safe: the repair wraps it in `RegExp(...)`, which carries no flags.
 	// Anything else -- a call to something else, a value from outside the file -- is not computable
 	// and therefore not reportable.
 	return preferRegexpExecIsComputableString(initializer)
@@ -311,7 +311,7 @@ func preferRegexpExecEvaluatesToNonGlobalRegex(ruleContext rule.Context, referen
 //
 // `getStaticValue` can evaluate `new RegExp('test', ”)` because both arguments are literals, and
 // cannot evaluate `new RegExp(`^${t}$`)` because the pattern depends on a runtime value. So this
-// requires EVERY argument to be a computable string, and then reads the flags from the second.
+// requires every argument to be a computable string, and then reads the flags from the second.
 func preferRegexpExecIsComputableConstruction(ruleContext rule.Context, node *ast.Node) bool {
 	var callee *ast.Node
 	var arguments *ast.NodeList
@@ -349,7 +349,7 @@ func preferRegexpExecIsComputableConstruction(ruleContext rule.Context, node *as
 // could fold to a literal.
 //
 // A literal is one, and so is a concatenation of them, which upstream's operations table folds and
-// its corpus exercises through `const s = 'a' + 'b'`. A template with a substitution is NOT, unless
+// its corpus exercises through `const s = 'a' + 'b'`. A template with a substitution is not, unless
 // every substitution is itself computable -- and this stops at the shapes measured rather than
 // reimplementing a folder, because anything it declines simply goes unreported, which is the safe
 // direction.
@@ -375,7 +375,7 @@ func preferRegexpExecIsComputableString(node *ast.Node) bool {
 //
 // A first draft required a `const` declaration, which reads as the safe conservative choice and is
 // simply a different rule: upstream reports `let r = /x/; a.match(r)` and this was silent on it.
-// What `getStaticValue` actually does is fold a variable only when its scope shows exactly ONE
+// What `getStaticValue` actually does is fold a variable only when its scope shows exactly one
 // write, so the keyword is irrelevant and reassignment is everything. Measured against the installed
 // 8.67.0 build:
 //
@@ -386,7 +386,7 @@ func preferRegexpExecIsComputableString(node *ast.Node) bool {
 //
 // The third and fourth are why a declaration-keyword test cannot substitute: `const` would report
 // the first two correctly and would have to be wrong about something, and a `let` test would be
-// wrong about all four. The last one also rules out any ordering shortcut -- a write AFTER the call
+// wrong about all four. The last one also rules out any ordering shortcut -- a write after the call
 // site disqualifies the fold just as much as one before it.
 //
 // So the binding's other references are examined, and any one of them writing disqualifies the
@@ -416,7 +416,7 @@ func preferRegexpExecInitializerOf(ruleContext rule.Context, reference *ast.Node
 //
 // The whole source file is walked rather than a scope, because a write can sit anywhere -- inside a
 // nested function, after the call site, in a branch never taken. That breadth is the point: the
-// question is whether the initializer is the ONLY value the binding ever holds, and a narrower
+// question is whether the initializer is the only value the binding ever holds, and a narrower
 // search answers a weaker question while looking like the same one.
 func preferRegexpExecBindingIsReassigned(
 	ruleContext rule.Context,
@@ -519,7 +519,7 @@ func preferRegexpExecLiteralHasGlobalFlag(literal string) bool {
 //
 // An empty pattern is `(?:)` in JavaScript, because `//` opens a comment.
 //
-// The pattern is COMPILED first, and a pattern that will not compile is declined. That is upstream's
+// The pattern is compiled first, and a pattern that will not compile is declined. That is upstream's
 // try/catch and it is not decorative: `str.match('[a-z')` is a valid string and an invalid regular
 // expression, so upstream reports nothing and a port that only escaped the text would report it and
 // then write `/[a-z/.exec(str)`, which does not parse. Upstream's corpus carries that exact case and
@@ -641,7 +641,7 @@ func preferRegexpExecHasWeakPrecedenceParent(node *ast.Node) bool {
 		ast.KindSpreadElement, ast.KindTypeAssertionExpression, ast.KindAsExpression:
 		return true
 	case ast.KindPropertyAccessExpression:
-		// Only when the call is the OBJECT being accessed. As the property it cannot be, and as an
+		// Only when the call is the object being accessed. As the property it cannot be, and as an
 		// argument it is already inside parentheses.
 		return parent.AsPropertyAccessExpression().Expression == node
 	case ast.KindElementAccessExpression:

@@ -49,7 +49,7 @@ func runConsistentTypeDefinitions(
 // The corpus is typescript-eslint's own, extracted mechanically rather than retyped.
 //
 // `tests/rules/consistent-type-definitions.test.ts` (clone, 8.69.0) was loaded with its RuleTester
-// stubbed so every case came out as data, then every case was replayed against the INSTALLED 8.67.0
+// stubbed so every case came out as data, then every case was replayed against the installed 8.67.0
 // rule through the ESLint Linter API. The expectations below are what the installed rule answered.
 //
 // Both halves agree with upstream's own annotations exactly: 10 cases it calls valid report nothing
@@ -160,7 +160,7 @@ func TestConsistentTypeDefinitionsRewritesWhatUpstreamRewrites(test *testing.T) 
 // Upstream returns a null fixer for an interface inside `declare global`, citing its own issue
 // 2707: a type alias there does not do what the interface did, so the repair would change meaning
 // rather than spelling. The finding is identical whether or not a fix rides along, so only asserting
-// the ABSENCE of a proposed fix can tell the two apart.
+// the absence of a proposed fix can tell the two apart.
 func TestConsistentTypeDefinitionsDeclinesInsideDeclareGlobal(test *testing.T) {
 	test.Parallel()
 
@@ -175,7 +175,7 @@ func TestConsistentTypeDefinitionsDeclinesInsideDeclareGlobal(test *testing.T) {
 		}
 	}
 
-	// The control. The same interface OUTSIDE a global augmentation is repaired, so the decline
+	// The control. The same interface outside a global augmentation is repaired, so the decline
 	// above is the guard rather than a fixer that never fires under this option.
 	repaired := runConsistentTypeDefinitions(test, consistentTypeDefinitionsCase{
 		sourceText: "interface Array2<T> {\n  foo(): T;\n}",
@@ -234,7 +234,7 @@ func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(test *testing.T) {
 // `interface A extends B, C {}` becomes `type A = {...} & B & C`, and the order of the intersection
 // is the order of the `extends` list. Upstream emits one insertion per heritage type and ESLint
 // applies same-position insertions in the order proposed; this tree's edit engine applies fixes back
-// to front, so a run of insertions sharing a position comes out REVERSED. The result is valid
+// to front, so a run of insertions sharing a position comes out reversed. The result is valid
 // TypeScript naming the constraints in the wrong order, which is the "repairs to something that
 // means a different thing" class rather than a broken repair, and no message-id fixture can see it.
 //

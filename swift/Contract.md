@@ -111,8 +111,8 @@ nothing else.
 Rendered (whole package, then scoped):
 
 ```
-package described in 412ms — 152 Swift files in the package, 149 of them ours
-package described in 412ms — 152 Swift files in the package, 149 of them ours, 3 in scope (Sources/AhraOsIpc)
+package described in 412ms: 152 Swift files in the package, 149 of them ours
+package described in 412ms: 152 Swift files in the package, 149 of them ours, 3 in scope (Sources/AhraOsIpc)
 ```
 
 Excluded files print as coverage notes under the lint line, grouped by reason. Up to five files of a

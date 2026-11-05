@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/rename"
+	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -17,7 +18,7 @@ import (
 //
 // A verb rather than a flag, and that separation is the design rather than a naming preference. Every
 // other write in this tool is a fix: a rule found something wrong, the repair is scoped to the file
-// the rule was looking at, and `--fix` runs by DEFAULT because a fix is meaning-preserving by
+// the rule was looking at, and `--fix` runs by default because a fix is meaning-preserving by
 // construction. A rename is none of those things. Nothing is wrong with the code, the user is
 // asserting an intention rather than accepting a repair, and the blast radius is wherever the symbol
 // lives. Folding it into `--fix` would mean a flag whose default is on could rewrite a symbol across
@@ -35,7 +36,7 @@ const renameVerbName = "rename"
 // intent, so the tool doing the obvious repair is a service rather than a surprise.
 //
 // A rename inverts every one of those. It is imperative rather than reactive, so the tool has no
-// independent judgment that the edit is correct — the user's assertion IS the justification. It is
+// independent judgment that the edit is correct: the user's assertion is the justification. It is
 // unbounded, reaching every file that mentions the symbol. And its characteristic failure is silent:
 // `internal/rule/rule.go` records a shipped case where a rename updated a usage, missed its
 // declaration, and produced a file that parsed while failing to compile. A rename that is subtly
@@ -53,12 +54,15 @@ func runRenameVerb(arguments []string) error {
 	singleThreaded := flags.Bool("single-threaded", false, "use one checker instead of several")
 	write := flags.Bool("write", false, "apply the rename; without it nothing is written")
 	dryRun := flags.Bool("dry-run", false, "print the plan and write nothing (the default; accepted so it can be stated explicitly)")
+	// The flag set's own lines, its defaults and a refused flag, go through the stream its usage does, so they
+	// arrive in the order they were written.
+	flags.SetOutput(streams.Errors)
 	flags.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: cohere %s <file>:<line>:<column> <newName>\n", renameVerbName)
-		fmt.Fprintf(os.Stderr, "       cohere %s <name> <newName>\n\n", renameVerbName)
-		fmt.Fprintf(os.Stderr, "Renames a symbol everywhere the type graph says it is used.\n")
-		fmt.Fprintf(os.Stderr, "The position form is primary; a bare name is refused when it is ambiguous.\n")
-		fmt.Fprintf(os.Stderr, "Nothing is written without --write.\n\n")
+		fmt.Fprintf(streams.Errors, "usage: cohere %s <file>:<line>:<column> <newName>\n", renameVerbName)
+		fmt.Fprintf(streams.Errors, "       cohere %s <name> <newName>\n\n", renameVerbName)
+		fmt.Fprintf(streams.Errors, "Renames a symbol everywhere the type graph says it is used.\n")
+		fmt.Fprintf(streams.Errors, "The position form is primary; a bare name is refused when it is ambiguous.\n")
+		fmt.Fprintf(streams.Errors, "Nothing is written without --write.\n\n")
 		flags.PrintDefaults()
 	}
 	if parseError := flags.Parse(arguments); parseError != nil {
@@ -116,12 +120,12 @@ func runRenameVerb(arguments []string) error {
 		}
 		if len(symbols) == 0 {
 			return fmt.Errorf(
-				"no declaration named %q in this project — name a position instead if the symbol is declared elsewhere",
+				"no declaration named %q in this project, so name a position instead if the symbol is declared elsewhere",
 				target,
 			)
 		}
 		if len(symbols) > 1 {
-			rename.WriteCandidates(os.Stdout, target, candidates)
+			rename.WriteCandidates(streams.Output, target, candidates)
 			return fmt.Errorf("%q is ambiguous, so nothing was renamed", target)
 		}
 		position = rename.Position{
@@ -137,24 +141,25 @@ func runRenameVerb(arguments []string) error {
 	}
 
 	if len(plan.Refusals) > 0 {
-		rename.Write(os.Stdout, plan, false)
+		rename.Write(streams.Output, plan, false)
 		return fmt.Errorf("the rename was refused, so nothing was written")
 	}
 
 	if !*write {
-		rename.Write(os.Stdout, plan, false)
+		rename.Write(streams.Output, plan, false)
 		return nil
 	}
 
-	// Printed BEFORE applying, so the record of what was about to happen exists even if the write
+	// Printed before applying, so the record of what was about to happen exists even if the write
 	// fails partway. A summary printed only on success cannot explain a tree that was half-written.
-	rename.Write(os.Stdout, plan, true)
+	rename.Write(streams.Output, plan, true)
+	streams.Show(streams.Output)
 
 	written, err := rename.Apply(plan)
 	if err != nil {
 		return fmt.Errorf("applying the rename: %w", err)
 	}
-	fmt.Printf("\nwrote %d files.\n", written)
+	fmt.Fprintf(streams.Output, "\nwrote %d files.\n", written)
 	return nil
 }
 

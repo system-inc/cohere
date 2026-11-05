@@ -59,7 +59,7 @@ var messageRelatedGetterSetterPairs = rule.Message{
 // declares an inner class holding another, which reports twice, and on the same shape where only the
 // inner mismatches, which reports once and points inside.
 //
-// # The container set, and the two shapes that are NOT in it
+// # The container set, and the two shapes that are not in it
 //
 // `ClassBody`, `TSInterfaceBody` and `TSTypeLiteral` are the three, and both omissions were measured
 // rather than assumed:
@@ -78,7 +78,7 @@ var messageRelatedGetterSetterPairs = rule.Message{
 // the listener covers `KindClassExpression` beside `KindClassDeclaration`: the two are one node type
 // in TSESTree and two here.
 //
-// # abstract accessors are silent, and this is a PARSER difference we have to reproduce by hand
+// # abstract accessors are silent, and this is a parser difference we have to reproduce by hand
 //
 // This is the single most surprising thing in the rule and no imported fixture can see it, because
 // the corpus writes no `abstract` anywhere.
@@ -102,12 +102,12 @@ var messageRelatedGetterSetterPairs = rule.Message{
 // case where fidelity wins: the gate compares against upstream, and reporting these would read as a
 // defect.
 //
-// # Name keying, which is upstream's `getNameFromMember` and does NOT match the property shelf
+// # Name keying, which is upstream's `getNameFromMember` and does not match the property shelf
 //
 // `internal/utilities/ecmascript/property.Name` is the obvious shelf function here and it is wrong for
-// this rule in two directions, both measured. It DECLINES a bare identifier inside brackets, on the
+// this rule in two directions, both measured. It declines a bare identifier inside brackets, on the
 // stated reasoning that `[a]` names whatever the variable holds; upstream keys that as the
-// identifier's own name, so `get [k]()` and `set [k]()` DO pair and report. And it reads THROUGH the
+// identifier's own name, so `get [k]()` and `set [k]()` do pair and report. And it reads through the
 // brackets for a literal, so `['lit']` and `'lit'` both answer `lit` while upstream keys the first
 // as its inner literal's cooked value too. The first disagreement costs findings, the second does
 // not, and only the first is visible from the corpus, which writes no computed key at all.
@@ -143,7 +143,7 @@ var messageRelatedGetterSetterPairs = rule.Message{
 //
 // # Last write wins, which decides which of two duplicates is judged
 //
-// The map is written with `.set`, so a second getter under one name REPLACES the first and a second
+// The map is written with `.set`, so a second getter under one name replaces the first and a second
 // setter replaces the first. That is a behavioral decision hiding in a data-structure choice and it
 // is invisible to any fixture asserting a count:
 //
@@ -195,7 +195,7 @@ var RelatedGetterSetterPairs = rule.Rule{
 
 		checkContainer := func(members []*ast.Node) {
 			// Insertion order matters for nothing here, since every pair is judged independently,
-			// but the ORDER OF REPORTS does: two mismatching pairs in one container report in the
+			// but the order of reports does: two mismatching pairs in one container report in the
 			// order their getters were written, which a map iteration would randomize. So the
 			// names are kept in a slice beside the map.
 			type pair struct {
@@ -225,7 +225,7 @@ var RelatedGetterSetterPairs = rule.Rule{
 			for _, member := range members {
 				switch member.Kind {
 				case ast.KindGetAccessor:
-					// An abstract accessor is a different NODE TYPE in typescript-eslint's parser
+					// An abstract accessor is a different node type in typescript-eslint's parser
 					// and its selector never matches one, so upstream records neither half of a
 					// pair that touches `abstract`. typescript-go gives us an ordinary accessor
 					// with a modifier, so the gap has to be written. See the abstract note above;
@@ -270,15 +270,15 @@ var RelatedGetterSetterPairs = rule.Rule{
 				if candidate.getter == nil || candidate.setter == nil {
 					continue
 				}
-				// The getter NODE, which is what upstream asks its parser services for. Asking the
-				// getter's TYPE NODE instead is a mutant that survives, and it is equivalent rather
+				// The getter node, which is what upstream asks its parser services for. Asking the
+				// getter's type node instead is a mutant that survives, and it is equivalent rather
 				// than uncovered: measured over sixteen annotation shapes (a keyword, `this`, a type
 				// parameter, an alias, a readonly array, `typeof`, a literal type, a generic
 				// instantiation, `keyof`, a parenthesized type, a union, an abstract member, an
 				// interface member, and four paired with a mismatching setter) the two locations
 				// answer identically.
 				//
-				// They can only diverge on an UNANNOTATED getter, where the node form takes the
+				// They can only diverge on an unannotated getter, where the node form takes the
 				// setter's type by inference and the type node does not exist to ask. The
 				// annotation filter above declines every one of those before this line, so the
 				// divergence is behind an earlier guard rather than absent.
@@ -297,7 +297,7 @@ var RelatedGetterSetterPairs = rule.Rule{
 				if shimchecker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, getterType, setterType) {
 					continue
 				}
-				// The getter's return TYPE, unwrapped past parentheses. TSESTree has no
+				// The getter's return type, unwrapped past parentheses. TSESTree has no
 				// parenthesized-type node, so upstream reports `string` for `(string)` and
 				// reporting `member.Type()` here would span the parens instead. See the span note.
 				ruleContext.ReportNode(ast.SkipTypeParentheses(candidate.getter.Type()), messageRelatedGetterSetterPairs)
@@ -369,7 +369,7 @@ func isAbstractAccessor(member *ast.Node) bool {
 func relatedAccessorName(ruleContext rule.Context, member *ast.Node) (string, bool) {
 	name := member.Name()
 
-	// A computed key in TSESTree is not a wrapper node: `member.key` IS the inner expression, so
+	// A computed key in TSESTree is not a wrapper node: `member.key` is the inner expression, so
 	// every branch below applies to `[x]` exactly as it applies to `x`. Read off the parser rather
 	// than inferred, on six computed spellings.
 	if name.Kind == ast.KindComputedPropertyName {
@@ -405,14 +405,14 @@ func relatedKeyName(ruleContext rule.Context, key *ast.Node) (string, bool) {
 		text := key.Text()
 		// `requiresQuoting` is exactly "not a valid identifier", so the wrap is its inverse.
 		//
-		// The PREDICATE decides real verdicts and a mutant inverting it is caught: without it,
+		// The predicate decides real verdicts and a mutant inverting it is caught: without it,
 		// `get 'a-b'()` would key as `a-b` and stop pairing with `set ["a-b"]()`, which upstream
-		// reports. The WRAP CHARACTER is a different question and the answer is that nothing can
+		// reports. The wrap character is a different question and the answer is that nothing can
 		// see it, which took an enumeration rather than an argument.
 		//
 		// A different character could only change a verdict by making a quoted key collide, or stop
 		// colliding, with a key that went through the raw-text arm below. Both arms move together
-		// for a literal, so the only exposure is a NON-literal key whose entire source text is a
+		// for a literal, so the only exposure is a non-literal key whose entire source text is a
 		// bare double-quoted string. Enumerated over twelve shapes that reach the raw-text arm
 		// (template, member access, call, non-null, optional chain, unary, binary, `as`,
 		// `satisfies`, and a bracketed member access): every one of them that contains a quote

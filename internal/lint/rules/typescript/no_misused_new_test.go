@@ -68,7 +68,7 @@ func TestNoMisusedNewFires(test *testing.T) {
 		{"a class inside a namespace",
 			"declare namespace N { class C { new(): C; } }",
 			[]string{"classNew"}},
-		// A NAMED class expression. Upstream anchors on AstKind::Class, which covers the
+		// A named class expression. Upstream anchors on AstKind::Class, which covers the
 		// declaration and expression forms alike; our parser gives them separate kinds, so the
 		// expression form is a second listener that no corpus case reaches. Every class
 		// expression upstream writes is anonymous, and an anonymous one returns early on the
@@ -185,7 +185,7 @@ func TestNoMisusedNewStaysSilent(test *testing.T) {
 		// A real class constructor declaration, which is KindConstructor rather than a method
 		// signature and is never the subject of either arm. Measured: silent.
 		{"a declared class constructor returning the class", "declare class C { constructor(): C; }"},
-		// The comparison is by NAME TEXT, not by resolution. `D` is an alias of `C`, so a port
+		// The comparison is by name text, not by resolution. `D` is an alias of `C`, so a port
 		// resolving the return type would find the enclosing class and report. oxc compares the
 		// written identifier and stays silent. This is the sharpest divergence available and no
 		// imported fixture covers it. Measured: silent.

@@ -37,7 +37,7 @@ import (
 // oxc has no implementation. `no_for_in_array.rs` declares `NoForInArray(tsgolint)` and its body is
 // `impl Rule for NoForInArray {}`, sixty four lines of documentation around an empty block. There
 // is no oxc corpus either, so the extractor has nothing to extract. oxlint's behavior for this rule
-// IS tsgolint's, by delegation, and on this machine oxlint refuses to run it at all with `Failed to
+// is tsgolint's, by delegation, and on this machine oxlint refuses to run it at all with `Failed to
 // find tsgolint executable` rather than falling back to something of its own.
 //
 // # The one correction to upstream: it misspells its own rule name
@@ -65,7 +65,7 @@ import (
 // disagreements.
 //
 // Listener counts match too, which is the check `await-thenable` earned. Both sides register
-// exactly ONE listener on the for-in statement. `@typescript-eslint` declares `schema: []`, so
+// exactly one listener on the for-in statement. `@typescript-eslint` declares `schema: []`, so
 // there is no option surface on either side, and the message id and its full text are identical
 // strings. There is no fourth arm here of the kind `await-thenable` had.
 //
@@ -74,12 +74,12 @@ import (
 // The subject's type is resolved through its base constraint first, so a type parameter reports
 // exactly when what it is constrained to would: `<T extends any[]>(arr: T)` fires. The predicate
 // then recurses through unions and intersections and asks two things of each part, both of which
-// must hold: it has a NUMBER index signature, and it has a `length` property whose type is
+// must hold: it has a number index signature, and it has a `length` property whose type is
 // number-like.
 //
 // Both halves are load-bearing and the corpus pins each one from the other side. `{ [key: number]:
-// number }` has the index signature and no length, and it is a PASSING case; adding `length: 1` to
-// that same object is a FAILING case. And because the recursion is a `some` rather than an `every`,
+// number }` has the index signature and no length, and it is a passing case; adding `length: 1` to
+// that same object is a failing case. And because the recursion is a `some` rather than an `every`,
 // a union reports when any part is array-like, which is why `string[] | null` and `boolean[] | { a:
 // 1 }` both fire.
 //
@@ -87,7 +87,7 @@ import (
 // than off the rule's name: arrays, tuples, `RegExpExecArray`, `HTMLCollection`, `NodeList`, an
 // `arguments` object, a union of an array with a plain object, a type parameter constrained to an
 // array, and any hand-written object carrying both a number index and a numeric length. A string is
-// NOT among them and neither is a `Set`; upstream writes no case for either, and neither has a
+// not among them and neither is a `Set`; upstream writes no case for either, and neither has a
 // number index signature.
 //
 // # It reports and offers nothing
@@ -100,7 +100,7 @@ import (
 // # The span is the head of the loop, not the statement
 //
 // Upstream reports `GetForStatementHeadLoc`, which runs from the `for` keyword to the start of the
-// loop BODY, deliberately excluding the body itself. It is also the reason the node-report trivia
+// loop body, deliberately excluding the body itself. It is also the reason the node-report trivia
 // question does not arise for this rule: this is a `ReportRange` of a range the helper computed, so
 // the `TokenRange` trimming that `ReportNode` applies is not in the path at all, and the trimming
 // that does happen is `rule.TokenRange` inside `GetForStatementHeadLoc`. Absorbing the rule
@@ -116,13 +116,13 @@ import (
 // use `RunTyped`. While this rule was adapted, the standing `if ctx.TypeChecker == nil { return }`
 // could not be written, because the listener was upstream's and editing it would have turned a
 // re-sync into a merge. `upstream.Adapt` set `NeedsTypeChecker` on every rule it wrapped, so the
-// nil case was unreachable through it. Absorbing the rule removes that constraint AND makes the nil
+// nil case was unreachable through it. Absorbing the rule removes that constraint and makes the nil
 // case reachable, so the guard is now written where the advice always wanted it, and it is the one
 // addition to the body.
 //
 // It matters more than a crash-avoidance would suggest. `GetSymbolAtLocation` and its neighbours on
 // this shim return nil rather than panicking under a nil checker, so a missing guard here does not
-// crash — it buys a VACUOUS GREEN, where every clean fixture passes having proven nothing and every
+// crash. It buys a vacuous green, where every clean fixture passes having proven nothing and every
 // reporting one fails. A test in this package pins the declaration and the guard together so a
 // later revert fails loudly.
 var NoForInArray = rule.Rule{
@@ -135,7 +135,7 @@ var NoForInArray = rule.Rule{
 	// `cohere-disable` comment an author would actually write could silence.
 	//
 	// Measured rather than assumed before editing: all 38 rules in tsgolint's `internal/rules/` were
-	// fetched and their Name compared against their directory, and this is the ONLY one that
+	// fetched and their Name compared against their directory, and this is the only one that
 	// disagrees. tsgolint's own `cmd/tsgolint/main.go` passes `r.Name` straight through to its
 	// reporter with no mapping table, so upstream really does emit the suffixed name; the typo is
 	// live there rather than absorbed somewhere downstream.

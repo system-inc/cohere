@@ -135,7 +135,7 @@ func TestNoMixedEnumsAcrossFiles(test *testing.T) {
 	}
 }
 
-// TestNoMixedEnumsSpans pins WHERE the finding points, which ExpectFindings cannot see.
+// TestNoMixedEnumsSpans pins where the finding points, which ExpectFindings cannot see.
 //
 // The expected text is derived from upstream's own line and column numbers, and the source is
 // trimmed the same way rule_testing.RunTyped trims it before writing the fixture to disk. Without
@@ -165,7 +165,7 @@ func TestNoMixedEnumsSpans(test *testing.T) {
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
-			// Slice the source the HARNESS wrote, not the Go literal.
+			// Slice the source the harness wrote, not the Go literal.
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			finding := result.Diagnostics[0]
 			got := onDisk[finding.Range.Pos():finding.Range.End()]
@@ -192,7 +192,7 @@ func TestNoMixedEnumsMessage(test *testing.T) {
 
 // TestNoMixedEnumsRequiresTheTypedHarness pins that this rule declares the checker and guards
 // on it. A typed rule run through the plain harness gets a nil checker; without the guard the
-// shim returns nil rather than panicking, so the failure would be SILENCE, and every
+// shim returns nil rather than panicking, so the failure would be silence, and every
 // StaysSilent case above would keep passing vacuously if the declaration were ever reverted.
 func TestNoMixedEnumsRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
@@ -229,13 +229,13 @@ func TestNoMixedEnumsParentheses(test *testing.T) {
 		sourceText string
 		findings   int
 	}{
-		// The parenthesized number still reports, and its SPAN excludes the parentheses. Verified
+		// The parenthesized number still reports, and its span excludes the parentheses. Verified
 		// against the parser directly: ESTree reports the range of the inner literal.
 		{"parenthesized number after string", "enum E {\n  A = 'a',\n  B = (1),\n}\n", 1},
 		{"bare number after string (control)", "enum E {\n  A = 'a',\n  B = 1,\n}\n", 1},
 
 		// The row that settles the whole question. If parentheses routed to the checker arm, a
-		// parenthesized boolean would classify as Number and this would REPORT. Upstream is
+		// parenthesized boolean would classify as Number and this would report. Upstream is
 		// silent, which is only possible if it sees the boolean literal through the wrapper.
 		{"parenthesized boolean after string", "enum E {\n  A = 'a',\n  B = (false),\n}\n", 0},
 		{"bare boolean after string (control)", "enum E {\n  A = 'a',\n  B = false,\n}\n", 0},
@@ -276,7 +276,7 @@ func TestNoMixedEnumsParenthesizedSpanExcludesTheWrapper(test *testing.T) {
 	}
 }
 
-// TestNoMixedEnumsUnknownAborts pins that an Unknown member abandons the WHOLE declaration rather
+// TestNoMixedEnumsUnknownAborts pins that an Unknown member abandons the whole declaration rather
 // than being skipped over. The middle row is the one that costs a finding, and it is the reason
 // this is a separate test: reading the upstream source shows a `return` inside a loop and not what
 // that return is worth.
@@ -306,7 +306,7 @@ func TestNoMixedEnumsUnknownAborts(test *testing.T) {
 }
 
 // TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType covers upstream's `desiredType ??= currentType`
-// line, which is only reachable when the FIRST member takes the checker arm and no merge case set a
+// line, which is only reachable when the first member takes the checker arm and no merge case set a
 // desired type. Without the adoption the scan reaches the string with nothing to compare against and
 // goes silent. Measured reporting upstream.
 func TestNoMixedEnumsAdoptsNumberIntoAnUnsetDesiredType(test *testing.T) {
@@ -337,7 +337,7 @@ func TestNoMixedEnumsMemberWithoutInitializerIsTheAnchor(test *testing.T) {
 	}
 }
 
-// TestNoMixedEnumsMergeOrdering pins that a third declaration is judged against the FIRST rather
+// TestNoMixedEnumsMergeOrdering pins that a third declaration is judged against the first rather
 // than against the one immediately before it. That is the observable consequence of upstream
 // breaking out of its scope scan on the earliest match, and it is not something a reader would
 // predict from the rule's description.
@@ -346,7 +346,7 @@ func TestNoMixedEnumsMergeOrdering(test *testing.T) {
 
 	sourceText := "enum E {\n  A = 1,\n}\nenum E {\n  B = 'b',\n}\nenum E {\n  C = 2,\n}\n"
 	result := rule_testing.RunTyped(test, NoMixedEnums, mixedEnumsFile, sourceText)
-	// Only the middle declaration reports. The third agrees with the FIRST, so if it were judged
+	// Only the middle declaration reports. The third agrees with the first, so if it were judged
 	// against the second there would be two findings here.
 	rule_testing.ExpectFindings(test, result, "mixed")
 }
@@ -425,7 +425,7 @@ func TestNoMixedEnumsConstAndAmbientEnums(test *testing.T) {
 // each row below was measured against the installed rule before it was written.
 //
 // The substitution row matters most. Upstream returns String from the node kind alone, so a template
-// interpolating a NUMBER is still a string member. Asking the checker would be more careful and
+// interpolating a number is still a string member. Asking the checker would be more careful and
 // would disagree with the rule being ported.
 func TestNoMixedEnumsTemplateLiteralsAreStrings(test *testing.T) {
 	test.Parallel()
@@ -510,7 +510,7 @@ func TestNoMixedEnumsNullAborts(test *testing.T) {
 	}
 }
 
-// TestNoMixedEnumsUnknownFirstMemberSilencesEverything pins the inputs that reach for an UNSET
+// TestNoMixedEnumsUnknownFirstMemberSilencesEverything pins the inputs that reach for an unset
 // desired type. Every one of them is clean, and that is the measurement behind the equivalence
 // verdict recorded on the adoption line in the rule: there is no input where the scan continues
 // with no desired type, because every route to that state runs through an Unknown first member,

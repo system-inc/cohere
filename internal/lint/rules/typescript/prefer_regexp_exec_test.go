@@ -23,7 +23,7 @@ type preferRegexpExecCase struct {
 // The corpus is typescript-eslint's own, extracted mechanically rather than retyped.
 //
 // `tests/rules/prefer-regexp-exec.test.ts` (clone, 8.69.0) was loaded with its RuleTester stubbed,
-// then every case was replayed against the INSTALLED 8.67.0 rule through the ESLint Linter API,
+// then every case was replayed against the installed 8.67.0 rule through the ESLint Linter API,
 // under upstream's own fixture tsconfig so the type graph is the one upstream's cases were written
 // against. The expectations are what the installed rule answered, and they agree with upstream's own
 // annotations exactly: 25 valid cases report nothing, 12 invalid cases report, zero disagree.
@@ -117,7 +117,7 @@ func TestPreferRegexpExecRewritesWhatUpstreamRewrites(test *testing.T) {
 		// recorded `output` in leading and trailing whitespace and nowhere else, and the
 		// expectation is normalised the same way rather than the corpus being edited.
 		//
-		// Only the OUTER whitespace is touched. Every newline and indent inside the fixture is
+		// Only the outer whitespace is touched. Every newline and indent inside the fixture is
 		// compared exactly, which is where a fixer's real mistakes live.
 		rule_testing.ExpectFixedSource(test, result,
 			strings.TrimSpace(*testCase.wantOutput)+"\n")
@@ -129,7 +129,7 @@ func TestPreferRegexpExecRewritesWhatUpstreamRewrites(test *testing.T) {
 
 // TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven pins the direction of the guard.
 //
-// The rule reports only when it can PROVE the argument carries no `g`. That asymmetry is the whole
+// The rule reports only when it can prove the argument carries no `g`. That asymmetry is the whole
 // safety property: reporting an unproven case rewrites a global match, which returns every match,
 // into an `exec`, which returns one -- a behaviour change rather than a style change.
 //
@@ -142,7 +142,7 @@ func TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven(test *testing.T)
 	silent := []string{
 		"declare const a: string;\na.match(/x/g);",
 		"declare const a: string;\nconst r = /x/g;\na.match(r);",
-		// A `let` bound to a GLOBAL regex, which is clean for the flag rather than for the keyword.
+		// A `let` bound to a global regex, which is clean for the flag rather than for the keyword.
 		// The non-global `let` reports; see the reassignment test below.
 		"declare const a: string;\nlet r = /x/g;\na.match(r);",
 		"declare function f(p: string): void;\ndeclare const a: string;\ndeclare const flags: string;\na.match(new RegExp('x', flags));",
@@ -169,13 +169,13 @@ func TestPreferRegexpExecStaysSilentWhenTheGlobalFlagIsUnproven(test *testing.T)
 // TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt pins the semantics that a
 // differential caught and the corpus could not.
 //
-// Upstream settles a bound identifier by EVALUATING it with `getStaticValue` and requiring a real
+// Upstream settles a bound identifier by evaluating it with `getStaticValue` and requiring a real
 // value back. The intuitive alternative -- resolve the binding, then ask the same "could this carry
 // a g" question of whatever it was initialised with -- agrees on every one of upstream's 37 corpus
 // rows and disagrees on real code: it reported 8 sites in this repository that upstream leaves
 // alone, all of them `const r = new RegExp(templateWithSubstitution)`.
 //
-// The line is whether the value can be COMPUTED, not whether a `g` can be ruled out. Every
+// The line is whether the value can be computed, not whether a `g` can be ruled out. Every
 // expectation below was measured against the installed 8.67.0 build.
 func TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt(test *testing.T) {
 	test.Parallel()
@@ -200,7 +200,7 @@ func TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt(test *test
 		{"a bound global regex", "declare const a: string;\nconst r = /x/g;\na.match(r);", false},
 		{"a bound global construction", "declare const a: string;\nconst r = new RegExp('x', 'g');\na.match(r);", false},
 
-		// An INLINE construction is judged syntactically instead, so the template that is clean when
+		// An inline construction is judged syntactically instead, so the template that is clean when
 		// bound reports when written in place. This asymmetry is upstream's and is the sharpest
 		// evidence that a reference and a construction take different paths.
 		{"an inline construction from a template", "declare const a: string;\ndeclare const t: string;\na.match(new RegExp(`^${t}$`));", true},
@@ -245,13 +245,13 @@ func TestPreferRegexpExecWrapsAWeakPrecedenceParent(test *testing.T) {
 // TestPreferRegexpExecFoldsAWrittenOnceBindingRegardlessOfKeyword pins the rule that decides whether
 // a bound regex can be trusted, and it is not the declaration keyword.
 //
-// `getStaticValue` folds a variable when its scope shows exactly ONE write, so `let` and `var` fold
+// `getStaticValue` folds a variable when its scope shows exactly one write, so `let` and `var` fold
 // as readily as `const`, and any reassignment anywhere disqualifies the fold. A first draft here
 // tested for `const` instead -- the intuitive conservative choice -- and was silent on
 // `let r = /x/; a.match(r)`, which upstream reports. A mutation deleting the guard survived every
 // corpus row, because upstream's 37 cases never bind a regex to a `let` at all.
 //
-// The last row is the one that rules out an ordering shortcut: a write AFTER the call site
+// The last row is the one that rules out an ordering shortcut: a write after the call site
 // disqualifies the fold just as much as one before it, so this cannot be answered by looking only at
 // what precedes the use.
 func TestPreferRegexpExecFoldsAWrittenOnceBindingRegardlessOfKeyword(test *testing.T) {

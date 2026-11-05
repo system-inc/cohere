@@ -37,16 +37,16 @@ import (
 //
 // # Where this diverges from upstream, and why it has to
 //
-// Upstream reads deprecation through `symbol.getJsDocTags(checker)`, a LANGUAGE SERVICE API.
-// typescript-go has no such method: it exposes deprecation at the DECLARATION level instead, via
+// Upstream reads deprecation through `symbol.getJsDocTags(checker)`, a language service API.
+// typescript-go has no such method: it exposes deprecation at the declaration level instead, via
 // `ast.GetJSDocDeprecatedTag`. The two are not the same question. `getJsDocTags` merges the tags of
 // every declaration a symbol has; the declaration-level call answers about one declaration.
 //
 // For this rule the difference is visible in exactly one place, and upstream documents it as a
 // deliberate choice rather than an accident: a function with overloads has one declaration per
-// overload, and asking the merged symbol whether it is deprecated says yes when ANY overload is.
+// overload, and asking the merged symbol whether it is deprecated says yes when any overload is.
 // Upstream works around its own API there by passing `false` for `checkDeprecationsOfAliasedSymbol`
-// on function and method declarations and relying on the resolved SIGNATURE instead. Reading
+// on function and method declarations and relying on the resolved signature instead. Reading
 // declarations one at a time gives that behaviour directly rather than as a workaround, so
 // `deprecationOnSymbol` unions across declarations while `deprecationOnSignatureDeclaration` asks
 // about the single declaration a call actually resolved to.
@@ -84,7 +84,7 @@ var NoDeprecated = rule.Rule{
 
 		// report emits with the right message id for whether a reason was given.
 		//
-		// Upstream branches on `reason ? withReason : plain`, so an EMPTY reason, a bare
+		// Upstream branches on `reason ? withReason : plain`, so an empty reason, a bare
 		// `/** @deprecated */`, takes the plain branch. The empty string and the absent tag are
 		// different states and only the presence flag separates them, which is why every helper
 		// below returns (string, bool) rather than a string whose emptiness means absent.
@@ -132,7 +132,7 @@ var NoDeprecated = rule.Rule{
 					return
 				}
 				// A computed member's property is handled by the element-access listener, which
-				// reads the property NAME off the type rather than resolving the identifier.
+				// reads the property name off the type rather than resolving the identifier.
 				if parent.Kind == ast.KindElementAccessExpression &&
 					parent.AsElementAccessExpression().ArgumentExpression == node {
 					return
@@ -171,7 +171,7 @@ func reportedDeprecationName(node *ast.Node) string {
 
 // deprecationTagOn finds the `@deprecated` tag governing a declaration.
 //
-// The walk up is not optional and not defensive. JSDoc attaches to the STATEMENT, so
+// The walk up is not optional and not defensive. JSDoc attaches to the statement, so
 // `/** @deprecated */ export const bare = 1;` hangs its tag on the VariableStatement while the
 // symbol's declaration is the VariableDeclaration underneath. Asking the declaration directly
 // answers no. Measured on exactly that input: direct lookup false, walk-up true, while an
@@ -195,7 +195,7 @@ func deprecationTagOn(declaration *ast.Node) *ast.Node {
 	return nil
 }
 
-// deprecationReasonOnDeclaration answers about ONE declaration, returning the tag's text and whether
+// deprecationReasonOnDeclaration answers about one declaration, returning the tag's text and whether
 // a tag was there at all.
 //
 // The two returns are not redundant: `/** @deprecated */` with no text is a real finding with an
@@ -243,13 +243,13 @@ func deprecationOnSymbol(ruleContext rule.Context, symbol *ast.Symbol) (string, 
 // this rule's header.
 //
 // `checkTarget` mirrors upstream's `checkDeprecationsOfAliasedSymbol`. It is false for calls to
-// functions and methods, where the ultimate target's merged tags would report a deprecated OVERLOAD
+// functions and methods, where the ultimate target's merged tags would report a deprecated overload
 // for a call that resolved to an undeprecated one; those calls consult the resolved signature's own
 // declaration instead.
 //
 // The hop count is bounded by the chain the checker built, and each hop must produce a symbol the
 // checker itself returned, so a cycle cannot be constructed here. The guard on the alias flag is
-// required rather than defensive: both accessors PANIC on a non-alias, in every build, which is
+// required rather than defensive: both accessors panic on a non-alias, in every build, which is
 // asserted in internal/program/shim_alias_test.go.
 func deprecationInAliasChain(ruleContext rule.Context, symbol *ast.Symbol, checkTarget bool) (string, bool) {
 	if symbol == nil {
@@ -288,7 +288,7 @@ func deprecationInAliasChain(ruleContext rule.Context, symbol *ast.Symbol, check
 //
 // Upstream switches on the estree parent type. Our parser names the same positions differently and,
 // in two places, does not distinguish them at all, so this asks the question positionally: is the
-// node the NAME of its parent, rather than something the parent refers to.
+// node the name of its parent, rather than something the parent refers to.
 func isDeprecationDeclarationSite(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
@@ -309,12 +309,12 @@ func isDeprecationDeclarationSite(node *ast.Node) bool {
 		return parent.Name() == node
 
 	case ast.KindBindingElement:
-		// `const { b } = a` reads `a.b`, so the shorthand binding is a USE of the source property
+		// `const { b } = a` reads `a.b`, so the shorthand binding is a use of the source property
 		// even though it also declares `b`. Upstream reaches the same answer by a different route:
 		// its parser models this as a Property whose key and value are the same node, and it
 		// declares only the value side, leaving the key side to report.
 		//
-		// A RENAMING form splits the two roles across two nodes, `const { b: renamed } = a`, and
+		// A renaming form splits the two roles across two nodes, `const { b: renamed } = a`, and
 		// then the roles are the obvious ones: the property name is the use, the new name is the
 		// declaration.
 		element := parent.AsBindingElement()
@@ -335,7 +335,7 @@ func isDeprecationDeclarationSite(node *ast.Node) bool {
 
 	case ast.KindPropertyAssignment:
 		// `const baz = { foo: bar }` -- `foo` names a key this literal declares, `bar` is a use.
-		// In an object PATTERN the roles invert, but our parser routes patterns through
+		// In an object pattern the roles invert, but our parser routes patterns through
 		// BindingElement rather than PropertyAssignment, so the inversion is handled above.
 		return parent.AsPropertyAssignment().Name() == node
 
@@ -371,7 +371,7 @@ func isInsideImportForDeprecation(node *ast.Node) bool {
 }
 
 // callLikeParentFor is upstream's `getCallLikeNode`: climbs out of a member access so `a.b.c()`
-// asks about the CALL when the identifier is `c`, and about nothing when it is `a`.
+// asks about the call when the identifier is `c`, and about nothing when it is `a`.
 func callLikeParentFor(node *ast.Node) *ast.Node {
 	callee := node
 	for callee.Parent != nil &&
@@ -407,7 +407,7 @@ func callLikeParentFor(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// deprecationOnSignatureDeclaration asks about the ONE declaration a call resolved to.
+// deprecationOnSignatureDeclaration asks about the one declaration a call resolved to.
 //
 // This is where the declaration-level API is a better fit than upstream's merged-symbol one. A
 // function with overloads has one declaration per overload; asking the symbol says yes when any
@@ -425,7 +425,7 @@ func deprecationOnSignatureDeclaration(ruleContext rule.Context, callLike *ast.N
 // declaresAsFunctionOrMethod reports whether a symbol's first declaration is a function or method.
 //
 // Upstream's `symbolDeclarationKind` test, and it selects between the two strategies above. A
-// PROPERTY whose type is function-like carries its tag on the symbol rather than on any signature,
+// property whose type is function-like carries its tag on the symbol rather than on any signature,
 // which is why the test is on the declaration's kind rather than on whether the thing is callable.
 func declaresAsFunctionOrMethod(symbol *ast.Symbol) bool {
 	if symbol == nil || len(symbol.Declarations) == 0 {
@@ -457,7 +457,7 @@ func deprecationForCallLike(ruleContext rule.Context, node *ast.Node, callLike *
 		return deprecationOnSymbol(ruleContext, aliased)
 	}
 
-	// A function or method. The chain is walked WITHOUT consulting the ultimate target, because the
+	// A function or method. The chain is walked without consulting the ultimate target, because the
 	// target's merged declarations would answer for every overload rather than the one called; the
 	// resolved signature answers for the one called.
 	if reason, found := deprecationInAliasChain(ruleContext, symbol, false); found {
@@ -467,18 +467,18 @@ func deprecationForCallLike(ruleContext rule.Context, node *ast.Node, callLike *
 }
 
 // deprecationForJsxAttribute is upstream's `getJSXAttributeDeprecation`: `<A b="" />` reports on `b`
-// when the element's prop type marks it deprecated, so the tag is on a property of the ELEMENT's
+// when the element's prop type marks it deprecated, so the tag is on a property of the element's
 // attribute type rather than on anything the attribute itself resolves to.
 //
-// Two routes to that type, because one route does not reach both element kinds. A COMPONENT's
+// Two routes to that type, because one route does not reach both element kinds. A component's
 // attribute type is the contextual type of its tag name, which is upstream's route and the only one
-// it needs, since estree hands it a tag name that resolves. An INTRINSIC element's `<div>` has no
+// it needs, since estree hands it a tag name that resolves. An intrinsic element's `<div>` has no
 // contextual type at the name: its attribute type comes from the JSX namespace's IntrinsicElements
 // rather than from a signature, so the name route answers nil and the whole arm goes silent on
 // every `<div aria-grabbed>`. Measured with the tag declared in the fixture: the name route reported
 // on a component prop and nothing on an intrinsic one.
 //
-// The second route asks the checker for the attribute's own contextual type and takes the SYMBOL
+// The second route asks the checker for the attribute's own contextual type and takes the symbol
 // that type came from, which is the property the tag sits on. Trying that route alone is worse than
 // either: measured, it went silent on both, because for a component the attribute's contextual type
 // is the property's type rather than the property.
@@ -533,7 +533,7 @@ func deprecationReasonFor(ruleContext rule.Context, node *ast.Node) (string, boo
 			}
 
 		case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment:
-			// `({ deprecatedKey: 1 })` reports on the key when the CONTEXTUAL object type marks it
+			// `({ deprecatedKey: 1 })` reports on the key when the contextual object type marks it
 			// deprecated, and `({ deprecatedBinding })` reports on the shorthand's value binding.
 			// Both are asked because the shorthand is one identifier playing both roles.
 			owner := parent.Parent
@@ -554,7 +554,7 @@ func deprecationReasonFor(ruleContext rule.Context, node *ast.Node) (string, boo
 				return reason, true
 			}
 			// `const bar = { test }` writes one identifier that both names the new key and reads the
-			// outer binding, and the symbol at that location is the KEY. The tag is on the binding,
+			// outer binding, and the symbol at that location is the key. The tag is on the binding,
 			// so reaching it needs the checker's own shorthand accessor; without this the case is
 			// silent while the equivalent longhand `{ test: test }` reports.
 			if parent.Kind == ast.KindShorthandPropertyAssignment {
@@ -591,7 +591,7 @@ func checkDeprecatedElementAccess(
 		return
 	}
 
-	// Upstream asks whether the argument's TYPE is a literal type, not whether its syntax is a
+	// Upstream asks whether the argument's type is a literal type, not whether its syntax is a
 	// literal. The difference is the whole arm: `const key = 'b'; a[key]` has a non-literal argument
 	// whose type is the literal `'b'`, and reading syntax alone is silent on it. Measured: seven of
 	// upstream's invalid cases index through such a variable, and one indexes through a `as const`.
@@ -618,7 +618,7 @@ func checkDeprecatedElementAccess(
 	report(argument, propertyName, reason)
 }
 
-// deprecationTypeIsAllowed asks whether a TYPE is on the allowlist.
+// deprecationTypeIsAllowed asks whether a type is on the allowlist.
 //
 // The early return on an empty allowlist is what keeps the default configuration from paying for
 // this at all: with no `allow` key, which is every configuration that does not name one, the rule
@@ -633,7 +633,7 @@ func deprecationTypeIsAllowed(ruleContext rule.Context, subject *checker.Type, s
 // deprecationIsAllowed asks whether the thing at a node is on the allowlist.
 //
 // Upstream asks twice, `typeMatchesSomeSpecifier` and then `valueMatchesSomeSpecifier`, because a
-// deprecated VALUE and a deprecated TYPE are different questions and the allowlist answers both.
+// deprecated value and a deprecated type are different questions and the allowlist answers both.
 // The value form resolves the node's own symbol to its declaration and matches on where that lives,
 // which is what makes `{ from: 'package', name: 'exists', package: 'fs' }` allow the imported
 // binding rather than only the type it happens to have.
@@ -650,7 +650,7 @@ func deprecationIsAllowed(ruleContext rule.Context, node *ast.Node, settings NoD
 
 // deprecationValueIsAllowed is upstream's `valueMatchesSomeSpecifier`.
 //
-// Separate from the type question because a deprecated BINDING and a deprecated TYPE are different
+// Separate from the type question because a deprecated binding and a deprecated type are different
 // things to allow. `{ from: 'package', name: 'exists', package: 'fs' }` is a statement about where
 // the imported `exists` came from, which the type of `exists` alone cannot answer.
 func deprecationValueIsAllowed(ruleContext rule.Context, node *ast.Node, settings NoDeprecatedOptions) bool {
@@ -662,7 +662,7 @@ func deprecationValueIsAllowed(ruleContext rule.Context, node *ast.Node, setting
 // literalPropertyName is upstream's `propertyType.isLiteral()` test: the name a computed access
 // selects, when the checker can pin it to one.
 //
-// The question is about the TYPE rather than the syntax. `a['b']`, `const key = 'b'; a[key]` and
+// The question is about the type rather than the syntax. `a['b']`, `const key = 'b'; a[key]` and
 // `a[key as const]` all have the literal type `'b'` while only the first has literal syntax, and
 // upstream reports on all three. `a[someString]` and `a[Symbol() as any]` do not narrow to a
 // literal and stay silent, which is what keeps this from reporting on every computed access.

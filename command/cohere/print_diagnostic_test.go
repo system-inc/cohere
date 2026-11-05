@@ -13,7 +13,7 @@ import (
  * rule tag landed on a continuation line carrying no position.
  *
  * The cost is silent and it is biased. Any reader keyed on `position ... [rule]` drops those
- * findings, and it drops the LONGEST messages, which are the ones carrying advice. Four of 5,312
+ * findings, and it drops the longest messages, which are the ones carrying advice. Four of 5,312
  * findings on the ahra tree wrapped that way. An extractor of mine missed them and I spent four
  * hours instrumenting a rule that was working correctly, chasing a gap that existed only in the
  * tool reading the output.

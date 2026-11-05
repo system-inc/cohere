@@ -29,7 +29,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 //
 // # The algorithm, and why it walks backwards
 //
-// Upstream sweeps the parameter list from the END toward the front, carrying one flag: has a plain
+// Upstream sweeps the parameter list from the end toward the front, carrying one flag: has a plain
 // parameter been seen yet. A plain parameter is one that is neither defaulted, nor rest, nor
 // optional. When the sweep is standing on a defaulted or optional parameter and a plain one has
 // already been passed, that plain parameter is to its right, so the default is unreachable without
@@ -63,11 +63,11 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // every parameter shape that can carry `optional` at all, so the gate excludes nothing and is not
 // reproduced. Its `isPlainParam` is then the negation of the three tests above.
 //
-// # A parameter property is a WRAPPER upstream and a modifier list here, and the span depends on it
+// # A parameter property is a wrapper upstream and a modifier list here, and the span depends on it
 //
 // `constructor(public a = 0, ...)` gives upstream a `TSParameterProperty` node wrapping the real
-// parameter. The classification questions are asked of the INNER node, and `context.report` is
-// called on the OUTER one, so the finding spans the modifier as well as the parameter.
+// parameter. The classification questions are asked of the inner node, and `context.report` is
+// called on the outer one, so the finding spans the modifier as well as the parameter.
 //
 // typescript-go attaches the modifiers to the parameter itself, so there is no unwrapping to do and
 // the span is the parameter's own token range, which already begins at the modifier. Measured
@@ -82,11 +82,11 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // arriving through a different tree shape. The corpus pins four parameter-property spans and they
 // are asserted directly.
 //
-// # A BODYLESS function-like construct is exempt, and that is a false-positive class of its own
+// # A bodyless function-like construct is exempt, and that is a false-positive class of its own
 //
 // Upstream listens on exactly three node types: `ArrowFunctionExpression`, `FunctionDeclaration`
 // and `FunctionExpression`. In the TypeScript ESTree, every function-like construct that has no
-// body is a DIFFERENT node type, so all of them fall outside those three listeners:
+// body is a different node type, so all of them fall outside those three listeners:
 //
 //	declare function foo(a = 1, b: number): void;     TSDeclareFunction
 //	class C { constructor(a = 1, b: number); }        TSEmptyBodyFunctionExpression
@@ -98,7 +98,7 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 // Our parser draws none of those distinctions for the first four: a `declare function` is an
 // ordinary `KindFunctionDeclaration` whose `Body()` is nil, and an overload signature is an
 // ordinary `KindConstructor` whose `Body()` is nil. So a port that simply listened for our
-// function kinds would report every declaration file in the tree, and NOT ONE of the 41 clean
+// function kinds would report every declaration file in the tree, and not one of the 41 clean
 // corpus cases could see it, because the corpus writes no ambient declaration anywhere.
 //
 // The nil-body guard is what reproduces the silence. Measured against the installed rule, all six
@@ -117,8 +117,8 @@ var messageDefaultParamLastShouldBeLast = rule.Message{
 //
 // The reason this is written out at length: the obvious argument is that these arms can never
 // report, because the grammar gives a setter exactly one parameter and a getter none, so no plain
-// parameter can follow a defaulted one. That argument is about the GRAMMAR and it is wrong about
-// the PARSER. Probed directly, `class C { set x(a = 1, b: number) {} }` parses to a SetAccessor
+// parameter can follow a defaulted one. That argument is about the grammar and it is wrong about
+// the parser. Probed directly, `class C { set x(a = 1, b: number) {} }` parses to a SetAccessor
 // carrying two parameters and a body: the source is illegal, so it is a parse error, and
 // typescript-go recovers by attaching the parameters anyway.
 //
@@ -155,9 +155,9 @@ var DefaultParamLast = rule.Rule{
 			for index, parameter := range parameters {
 				// The boundary and the rest-skip below overlap by exactly one index, and that is
 				// measured rather than assumed. A mutation widening this to `index >= lastPlainIndex+1`
-				// SURVIVES the whole suite, because the parameter at lastPlainIndex is by
+				// survives the whole suite, because the parameter at lastPlainIndex is by
 				// definition plain, so it carries no initializer and no question token and the
-				// skip below declines it anyway. Widening by two is CAUGHT, on 51 lines. So the
+				// skip below declines it anyway. Widening by two is caught, on 51 lines. So the
 				// break is a bound on the loop rather than a discrimination, and the skip is what
 				// decides. Both are kept because both are upstream's: its backwards sweep carries
 				// the same pair as a flag and a two-armed test.

@@ -9,7 +9,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // changing.
 //
 // The Decode entry names the rule's own decoder rather than the generic helper. This rule's single
-// option defaults to FALSE, so the generic one would happen to produce the right zero value, and the
+// option defaults to false, so the generic one would happen to produce the right zero value, and the
 // hand-rolled decoder is used anyway: relying on that coincidence leaves the next person to add a
 // default-true key here inheriting a decoder that silently inverts their rule.
 func init() {

@@ -121,7 +121,8 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 			test.Helper()
 			command := exec.Command(binary, "--no-format", "--no-cache")
 			command.Dir = root
-			output, _ := command.CombinedOutput()
+			output, runError := command.CombinedOutput()
+			requireChildRan(test, runError)
 			return string(output)
 		}
 		page := func() string {

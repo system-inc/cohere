@@ -473,7 +473,7 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 
 // TestNoRequireImportsSurvivesMalformedImportEquals pins two guards that are crash protection
 // rather than behavioral filters, which no ExpectFindings fixture can see: a mutation sweep reports
-// SURVIVED whether such a guard matters or not, because a panic is not a finding.
+// survived whether such a guard matters or not, because a panic is not a finding.
 //
 // `import a = require(`lib`)` is a parse error in oxc, confirmed by running the release binary,
 // which prints `Unexpected token` and no rule diagnostic. Our parser recovers from it and hands the
@@ -529,8 +529,8 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(test *testing.T) {
 // exactly that, measured on the harness: two declarations, the ambient one first.
 //
 // It also pins a divergence that reading the code alone would have got backwards. A source
-// declaration is not automatically a shadow: measured on the release binary, upstream REPORTS the
-// call beside a `declare global` block and is SILENT beside a plain `function require(...)`, even
+// declaration is not automatically a shadow: measured on the release binary, upstream reports the
+// call beside a `declare global` block and is silent beside a plain `function require(...)`, even
 // though both put a declaration in a source file. An ambient declaration declares a name that
 // already exists rather than introducing a binding, and the ambient flag is what separates them.
 func TestNoRequireImportsAcrossDeclarationOrderings(test *testing.T) {

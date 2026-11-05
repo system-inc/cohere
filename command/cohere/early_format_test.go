@@ -69,7 +69,8 @@ func TestANarrowedSpeculationRunsOnFewerWorkersAndStillReachesEveryFile(test *te
 		}
 		candidates = append(candidates, fileName)
 	}
-	const workers, narrowed = 8, 2
+	const workers = 8
+	const narrowed = 2
 
 	// Each transform begun before the narrowing holds its file until the test lets it go, so every worker is
 	// mid-file when it lands. Each begun after it holds for a moment, so any two running at once would overlap,
@@ -77,7 +78,8 @@ func TestANarrowedSpeculationRunsOnFewerWorkersAndStillReachesEveryFile(test *te
 	started := make(chan struct{}, len(candidates))
 	release := make(chan struct{})
 	var isNarrowed atomic.Bool
-	var runningAfter, mostAfter atomic.Int32
+	var runningAfter atomic.Int32
+	var mostAfter atomic.Int32
 	holding := func(_ string, text string, _ *ast.SourceFile) (string, error) {
 		if !isNarrowed.Load() {
 			started <- struct{}{}

@@ -76,7 +76,7 @@ func TestNoRestrictedTypesStaysSilent(test *testing.T) {
 			optionsJson: "{\"types\": {\"NS.Banned\": true}}",
 		},
 		{
-			// Measured, not imported. A NON-empty tuple and a non-empty type literal, which the
+			// Measured, not imported. A non-empty tuple and a non-empty type literal, which the
 			// corpus never writes: every one of its tuple and literal cases is the empty spelling,
 			// so a mutant dropping the size test survived all forty-two. Both are clean upstream.
 			sourceText:  "let value: [string];\n",
@@ -87,7 +87,7 @@ func TestNoRestrictedTypesStaysSilent(test *testing.T) {
 			optionsJson: `{"types":{"{}":"no"}}`,
 		},
 		{
-			// The stronger half of the same pair: even NAMING the non-empty spelling does not
+			// The stronger half of the same pair: even naming the non-empty spelling does not
 			// report, because the size test gates before the lookup happens at all. Measured
 			// clean upstream, which is what makes the size test a real judgment rather than an
 			// optimization over the lookup.
@@ -134,7 +134,7 @@ func TestNoRestrictedTypesStaysSilent(test *testing.T) {
 //
 // There is one message id, so asserting it proves almost nothing. What varies is the rendered text,
 // which carries both the stripped type name and whatever the configuration appended, and the span,
-// which is the RAW source text rather than the stripped name. A generic reference reports twice,
+// which is the raw source text rather than the stripped name. A generic reference reports twice,
 // once on the name and once on the whole thing, and only the span separates those two.
 type noRestrictedTypesFinding struct {
 	wantSpan    string
@@ -607,11 +607,11 @@ func TestNoRestrictedTypesFires(test *testing.T) {
 // TestNoRestrictedTypesOffersSuggestions covers the half of the option surface upstream's corpus
 // does not touch at all.
 //
-// The corpus asserts thirteen fixer outputs and ZERO suggestions, so every one of these rows is
+// The corpus asserts thirteen fixer outputs and zero suggestions, so every one of these rows is
 // measured against the installed 8.67.0 build rather than imported. Two of them caught real defects
 // in the first version of this rule, both invisible to the imported cases: a fix and suggestions are
 // not exclusive and returning after the fix dropped the suggestions, and an empty `fixWith` is
-// FALSY upstream so it produces no repair rather than one deleting the type.
+// falsy upstream so it produces no repair rather than one deleting the type.
 func TestNoRestrictedTypesOffersSuggestions(test *testing.T) {
 	test.Parallel()
 
@@ -645,7 +645,7 @@ func TestNoRestrictedTypesOffersSuggestions(test *testing.T) {
 			wantOutput: "let value: Foo;\n",
 		},
 		{
-			// The row that caught the first defect. Upstream emits BOTH, so a reader who declines
+			// The row that caught the first defect. Upstream emits both, so a reader who declines
 			// the automatic repair still gets the offer.
 			name:         "fixWith and suggest are not exclusive",
 			optionsJson:  `{"types":{"Foo":{"fixWith":"Bar","suggest":["Baz"]}}}`,
@@ -707,7 +707,7 @@ func TestNoRestrictedTypesOffersSuggestions(test *testing.T) {
 						suggestion.Message.Description)
 				}
 				// The harness applies fixes but not suggestions, so the replacement is checked by
-				// applying it here. Comparing the fix's TEXT alone would pass a suggestion writing
+				// applying it here. Comparing the fix's text alone would pass a suggestion writing
 				// the right string over the wrong span.
 				if len(suggestion.Fixes) != 1 {
 					test.Fatalf("suggestion %d: expected one fix, got %d", position, len(suggestion.Fixes))
@@ -732,7 +732,7 @@ func TestNoRestrictedTypesOffersSuggestions(test *testing.T) {
 
 // TestNoRestrictedTypesSurvivesNilOptions covers the configuration this rule actually ships under.
 //
-// The live config enables it as a bare "error", which means the decoder is handed NOTHING. The
+// The live config enables it as a bare "error", which means the decoder is handed nothing. The
 // brief's warning about this failure is specific: a rule whose decoder errors on empty input gets
 // nil back, `options.(T)` on nil yields the zero value, and the rule registers on every file while
 // matching nothing. That reads exactly like a correctly-declining rule, and every fixture routed

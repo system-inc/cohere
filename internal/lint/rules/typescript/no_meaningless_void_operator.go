@@ -11,9 +11,9 @@ import (
 
 // NoMeaninglessVoidOperatorOptions is the rule's option surface.
 type NoMeaninglessVoidOperatorOptions struct {
-	// CheckNever extends the rule to an argument of type `never`, as a SUGGESTION rather than a fix.
+	// CheckNever extends the rule to an argument of type `never`, as a suggestion rather than a fix.
 	//
-	// It defaults to FALSE, so unlike the sibling rule in this package the generic decoder happens
+	// It defaults to false, so unlike the sibling rule in this package the generic decoder happens
 	// to produce the right zero value. The decoder below is still hand-rolled, because relying on
 	// that coincidence means the next person to add a default-true key inherits a decoder that
 	// silently does the wrong thing.
@@ -82,21 +82,21 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 // The type test below then runs only on a call, which is also new in 8.71: `void x` with `x: void`
 // is now a non-call finding rather than a "used on void" one.
 //
-// # Two branches, and the SAME repair is a fix in one and a suggestion in the other
+// # Two branches, and the same repair is a fix in one and a suggestion in the other
 //
 // That distinction is the most important thing in this rule and it is easy to flatten.
 //
-// When every constituent of the argument's type is `void` or `undefined`, the repair is a FIX:
+// When every constituent of the argument's type is `void` or `undefined`, the repair is a fix:
 // removing the operator cannot change what the program does, because the expression already
 // evaluated to the value `void` would have produced.
 //
 // When `checkNever` is on and every constituent is `void`, `undefined` or `never`, the repair is a
-// SUGGESTION. `never` means control does not return from that expression at all, so removing the
+// suggestion. `never` means control does not return from that expression at all, so removing the
 // operator is a judgment about code the type system says is unreachable, and upstream declines to
 // make it unattended. Shipping that as a fix would have the edit engine rewriting it silently.
 //
 // The two tests are nested rather than exclusive, and the order matters: `void | never` under
-// `checkNever` satisfies the FIRST predicate, because a union's `every` is over its constituents and
+// `checkNever` satisfies the first predicate, because a union's `every` is over its constituents and
 // `never` is absorbed out of a union by the checker before the rule sees it. Measured on the
 // installed build: `declare const x: void | never; void x;` reports with a fix, not a suggestion.
 //
@@ -110,7 +110,7 @@ func DecodeNoMeaninglessVoidOperatorOptions(raw []byte) (any, error) {
 //
 // # What the fix removes, including a comment
 //
-// Upstream removes the range from the start of the first token to the start of the SECOND, which is
+// Upstream removes the range from the start of the first token to the start of the second, which is
 // the `void` keyword plus everything between it and the argument. That is whitespace usually, and
 // it is not always:
 //
@@ -169,7 +169,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 				// which is upstream's "first token start to second token start".
 				//
 				// `rule.TokenRange` supplies the argument's start rather than `Pos()`, because
-				// `Pos()` includes leading trivia and would put the range's END inside the
+				// `Pos()` includes leading trivia and would put the range's end inside the
 				// whitespace, leaving a stray fragment behind. That is the fix hazard the span
 				// hazard is usually described as, arriving through the other side of the range.
 				voidKeyword := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())
@@ -206,7 +206,7 @@ var NoMeaninglessVoidOperator = rule.Rule{
 				// Upstream interpolates `checker.typeToString(argType)`, which is this method
 				// rather than the shelf's `GetTypeName`.
 				//
-				// Swapping the two is an EQUIVALENT mutation here, and the sweep says so: no input
+				// Swapping the two is an equivalent mutation here, and the sweep says so: no input
 				// this rule reports on can distinguish them. `GetTypeName` differs only by
 				// collapsing string-like types to the word "string", and it delegates to
 				// `TypeToString` for everything else, while this rule reports only when every

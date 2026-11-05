@@ -75,7 +75,7 @@ func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
 //
 // # `readonly` is exempt for a compiler reason, not a stylistic one
 //
-// `class C { readonly a: number = 5 }` is CLEAN. Upstream cites Microsoft/TypeScript#14416: without
+// `class C { readonly a: number = 5 }` is clean. Upstream cites Microsoft/TypeScript#14416: without
 // the annotation a readonly property's type narrows to the literal `5` rather than to `number`, so
 // removing it changes what the class means and can break every assignment elsewhere. `optional` is
 // exempt for the same family of reason. This is the `output: null` situation one level up -- a case
@@ -145,12 +145,12 @@ var NoInferrableTypes = rule.Rule{
 // Upstream unwraps a `TSParameterProperty` to its inner parameter and then requires an
 // `AssignmentPattern`, which is its shape for a parameter with a default. Here a parameter property
 // is an ordinary `KindParameter` carrying modifiers and the default is its `Initializer`, so the
-// FIELD reads collapse into reading the parameter directly.
+// field reads collapse into reading the parameter directly.
 //
 // # The report span does not collapse with them, and that difference was measured rather than
 // reasoned
 //
-// Unwrapping to `param.parameter` also moves where upstream REPORTS: the finding starts at the
+// Unwrapping to `param.parameter` also moves where upstream reports: the finding starts at the
 // parameter's name, after `public readonly`, not at the modifiers. A first draft reported the whole
 // parameter node, which is what this tree's flat shape hands you, and a differential over real files
 // caught it -- 202 of 204 findings matched position exactly and the two that did not were both
@@ -173,7 +173,7 @@ func checkNoInferrableTypesParameter(ruleContext rule.Context, parameter *ast.No
 	}
 
 	// A parameter carrying an accessibility or `readonly` modifier is upstream's
-	// TSParameterProperty, and upstream reports its INNER parameter. The equivalent here is to
+	// TSParameterProperty, and upstream reports its inner parameter. The equivalent here is to
 	// anchor on the name, since the modifiers are the only thing between the two.
 	anchor := parameter
 	if parameter.Modifiers() != nil && len(parameter.Modifiers().Nodes) > 0 {
@@ -299,7 +299,7 @@ func noInferrableTypesAnnotationName(
 			unwrapped.Kind == ast.KindNumericLiteral
 
 	case ast.KindLiteralType:
-		// `null` in TYPE position is a literal type wrapping the keyword here, not a bare keyword
+		// `null` in type position is a literal type wrapping the keyword here, not a bare keyword
 		// node -- measured, and the reason a kind check against KindNullKeyword alone is silent on
 		// `const a: null = null`, which upstream reports and repairs.
 		//

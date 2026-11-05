@@ -39,13 +39,13 @@ import (
 // oxc has no implementation. `no_unsafe_unary_minus.rs` is sixty lines of documentation ending in
 // `impl Rule for NoUnsafeUnaryMinus {}`, an empty body, with the declaration `NoUnsafeUnaryMinus`
 // carrying the `(tsgolint)` marker. There is no algorithm and no corpus on that side at all, so the
-// behavior oxlint exhibits for this rule IS tsgolint's: the release binary shells out to a
+// behavior oxlint exhibits for this rule is tsgolint's: the release binary shells out to a
 // `tsgolint` executable and refuses with `Failed to find tsgolint executable` when it is absent,
 // which is what it does on this machine. That refusal is the proof rather than an obstacle.
 //
 // # Where the two references disagree: the message text, not the verdict
 //
-// Both implementations register exactly ONE listener, on prefix unary expressions, and both declare
+// Both implementations register exactly one listener, on prefix unary expressions, and both declare
 // `schema: []`, so there is no option surface on either side and nothing for the config to carry.
 // That is the first thing checked, because await-thenable's port found `@typescript-eslint`
 // carrying a fourth listener tsgolint has no counterpart for. Here the arms match.
@@ -54,9 +54,9 @@ import (
 // 8.67.0 on a real program and through the adapted rule here, and all fifty four agree on whether
 // to report and on where the finding points, byte for byte on the reported span.
 //
-// What differs is the type NAMED in the message, and it differs on five of the twenty four
-// reporting inputs. tsgolint reports the offending union PART, `ctx.TypeChecker.TypeToString(t)`
-// inside the loop, while `@typescript-eslint` reports the WHOLE argument type,
+// What differs is the type named in the message, and it differs on five of the twenty four
+// reporting inputs. tsgolint reports the offending union part, `ctx.TypeChecker.TypeToString(t)`
+// inside the loop, while `@typescript-eslint` reports the whole argument type,
 // `checker.typeToString(argType)` outside it. Measured:
 //
 //	(a: number | string) => -a          tsgolint: "is string"   ts-eslint: "is string | number"
@@ -81,7 +81,7 @@ import (
 // the first offender, so one expression yields at most one finding.
 //
 // The union walk is load-bearing rather than a convenience, and there is an input that proves it:
-// `number | bigint` has flags `Union` and NOTHING else. Not `NumberLike`, not `BigIntLike`. A
+// `number | bigint` has flags `Union` and nothing else. Not `NumberLike`, not `BigIntLike`. A
 // version asking the union's own flags would report the safe case that upstream's corpus lists as
 // valid. Measured with a flags probe rather than reasoned about, because the two spellings look
 // interchangeable in source.
@@ -111,7 +111,7 @@ import (
 //
 // The harness tsconfig pins `lib: ["ES2022"]` and cannot be raised. A type it does not carry
 // resolves to the error type, whose flags are exactly `Any`, and `Any` is in the safe set. So
-// `declare const x: Disposable; -x;` and `declare const x: NotDefinedAnywhere; -x;` both go SILENT
+// `declare const x: Disposable; -x;` and `declare const x: NotDefinedAnywhere; -x;` both go silent
 // here, and both were measured that way rather than assumed. For this rule that failure runs in the
 // direction that hides: a fixture naming a type beyond ES2022 lands in the clean list, passes, and
 // asserts nothing. Every fixture in the test file was checked against that hazard, and the corpus
@@ -171,7 +171,7 @@ var NoUnsafeUnaryMinus = rule.Rule{
 	},
 }
 
-// buildUnaryMinusMessage names the offending union PART rather than the whole argument type, which
+// buildUnaryMinusMessage names the offending union part rather than the whole argument type, which
 // is tsgolint's behavior and differs observably from `@typescript-eslint`. See the note above.
 func buildUnaryMinusMessage(t string) rule.Message {
 	return rule.Message{

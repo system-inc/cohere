@@ -12,7 +12,7 @@ const unsafeDeclarationMergingFile = "/repository/source/Merged.ts"
 // snapshot records as producing exactly one diagnostic.
 //
 // One is the count worth noticing rather than the obvious two. Both listeners see the same pair, and
-// only the one visiting the LATER declaration reports, because the earlier declaration is the one
+// only the one visiting the later declaration reports, because the earlier declaration is the one
 // the symbol records first and the opposite-kind test is asked against it. The rule note explains
 // why that asymmetry is upstream's decision rather than an artifact.
 func TestNoUnsafeDeclarationMergingFires(test *testing.T) {
@@ -73,7 +73,7 @@ func TestNoUnsafeDeclarationMergingStaysSilent(test *testing.T) {
 //
 // Both verdicts were measured on the release oxlint binary before being written here, per the rule
 // that a hypothesis about upstream is not evidence about upstream. They are the two directions of
-// the same mechanism: only the declarations that are NOT first report, and only when the first one
+// the same mechanism: only the declarations that are not first report, and only when the first one
 // is of the opposite kind. So three interfaces after a class produce two findings, and two
 // interfaces before a class produce one.
 func TestNoUnsafeDeclarationMergingCountsFindingsPerDeclaration(test *testing.T) {
@@ -210,11 +210,11 @@ func TestNoUnsafeDeclarationMergingPointsAtTheName(test *testing.T) {
 // TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration is the offset half of the span
 // assertion, and it is the whole reason the span was measured rather than assumed.
 //
-// The two candidate spans hold the SAME TEXT, `Foo` either way, so the text comparison above passes
+// The two candidate spans hold the same text, `Foo` either way, so the text comparison above passes
 // over whichever node the rule picked and cannot tell them apart. Only the position separates them.
 //
-// Upstream attaches two labels and sorts them, so its primary is the declaration written FIRST,
-// while the listener arm that fires is always visiting the SECOND. Reporting the visited node is the
+// Upstream attaches two labels and sorts them, so its primary is the declaration written first,
+// while the listener arm that fires is always visiting the second. Reporting the visited node is the
 // natural way to write this rule and puts every finding one declaration too late. Pinned on the
 // release binary at 1:7 for `class Bar {}; interface Bar {}` and 1:11 for
 // `interface Foo {}; class Foo {}`, which is the first declaration in both directions.
@@ -332,7 +332,7 @@ func TestNoUnsafeDeclarationMergingHandlesAnAnonymousClass(test *testing.T) {
 // Upstream writes no `export` in any of its eleven cases, so nothing in the corpus exercises what an
 // export does to symbol resolution. It does something substantial: typescript-go hands an exported
 // declaration its own symbol carrying only itself and puts the merged list on that declaration's
-// LOCAL symbol, while the non-exported partner sees both through the ordinary lookup. A rule reading
+// local symbol, while the non-exported partner sees both through the ordinary lookup. A rule reading
 // only GetSymbolAtLocation therefore goes silent on three of the six export arrangements below,
 // every one of which upstream reports.
 //

@@ -28,7 +28,7 @@ func DefaultNoUselessDefaultAssignmentSettings() NoUselessDefaultAssignmentOptio
 
 // noUselessDefaultAssignmentRawOptions is the wire shape.
 //
-// The pointer is not needed for correctness here, since the single key defaults to FALSE and the
+// The pointer is not needed for correctness here, since the single key defaults to false and the
 // generic decoder's zero value would happen to be right. It is written this way anyway, for the
 // same reason its sibling in this package is: relying on that coincidence leaves the next person to
 // add a default-true key inheriting a decoder that silently inverts their rule.
@@ -74,7 +74,7 @@ func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
 //	preferOptionalSyntax      `= undefined` on a parameter whose annotation admits undefined;
 //	                          the `?` marker says the same thing with no runtime branch
 //
-// Only the third rewrites anything beyond a deletion: it removes the default AND inserts `?` after
+// Only the third rewrites anything beyond a deletion: it removes the default and inserts `?` after
 // the parameter name, so the declaration keeps its meaning. The other two only delete.
 //
 // # Where estree and our parser disagree, and why this rule has two anchors instead of one
@@ -98,7 +98,7 @@ func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
 // a type at all, so `canBeUndefined` answers false for everything and the rule would report every
 // default in the file as useless.
 //
-// This port reproduces the gate by DECLINING to judge rather than by reporting at position zero,
+// This port reproduces the gate by declining to judge rather than by reporting at position zero,
 // and that is a stated divergence rather than an oversight. A file-level finding anchored at 0:0
 // has no node to point at, and the surrounding harness reports per node; more importantly the
 // finding says nothing about the code, it says something about the configuration. The decline is
@@ -106,7 +106,7 @@ func DecodeNoUselessDefaultAssignmentOptions(raw []byte) (any, error) {
 // rather than letting a declined file read as a clean one (#pa7k7zv). Every project here resolves
 // `strictNullChecks` on, ahra and www by TypeScript 6's default and api by writing `strict`, so the
 // skip fires only on a project that turns it off (#6ar414z). Measured on the installed 8.67.0 build: under an
-// unstrict project, upstream emits the `noStrictNullCheck` finding AND the real one; under the
+// unstrict project, upstream emits the `noStrictNullCheck` finding and the real one; under the
 // option, only the real one. The three corpus cases written against an unstrict project keep their
 // real findings here, which is the half that is about the code.
 //
@@ -264,14 +264,14 @@ func defaultTargetType(ruleContext rule.Context, node *ast.Node) (*checker.Type,
 		if symbol == nil {
 			return nil, false
 		}
-		// An OPTIONAL property destructured out of a conditionally-built object needs one more
+		// An optional property destructured out of a conditionally-built object needs one more
 		// question asked, and skipping it produced three false positives on upstream's own passing
 		// cases. `const { a = 'default' } = cond ? { a: 'Hello' } : {}` has `a` optional on the
 		// union, but the checker's type for the property is just `string`, because the branch that
 		// omits it contributes nothing to read. So the default is live and the naive answer says
 		// it is dead.
 		//
-		// Upstream's test is whether EVERY branch of the initializer supplies the property. If one
+		// Upstream's test is whether every branch of the initializer supplies the property. If one
 		// does not, the property can genuinely arrive undefined and the default is reachable.
 		if type_checking.IsSymbolFlagSet(symbol, ast.SymbolFlagsOptional) {
 			if initializer := conditionalInitializerAbove(pattern); initializer != nil &&
@@ -283,7 +283,7 @@ func defaultTargetType(ruleContext rule.Context, node *ast.Node) (*checker.Type,
 	}
 
 	if ast.IsArrayBindingPattern(pattern) {
-		// TUPLE ONLY, and the narrowness is upstream's rather than a simplification.
+		// Tuple only, and the narrowness is upstream's rather than a simplification.
 		//
 		// A tuple states each position's type and its length, so element 0 of `[string]` is a
 		// string and element 1 provably does not exist. A plain `Array<string>` states neither:
@@ -292,7 +292,7 @@ func defaultTargetType(ruleContext rule.Context, node *ast.Node) (*checker.Type,
 		//
 		// This was written with a number-index fallback first, on the reasoning that upstream has
 		// one. Upstream does have one, in `getArrayElementType`, and it is reached from exactly one
-		// call site: resolving the SOURCE of a nested pattern, never the target being reported on.
+		// call site: resolving the source of a nested pattern, never the target being reported on.
 		// The fallback here produced five false positives on upstream's own passing cases, all of
 		// them a top-level array pattern over a plain array. Read rather than reasoned about after
 		// the corpus disagreed: the fallback belongs in `arrayElementType` below.
@@ -327,9 +327,9 @@ func defaultTargetType(ruleContext rule.Context, node *ast.Node) (*checker.Type,
 //
 // This is the subtle half of upstream's rule and the reason it is not simply "read the annotation".
 // A callback written inline gets its parameter types from the signature it is passed to, so
-// `[1, 2, 3].map((a = 42) => a + 1)` has a default on a parameter the caller ALWAYS supplies, and
+// `[1, 2, 3].map((a = 42) => a + 1)` has a default on a parameter the caller always supplies, and
 // nothing about the arrow itself says so. Upstream asks for the contextual type, takes its call
-// signatures, and reports only when NO signature could ever leave the parameter undefined.
+// signatures, and reports only when no signature could ever leave the parameter undefined.
 //
 // A signature leaves it usable when the parameter is past the end of that signature's list, is a
 // rest parameter, is marked optional, is a type parameter, or has a type admitting undefined. Any
@@ -341,14 +341,14 @@ func contextualParameterType(ruleContext rule.Context, node *ast.Node) (*checker
 		return nil, false
 	}
 
-	// Upstream restricts this path to a function EXPRESSION or an arrow, because only those are
-	// checked against a contextual type. Anything else DECLINES, and that decline is load-bearing
+	// Upstream restricts this path to a function expression or an arrow, because only those are
+	// checked against a contextual type. Anything else declines, and that decline is load-bearing
 	// rather than a narrowing this port could tidy up.
 	//
 	// The first version of this returned the parameter's declared type here instead, which reads
 	// like an improvement and produced four false positives on upstream's own passing cases:
 	// `function test(a: string = 'default')` reports, because `string` cannot be undefined. It is
-	// wrong because a parameter carrying a default is IMPLICITLY OPTIONAL in TypeScript, so callers
+	// wrong because a parameter carrying a default is implicitly optional in TypeScript, so callers
 	// may omit it and the default fires every time they do. The annotation describes what the
 	// parameter is once bound, not what the caller must pass, and reading it as the latter inverts
 	// the rule for the single most ordinary shape it will ever see.
@@ -365,7 +365,7 @@ func contextualParameterType(ruleContext rule.Context, node *ast.Node) (*checker
 	if len(signatures) == 0 {
 		return nil, false
 	}
-	// When the contextual type's own signature IS this function, there is no caller contract to
+	// When the contextual type's own signature is this function, there is no caller contract to
 	// compare against and the parameter's declared type is the whole story.
 	if checker.Signature_declaration(signatures[0]) == function {
 		return nil, false
@@ -448,7 +448,7 @@ func bindingPatternSourceType(ruleContext rule.Context, pattern *ast.Node) (*che
 	// A pattern nested inside another binding element: its source is that element's own type,
 	// which the same machinery already knows how to answer.
 	//
-	// The ARRAY case cannot go through `defaultTargetType`, because that path is tuple-only by
+	// The array case cannot go through `defaultTargetType`, because that path is tuple-only by
 	// design and the element being resolved here is a source rather than a report target. Upstream
 	// splits the same way, and it is the one place its number-index fallback is reached.
 	if ast.IsBindingElement(parent) {
@@ -480,7 +480,7 @@ func bindingPatternSourceType(ruleContext rule.Context, pattern *ast.Node) (*che
 
 // conditionalInitializerAbove finds the conditional expression a destructuring pattern reads from.
 //
-// Upstream walks UP from the pattern rather than looking only at its immediate parent, because a
+// Upstream walks up from the pattern rather than looking only at its immediate parent, because a
 // nested pattern is several levels below the declaration that carries the initializer. The walk
 // stops at the first variable declaration it meets and answers its initializer only when that
 // initializer branches; a plain object literal cannot hide a missing property from the checker.
@@ -507,7 +507,7 @@ func conditionalInitializerAbove(node *ast.Node) *ast.Node {
 
 // hasPropertyInAllBranches answers whether every branch of an initializer supplies a property.
 //
-// An object literal answers directly. A conditional recurses into BOTH arms and requires both, so
+// An object literal answers directly. A conditional recurses into both arms and requires both, so
 // `cond ? { a: 1 } : {}` is false and the default it guards is reachable. Anything else answers
 // false, which is the safe direction: an initializer this cannot read is one whose branches cannot
 // be enumerated, and reporting would claim a guarantee nobody established.
@@ -526,7 +526,7 @@ func hasPropertyInAllBranches(expression *ast.Node, propertyName string) bool {
 			if name == nil {
 				continue
 			}
-			// A method and a shorthand both count: upstream reads the KEY, so `{ a() {} }` supplies
+			// A method and a shorthand both count: upstream reads the key, so `{ a() {} }` supplies
 			// `a` exactly as `{ a: 1 }` does. The corpus pins that with a case whose branch holds a
 			// method, and it reports.
 			if staticPropertyKeyText(name) == propertyName {
@@ -547,7 +547,7 @@ func hasPropertyInAllBranches(expression *ast.Node, propertyName string) bool {
 
 // arrayElementType answers the type at one index of an array or tuple.
 //
-// This is upstream's `getArrayElementType`, and it exists to resolve the SOURCE a nested pattern
+// This is upstream's `getArrayElementType`, and it exists to resolve the source a nested pattern
 // destructures rather than to judge a default. That distinction is the whole reason the number-index
 // fallback lives here and not in the reporting path: asking "what type sits at this index" is
 // answerable for a plain array, while asking "can this index be missing" is not.
@@ -629,10 +629,10 @@ func isUndefinedIdentifier(initializer *ast.Node) bool {
 	return ast.IsIdentifier(initializer) && initializer.Text() == "undefined"
 }
 
-// removeDefaultFix deletes the default and the `=` introducing it, and NOTHING ELSE.
+// removeDefaultFix deletes the default and the `=` introducing it, and nothing else.
 //
 // The end is the initializer's end. The start is the end of whatever the default follows, which is
-// the TYPE ANNOTATION when there is one and the bound name otherwise. Getting that wrong is how a
+// the type annotation when there is one and the bound name otherwise. Getting that wrong is how a
 // fixer silently destroys type information, and this one did on its first version:
 //
 //	p2: number | undefined = undefined   from the NAME's end  -> `p2?`           annotation gone
@@ -640,7 +640,7 @@ func isUndefinedIdentifier(initializer *ast.Node) bool {
 //
 // The first spelling compiles, so nothing fails; the declaration simply becomes implicitly `any`
 // and the next reader has no way to see that a type was deleted. Upstream computes the start from
-// `node.left.range[1]`, and in estree `left` is the whole annotated pattern INCLUDING its type
+// `node.left.range[1]`, and in estree `left` is the whole annotated pattern including its type
 // annotation, so upstream's one expression is two different positions in our tree. Two of the
 // corpus's fix vectors catch it and no message-id assertion can.
 //

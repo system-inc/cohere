@@ -2,7 +2,7 @@ package typescript
 
 // nativelyBoundMembers is upstream's `nativelyBoundMembers`, frozen.
 //
-// Upstream builds this set at module load by REFLECTING over the running Node global object: for
+// Upstream builds this set at module load by reflecting over the running Node global object: for
 // each of fourteen supported namespaces it takes every own property that is a function and does not
 // begin with an underscore. A compiled binary has no such object to reflect over, so the set is
 // captured once and written down.
@@ -15,7 +15,7 @@ package typescript
 // in fact natively bound.
 //
 // Measured rather than taken on trust. The installed rule was patched to answer false from this
-// lookup and its whole corpus re-run: exactly FIVE of two hundred and eleven verdicts moved, and
+// lookup and its whole corpus re-run: exactly five of two hundred and eleven verdicts moved, and
 // three of those five are `console`, which is declared in `@types/node` rather than in the default
 // library. The other two are `({ parseInt } = Number)` and `({ log } = console)`.
 //
