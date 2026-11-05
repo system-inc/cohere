@@ -303,14 +303,6 @@ func enclosingFunctionOf(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// isCalleeOfCall reports whether a node is the thing being called.
-//
-// Upstream's `isCallee`. It is what separates an immediately invoked wrapper, whose return value
-// becomes the callback, from an ordinary function whose return value goes to its own caller.
-func isCalleeOfCall(node *ast.Node) bool {
-	return callConsuming(node) != nil
-}
-
 // callConsuming returns the call expression that invokes a node, or nil when nothing does.
 //
 // Parentheses around the callee are skipped on the way up, since `(function(){})()` and

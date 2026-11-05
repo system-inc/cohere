@@ -48,7 +48,11 @@ func runEqeqeq(test *testing.T, testCase eqeqeqCase) rule_testing.Result {
 	if testCase.options == nil {
 		return rule_testing.Run(test, Eqeqeq, eqeqeqFile, testCase.sourceText)
 	}
-	decoded, err := DecodeEqeqeqOptions([]byte(eqeqeqUpstreamList(testCase.options.(EqeqeqOptions))))
+	options, ok := testCase.options.(EqeqeqOptions)
+	if !ok {
+		test.Fatalf("the case carries %T options, not EqeqeqOptions", testCase.options)
+	}
+	decoded, err := DecodeEqeqeqOptions([]byte(eqeqeqUpstreamList(options)))
 	if err != nil {
 		test.Fatalf("could not decode options: %v", err)
 	}
@@ -437,7 +441,11 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		settings := decoded.(EqeqeqOptions).resolve()
+		options, ok := decoded.(EqeqeqOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not EqeqeqOptions", decoded)
+		}
+		settings := options.resolve()
 		if settings.mode != EqeqeqAlways || settings.null != EqeqeqNullAlways {
 			test.Errorf("defaults resolved to %+v, wanted Always and Always", settings)
 		}
@@ -449,7 +457,11 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		if settings := decoded.(EqeqeqOptions).resolve(); settings.mode != EqeqeqAlways ||
+		options, ok := decoded.(EqeqeqOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not EqeqeqOptions", decoded)
+		}
+		if settings := options.resolve(); settings.mode != EqeqeqAlways ||
 			settings.null != EqeqeqNullIgnore {
 			test.Errorf("resolved to %+v, wanted Always and Ignore", settings)
 		}
@@ -461,7 +473,11 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 		if err != nil {
 			test.Fatalf("unexpected error: %v", err)
 		}
-		if settings := decoded.(EqeqeqOptions).resolve(); settings.mode != EqeqeqAlways ||
+		options, ok := decoded.(EqeqeqOptions)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not EqeqeqOptions", decoded)
+		}
+		if settings := options.resolve(); settings.mode != EqeqeqAlways ||
 			settings.null != EqeqeqNullIgnore {
 			test.Errorf("resolved to %+v, wanted Always and Ignore", settings)
 		}
