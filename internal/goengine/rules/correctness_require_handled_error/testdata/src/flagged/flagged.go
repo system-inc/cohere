@@ -110,6 +110,21 @@ func failingWriters(writer *bufio.Writer, reader io.Reader) {
 	_ = sha256.Size
 }
 
+// A stored method value is judged by its static func type, which promises nothing, never by the method the variable
+// happens to hold.
+func storedMethodValue() {
+	var builder strings.Builder
+	write := builder.WriteString
+	write("x") // want `^.write. returns an error`
+}
+
+// Read is this package's own, so crypto/rand's promise is not its promise.
+func Read(data []byte) (int, error) { return len(data), nil }
+
+func localRead() {
+	Read(nil) // want `^.Read. returns an error`
+}
+
 // An embedded Builder written through fmt is judged by the writer's static type, which is not *strings.Builder.
 type document struct{ strings.Builder }
 

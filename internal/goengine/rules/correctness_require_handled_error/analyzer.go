@@ -76,6 +76,16 @@ var (
 	// error encountered." Formatting itself never fails, so writing to one of the exemptWriters, they return what its
 	// write would. Println and Printf write to standard output, which can fail, so they are not here.
 	exemptPrintFunctions = map[string]bool{"Fprint": true, "Fprintf": true, "Fprintln": true}
+	// exemptCallees are single callees documented never to fail, by package path, receiver type name (empty for a
+	// package function) and name, as their documentation gives them:
+	//
+	//	maphash.Hash.WriteString  "It always writes all of s and never fails; the count and error result are for
+	//	                          implementing io.StringWriter."
+	//	rand.Read                 "It never returns an error, and always fills b entirely." (crypto/rand)
+	exemptCallees = []struct{ packagePath, typeName, name string }{
+		{"hash/maphash", "Hash", "WriteString"},
+		{"crypto/rand", "", "Read"},
+	}
 )
 
 // hashPackagePath holds hash.Hash, whose Write the interface itself documents: "Write (via the embedded io.Writer
@@ -240,6 +250,9 @@ func (checker checker) isExempt(call *ast.CallExpr) bool {
 	if !isFunc {
 		return false
 	}
+	if isExemptCallee(function) {
+		return true
+	}
 	if receiver := function.Signature().Recv(); receiver != nil {
 		// The method's own receiver, so a Builder embedded in another struct and written through it is the same
 		// Builder.WriteString.
@@ -301,6 +314,35 @@ func isExemptWriterType(candidate types.Type) bool {
 	}
 	for _, writer := range exemptWriters {
 		if named.Obj().Pkg().Path() == writer.packagePath && named.Obj().Name() == writer.typeName {
+			return true
+		}
+	}
+	return false
+}
+
+// isExemptCallee is whether function is one of exemptCallees: a package function when the entry's type name is
+// empty, or else a method declared on that type, through a pointer or not.
+func isExemptCallee(function *types.Func) bool {
+	if function.Pkg() == nil {
+		return false
+	}
+	typeName := ""
+	if receiver := function.Signature().Recv(); receiver != nil {
+		receiverType := types.Unalias(receiver.Type())
+		if pointer, isPointer := receiverType.(*types.Pointer); isPointer {
+			receiverType = types.Unalias(pointer.Elem())
+		}
+		named, isNamed := receiverType.(*types.Named)
+		if !isNamed {
+			return false
+		}
+		typeName = named.Obj().Name()
+	}
+	for _, callee := range exemptCallees {
+		if function.Pkg().Path() != callee.packagePath || function.Name() != callee.name {
+			continue
+		}
+		if typeName == callee.typeName {
 			return true
 		}
 	}
