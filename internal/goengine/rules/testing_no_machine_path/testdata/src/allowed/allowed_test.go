@@ -20,16 +20,10 @@ const excusedAtTheEnd = "/Users/someone/x" // Not a machine path: trimmed by the
 
 const excusedByABlockComment = "/Users/someone/x" /* Not a machine path: trimmed by the transform. */
 
-// Not a machine path:
-// the reason may open the group's next line, as testpolicy reads the group's whole text.
-const reasonOnTheNextLine = "/Users/someone/x"
-
-// not a machine path: testpolicy reads the marker in any case.
-const lowerCaseMarker = "/Users/someone/x"
-
-// Testpolicy finds the marker anywhere in the group, so this sentence saying Not a machine path: a planted case,
-// excuses the declaration below it as testpolicy's does.
-const markerInASentence = "/Users/someone/x"
+// The comment says what the literal is first.
+//
+// Not a machine path: the marker may open any line of the group above.
+const markerOnALaterLine = "/Users/someone/x"
 
 // Not a machine path: every case below is a planted source, never read from the filesystem.
 func TestExcusedAboveTheFunction(test *testing.T) {

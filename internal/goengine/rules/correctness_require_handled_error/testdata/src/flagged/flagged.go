@@ -156,4 +156,8 @@ func markers(file *os.File) {
 	// Ignored: a reason above one statement is not the next one's.
 	save()
 	file.Close() // want `\(\*os\.File\)\.Close. returns an error`
+
+	// A reason trailing the code on the line above speaks for that line, not for the statement below it.
+	save()       // Ignored: this speaks for save, the line it ends.
+	file.Close() // want `\(\*os\.File\)\.Close. returns an error`
 }
