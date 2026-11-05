@@ -22,10 +22,10 @@ func checkCoherePin(path string, versionRange VersionRange) error {
 	if version == "dev" {
 		return nil
 	}
-	admitted, err := versionRange.Admits(version)
-	if err != nil {
+	admitted, admitsError := versionRange.Admits(version)
+	if admitsError != nil {
 		return fmt.Errorf("lint config %s pins cohere to %q, and this binary's own version %q does not read as a "+
-			"release version: %w", path, versionRange.Text, version, err)
+			"release version: %w", path, versionRange.Text, version, admitsError)
 	}
 	if !admitted {
 		return fmt.Errorf("lint config %s pins cohere to %q, and this binary is cohere %s: install a release "+
@@ -82,9 +82,9 @@ func ParseVersionRange(text string) (VersionRange, error) {
 		}
 		var comparators []versionComparator
 		for _, field := range fields {
-			expanded, err := parseComparator(field)
-			if err != nil {
-				return VersionRange{}, fmt.Errorf("the \"cohere\" range %q: %w", trimmed, err)
+			expanded, parseComparatorError := parseComparator(field)
+			if parseComparatorError != nil {
+				return VersionRange{}, fmt.Errorf("the \"cohere\" range %q: %w", trimmed, parseComparatorError)
 			}
 			comparators = append(comparators, expanded...)
 		}
@@ -103,9 +103,9 @@ func parseComparator(field string) ([]versionComparator, error) {
 		if !found {
 			continue
 		}
-		version, err := parseSemanticVersion(rest)
-		if err != nil {
-			return nil, err
+		version, parseSemanticVersionError := parseSemanticVersion(rest)
+		if parseSemanticVersionError != nil {
+			return nil, parseSemanticVersionError
 		}
 		switch operator {
 		case "^":
@@ -116,9 +116,9 @@ func parseComparator(field string) ([]versionComparator, error) {
 			return []versionComparator{{operator, version}}, nil
 		}
 	}
-	version, err := parseSemanticVersion(field)
-	if err != nil {
-		return nil, err
+	version, parseSemanticVersionError := parseSemanticVersion(field)
+	if parseSemanticVersionError != nil {
+		return nil, parseSemanticVersionError
 	}
 	return []versionComparator{{"=", version}}, nil
 }
@@ -151,8 +151,8 @@ func parseSemanticVersion(text string) (semanticVersion, error) {
 	}
 	numbers := make([]int, 3)
 	for index, part := range parts {
-		number, err := strconv.Atoi(part)
-		if err != nil || number < 0 || (len(part) > 1 && part[0] == '0') {
+		number, parseError := strconv.Atoi(part)
+		if parseError != nil || number < 0 || (len(part) > 1 && part[0] == '0') {
 			return semanticVersion{}, fmt.Errorf("%q is not a version: %q is not a whole number without leading zeros", text, part)
 		}
 		numbers[index] = number
@@ -173,9 +173,9 @@ func parseSemanticVersion(text string) (semanticVersion, error) {
 // them names the same major, minor and patch with a prerelease of its own. So `^1.0.0` does not admit
 // 1.1.0-beta.1, and `>=1.1.0-beta.0 <2.0.0` does. A project opts into prereleases by writing one.
 func (versionRange VersionRange) Admits(version string) (bool, error) {
-	candidate, err := parseSemanticVersion(version)
-	if err != nil {
-		return false, err
+	candidate, parseSemanticVersionError := parseSemanticVersion(version)
+	if parseSemanticVersionError != nil {
+		return false, parseSemanticVersionError
 	}
 	for _, comparators := range versionRange.alternatives {
 		if admitsAll(comparators, candidate) {

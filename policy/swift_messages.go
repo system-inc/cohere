@@ -83,8 +83,8 @@ func swiftMessagesSource(catalog *MessageCatalog, digest string) ([]byte, error)
 			if index > 0 {
 				source.WriteString("\n")
 			}
-			if err := writeSwiftMessage(&source, id, catalog.templates[each.name][id]); err != nil {
-				return nil, fmt.Errorf("%s %q: %w", each.name, id, err)
+			if writeSwiftMessageError := writeSwiftMessage(&source, id, catalog.templates[each.name][id]); writeSwiftMessageError != nil {
+				return nil, fmt.Errorf("%s %q: %w", each.name, id, writeSwiftMessageError)
 			}
 		}
 		source.WriteString("    }\n")
@@ -158,9 +158,9 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 		fmt.Fprintf(source, "            let %sText =\n                switch %s {\n", phrase, phrase)
 		for _, name := range optionNames {
 			values := valueSlots(options[name])
-			literal, err := swiftInterpolatedLiteral(options[name])
-			if err != nil {
-				return fmt.Errorf("the option %q of %q: %w", name, phrase, err)
+			literal, swiftInterpolatedLiteralError := swiftInterpolatedLiteral(options[name])
+			if swiftInterpolatedLiteralError != nil {
+				return fmt.Errorf("the option %q of %q: %w", name, phrase, swiftInterpolatedLiteralError)
 			}
 			if len(values) == 0 {
 				fmt.Fprintf(source, "                    case .%s:\n                        %s\n", name, literal)
@@ -178,9 +178,9 @@ func writeSwiftMessage(source *bytes.Buffer, id string, template messageTemplate
 	for _, phrase := range phraseNames {
 		text = strings.ReplaceAll(text, "<<"+phrase+">>", "{{"+phrase+"Text}}")
 	}
-	literal, err := swiftInterpolatedLiteral(text)
-	if err != nil {
-		return err
+	literal, swiftInterpolatedLiteralError := swiftInterpolatedLiteral(text)
+	if swiftInterpolatedLiteralError != nil {
+		return swiftInterpolatedLiteralError
 	}
 	// A function of one expression returns it, and one that first picks its options returns explicitly.
 	// The call is broken one argument to a line, the house format's shape for a call this long, which it

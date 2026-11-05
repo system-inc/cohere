@@ -119,11 +119,11 @@ func formatFor(fileName string) func(string, string, formatoptions.Options) (str
 // generic call to TypeScript, so printing the TSX parse would rewrite the program's meaning.
 func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(test *testing.T) {
 	test.Parallel()
-	if _, err := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", formatoptions.Default(), nil); err == nil {
+	if _, formatJavaScriptError := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", formatoptions.Default(), nil); formatJavaScriptError == nil {
 		test.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
 	}
-	if _, err := FormatJavaScript("Probe.js", "const result = a < b;\n", formatoptions.Default(), nil); err != nil {
-		test.Fatalf("plain JavaScript was refused: %v", err)
+	if _, formatJavaScriptError := FormatJavaScript("Probe.js", "const result = a < b;\n", formatoptions.Default(), nil); formatJavaScriptError != nil {
+		test.Fatalf("plain JavaScript was refused: %v", formatJavaScriptError)
 	}
 }
 
@@ -132,9 +132,9 @@ func TestFormatMatchesTheFork(test *testing.T) {
 	sameLine := formatoptions.Default()
 	sameLine.BracketSameLine = true
 	for _, options := range []formatoptions.Options{formatoptions.Default(), sameLine} {
-		oracle, err := prettier.New(options)
-		if err != nil {
-			test.Fatal(err)
+		oracle, newPrettierError := prettier.New(options)
+		if newPrettierError != nil {
+			test.Fatal(newPrettierError)
 		}
 		for _, testCase := range formatCases {
 			expected, err := oracle.Format(testCase.fileName, testCase.source)

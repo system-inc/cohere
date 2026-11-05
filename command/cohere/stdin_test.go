@@ -19,13 +19,13 @@ func runCohereWithStdin(test *testing.T, binary string, directory string, stdin 
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
-	err := command.Run()
-	if err == nil {
+	runError := command.Run()
+	if runError == nil {
 		return stdout.String(), stderr.String(), 0
 	}
-	exitError, isExit := err.(*exec.ExitError)
+	exitError, isExit := runError.(*exec.ExitError)
 	if !isExit {
-		test.Fatalf("running cohere: %v\n%s", err, stderr.String())
+		test.Fatalf("running cohere: %v\n%s", runError, stderr.String())
 	}
 	return stdout.String(), stderr.String(), childExitCode(test, exitError)
 }

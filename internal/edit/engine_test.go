@@ -52,9 +52,9 @@ func TestFixProducingInvalidSyntaxIsRefused(test *testing.T) {
 	closingBrace := strings.LastIndex(source, "}")
 	propose := proposeOnce(proposal("brace-eater", closingBrace, closingBrace+1, ""))
 
-	result, err := FixText("broken.ts", source, propose, DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixTextError := FixText("broken.ts", source, propose, DefaultMaxPasses)
+	if fixTextError != nil {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 
 	if result.Changed {
@@ -93,9 +93,9 @@ func TestAParseFailureDiscardsTheWholePass(test *testing.T) {
 		proposal("brace-eater", closingBrace, closingBrace+1, ""),
 	)
 
-	result, err := FixText("mixed.ts", source, propose, DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixTextError := FixText("mixed.ts", source, propose, DefaultMaxPasses)
+	if fixTextError != nil {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 
 	if result.Text != source {
@@ -115,9 +115,9 @@ func TestConvergenceTakesSeveralPasses(test *testing.T) {
 	// pass that finds nothing left.
 	source := "const a = 'old'; const b = 'old'; const c = 'old';\n"
 
-	result, err := FixText("converge.ts", source, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixTextError := FixText("converge.ts", source, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
+	if fixTextError != nil {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 
 	if !result.Converged {
@@ -156,9 +156,9 @@ func TestTwoRulesFightingTerminateOnTheBudget(test *testing.T) {
 		return nil, nil
 	}
 
-	result, err := FixText("fight.ts", "const a = 'ping';\n", propose, 6)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixTextError := FixText("fight.ts", "const a = 'ping';\n", propose, 6)
+	if fixTextError != nil {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 
 	if result.Converged {
@@ -188,12 +188,12 @@ func TestTwoRulesFightingTerminateOnTheBudget(test *testing.T) {
 // did not do — or worse, hide damage it did.
 func TestAlreadyBrokenFileIsRefusedUpFront(test *testing.T) {
 	test.Parallel()
-	_, err := FixText("broken.ts", "function alpha() { return 1;\n", proposeOnce(), DefaultMaxPasses)
-	if err == nil {
+	_, fixTextError := FixText("broken.ts", "function alpha() { return 1;\n", proposeOnce(), DefaultMaxPasses)
+	if fixTextError == nil {
 		test.Fatalf("expected an error for a file that does not parse to begin with")
 	}
-	if !strings.Contains(err.Error(), "does not parse") {
-		test.Fatalf("unexpected error: %v", err)
+	if !strings.Contains(fixTextError.Error(), "does not parse") {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 }
 
@@ -211,13 +211,13 @@ func TestFixFileWritesAtomicallyAndKeepsMode(test *testing.T) {
 	source := "const a = 'old';\n"
 
 	const sourceMode = os.FileMode(0o644)
-	if err := os.WriteFile(fileName, []byte(source), sourceMode); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), sourceMode); writeError != nil {
+		test.Fatal(writeError)
 	}
 	// os.WriteFile applies the process umask, so the file on disk may not be what was asked for.
 	// Setting it explicitly means the assertion below compares against a mode that is really there.
-	if err := os.Chmod(fileName, sourceMode); err != nil {
-		test.Fatal(err)
+	if changeModeError := os.Chmod(fileName, sourceMode); changeModeError != nil {
+		test.Fatal(changeModeError)
 	}
 
 	result, err := FixFile(fileName, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
@@ -266,8 +266,8 @@ func TestFixFileDoesNotTouchAnUnchangedFile(test *testing.T) {
 	directory := test.TempDir()
 	fileName := filepath.Join(directory, "clean.ts")
 
-	if err := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte("const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	before, err := os.Stat(fileName)
 	if err != nil {
@@ -298,8 +298,8 @@ func TestFixFileLeavesTheFileUntouchedOnRefusal(test *testing.T) {
 	fileName := filepath.Join(directory, "guarded.ts")
 	source := "function alpha() { return 1; }\n"
 
-	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	closingBrace := strings.LastIndex(source, "}")
@@ -324,8 +324,8 @@ func TestFixFileLeavesTheFileUntouchedOnRefusal(test *testing.T) {
 // reports success, which is the shape of every silent-green failure this project has recorded.
 func TestMissingFileIsAnError(test *testing.T) {
 	test.Parallel()
-	_, err := FixFile(filepath.Join(test.TempDir(), "absent.ts"), proposeOnce(), DefaultMaxPasses)
-	if err == nil {
+	_, fixFileError := FixFile(filepath.Join(test.TempDir(), "absent.ts"), proposeOnce(), DefaultMaxPasses)
+	if fixFileError == nil {
 		test.Fatalf("expected an error for a file that does not exist")
 	}
 }
@@ -449,9 +449,9 @@ func TestARefusedPassNamesItsFileAndTheFixThatBrokeIt(test *testing.T) {
 	fine := proposal("rule-that-is-fine", strings.Index(text, "1"), strings.Index(text, "1")+1, "3")
 	broken := proposal("rule-that-breaks", strings.Index(text, "2"), strings.Index(text, "2")+1, "(")
 
-	result, err := FixText("refused.ts", text, proposeOnce(fine, broken), DefaultMaxPasses)
-	if err != nil {
-		test.Fatal(err)
+	result, fixTextError := FixText("refused.ts", text, proposeOnce(fine, broken), DefaultMaxPasses)
+	if fixTextError != nil {
+		test.Fatal(fixTextError)
 	}
 	if result.Changed || result.Text != text {
 		test.Fatalf("a pass that did not parse was written in part: %q", result.Text)

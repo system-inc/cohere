@@ -24,9 +24,9 @@ func decodedNoImplicitCoercionOptions(test *testing.T, raw string) any {
 	if raw == "" {
 		return nil
 	}
-	options, err := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	options, decodeNoImplicitCoercionOptionsError := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
+	if decodeNoImplicitCoercionOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitCoercionOptionsError)
 	}
 	return options
 }
@@ -574,9 +574,9 @@ func TestDecodeNoImplicitCoercionOptions(test *testing.T) {
 
 	settingsFrom := func(test *testing.T, raw string) NoImplicitCoercionOptions {
 		test.Helper()
-		decoded, err := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
-		if err != nil {
-			test.Fatalf("the decoder refused %s: %v", raw, err)
+		decoded, decodeNoImplicitCoercionOptionsError := DecodeNoImplicitCoercionOptions(json.RawMessage(raw))
+		if decodeNoImplicitCoercionOptionsError != nil {
+			test.Fatalf("the decoder refused %s: %v", raw, decodeNoImplicitCoercionOptionsError)
 		}
 		options, isOptions := decoded.(NoImplicitCoercionOptions)
 		if !isOptions {

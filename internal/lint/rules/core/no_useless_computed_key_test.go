@@ -36,9 +36,9 @@ func decodeUselessComputedKeyOptionsForTest(test *testing.T, optionsJson string)
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodeNoUselessComputedKeyOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeNoUselessComputedKeyOptionsError := DecodeNoUselessComputedKeyOptions(json.RawMessage(optionsJson))
+	if decodeNoUselessComputedKeyOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoUselessComputedKeyOptionsError)
 	}
 	return decoded
 }
@@ -496,9 +496,9 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testin
 			if testCase.optionsJson == "" {
 				settings = DefaultNoUselessComputedKeySettings()
 			} else {
-				decoded, err := DecodeNoUselessComputedKeyOptions(json.RawMessage(testCase.optionsJson))
-				if err != nil {
-					test.Fatalf("decoding %q: %v", testCase.optionsJson, err)
+				decoded, decodeNoUselessComputedKeyOptionsError := DecodeNoUselessComputedKeyOptions(json.RawMessage(testCase.optionsJson))
+				if decodeNoUselessComputedKeyOptionsError != nil {
+					test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeNoUselessComputedKeyOptionsError)
 				}
 				settings = decoded.(NoUselessComputedKeySettings)
 			}

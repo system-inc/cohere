@@ -29,9 +29,9 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 		return plan, nil
 	}
 
-	anchor, anchorNode, err := resolveAnchor(ctx, graph, files, at)
-	if err != nil {
-		return nil, err
+	anchor, anchorNode, resolveAnchorError := resolveAnchor(ctx, graph, files, at)
+	if resolveAnchorError != nil {
+		return nil, resolveAnchorError
 	}
 	if anchor == nil {
 		return nil, fmt.Errorf(

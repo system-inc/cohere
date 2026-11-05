@@ -67,9 +67,9 @@ func decodeConsistentTypeExportsOptions(test *testing.T, configuration string) a
 		// A rule configured as a bare `"error"` is handed nil, not an empty struct.
 		return nil
 	}
-	options, err := DecodeConsistentTypeExportsOptions([]byte(configuration))
-	if err != nil {
-		test.Fatalf("could not decode %s: %v", configuration, err)
+	options, decodeConsistentTypeExportsOptionsError := DecodeConsistentTypeExportsOptions([]byte(configuration))
+	if decodeConsistentTypeExportsOptionsError != nil {
+		test.Fatalf("could not decode %s: %v", configuration, decodeConsistentTypeExportsOptionsError)
 	}
 	return options
 }
@@ -671,9 +671,9 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeConsistentTypeExportsOptions([]byte(testCase.configuration))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.configuration, err)
+			decoded, decodeConsistentTypeExportsOptionsError := DecodeConsistentTypeExportsOptions([]byte(testCase.configuration))
+			if decodeConsistentTypeExportsOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.configuration, decodeConsistentTypeExportsOptionsError)
 			}
 			options, ok := decoded.(ConsistentTypeExportsOptions)
 			if !ok {

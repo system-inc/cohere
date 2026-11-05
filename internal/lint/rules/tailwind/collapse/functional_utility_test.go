@@ -23,13 +23,13 @@ type functionalFixture struct {
 
 func loadFunctionalFixture(test *testing.T, name string) functionalFixture {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("read %s: %v", name, err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("read %s: %v", name, readError)
 	}
 	var fixture functionalFixture
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		test.Fatalf("parse %s: %v", name, err)
+	if decodeError := json.Unmarshal(raw, &fixture); decodeError != nil {
+		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.ProbeCount == 0 {
 		test.Fatalf("%s holds no probes, so every assertion over it passes by comparing nothing", name)

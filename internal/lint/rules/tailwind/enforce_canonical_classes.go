@@ -441,8 +441,8 @@ type ignorePattern struct {
 func compileIgnorePatterns(patterns []string) []*ignorePattern {
 	compiled := make([]*ignorePattern, 0, len(patterns))
 	for _, pattern := range patterns {
-		expression, err := esregexp.Compile(pattern, "")
-		if err != nil {
+		expression, compileError := esregexp.Compile(pattern, "")
+		if compileError != nil {
 			continue
 		}
 		compiled = append(compiled, &ignorePattern{pattern: expression})

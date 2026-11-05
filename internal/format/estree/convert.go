@@ -2303,14 +2303,14 @@ func numberValue(raw string) float64 {
 		base = 2
 	}
 	if base != 0 {
-		value, err := strconv.ParseUint(text[2:], base, 64)
-		if err != nil {
+		value, parseError := strconv.ParseUint(text[2:], base, 64)
+		if parseError != nil {
 			return math.NaN()
 		}
 		return float64(value)
 	}
-	value, err := strconv.ParseFloat(text, 64)
-	if err != nil {
+	value, parseError := strconv.ParseFloat(text, 64)
+	if parseError != nil {
 		return math.NaN()
 	}
 	return value

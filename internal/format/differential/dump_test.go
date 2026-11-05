@@ -57,9 +57,9 @@ func TestDumpDifferences(test *testing.T) {
 	}
 	directory := os.Getenv("COHERE_FORMAT_CACHE")
 	if directory == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			test.Fatal(err)
+		base, userCacheDirectoryError := os.UserCacheDir()
+		if userCacheDirectoryError != nil {
+			test.Fatal(userCacheDirectoryError)
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
@@ -119,8 +119,8 @@ func TestDumpDifferences(test *testing.T) {
 
 		options := resolution.Options
 		if width := os.Getenv("COHERE_FORMAT_PRINT_WIDTH"); width != "" {
-			if _, err := fmt.Sscan(width, &options.PrintWidth); err != nil {
-				test.Fatalf("COHERE_FORMAT_PRINT_WIDTH %q: %v", width, err)
+			if _, scanError := fmt.Sscan(width, &options.PrintWidth); scanError != nil {
+				test.Fatalf("COHERE_FORMAT_PRINT_WIDTH %q: %v", width, scanError)
 			}
 		}
 		newOracle := func() (Formatter, error) { return prettier.New(options) }
@@ -169,21 +169,21 @@ func TestDumpDifferences(test *testing.T) {
 				test.Fatal(err)
 			}
 			base := filepath.Join(corpus, "files", relative)
-			if err := os.MkdirAll(filepath.Dir(base), 0o755); err != nil {
-				test.Fatal(err)
+			if createDirectoryError := os.MkdirAll(filepath.Dir(base), 0o755); createDirectoryError != nil {
+				test.Fatal(createDirectoryError)
 			}
-			if err := os.WriteFile(base+".expected", []byte(expected), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(base+".expected", []byte(expected), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
-			if err := os.WriteFile(base+".actual", []byte(actual), 0o644); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(base+".actual", []byte(actual), 0o644); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
-		if err := os.MkdirAll(corpus, 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(corpus, 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(filepath.Join(corpus, "summary.txt"), []byte(summary.String()), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(corpus, "summary.txt"), []byte(summary.String()), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

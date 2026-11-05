@@ -62,9 +62,9 @@ func TestTailwindFixersComposeInOnePass(test *testing.T) {
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result, err := edit.FixText("/Component.tsx", testCase.source, proposeFromTailwindFixers(test), edit.DefaultMaxPasses)
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			result, fixTextError := edit.FixText("/Component.tsx", testCase.source, proposeFromTailwindFixers(test), edit.DefaultMaxPasses)
+			if fixTextError != nil {
+				test.Fatalf("unexpected error: %v", fixTextError)
 			}
 			for _, rejection := range result.Rejected {
 				test.Errorf("refused %s (conflicts with %s): %s",

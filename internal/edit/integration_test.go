@@ -86,8 +86,8 @@ func TestARealRuleFixLandsCorrectly(test *testing.T) {
 		"\n" +
 		"export const roots = [NodeFileSystem, NodePath, NodeOperatingSystem];\n"
 
-	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
@@ -134,9 +134,9 @@ func TestARealRuleConvergesInTwoPasses(test *testing.T) {
 	test.Parallel()
 	source := "import * as NodeFileSystem from 'fs';\n"
 
-	result, err := FixText("imports.ts", source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixTextError := FixText("imports.ts", source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+	if fixTextError != nil {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 
 	if !result.Converged {
@@ -193,9 +193,9 @@ func TestReplaceNodeMustNotEatLeadingTrivia(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result, err := FixText("imports.ts", testCase.source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
-			if err != nil {
-				test.Fatalf("unexpected error: %v", err)
+			result, fixTextError := FixText("imports.ts", testCase.source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+			if fixTextError != nil {
+				test.Fatalf("unexpected error: %v", fixTextError)
 			}
 			if result.Text != testCase.want {
 				test.Fatalf("trivia was consumed by the fix:\n  want %q\n  got  %q", testCase.want, result.Text)
@@ -214,8 +214,8 @@ func TestAFindingWithNoFixChangesNothing(test *testing.T) {
 	// A named import of a builtin: reported, and deliberately not fixed.
 	source := "import { readFileSync } from 'node:fs';\n\nexport const read = readFileSync;\n"
 
-	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
@@ -267,8 +267,8 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 	fileName := filepath.Join(directory, "probe.ts")
 	source := "export function alpha() { return 1; }\n"
 
-	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(breakingRule), DefaultMaxPasses)
@@ -351,8 +351,8 @@ func TestAFileThatDoesNotConvergeIsNotWritten(test *testing.T) {
 	fileName := filepath.Join(directory, "switch.ts")
 	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
 
-	if err := os.WriteFile(fileName, []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(fileName, []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	result, err := FixFile(fileName, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
@@ -389,9 +389,9 @@ func TestNonConvergenceNamesTheRule(test *testing.T) {
 	test.Parallel()
 	source := "switch (x) {\n\tcase 1:\n\t\tconst a = 1;\n\t\tbreak;\n}\n"
 
-	result, err := FixText("switch.ts", source, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixTextError := FixText("switch.ts", source, proposeFromRules(nonSilencingRule), DefaultMaxPasses)
+	if fixTextError != nil {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 
 	if len(result.UnconvergedRules) != 1 || result.UnconvergedRules[0] != "probe-never-silences" {
@@ -455,9 +455,9 @@ func TestSiblingFixesFromOneDiagnosticHalfApply(test *testing.T) {
 	test.Parallel()
 	source := "const a = \"xy\";\n"
 
-	result, err := FixText("p.ts", source, proposeFromRules(siblingOverlapRule), DefaultMaxPasses)
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, fixTextError := FixText("p.ts", source, proposeFromRules(siblingOverlapRule), DefaultMaxPasses)
+	if fixTextError != nil {
+		test.Fatalf("unexpected error: %v", fixTextError)
 	}
 
 	if len(result.Applied) != 1 {

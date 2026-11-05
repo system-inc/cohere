@@ -565,9 +565,9 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		decoded, err := DecodeIdDenylistOptions([]byte(testCase.raw))
-		if err != nil {
-			test.Errorf("decoding %s: %v", testCase.raw, err)
+		decoded, decodeIdDenylistOptionsError := DecodeIdDenylistOptions([]byte(testCase.raw))
+		if decodeIdDenylistOptionsError != nil {
+			test.Errorf("decoding %s: %v", testCase.raw, decodeIdDenylistOptionsError)
 			continue
 		}
 		settings, ok := decoded.(IdDenylistSettings)
@@ -596,7 +596,7 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 		// The nested workaround spelling, an element that is not a string.
 		`[["data", "err"]]`,
 	} {
-		if _, err := DecodeIdDenylistOptions([]byte(raw)); err == nil {
+		if _, decodeIdDenylistOptionsError := DecodeIdDenylistOptions([]byte(raw)); decodeIdDenylistOptionsError == nil {
 			test.Errorf("expected %s to be refused, got no error", raw)
 		}
 	}

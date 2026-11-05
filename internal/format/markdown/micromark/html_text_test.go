@@ -223,14 +223,14 @@ func compareEventsWithoutHtmlTextOverride(test *testing.T, inputs []string) {
 // htmlTextUpstreamEvents is oracle_test.go's upstreamEvents with the script as a parameter.
 func htmlTextUpstreamEvents(test *testing.T, script string, inputs []string) [][]string {
 	test.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed; the event oracle needs it")
 	}
 	root := forkRoot(test)
 
 	path := filepath.Join(test.TempDir(), "oracle.mjs")
-	if err := os.WriteFile(path, []byte(strings.ReplaceAll(script, "FORK", root)), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(path, []byte(strings.ReplaceAll(script, "FORK", root)), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	encoded, err := json.Marshal(inputs)
 	if err != nil {
@@ -246,8 +246,8 @@ func htmlTextUpstreamEvents(test *testing.T, script string, inputs []string) [][
 		test.Fatal(err)
 	}
 	var outputs [][]string
-	if err := json.Unmarshal(output, &outputs); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	return outputs
 }

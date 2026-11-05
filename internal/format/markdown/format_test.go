@@ -156,9 +156,9 @@ func TestExhaustiveDelimitersMatchOracle(test *testing.T) {
 
 	// The live oracle, not a golden (see oracletest): an opt-in measuring sweep of some 19,500 inputs that
 	// no default run reaches, so recording it would check in its answers for nothing a default run reads.
-	engine, err := prettier.New(formatoptions.Default())
-	if err != nil {
-		test.Fatal(err)
+	engine, newPrettierError := prettier.New(formatoptions.Default())
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	failures := 0
 	for _, input := range inputs {

@@ -59,9 +59,9 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(test *testing.T) {
 	// Every file and directory of this module, named from its root, the way a fingerprint names a program's
 	// files from the run's directory: as written on a case-sensitive host, and canonical (lowercased) under the
 	// root's own spelling on a case-insensitive one, which is macOS's and where the slice first never matched.
-	root, err := filepath.Abs(filepath.Join("..", "..", ".."))
-	if err != nil {
-		test.Fatal(err)
+	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	directory := tspath.NormalizePath(filepath.ToSlash(root))
 	sensitive := directoryProgram{directory: directory, caseSensitive: true}

@@ -48,8 +48,8 @@ func DecodeNoUselessComputedKeyOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUselessComputedKeyWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return DefaultNoUselessComputedKeySettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return DefaultNoUselessComputedKeySettings(), unmarshalOptionsError
 	}
 	settings := DefaultNoUselessComputedKeySettings()
 	if wire.EnforceForClassMembers != nil {

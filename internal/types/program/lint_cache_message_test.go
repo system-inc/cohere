@@ -40,7 +40,7 @@ func messageIdTexts(test *testing.T) (staticTexts map[string]map[string]struct{}
 
 	root := filepath.Join("..", "..", "lint", "rules")
 	walked := 0
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -65,8 +65,8 @@ func messageIdTexts(test *testing.T) (staticTexts map[string]map[string]struct{}
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking %s: %v", root, err)
+	if walkError != nil {
+		test.Fatalf("walking %s: %v", root, walkError)
 	}
 
 	// A scan that read nothing passes every assertion below for the wrong reason, which is the same

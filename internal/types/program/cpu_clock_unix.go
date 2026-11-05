@@ -17,7 +17,7 @@ import (
 // rather than the wall clock (#8qyzmxw).
 func threadCPU() (time.Duration, bool) {
 	var spec unix.Timespec
-	if err := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); err != nil {
+	if clockGettimeError := unix.ClockGettime(unix.CLOCK_THREAD_CPUTIME_ID, &spec); clockGettimeError != nil {
 		return 0, false
 	}
 	return time.Duration(spec.Nano()), true
@@ -26,7 +26,7 @@ func threadCPU() (time.Duration, bool) {
 // processCPU is the CPU the whole process has used, user and system. False when it cannot be read.
 func processCPU() (time.Duration, bool) {
 	var usage syscall.Rusage
-	if err := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); err != nil {
+	if getrusageError := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); getrusageError != nil {
 		return 0, false
 	}
 	return time.Duration(usage.Utime.Nano() + usage.Stime.Nano()), true

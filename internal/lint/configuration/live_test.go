@@ -23,9 +23,9 @@ func liveConfigPath(test testing.TB) string {
 func TestAgainstTheLiveConfig(test *testing.T) {
 	test.Parallel()
 
-	loaded, err := Load(liveConfigPath(test))
-	if err != nil {
-		test.Fatalf("loading the live config: %v", err)
+	loaded, loadError := Load(liveConfigPath(test))
+	if loadError != nil {
+		test.Fatalf("loading the live config: %v", loadError)
 	}
 
 	// Prove the input is real before asserting anything about it. A config that parsed to zero rules
@@ -194,9 +194,9 @@ func TestBothPathsAgreeOnEveryPluginDefault(test *testing.T) {
 // (#rkm5a31), now the sets cohere carries (#njhfftt): the forty lines moved into the Nexus tier, so
 // reading ahra's file alone reported all forty dropped to warn while every one still ran at error.
 func ruleNamesInChain(path string) (map[string]RuleSetting, error) {
-	sources, err := SourcesOf(path)
-	if err != nil {
-		return nil, err
+	sources, sourcesOfError := SourcesOf(path)
+	if sourcesOfError != nil {
+		return nil, sourcesOfError
 	}
 	named := map[string]RuleSetting{}
 	for index := len(sources) - 1; index >= 0; index-- {
@@ -230,15 +230,15 @@ func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
 	var raw struct {
 		Rules map[string]json.RawMessage `json:"rules"`
 	}
-	if err := json.Unmarshal(contents, &raw); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal(contents, &raw); decodeError != nil {
+		return nil, decodeError
 	}
 
 	named := map[string]RuleSetting{}
 	for name, value := range raw.Rules {
-		setting, err := parseRuleSetting(value)
-		if err != nil {
-			return nil, err
+		setting, parseRuleSettingError := parseRuleSetting(value)
+		if parseRuleSettingError != nil {
+			return nil, parseRuleSettingError
 		}
 		// The config writes `react/no-children-prop` and the table keys on the same spelling the
 		// inventory uses, so both are recorded and a lookup finds either.
@@ -266,9 +266,9 @@ func ruleNamesInContents(contents []byte) (map[string]RuleSetting, error) {
 // exists so this one does neither.
 func TestTheGuardCatchesARemovedLine(test *testing.T) {
 	test.Parallel()
-	intact, err := ruleNamesInChain(liveConfigPath(test))
-	if err != nil {
-		test.Fatalf("reading the rules blocks: %v", err)
+	intact, ruleNamesInChainError := ruleNamesInChain(liveConfigPath(test))
+	if ruleNamesInChainError != nil {
+		test.Fatalf("reading the rules blocks: %v", ruleNamesInChainError)
 	}
 	unnamed := func(named map[string]RuleSetting) int {
 		missing := 0

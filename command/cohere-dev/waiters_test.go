@@ -20,16 +20,16 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 		test.Skip("tokens are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	home := privatePool(test)
 	slots := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots")
 	environment := append(outsideThePool(os.Environ()), homeVariable+"="+home, tokensVariable+"=1")
 
-	first, err := takeSlot(slots, 1, "the first holder, which the test lets go")
-	if err != nil || first == nil {
-		test.Fatalf("taking the token: %v", err)
+	first, takeSlotError := takeSlot(slots, 1, "the first holder, which the test lets go")
+	if takeSlotError != nil || first == nil {
+		test.Fatalf("taking the token: %v", takeSlotError)
 	}
 	tickets := func() int {
 		entries, _ := os.ReadDir(queueDirectory(slots))
@@ -49,8 +49,8 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 		var output strings.Builder
 		command := exec.Command(wrapper, "exec", "--", "sh", "-c", "sleep 2 # "+marker)
 		command.Env, command.Stdout, command.Stderr = environment, &output, &output
-		if err := command.Start(); err != nil {
-			test.Fatal(err)
+		if startError := command.Start(); startError != nil {
+			test.Fatal(startError)
 		}
 		for deadline := time.Now().Add(time.Minute); tickets() < want; time.Sleep(20 * time.Millisecond) {
 			if time.Now().After(deadline) {
@@ -63,8 +63,8 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 	third := queue("the third run", 2)
 	first.release()
 	for _, run := range []waiter{second, third} {
-		if err := run.command.Wait(); err != nil {
-			test.Fatalf("a queued run failed: %v\n%s", err, run.output)
+		if waitError := run.command.Wait(); waitError != nil {
+			test.Fatalf("a queued run failed: %v\n%s", waitError, run.output)
 		}
 	}
 	if output := third.output.String(); !strings.Contains(output, "the first holder") ||
@@ -80,21 +80,21 @@ func TestStatusShowsTheLandLock(test *testing.T) {
 		test.Skip("the land lock is a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	home := privatePool(test)
 	land := filepath.Join(userCacheDirectoryIn(home), "cohere", "test-slots", "land")
-	if err := os.MkdirAll(land, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(land, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	status := func() string {
 		test.Helper()
 		command := exec.Command(wrapper, "status")
 		command.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home)
-		output, err := command.CombinedOutput()
-		if err != nil {
-			test.Fatalf("cohere-dev status: %v\n%s", err, output)
+		output, outputError := command.CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("cohere-dev status: %v\n%s", outputError, output)
 		}
 		return string(output)
 	}

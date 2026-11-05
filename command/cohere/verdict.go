@@ -29,9 +29,9 @@ func sendVerdict(exitCode int) bool {
 	}
 	file := verdictFile
 	verdictFile = nil
-	_, err := file.Write([]byte{byte(exitCode)})
+	_, writeError := file.Write([]byte{byte(exitCode)})
 	file.Close()
-	if err != nil {
+	if writeError != nil {
 		return false
 	}
 	verdictSent = true

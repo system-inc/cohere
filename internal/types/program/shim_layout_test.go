@@ -316,22 +316,22 @@ func buildLayoutSubject(test *testing.T) (*checker.Checker, *ast.SourceFile, fun
 	test.Helper()
 	directory := test.TempDir()
 	sourcePath := filepath.Join(directory, "Subject.ts")
-	if err := os.WriteFile(sourcePath, []byte(layoutSubjectSource), 0o644); err != nil {
-		test.Fatalf("writing the fixture: %v", err)
+	if writeError := os.WriteFile(sourcePath, []byte(layoutSubjectSource), 0o644); writeError != nil {
+		test.Fatalf("writing the fixture: %v", writeError)
 	}
 	configPath := filepath.Join(directory, "tsconfig.json")
 	config := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"types":[]},"include":["*.ts"]}`
-	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
-		test.Fatalf("writing the tsconfig: %v", err)
+	if writeError := os.WriteFile(configPath, []byte(config), 0o644); writeError != nil {
+		test.Fatalf("writing the tsconfig: %v", writeError)
 	}
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   configPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
-	if err != nil {
-		test.Fatalf("building the type graph: %v", err)
+	if buildError != nil {
+		test.Fatalf("building the type graph: %v", buildError)
 	}
 	files := graph.ProjectFiles()
 	if len(files) == 0 {

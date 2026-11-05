@@ -133,9 +133,9 @@ func runNoDeprecatedCases(test *testing.T, cases []noDeprecatedCase) {
 
 			var decoded any
 			if testCase.options != "" {
-				parsed, err := DecodeNoDeprecatedOptions(json.RawMessage(testCase.options))
-				if err != nil {
-					test.Fatalf("the decoder refused %s: %v", testCase.options, err)
+				parsed, decodeNoDeprecatedOptionsError := DecodeNoDeprecatedOptions(json.RawMessage(testCase.options))
+				if decodeNoDeprecatedOptionsError != nil {
+					test.Fatalf("the decoder refused %s: %v", testCase.options, decodeNoDeprecatedOptionsError)
 				}
 				decoded = parsed
 			}
@@ -188,12 +188,12 @@ func linkInstalledTypesForNoDeprecated(test *testing.T) func(string) {
 	test.Helper()
 	return func(directory string) {
 		source := corpus.Ahra.Path(test, "node_modules")
-		if _, err := os.Stat(filepath.Join(source, "@types", "react")); err != nil {
+		if _, statError := os.Stat(filepath.Join(source, "@types", "react")); statError != nil {
 			test.Fatalf("this case reads its deprecation from @types/react, which the ahra corpus at %s does "+
-				"not have installed: %v", source, err)
+				"not have installed: %v", source, statError)
 		}
-		if err := os.Symlink(source, filepath.Join(directory, "node_modules")); err != nil {
-			test.Fatalf("linking node_modules into the fixture: %v", err)
+		if symlinkError := os.Symlink(source, filepath.Join(directory, "node_modules")); symlinkError != nil {
+			test.Fatalf("linking node_modules into the fixture: %v", symlinkError)
 		}
 	}
 }

@@ -75,7 +75,7 @@ func TestCohereStyleAndTheSystemIncTiersResolveToThemselves(test *testing.T) {
 		test.Errorf("cohere:style should load alone, and its sources are %v", sources)
 	}
 	// A name that doesn't exist is refused rather than matched to a set it begins like.
-	if _, err := SourceContents("cohere:system"); err == nil {
+	if _, sourceContentsError := SourceContents("cohere:system"); sourceContentsError == nil {
 		test.Error("cohere:system, which is no set, resolved to something")
 	}
 }
@@ -174,9 +174,9 @@ func TestAnUnknownSetIsRefusedNamingTheSetsThereAre(test *testing.T) {
 	test.Parallel()
 	directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "cohere:typescirpt"}`})
 	refusedWith(test, filepath.Join(directory, "CohereSettings.json"), "the sets are cohere:")
-	_, err := Load(filepath.Join(directory, "CohereSettings.json"))
-	if err == nil || !strings.Contains(err.Error(), "cohere:typescript") {
-		test.Errorf("the refusal must name the set that was meant: %v", err)
+	_, loadError := Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError == nil || !strings.Contains(loadError.Error(), "cohere:typescript") {
+		test.Errorf("the refusal must name the set that was meant: %v", loadError)
 	}
 }
 

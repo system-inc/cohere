@@ -33,9 +33,9 @@ lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
   suppressed: 279 findings silenced by a disable comment, 264 of them without a stated reason
   config: rule consistency-require-type-suffix scoped off for 6 files by the config`
 
-	result, err := ParseCohere(output, ahraTreeRoot)
-	if err != nil {
-		test.Fatalf("parsing real cohere output: %v", err)
+	result, parseCohereError := ParseCohere(output, ahraTreeRoot)
+	if parseCohereError != nil {
+		test.Fatalf("parsing real cohere output: %v", parseCohereError)
 	}
 	if len(result.Findings) != 1 {
 		test.Fatalf("want 1 finding from real output, got %d (unparsed: %v)", len(result.Findings), result.UnparsedLines)
@@ -63,9 +63,9 @@ func TestParsesRealGateOutput(test *testing.T) {
 	output := `app/(os-layout)/finance/_components/FinanceLedgerTable.tsx:49:5: error structure(react-component-no-multiple-primary): File contains a component with 108 lines.
 libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structure(react-component-no-multiple-primary): File contains a component with 184 lines.`
 
-	result, err := ParseGate(output, ahraTreeRoot)
-	if err != nil {
-		test.Fatalf("parsing real gate output: %v", err)
+	result, parseGateError := ParseGate(output, ahraTreeRoot)
+	if parseGateError != nil {
+		test.Fatalf("parsing real gate output: %v", parseGateError)
 	}
 	if len(result.Findings) != 2 {
 		test.Fatalf("want 2 findings from real output, got %d (unparsed: %v)", len(result.Findings), result.UnparsedLines)
@@ -132,9 +132,9 @@ func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 // silently stops matching must not present as a clean run.
 func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 	test.Parallel()
-	result, err := ParseCohere("this line is neither a finding nor a summary", "")
-	if err != nil {
-		test.Fatalf("unexpected error: %v", err)
+	result, parseCohereError := ParseCohere("this line is neither a finding nor a summary", "")
+	if parseCohereError != nil {
+		test.Fatalf("unexpected error: %v", parseCohereError)
 	}
 	if len(result.Findings) != 0 {
 		test.Fatalf("invented %d findings from an unrecognized line", len(result.Findings))

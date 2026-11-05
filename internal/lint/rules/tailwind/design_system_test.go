@@ -94,11 +94,11 @@ func designSystemProject(test *testing.T, sourceFileCount int) string {
 	root := test.TempDir()
 	write := func(relativePath, contents string) {
 		full := filepath.Join(root, relativePath)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			test.Fatalf("creating %s: %v", filepath.Dir(full), err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {
+			test.Fatalf("creating %s: %v", filepath.Dir(full), createDirectoryError)
 		}
-		if err := os.WriteFile(full, []byte(contents), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", full, err)
+		if writeError := os.WriteFile(full, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", full, writeError)
 		}
 	}
 
@@ -160,9 +160,9 @@ func (probe *designSystemProbe) rule() rule.Rule {
 func designSystemWalk(test *testing.T, root string, subject rule.Rule) *program.Graph {
 	test.Helper()
 
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: root})
-	if err != nil {
-		test.Fatalf("building the program: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: root})
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
 	}
 
 	files := graph.ProjectFiles()
@@ -170,8 +170,8 @@ func designSystemWalk(test *testing.T, root string, subject rule.Rule) *program.
 		test.Fatal("the program holds no project files, so the walk would prove nothing")
 	}
 
-	if _, err := graph.Walk(context.Background(), files, []rule.Rule{subject}); err != nil {
-		test.Fatalf("walking: %v", err)
+	if _, walkError := graph.Walk(context.Background(), files, []rule.Rule{subject}); walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 	return graph
 }
@@ -324,14 +324,14 @@ func TestDesignSystemDeclinesRatherThanReportingClean(test *testing.T) {
 	resetDesignSystemCacheForTest()
 
 	root := test.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(designSystemTestConfig), 0o644); err != nil {
-		test.Fatalf("writing tsconfig: %v", err)
+	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(designSystemTestConfig), 0o644); writeError != nil {
+		test.Fatalf("writing tsconfig: %v", writeError)
 	}
-	if err := os.WriteFile(
+	if writeError := os.WriteFile(
 		filepath.Join(root, "Component.tsx"),
 		[]byte("export const value = 1;\n"), 0o644,
-	); err != nil {
-		test.Fatalf("writing source: %v", err)
+	); writeError != nil {
+		test.Fatalf("writing source: %v", writeError)
 	}
 
 	probe := &designSystemProbe{}
@@ -368,15 +368,15 @@ func TestDesignSystemFailedBuildIsCachedToo(test *testing.T) {
 	resetDesignSystemCacheForTest()
 
 	root := test.TempDir()
-	if err := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(designSystemTestConfig), 0o644); err != nil {
-		test.Fatalf("writing tsconfig: %v", err)
+	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(designSystemTestConfig), 0o644); writeError != nil {
+		test.Fatalf("writing tsconfig: %v", writeError)
 	}
 	for index := range 8 {
-		if err := os.WriteFile(
+		if writeError := os.WriteFile(
 			filepath.Join(root, "Component"+string(rune('A'+index))+".tsx"),
 			[]byte("export const value = 1;\n"), 0o644,
-		); err != nil {
-			test.Fatalf("writing source: %v", err)
+		); writeError != nil {
+			test.Fatalf("writing source: %v", writeError)
 		}
 	}
 
@@ -499,7 +499,7 @@ func TestDesignSystemCustomVariantsRegisterWithoutMovingFrameworkOnes(test *test
 @custom-variant pointer-coarse (@media (pointer: coarse));
 `)
 
-	system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+	system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 		EntryPoint: entryPoint,
 		Resolve:    resolve,
 		FrameworkVariants: []tailwindengine.FrameworkVariant{
@@ -508,8 +508,8 @@ func TestDesignSystemCustomVariantsRegisterWithoutMovingFrameworkOnes(test *test
 			{Name: "group", Kind: tailwindengine.ParsedVariantKindCompound},
 		},
 	})
-	if err != nil {
-		test.Fatalf("loading: %v", err)
+	if loadDesignSystemError != nil {
+		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	darkBefore, isRegistered := system.Variants().Get("dark")
@@ -569,15 +569,15 @@ func TestDesignSystemVariantRegistrationOrderIsDeterministic(test *testing.T) {
 	entryPoint := designSystemWriteStylesheet(test, stylesheet)
 
 	orderOf := func() map[string]int {
-		system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 			EntryPoint: entryPoint,
 			Resolve:    resolve,
 			FrameworkVariants: []tailwindengine.FrameworkVariant{
 				{Name: "hover", Kind: tailwindengine.ParsedVariantKindStatic},
 			},
 		})
-		if err != nil {
-			test.Fatalf("loading: %v", err)
+		if loadDesignSystemError != nil {
+			test.Fatalf("loading: %v", loadDesignSystemError)
 		}
 		orders := map[string]int{}
 		for _, name := range names {
@@ -659,19 +659,19 @@ func TestDesignSystemRefusesRatherThanHalfBuilding(test *testing.T) {
 		test.Run(aCase.name, func(test *testing.T) {
 			test.Parallel()
 			entryPoint := designSystemWriteStylesheet(test, aCase.stylesheet)
-			system, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+			system, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 				EntryPoint: entryPoint,
 				Resolve:    resolve,
 			})
-			if err == nil {
+			if loadDesignSystemError == nil {
 				test.Fatalf("expected a refusal; got a design system with %d theme entries",
 					system.Contributions().ThemeEntries)
 			}
 			if system != nil {
 				test.Fatal("a failed load must return no value at all, never a partial one")
 			}
-			if aCase.wants != "" && !strings.Contains(err.Error(), aCase.wants) {
-				test.Fatalf("expected the error to name %q, got %v", aCase.wants, err)
+			if aCase.wants != "" && !strings.Contains(loadDesignSystemError.Error(), aCase.wants) {
+				test.Fatalf("expected the error to name %q, got %v", aCase.wants, loadDesignSystemError)
 			}
 		})
 	}
@@ -689,9 +689,9 @@ func TestDesignSystemIsSafeUnderTheParallelWalk(test *testing.T) {
 	resetDesignSystemCacheForTest()
 
 	root := designSystemProject(test, 2)
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: root})
-	if err != nil {
-		test.Fatalf("building the program: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: root})
+	if buildError != nil {
+		test.Fatalf("building the program: %v", buildError)
 	}
 
 	before := tailwindengine.BuildsSoFar()
@@ -734,18 +734,18 @@ func TestDesignSystemLoadCost(test *testing.T) {
 	})
 	entryPoint := designSystemWriteStylesheet(test, designSystemStylesheet)
 	tokensPath := filepath.Join(filepath.Dir(entryPoint), "tokens.css")
-	if err := os.WriteFile(tokensPath, []byte(designSystemTokensStylesheet), 0o644); err != nil {
-		test.Fatalf("writing tokens: %v", err)
+	if writeError := os.WriteFile(tokensPath, []byte(designSystemTokensStylesheet), 0o644); writeError != nil {
+		test.Fatalf("writing tokens: %v", writeError)
 	}
 
 	const iterations = 50
 	start := time.Now()
 	for range iterations {
-		if _, err := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
+		if _, loadDesignSystemError := tailwindengine.LoadDesignSystem(tailwindengine.LoadOptions{
 			EntryPoint: entryPoint,
 			Resolve:    resolve,
-		}); err != nil {
-			test.Fatalf("loading: %v", err)
+		}); loadDesignSystemError != nil {
+			test.Fatalf("loading: %v", loadDesignSystemError)
 		}
 	}
 	perBuild := time.Since(start) / iterations
@@ -762,8 +762,8 @@ func designSystemWriteStylesheet(test *testing.T, contents string) string {
 	test.Helper()
 
 	path := filepath.Join(test.TempDir(), "theme.css")
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		test.Fatalf("writing %s: %v", path, err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing %s: %v", path, writeError)
 	}
 	return path
 }
@@ -786,15 +786,15 @@ func designSystemFixtureResolver(bySpecifier map[string]string) tailwindengine.S
 		}
 
 		if directory == "" {
-			created, err := os.MkdirTemp("", "design-system-fixture")
-			if err != nil {
-				return "", err
+			created, temporaryDirectoryError := os.MkdirTemp("", "design-system-fixture")
+			if temporaryDirectoryError != nil {
+				return "", temporaryDirectoryError
 			}
 			directory = created
 		}
 		path := filepath.Join(directory, strings.ReplaceAll(specifier, "/", "-")+".css")
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			return "", err
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			return "", writeError
 		}
 		return path, nil
 	}

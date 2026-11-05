@@ -364,9 +364,9 @@ func TestJsxNoTargetBlankStaysSilent(test *testing.T) {
 // be testing the rule against options no config can produce.
 func decodeTargetBlankOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	options, err := DecodeJsxNoTargetBlankOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", raw, err)
+	options, decodeJsxNoTargetBlankOptionsError := DecodeJsxNoTargetBlankOptions([]byte(raw))
+	if decodeJsxNoTargetBlankOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", raw, decodeJsxNoTargetBlankOptionsError)
 	}
 	return options
 }
@@ -453,9 +453,9 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodeJsxNoTargetBlankOptions([]byte(testCase.raw))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", testCase.raw, err)
+			decoded, decodeJsxNoTargetBlankOptionsError := DecodeJsxNoTargetBlankOptions([]byte(testCase.raw))
+			if decodeJsxNoTargetBlankOptionsError != nil {
+				test.Fatalf("decoding %q: %v", testCase.raw, decodeJsxNoTargetBlankOptionsError)
 			}
 			if decoded != any(testCase.want) {
 				test.Errorf("got %+v, want %+v", decoded, testCase.want)
@@ -463,7 +463,7 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 		})
 	}
 
-	if _, err := DecodeJsxNoTargetBlankOptions([]byte("not json")); err == nil {
+	if _, decodeJsxNoTargetBlankOptionsError := DecodeJsxNoTargetBlankOptions([]byte("not json")); decodeJsxNoTargetBlankOptionsError == nil {
 		test.Error("malformed input should error rather than silently producing defaults")
 	}
 }

@@ -49,8 +49,8 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 			ConfigFileName:     filepath.Join(directory, "tsconfig.json"),
 			LintConfigFileName: filepath.Join(directory, "CohereSettings.json"),
 		}
-		if _, err := configureLint(graph, location, nil); err != nil {
-			test.Fatal(err)
+		if _, configureLintError := configureLint(graph, location, nil); configureLintError != nil {
+			test.Fatal(configureLintError)
 		}
 		engine, err := native.NewResolving(directory)
 		if err != nil {
@@ -81,9 +81,9 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 
 		onDisk := map[string]string{}
 		for name := range files {
-			contents, err := os.ReadFile(filepath.Join(directory, name))
-			if err != nil {
-				test.Fatal(err)
+			contents, readError := os.ReadFile(filepath.Join(directory, name))
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			onDisk[name] = string(contents)
 		}
@@ -111,7 +111,7 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 }
 
 func stripRoot(text string, root string) string {
-	if resolved, err := filepath.EvalSymlinks(root); err == nil {
+	if resolved, resolveSymlinksError := filepath.EvalSymlinks(root); resolveSymlinksError == nil {
 		text = strings.ReplaceAll(text, resolved, "ROOT")
 	}
 	return strings.ReplaceAll(text, root, "ROOT")

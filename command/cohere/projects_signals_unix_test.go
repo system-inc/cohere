@@ -34,16 +34,16 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	run := exec.Command(binary, "--no-fix")
 	run.Dir = root
 	run.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine, "COHERE_VERDICT_FD=")
-	if err := run.Start(); err != nil {
-		test.Fatal(err)
+	if startError := run.Start(); startError != nil {
+		test.Fatal(startError)
 	}
 	defer run.Process.Kill()
 
 	readPID := func(path string) int {
 		deadline := time.Now().Add(2 * time.Minute)
 		for time.Now().Before(deadline) {
-			if contents, err := os.ReadFile(path); err == nil {
-				if pid, err := strconv.Atoi(strings.TrimSpace(string(contents))); err == nil {
+			if contents, readError := os.ReadFile(path); readError == nil {
+				if pid, parseError := strconv.Atoi(strings.TrimSpace(string(contents))); parseError == nil {
 					return pid
 				}
 			}
@@ -54,8 +54,8 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	}
 	engineProcess, compilerProcess := readPID(enginePID), readPID(compilerPID)
 
-	if err := run.Process.Signal(syscall.SIGTERM); err != nil {
-		test.Fatal(err)
+	if signalError := run.Process.Signal(syscall.SIGTERM); signalError != nil {
+		test.Fatal(signalError)
 	}
 	// Bounded well under the compile's 300s: a run that waits for its children to end on their own, rather
 	// than ending them, also exits as terminated, but only once the compile finishes.

@@ -406,8 +406,8 @@ func DecodeNoUnsafeMemberAccessOptions(raw []byte) (any, error) {
 		return settings, nil
 	}
 	var wire noUnsafeMemberAccessRawOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 	if wire.AllowOptionalChaining != nil {
 		settings.AllowOptionalChaining = *wire.AllowOptionalChaining

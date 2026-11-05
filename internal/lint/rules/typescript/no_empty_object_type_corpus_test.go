@@ -42,14 +42,14 @@ func TestNoEmptyObjectTypeUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			options, err := DecodeNoEmptyObjectTypeOptions([]byte(row.options))
-			if err != nil {
-				test.Fatalf("decoding %q: %v", row.options, err)
+			options, decodeNoEmptyObjectTypeOptionsError := DecodeNoEmptyObjectTypeOptions([]byte(row.options))
+			if decodeNoEmptyObjectTypeOptionsError != nil {
+				test.Fatalf("decoding %q: %v", row.options, decodeNoEmptyObjectTypeOptionsError)
 			}
 			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoEmptyObjectType, map[string]string{"file.ts": row.source}, "file.ts", options,
 				func(directory string) {
-					if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noEmptyObjectTypeCorpusTsconfig), 0o644); err != nil {
-						test.Fatal(err)
+					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noEmptyObjectTypeCorpusTsconfig), 0o644); writeError != nil {
+						test.Fatal(writeError)
 					}
 				})
 

@@ -490,14 +490,14 @@ var constructAfterInline = regexp.MustCompile(
 func TestConstructionIsNotReRunAfterTheInline(test *testing.T) {
 	test.Parallel()
 
-	paths, err := filepath.Glob("*.go")
-	if err != nil {
-		test.Fatal(err)
+	paths, globError := filepath.Glob("*.go")
+	if globError != nil {
+		test.Fatal(globError)
 	}
 	for _, path := range paths {
-		source, err := os.ReadFile(path)
-		if err != nil {
-			test.Fatal(err)
+		source, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
 		}
 		// This file names the pattern in prose.
 		if filepath.Base(path) == "ssa_test.go" {

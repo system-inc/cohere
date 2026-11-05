@@ -153,8 +153,8 @@ func trimLeadingJavaScriptSpace(value string) string {
 // ECMAScript's Number::toString does for the cases that matter here, and below 1e21 both print
 // plain decimal, so comparing the reprint is the same test upstream runs.
 func roundTripsAsJavaScriptNumber(value string) bool {
-	parsed, err := strconv.ParseFloat(value, 64)
-	if err != nil {
+	parsed, parseError := strconv.ParseFloat(value, 64)
+	if parseError != nil {
 		return false
 	}
 	// ECMAScript prints integers below 1e21 without an exponent; above it, upstream's comparison

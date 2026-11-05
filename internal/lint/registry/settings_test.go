@@ -36,8 +36,8 @@ func TestCheckSettingsAcceptsWhatTheRunReads(test *testing.T) {
 		"an empty list replacing a kind": settingsOf(map[string]string{"better-tailwindcss": `{"callees": []}`}),
 	}
 	for name, base := range accepted {
-		if err := CheckSettings(base); err != nil {
-			test.Errorf("%s was refused: %v", name, err)
+		if checkSettingsError := CheckSettings(base); checkSettingsError != nil {
+			test.Errorf("%s was refused: %v", name, checkSettingsError)
 		}
 	}
 }
@@ -68,14 +68,14 @@ func TestCheckSettingsRefusesWhatWouldBeIgnored(test *testing.T) {
 			[]string{"collapse"}},
 	}
 	for _, testCase := range refused {
-		err := CheckSettings(testCase.base)
-		if err == nil {
+		checkSettingsError := CheckSettings(testCase.base)
+		if checkSettingsError == nil {
 			test.Errorf("%s loaded", testCase.name)
 			continue
 		}
 		for _, mention := range testCase.mentions {
-			if !strings.Contains(err.Error(), mention) {
-				test.Errorf("%s: the refusal does not mention %s: %v", testCase.name, mention, err)
+			if !strings.Contains(checkSettingsError.Error(), mention) {
+				test.Errorf("%s: the refusal does not mention %s: %v", testCase.name, mention, checkSettingsError)
 			}
 		}
 	}

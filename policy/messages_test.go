@@ -26,8 +26,8 @@ func loadMinimalMessages(text string) (*MessageCatalog, error) {
 // change that would misread does not.
 func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
 	test.Parallel()
-	if _, err := loadMinimalMessages(minimalMessages); err != nil {
-		test.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
+	if _, loadMinimalMessagesError := loadMinimalMessages(minimalMessages); loadMinimalMessagesError != nil {
+		test.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", loadMinimalMessagesError)
 	}
 	for _, refused := range []struct {
 		name string
@@ -58,7 +58,7 @@ func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
 		if !strings.Contains(minimalMessages, refused.old) {
 			test.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
 		}
-		if _, err := loadMinimalMessages(strings.Replace(minimalMessages, refused.old, refused.new, 1)); err == nil {
+		if _, loadMinimalMessagesError := loadMinimalMessages(strings.Replace(minimalMessages, refused.old, refused.new, 1)); loadMinimalMessagesError == nil {
 			test.Errorf("%s loaded", refused.name)
 		}
 	}
@@ -68,11 +68,11 @@ func TestTheMessageLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
 func TestALoneRuleCarriesNoTerms(test *testing.T) {
 	test.Parallel()
 	lone := `{"rules": {"TypeScript": "base/consistency-no-thing"}, "messages": {"thing": {"text": "This is %s."}}}`
-	if _, err := loadMinimalMessages(strings.Replace(lone, "%s", "a thing", 1)); err != nil {
-		test.Fatalf("a lone rule with no terms is refused: %v", err)
+	if _, loadMinimalMessagesError := loadMinimalMessages(strings.Replace(lone, "%s", "a thing", 1)); loadMinimalMessagesError != nil {
+		test.Fatalf("a lone rule with no terms is refused: %v", loadMinimalMessagesError)
 	}
 	withTerm := `{"rules": {"TypeScript": "base/consistency-no-thing"}, "messages": {"thing": {"text": "This is [[subject]].", "terms": {"subject": {"TypeScript": "a thing"}}}}}`
-	if _, err := loadMinimalMessages(withTerm); err == nil {
+	if _, loadMinimalMessagesError := loadMinimalMessages(withTerm); loadMinimalMessagesError == nil {
 		test.Error("a lone rule with a term loaded")
 	}
 }
@@ -115,11 +115,11 @@ func TestGoNamesALoneFileAndJoinsATwinWithItsOwnTerms(test *testing.T) {
 func TestARuleNamedByTwoFilesIsRefused(test *testing.T) {
 	test.Parallel()
 	second := strings.Replace(minimalMessages, `"base/consistency-no-thing"`, `"base/consistency-no-other"`, 1)
-	_, err := LoadMessages(fstest.MapFS{
+	_, loadMessagesError := LoadMessages(fstest.MapFS{
 		"consistency-no-thing.json": {Data: []byte(minimalMessages)},
 		"consistency-no-other.json": {Data: []byte(second)},
 	})
-	if err == nil {
+	if loadMessagesError == nil {
 		test.Error("cohere-swift/consistency-no-thing named by two files loaded")
 	}
 }
@@ -127,9 +127,9 @@ func TestARuleNamedByTwoFilesIsRefused(test *testing.T) {
 // Each language's text resolves its own terms, and Render puts in exactly the values that text uses.
 func TestEachLanguageRendersItsOwnTermsAndValues(test *testing.T) {
 	test.Parallel()
-	catalog, err := loadMinimalMessages(minimalMessages)
-	if err != nil {
-		test.Fatal(err)
+	catalog, loadMinimalMessagesError := loadMinimalMessages(minimalMessages)
+	if loadMinimalMessagesError != nil {
+		test.Fatal(loadMinimalMessagesError)
 	}
 	typeScript := MessageHandle{Rule: "base/consistency-no-thing", Id: "thing"}
 	if got, want := catalog.Render(typeScript, map[string]string{"kind": "class", "count": "3"}), "This is a class, which names 3 things."; got != want {
@@ -194,8 +194,8 @@ const minimalPhrases = `{
 // change that would misread does not.
 func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
 	test.Parallel()
-	if _, err := loadMinimalMessages(minimalPhrases); err != nil {
-		test.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", err)
+	if _, loadMinimalMessagesError := loadMinimalMessages(minimalPhrases); loadMinimalMessagesError != nil {
+		test.Fatalf("the minimal file is refused (%v), so no refusal below would mean anything", loadMinimalMessagesError)
 	}
 	for _, refused := range []struct {
 		name string
@@ -216,7 +216,7 @@ func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
 		if !strings.Contains(minimalPhrases, refused.old) {
 			test.Fatalf("%s: the anchor %q is not in the minimal file, so the change would not apply", refused.name, refused.old)
 		}
-		if _, err := loadMinimalMessages(strings.Replace(minimalPhrases, refused.old, refused.new, 1)); err == nil {
+		if _, loadMinimalMessagesError := loadMinimalMessages(strings.Replace(minimalPhrases, refused.old, refused.new, 1)); loadMinimalMessagesError == nil {
 			test.Errorf("%s loaded", refused.name)
 		}
 	}
@@ -226,9 +226,9 @@ func TestThePhraseLoaderRefusesWhatWouldReadAsSomethingElse(test *testing.T) {
 // option's values, and nothing else.
 func TestPhrasesRenderTheSharedTextAndThePickedOption(test *testing.T) {
 	test.Parallel()
-	catalog, err := loadMinimalMessages(minimalPhrases)
-	if err != nil {
-		test.Fatal(err)
+	catalog, loadMinimalMessagesError := loadMinimalMessages(minimalPhrases)
+	if loadMinimalMessagesError != nil {
+		test.Fatal(loadMinimalMessagesError)
 	}
 	first := MessageHandle{Rule: "base/consistency-no-thing", Id: "first"}
 	second := MessageHandle{Rule: "base/consistency-no-thing", Id: "second"}
@@ -268,9 +268,9 @@ func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(test *testing.T) {
 	test.Parallel()
 	withOneLanguage := strings.Replace(minimalMessages, `"messages": {`, `"messages": {
     "onlyHere": { "text": "Only TypeScript says {{this}}.", "languages": ["TypeScript"] },`, 1)
-	catalog, err := loadMinimalMessages(withOneLanguage)
-	if err != nil {
-		test.Fatalf("a twin file with a TypeScript-only message is refused: %v", err)
+	catalog, loadMinimalMessagesError := loadMinimalMessages(withOneLanguage)
+	if loadMinimalMessagesError != nil {
+		test.Fatalf("a twin file with a TypeScript-only message is refused: %v", loadMinimalMessagesError)
 	}
 	if _, rendered := catalog.templates["cohere-swift/consistency-no-thing"]["onlyHere"]; rendered {
 		test.Error("the Swift rule holds a message only TypeScript renders")
@@ -288,13 +288,13 @@ func TestAMessageCanBeRenderedInOneLanguageOfATwinFile(test *testing.T) {
 		{"no language", `["TypeScript"]`, `[]`},
 		{"a term on a one-language message", `"languages": ["TypeScript"]`, `"languages": ["TypeScript"], "terms": {"x": {"TypeScript": "y"}}`},
 	} {
-		if _, err := loadMinimalMessages(strings.Replace(withOneLanguage, refused.old, refused.new, 1)); err == nil {
+		if _, loadMinimalMessagesError := loadMinimalMessages(strings.Replace(withOneLanguage, refused.old, refused.new, 1)); loadMinimalMessagesError == nil {
 			test.Errorf("%s loaded", refused.name)
 		}
 	}
 	twinTerm := strings.Replace(minimalMessages, `"terms": { "subject": { "TypeScript": "a {{kind}}", "Swift": "an enum" } }`,
 		`"terms": { "subject": { "TypeScript": "a {{kind}}", "Swift": "an enum" } }, "languages": ["TypeScript"]`, 1)
-	if _, err := loadMinimalMessages(twinTerm); err == nil {
+	if _, loadMinimalMessagesError := loadMinimalMessages(twinTerm); loadMinimalMessagesError == nil {
 		test.Error("a term giving words for a language the message is not rendered in loaded")
 	}
 }
@@ -319,9 +319,9 @@ const optionsByLanguage = `{
 // option with no text for a language does not reach it, so that language's rule cannot pick it.
 func TestAnOptionCanGiveItsTextByLanguage(test *testing.T) {
 	test.Parallel()
-	catalog, err := loadMinimalMessages(optionsByLanguage)
-	if err != nil {
-		test.Fatalf("an option with text by language is refused: %v", err)
+	catalog, loadMinimalMessagesError := loadMinimalMessages(optionsByLanguage)
+	if loadMinimalMessagesError != nil {
+		test.Fatalf("an option with text by language is refused: %v", loadMinimalMessagesError)
 	}
 	typeScript := MessageHandle{Rule: "base/consistency-no-thing", Id: "lostUpdate"}
 	swift := MessageHandle{Rule: "cohere-swift/consistency-no-thing", Id: "lostUpdate"}
@@ -367,7 +367,7 @@ func TestAnOptionCanGiveItsTextByLanguage(test *testing.T) {
 		if !strings.Contains(optionsByLanguage, refused.old) {
 			test.Fatalf("%s: the anchor %q is not in the file, so the change would not apply", refused.name, refused.old)
 		}
-		if _, err := loadMinimalMessages(strings.Replace(optionsByLanguage, refused.old, refused.new, 1)); err == nil {
+		if _, loadMinimalMessagesError := loadMinimalMessages(strings.Replace(optionsByLanguage, refused.old, refused.new, 1)); loadMinimalMessagesError == nil {
 			test.Errorf("%s loaded", refused.name)
 		}
 	}

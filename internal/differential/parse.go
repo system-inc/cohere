@@ -87,8 +87,8 @@ func ParseCohere(output string, root string) (ParseResult, error) {
 			continue
 		}
 
-		line, column, err := parsePosition(match[2], match[3])
-		if err != nil {
+		line, column, parsePositionError := parsePosition(match[2], match[3])
+		if parsePositionError != nil {
 			result.UnparsedLines = append(result.UnparsedLines, trimmed)
 			continue
 		}
@@ -121,8 +121,8 @@ func ParseGate(output string, root string) (ParseResult, error) {
 		}
 
 		if match := gateFindingPattern.FindStringSubmatch(trimmed); match != nil {
-			line, column, err := parsePosition(match[2], match[3])
-			if err != nil {
+			line, column, parsePositionError := parsePosition(match[2], match[3])
+			if parsePositionError != nil {
 				result.UnparsedLines = append(result.UnparsedLines, trimmed)
 				continue
 			}
@@ -203,7 +203,7 @@ func relativeTo(root string, path string) string {
 	if root == "" {
 		return cleaned
 	}
-	if relative, err := filepath.Rel(filepath.Clean(root), cleaned); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(filepath.Clean(root), cleaned); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return relative
 	}
 	return cleaned

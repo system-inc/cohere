@@ -395,11 +395,11 @@ func (g *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict
 
 // inspectRootOnDisk asks the real disk, past every cache, what is at a path now.
 func inspectRootOnDisk(fileName string) rootState {
-	if _, err := os.Stat(fileName); err != nil {
+	if _, statError := os.Stat(fileName); statError != nil {
 		return rootAbsent
 	}
-	file, err := os.Open(fileName)
-	if err != nil {
+	file, openError := os.Open(fileName)
+	if openError != nil {
 		return rootUnreadable
 	}
 	file.Close()
@@ -420,9 +420,9 @@ func describeRoots(fileNames []string) string {
 func buildOnce(options Options) (*Graph, error) {
 	currentDirectory := options.CurrentDirectory
 	if currentDirectory == "" {
-		workingDirectory, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("resolving the current directory: %w", err)
+		workingDirectory, workingDirectoryError := os.Getwd()
+		if workingDirectoryError != nil {
+			return nil, fmt.Errorf("resolving the current directory: %w", workingDirectoryError)
 		}
 		currentDirectory = workingDirectory
 	}

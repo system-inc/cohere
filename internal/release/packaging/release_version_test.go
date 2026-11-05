@@ -12,8 +12,8 @@ func TestReleaseVersionFloor(test *testing.T) {
 	test.Parallel()
 
 	for _, version := range []string{"0.1.0", "0.1.0-rc.1", "0.3.1", "0.12.0", "1.0.0", "1.0.0-rc.1", "1.2.3", "12.0.0", "2.10.31-beta.2"} {
-		if err := requireReleaseVersion(version); err != nil {
-			test.Errorf("%s was refused: %v", version, err)
+		if requireReleaseVersionError := requireReleaseVersion(version); requireReleaseVersionError != nil {
+			test.Errorf("%s was refused: %v", version, requireReleaseVersionError)
 		}
 	}
 
@@ -29,13 +29,13 @@ func TestReleaseVersionFloor(test *testing.T) {
 		" 1.0.0":      "not a semantic version",
 	}
 	for version, reason := range refused {
-		err := requireReleaseVersion(version)
-		if err == nil {
+		requireReleaseVersionError := requireReleaseVersion(version)
+		if requireReleaseVersionError == nil {
 			test.Errorf("%q was accepted", version)
 			continue
 		}
-		if !strings.Contains(err.Error(), reason) {
-			test.Errorf("%q was refused for the wrong reason: %v", version, err)
+		if !strings.Contains(requireReleaseVersionError.Error(), reason) {
+			test.Errorf("%q was refused for the wrong reason: %v", version, requireReleaseVersionError)
 		}
 	}
 }
@@ -45,11 +45,11 @@ func TestReleaseVersionFloor(test *testing.T) {
 func TestBuildRefusesAVersionBelowTheFloor(test *testing.T) {
 	test.Parallel()
 
-	_, err := Build(Options{Version: "0.0.9", ModuleDirectory: test.TempDir(), OutputDirectory: test.TempDir()})
-	if err == nil {
+	_, buildError := Build(Options{Version: "0.0.9", ModuleDirectory: test.TempDir(), OutputDirectory: test.TempDir()})
+	if buildError == nil {
 		test.Fatal("Build accepted 0.0.9")
 	}
-	if !strings.Contains(err.Error(), "start at 0.1.0") {
-		test.Fatalf("Build failed, but not on the version: %v", err)
+	if !strings.Contains(buildError.Error(), "start at 0.1.0") {
+		test.Fatalf("Build failed, but not on the version: %v", buildError)
 	}
 }

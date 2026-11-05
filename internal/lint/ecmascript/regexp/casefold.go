@@ -44,8 +44,8 @@ func CaseClass(r rune, unicode bool) (string, bool) {
 // to the character at hand, and answers no to `A`.
 func CaseCloseClass(body string, unicode bool) string {
 	options := rewriteOptions{ignoreCase: true, unicode: unicode}
-	atoms, _, err := classAtoms(body, options, escapeContext{unicode: unicode})
-	if err != nil {
+	atoms, _, classAtomsError := classAtoms(body, options, escapeContext{unicode: unicode})
+	if classAtomsError != nil {
 		return body
 	}
 	extras := caseExtras(atoms, unicode)

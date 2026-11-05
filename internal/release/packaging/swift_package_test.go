@@ -27,8 +27,8 @@ func smallMacBinary(test *testing.T, goArchitecture string) string {
 	command := exec.Command("go", "build", "-o", binary, ".")
 	command.Dir = directory
 	command.Env = append(command.Environ(), "GOOS=darwin", "GOARCH="+goArchitecture, "CGO_ENABLED=0")
-	if output, err := command.CombinedOutput(); err != nil {
-		test.Fatalf("building the sample binary: %v\n%s", err, output)
+	if output, outputError := command.CombinedOutput(); outputError != nil {
+		test.Fatalf("building the sample binary: %v\n%s", outputError, output)
 	}
 	return binary
 }
@@ -39,16 +39,16 @@ func TestArchitectureIsReadFromTheBinary(test *testing.T) {
 	test.Parallel()
 
 	arm := smallMacBinary(test, "arm64")
-	if err := requireArchitecture(arm, "arm64"); err != nil {
-		test.Fatalf("an arm64 binary was refused as arm64: %v", err)
+	if requireArchitectureError := requireArchitecture(arm, "arm64"); requireArchitectureError != nil {
+		test.Fatalf("an arm64 binary was refused as arm64: %v", requireArchitectureError)
 	}
 
-	err := requireArchitecture(arm, "x86_64")
-	if err == nil {
+	requireArchitectureError := requireArchitecture(arm, "x86_64")
+	if requireArchitectureError == nil {
 		test.Fatal("an arm64 binary was accepted for an x86_64 package")
 	}
-	if !strings.Contains(err.Error(), "arm64") {
-		test.Fatalf("the refusal does not say what the binary was built for: %v", err)
+	if !strings.Contains(requireArchitectureError.Error(), "arm64") {
+		test.Fatalf("the refusal does not say what the binary was built for: %v", requireArchitectureError)
 	}
 }
 
@@ -59,22 +59,22 @@ func TestMinimumMacOSIsReadFromTheBinary(test *testing.T) {
 	test.Parallel()
 
 	binary := smallMacBinary(test, "arm64")
-	if err := requireMinimumMacOS(binary, MinimumSwiftEngineMacOS); err != nil {
-		test.Fatalf("a binary Go built for an old macOS was refused: %v", err)
+	if requireMinimumMacOSError := requireMinimumMacOS(binary, MinimumSwiftEngineMacOS); requireMinimumMacOSError != nil {
+		test.Fatalf("a binary Go built for an old macOS was refused: %v", requireMinimumMacOSError)
 	}
 
 	tooNew := filepath.Join(test.TempDir(), "too-new")
 	rewrite := exec.Command("vtool", "-set-build-version", "macos", "27.0", "27.0", "-replace", "-output", tooNew, binary)
-	if output, err := rewrite.CombinedOutput(); err != nil {
-		test.Fatalf("rewriting the minimum macOS: %v\n%s", err, output)
+	if output, outputError := rewrite.CombinedOutput(); outputError != nil {
+		test.Fatalf("rewriting the minimum macOS: %v\n%s", outputError, output)
 	}
 
-	err := requireMinimumMacOS(tooNew, MinimumSwiftEngineMacOS)
-	if err == nil {
+	requireMinimumMacOSError := requireMinimumMacOS(tooNew, MinimumSwiftEngineMacOS)
+	if requireMinimumMacOSError == nil {
 		test.Fatal("a binary requiring macOS 27 was accepted for a release promising macOS 15")
 	}
-	if !strings.Contains(err.Error(), "requires macOS 27.0") {
-		test.Fatalf("the refusal does not name the minimum it found: %v", err)
+	if !strings.Contains(requireMinimumMacOSError.Error(), "requires macOS 27.0") {
+		test.Fatalf("the refusal does not name the minimum it found: %v", requireMinimumMacOSError)
 	}
 }
 
@@ -97,16 +97,16 @@ func TestMacOSVersionsCompareByNumber(test *testing.T) {
 		{"15.0.1", "15.0", false},
 	}
 	for _, testCase := range cases {
-		newer, err := macOSVersionIsNewer(testCase.version, testCase.than)
-		if err != nil {
-			test.Fatalf("comparing %s with %s: %v", testCase.version, testCase.than, err)
+		newer, macOSVersionIsNewerError := macOSVersionIsNewer(testCase.version, testCase.than)
+		if macOSVersionIsNewerError != nil {
+			test.Fatalf("comparing %s with %s: %v", testCase.version, testCase.than, macOSVersionIsNewerError)
 		}
 		if newer != testCase.newer {
 			test.Errorf("%s newer than %s: got %v, want %v", testCase.version, testCase.than, newer, testCase.newer)
 		}
 	}
 
-	if _, err := macOSVersionIsNewer("fifteen", "15.0"); err == nil {
+	if _, macOSVersionIsNewerError := macOSVersionIsNewer("fifteen", "15.0"); macOSVersionIsNewerError == nil {
 		test.Error("a version that is not a number was compared")
 	}
 }
@@ -120,8 +120,8 @@ func TestSwiftArchitectureNamesEveryMacTarget(test *testing.T) {
 		if !ShipsSwiftEngine(target.GoOperatingSystem) {
 			continue
 		}
-		if _, err := swiftArchitecture(target.GoArchitecture); err != nil {
-			test.Errorf("%s ships the Swift engine and has no Swift architecture: %v", target, err)
+		if _, swiftArchitectureError := swiftArchitecture(target.GoArchitecture); swiftArchitectureError != nil {
+			test.Errorf("%s ships the Swift engine and has no Swift architecture: %v", target, swiftArchitectureError)
 		}
 	}
 }
@@ -161,8 +161,8 @@ func TestSwiftContractAcceptsAMatchingPair(test *testing.T) {
 	test.Parallel()
 
 	coherePath, enginePath := contractPair(test, "cohere 1.0.0\n  swift contract: 3", speaksContract("3"))
-	if err := requireSwiftContract(coherePath, enginePath, stampedCommit); err != nil {
-		test.Fatalf("a pair speaking the same contract was refused: %v", err)
+	if requireSwiftContractError := requireSwiftContract(coherePath, enginePath, stampedCommit); requireSwiftContractError != nil {
+		test.Fatalf("a pair speaking the same contract was refused: %v", requireSwiftContractError)
 	}
 }
 
@@ -192,12 +192,12 @@ func TestSwiftContractRefusesAMismatchedPair(test *testing.T) {
 			test.Parallel()
 
 			coherePath, enginePath := contractPair(test, testCase.cohereVersion, testCase.engineScript)
-			err := requireSwiftContract(coherePath, enginePath, stampedCommit)
-			if err == nil {
+			requireSwiftContractError := requireSwiftContract(coherePath, enginePath, stampedCommit)
+			if requireSwiftContractError == nil {
 				test.Fatal("a mismatched pair was staged")
 			}
-			if !strings.Contains(err.Error(), testCase.says) {
-				test.Fatalf("refused, but without saying %q: %v", testCase.says, err)
+			if !strings.Contains(requireSwiftContractError.Error(), testCase.says) {
+				test.Fatalf("refused, but without saying %q: %v", testCase.says, requireSwiftContractError)
 			}
 		})
 	}
@@ -218,7 +218,7 @@ func TestSwiftEngineBuildReadsTheTreeAsItIsNow(test *testing.T) {
 	if runtime.GOOS != "darwin" {
 		test.Skip("NOT MEASURED: the Swift engine is only built on macOS")
 	}
-	if _, err := exec.LookPath("swift"); err != nil {
+	if _, lookPathError := exec.LookPath("swift"); lookPathError != nil {
 		test.Skip("NOT MEASURED: no swift toolchain on PATH")
 	}
 
@@ -239,9 +239,9 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	gitIn(test, module, "init", "--quiet")
 	gitIn(test, module, "add", ".")
 	gitIn(test, module, "commit", "--quiet", "-m", "stand-in engine")
-	commit, err := readReleaseCommit(module)
-	if err != nil {
-		test.Fatal(err)
+	commit, readReleaseCommitError := readReleaseCommit(module)
+	if readReleaseCommitError != nil {
+		test.Fatal(readReleaseCommitError)
 	}
 
 	target := Target{GoOperatingSystem: "darwin", GoArchitecture: runtime.GOARCH}
@@ -249,12 +249,12 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	says := func() string {
 		test.Helper()
 		destination := filepath.Join(test.TempDir(), SwiftEngineFileName)
-		if err := buildSwiftEngine(module, scratch, target, destination, commit); err != nil {
-			test.Fatal(err)
+		if buildSwiftEngineError := buildSwiftEngine(module, scratch, target, destination, commit); buildSwiftEngineError != nil {
+			test.Fatal(buildSwiftEngineError)
 		}
-		output, err := exec.Command(destination).Output()
-		if err != nil {
-			test.Fatal(err)
+		output, outputError := exec.Command(destination).Output()
+		if outputError != nil {
+			test.Fatal(outputError)
 		}
 		return strings.TrimSpace(string(output))
 	}
@@ -262,7 +262,7 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	if got := says(); got != "clean "+commit {
 		test.Fatalf("an engine built from a clean tree says %q, and should say clean and its commit %s", got, commit)
 	}
-	if _, err := os.Stat(filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftEngineStampFileName)); err == nil {
+	if _, statError := os.Stat(filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftEngineStampFileName)); statError == nil {
 		test.Fatal("the stamp was left in the checkout after the build")
 	}
 	writeFile(test, source, program+"// edited\n")

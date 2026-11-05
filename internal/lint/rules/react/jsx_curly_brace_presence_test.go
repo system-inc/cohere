@@ -17,9 +17,9 @@ import (
 func jsxCurlyBracePresenceRun(test *testing.T, source string, optionsJson string) rule_testing.Result {
 	test.Helper()
 
-	decoded, err := DecodeJsxCurlyBracePresenceOptions([]byte(optionsJson))
-	if err != nil {
-		test.Fatalf("decoding options %q: %v", optionsJson, err)
+	decoded, decodeJsxCurlyBracePresenceOptionsError := DecodeJsxCurlyBracePresenceOptions([]byte(optionsJson))
+	if decodeJsxCurlyBracePresenceOptionsError != nil {
+		test.Fatalf("decoding options %q: %v", optionsJson, decodeJsxCurlyBracePresenceOptionsError)
 	}
 	return rule_testing.RunWithOptions(test, JsxCurlyBracePresence, "component.tsx", source, decoded)
 }

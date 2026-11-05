@@ -27,20 +27,20 @@ func (tree *signatureTree) write(files map[string]string) {
 	tree.t.Helper()
 	for name, contents := range files {
 		path := filepath.Join(tree.directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			tree.t.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			tree.t.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			tree.t.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			tree.t.Fatal(writeError)
 		}
 	}
 }
 
 func (tree *signatureTree) graph() *Graph {
 	tree.t.Helper()
-	graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: tree.directory})
-	if err != nil {
-		tree.t.Fatal(err)
+	graph, buildError := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: tree.directory})
+	if buildError != nil {
+		tree.t.Fatal(buildError)
 	}
 	return graph
 }

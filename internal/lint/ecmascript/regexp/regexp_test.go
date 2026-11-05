@@ -214,9 +214,9 @@ func TestTest(test *testing.T) {
 	for _, testCase := range tests {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			re, err := Compile(testCase.source, testCase.flags)
-			if err != nil {
-				test.Fatalf("Compile(%q, %q) = %v", testCase.source, testCase.flags, err)
+			re, compileError := Compile(testCase.source, testCase.flags)
+			if compileError != nil {
+				test.Fatalf("Compile(%q, %q) = %v", testCase.source, testCase.flags, compileError)
 			}
 			if got := re.Test(testCase.subject); got != testCase.want {
 				test.Errorf("/%s/%s.test(%q) = %v, want %v", testCase.source, testCase.flags, testCase.subject, got, testCase.want)
@@ -275,9 +275,9 @@ func TestCompileRejects(test *testing.T) {
 	for _, testCase := range tests {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			_, err := Compile(testCase.source, testCase.flags)
-			if !errors.Is(err, testCase.is) {
-				test.Errorf("Compile(%q, %q) error = %v, want %v", testCase.source, testCase.flags, err, testCase.is)
+			_, compileError := Compile(testCase.source, testCase.flags)
+			if !errors.Is(compileError, testCase.is) {
+				test.Errorf("Compile(%q, %q) error = %v, want %v", testCase.source, testCase.flags, compileError, testCase.is)
 			}
 		})
 	}

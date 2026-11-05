@@ -466,9 +466,9 @@ func DecodeBanTsCommentOptions(raw []byte) (any, error) {
 		{"ts-nocheck", wire.TsNoCheck, &options.TsNoCheck},
 		{"ts-check", wire.TsCheck, &options.TsCheck},
 	} {
-		setting, err := settingOrDefaultBanTsComment(directive.raw, *directive.setting)
-		if err != nil {
-			return DefaultBanTsCommentOptions(), fmt.Errorf("%s: %w", directive.key, err)
+		setting, settingOrDefaultBanTsCommentError := settingOrDefaultBanTsComment(directive.raw, *directive.setting)
+		if settingOrDefaultBanTsCommentError != nil {
+			return DefaultBanTsCommentOptions(), fmt.Errorf("%s: %w", directive.key, settingOrDefaultBanTsCommentError)
 		}
 		*directive.setting = setting
 	}
@@ -510,8 +510,8 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 	}
 	// Go whitespace: JSON wire bytes, whose whitespace is space, tab, LF and CR in either set.
 	if trimmed := strings.TrimSpace(string(raw)); strings.HasPrefix(trimmed, "{") {
-		if err := rule.UnmarshalOptions(raw, &asObject); err != nil {
-			return fallback, err
+		if unmarshalOptionsError := rule.UnmarshalOptions(raw, &asObject); unmarshalOptionsError != nil {
+			return fallback, unmarshalOptionsError
 		}
 		// An empty pattern is falsy to upstream's `option.descriptionFormat` test, so it sets nothing,
 		// as an absent or null one does.

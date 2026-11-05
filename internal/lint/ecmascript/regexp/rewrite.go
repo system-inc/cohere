@@ -132,9 +132,9 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				i += nameSize
 				continue
 			}
-			escape, err := decodeEscape(source, i+size, context())
-			if err != nil {
-				return "", false, err
+			escape, decodeEscapeError := decodeEscape(source, i+size, context())
+			if decodeEscapeError != nil {
+				return "", false, decodeEscapeError
 			}
 			end := i + size + escape.width
 
@@ -227,8 +227,8 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				i += openerSize
 				continue
 			}
-			if err := checkGroupConstruct(source[i:]); err != nil {
-				return "", false, err
+			if checkGroupConstructError := checkGroupConstruct(source[i:]); checkGroupConstructError != nil {
+				return "", false, checkGroupConstructError
 			}
 			groups = append(groups, openGroup{options: current, kind: groupKindOf(source[i:])})
 			out.WriteByte('(')
@@ -240,8 +240,8 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				group := groups[last]
 				groups = groups[:last]
 				current = group.options
-				if err := checkGroupQuantifier(group.kind, source[i+size:], options); err != nil {
-					return "", false, err
+				if checkGroupQuantifierError := checkGroupQuantifier(group.kind, source[i+size:], options); checkGroupQuantifierError != nil {
+					return "", false, checkGroupQuantifierError
 				}
 			}
 			out.WriteByte(')')

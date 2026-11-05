@@ -93,15 +93,15 @@ func compareProperty(name string, points []rune, bits []string) (int, string) {
 		for _, escape := range []string{"p", "P"} {
 			for shape := range 3 {
 				source := propertySource(name, escape, shape)
-				re, err := Compile(source, flags)
-				if err != nil {
-					return count, fmt.Sprintf("%s /%s: %v", source, flags, err)
+				re, compileError := Compile(source, flags)
+				if compileError != nil {
+					return count, fmt.Sprintf("%s /%s: %v", source, flags, compileError)
 				}
 				for j, c := range points {
-					match, err := re.Unwrap().MatchRunes([]rune{c})
+					match, matchRunesError := re.Unwrap().MatchRunes([]rune{c})
 					count++
-					if err != nil {
-						return count, err.Error()
+					if matchRunesError != nil {
+						return count, matchRunesError.Error()
 					}
 					if match != (bits[index][j] == '1') {
 						return count, fmt.Sprintf("%s /%s U+%04X: Go=%t Node=%t", source, flags, c, match, bits[index][j] == '1')
@@ -161,9 +161,9 @@ func TestUnicodePropertiesNode(test *testing.T) {
 func TestUnicodePropertiesFresh(test *testing.T) {
 	test.Parallel()
 	cmd := exec.Command("go", "run", "../../../../unicodeproperties/internal/generate", "-check", "-output", "../../../../unicodeproperties/tables_generated.go")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		test.Fatalf("freshness: %v: %s", err, output)
+	output, outputError := cmd.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("freshness: %v: %s", outputError, output)
 	}
 }
 
@@ -221,11 +221,11 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 	for i, f := range fixtures {
 		// Not parallel: each subtest updates the membership count that the parent logs after the loop.
 		test.Run(fmt.Sprintf("%d", i), func(test *testing.T) {
-			re, err := Compile(f.Source, f.Flags)
-			if (err == nil) != answers[i].Accepted {
-				test.Fatalf("/%s/%s compile=%v Node accepted=%t", f.Source, f.Flags, err, answers[i].Accepted)
+			re, compileError := Compile(f.Source, f.Flags)
+			if (compileError == nil) != answers[i].Accepted {
+				test.Fatalf("/%s/%s compile=%v Node accepted=%t", f.Source, f.Flags, compileError, answers[i].Accepted)
 			}
-			if err != nil {
+			if compileError != nil {
 				return
 			}
 			for j, subject := range subjects {

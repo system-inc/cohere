@@ -23,9 +23,9 @@ func TestMain(m *testing.M) {
 	// In-process, the tests read the verbose account, as the binary tests do through verboseArguments.
 	activeOutput = outputSettings{Mode: outputVerbose}
 	pinGoEnvironment()
-	home, err := os.MkdirTemp("", "cohere-test-home-")
-	if err != nil {
-		panic(err)
+	home, temporaryDirectoryError := os.MkdirTemp("", "cohere-test-home-")
+	if temporaryDirectoryError != nil {
+		panic(temporaryDirectoryError)
 	}
 	os.Setenv("HOME", home)
 	os.Setenv("XDG_CACHE_HOME", "")
@@ -144,14 +144,14 @@ func TestRunCacheEndToEnd(test *testing.T) {
 		// the change time and the bytes moved.
 		{"a same-size edit with its modification time restored", true, nil,
 			func(fixture *runCacheFixture) {
-				information, err := os.Stat(filepath.Join(fixture.root, "source/a.ts"))
-				if err != nil {
-					fixture.t.Fatal(err)
+				information, statError := os.Stat(filepath.Join(fixture.root, "source/a.ts"))
+				if statError != nil {
+					fixture.t.Fatal(statError)
 				}
 				time.Sleep(10 * time.Millisecond)
 				fixture.write("source/a.ts", "export const a: string = 1;\n")
-				if err := os.Chtimes(filepath.Join(fixture.root, "source/a.ts"), information.ModTime(), information.ModTime()); err != nil {
-					fixture.t.Fatal(err)
+				if changeTimesError := os.Chtimes(filepath.Join(fixture.root, "source/a.ts"), information.ModTime(), information.ModTime()); changeTimesError != nil {
+					fixture.t.Fatal(changeTimesError)
 				}
 			}},
 		{"a file added at the top level", true, nil,
@@ -376,8 +376,8 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			test.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}
 		for _, table := range tables {
-			if err := os.WriteFile(table, []byte("not a cache table"), 0o600); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(table, []byte("not a cache table"), 0o600); writeError != nil {
+				test.Fatal(writeError)
 			}
 		}
 		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "cache table discarded") {
@@ -511,19 +511,19 @@ func (fixture *runCacheFixture) git(arguments ...string) {
 	command := exec.Command("git", arguments...)
 	command.Dir = fixture.root
 	command.Env = append(os.Environ(), "HOME="+fixture.home)
-	if output, err := command.CombinedOutput(); err != nil {
-		fixture.t.Fatalf("git %v: %v\n%s", arguments, err, output)
+	if output, outputError := command.CombinedOutput(); outputError != nil {
+		fixture.t.Fatalf("git %v: %v\n%s", arguments, outputError, output)
 	}
 }
 
 func (fixture *runCacheFixture) write(name, contents string) {
 	fixture.t.Helper()
 	path := filepath.Join(fixture.root, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		fixture.t.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+		fixture.t.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-		fixture.t.Fatal(err)
+	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+		fixture.t.Fatal(writeError)
 	}
 }
 
@@ -539,8 +539,8 @@ func (fixture *runCacheFixture) requireConfigReadAhead() {
 
 func (fixture *runCacheFixture) remove(name string) {
 	fixture.t.Helper()
-	if err := os.RemoveAll(filepath.Join(fixture.root, name)); err != nil {
-		fixture.t.Fatal(err)
+	if removeError := os.RemoveAll(filepath.Join(fixture.root, name)); removeError != nil {
+		fixture.t.Fatal(removeError)
 	}
 }
 
@@ -569,13 +569,13 @@ func (fixture *runCacheFixture) run(cached bool, arguments ...string) (string, i
 	// on purpose, and a run that formats it is a run that writes, which is never recorded.
 	command.Args = append(command.Args, "--no-format")
 	command.Env = environment
-	output, err := command.CombinedOutput()
-	if err == nil {
+	output, outputError := command.CombinedOutput()
+	if outputError == nil {
 		return string(output), 0
 	}
-	exitError, isExit := err.(*exec.ExitError)
+	exitError, isExit := outputError.(*exec.ExitError)
 	if !isExit {
-		fixture.t.Fatalf("running cohere: %v\n%s", err, output)
+		fixture.t.Fatalf("running cohere: %v\n%s", outputError, output)
 	}
 	return string(output), childExitCode(fixture.t, exitError)
 }
@@ -598,13 +598,13 @@ func isRunCacheReplay(output string) bool { return strings.HasPrefix(output, "ca
 // the house's -trimpath: about a minute per package run, the most of command/cohere's wall (#nxgt2ca). A
 // variable the caller already set is left as it is.
 func pinGoEnvironment() {
-	output, err := exec.Command("go", "env", "-json", "GOCACHE", "GOMODCACHE", "GOPATH", "GOFLAGS").Output()
-	if err != nil {
-		panic(fmt.Sprintf("reading the go environment: %v", err))
+	output, outputError := exec.Command("go", "env", "-json", "GOCACHE", "GOMODCACHE", "GOPATH", "GOFLAGS").Output()
+	if outputError != nil {
+		panic(fmt.Sprintf("reading the go environment: %v", outputError))
 	}
 	var settings map[string]string
-	if err := json.Unmarshal(output, &settings); err != nil {
-		panic(fmt.Sprintf("reading the go environment: %v", err))
+	if decodeError := json.Unmarshal(output, &settings); decodeError != nil {
+		panic(fmt.Sprintf("reading the go environment: %v", decodeError))
 	}
 	for name, value := range settings {
 		if _, set := os.LookupEnv(name); !set && value != "" {

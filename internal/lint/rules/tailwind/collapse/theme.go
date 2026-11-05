@@ -740,7 +740,7 @@ func unescapeCSSIdentifier(escaped string) string {
 			continue
 		}
 
-		codePoint, err := strconv.ParseUint(escaped[index+1:index+1+digitCount], 16, 32)
+		codePoint, parseError := strconv.ParseUint(escaped[index+1:index+1+digitCount], 16, 32)
 		consumed := 1 + digitCount
 		// One optional whitespace character terminates the escape and is consumed with it.
 		if index+consumed < len(escaped) && isEscapeTerminator(escaped[index+consumed]) {
@@ -748,7 +748,7 @@ func unescapeCSSIdentifier(escaped string) string {
 		}
 		index += consumed
 
-		if err != nil || codePoint == 0 || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
+		if parseError != nil || codePoint == 0 || codePoint > 0x10FFFF || (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
 			builder.WriteRune('�')
 			continue
 		}

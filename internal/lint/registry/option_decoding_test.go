@@ -89,9 +89,9 @@ func findOptionDecodes(test *testing.T, moduleRoot string, rulesRoot string, pat
 			if strings.HasSuffix(fileName, "_test.go") {
 				continue
 			}
-			relative, err := filepath.Rel(rulesRoot, fileName)
-			if err != nil {
-				test.Fatalf("relating %s to %s: %v", fileName, rulesRoot, err)
+			relative, relativePathError := filepath.Rel(rulesRoot, fileName)
+			if relativePathError != nil {
+				test.Fatalf("relating %s to %s: %v", fileName, rulesRoot, relativePathError)
 			}
 			for _, declaration := range file.Decls {
 				function, isFunction := declaration.(*ast.FuncDecl)
@@ -220,8 +220,8 @@ func walkOptionStruct(structure *types.Struct, owner string, fileSet *token.File
 		}
 		if key == "" {
 			position := fileSet.Position(field.Pos())
-			relative, err := filepath.Rel(rulesRoot, position.Filename)
-			if err != nil {
+			relative, relativePathError := filepath.Rel(rulesRoot, position.Filename)
+			if relativePathError != nil {
 				relative = position.Filename
 			}
 			untagged[fmt.Sprintf("%s:%d %s.%s", filepath.ToSlash(relative), position.Line, owner, field.Name())] = true
@@ -246,9 +246,9 @@ func unmarshalsItself(named *types.Named) bool {
 // TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey is the guard over the rules tree.
 func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(test *testing.T) {
 	test.Parallel()
-	rulesRoot, err := filepath.Abs("../rules")
-	if err != nil {
-		test.Fatal(err)
+	rulesRoot, absolutePathError := filepath.Abs("../rules")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	findings := findOptionDecodes(test, "../../..", rulesRoot, "./internal/lint/rules/...")
 
@@ -290,9 +290,9 @@ func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(test *testin
 // package, so a clean result above is a measurement rather than a matcher that never matches.
 func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(test *testing.T) {
 	test.Parallel()
-	plantedRoot, err := filepath.Abs("testdata/optiondecoding")
-	if err != nil {
-		test.Fatal(err)
+	plantedRoot, absolutePathError := filepath.Abs("testdata/optiondecoding")
+	if absolutePathError != nil {
+		test.Fatal(absolutePathError)
 	}
 	findings := findOptionDecodes(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optiondecoding")
 

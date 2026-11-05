@@ -46,8 +46,8 @@ func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
 	if len(raw) == 0 {
 		return options, nil
 	}
-	if err := rule.UnmarshalOptions(raw, &options); err != nil {
-		return options, fmt.Errorf("no-inferrable-types takes an options object: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("no-inferrable-types takes an options object: %w", unmarshalOptionsError)
 	}
 	return options, nil
 }

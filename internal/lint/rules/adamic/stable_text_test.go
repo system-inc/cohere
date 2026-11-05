@@ -37,8 +37,8 @@ func relationMessages(test *testing.T, files map[string]string, anotherFirst boo
 	directory := test.TempDir()
 	writeAdamicSupport(test)(directory)
 	for name, source := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(source), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(source), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), SingleThreaded: true})

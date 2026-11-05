@@ -17,12 +17,12 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 	test.Parallel()
 	root := test.TempDir()
 	cache := filepath.Join(root, "cache")
-	if err := os.MkdirAll(cache, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 	file := filepath.Join(root, "a.ts")
-	if err := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	// A previous run read the file and kept it in the pack, and recorded it as an input.
@@ -32,19 +32,19 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 	}
 	recording, _ := OpenContentPack(cache)
 	recording.noteRead(file, identity, true, "export const a = 1;\n")
-	if err := recording.Save(); err != nil {
-		test.Fatal(err)
+	if saveError := recording.Save(); saveError != nil {
+		test.Fatal(saveError)
 	}
-	recorded, err := RecordRunCache("key", []string{file}, nil, nil, nil, []byte("verdict"), 0, time.Time{})
-	if err != nil {
-		test.Fatal(err)
+	recorded, recordRunCacheError := RecordRunCache("key", []string{file}, nil, nil, nil, []byte("verdict"), 0, time.Time{})
+	if recordRunCacheError != nil {
+		test.Fatal(recordRunCacheError)
 	}
 
 	// This run: the clock starts, then the check stats every input and notes them.
 	readSince := time.Now()
 	snapshot := NewStatSnapshot()
-	if err := recorded.CheckNoting("key", snapshot); err != nil {
-		test.Fatalf("an unchanged input missed: %v", err)
+	if checkNotingError := recorded.CheckNoting("key", snapshot); checkNotingError != nil {
+		test.Fatalf("an unchanged input missed: %v", checkNotingError)
 	}
 	if _, noted := snapshot.identityOf(file); !noted {
 		test.Fatal("the check noted no stat for the input, so trusting it proves nothing")
@@ -52,8 +52,8 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 
 	// The file changes after the check, at the same size.
 	time.Sleep(10 * time.Millisecond)
-	if err := os.WriteFile(file, []byte("export const a = 2;\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(file, []byte("export const a = 2;\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 
 	trusting, _ := OpenContentPack(cache)
@@ -66,8 +66,8 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 		test.Errorf("a pack statting afresh served %q, so the snapshot was not what decided above", served)
 	}
 
-	if _, err := RecordRunCache("key", []string{file}, nil, nil, nil, []byte("verdict"), 0, readSince); err == nil ||
-		!strings.Contains(err.Error(), "changed after the run began reading") {
-		test.Errorf("a run that read the file before its change was recorded anyway (%v), so the next run could replay it", err)
+	if _, recordRunCacheError := RecordRunCache("key", []string{file}, nil, nil, nil, []byte("verdict"), 0, readSince); recordRunCacheError == nil ||
+		!strings.Contains(recordRunCacheError.Error(), "changed after the run began reading") {
+		test.Errorf("a run that read the file before its change was recorded anyway (%v), so the next run could replay it", recordRunCacheError)
 	}
 }

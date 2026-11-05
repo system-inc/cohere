@@ -79,7 +79,7 @@ func TestNoScratchFilesRemain(test *testing.T) {
 
 	examined := 0
 	for _, root := range roots {
-		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -120,8 +120,8 @@ func TestNoScratchFilesRemain(test *testing.T) {
 				"is every tree outside internal/rules", normalized)
 			return nil
 		})
-		if err != nil {
-			test.Fatalf("walking %s: %v", root, err)
+		if walkError != nil {
+			test.Fatalf("walking %s: %v", root, walkError)
 		}
 	}
 

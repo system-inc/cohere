@@ -89,12 +89,12 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(test *testing.T) {
 
 	fixture := newCommittedFixture(test)
 	launcher := filepath.Join(test.TempDir(), "cohere-dispatch")
-	if output, err := exec.Command("go", "build", "-o", launcher, "../../../command/cohere-dispatch").CombinedOutput(); err != nil {
-		test.Fatalf("building the launcher: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", launcher, "../../../command/cohere-dispatch").CombinedOutput(); outputError != nil {
+		test.Fatalf("building the launcher: %v\n%s", outputError, output)
 	}
 	// The launcher keeps its cache in the checkout, and builds through the toolchain's own Go cache.
-	if err := os.MkdirAll(filepath.Join(fixture.superproject, ".cache", "cohere"), 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(filepath.Join(fixture.superproject, ".cache", "cohere"), 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
 
 	launch := func(arguments ...string) string {
@@ -102,9 +102,9 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(test *testing.T) {
 		command := exec.Command(launcher, arguments...)
 		command.Dir = fixture.superproject
 		command.Env = append(os.Environ(), "COHERE_WAIT=1")
-		output, err := command.CombinedOutput()
-		if err != nil {
-			test.Fatalf("the launcher failed: %v\n%s", err, output)
+		output, outputError := command.CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("the launcher failed: %v\n%s", outputError, output)
 		}
 		return string(output)
 	}
@@ -136,9 +136,9 @@ func TestAPruneIsSilentUnlessVerbose(test *testing.T) {
 		pruneAfterBuild(paths, filepath.Join(paths.BinaryDirectory(), "cohere-"+platformTag()+"-keepme0000000000"), "")
 		Report = previous
 
-		log, err := os.ReadFile(paths.PruneLogPath())
-		if err != nil || !strings.Contains(string(log), "removed") {
-			test.Fatalf("the prune removed nothing, so its silence proves nothing: %q, %v", log, err)
+		log, readError := os.ReadFile(paths.PruneLogPath())
+		if readError != nil || !strings.Contains(string(log), "removed") {
+			test.Fatalf("the prune removed nothing, so its silence proves nothing: %q, %v", log, readError)
 		}
 		switch {
 		case !verbose && out.Len() != 0:
@@ -161,8 +161,8 @@ func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 	writeFile(test, filepath.Join(product, "cohere-swift"), "#!/bin/sh\n")
 	fake := "#!/bin/sh\ncase \"$*\" in\n*--show-bin-path*) echo " + product + " ;;\n" +
 		"*) echo 'Building for production...'; echo '[Computing dependencies]'; exit ${FAKE_SWIFT_EXIT:-0} ;;\nesac\n"
-	if err := os.WriteFile(filepath.Join(bin, "swift"), []byte(fake), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(bin, "swift"), []byte(fake), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	test.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
@@ -172,8 +172,8 @@ func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 		previous := Report
 		Report = NewProgress(&out, verbose, false)
 		defer func() { Report = previous }()
-		err := buildSwiftProductWithSwiftPM(test.TempDir(), test.TempDir(), filepath.Join(test.TempDir(), "bin", "cohere-swift"))
-		return out.String(), err
+		buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(test.TempDir(), test.TempDir(), filepath.Join(test.TempDir(), "bin", "cohere-swift"))
+		return out.String(), buildSwiftProductWithSwiftPMError
 	}
 
 	if output, err := build(false); err != nil || output != "" {

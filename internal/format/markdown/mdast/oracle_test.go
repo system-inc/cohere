@@ -49,15 +49,15 @@ func newLiveTreeOracle(test *testing.T) *treeOracle {
 }
 
 func (oracle *treeOracle) load() {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		oracle.err = err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		oracle.err = bundlesError
 		return
 	}
 	runtime := goja.New()
 	for _, name := range []string{"standalone.js", "plugins/markdown.js"} {
-		if _, err := runtime.RunString(string(bundles.Files[name])); err != nil {
-			oracle.err = fmt.Errorf("evaluating %s: %w", name, err)
+		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
+			oracle.err = fmt.Errorf("evaluating %s: %w", name, runStringError)
 			return
 		}
 	}
@@ -83,8 +83,8 @@ func (oracle *treeOracle) parse(text string) (any, error) {
 		return nil, err
 	}
 	var tree any
-	if err := json.Unmarshal([]byte(serialized), &tree); err != nil {
-		return nil, err
+	if decodeError := json.Unmarshal([]byte(serialized), &tree); decodeError != nil {
+		return nil, decodeError
 	}
 	return tree, nil
 }
@@ -92,10 +92,10 @@ func (oracle *treeOracle) parse(text string) (any, error) {
 // serialize is upstream's tree for text, as the JSON text the bundle's parser and JSON.stringify give.
 func (oracle *treeOracle) serialize(text string) (string, error) {
 	oracle.runtime.Set("__text", text)
-	value, err := oracle.runtime.RunString(`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
+	value, runStringError := oracle.runtime.RunString(`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
 		(key, value) => key === "data" ? undefined : value)`)
-	if err != nil {
-		return "", err
+	if runStringError != nil {
+		return "", runStringError
 	}
 	return value.String(), nil
 }
@@ -342,9 +342,9 @@ func TestTreesMatchUpstream(test *testing.T) {
 func TestTreeOracleCanFail(test *testing.T) {
 	test.Parallel()
 	oracle := newTreeOracle(test)
-	expected, err := oracle.parse("*a*")
-	if err != nil {
-		test.Fatal(err)
+	expected, parseError := oracle.parse("*a*")
+	if parseError != nil {
+		test.Fatal(parseError)
 	}
 	root, _ := ParseMarkdown("**a**", nil)
 	encoded, _ := json.Marshal(describe(root))
@@ -366,7 +366,7 @@ func TestCorpusTreesMatchUpstream(test *testing.T) {
 	oracle := newLiveTreeOracle(test)
 	total, failures := 0, 0
 	byDifference := map[string]int{}
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -392,8 +392,8 @@ func TestCorpusTreesMatchUpstream(test *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	classes := make([]string, 0, len(byDifference))
 	for class := range byDifference {

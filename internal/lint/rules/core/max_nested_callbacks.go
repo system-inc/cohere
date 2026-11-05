@@ -108,7 +108,7 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 	// The integer arm first, because it is the narrower shape: a JSON number cannot also decode as
 	// an object, so trying it first cannot swallow a case belonging to the other arm.
 	var configuredMaximum int
-	if err := json.Unmarshal(raw, &configuredMaximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &configuredMaximum); decodeError == nil {
 		if configuredMaximum < 0 {
 			return DefaultMaxNestedCallbacksSettings(), fmt.Errorf(
 				"max-nested-callbacks takes a maximum of at least 0, got %d", configuredMaximum)
@@ -118,8 +118,8 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 	}
 
 	var object maxNestedCallbacksObjectShape
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return DefaultMaxNestedCallbacksSettings(), err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return DefaultMaxNestedCallbacksSettings(), unmarshalOptionsError
 	}
 	// `option.maximum || option.max`, truthiness and all. A zero `maximum` is falsy in JavaScript
 	// and falls through to `max`; only when both are absent or both are zero does the default stand.

@@ -51,12 +51,12 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(test *testing.T) {
 	// A repository that redefines a framework variant and adds two of its own, which is the shape
 	// every corpus repository has: all three declare `@custom-variant dark`.
 	redefining := filepath.Join(filepath.Dir(baseline), "redefining.css")
-	if err := os.WriteFile(redefining, []byte(`@import "tailwindcss";
+	if writeError := os.WriteFile(redefining, []byte(`@import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 @custom-variant totally-new-variant (&:hover);
 @custom-variant another-new-one (&:focus);
-`), 0o644); err != nil {
-		test.Fatalf("write: %v", err)
+`), 0o644); writeError != nil {
+		test.Fatalf("write: %v", writeError)
 	}
 
 	redefiningSystem, err := LoadDesignSystem(LoadOptions{EntryPoint: redefining, TailwindPackageRoot: packageRoot})

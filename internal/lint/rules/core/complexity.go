@@ -59,7 +59,7 @@ func DecodeComplexityOptions(raw []byte) (any, error) {
 	}
 
 	var maximum int
-	if err := json.Unmarshal(raw, &maximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &maximum); decodeError == nil {
 		settings.Maximum = maximum
 		return settings, nil
 	}
@@ -69,8 +69,8 @@ func DecodeComplexityOptions(raw []byte) (any, error) {
 		Max     *int    `json:"max"`
 		Variant *string `json:"variant"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 
 	if object.Variant != nil && *object.Variant == "modified" {

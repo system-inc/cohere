@@ -68,10 +68,10 @@ func TestFixPathHonoursADisableComment(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			proposals, err := proposalsForText("/Probe.ts", testCase.text, &program.Graph{},
+			proposals, proposalsForTextError := proposalsForText("/Probe.ts", testCase.text, &program.Graph{},
 				[]rule.Rule{core.NoDebugger})
-			if err != nil {
-				test.Fatalf("proposalsForText: %v", err)
+			if proposalsForTextError != nil {
+				test.Fatalf("proposalsForText: %v", proposalsForTextError)
 			}
 			if got := len(proposals) > 0; got != testCase.wantProposals {
 				test.Errorf("proposals = %d, want %s", len(proposals),

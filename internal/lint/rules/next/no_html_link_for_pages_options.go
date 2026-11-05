@@ -59,8 +59,8 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 	switch {
 	case len(trimmed) > 0 && trimmed[0] == '"':
 		var directory string
-		if err := json.Unmarshal(trimmed, &directory); err != nil {
-			return nil, fmt.Errorf("expected a pages directory or a list of them: %w", err)
+		if decodeError := json.Unmarshal(trimmed, &directory); decodeError != nil {
+			return nil, fmt.Errorf("expected a pages directory or a list of them: %w", decodeError)
 		}
 		if directory == "" {
 			return NoHtmlLinkForPagesOptions{}, nil
@@ -69,15 +69,15 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 
 	case len(trimmed) > 0 && trimmed[0] == '[':
 		var elements []json.RawMessage
-		if err := json.Unmarshal(trimmed, &elements); err != nil {
-			return nil, fmt.Errorf("expected a pages directory or a list of them: %w", err)
+		if decodeError := json.Unmarshal(trimmed, &elements); decodeError != nil {
+			return nil, fmt.Errorf("expected a pages directory or a list of them: %w", decodeError)
 		}
 		written = make([]string, 0, len(elements))
 		seen := make(map[string]bool, len(elements))
 		for index, element := range elements {
 			var directory string
 			// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
-			if err := json.Unmarshal(element, &directory); err != nil || bytes.TrimSpace(element)[0] != '"' {
+			if decodeError := json.Unmarshal(element, &directory); decodeError != nil || bytes.TrimSpace(element)[0] != '"' {
 				return nil, fmt.Errorf("element %d of the pages directory list is %s, and each must be a string", index+1, element)
 			}
 			// Upstream's schema says uniqueItems, so ESLint refuses the config before the rule runs.

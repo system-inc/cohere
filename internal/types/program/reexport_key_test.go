@@ -13,9 +13,9 @@ import (
 // keysOf builds the project and returns one file's type fingerprint and shape fingerprint.
 func keysOf(test *testing.T, root string, name string) ([sha256.Size]byte, [sha256.Size]byte) {
 	test.Helper()
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
-	if err != nil {
-		test.Fatalf("build: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
+	if buildError != nil {
+		test.Fatalf("build: %v", buildError)
 	}
 	shapes, _ := graph.Signatures(context.Background(), program.RecordedRealSignatures(graph))
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -51,14 +51,14 @@ func TestAReExportResolvingElsewhereMovesItsImportersKeys(test *testing.T) {
 		})
 		types, shapes := keysOf(test, root, "a.ts")
 		// The same text at a new place: ./c now resolves to c/index.ts, and only where it lives changed.
-		if err := os.Remove(filepath.Join(root, "c.ts")); err != nil {
-			test.Fatal(err)
+		if removeError := os.Remove(filepath.Join(root, "c.ts")); removeError != nil {
+			test.Fatal(removeError)
 		}
-		if err := os.MkdirAll(filepath.Join(root, "c"), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Join(root, "c"), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(filepath.Join(root, "c", "index.ts"), []byte("export const v = 1;\n"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, "c", "index.ts"), []byte("export const v = 1;\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		movedTypes, movedShapes := keysOf(test, root, "a.ts")
 		if movedTypes == types || movedShapes == shapes {
@@ -81,9 +81,9 @@ func TestAReExportResolvingElsewhereMovesItsImportersKeys(test *testing.T) {
 			"node_modules/pkg/two.d.ts":     "export declare const v: string;\n",
 		})
 		types, shapes := keysOf(test, root, "a.ts")
-		if err := os.WriteFile(filepath.Join(root, "node_modules/pkg/package.json"),
-			[]byte("{\"name\": \"pkg\", \"types\": \"two.d.ts\"}\n"), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(root, "node_modules/pkg/package.json"),
+			[]byte("{\"name\": \"pkg\", \"types\": \"two.d.ts\"}\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		movedTypes, movedShapes := keysOf(test, root, "a.ts")
 		if movedTypes == types || movedShapes == shapes {

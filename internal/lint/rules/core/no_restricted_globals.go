@@ -48,7 +48,7 @@ type noRestrictedGlobalsEntry struct {
 // UnmarshalJSON accepts both a bare string and an object, which is upstream's `oneOf`.
 func (entry *noRestrictedGlobalsEntry) UnmarshalJSON(raw []byte) error {
 	var name string
-	if err := json.Unmarshal(raw, &name); err == nil {
+	if decodeError := json.Unmarshal(raw, &name); decodeError == nil {
 		entry.Name = name
 		entry.Message = ""
 		return nil
@@ -59,8 +59,8 @@ func (entry *noRestrictedGlobalsEntry) UnmarshalJSON(raw []byte) error {
 	}
 	// Strict, which is upstream's `additionalProperties: false`: a misspelled `message` key would
 	// otherwise be accepted and the custom message silently never shown.
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	if object.Name == "" {
 		return fmt.Errorf("no-restricted-globals entry needs a name")
@@ -96,15 +96,15 @@ func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 	}
 
 	var elements []json.RawMessage
-	if err := json.Unmarshal(list, &elements); err != nil {
-		return settings, fmt.Errorf("no-restricted-globals: the option list is not a JSON array: %w", err)
+	if decodeError := json.Unmarshal(list, &elements); decodeError != nil {
+		return settings, fmt.Errorf("no-restricted-globals: the option list is not a JSON array: %w", decodeError)
 	}
 	if len(elements) == 0 {
 		return settings, nil
 	}
 
 	var probe map[string]json.RawMessage
-	if err := json.Unmarshal(elements[0], &probe); err == nil {
+	if decodeError := json.Unmarshal(elements[0], &probe); decodeError == nil {
 		if _, isGlobalsObject := probe["globals"]; isGlobalsObject {
 			if len(elements) > 1 {
 				return settings, fmt.Errorf(
@@ -112,8 +112,8 @@ func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 						"would never be read", elements[1])
 			}
 			var object noRestrictedGlobalsObjectWire
-			if err := rule.UnmarshalOptions(elements[0], &object); err != nil {
-				return settings, fmt.Errorf("no-restricted-globals element 1: %w", err)
+			if unmarshalOptionsError := rule.UnmarshalOptions(elements[0], &object); unmarshalOptionsError != nil {
+				return settings, fmt.Errorf("no-restricted-globals element 1: %w", unmarshalOptionsError)
 			}
 			checkGlobalObject := false
 			if object.CheckGlobalObject != nil {
@@ -125,8 +125,8 @@ func DecodeNoRestrictedGlobalsOptions(list []byte) (any, error) {
 
 	entries := make([]noRestrictedGlobalsEntry, len(elements))
 	for index, element := range elements {
-		if err := json.Unmarshal(element, &entries[index]); err != nil {
-			return settings, fmt.Errorf("no-restricted-globals element %d: %w", index+1, err)
+		if decodeError := json.Unmarshal(element, &entries[index]); decodeError != nil {
+			return settings, fmt.Errorf("no-restricted-globals element %d: %w", index+1, decodeError)
 		}
 	}
 	return buildNoRestrictedGlobalsSettings(entries, false, nil), nil

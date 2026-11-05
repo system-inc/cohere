@@ -18,7 +18,7 @@ import (
 // asks for its inputs. Kept entries are told by their inode, since Go refreshes the time of an entry it uses.
 func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 	test.Parallel()
-	if _, err := exec.LookPath("go"); err != nil {
+	if _, lookPathError := exec.LookPath("go"); lookPathError != nil {
 		test.Skip("no go command")
 	}
 	cache := test.TempDir()
@@ -30,19 +30,19 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 		"lib/helper.go":  "package lib\n\nfunc helper() int { return 2 }\n",
 		"other/other.go": "package other\n\nfunc Other() int { return 3 }\n",
 	} {
-		if err := os.MkdirAll(filepath.Dir(filepath.Join(module, name)), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(filepath.Join(module, name)), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(filepath.Join(module, name), []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(module, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 		// An hour old, so both builds see the same sources. Go caches a package directory's module index
 		// only once every file in it is two seconds old (modTimeCutoff in cmd/go/internal/modindex), so a
 		// first build within two seconds of the writes cached no index for them, the rebuild did, and the
 		// test read those three entries as recomputed work it had not trimmed.
 		hourAgo := time.Now().Add(-time.Hour)
-		if err := os.Chtimes(filepath.Join(module, name), hourAgo, hourAgo); err != nil {
-			test.Fatal(err)
+		if changeTimesError := os.Chtimes(filepath.Join(module, name), hourAgo, hourAgo); changeTimesError != nil {
+			test.Fatal(changeTimesError)
 		}
 	}
 	build := func() {
@@ -50,8 +50,8 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 		command := exec.Command("go", "build", "-o", test.TempDir()+string(filepath.Separator), "./...")
 		command.Dir = module
 		command.Env = append(os.Environ(), "GOCACHE="+cache, "GOFLAGS=", "GOWORK=off")
-		if output, err := command.CombinedOutput(); err != nil {
-			test.Fatalf("go build: %v: %s", err, output)
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("go build: %v: %s", outputError, output)
 		}
 	}
 	// Every entry, by path, with its inode.
@@ -78,15 +78,15 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 	old := time.Now().Add(-3 * time.Hour)
 	var size int64
 	for path := range before {
-		if err := os.Chtimes(path, old, old); err != nil {
-			test.Fatal(err)
+		if changeTimesError := os.Chtimes(path, old, old); changeTimesError != nil {
+			test.Fatal(changeTimesError)
 		}
 		information, _ := os.Stat(path)
 		size += information.Size()
 	}
-	trimmed, err := Trim(cache, Limit{Cap: size / 2, Target: size / 2, Spare: 10 * time.Minute}, time.Now())
-	if err != nil {
-		test.Fatal(err)
+	trimmed, trimError := Trim(cache, Limit{Cap: size / 2, Target: size / 2, Spare: 10 * time.Minute}, time.Now())
+	if trimError != nil {
+		test.Fatal(trimError)
 	}
 	afterTrim := entries()
 	if trimmed.Removed == 0 || len(afterTrim) == len(before) {

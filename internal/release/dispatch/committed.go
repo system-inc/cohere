@@ -109,8 +109,8 @@ func ResolveCommitted(paths Paths, packagePath string) (binaryPath string, commi
 	if err != nil {
 		return "", "", false, err
 	}
-	if err := buildCommitted(paths, packagePath, build, binaryPath); err != nil {
-		return "", "", false, err
+	if buildCommittedError := buildCommitted(paths, packagePath, build, binaryPath); buildCommittedError != nil {
+		return "", "", false, buildCommittedError
 	}
 	return binaryPath, build.Commit, true, nil
 }
@@ -134,8 +134,8 @@ func readCommittedBuild(moduleDirectory string) (committedBuild, error) {
 // buildCommitted extracts the snapshot, builds it, and proves the result before it can be found.
 func buildCommitted(paths Paths, packagePath string, build committedBuild, binaryPath string) error {
 	for _, directory := range []string{paths.BinaryDirectory(), paths.SnapshotDirectory(), paths.CompilerDirectory()} {
-		if err := os.MkdirAll(directory, 0o755); err != nil {
-			return fmt.Errorf("creating %s: %w", directory, err)
+		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+			return fmt.Errorf("creating %s: %w", directory, createDirectoryError)
 		}
 	}
 
@@ -157,8 +157,8 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 		return fmt.Errorf("resolving the snapshot directory: %w", err)
 	}
 
-	if err := extractGitArchive(paths.ModuleDirectory, build.Commit, "", snapshot); err != nil {
-		return fmt.Errorf("extracting commit %s: %w", release.ShortCommit(build.Commit), err)
+	if extractGitArchiveError := extractGitArchive(paths.ModuleDirectory, build.Commit, "", snapshot); extractGitArchiveError != nil {
+		return fmt.Errorf("extracting commit %s: %w", release.ShortCommit(build.Commit), extractGitArchiveError)
 	}
 
 	compiler, err := ensureCompiler(paths, build.CompilerCommit)
@@ -170,11 +170,11 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	// as a link, which Go follows for a workspace module, and which keeps the snapshot to this
 	// repository's own few thousand files.
 	submodulePath := filepath.Join(snapshot, "TypeScript")
-	if err := os.Remove(submodulePath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("clearing the submodule placeholder in the snapshot: %w", err)
+	if removeError := os.Remove(submodulePath); removeError != nil && !errors.Is(removeError, os.ErrNotExist) {
+		return fmt.Errorf("clearing the submodule placeholder in the snapshot: %w", removeError)
 	}
-	if err := os.Symlink(compiler, submodulePath); err != nil {
-		return fmt.Errorf("linking the compiler into the snapshot: %w", err)
+	if symlinkError := os.Symlink(compiler, submodulePath); symlinkError != nil {
+		return fmt.Errorf("linking the compiler into the snapshot: %w", symlinkError)
 	}
 
 	// Built to a temporary name and renamed only once proven, so a concurrent run never finds, and
@@ -183,14 +183,14 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	temporary := strings.TrimSuffix(binaryPath, executableSuffix) + fmt.Sprintf(".partial-%d", os.Getpid()) + executableSuffix
 	defer os.Remove(temporary)
 
-	if err := goBuildSnapshot(paths, snapshot, packagePath, build, temporary); err != nil {
-		return err
+	if goBuildSnapshotError := goBuildSnapshot(paths, snapshot, packagePath, build, temporary); goBuildSnapshotError != nil {
+		return goBuildSnapshotError
 	}
-	if err := proveCommittedBinary(temporary, snapshot, build); err != nil {
-		return err
+	if proveCommittedBinaryError := proveCommittedBinary(temporary, snapshot, build); proveCommittedBinaryError != nil {
+		return proveCommittedBinaryError
 	}
-	if err := os.Rename(temporary, binaryPath); err != nil {
-		return fmt.Errorf("moving the built binary into the cache: %w", err)
+	if renameError := os.Rename(temporary, binaryPath); renameError != nil {
+		return fmt.Errorf("moving the built binary into the cache: %w", renameError)
 	}
 
 	pruneAfterBuild(paths, binaryPath, compiler)
@@ -205,14 +205,14 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 // --verbose, so an ordinary build stays quiet.
 func pruneAfterBuild(paths Paths, keep string, currentCompiler string) {
 	now := time.Now()
-	plan, err := PlanPrune(paths, []string{keep}, currentCompiler, now)
-	if err != nil {
-		Report.Fail("cohere: the cache was not pruned: %v", err)
+	plan, planPruneError := PlanPrune(paths, []string{keep}, currentCompiler, now)
+	if planPruneError != nil {
+		Report.Fail("cohere: the cache was not pruned: %v", planPruneError)
 		return
 	}
 	removed, applyErr := ApplyPrune(paths, plan)
-	if err := RecordPrune(paths, plan, removed, now); err != nil {
-		Report.Fail("cohere: the prune log was not written: %v", err)
+	if recordPruneError := RecordPrune(paths, plan, removed, now); recordPruneError != nil {
+		Report.Fail("cohere: the prune log was not written: %v", recordPruneError)
 	}
 	if len(removed) > 0 {
 		bytes := int64(0)
@@ -234,38 +234,38 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 	key := compilerCommit
 	compiler := filepath.Join(paths.CompilerDirectory(), key)
 
-	if _, err := os.Stat(compiler); err == nil {
+	if _, statError := os.Stat(compiler); statError == nil {
 		// Marked as used, because the prune removes an extraction untouched for an hour and an
 		// extraction's own time is when it was made. A build against a pin extracted yesterday would
 		// otherwise compile against a directory the next prune is free to take.
-		if err := os.Chtimes(compiler, time.Now(), time.Now()); err != nil {
-			return "", fmt.Errorf("marking the compiler at %s in use: %w", release.ShortCommit(compilerCommit), err)
+		if changeTimesError := os.Chtimes(compiler, time.Now(), time.Now()); changeTimesError != nil {
+			return "", fmt.Errorf("marking the compiler at %s in use: %w", release.ShortCommit(compilerCommit), changeTimesError)
 		}
 		return compiler, nil
 	}
 
 	Report.Step("cohere: extracting the compiler at %s, once per pin (about seven seconds)", release.ShortCommit(compilerCommit))
 
-	partial, err := os.MkdirTemp(paths.CompilerDirectory(), key+".partial-*")
-	if err != nil {
-		return "", fmt.Errorf("creating a compiler directory: %w", err)
+	partial, temporaryDirectoryError := os.MkdirTemp(paths.CompilerDirectory(), key+".partial-*")
+	if temporaryDirectoryError != nil {
+		return "", fmt.Errorf("creating a compiler directory: %w", temporaryDirectoryError)
 	}
 	// After a successful rename the name no longer exists and this does nothing.
 	defer os.RemoveAll(partial)
 
 	submodule := filepath.Join(paths.ModuleDirectory, "TypeScript")
-	if err := extractGitArchive(submodule, compilerCommit, compilerSubdirectory, partial); err != nil {
+	if extractGitArchiveError := extractGitArchive(submodule, compilerCommit, compilerSubdirectory, partial); extractGitArchiveError != nil {
 		return "", fmt.Errorf("extracting the compiler at %s (if the commit is missing, the submodule has not fetched it: "+
-			"run `git submodule sync && git submodule update --init` in %s): %w", release.ShortCommit(compilerCommit), paths.ModuleDirectory, err)
+			"run `git submodule sync && git submodule update --init` in %s): %w", release.ShortCommit(compilerCommit), paths.ModuleDirectory, extractGitArchiveError)
 	}
 
-	if err := os.Rename(partial, compiler); err != nil {
+	if renameError := os.Rename(partial, compiler); renameError != nil {
 		// Another run finished the same extraction first. Its directory is identical by construction,
 		// so it is used and this one is discarded.
 		if _, statErr := os.Stat(compiler); statErr == nil {
 			return compiler, nil
 		}
-		return "", fmt.Errorf("moving the compiler into the cache: %w", err)
+		return "", fmt.Errorf("moving the compiler into the cache: %w", renameError)
 	}
 	return compiler, nil
 }
@@ -293,9 +293,9 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 		arguments = append(arguments, flag)
 	}
 	workspace := "GOWORK=" + filepath.Join(snapshot, "go.work")
-	formatter, err := FormatterIdentity(snapshot, build.GoVersion, []string{workspace})
-	if err != nil {
-		return err
+	formatter, formatterIdentityError := FormatterIdentity(snapshot, build.GoVersion, []string{workspace})
+	if formatterIdentityError != nil {
+		return formatterIdentityError
 	}
 	linkerFlags = append(linkerFlags,
 		"-X", packagingPath+".selfCommit="+build.Commit,
@@ -315,11 +315,11 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 	command.Env = append(os.Environ(), workspace, "CGO_ENABLED=0")
 	command.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
-		return fmt.Errorf("building cohere from commit %s: %w", release.ShortCommit(build.Commit), err)
+	if runError := command.Run(); runError != nil {
+		return fmt.Errorf("building cohere from commit %s: %w", release.ShortCommit(build.Commit), runError)
 	}
-	if _, err := os.Stat(outputPath); err != nil {
-		return fmt.Errorf("go build reported success but produced no binary at %s: %w", outputPath, err)
+	if _, statError := os.Stat(outputPath); statError != nil {
+		return fmt.Errorf("go build reported success but produced no binary at %s: %w", outputPath, statError)
 	}
 	return nil
 }
@@ -332,10 +332,10 @@ func goBuildSnapshot(paths Paths, snapshot string, packagePath string, build com
 func proveCommittedBinary(binaryPath string, workingDirectory string, build committedBuild) error {
 	command := exec.Command(binaryPath, "--version")
 	command.Dir = workingDirectory
-	output, err := command.CombinedOutput()
-	if err != nil {
+	output, outputError := command.CombinedOutput()
+	if outputError != nil {
 		return fmt.Errorf("the binary built from %s failed its own --version (%w), so it was not cached:\n%s",
-			release.ShortCommit(build.Commit), err, output)
+			release.ShortCommit(build.Commit), outputError, output)
 	}
 	return checkCommittedVersion(string(output), build.Commit)
 }
@@ -375,12 +375,12 @@ func extractGitArchive(repository string, commit string, subdirectory string, de
 	command := exec.Command("git", arguments...)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	stream, err := command.StdoutPipe()
-	if err != nil {
-		return err
+	stream, stdoutPipeError := command.StdoutPipe()
+	if stdoutPipeError != nil {
+		return stdoutPipeError
 	}
-	if err := command.Start(); err != nil {
-		return err
+	if startError := command.Start(); startError != nil {
+		return startError
 	}
 
 	written, extractErr := extractTar(stream, destination)
@@ -407,12 +407,12 @@ func extractTar(stream io.Reader, destination string) (int, error) {
 	reader := tar.NewReader(stream)
 	written := 0
 	for {
-		header, err := reader.Next()
-		if errors.Is(err, io.EOF) {
+		header, nextError := reader.Next()
+		if errors.Is(nextError, io.EOF) {
 			return written, nil
 		}
-		if err != nil {
-			return written, fmt.Errorf("reading the archive: %w", err)
+		if nextError != nil {
+			return written, fmt.Errorf("reading the archive: %w", nextError)
 		}
 
 		target := filepath.Join(destination, filepath.FromSlash(header.Name))
@@ -422,31 +422,31 @@ func extractTar(stream io.Reader, destination string) (int, error) {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return written, err
+			if createDirectoryError := os.MkdirAll(target, 0o755); createDirectoryError != nil {
+				return written, createDirectoryError
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return written, err
+			if createDirectoryError := os.MkdirAll(filepath.Dir(target), 0o755); createDirectoryError != nil {
+				return written, createDirectoryError
 			}
-			file, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode)&0o777)
-			if err != nil {
-				return written, err
+			file, openError := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode)&0o777)
+			if openError != nil {
+				return written, openError
 			}
-			if _, err := io.Copy(file, reader); err != nil {
+			if _, copyError := io.Copy(file, reader); copyError != nil {
 				file.Close()
-				return written, err
+				return written, copyError
 			}
-			if err := file.Close(); err != nil {
-				return written, err
+			if closeError := file.Close(); closeError != nil {
+				return written, closeError
 			}
 			written++
 		case tar.TypeSymlink:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return written, err
+			if createDirectoryError := os.MkdirAll(filepath.Dir(target), 0o755); createDirectoryError != nil {
+				return written, createDirectoryError
 			}
-			if err := os.Symlink(header.Linkname, target); err != nil {
-				return written, err
+			if symlinkError := os.Symlink(header.Linkname, target); symlinkError != nil {
+				return written, symlinkError
 			}
 		case tar.TypeXGlobalHeader:
 			// git archive opens with a pax header carrying the commit id. It describes the archive and
@@ -462,9 +462,9 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 	command := exec.Command("git", append([]string{"-C", directory}, arguments...)...)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, err := command.Output()
-	if err != nil {
-		return "", fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), err, strings.TrimSpace(standardError.String()))
+	output, outputError := command.Output()
+	if outputError != nil {
+		return "", fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), outputError, strings.TrimSpace(standardError.String()))
 	}
 	return string(output), nil
 }
@@ -481,8 +481,8 @@ func platformBinaryPrefix() string {
 // uncommitted change, read from no commit, by the same reasoning that reads the pin from the commit's
 // gitlink rather than from the submodule's checkout. A snapshot has no `.git` to ask anyway.
 func committedCompilerUpstream(snapshot string) string {
-	contents, err := os.ReadFile(filepath.Join(snapshot, ".gitmodules"))
-	if err != nil {
+	contents, readError := os.ReadFile(filepath.Join(snapshot, ".gitmodules"))
+	if readError != nil {
 		return ""
 	}
 	if upstream := release.CompilerUpstreamFromGitmodules(string(contents)); upstream != "unknown" {

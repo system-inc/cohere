@@ -49,8 +49,8 @@ var goldenDependencyPattern = regexp.MustCompile(`\$\[[0-9]+\] !== ([A-Za-z_$][A
 // goldenDependencies returns the dependency expressions upstream's compiled output compares.
 func goldenDependencies(test *testing.T, expectPath string) []string {
 	test.Helper()
-	body, err := os.ReadFile(expectPath)
-	if err != nil {
+	body, readError := os.ReadFile(expectPath)
+	if readError != nil {
 		return nil
 	}
 	// Only the `## Code` section. The `## Input` section holds the source, which contains the
@@ -94,9 +94,9 @@ func goldenDependencies(test *testing.T, expectPath string) []string {
 func TestInferredDependenciesAgainstGoldenCacheSlots(test *testing.T) {
 	test.Parallel()
 
-	fixtures, err := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
-	if err != nil {
-		test.Fatalf("loading the vendored corpus: %v", err)
+	fixtures, loadError := react_conformance.Load("../../rules/react/conformance/testdata/fixtures")
+	if loadError != nil {
+		test.Fatalf("loading the vendored corpus: %v", loadError)
 	}
 
 	scored, matched, missed, unmatchable, flowExcluded := 0, 0, 0, 0, 0

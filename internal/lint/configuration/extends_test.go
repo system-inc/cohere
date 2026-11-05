@@ -17,11 +17,11 @@ func writeConfigs(test *testing.T, files map[string]string) string {
 	directory := test.TempDir()
 	for name, contents := range files {
 		path := filepath.Join(directory, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			test.Fatal(err)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
 		}
-		if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 	return directory
@@ -30,9 +30,9 @@ func writeConfigs(test *testing.T, files map[string]string) string {
 // loadOrFail loads a config that must load.
 func loadOrFail(test *testing.T, path string) *Config {
 	test.Helper()
-	loaded, err := Load(path)
-	if err != nil {
-		test.Fatalf("loading %s: %v", path, err)
+	loaded, loadError := Load(path)
+	if loadError != nil {
+		test.Fatalf("loading %s: %v", path, loadError)
 	}
 	return loaded
 }
@@ -40,12 +40,12 @@ func loadOrFail(test *testing.T, path string) *Config {
 // refusedWith loads a config that must be refused, and checks the error says why.
 func refusedWith(test *testing.T, path string, want string) {
 	test.Helper()
-	_, err := Load(path)
-	if err == nil {
+	_, loadError := Load(path)
+	if loadError == nil {
 		test.Fatalf("loading %s succeeded; it must be refused (%s)", path, want)
 	}
-	if !strings.Contains(err.Error(), want) {
-		test.Fatalf("loading %s was refused, but not for the reason under test.\n  got:  %v\n  want: %s", path, err, want)
+	if !strings.Contains(loadError.Error(), want) {
+		test.Fatalf("loading %s was refused, but not for the reason under test.\n  got:  %v\n  want: %s", path, loadError, want)
 	}
 }
 
@@ -220,9 +220,9 @@ func TestADepartureCannotHideBehindAnotherSpelling(test *testing.T) {
 				"base.json":           `{"extends": "cohere:system-inc/test", "rules": {"` + testCase.base + `": "error"}}`,
 				"CohereSettings.json": `{"extends": "./base.json", "rules": {"` + testCase.project + `": "off"}}`,
 			})
-			if _, err := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); err == nil ||
-				!strings.Contains(err.Error(), "differently") {
-				test.Fatalf("a respelled departure with no reason loaded: %v", err)
+			if _, loadForError := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); loadForError == nil ||
+				!strings.Contains(loadForError.Error(), "differently") {
+				test.Fatalf("a respelled departure with no reason loaded: %v", loadForError)
 			}
 
 			declared := writeConfigs(test, map[string]string{
@@ -231,9 +231,9 @@ func TestADepartureCannotHideBehindAnotherSpelling(test *testing.T) {
 					"departures": {"` + testCase.project + `": "enums are generated here"},
 					"rules": {"` + testCase.project + `": "off"}}`,
 			})
-			loaded, err := LoadFor(filepath.Join(declared, "CohereSettings.json"), registered)
-			if err != nil {
-				test.Fatal(err)
+			loaded, loadForError := LoadFor(filepath.Join(declared, "CohereSettings.json"), registered)
+			if loadForError != nil {
+				test.Fatal(loadForError)
 			}
 			// One key per ruling, or the resolver holds two spellings and calls the rule ambiguous.
 			if _, kept := loaded.Rules[testCase.dropped]; kept {
@@ -310,8 +310,8 @@ func TestOverridesAndIgnorePatternsConcatenateBaseFirst(test *testing.T) {
 		test.Errorf("ignorePatterns are %v, want the base's first", loaded.IgnorePatterns)
 	}
 	// The format walk reads the same list without decoding rules, and must read it identically.
-	if shared, err := IgnorePatternsOf(filepath.Join(directory, "CohereSettings.json")); err != nil || strings.Join(shared, ",") != strings.Join(loaded.IgnorePatterns, ",") {
-		test.Errorf("IgnorePatternsOf = %v (%v), want Load's %v", shared, err, loaded.IgnorePatterns)
+	if shared, ignorePatternsOfError := IgnorePatternsOf(filepath.Join(directory, "CohereSettings.json")); ignorePatternsOfError != nil || strings.Join(shared, ",") != strings.Join(loaded.IgnorePatterns, ",") {
+		test.Errorf("IgnorePatternsOf = %v (%v), want Load's %v", shared, ignorePatternsOfError, loaded.IgnorePatterns)
 	}
 	if loaded.Root != directory {
 		test.Errorf("root is %s, want the project directory %s", loaded.Root, directory)
@@ -523,9 +523,9 @@ func TestATwinRuleKeepsItsOwnKeyWhenAProjectWritesTheOther(test *testing.T) {
 			"departures": {"no-invalid-this": "the core rule is off here"},
 			"rules": {"no-invalid-this": "off"}}`,
 	})
-	loaded, err := LoadFor(filepath.Join(directory, "CohereSettings.json"), registered)
-	if err != nil {
-		test.Fatal(err)
+	loaded, loadForError := LoadFor(filepath.Join(directory, "CohereSettings.json"), registered)
+	if loadForError != nil {
+		test.Fatal(loadForError)
 	}
 	resolved := loaded.Resolve("source/File.ts")
 	if !resolved.Enabled("@typescript-eslint/no-invalid-this") {
@@ -542,7 +542,7 @@ func TestATwinRuleKeepsItsOwnKeyWhenAProjectWritesTheOther(test *testing.T) {
 		"base.json":           `{"extends": "cohere:system-inc/test", "rules": {"@typescript-eslint/no-invalid-this": "error"}}`,
 		"CohereSettings.json": `{"extends": "./base.json", "rules": {"no-invalid-this": "off"}}`,
 	})
-	if _, err := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); err == nil {
+	if _, loadForError := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); loadForError == nil {
 		test.Error("the core key changed the ruling the twin's key carried for it, and no reason was demanded")
 	}
 }

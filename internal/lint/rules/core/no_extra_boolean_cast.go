@@ -54,8 +54,8 @@ func (options *NoExtraBooleanCastOptions) UnmarshalJSON(raw []byte) error {
 		EnforceForInnerExpressions *bool `json:"enforceForInnerExpressions"`
 		EnforceForLogicalOperands  *bool `json:"enforceForLogicalOperands"`
 	}
-	if err := rule.UnmarshalOptions(raw, &decoded); err != nil {
-		return err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
+		return unmarshalOptionsError
 	}
 	// The newer name wins when both are written, matching serde's alias resolution, where the
 	// canonical field name takes the value and the alias only fills an absent one.

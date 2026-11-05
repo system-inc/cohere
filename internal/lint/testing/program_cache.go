@@ -183,7 +183,7 @@ func buildProgramInto(directoryName string, files map[string]string, subjectFile
 	configPath := directory + "/tsconfig.json"
 	contents[configPath] = defaultTsConfig
 
-	graph, err := program.Build(program.Options{
+	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   configPath,
 		CurrentDirectory: directory,
 		LibraryParses:    libraryParses,
@@ -192,8 +192,8 @@ func buildProgramInto(directoryName string, files map[string]string, subjectFile
 		// scheduling nondeterminism to a test whose whole value is being deterministic.
 		SingleThreaded: true,
 	})
-	if err != nil {
-		return nil, directory, fmt.Errorf("building the type graph: %w", err)
+	if buildError != nil {
+		return nil, directory, fmt.Errorf("building the type graph: %w", buildError)
 	}
 	return graph, directory, nil
 }

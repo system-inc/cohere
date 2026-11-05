@@ -47,11 +47,11 @@ func TestBuildRefusesARootItCannotReadInsteadOfPanicking(test *testing.T) {
 		"Locked.ts":     "export const locked = 2;\n",
 	})
 	locked := filepath.Join(directory, "Locked.ts")
-	if err := os.Chmod(locked, 0o000); err != nil {
-		test.Fatal(err)
+	if changeModeError := os.Chmod(locked, 0o000); changeModeError != nil {
+		test.Fatal(changeModeError)
 	}
 	test.Cleanup(func() { os.Chmod(locked, 0o644) })
-	if file, err := os.Open(locked); err == nil {
+	if file, openError := os.Open(locked); openError == nil {
 		file.Close()
 		test.Skip("this user can read a mode-000 file, so the fixture cannot make a root unreadable")
 	}
@@ -61,13 +61,13 @@ func TestBuildRefusesARootItCannotReadInsteadOfPanicking(test *testing.T) {
 			test.Fatalf("Build panicked on an unreadable root: %v", recovered)
 		}
 	}()
-	graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err == nil {
+	graph, buildError := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError == nil {
 		test.Fatalf("Build returned a graph of %d project files from a config naming 2, one unreadable",
 			len(graph.ProjectFiles()))
 	}
-	if !strings.Contains(err.Error(), "Locked.ts") || !strings.Contains(err.Error(), "could not be read") {
-		test.Fatalf("the error does not name the unreadable file and why: %v", err)
+	if !strings.Contains(buildError.Error(), "Locked.ts") || !strings.Contains(buildError.Error(), "could not be read") {
+		test.Fatalf("the error does not name the unreadable file and why: %v", buildError)
 	}
 }
 
@@ -80,9 +80,9 @@ func TestBuildReturnsEveryNamedFileWhenNothingMoved(test *testing.T) {
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Beta.ts":       "export const beta = 2;\n",
 	})
-	graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
 	if named, got := len(graph.Config.FileNames()), len(graph.ProjectFiles()); named != 2 || got != 2 {
 		test.Fatalf("named %d and returned %d project files, want 2 and 2", named, got)
@@ -124,8 +124,8 @@ func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(test *testing.T) {
 					test.Fatalf("attempt %d: Build panicked while the tree changed: %v", attempt, recovered)
 				}
 			}()
-			graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-			if err != nil {
+			graph, buildError := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+			if buildError != nil {
 				return
 			}
 			if named, got := len(graph.Config.FileNames()), len(graph.ProjectFiles()); named != got {

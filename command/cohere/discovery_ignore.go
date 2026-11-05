@@ -10,17 +10,17 @@ type gitignoreScope struct {
 }
 
 func newGitignoreScope(repositoryRoot string) (ignoreScope, error) {
-	matcher, err := gitignore.New(repositoryRoot)
-	if err != nil {
-		return nil, err
+	matcher, newGitignoreError := gitignore.New(repositoryRoot)
+	if newGitignoreError != nil {
+		return nil, newGitignoreError
 	}
 	return gitignoreScope{matcher: matcher}, nil
 }
 
 func (scope gitignoreScope) Enter(relativeDirectory string) (ignoreScope, error) {
-	entered, err := scope.matcher.Enter(relativeDirectory)
-	if err != nil {
-		return nil, err
+	entered, enterError := scope.matcher.Enter(relativeDirectory)
+	if enterError != nil {
+		return nil, enterError
 	}
 	return gitignoreScope{matcher: entered}, nil
 }

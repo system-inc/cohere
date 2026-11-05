@@ -297,8 +297,8 @@ func compileRouteSources(sources []string) []*esregexp.RegExp {
 			continue
 		}
 		seen[source] = true
-		compiled, err := esregexp.Compile(dynamicSegments.ReplaceAllLiteralString(source, dynamicSegmentPattern), "")
-		if err != nil {
+		compiled, compileError := esregexp.Compile(dynamicSegments.ReplaceAllLiteralString(source, dynamicSegmentPattern), "")
+		if compileError != nil {
 			continue
 		}
 		routes = append(routes, compiled)

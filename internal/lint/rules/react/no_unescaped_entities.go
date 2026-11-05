@@ -348,8 +348,8 @@ func DecodeNoUnescapedEntitiesOptions(raw []byte) (any, error) {
 	}
 
 	var wire noUnescapedEntitiesWireOptions
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return NoUnescapedEntitiesOptions{}, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return NoUnescapedEntitiesOptions{}, unmarshalOptionsError
 	}
 	if wire.Forbid == nil {
 		return NoUnescapedEntitiesOptions{}, nil
@@ -370,7 +370,7 @@ func DecodeNoUnescapedEntitiesOptions(raw []byte) (any, error) {
 // decodeForbiddenEntity reads one `forbid` array element in either of its two spellings.
 func decodeForbiddenEntity(element json.RawMessage) (forbiddenEntity, bool) {
 	var asString string
-	if err := json.Unmarshal(element, &asString); err == nil {
+	if decodeError := json.Unmarshal(element, &asString); decodeError == nil {
 		// The bare-string spelling: the character is forbidden and nothing is offered. Upstream
 		// reports `unescapedEntity` with no suggestions for it, which is a different message from
 		// the object spelling even when the object carries no alternatives.
@@ -381,7 +381,7 @@ func decodeForbiddenEntity(element json.RawMessage) (forbiddenEntity, bool) {
 	// `additionalProperties`), so ESLint loads `{"char": ">", "alternatives": [], "extra": 1}` and so
 	// must this.
 	var asObject noUnescapedEntitiesWireEntry
-	if err := json.Unmarshal(element, &asObject); err != nil {
+	if decodeError := json.Unmarshal(element, &asObject); decodeError != nil {
 		return forbiddenEntity{}, false
 	}
 	if asObject.Char == nil || asObject.Alternatives == nil {

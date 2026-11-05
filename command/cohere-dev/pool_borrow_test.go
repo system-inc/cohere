@@ -40,8 +40,8 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 		test.Skip("tokens are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
-	if output, err := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); err != nil {
-		test.Fatalf("building: %v\n%s", err, output)
+	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
 	// A go that logs its share as it starts, and holds the first run until the test releases it.
 	bin := test.TempDir()
@@ -50,8 +50,8 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 	stand := "#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN token=$" + heldTokenVariable + " flags=$GOFLAGS threads=$GOMAXPROCS cores=$" +
 		coresVariable + "\" >> '" + log + "'\n" +
 		"[ \"$COHERE_DEV_TEST_RUN\" = first ] && while [ ! -e '" + release + "' ]; do sleep 0.05; done\nexit 0\n"
-	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
+		test.Fatal(writeError)
 	}
 	home := privatePool(test)
 	start := func(name string) (*exec.Cmd, *strings.Builder) {
@@ -60,8 +60,8 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 			homeVariable+"="+home, tokensVariable+"=4", packagesVariable+"=2", threadsVariable+"=2", "COHERE_DEV_TEST_RUN="+name)
 		command.Stdout, command.Stderr = &output, &output
-		if err := command.Start(); err != nil {
-			test.Fatal(err)
+		if startError := command.Start(); startError != nil {
+			test.Fatal(startError)
 		}
 		return command, &output
 	}
@@ -92,9 +92,9 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 	}
 	status := exec.Command(wrapper, "status")
 	status.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, tokensVariable+"=4")
-	output, err := status.CombinedOutput()
-	if err != nil {
-		test.Fatalf("cohere-dev status: %v\n%s", err, output)
+	output, outputError := status.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("cohere-dev status: %v\n%s", outputError, output)
 	}
 	if borrowed := strings.Count(string(output), "borrowed by token 1's run"); borrowed != 2 || strings.Count(string(output), "token 4: free") != 1 {
 		test.Errorf("status shows %d borrowed tokens, want 2 borrowed and 1 free:\n%s", borrowed, output)
@@ -105,17 +105,17 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 	if line := waitFor("second"); !strings.Contains(line, "flags=-trimpath -p=2 threads=2 cores=4") {
 		test.Errorf("the run after a borrower ran with %q, want one token's share", line)
 	}
-	if err := second.Wait(); err != nil {
-		test.Errorf("the second run failed: %v\n%s", err, secondOutput)
+	if waitError := second.Wait(); waitError != nil {
+		test.Errorf("the second run failed: %v\n%s", waitError, secondOutput)
 	}
 	if strings.Contains(secondOutput.String(), "waiting for a token") {
 		test.Errorf("the second run waited behind a borrower:\n%s", secondOutput)
 	}
-	if err := os.WriteFile(release, nil, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(release, nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := first.Wait(); err != nil {
-		test.Errorf("the first run failed: %v\n%s", err, firstOutput)
+	if waitError := first.Wait(); waitError != nil {
+		test.Errorf("the first run failed: %v\n%s", waitError, firstOutput)
 	}
 	if !strings.Contains(firstOutput.String(), "borrows tokens 2 and 3") {
 		test.Errorf("the borrowing run did not say what it borrowed:\n%s", firstOutput)
@@ -157,9 +157,9 @@ func TestNothingIsBorrowedWithAWaiterOrOneFreeToken(test *testing.T) {
 	crowded := test.TempDir()
 	held := []*heldSlot{}
 	for range 3 {
-		token, err := takeSlot(crowded, 4, "a run")
-		if err != nil || token == nil {
-			test.Fatalf("taking a token: %v", err)
+		token, takeSlotError := takeSlot(crowded, 4, "a run")
+		if takeSlotError != nil || token == nil {
+			test.Fatalf("taking a token: %v", takeSlotError)
 		}
 		held = append(held, token)
 	}

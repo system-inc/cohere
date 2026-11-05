@@ -36,9 +36,9 @@ func TestByteOrderMarksAndCarriageReturnsMatchTheForkInEveryLanguage(test *testi
 	}
 
 	options := formatoptions.Default()
-	oracle, err := prettier.New(options)
-	if err != nil {
-		test.Fatal(err)
+	oracle, newPrettierError := prettier.New(options)
+	if newPrettierError != nil {
+		test.Fatal(newPrettierError)
 	}
 	formatter := Formatter{Options: options}
 	compared := 0

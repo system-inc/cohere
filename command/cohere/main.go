@@ -46,7 +46,7 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == goEngineVerb {
 		os.Exit(runGoEngineVerb(os.Args[2:], os.Stdout, os.Stderr))
 	}
-	if err := run(); err != nil {
+	if runError := run(); runError != nil {
 		// A failure of the tool is never recorded by the run cache, and the recording stops before the
 		// error prints so the message reaches the terminal rather than a pipe nobody is reading.
 		abandonRunCache()
@@ -55,7 +55,7 @@ func main() {
 		}
 		// The chain is lowercase clauses until here, the one place a person reads it, where it becomes a
 		// sentence (see package sentence).
-		fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(err))
+		fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(runError))
 		exitProcess(1)
 	}
 	finishRunCache(0)
@@ -186,8 +186,8 @@ func run() error {
 		activeOutput = outputSettings{Mode: outputJSON}
 	}
 	if *profilePath != "" {
-		if err := startProfile(*profilePath); err != nil {
-			return err
+		if startProfileError := startProfile(*profilePath); startProfileError != nil {
+			return startProfileError
 		}
 	}
 
@@ -225,9 +225,9 @@ func run() error {
 		if given["lint-config"] {
 			namedLintConfig = absoluteFrom(workingDirectory, *lintConfigFileName)
 		}
-		exitCode, checked, err := checkDiscoveredProjects(location, locateError, workingDirectory, namedLintConfig)
-		if err != nil {
-			return err
+		exitCode, checked, checkDiscoveredProjectsError := checkDiscoveredProjects(location, locateError, workingDirectory, namedLintConfig)
+		if checkDiscoveredProjectsError != nil {
+			return checkDiscoveredProjectsError
 		}
 		if checked {
 			exitProcess(exitCode)
@@ -240,16 +240,16 @@ func run() error {
 			if given, set := os.LookupEnv("COHERE_TEST_CREATE_AFTER_DISCOVERY_TEXT"); set {
 				text = given
 			}
-			if err := os.WriteFile(created, []byte(text), 0o644); err != nil {
-				return err
+			if writeError := os.WriteFile(created, []byte(text), 0o644); writeError != nil {
+				return writeError
 			}
 		}
 	}
 
 	if locateError == nil && location.Engine == engineSwift {
-		exitCode, err := runSwiftEngine(location, given, flag.Args())
-		if err != nil {
-			return err
+		exitCode, runSwiftEngineError := runSwiftEngine(location, given, flag.Args())
+		if runSwiftEngineError != nil {
+			return runSwiftEngineError
 		}
 		if exitCode != 0 {
 			exitProcess(exitCode)
@@ -305,9 +305,9 @@ func run() error {
 		if locateError == nil && usesHouseSets(location) {
 			return errHouseSetsPerFile
 		}
-		lintConfig, err := configuration.LoadFor(lintConfigPath, registeredRuleNames())
-		if err != nil {
-			return fmt.Errorf("reading %s: %w", lintConfigPath, err)
+		lintConfig, loadForError := configuration.LoadFor(lintConfigPath, registeredRuleNames())
+		if loadForError != nil {
+			return fmt.Errorf("reading %s: %w", lintConfigPath, loadForError)
 		}
 
 		// Resolution is per file, because an override can turn a rule off for one path and leave it
@@ -577,7 +577,7 @@ func run() error {
 		buildStart := time.Now()
 		contentPack := openContentPack(location.Root)
 		contentPackOpened = time.Since(buildStart)
-		built, err := program.Build(program.Options{
+		built, buildError := program.Build(program.Options{
 			ConfigFileName:   location.ConfigFileName,
 			CurrentDirectory: location.Root,
 			SingleThreaded:   *singleThreaded,
@@ -588,11 +588,11 @@ func run() error {
 			Yielded:          yield.yieldedFiles(),
 			Listings:         discoveredListings,
 		})
-		if err != nil {
+		if buildError != nil {
 			// A program that fails to build is a loud failure and never an empty result. An empty file list
 			// is indistinguishable from a clean tree, and that confusion is what let the gate this replaces
 			// print green over zero files for days.
-			return fmt.Errorf("building the type graph: %w", err)
+			return fmt.Errorf("building the type graph: %w", buildError)
 		}
 		graph = built
 		buildDuration = time.Since(buildStart)
@@ -646,9 +646,9 @@ func run() error {
 	writeScope := formatScope{Everything: true}
 
 	if len(flag.Args()) > 0 && !*listRules && !*listRulesEnabled {
-		scope, err := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
-		if err != nil {
-			return err
+		scope, namedPathsScopeError := namedPathsScope(location.ArgumentBase, location.Root, flag.Args())
+		if namedPathsScopeError != nil {
+			return namedPathsScopeError
 		}
 		writeScope = scope
 		if graph != nil {
@@ -744,9 +744,9 @@ func run() error {
 
 	// `--format-only` proposes no fixes, so it reads no rules and its verdict cannot hang on their config.
 	if (runFix && !*formatOnly) || runLint {
-		loaded, err := configureLint(graph, location, lintAhead)
-		if err != nil {
-			return err
+		loaded, configureLintError := configureLint(graph, location, lintAhead)
+		if configureLintError != nil {
+			return configureLintError
 		}
 		lintConfig = loaded
 		writeSetsLine(accountOutput(os.Stdout), lintConfig)
@@ -976,7 +976,7 @@ func run() error {
 			return formatting.timing(scopedTransform(record.observe(formatTransform(formatter), optionsFingerprintOf(formatter)), scope)),
 				scope.formatCandidates()
 		}
-		fixSummary, fixWalk, lineEndings, err := applyProposedFixes(
+		fixSummary, fixWalk, lineEndings, applyProposedFixesError := applyProposedFixes(
 			ctx, graph, fixFiles, fixRules,
 			formatPlan,
 			writeScope,
@@ -990,14 +990,14 @@ func run() error {
 		if formatter != nil {
 			activeSummary.Formatting = formatting.Total()
 		}
-		if err != nil {
+		if applyProposedFixesError != nil {
 			// The bail condition here is a failure to produce valid output, never a finding. A fixer
 			// that cannot write a parseable file means the edit was malformed and everything after it
 			// is meaningless, so the pipeline stops and says which phases never ran.
 			report.record(phaseFix, outcomeRan, fixDuration, "")
-			report.markRemainingNotReachedFor(phaseFix, err.Error(), unusedRequest)
+			report.markRemainingNotReachedFor(phaseFix, applyProposedFixesError.Error(), unusedRequest)
 			writeRunEnd(report, os.Stdout)
-			return fmt.Errorf("fix: %w", err)
+			return fmt.Errorf("fix: %w", applyProposedFixesError)
 		}
 		// True of the tree and actionable, so a replay keeps it, but it says which run produced it.
 		fmt.Fprintln(accountOutput(provenanceOutput(os.Stdout)), fixSummary)
@@ -1012,8 +1012,8 @@ func run() error {
 
 		// Not writing the record costs the next run a format of files already formatted, never a skip,
 		// so it is a note rather than a failure.
-		if err := record.save(recordUniverse); err != nil {
-			fmt.Fprintf(accountOutput(os.Stderr), "note: the format record could not be written: %v\n", firstLine(err.Error()))
+		if saveError := record.save(recordUniverse); saveError != nil {
+			fmt.Fprintf(accountOutput(os.Stderr), "note: the format record could not be written: %v\n", firstLine(saveError.Error()))
 		}
 
 		// A run that rewrote files must not be replayed. The run cache stats inputs when it records, which
@@ -1089,11 +1089,11 @@ func run() error {
 		// longer exists — which is the same stale-read corruption the edit engine refuses internally,
 		// one level up.
 		if mutate && fixSummary.FilesChanged > 0 && (runTypes || runLint) {
-			rebuiltGraph, rebuildDuration, err := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig, yield.yieldedFiles())
-			if err != nil {
-				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", err), unusedRequest)
+			rebuiltGraph, rebuildDuration, rebuildGraphError := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig, yield.yieldedFiles())
+			if rebuildGraphError != nil {
+				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", rebuildGraphError), unusedRequest)
 				writeRunEnd(report, os.Stdout)
-				return fmt.Errorf("rebuilding the type graph after fixing: %w", err)
+				return fmt.Errorf("rebuilding the type graph after fixing: %w", rebuildGraphError)
 			}
 			// The early check was of the bytes the fixer just replaced. It is retired and left to finish
 			// rather than cancelled: the compiler's whole-program check panics when its context ends part
@@ -1269,9 +1269,9 @@ func run() error {
 			if len(projectFiles) == 0 && !lintScope.Everything && len(flag.Args()) > 0 {
 				return errNamedPathsOutsideProgram(location, flag.Args())
 			}
-			walked, err := graph.Walk(ctx, projectFiles, rules)
-			if err != nil {
-				return fmt.Errorf("running rules: %w", err)
+			walked, walkError := graph.Walk(ctx, projectFiles, rules)
+			if walkError != nil {
+				return fmt.Errorf("running rules: %w", walkError)
 			}
 			result = walked
 			reportForeignCheckers(graph, walked, len(projectFiles))
@@ -1336,9 +1336,9 @@ func run() error {
 				// empty explanation reads as a file with nothing to say.
 				fmt.Printf("\nexplain: %s is not in the program, so there is nothing to explain\n", *explainFile)
 			} else {
-				explanation, err := graph.Explain(ctx, subject, rules)
-				if err != nil {
-					return fmt.Errorf("explaining %s: %w", *explainFile, err)
+				explanation, explainError := graph.Explain(ctx, subject, rules)
+				if explainError != nil {
+					return fmt.Errorf("explaining %s: %w", *explainFile, explainError)
 				}
 				printExplanation(os.Stdout, explanation)
 			}
@@ -1375,9 +1375,9 @@ func run() error {
 			)
 		}
 
-		unusedResult, err := unused_exports.Run(ctx, graph, projectFiles, *unusedDeep)
-		if err != nil {
-			return fmt.Errorf("running the unused report: %w", err)
+		unusedResult, runError := unused_exports.Run(ctx, graph, projectFiles, *unusedDeep)
+		if runError != nil {
+			return fmt.Errorf("running the unused report: %w", runError)
 		}
 		unusedDuration := time.Since(unusedStart)
 
@@ -1423,15 +1423,15 @@ func rebuildGraph(
 	start := time.Now()
 	// The check's stats predate the rewrite. See distrustCheckStats.
 	distrustCheckStats()
-	rebuilt, err := program.Build(program.Options{
+	rebuilt, buildError := program.Build(program.Options{
 		ConfigFileName:   configFileName,
 		CurrentDirectory: directory,
 		SingleThreaded:   singleThreaded,
 		ContentPack:      openContentPack(directory),
 		Yielded:          yieldedFiles,
 	})
-	if err != nil {
-		return nil, time.Since(start), err
+	if buildError != nil {
+		return nil, time.Since(start), buildError
 	}
 	rebuilt.LintConfig = lintConfig
 	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, directory))
@@ -1480,8 +1480,8 @@ func configureLint(graph *program.Graph, location projectLocation, ahead *lintCo
 	for _, projectFile := range wholeProgramFiles {
 		projectFileNames = append(projectFileNames, projectFile.FileName().AsString())
 	}
-	if err := lintConfig.ValidateSelectors(projectFileNames); err != nil {
-		return nil, fmt.Errorf("validating the lint config: %w", err)
+	if validateSelectorsError := lintConfig.ValidateSelectors(projectFileNames); validateSelectorsError != nil {
+		return nil, fmt.Errorf("validating the lint config: %w", validateSelectorsError)
 	}
 	base := optionsBase(lintConfig, location.Root)
 	if ahead != nil {
@@ -1490,8 +1490,8 @@ func configureLint(graph *program.Graph, location projectLocation, ahead *lintCo
 		}
 		graph.RuleOptions = ahead.options
 	} else {
-		if err := registry.CheckSettings(base); err != nil {
-			return nil, fmt.Errorf("validating the lint config: %w", err)
+		if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
+			return nil, fmt.Errorf("validating the lint config: %w", checkSettingsError)
 		}
 		graph.RuleOptions = registry.OptionsAt(base)
 	}
@@ -1823,8 +1823,8 @@ func registeredRuleNames() []string {
 // so a run with an unreadable base is never recorded or replayed. It only keeps the callers here,
 // which name inputs, from naming none.
 func lintConfigSources(path string) []string {
-	sources, err := configuration.SourcesOf(path)
-	if err != nil || len(sources) == 0 {
+	sources, sourcesOfError := configuration.SourcesOf(path)
+	if sourcesOfError != nil || len(sources) == 0 {
 		return []string{path}
 	}
 	return sources

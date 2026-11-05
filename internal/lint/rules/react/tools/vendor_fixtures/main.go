@@ -158,9 +158,9 @@ func main() {
 // errorFixtureNames returns the error-named inputs, relative to the fixture root.
 func errorFixtureNames(sha string) ([]string, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/facebook/react/git/trees/%s?recursive=1", sha)
-	body, err := get(url)
-	if err != nil {
-		return nil, err
+	body, getError := get(url)
+	if getError != nil {
+		return nil, getError
 	}
 	defer body.Close()
 
@@ -171,8 +171,8 @@ func errorFixtureNames(sha string) ([]string, error) {
 			Type string `json:"type"`
 		} `json:"tree"`
 	}
-	if err := json.NewDecoder(body).Decode(&tree); err != nil {
-		return nil, err
+	if decodeError := json.NewDecoder(body).Decode(&tree); decodeError != nil {
+		return nil, decodeError
 	}
 
 	// The contents API silently repeats pages when it caps; the tree API says so instead. A
@@ -207,9 +207,9 @@ func errorFixtureNames(sha string) ([]string, error) {
 // and an expectation's error block is in its pair's. Neither question can be answered from a list of
 // paths, which is why this population was invisible to a tool built to filter on names.
 func cleanFixtureNames(sha string) ([]string, error) {
-	contents, err := fixtureContents(sha)
-	if err != nil {
-		return nil, err
+	contents, fixtureContentsError := fixtureContents(sha)
+	if fixtureContentsError != nil {
+		return nil, fixtureContentsError
 	}
 
 	var names []string
@@ -305,9 +305,9 @@ func writeFixtures(sha string, names []string, out string) (int, error) {
 		wanted[strings.TrimSuffix(name, filepath.Ext(name))+".expect.md"] = true
 	}
 
-	contents, err := fixtureContents(sha)
-	if err != nil {
-		return 0, err
+	contents, fixtureContentsError := fixtureContents(sha)
+	if fixtureContentsError != nil {
+		return 0, fixtureContentsError
 	}
 
 	found := map[string]bool{}
@@ -318,11 +318,11 @@ func writeFixtures(sha string, names []string, out string) (int, error) {
 			continue
 		}
 		destination := filepath.Join(out, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
-			return written, err
+		if createDirectoryError := os.MkdirAll(filepath.Dir(destination), 0o755); createDirectoryError != nil {
+			return written, createDirectoryError
 		}
-		if err := os.WriteFile(destination, file, 0o644); err != nil {
-			return written, err
+		if writeError := os.WriteFile(destination, file, 0o644); writeError != nil {
+			return written, writeError
 		}
 		found[name] = true
 		written++

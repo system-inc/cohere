@@ -46,8 +46,8 @@ func TestDispatcherPackageShipsTheSettingsSchemas(test *testing.T) {
 	var manifest struct {
 		Files []string `json:"files"`
 	}
-	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(manifestBytes, &manifest); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if !slices.Contains(manifest.Files, SchemaDirectoryName+"/") {
 		test.Fatalf("the dispatcher's files are %v, so npm publish would leave the schemas out", manifest.Files)
@@ -77,19 +77,19 @@ func TestDispatcherPackageRefusesASchemaThatValidatesNothing(test *testing.T) {
 			}
 			broken := filepath.Join(module, SchemaDirectoryName, SettingsSchemaFileNames[len(SettingsSchemaFileNames)-1])
 			if testCase.contents == nil {
-				if err := os.Remove(broken); err != nil {
-					test.Fatal(err)
+				if removeError := os.Remove(broken); removeError != nil {
+					test.Fatal(removeError)
 				}
 			} else {
 				writeFile(test, broken, *testCase.contents)
 			}
 
-			_, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, placeholderChecksums)
-			if err == nil {
+			_, buildDispatcherPackageError := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, placeholderChecksums)
+			if buildDispatcherPackageError == nil {
 				test.Fatal("the dispatcher was staged with a schema that validates nothing")
 			}
-			if !strings.Contains(err.Error(), testCase.says) {
-				test.Fatalf("refused, but without saying %q: %v", testCase.says, err)
+			if !strings.Contains(buildDispatcherPackageError.Error(), testCase.says) {
+				test.Fatalf("refused, but without saying %q: %v", testCase.says, buildDispatcherPackageError)
 			}
 		})
 	}

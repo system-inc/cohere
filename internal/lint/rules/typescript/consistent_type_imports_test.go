@@ -32,9 +32,9 @@ func decodeConsistentTypeImportsFixtureOptions(test *testing.T, payload string) 
 	if payload == "" {
 		return DefaultConsistentTypeImportsOptions()
 	}
-	decoded, err := DecodeConsistentTypeImportsOptions(json.RawMessage(payload))
-	if err != nil {
-		test.Fatalf("decoding fixture options %s: %v", payload, err)
+	decoded, decodeConsistentTypeImportsOptionsError := DecodeConsistentTypeImportsOptions(json.RawMessage(payload))
+	if decodeConsistentTypeImportsOptionsError != nil {
+		test.Fatalf("decoding fixture options %s: %v", payload, decodeConsistentTypeImportsOptionsError)
 	}
 	return decoded
 }
@@ -1060,9 +1060,9 @@ func TestConsistentTypeImportsDecoderDefaults(test *testing.T) {
 			want:    defaults,
 		},
 	} {
-		decoded, err := DecodeConsistentTypeImportsOptions([]byte(testCase.payload))
-		if err != nil {
-			test.Fatalf("decoding %s: %v", testCase.payload, err)
+		decoded, decodeConsistentTypeImportsOptionsError := DecodeConsistentTypeImportsOptions([]byte(testCase.payload))
+		if decodeConsistentTypeImportsOptionsError != nil {
+			test.Fatalf("decoding %s: %v", testCase.payload, decodeConsistentTypeImportsOptionsError)
 		}
 		if decoded != any(testCase.want) {
 			test.Errorf("decoding %s gave %+v, want %+v", testCase.payload, decoded, testCase.want)
@@ -1146,8 +1146,8 @@ func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(test *testing.T) 
 			`"moduleDetection": "force", "types": [], "jsx": "react", "jsxFactory": "h.createElement", ` +
 			`"jsxFragmentFactory": "Fragment"}, ` +
 			`"include": ["**/*.ts", "**/*.tsx"]}`
-		if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); err != nil {
-			test.Fatalf("writing the tsconfig: %v", err)
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	}
 	cases := []struct {

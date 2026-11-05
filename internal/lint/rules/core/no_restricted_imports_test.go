@@ -392,9 +392,9 @@ func TestNoRestrictedImportsIsSilentWithNoConfiguration(test *testing.T) {
 func TestNoRestrictedImportsEmptyObjectRestrictsNothing(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeNoRestrictedImportsOptions([]byte(`[{}]`))
-	if err != nil {
-		test.Fatalf("decoding [{}]: %v", err)
+	decoded, decodeNoRestrictedImportsOptionsError := DecodeNoRestrictedImportsOptions([]byte(`[{}]`))
+	if decodeNoRestrictedImportsOptionsError != nil {
+		test.Fatalf("decoding [{}]: %v", decodeNoRestrictedImportsOptionsError)
 	}
 	result := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
 		`import a from "foo"; import b from "undefined"; import c from "";`, decoded)
@@ -481,12 +481,12 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(test *testing.T) {
 		{"a path object with no name, which upstream's schema refuses", `[{"message":"nope"}]`, true},
 	}
 	for _, testCase := range cases {
-		_, err := DecodeNoRestrictedImportsOptions([]byte(testCase.configured))
-		if testCase.wantError && err == nil {
+		_, decodeNoRestrictedImportsOptionsError := DecodeNoRestrictedImportsOptions([]byte(testCase.configured))
+		if testCase.wantError && decodeNoRestrictedImportsOptionsError == nil {
 			test.Errorf("%s: expected the decoder to refuse %s", testCase.name, testCase.configured)
 		}
-		if !testCase.wantError && err != nil {
-			test.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, err)
+		if !testCase.wantError && decodeNoRestrictedImportsOptionsError != nil {
+			test.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, decodeNoRestrictedImportsOptionsError)
 		}
 	}
 }
@@ -500,9 +500,9 @@ func TestNoRestrictedImportsRejectsContradictoryConfiguration(test *testing.T) {
 func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeNoRestrictedImportsOptions([]byte(`[{"patterns":["foo/*","!foo/bar"]}]`))
-	if err != nil {
-		test.Fatalf("could not decode: %v", err)
+	decoded, decodeNoRestrictedImportsOptionsError := DecodeNoRestrictedImportsOptions([]byte(`[{"patterns":["foo/*","!foo/bar"]}]`))
+	if decodeNoRestrictedImportsOptionsError != nil {
+		test.Fatalf("could not decode: %v", decodeNoRestrictedImportsOptionsError)
 	}
 	options, ok := decoded.(NoRestrictedImportsOptions)
 	if !ok {

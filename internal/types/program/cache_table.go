@@ -323,11 +323,11 @@ func CacheTableInvocation(arguments []string) string {
 func encodeCacheTableFile(section string, body any, identity CacheTableIdentity) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
-	if err := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity, Section: section}); err != nil {
-		return nil, fmt.Errorf("encoding the %s file's header: %w", section, err)
+	if encodeError := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity, Section: section}); encodeError != nil {
+		return nil, fmt.Errorf("encoding the %s file's header: %w", section, encodeError)
 	}
-	if err := encoder.Encode(body); err != nil {
-		return nil, fmt.Errorf("encoding the %s file: %w", section, err)
+	if encodeError := encoder.Encode(body); encodeError != nil {
+		return nil, fmt.Errorf("encoding the %s file: %w", section, encodeError)
 	}
 	return buffer.Bytes(), nil
 }
@@ -345,8 +345,8 @@ func decodeCacheTableFile(contents []byte, section string, identity CacheTableId
 	decoder := gob.NewDecoder(reader)
 
 	var header cacheTableHeader
-	if err := decoder.Decode(&header); err != nil {
-		return fmt.Errorf("unreadable header: %v", err)
+	if decodeError := decoder.Decode(&header); decodeError != nil {
+		return fmt.Errorf("unreadable header: %v", decodeError)
 	}
 	if header.Magic != cacheTableMagic {
 		return errors.New("not a cache table file")
@@ -367,8 +367,8 @@ func decodeCacheTableFile(contents []byte, section string, identity CacheTableId
 		otherCommit = fmt.Errorf("%w (%s, this is %s)", errWrittenByAnotherCommit, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
 	}
 
-	if err := decoder.Decode(body); err != nil {
-		return fmt.Errorf("unreadable body: %v", err)
+	if decodeError := decoder.Decode(body); decodeError != nil {
+		return fmt.Errorf("unreadable body: %v", decodeError)
 	}
 	// gob stops at the end of the value it was asked for, so bytes after it would otherwise go unread. A
 	// file longer than its contents is a file something else wrote into.
@@ -520,9 +520,9 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 //
 // The single table.gob of earlier formats is removed here, unread.
 func ReadCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) (*CacheTable, error) {
-	table, err := readCacheTable(directory, identity, sections)
+	table, readCacheTableError := readCacheTable(directory, identity, sections)
 	table.spell(anchor)
-	return table, err
+	return table, readCacheTableError
 }
 
 func readCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections) (*CacheTable, error) {
@@ -584,10 +584,10 @@ func readCacheTable(directory string, identity CacheTableIdentity, sections Cach
 	if sections.Findings {
 		var wire *lintCacheWire
 		if read(cacheTableFile(cacheTableFindingsSection), cacheTableFindingsSection, &wire) && wire != nil {
-			findings, err := wire.cache()
-			if err != nil {
+			findings, cacheError := wire.cache()
+			if cacheError != nil {
 				onlyAnotherCommit = false
-				dropped = append(dropped, fmt.Sprintf("%s (%v)", cacheTableFile(cacheTableFindingsSection), err))
+				dropped = append(dropped, fmt.Sprintf("%s (%v)", cacheTableFile(cacheTableFindingsSection), cacheError))
 			} else {
 				table.Findings = findings
 			}
@@ -641,13 +641,13 @@ var beforeCacheTableRename func(temporaryName string)
 // need not be: each carries its own proof, and the table's lock orders whole writes against reads.
 func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) error {
 	table = table.anchored(anchor)
-	if err := os.MkdirAll(directory, 0o755); err != nil {
-		return fmt.Errorf("creating %s: %w", directory, err)
+	if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
+		return fmt.Errorf("creating %s: %w", directory, createDirectoryError)
 	}
 	write := func(name string, section string, body any) error {
-		encoded, err := encodeCacheTableFile(section, body, identity)
-		if err != nil {
-			return err
+		encoded, encodeCacheTableFileError := encodeCacheTableFile(section, body, identity)
+		if encodeCacheTableFileError != nil {
+			return encodeCacheTableFileError
 		}
 		return writeCacheTableFile(filepath.Join(directory, name), encoded)
 	}
@@ -763,9 +763,9 @@ func (table *CacheTable) mapPaths(path func(string) string) *CacheTable {
 // writeCacheTableFile writes one file through a temporary beside it and a rename.
 func writeCacheTableFile(path string, encoded []byte) error {
 	directory := filepath.Dir(path)
-	temporary, err := os.CreateTemp(directory, ".cachetable-*")
-	if err != nil {
-		return fmt.Errorf("creating a temporary in %s: %w", directory, err)
+	temporary, temporaryFileError := os.CreateTemp(directory, ".cachetable-*")
+	if temporaryFileError != nil {
+		return fmt.Errorf("creating a temporary in %s: %w", directory, temporaryFileError)
 	}
 	temporaryName := temporary.Name()
 	defer func() {
@@ -773,19 +773,19 @@ func writeCacheTableFile(path string, encoded []byte) error {
 			os.Remove(temporaryName)
 		}
 	}()
-	if _, err := temporary.Write(encoded); err != nil {
+	if _, writeError := temporary.Write(encoded); writeError != nil {
 		temporary.Close()
-		return fmt.Errorf("writing %s: %w", temporaryName, err)
+		return fmt.Errorf("writing %s: %w", temporaryName, writeError)
 	}
-	if err := temporary.Close(); err != nil {
-		return fmt.Errorf("closing %s: %w", temporaryName, err)
+	if closeError := temporary.Close(); closeError != nil {
+		return fmt.Errorf("closing %s: %w", temporaryName, closeError)
 	}
 	if beforeCacheTableRename != nil {
 		beforeCacheTableRename(temporaryName)
 	}
 	// replace.File, which retries through Windows refusing the rename while another run reads the file.
-	if err := replace.File(temporaryName, path); err != nil {
-		return fmt.Errorf("renaming %s into place: %w", filepath.Base(path), err)
+	if fileError := replace.File(temporaryName, path); fileError != nil {
+		return fmt.Errorf("renaming %s into place: %w", filepath.Base(path), fileError)
 	}
 	temporaryName = ""
 	return nil

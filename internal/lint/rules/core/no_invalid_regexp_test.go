@@ -153,9 +153,9 @@ func TestNoInvalidRegexpHonorsAllowConstructorFlags(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			options, err := DecodeNoInvalidRegexpOptions([]byte(testCase.options))
-			if err != nil {
-				test.Fatalf("decoding %s: %v", testCase.options, err)
+			options, decodeNoInvalidRegexpOptionsError := DecodeNoInvalidRegexpOptions([]byte(testCase.options))
+			if decodeNoInvalidRegexpOptionsError != nil {
+				test.Fatalf("decoding %s: %v", testCase.options, decodeNoInvalidRegexpOptionsError)
 			}
 			result := rule_testing.RunTypedWithOptions(test, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText, options)
 			if testCase.reports {
@@ -187,12 +187,12 @@ func TestNoInvalidRegexpDecodesOnlyUpstreamsSchema(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			_, err := DecodeNoInvalidRegexpOptions([]byte(testCase.raw))
-			if testCase.refused && err == nil {
+			_, decodeNoInvalidRegexpOptionsError := DecodeNoInvalidRegexpOptions([]byte(testCase.raw))
+			if testCase.refused && decodeNoInvalidRegexpOptionsError == nil {
 				test.Errorf("%s decoded, and upstream's schema refuses it", testCase.raw)
 			}
-			if !testCase.refused && err != nil {
-				test.Errorf("%s was refused, and upstream's schema accepts it: %v", testCase.raw, err)
+			if !testCase.refused && decodeNoInvalidRegexpOptionsError != nil {
+				test.Errorf("%s was refused, and upstream's schema accepts it: %v", testCase.raw, decodeNoInvalidRegexpOptionsError)
 			}
 		})
 	}

@@ -73,14 +73,14 @@ func loadFixtures(test *testing.T) fixtureCorpus {
 	test.Helper()
 
 	path := filepath.Join("testdata", "gate_fixtures.json")
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		test.Fatalf("reading %s: %v", path, err)
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatalf("reading %s: %v", path, readError)
 	}
 
 	var corpus fixtureCorpus
-	if err := json.Unmarshal(contents, &corpus); err != nil {
-		test.Fatalf("parsing %s: %v", path, err)
+	if decodeError := json.Unmarshal(contents, &corpus); decodeError != nil {
+		test.Fatalf("parsing %s: %v", path, decodeError)
 	}
 
 	// A fixture file that loaded nothing would let every assertion below pass for the wrong reason.

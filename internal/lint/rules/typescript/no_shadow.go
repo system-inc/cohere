@@ -76,8 +76,8 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 		return options, nil
 	}
 	var wire noShadowWire
-	if err := rule.UnmarshalOptions(raw, &wire); err != nil {
-		return options, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &wire); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
 	}
 	options.Allow = wire.Allow
 	if wire.BuiltinGlobals != nil {

@@ -33,15 +33,15 @@ func newOptionsOracle(test *testing.T) *optionsOracle {
 }
 
 func (oracle *optionsOracle) load() {
-	bundles, err := prettier.Bundles()
-	if err != nil {
-		oracle.err = err
+	bundles, bundlesError := prettier.Bundles()
+	if bundlesError != nil {
+		oracle.err = bundlesError
 		return
 	}
 	runtime := goja.New()
 	for _, name := range prettier.BundleFiles {
-		if _, err := runtime.RunString(string(bundles.Files[name])); err != nil {
-			oracle.err = fmt.Errorf("evaluating %s: %w", name, err)
+		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
+			oracle.err = fmt.Errorf("evaluating %s: %w", name, runStringError)
 			return
 		}
 	}
@@ -71,13 +71,13 @@ func (oracle *optionsOracle) formatLive(text string, filePath string, parser str
 	oracle.runtime.Set("__bracketSpacing", options.BracketSpacing)
 	oracle.runtime.Set("__trailingComma", options.TrailingComma)
 	oracle.runtime.Set("__endOfLine", options.EndOfLine)
-	value, err := oracle.runtime.RunString(`prettier.format(__source, {
+	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
 		filepath: __filePath, parser: __parser, plugins: prettierPlugins, proseWrap: __proseWrap,
 		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,
 		bracketSpacing: __bracketSpacing, trailingComma: __trailingComma, endOfLine: __endOfLine,
 	})`)
-	if err != nil {
-		return "", err
+	if runStringError != nil {
+		return "", runStringError
 	}
 	// prettier.format returns a promise; each RunString drains goja's job queue, so pump until settled.
 	promise, isPromise := value.Export().(*goja.Promise)
@@ -85,8 +85,8 @@ func (oracle *optionsOracle) formatLive(text string, filePath string, parser str
 		return value.String(), nil
 	}
 	for pump := 0; pump < 100000 && promise.State() == goja.PromiseStatePending; pump++ {
-		if _, err := oracle.runtime.RunString("0"); err != nil {
-			return "", err
+		if _, runStringError := oracle.runtime.RunString("0"); runStringError != nil {
+			return "", runStringError
 		}
 	}
 	if promise.State() != goja.PromiseStateFulfilled {
@@ -128,10 +128,10 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 				}
 				compared++
 				// The full stack: the Go parser and the printer, from the text.
-				if fullStack, err := formatFullStack("fixture.yaml", input, options, proseWrap, nil); err != nil || fullStack != expected {
+				if fullStack, formatFullStackError := formatFullStack("fixture.yaml", input, options, proseWrap, nil); formatFullStackError != nil || fullStack != expected {
 					fullStackFailures++
-					if err != nil {
-						test.Errorf("%s, variant %d, %q: Format: %v", proseWrap, variantIndex, input, err)
+					if formatFullStackError != nil {
+						test.Errorf("%s, variant %d, %q: Format: %v", proseWrap, variantIndex, input, formatFullStackError)
 					} else {
 						test.Errorf("%s, variant %d, %q: Format: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, fullStack))
 					}
@@ -159,9 +159,9 @@ func jsonTextToDoc(test *testing.T, oracle *optionsOracle, options formatoptions
 		if parser != "json" {
 			test.Errorf("the YAML printer asked for parser %q", parser)
 		}
-		formatted, err := oracle.format(text, "embedded.json", "json", options, "preserve")
-		if err != nil {
-			return nil, err
+		formatted, formatError := oracle.format(text, "embedded.json", "json", options, "preserve")
+		if formatError != nil {
+			return nil, formatError
 		}
 		return doc.Text(strings.TrimSuffix(formatted, "\n")), nil
 	}
@@ -192,8 +192,8 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 					}
 					continue
 				}
-				if fullStack, err := formatFullStack(fileName, input, options, "preserve", textToDoc); err != nil {
-					test.Errorf("%s, %q: Format: %v", fileName, input, err)
+				if fullStack, formatFullStackError := formatFullStack(fileName, input, options, "preserve", textToDoc); formatFullStackError != nil {
+					test.Errorf("%s, %q: Format: %v", fileName, input, formatFullStackError)
 				} else if fullStack != expected {
 					test.Errorf("%s, %q: Format: %s", fileName, input, differential.FirstDifference(expected, fullStack))
 				}
@@ -215,9 +215,9 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 func TestPrettierRcWithoutTextToDocPrintsYAML(test *testing.T) {
 	test.Parallel()
 	texts, _, trees := parseInputs(test, []string{`{"a":1}`})
-	actual, err := PrintFile(".prettierrc", trees[0].root, texts[0], formatoptions.Default(), nil)
-	if err != nil {
-		test.Fatal(err)
+	actual, printFileError := PrintFile(".prettierrc", trees[0].root, texts[0], formatoptions.Default(), nil)
+	if printFileError != nil {
+		test.Fatal(printFileError)
 	}
 	if actual != "{ 'a': 1 }\n" {
 		test.Fatalf("got %q", actual)

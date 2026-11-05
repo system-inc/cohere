@@ -52,13 +52,13 @@ type descriptorFixtures struct {
 
 func loadDescriptorFixtures(test *testing.T, name string) *descriptorFixtures {
 	test.Helper()
-	raw, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		test.Fatalf("reading fixtures: %v", err)
+	raw, readError := os.ReadFile(filepath.Join("testdata", name))
+	if readError != nil {
+		test.Fatalf("reading fixtures: %v", readError)
 	}
 	fixtures := &descriptorFixtures{}
-	if err := json.Unmarshal(raw, fixtures); err != nil {
-		test.Fatalf("parsing fixtures: %v", err)
+	if decodeError := json.Unmarshal(raw, fixtures); decodeError != nil {
+		test.Fatalf("parsing fixtures: %v", decodeError)
 	}
 	if len(fixtures.Cases) == 0 {
 		test.Fatal("fixture corpus is empty")

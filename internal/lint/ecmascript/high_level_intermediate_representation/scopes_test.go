@@ -463,7 +463,7 @@ func corpusScopeStats(test *testing.T, limit int) (functions, scopes, members in
 	test.Helper()
 
 	var files []string
-	err := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
+	walkError := filepath.Walk(corpusRoot(test), func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return nil
 		}
@@ -472,8 +472,8 @@ func corpusScopeStats(test *testing.T, limit int) (functions, scopes, members in
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatalf("walking the corpus: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking the corpus: %v", walkError)
 	}
 	sort.Strings(files)
 	if len(files) > limit {
@@ -857,8 +857,8 @@ func TestScopeMatchesTheDisjointSetPartition(test *testing.T) {
 
 	compared := 0
 	for _, path := range files {
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)

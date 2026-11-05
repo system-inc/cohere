@@ -1562,9 +1562,9 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 
 	test.Run("no options means the default list", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions(nil)
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions(nil)
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
 		options := decoded.(ForbidPropTypesOptions)
 		if options.Forbid != nil {
@@ -1577,9 +1577,9 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 
 	test.Run("an empty object means the default list", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{}`))
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
 		if got := decoded.(ForbidPropTypesOptions).forbiddenTypes(); len(got) != 3 {
 			test.Errorf("effective list = %v, wanted the three defaults", got)
@@ -1588,9 +1588,9 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 
 	test.Run("an explicitly empty list forbids nothing", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"forbid":[]}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{"forbid":[]}`))
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
 		options := decoded.(ForbidPropTypesOptions)
 		if options.Forbid == nil {
@@ -1603,9 +1603,9 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 
 	test.Run("a custom list replaces the defaults", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"forbid":["string"]}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{"forbid":["string"]}`))
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
 		got := decoded.(ForbidPropTypesOptions).forbiddenTypes()
 		if len(got) != 1 || got[0] != "string" {
@@ -1615,9 +1615,9 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 
 	test.Run("the two context flags decode", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeForbidPropTypesOptions([]byte(`{"checkContextTypes":true,"checkChildContextTypes":true}`))
-		if err != nil {
-			test.Fatalf("unexpected error: %v", err)
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{"checkContextTypes":true,"checkChildContextTypes":true}`))
+		if decodeForbidPropertyTypesOptionsError != nil {
+			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}
 		options := decoded.(ForbidPropTypesOptions)
 		if !options.CheckContextTypes || !options.CheckChildContextTypes {

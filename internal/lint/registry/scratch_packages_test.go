@@ -31,9 +31,9 @@ var scratchPackageSuffixes = []string{"iso", "probe"}
 // somebody makes on purpose rather than a guard quietly widening.
 func TestNoScratchPackagesRemain(test *testing.T) {
 	test.Parallel()
-	entries, err := filepath.Glob("../rules/*")
-	if err != nil {
-		test.Fatalf("globbing rule packages: %v", err)
+	entries, globError := filepath.Glob("../rules/*")
+	if globError != nil {
+		test.Fatalf("globbing rule packages: %v", globError)
 	}
 	if len(entries) == 0 {
 		// A sweep with nothing to look at passes for the wrong reason, which is the same shape as

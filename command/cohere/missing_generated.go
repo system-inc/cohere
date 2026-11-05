@@ -37,9 +37,9 @@ const missingGeneratedRule = "missing-generated-file"
 // git there. Outside root, or when root's ignore files cannot be read, nothing is, so the cause is never
 // claimed on a guess.
 func generatedOutputUnder(root string) func(target string) bool {
-	matcher, err := gitignore.New(root)
+	matcher, newGitignoreError := gitignore.New(root)
 	return func(target string) bool {
-		if err != nil {
+		if newGitignoreError != nil {
 			return false
 		}
 		relative, relativeError := filepath.Rel(root, filepath.FromSlash(target))
@@ -120,7 +120,7 @@ func missingGeneratedTargets(missing []program.MissingInput, root string) []stri
 	var targets []string
 	for _, input := range missing {
 		target := input.Target
-		if relative, err := filepath.Rel(root, filepath.FromSlash(target)); err == nil {
+		if relative, relativePathError := filepath.Rel(root, filepath.FromSlash(target)); relativePathError == nil {
 			target = filepath.ToSlash(relative)
 		}
 		if !seen[target] {

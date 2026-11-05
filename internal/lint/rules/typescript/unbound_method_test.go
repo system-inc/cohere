@@ -37,9 +37,9 @@ func asTheTypedUnboundMethodHarnessWroteIt(text string) string {
 // that dropped it entirely would still satisfy the other two hundred and ten rows.
 func decodeUnboundMethodOptionsForTest(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeUnboundMethodOptions(json.RawMessage(raw))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", raw, err)
+	decoded, decodeUnboundMethodOptionsError := DecodeUnboundMethodOptions(json.RawMessage(raw))
+	if decodeUnboundMethodOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", raw, decodeUnboundMethodOptionsError)
 	}
 	return decoded
 }

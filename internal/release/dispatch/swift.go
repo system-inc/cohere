@@ -84,7 +84,7 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool,
 	}
 
 	binaryPath := paths.SwiftEngineBinaryPath(hash)
-	if _, err := os.Stat(binaryPath); err == nil {
+	if _, statError := os.Stat(binaryPath); statError == nil {
 		return binaryPath, false, nil
 	}
 
@@ -100,9 +100,9 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool,
 // engine cannot be built and could not read the compiler's diagnostics if it were, so there is no
 // engine to fall back to: only a run that checks nothing.
 func swiftToolchain() (string, error) {
-	output, err := exec.Command("swift", "--version").Output()
-	if err != nil {
-		return "", fmt.Errorf("no Swift toolchain answered `swift --version` (%w), so the Swift engine cannot be built and nothing was checked", err)
+	output, outputError := exec.Command("swift", "--version").Output()
+	if outputError != nil {
+		return "", fmt.Errorf("no Swift toolchain answered `swift --version` (%w), so the Swift engine cannot be built and nothing was checked", outputError)
 	}
 	identity := strings.Join(strings.Fields(string(output)), " ")
 	if identity == "" {
@@ -207,8 +207,8 @@ func runBuildTool(command *exec.Cmd) error {
 func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 	startInOwnGroup(command)
 	command.WaitDelay = buildToolWaitDelay
-	if err := command.Start(); err != nil {
-		return err
+	if startError := command.Start(); startError != nil {
+		return startError
 	}
 	done := make(chan error, 1)
 	go func() { done <- command.Wait() }()
@@ -237,8 +237,8 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 // Copied rather than linked, because the next build replaces the product in place, and a link would
 // turn every hash-named binary into whichever engine was built last.
 func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory string, binaryPath string) error {
-	if err := os.MkdirAll(filepath.Dir(binaryPath), 0o755); err != nil {
-		return fmt.Errorf("creating the binary cache directory: %w", err)
+	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
+		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}
 
 	Report.Step("cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)",
@@ -264,19 +264,19 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 	if stream := Report.ToolOutput(); stream != nil {
 		build.Stdout, build.Stderr = stream, stream
 	}
-	if err := runBuildTool(build); err != nil {
-		return fmt.Errorf("building the Swift engine (swift %s): %w%s", strings.Join(arguments, " "), err, lastLines(kept.String(), 40))
+	if runBuildToolError := runBuildTool(build); runBuildToolError != nil {
+		return fmt.Errorf("building the Swift engine (swift %s): %w%s", strings.Join(arguments, " "), runBuildToolError, lastLines(kept.String(), 40))
 	}
 
-	binPath, err := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
-	if err != nil {
-		return fmt.Errorf("asking SwiftPM where it put the Swift engine: %w", err)
+	binPath, outputError := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
+	if outputError != nil {
+		return fmt.Errorf("asking SwiftPM where it put the Swift engine: %w", outputError)
 	}
 	product := filepath.Join(strings.TrimSpace(string(binPath)), "cohere-swift")
 
 	// The build said it worked; the file is what gets run. The same gap build() closes for cohere.
-	if err := copyExecutable(product, binaryPath); err != nil {
-		return fmt.Errorf("swift build reported success but the engine could not be taken from %s: %w", product, err)
+	if copyExecutableError := copyExecutable(product, binaryPath); copyExecutableError != nil {
+		return fmt.Errorf("swift build reported success but the engine could not be taken from %s: %w", product, copyExecutableError)
 	}
 	return nil
 }
@@ -298,16 +298,16 @@ func copyExecutable(source string, destination string) error {
 	// does nothing.
 	defer os.Remove(temporary.Name())
 
-	if _, err := io.Copy(temporary, input); err != nil {
+	if _, copyError := io.Copy(temporary, input); copyError != nil {
 		temporary.Close()
-		return err
+		return copyError
 	}
-	if err := temporary.Chmod(0o755); err != nil {
+	if chmodError := temporary.Chmod(0o755); chmodError != nil {
 		temporary.Close()
-		return err
+		return chmodError
 	}
-	if err := temporary.Close(); err != nil {
-		return err
+	if closeError := temporary.Close(); closeError != nil {
+		return closeError
 	}
 	return os.Rename(temporary.Name(), destination)
 }

@@ -47,12 +47,12 @@ func TestCacheTableRoundTripsEverySection(test *testing.T) {
 	original := sampleCacheTable()
 	original.Signatures = map[string]program.SignatureEntry{"/project/source/a.ts": {Version: "1", Signature: "s", Syntax: "x"}}
 	original.Types = &program.TypesSection{Version: 2, GlobalsClean: true}
-	if err := program.WriteCacheTable(directory, original, testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); err != nil {
-		test.Fatalf("writing: %v", err)
+	if writeCacheTableError := program.WriteCacheTable(directory, original, testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); writeCacheTableError != nil {
+		test.Fatalf("writing: %v", writeCacheTableError)
 	}
-	decoded, err := readEverySection(test, directory, testIdentity)
-	if err != nil {
-		test.Fatalf("reading: %v", err)
+	decoded, readEverySectionError := readEverySection(test, directory, testIdentity)
+	if readEverySectionError != nil {
+		test.Fatalf("reading: %v", readEverySectionError)
 	}
 
 	run := decoded.Runs["--no-fix"]
@@ -89,20 +89,20 @@ func TestCacheTableRoundTripsEverySection(test *testing.T) {
 func TestAWriteReplacesOnlyTheSectionsItNames(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
-	if err := program.WriteCacheTable(directory, sampleCacheTable(), testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); err != nil {
-		test.Fatal(err)
+	if writeCacheTableError := program.WriteCacheTable(directory, sampleCacheTable(), testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); writeCacheTableError != nil {
+		test.Fatal(writeCacheTableError)
 	}
 	snapshot := func() map[string]string {
 		test.Helper()
 		files := map[string]string{}
-		entries, err := os.ReadDir(directory)
-		if err != nil {
-			test.Fatal(err)
+		entries, readDirectoryError := os.ReadDir(directory)
+		if readDirectoryError != nil {
+			test.Fatal(readDirectoryError)
 		}
 		for _, entry := range entries {
-			contents, err := os.ReadFile(filepath.Join(directory, entry.Name()))
-			if err != nil {
-				test.Fatal(err)
+			contents, readError := os.ReadFile(filepath.Join(directory, entry.Name()))
+			if readError != nil {
+				test.Fatal(readError)
 			}
 			files[entry.Name()] = string(contents)
 		}
@@ -111,8 +111,8 @@ func TestAWriteReplacesOnlyTheSectionsItNames(test *testing.T) {
 	before := snapshot()
 
 	formatOnly := &program.CacheTable{Formatted: &program.FormatSection{Key: "another-key"}}
-	if err := program.WriteCacheTable(directory, formatOnly, testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); err != nil {
-		test.Fatal(err)
+	if writeCacheTableError := program.WriteCacheTable(directory, formatOnly, testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); writeCacheTableError != nil {
+		test.Fatal(writeCacheTableError)
 	}
 	after := snapshot()
 	if len(after) != len(before) {
@@ -127,10 +127,10 @@ func TestAWriteReplacesOnlyTheSectionsItNames(test *testing.T) {
 	if len(changed) != 1 || changed[0] != "format.gob" {
 		test.Errorf("writing the format record alone changed %v, want only format.gob", changed)
 	}
-	read, err := readEverySection(test, directory, testIdentity)
-	if err != nil || read.Formatted.Key != "another-key" || read.Runs["--no-fix"] == nil || read.Findings == nil {
+	read, readEverySectionError := readEverySection(test, directory, testIdentity)
+	if readEverySectionError != nil || read.Formatted.Key != "another-key" || read.Runs["--no-fix"] == nil || read.Findings == nil {
 		test.Errorf("after writing the format record alone: format %+v, run %v, findings %v, error %v",
-			read.Formatted, read.Runs["--no-fix"] != nil, read.Findings != nil, err)
+			read.Formatted, read.Runs["--no-fix"] != nil, read.Findings != nil, readEverySectionError)
 	}
 }
 
@@ -140,12 +140,12 @@ func TestAWriteReplacesOnlyTheSectionsItNames(test *testing.T) {
 func TestCacheTableDiscardsWhatItCannotTrust(test *testing.T) {
 	test.Parallel()
 	source := test.TempDir()
-	if err := program.WriteCacheTable(source, sampleCacheTable(), testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); err != nil {
-		test.Fatalf("writing: %v", err)
+	if writeCacheTableError := program.WriteCacheTable(source, sampleCacheTable(), testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); writeCacheTableError != nil {
+		test.Fatalf("writing: %v", writeCacheTableError)
 	}
-	valid, err := os.ReadFile(filepath.Join(source, "findings.gob"))
-	if err != nil {
-		test.Fatal(err)
+	valid, readError := os.ReadFile(filepath.Join(source, "findings.gob"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	otherCompiler := testIdentity
 	otherCompiler.CompilerCommit = "another"
@@ -173,16 +173,16 @@ func TestCacheTableDiscardsWhatItCannotTrust(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			directory := test.TempDir()
-			if err := os.WriteFile(filepath.Join(directory, "findings.gob"), testCase.buffer, 0o600); err != nil {
-				test.Fatal(err)
+			if writeError := os.WriteFile(filepath.Join(directory, "findings.gob"), testCase.buffer, 0o600); writeError != nil {
+				test.Fatal(writeError)
 			}
-			read, err := program.ReadCacheTable(directory, testCase.identity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
+			read, readCacheTableError := program.ReadCacheTable(directory, testCase.identity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
 			if read.Findings != nil {
 				test.Fatalf("read without discarding into %d entries; the reader cannot detect this and every "+
 					"clean read from it is vacuous", len(read.Findings.Entries))
 			}
-			if !errors.Is(err, program.ErrCacheTableUnreadable) {
-				test.Errorf("error should be ErrCacheTableUnreadable so a caller runs without it rather than failing: %v", err)
+			if !errors.Is(readCacheTableError, program.ErrCacheTableUnreadable) {
+				test.Errorf("error should be ErrCacheTableUnreadable so a caller runs without it rather than failing: %v", readCacheTableError)
 			}
 		})
 	}
@@ -195,15 +195,15 @@ func TestCacheTableFromAnotherCohereCommitKeepsOnlyTheFormatRecord(test *testing
 	otherCommit := testIdentity
 	otherCommit.SelfCommit = "another"
 	directory := test.TempDir()
-	if err := program.WriteCacheTable(directory, sampleCacheTable(), otherCommit, program.EveryCacheTableSection, program.PathAnchor{}); err != nil {
-		test.Fatal(err)
+	if writeCacheTableError := program.WriteCacheTable(directory, sampleCacheTable(), otherCommit, program.EveryCacheTableSection, program.PathAnchor{}); writeCacheTableError != nil {
+		test.Fatal(writeCacheTableError)
 	}
 
-	table, err := readEverySection(test, directory, testIdentity)
-	if !errors.Is(err, program.ErrCacheTablePartlyKept) {
-		test.Fatalf("a table from another cohere commit should be partly kept, got %v", err)
+	table, readEverySectionError := readEverySection(test, directory, testIdentity)
+	if !errors.Is(readEverySectionError, program.ErrCacheTablePartlyKept) {
+		test.Fatalf("a table from another cohere commit should be partly kept, got %v", readEverySectionError)
 	}
-	if errors.Is(err, program.ErrCacheTableUnreadable) {
+	if errors.Is(readEverySectionError, program.ErrCacheTableUnreadable) {
 		test.Error("a partly kept table was reported as wholly discarded")
 	}
 	if table.Formatted == nil || table.Formatted.Key != "format-key" || len(table.Formatted.Entries) != 1 {
@@ -221,11 +221,11 @@ func TestReadCacheTableAlwaysReturnsATable(test *testing.T) {
 	test.Parallel()
 	test.Run("missing", func(test *testing.T) {
 		test.Parallel()
-		table, err := readEverySection(test, filepath.Join(test.TempDir(), "absent"), testIdentity)
-		if !errors.Is(err, os.ErrNotExist) {
-			test.Errorf("a missing table should say it is missing, got %v", err)
+		table, readEverySectionError := readEverySection(test, filepath.Join(test.TempDir(), "absent"), testIdentity)
+		if !errors.Is(readEverySectionError, os.ErrNotExist) {
+			test.Errorf("a missing table should say it is missing, got %v", readEverySectionError)
 		}
-		if errors.Is(err, program.ErrCacheTableUnreadable) {
+		if errors.Is(readEverySectionError, program.ErrCacheTableUnreadable) {
 			test.Error("a missing table was reported as a discard, so every first run would print a warning")
 		}
 		if table == nil || table.Runs == nil || table.Findings != nil {
@@ -237,12 +237,12 @@ func TestReadCacheTableAlwaysReturnsATable(test *testing.T) {
 	test.Run("corrupt", func(test *testing.T) {
 		test.Parallel()
 		directory := test.TempDir()
-		if err := os.WriteFile(filepath.Join(directory, "findings.gob"), []byte("{not a table"), 0o600); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(filepath.Join(directory, "findings.gob"), []byte("{not a table"), 0o600); writeError != nil {
+			test.Fatal(writeError)
 		}
-		table, err := readEverySection(test, directory, testIdentity)
-		if !errors.Is(err, program.ErrCacheTableUnreadable) {
-			test.Errorf("a corrupt file should be a discard, got %v", err)
+		table, readEverySectionError := readEverySection(test, directory, testIdentity)
+		if !errors.Is(readEverySectionError, program.ErrCacheTableUnreadable) {
+			test.Errorf("a corrupt file should be a discard, got %v", readEverySectionError)
 		}
 		if table == nil || len(table.Runs) != 0 || table.Findings != nil {
 			test.Fatalf("a corrupt table should come back empty, got %+v", table)
@@ -258,8 +258,8 @@ func TestCacheTableSurvivesDisk(test *testing.T) {
 	directory := filepath.Join(test.TempDir(), "nested")
 	original := sampleCacheTable()
 
-	if err := program.WriteCacheTable(directory, original, testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); err != nil {
-		test.Fatalf("writing: %v", err)
+	if writeCacheTableError := program.WriteCacheTable(directory, original, testIdentity, program.EveryCacheTableSection, program.PathAnchor{}); writeCacheTableError != nil {
+		test.Fatalf("writing: %v", writeCacheTableError)
 	}
 	read, err := readEverySection(test, directory, testIdentity)
 	if err != nil {

@@ -41,11 +41,11 @@ func TestTsconfigPathsResolveStylesheetImports(test *testing.T) {
 		}}
 		return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
 			modules := filepath.Join(root, "node_modules")
-			if err := os.MkdirAll(modules, 0o755); err != nil {
-				test.Fatalf("creating node_modules: %v", err)
+			if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+				test.Fatalf("creating node_modules: %v", createDirectoryError)
 			}
-			if err := os.Symlink(unknownFixturePackageRoot(), filepath.Join(modules, "tailwindcss")); err != nil {
-				test.Fatalf("linking tailwindcss: %v", err)
+			if symlinkError := os.Symlink(unknownFixturePackageRoot(), filepath.Join(modules, "tailwindcss")); symlinkError != nil {
+				test.Fatalf("linking tailwindcss: %v", symlinkError)
 			}
 		})
 	}
@@ -117,9 +117,9 @@ func TestTsconfigMatchingIsTsconfigPaths(test *testing.T) {
 	readFile := func(path string) (string, bool) { text, found := files[filepath.Clean(path)]; return text, found }
 	fileExists := func(path string) bool { _, found := files[filepath.Clean(path)]; return found }
 
-	mapping, err := loadTsconfigPaths("/repo/tsconfig.json", readFile, fileExists)
-	if err != nil {
-		test.Fatal(err)
+	mapping, loadTsconfigPathsError := loadTsconfigPaths("/repo/tsconfig.json", readFile, fileExists)
+	if loadTsconfigPathsError != nil {
+		test.Fatal(loadTsconfigPathsError)
 	}
 	for specifier, want := range map[string]string{
 		"@/a.css":       "/repo/src/styles/a.css",

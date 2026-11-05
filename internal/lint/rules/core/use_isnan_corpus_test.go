@@ -273,8 +273,8 @@ func TestUseIsNaNAgreesWithESLintsCorpus(test *testing.T) {
 		source := strings.TrimSpace(testCase.code) + "\n"
 		run := func(options string) []string {
 			var settings UseIsNaNOptions
-			if err := rule.UnmarshalOptions([]byte(options), &settings); err != nil {
-				test.Fatalf("decoding %s: %v", options, err)
+			if unmarshalOptionsError := rule.UnmarshalOptions([]byte(options), &settings); unmarshalOptionsError != nil {
+				test.Fatalf("decoding %s: %v", options, unmarshalOptionsError)
 			}
 			result := rule_testing.RunTypedWithOptions(test, UseIsNaN, isNaNFile, source, settings)
 			var got []string

@@ -61,8 +61,8 @@ func TestTheMatcherAgreesWithGitOnGeneratedTrees(test *testing.T) {
 	if count <= 0 {
 		test.Skip("COHERE_GITIGNORE_GENERATED asks for no generated trees")
 	}
-	seed, err := strconv.ParseInt(os.Getenv("COHERE_GITIGNORE_SEED"), 10, 64)
-	if err != nil {
+	seed, parseError := strconv.ParseInt(os.Getenv("COHERE_GITIGNORE_SEED"), 10, 64)
+	if parseError != nil {
 		seed = rand.Int63()
 	}
 	test.Logf("seed %d", seed)
@@ -108,9 +108,9 @@ func newOracle(test *testing.T) *oracle {
 	if runtime.GOOS != "darwin" {
 		test.Skip("the oracle sandbox is sandbox-exec, which is macOS only")
 	}
-	scratch, err := filepath.EvalSymlinks(test.TempDir())
-	if err != nil {
-		test.Fatal(err)
+	scratch, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	profile := filepath.Join(scratch, "oracle.sb")
 	rules := fmt.Sprintf(`(version 1)
@@ -119,26 +119,26 @@ func newOracle(test *testing.T) *oracle {
 (deny file-write*)
 (allow file-write* (subpath %q) (literal "/dev/null") (regex #"^/dev/fd/") (literal "/dev/stdout") (literal "/dev/stderr"))
 `, scratch)
-	if err := os.WriteFile(profile, []byte(rules), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(profile, []byte(rules), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	emptyExclude := filepath.Join(scratch, "empty-excludes")
-	if err := os.WriteFile(emptyExclude, nil, 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(emptyExclude, nil, 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	result := &oracle{scratch: scratch, profile: profile, emptyExclude: emptyExclude}
 
 	// The sandbox must hold before git reads a real tree: a write outside the scratch directory and a
 	// network connection both fail, and a write inside succeeds.
 	outside := filepath.Join(os.Getenv("HOME"), fmt.Sprintf(".cohere-sandbox-probe-%d", os.Getpid()))
-	if err := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/touch", outside).Run(); err == nil {
+	if runError := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/touch", outside).Run(); runError == nil {
 		_ = os.Remove(outside)
 		test.Fatal("the sandbox let a write outside its scratch directory through")
 	}
-	if err := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/touch", filepath.Join(scratch, "inside")).Run(); err != nil {
-		test.Fatalf("the sandbox refused a write inside its scratch directory: %v", err)
+	if runError := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/touch", filepath.Join(scratch, "inside")).Run(); runError != nil {
+		test.Fatalf("the sandbox refused a write inside its scratch directory: %v", runError)
 	}
-	if err := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/nc", "-z", "-G", "2", "1.1.1.1", "443").Run(); err == nil {
+	if runError := exec.Command("sandbox-exec", "-f", profile, "/usr/bin/nc", "-z", "-G", "2", "1.1.1.1", "443").Run(); runError == nil {
 		test.Fatal("the sandbox let a network connection through")
 	}
 	return result
@@ -186,18 +186,18 @@ type comparison struct {
 func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
 	test.Helper()
 	var result comparison
-	matcher, err := New(root)
-	if err != nil {
-		test.Fatalf("%s: %v", root, err)
+	matcher, newGitignoreError := New(root)
+	if newGitignoreError != nil {
+		test.Fatalf("%s: %v", root, newGitignoreError)
 	}
 
 	ours := map[string]verdict{}
 	var paths []string
 	var walk func(scope *Matcher, directory string)
 	walk = func(scope *Matcher, directory string) {
-		entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(directory)))
-		if err != nil {
-			test.Fatalf("%s: %v", root, err)
+		entries, readDirectoryError := os.ReadDir(filepath.Join(root, filepath.FromSlash(directory)))
+		if readDirectoryError != nil {
+			test.Fatalf("%s: %v", root, readDirectoryError)
 		}
 		for _, entry := range entries {
 			name := entry.Name()
@@ -210,7 +210,7 @@ func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
 			}
 			isDirectory := entry.Type()&fs.ModeType == fs.ModeDir
 			if isDirectory {
-				if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(relative), ".git")); err == nil {
+				if _, statError := os.Lstat(filepath.Join(root, filepath.FromSlash(relative), ".git")); statError == nil {
 					result.nested = append(result.nested, filepath.Join(root, filepath.FromSlash(relative)))
 					continue
 				}
@@ -225,9 +225,9 @@ func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
 				if excluded, _ := scope.Excluded(); excluded {
 					continue
 				}
-				child, err := scope.Enter(relative)
-				if err != nil {
-					test.Fatalf("%s: %v", root, err)
+				child, enterError := scope.Enter(relative)
+				if enterError != nil {
+					test.Fatalf("%s: %v", root, enterError)
 				}
 				walk(child, relative)
 			}
@@ -252,8 +252,8 @@ func compareWithGit(test *testing.T, oracle *oracle, root string) comparison {
 			theirs[relative] = verdict{}
 			continue
 		}
-		lineNumber, err := strconv.Atoi(line)
-		if err != nil {
+		lineNumber, parseError := strconv.Atoi(line)
+		if parseError != nil {
 			test.Fatalf("%s: git printed line %q for %s", root, line, relative)
 		}
 		theirs[relative] = verdict{ignored: !strings.HasPrefix(pattern, "!"), source: Source{File: file, Line: lineNumber, Pattern: pattern}}
@@ -332,14 +332,14 @@ func writeTreeTolerant(test *testing.T, root string, files map[string]string) {
 			_ = os.MkdirAll(full, 0o755)
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {
 			continue
 		}
-		if info, err := os.Stat(full); err == nil && info.IsDir() {
+		if info, statError := os.Stat(full); statError == nil && info.IsDir() {
 			continue
 		}
-		if err := os.WriteFile(full, []byte(files[name]), 0o644); err != nil {
-			test.Fatal(err)
+		if writeError := os.WriteFile(full, []byte(files[name]), 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
 }

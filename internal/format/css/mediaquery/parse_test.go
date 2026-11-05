@@ -131,9 +131,9 @@ func TestParseTrees(test *testing.T) {
 	}
 	for _, each := range cases {
 		params := strings.NewReplacer("<e>", "\xc3\xa9", "<nbsp>", "\u00a0").Replace(each.params)
-		tree, err := Parse(params)
-		if err != nil {
-			test.Errorf("%q: %v", each.params, err)
+		tree, parseError := Parse(params)
+		if parseError != nil {
+			test.Errorf("%q: %v", each.params, parseError)
 			continue
 		}
 		var builder strings.Builder
@@ -150,13 +150,13 @@ func TestParseTrees(test *testing.T) {
 func TestParseRefusals(test *testing.T) {
 	test.Parallel()
 	for _, params := range []string{"(a} b", "screen and (color}", "url(", "  url (a(b)"} {
-		tree, err := Parse(params)
-		if err == nil {
+		tree, parseError := Parse(params)
+		if parseError == nil {
 			test.Errorf("%q: parsed to %v, want a refusal", params, tree.Type())
 			continue
 		}
-		if !printing.IsSyntax(err) {
-			test.Errorf("%q: %v is not marked as a syntax error", params, err)
+		if !printing.IsSyntax(parseError) {
+			test.Errorf("%q: %v is not marked as a syntax error", params, parseError)
 		}
 	}
 }

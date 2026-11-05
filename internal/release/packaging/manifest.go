@@ -134,9 +134,9 @@ func DispatcherManifest(version string) ([]byte, error) {
 // releases and read in diffs. A manifest that reformats on every generation makes every release
 // diff look like a rewrite.
 func marshalManifest(manifest map[string]any) ([]byte, error) {
-	encoded, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("rendering the package manifest: %w", err)
+	encoded, encodeError := json.MarshalIndent(manifest, "", "  ")
+	if encodeError != nil {
+		return nil, fmt.Errorf("rendering the package manifest: %w", encodeError)
 	}
 	return append(encoded, '\n'), nil
 }

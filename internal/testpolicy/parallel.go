@@ -31,9 +31,9 @@ var reasonAfterMarker = regexp.MustCompile(`(?i)` + regexp.QuoteMeta(NotParallel
 // will see it, and this is what keeps the default from wearing away one serial test at a time.
 func SerialTests(fileName string, source []byte) ([]Violation, error) {
 	files := token.NewFileSet()
-	file, err := parser.ParseFile(files, fileName, source, parser.ParseComments)
-	if err != nil {
-		return nil, err
+	file, parseFileError := parser.ParseFile(files, fileName, source, parser.ParseComments)
+	if parseFileError != nil {
+		return nil, parseFileError
 	}
 	excused := map[int]bool{}
 	for _, group := range file.Comments {

@@ -55,13 +55,13 @@ type ArrowBodyStyleOptions struct {
 // ignored, which is upstream's schema: its `anyOf` gives those two a one-element list.
 func DecodeArrowBodyStyleOptions(list []byte) (any, error) {
 	options := ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	var mode string
-	if err := json.Unmarshal(elements[0], &mode); err != nil {
+	if decodeError := json.Unmarshal(elements[0], &mode); decodeError != nil {
 		return options, fmt.Errorf("arrow-body-style element 1 takes a string, got %s", elements[0])
 	}
 	switch mode {
@@ -86,8 +86,8 @@ func DecodeArrowBodyStyleOptions(list []byte) (any, error) {
 	var second struct {
 		RequireReturnForObjectLiteral bool `json:"requireReturnForObjectLiteral"`
 	}
-	if err := rule.UnmarshalOptions(elements[1], &second); err != nil {
-		return options, fmt.Errorf("arrow-body-style element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(elements[1], &second); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("arrow-body-style element 2: %w", unmarshalOptionsError)
 	}
 	options.RequireReturnForObjectLiteral = second.RequireReturnForObjectLiteral
 	return options, nil

@@ -337,7 +337,7 @@ func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 
 	// A pattern that does not compile is an error rather than a rule that silently matches
 	// everything, because an inert rule that looks configured is the worse of the two failures.
-	if _, err := DecodeIdMatchOptions([]byte(`["^[a-z"]`)); err == nil {
+	if _, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(`["^[a-z"]`)); decodeIdMatchOptionsError == nil {
 		test.Error("expected an uncompilable pattern to be reported, got no error")
 	}
 
@@ -547,9 +547,9 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 	test.Parallel()
 
 	// Upstream's spelling: the pattern, then the flags as the second element.
-	decoded, err := DecodeIdMatchOptions([]byte(`["^[a-z]+$", {"properties": true, "classFields": true}]`))
-	if err != nil {
-		test.Fatalf("decoding the option list: %v", err)
+	decoded, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(`["^[a-z]+$", {"properties": true, "classFields": true}]`))
+	if decodeIdMatchOptionsError != nil {
+		test.Fatalf("decoding the option list: %v", decodeIdMatchOptionsError)
 	}
 	settings, _ := decoded.(IdMatchSettings)
 	if settings.PatternText != "^[a-z]+$" {
@@ -571,7 +571,7 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 		// A third element.
 		`["^[a-z]+$", {"properties": true}, {"classFields": true}]`,
 	} {
-		if _, err := DecodeIdMatchOptions([]byte(raw)); err == nil {
+		if _, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(raw)); decodeIdMatchOptionsError == nil {
 			test.Errorf("expected %s to be refused, got no error", raw)
 		}
 	}
@@ -589,9 +589,9 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 // mustDecodeIdMatch decodes exactly the bytes the config layer would hand the rule.
 func mustDecodeIdMatch(test *testing.T, raw string) any {
 	test.Helper()
-	decoded, err := DecodeIdMatchOptions([]byte(raw))
-	if err != nil {
-		test.Fatalf("decoding %s: %v", raw, err)
+	decoded, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(raw))
+	if decodeIdMatchOptionsError != nil {
+		test.Fatalf("decoding %s: %v", raw, decodeIdMatchOptionsError)
 	}
 	return decoded
 }

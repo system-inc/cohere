@@ -38,7 +38,7 @@ func errNamedPathsOutsideProgram(location projectLocation, names []string) error
 func explainNamedPathsOutsideProgram(location projectLocation, names []string) string {
 	sentences := make([]string, 0, len(names))
 	configName := location.ConfigFileName
-	if relative, err := filepath.Rel(location.Root, configName); err == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(location.Root, configName); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		configName = relative
 	}
 
@@ -50,9 +50,9 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 		path = filepath.Clean(path)
 
 		var sentence string
-		information, err := os.Stat(path)
+		information, statError := os.Stat(path)
 		switch {
-		case err == nil && information.IsDir():
+		case statError == nil && information.IsDir():
 			sentence = name + " is a directory holding no file the program contains, because the tsconfig at " +
 				configName + " leaves every file in it out with its `include` and `exclude` lists"
 		case !programExtensions[strings.ToLower(filepath.Ext(path))]:

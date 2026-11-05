@@ -14,7 +14,7 @@ import (
 func TestReadHeadAgreesWithGitInEveryLayout(test *testing.T) {
 	test.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
+	if _, lookPathError := exec.LookPath("git"); lookPathError != nil {
 		test.Skip("git is needed to build the fixtures and to compare against")
 	}
 	git := func(directory string, arguments ...string) string {
@@ -24,9 +24,9 @@ func TestReadHeadAgreesWithGitInEveryLayout(test *testing.T) {
 		command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 			"GIT_AUTHOR_NAME=fixture", "GIT_AUTHOR_EMAIL=fixture@example.com",
 			"GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.com")
-		output, err := command.CombinedOutput()
-		if err != nil {
-			test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), err, output)
+		output, outputError := command.CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), outputError, output)
 		}
 		return strings.TrimSpace(string(output))
 	}
@@ -39,9 +39,9 @@ func TestReadHeadAgreesWithGitInEveryLayout(test *testing.T) {
 	agree := func(name string, directory string) {
 		test.Helper()
 		want := git(directory, "rev-parse", "HEAD")
-		got, err := readHead(directory)
-		if err != nil {
-			test.Fatalf("%s: %v", name, err)
+		got, readHeadError := readHead(directory)
+		if readHeadError != nil {
+			test.Fatalf("%s: %v", name, readHeadError)
 		}
 		if got != want {
 			test.Fatalf("%s: read %s, git says %s", name, got, want)
@@ -55,8 +55,8 @@ func TestReadHeadAgreesWithGitInEveryLayout(test *testing.T) {
 
 	commit(repository, "second")
 	git(repository, "pack-refs", "--all")
-	if _, err := os.Stat(filepath.Join(repository, ".git", "refs", "heads", "main")); !os.IsNotExist(err) {
-		test.Fatalf("the fixture meant to pack its refs still has a loose one: %v", err)
+	if _, statError := os.Stat(filepath.Join(repository, ".git", "refs", "heads", "main")); !os.IsNotExist(statError) {
+		test.Fatalf("the fixture meant to pack its refs still has a loose one: %v", statError)
 	}
 	agree("a branch only in packed-refs", repository)
 
@@ -80,7 +80,7 @@ func TestReadHeadAgreesWithGitInEveryLayout(test *testing.T) {
 	git(parent, "-c", "protocol.file.allow=always", "submodule", "--quiet", "add", repository, "vendored")
 	agree("a submodule's gitlink", filepath.Join(parent, "vendored"))
 
-	if _, err := readHead(test.TempDir()); err == nil {
+	if _, readHeadError := readHead(test.TempDir()); readHeadError == nil {
 		test.Fatal("a directory that is no checkout produced a commit")
 	}
 }
@@ -91,19 +91,19 @@ func TestReadHeadRefusesWhatIsNotACommit(test *testing.T) {
 	repository := test.TempDir()
 	writeFile(test, filepath.Join(repository, ".git", "HEAD"), "ref: refs/heads/main\n")
 	writeFile(test, filepath.Join(repository, ".git", "refs", "heads", "main"), "abc123\n")
-	if _, err := readHead(repository); err == nil || !strings.Contains(err.Error(), "not a commit") {
-		test.Fatalf("an abbreviated object name was accepted: %v", err)
+	if _, readHeadError := readHead(repository); readHeadError == nil || !strings.Contains(readHeadError.Error(), "not a commit") {
+		test.Fatalf("an abbreviated object name was accepted: %v", readHeadError)
 	}
 
 	writeFile(test, filepath.Join(repository, ".git", "HEAD"), "ref: ../../outside\n")
-	if _, err := readHead(repository); err == nil {
+	if _, readHeadError := readHead(repository); readHeadError == nil {
 		test.Fatal("a ref name walking out of the git directory was followed")
 	}
 
 	writeFile(test, filepath.Join(repository, ".git", "HEAD"), "ref: refs/heads/.invalid\n")
 	writeFile(test, filepath.Join(repository, ".git", "config"), "[extensions]\n\trefStorage = reftable\n")
-	if _, err := readHead(repository); err == nil || !strings.Contains(err.Error(), "reftable") {
-		test.Fatalf("a reftable repository was read as though its files held the refs: %v", err)
+	if _, readHeadError := readHead(repository); readHeadError == nil || !strings.Contains(readHeadError.Error(), "reftable") {
+		test.Fatalf("a reftable repository was read as though its files held the refs: %v", readHeadError)
 	}
 }
 
@@ -112,7 +112,7 @@ func TestReadHeadRefusesWhatIsNotACommit(test *testing.T) {
 func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 	test.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
+	if _, lookPathError := exec.LookPath("git"); lookPathError != nil {
 		test.Skip("git is needed for the first answer")
 	}
 	module := test.TempDir()
@@ -123,9 +123,9 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 		command.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null",
 			"GIT_AUTHOR_NAME=fixture", "GIT_AUTHOR_EMAIL=fixture@example.com",
 			"GIT_COMMITTER_NAME=fixture", "GIT_COMMITTER_EMAIL=fixture@example.com")
-		output, err := command.CombinedOutput()
-		if err != nil {
-			test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), err, output)
+		output, outputError := command.CombinedOutput()
+		if outputError != nil {
+			test.Fatalf("git %s: %v\n%s", strings.Join(arguments, " "), outputError, output)
 		}
 		return strings.TrimSpace(string(output))
 	}
@@ -143,8 +143,8 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 		test.Fatal(err)
 	}
 
-	if err := os.Rename(filepath.Join(module, ".git"), filepath.Join(module, "not-git")); err != nil {
-		test.Fatal(err)
+	if renameError := os.Rename(filepath.Join(module, ".git"), filepath.Join(module, "not-git")); renameError != nil {
+		test.Fatal(renameError)
 	}
 	second, err := swiftEngineInputObjects(paths, commit)
 	if err != nil {
@@ -160,7 +160,7 @@ func TestSwiftEngineInputsAreAskedOncePerCommit(test *testing.T) {
 		test.Fatalf("expected one kept answer, found %v (err %v)", entries, err)
 	}
 	writeFile(test, filepath.Join(paths.CacheDirectory, "swift-inputs", entries[0].Name()), first[0]+"\n")
-	if _, err := swiftEngineInputObjects(paths, commit); err == nil {
+	if _, swiftEngineInputObjectsError := swiftEngineInputObjects(paths, commit); swiftEngineInputObjectsError == nil {
 		test.Fatal("a kept answer with a missing object was trusted")
 	}
 }

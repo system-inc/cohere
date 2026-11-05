@@ -23,8 +23,8 @@ func TestPipelineRefusesAZeroMatchOverrideSelector(test *testing.T) {
 	writeSelectorValidationProject(test, directory, "missing/**")
 
 	command := exec.Command(binary, "--lint", "--no-fix", "--directory", directory)
-	output, err := command.CombinedOutput()
-	if err == nil {
+	output, outputError := command.CombinedOutput()
+	if outputError == nil {
 		test.Fatalf("the pipeline exited successfully with a zero-match override selector:\n%s", output)
 	}
 	if !strings.Contains(string(output), "missing/**") {
@@ -33,8 +33,8 @@ func TestPipelineRefusesAZeroMatchOverrideSelector(test *testing.T) {
 
 	writeSelectorValidationProject(test, directory, "**/*.ts")
 	command = exec.Command(binary, "--lint", "--no-fix", "--directory", directory)
-	if output, err := command.CombinedOutput(); err != nil {
-		test.Fatalf("the same project failed after its selector was changed to match index.ts: %v\n%s", err, output)
+	if output, outputError := command.CombinedOutput(); outputError != nil {
+		test.Fatalf("the same project failed after its selector was changed to match index.ts: %v\n%s", outputError, output)
 	}
 }
 
@@ -48,8 +48,8 @@ func writeSelectorValidationProject(test *testing.T, directory string, selector 
 			`"],"rules":{"no-debugger":"off"}}]}`,
 	}
 	for name, contents := range files {
-		if err := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); err != nil {
-			test.Fatalf("writing %s: %v", name, err)
+		if writeError := os.WriteFile(filepath.Join(directory, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
 }

@@ -47,15 +47,15 @@ type GroupedAccessorPairsOptions struct {
 // from its schema before the rule runs; there is no schema layer here, so it lives here.
 func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 	options := GroupedAccessorPairsOptions{Order: GroupedAccessorPairsAnyOrder}
-	configured, err := rule.OptionElements(list, 2)
-	if err != nil || len(configured) == 0 {
-		return options, err
+	configured, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(configured) == 0 {
+		return options, optionElementsError
 	}
 
 	var order string
-	if err := json.Unmarshal(configured[0], &order); err != nil {
+	if decodeError := json.Unmarshal(configured[0], &order); decodeError != nil {
 		return options, fmt.Errorf("grouped-accessor-pairs takes a string first, %q: %w",
-			string(configured[0]), err)
+			string(configured[0]), decodeError)
 	}
 	switch GroupedAccessorPairsOrder(order) {
 	case GroupedAccessorPairsAnyOrder, GroupedAccessorPairsGetBeforeSet, GroupedAccessorPairsSetBeforeGet:
@@ -73,8 +73,8 @@ func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 	var second struct {
 		EnforceForTSTypes bool `json:"enforceForTSTypes"`
 	}
-	if err := rule.UnmarshalOptions(configured[1], &second); err != nil {
-		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(configured[1], &second); unmarshalOptionsError != nil {
+		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", unmarshalOptionsError)
 	}
 	options.EnforceForTSTypes = second.EnforceForTSTypes
 	return options, nil

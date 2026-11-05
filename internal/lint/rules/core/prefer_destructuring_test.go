@@ -41,9 +41,9 @@ func decodePreferDestructuringOptionsForTest(test *testing.T, optionsJson string
 	if optionsJson == "" {
 		return nil
 	}
-	decoded, err := DecodePreferDestructuringOptions(json.RawMessage(optionsJson))
-	if err != nil {
-		test.Fatalf("the decoder refused %s: %v", optionsJson, err)
+	decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(json.RawMessage(optionsJson))
+	if decodePreferDestructuringOptionsError != nil {
+		test.Fatalf("the decoder refused %s: %v", optionsJson, decodePreferDestructuringOptionsError)
 	}
 	return decoded
 }
@@ -269,15 +269,15 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, err := DecodePreferDestructuringOptions(json.RawMessage(testCase.raw))
+			decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(json.RawMessage(testCase.raw))
 			if testCase.wantErr {
-				if err == nil {
+				if decodePreferDestructuringOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
 				}
 				return
 			}
-			if err != nil {
-				test.Fatalf("the decoder refused %s: %v", testCase.raw, err)
+			if decodePreferDestructuringOptionsError != nil {
+				test.Fatalf("the decoder refused %s: %v", testCase.raw, decodePreferDestructuringOptionsError)
 			}
 			options, ok := decoded.(PreferDestructuringOptions)
 			if !ok {

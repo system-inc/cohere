@@ -76,7 +76,7 @@ func DecodeMaxDepthOptions(raw []byte) (any, error) {
 	}
 
 	var maximum int
-	if err := json.Unmarshal(raw, &maximum); err == nil {
+	if decodeError := json.Unmarshal(raw, &maximum); decodeError == nil {
 		settings.Maximum = maximum
 		return settings, nil
 	}
@@ -85,8 +85,8 @@ func DecodeMaxDepthOptions(raw []byte) (any, error) {
 		Maximum *int `json:"maximum"`
 		Max     *int `json:"max"`
 	}
-	if err := rule.UnmarshalOptions(raw, &object); err != nil {
-		return settings, err
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
+		return settings, unmarshalOptionsError
 	}
 
 	// Upstream's `hasOwn` guard: neither key present means the branch is never entered and the

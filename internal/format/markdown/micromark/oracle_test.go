@@ -69,15 +69,15 @@ function describe(kind, token) {
 // upstreamEvents runs the oracle over inputs, one Node process for all of them.
 func upstreamEvents(test *testing.T, inputs []string) [][]string {
 	test.Helper()
-	if _, err := exec.LookPath("node"); err != nil {
+	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
 		test.Skip("node is not installed; the event oracle needs it")
 	}
 	root := forkRoot(test)
 
 	directory := test.TempDir()
 	script := filepath.Join(directory, "oracle.mjs")
-	if err := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	encoded, err := json.Marshal(inputs)
 	if err != nil {
@@ -93,8 +93,8 @@ func upstreamEvents(test *testing.T, inputs []string) [][]string {
 		test.Fatal(err)
 	}
 	var outputs [][]string
-	if err := json.Unmarshal(output, &outputs); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(output, &outputs); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	return outputs
 }
@@ -186,7 +186,7 @@ func TestCorpusEventsMatchUpstream(test *testing.T) {
 	}
 	var paths []string
 	var inputs []string
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -194,9 +194,9 @@ func TestCorpusEventsMatchUpstream(test *testing.T) {
 			return filepath.SkipDir
 		}
 		if !entry.IsDir() && strings.EqualFold(filepath.Ext(path), ".md") {
-			source, err := os.ReadFile(path)
-			if err != nil {
-				return err
+			source, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
 			}
 			paths = append(paths, path)
 			// Prettier normalizes line endings and strips a byte order mark before parsing.
@@ -205,8 +205,8 @@ func TestCorpusEventsMatchUpstream(test *testing.T) {
 		}
 		return nil
 	})
-	if err != nil {
-		test.Fatal(err)
+	if walkError != nil {
+		test.Fatal(walkError)
 	}
 	// Node reads its input and writes its events as one string each, capped at 512MB, and the events of a
 	// tree run to many times its text, so the oracle is asked in batches of about 4MB of input.

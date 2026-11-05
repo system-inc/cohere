@@ -26,27 +26,27 @@ const moduleRoot = "../.."
 
 func sourceInputs(test *testing.T) Inputs {
 	test.Helper()
-	inputs, err := SourceInputs(moduleRoot)
-	if err != nil {
-		test.Fatal(err)
+	inputs, sourceInputsError := SourceInputs(moduleRoot)
+	if sourceInputsError != nil {
+		test.Fatal(sourceInputsError)
 	}
 	return inputs
 }
 
 func built(test *testing.T, inputs Inputs) map[string][]byte {
 	test.Helper()
-	files, err := Build(inputs)
-	if err != nil {
-		test.Fatal(err)
+	files, buildError := Build(inputs)
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	return files
 }
 
 func staleAgainstCommitted(test *testing.T, files map[string][]byte) []string {
 	test.Helper()
-	stale, err := Stale(moduleRoot, files)
-	if err != nil {
-		test.Fatal(err)
+	stale, staleError := Stale(moduleRoot, files)
+	if staleError != nil {
+		test.Fatal(staleError)
 	}
 	return stale
 }
@@ -129,8 +129,8 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 		test.Fatal(err)
 	}
 	var rules Rules
-	if err := json.Unmarshal(committed, &rules); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(committed, &rules); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	swiftRegistry, err := os.ReadFile(filepath.Join(moduleRoot, "swift", "Rules.json"))
 	if err != nil {
@@ -139,8 +139,8 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 	var swiftEntries []struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(swiftRegistry, &swiftEntries); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(swiftRegistry, &swiftEntries); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	registered := map[string][]string{"TypeScript": registry.Names(), "Go": {}}
 	for _, entry := range swiftEntries {
@@ -197,8 +197,8 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 		test.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
 	}
 	var entries []map[string]any
-	if err := json.Unmarshal(inputs.SwiftRules, &entries); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(inputs.SwiftRules, &entries); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	withEntries := func(change func([]map[string]any) []map[string]any) Inputs {
 		copied := make([]map[string]any, 0, len(entries))
@@ -209,9 +209,9 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 			}
 			copied = append(copied, clone)
 		}
-		encoded, err := json.Marshal(change(copied))
-		if err != nil {
-			test.Fatal(err)
+		encoded, encodeError := json.Marshal(change(copied))
+		if encodeError != nil {
+			test.Fatal(encodeError)
 		}
 		changed := inputs
 		changed.SwiftRules = encoded
@@ -251,7 +251,7 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 			return nil
 		},
 	} {
-		if _, err := Build(withEntries(change)); err == nil {
+		if _, buildError := Build(withEntries(change)); buildError == nil {
 			test.Errorf("%s built", name)
 		}
 	}
@@ -263,8 +263,8 @@ func TestEveryHouseRuleFollowsTheNamingScheme(test *testing.T) {
 	test.Parallel()
 	inputs := sourceInputs(test)
 	var rules Rules
-	if err := json.Unmarshal(built(test, inputs)[RulesPath], &rules); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(built(test, inputs)[RulesPath], &rules); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	house := 0
 	for _, row := range rules.Rules {
@@ -286,8 +286,8 @@ func TestEveryHouseRuleFollowsTheNamingScheme(test *testing.T) {
 	misnamed.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
 		Rule: rule.Rule{Name: "nexus/docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
 	})
-	if _, err := Build(misnamed); err == nil || !strings.Contains(err.Error(), "nexus/docsdata-test-rule") {
-		test.Errorf("a house rule named outside the scheme built: %v", err)
+	if _, buildError := Build(misnamed); buildError == nil || !strings.Contains(buildError.Error(), "nexus/docsdata-test-rule") {
+		test.Errorf("a house rule named outside the scheme built: %v", buildError)
 	}
 }
 
@@ -310,14 +310,14 @@ func TestBuildIsDeterministic(test *testing.T) {
 // a row does not have.
 func TestEveryFieldHasASourceNote(test *testing.T) {
 	test.Parallel()
-	encoded, err := json.Marshal(RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
+	encoded, encodeError := json.Marshal(RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
 		Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-", TypeScriptRules: []string{""}})
-	if err != nil {
-		test.Fatal(err)
+	if encodeError != nil {
+		test.Fatal(encodeError)
 	}
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(encoded, &fields); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(encoded, &fields); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	for field := range fields {
 		if ruleSourceNotes[field] == "" {
@@ -348,9 +348,9 @@ func TestTheHelpParserReadsWhatTheFlagPackageWrites(test *testing.T) {
 	var printed bytes.Buffer
 	set.SetOutput(&printed)
 	set.PrintDefaults()
-	_, parsed, err := parseFlagHelp(printed.Bytes())
-	if err != nil {
-		test.Fatalf("%v\n%s", err, printed.String())
+	_, parsed, parseFlagHelpError := parseFlagHelp(printed.Bytes())
+	if parseFlagHelpError != nil {
+		test.Fatalf("%v\n%s", parseFlagHelpError, printed.String())
 	}
 
 	var want []CliFlag
@@ -379,9 +379,9 @@ func TestTheVerbHelpKeepsItsSynopsis(test *testing.T) {
 		"       cohere rename <name> <newName>\n\n" +
 		"Renames a symbol.\nNothing is written without --write.\n\n" +
 		"  -write\n    \tapply the rename\n"
-	cli, err := parseCli([]byte("  -fix\n    \tapply fixes only\n"), map[string][]byte{"rename": []byte(help)})
-	if err != nil {
-		test.Fatal(err)
+	cli, parseCommandLineInterfaceError := parseCli([]byte("  -fix\n    \tapply fixes only\n"), map[string][]byte{"rename": []byte(help)})
+	if parseCommandLineInterfaceError != nil {
+		test.Fatal(parseCommandLineInterfaceError)
 	}
 	verb := cli.Verbs[0]
 	if strings.Join(verb.Usage, "|") != "cohere rename <file>:<line>:<column> <newName>|cohere rename <name> <newName>" {
@@ -418,7 +418,7 @@ func TestTheChangelogParsesEveryRelease(test *testing.T) {
 	if headingAnchor("1.0.0 (unreleased)") != "100-unreleased" {
 		test.Errorf("anchor %q", headingAnchor("1.0.0 (unreleased)"))
 	}
-	if _, err := parseChangelog([]byte("# Changelog\n\n## Notes\n")); err == nil {
+	if _, parseChangelogError := parseChangelog([]byte("# Changelog\n\n## Notes\n")); parseChangelogError == nil {
 		test.Error("a second-level heading that is not a release parsed")
 	}
 }
@@ -503,9 +503,9 @@ func TestPickExamplesCountsACaseOnce(test *testing.T) {
 func TestBenchmarksHoldEveryRecordNewestFirst(test *testing.T) {
 	test.Parallel()
 	inputs := sourceInputs(test)
-	committed, err := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
-	if err != nil {
-		test.Fatal(err)
+	committed, readError := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if len(committed) == 0 {
 		test.Fatal("bench/results holds no record, so this test would compare nothing")
@@ -515,8 +515,8 @@ func TestBenchmarksHoldEveryRecordNewestFirst(test *testing.T) {
 	inputs.Benchmarks = append(slices.Clone(committed), later)
 
 	var benchmarks Benchmarks
-	if err := json.Unmarshal(built(test, inputs)[BenchmarksPath], &benchmarks); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(built(test, inputs)[BenchmarksPath], &benchmarks); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(benchmarks.Records) != len(committed)+1 {
 		test.Fatalf("%d records published for %d given", len(benchmarks.Records), len(committed)+1)
@@ -539,9 +539,9 @@ func TestBenchmarksHoldEveryRecordNewestFirst(test *testing.T) {
 func TestAnUnearnedQuietNumberRefusesTheBuild(test *testing.T) {
 	test.Parallel()
 	inputs := sourceInputs(test)
-	committed, err := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
-	if err != nil {
-		test.Fatal(err)
+	committed, readError := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	if len(committed) == 0 {
 		test.Fatal("bench/results holds no record, so this test would plant nothing")
@@ -555,7 +555,7 @@ func TestAnUnearnedQuietNumberRefusesTheBuild(test *testing.T) {
 	cold.Quiet = &benchresults.QuietSummary{Count: 1, Best: 0.1, Median: 0.1, Worst: 0.1}
 	tampered.Modes[benchresults.ModeCold] = cold
 	inputs.Benchmarks = []benchresults.Record{tampered}
-	if _, err := Build(inputs); err == nil {
+	if _, buildError := Build(inputs); buildError == nil {
 		test.Error("a quiet number the runs did not earn was published")
 	}
 }

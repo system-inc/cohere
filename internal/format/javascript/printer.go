@@ -88,9 +88,9 @@ func format(fileName string, text string, parsed *ast.SourceFile, options format
 	// The doc's parts come from a slab released with the tree, for the same reason.
 	docs := acquireDocMemory()
 	defer docs.release()
-	document, err := printToDoc(fileName, text, parsed, options, parser, "", textToDoc, nodes, docs)
-	if err != nil {
-		return "", err
+	document, printToDocError := printToDoc(fileName, text, parsed, options, parser, "", textToDoc, nodes, docs)
+	if printToDocError != nil {
+		return "", printToDocError
 	}
 	return doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs,
 		ExpectedLength: len(text)}), nil
@@ -103,9 +103,9 @@ func format(fileName string, text string, parsed *ast.SourceFile, options format
 func PrintToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (doc.Doc, error) {
 	// The doc is laid out later, by the outer printer, so its tree outlives this call and comes from the heap.
-	document, err := printToDoc(fileName, text, nil, options, parser, parentParser, textToDoc, nil, nil)
-	if err != nil {
-		return nil, err
+	document, printToDocError := printToDoc(fileName, text, nil, options, parser, parentParser, textToDoc, nil, nil)
+	if printToDocError != nil {
+		return nil, printToDocError
 	}
 	return doc.StripTrailingHardline(document), nil
 }

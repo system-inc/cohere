@@ -35,9 +35,9 @@ func TestStrictVariantsMatchUpstream(test *testing.T) {
 func expectStrictVariantsMatchUpstream(test *testing.T, designSystem DesignSystemResult) {
 	test.Helper()
 
-	data, err := os.ReadFile(filepath.Join("testdata", "strict_variants.json"))
-	if err != nil {
-		test.Fatal(err)
+	data, readError := os.ReadFile(filepath.Join("testdata", "strict_variants.json"))
+	if readError != nil {
+		test.Fatal(readError)
 	}
 	var file struct {
 		Classes []struct {
@@ -45,8 +45,8 @@ func expectStrictVariantsMatchUpstream(test *testing.T, designSystem DesignSyste
 			Variants  []string `json:"variants"`
 		} `json:"classes"`
 	}
-	if err := json.Unmarshal(data, &file); err != nil {
-		test.Fatal(err)
+	if decodeError := json.Unmarshal(data, &file); decodeError != nil {
+		test.Fatal(decodeError)
 	}
 	if len(file.Classes) < 100 {
 		test.Fatalf("only %d classes in the goldens, too few to speak for the printer", len(file.Classes))

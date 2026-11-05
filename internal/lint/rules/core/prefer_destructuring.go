@@ -78,19 +78,19 @@ func DecodePreferDestructuringOptions(list []byte) (any, error) {
 		VariableDeclarator:   PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 		AssignmentExpression: PreferDestructuringKindOptions{Array: &enabled, Object: &enabled},
 	}
-	elements, err := rule.OptionElements(list, 2)
-	if err != nil || len(elements) == 0 {
-		return options, err
+	elements, optionElementsError := rule.OptionElements(list, 2)
+	if optionElementsError != nil || len(elements) == 0 {
+		return options, optionElementsError
 	}
 
 	var enabling preferDestructuringEnablingWire
-	if err := preferDestructuringDecodeStrictly(elements[0], &enabling); err != nil {
-		return options, fmt.Errorf("prefer-destructuring element 1: %w", err)
+	if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(elements[0], &enabling); preferDestructuringDecodeStrictlyError != nil {
+		return options, fmt.Errorf("prefer-destructuring element 1: %w", preferDestructuringDecodeStrictlyError)
 	}
 	if len(elements) > 1 {
 		var renamed preferDestructuringRenamedWire
-		if err := preferDestructuringDecodeStrictly(elements[1], &renamed); err != nil {
-			return options, fmt.Errorf("prefer-destructuring element 2: %w", err)
+		if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(elements[1], &renamed); preferDestructuringDecodeStrictlyError != nil {
+			return options, fmt.Errorf("prefer-destructuring element 2: %w", preferDestructuringDecodeStrictlyError)
 		}
 		if renamed.EnforceForRenamedProperties != nil {
 			options.EnforceForRenamedProperties = *renamed.EnforceForRenamedProperties

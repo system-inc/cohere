@@ -101,12 +101,12 @@ type stringSet []string
 
 func (set *stringSet) UnmarshalJSON(raw []byte) error {
 	var single string
-	if err := json.Unmarshal(raw, &single); err == nil {
+	if decodeError := json.Unmarshal(raw, &single); decodeError == nil {
 		*set = stringSet{single}
 		return nil
 	}
 	var many []string
-	if err := json.Unmarshal(raw, &many); err != nil {
+	if decodeError := json.Unmarshal(raw, &many); decodeError != nil {
 		return fmt.Errorf("expected a string or an array of strings, got %s", raw)
 	}
 	*set = many
@@ -138,21 +138,21 @@ func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) > 0 && trimmed[0] == '[' {
 		var many []json.RawMessage
-		if err := json.Unmarshal(trimmed, &many); err != nil {
-			return err
+		if decodeError := json.Unmarshal(trimmed, &many); decodeError != nil {
+			return decodeError
 		}
 		for _, element := range many {
 			var item Item
-			if err := rule.UnmarshalOptions(element, &item); err != nil {
-				return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", err, shape)
+			if unmarshalOptionsError := rule.UnmarshalOptions(element, &item); unmarshalOptionsError != nil {
+				return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", unmarshalOptionsError, shape)
 			}
 			*into = append(*into, item)
 		}
 		return nil
 	}
 	var item Item
-	if err := rule.UnmarshalOptions(trimmed, &item); err != nil {
-		return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", err, shape)
+	if unmarshalOptionsError := rule.UnmarshalOptions(trimmed, &item); unmarshalOptionsError != nil {
+		return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", unmarshalOptionsError, shape)
 	}
 	*into = append(*into, item)
 	return nil
@@ -170,8 +170,8 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 	}
 
 	var settings DependenciesOptions
-	if err := rule.UnmarshalOptions(raw, &settings); err != nil {
-		return nil, fmt.Errorf("boundaries/dependencies: %w", err)
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &settings); unmarshalOptionsError != nil {
+		return nil, fmt.Errorf("boundaries/dependencies: %w", unmarshalOptionsError)
 	}
 
 	if settings.Default != "" && settings.Default != "allow" && settings.Default != "disallow" {
@@ -217,26 +217,26 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 			return nil, fmt.Errorf("boundaries/dependencies: policy %d has neither allow nor disallow, so it "+
 				"could never decide a dependency", index)
 		}
-		if err := refuseTemplate(policy.Message); err != nil {
-			return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, err)
+		if refuseTemplateError := refuseTemplate(policy.Message); refuseTemplateError != nil {
+			return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, refuseTemplateError)
 		}
 		for _, selectors := range []entitySelectors{policy.From, policy.To} {
-			if err := checkEntitySelectors(selectors); err != nil {
-				return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, err)
+			if checkEntitySelectorsError := checkEntitySelectors(selectors); checkEntitySelectorsError != nil {
+				return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, checkEntitySelectorsError)
 			}
 		}
 		for _, entries := range []dependencySelectors{policy.Allow, policy.Disallow} {
 			for _, entry := range entries {
 				for _, selectors := range []entitySelectors{entry.From, entry.To} {
-					if err := checkEntitySelectors(selectors); err != nil {
-						return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, err)
+					if checkEntitySelectorsError := checkEntitySelectors(selectors); checkEntitySelectorsError != nil {
+						return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, checkEntitySelectorsError)
 					}
 				}
 			}
 		}
 	}
-	if err := refuseTemplate(settings.Message); err != nil {
-		return nil, fmt.Errorf("boundaries/dependencies: %w", err)
+	if refuseTemplateError := refuseTemplate(settings.Message); refuseTemplateError != nil {
+		return nil, fmt.Errorf("boundaries/dependencies: %w", refuseTemplateError)
 	}
 
 	// Anchored where the config was written, which is where upstream's rootPath sits for every project
@@ -368,7 +368,7 @@ func matchGlobSegments(pattern []string, segments []string) bool {
 	}
 	// One segment, so `*` and `?` cannot cross a slash. Brace and extglob syntax, which path.Match
 	// does not read, is refused when the options are decoded.
-	if matched, err := path.Match(pattern[0], segments[0]); err != nil || !matched {
+	if matched, matchError := path.Match(pattern[0], segments[0]); matchError != nil || !matched {
 		return false
 	}
 	return matchGlobSegments(pattern[1:], segments[1:])
@@ -558,16 +558,16 @@ var Dependencies = rule.Rule{
 		// Measuring only against the root as written would put every package outside the project,
 		// where it is skipped for the wrong reason and the external check is never asked.
 		roots := []string{root}
-		if realRoot, err := filepath.EvalSymlinks(root); err == nil && realRoot != root {
+		if realRoot, resolveSymlinksError := filepath.EvalSymlinks(root); resolveSymlinksError == nil && realRoot != root {
 			roots = append(roots, realRoot)
 		}
 		relative := func(fileName string) (string, bool) {
 			for _, candidate := range roots {
-				path, err := filepath.Rel(candidate, fileName)
+				path, relativePathError := filepath.Rel(candidate, fileName)
 				// Slashed before the test rather than after it: on Windows Rel answers `..\x`, which the
 				// `../` test let through, so every file outside the root was described as inside it.
 				path = filepath.ToSlash(path)
-				if err == nil && path != ".." && !strings.HasPrefix(path, "../") {
+				if relativePathError == nil && path != ".." && !strings.HasPrefix(path, "../") {
 					return path, true
 				}
 			}

@@ -13,14 +13,14 @@ import (
 func keyFixture(test *testing.T, root string, source string) *listing {
 	test.Helper()
 	shim := filepath.Join(root, "TypeScript-shim", "ast")
-	if err := os.MkdirAll(shim, 0o755); err != nil {
-		test.Fatal(err)
+	if createDirectoryError := os.MkdirAll(shim, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
 	}
-	if err := os.WriteFile(filepath.Join(shim, "go.mod"), []byte("module example.com/shim/ast\n\ngo 1.27\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(shim, "go.mod"), []byte("module example.com/shim/ast\n\ngo 1.27\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.WriteFile(filepath.Join(shim, "ast.go"), []byte(source), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(shim, "ast.go"), []byte(source), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	packages := []*listedPackage{
 		{ImportPath: "strings", Name: "strings", Standard: true, GoFiles: []string{"builder.go", "strings.go"}},
@@ -96,9 +96,9 @@ func TestAProductKeyMovesWithWhatChangesItsExportData(test *testing.T) {
 			environment[key] = original
 		}
 		environment[name] = value
-		key, _, err := productKey(product, root, environment, keyFixture(test, root, "package ast\n"), everyPackage)
-		if err != nil {
-			test.Fatal(err)
+		key, _, productKeyError := productKey(product, root, environment, keyFixture(test, root, "package ast\n"), everyPackage)
+		if productKeyError != nil {
+			test.Fatal(productKeyError)
 		}
 		if key == baseKey {
 			test.Errorf("%s=%s kept the product's key", name, value)
@@ -122,9 +122,9 @@ func TestAPackageOutsideTheRepositoryIsRefusedAKey(test *testing.T) {
 
 	root, elsewhere := test.TempDir(), test.TempDir()
 	listed := keyFixture(test, elsewhere, "package ast\n")
-	_, _, err := productKey(Product{Name: "fixture"}, root, keyEnvironment, listed, everyPackage)
-	if err == nil || !strings.Contains(err.Error(), "outside the repository") {
-		test.Fatalf("a package outside the repository was keyed: %v", err)
+	_, _, productKeyError := productKey(Product{Name: "fixture"}, root, keyEnvironment, listed, everyPackage)
+	if productKeyError == nil || !strings.Contains(productKeyError.Error(), "outside the repository") {
+		test.Fatalf("a package outside the repository was keyed: %v", productKeyError)
 	}
 }
 
@@ -180,11 +180,11 @@ func TestAMissingProductNamesTheKeyTheCacheHoldsInstead(test *testing.T) {
 
 	cache := test.TempDir()
 	theirs := "name go types fixture\npatterns ./...\ngo go1.27.0 linux/amd64 GOEXPERIMENT=\npackage strings standard 0123456789ab\n"
-	if err := os.WriteFile(filepath.Join(cache, strings.Repeat("a", 64)+".inputs"), []byte(theirs), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(cache, strings.Repeat("a", 64)+".inputs"), []byte(theirs), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
-	if err := os.WriteFile(filepath.Join(cache, strings.Repeat("b", 64)+".inputs"), []byte("name go types another\n"), 0o644); err != nil {
-		test.Fatal(err)
+	if writeError := os.WriteFile(filepath.Join(cache, strings.Repeat("b", 64)+".inputs"), []byte("name go types another\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
 	}
 	ours := strings.Replace(theirs, "linux/amd64", "darwin/arm64", 1)
 	named := otherKeys(Product{Name: "fixture"}, &productState{key: strings.Repeat("c", 64), description: ours, cache: cache})

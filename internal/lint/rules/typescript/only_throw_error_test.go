@@ -512,9 +512,9 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 
 	test.Run("an empty object leaves every pointer nil so the rule defaults them", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(`{}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(`{}`))
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
 		options, ok := decoded.(OnlyThrowErrorOptions)
 		if !ok {
@@ -542,10 +542,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 
 	test.Run("a bare string lands in AllowInline and an object lands in Allow", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": ["Promise", {"from": "lib", "name": "undefined"}]}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		if len(options.AllowInline) != 1 || options.AllowInline[0] != "Promise" {
@@ -564,10 +564,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 
 	test.Run("name accepts an array as well as a string", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "file", "name": ["A", "B"], "path": "x.ts"}]}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		if len(options.Allow) != 1 || len(options.Allow[0].Name) != 2 {
@@ -583,10 +583,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 
 	test.Run("an unrecognized from is dropped rather than silently meaning file", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "nowhere", "name": "X"}]}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		// `file` is the zero value, so keeping the specifier would silently mean `file`. Dropping
@@ -598,10 +598,10 @@ func TestDecodeOnlyThrowErrorOptions(test *testing.T) {
 
 	test.Run("the package form carries its package name", func(test *testing.T) {
 		test.Parallel()
-		decoded, err := DecodeOnlyThrowErrorOptions(json.RawMessage(
+		decoded, decodeOnlyThrowErrorOptionsError := DecodeOnlyThrowErrorOptions(json.RawMessage(
 			`{"allow": [{"from": "package", "name": "ErrorLike", "package": "errors"}]}`))
-		if err != nil {
-			test.Fatalf("decoding: %v", err)
+		if decodeOnlyThrowErrorOptionsError != nil {
+			test.Fatalf("decoding: %v", decodeOnlyThrowErrorOptionsError)
 		}
 		options := decoded.(OnlyThrowErrorOptions)
 		if len(options.Allow) != 1 {

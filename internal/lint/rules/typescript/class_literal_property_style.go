@@ -910,7 +910,7 @@ func DecodeClassLiteralPropertyStyleOptions(raw []byte) (any, error) {
 		return DefaultClassLiteralPropertyStyleOptions(), nil
 	}
 	var wire string
-	if err := json.Unmarshal(raw, &wire); err != nil {
+	if decodeError := json.Unmarshal(raw, &wire); decodeError != nil {
 		return DefaultClassLiteralPropertyStyleOptions(),
 			fmt.Errorf(`expected a style string, "fields" or "getters", got %s`, trimmed)
 	}
