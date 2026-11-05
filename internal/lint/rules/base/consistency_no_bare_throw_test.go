@@ -154,7 +154,8 @@ func TestNoBareThrowFires(test *testing.T) {
 			rule_testing.ExpectFindings(test, result, wantIds...)
 
 			for index, wantSpan := range testCase.wantSpans {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				diagnostic := result.Diagnostics[index]
+				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != wantSpan {
 					test.Errorf("finding %d covers %q, want %q", index, reported, wantSpan)
 				}

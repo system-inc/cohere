@@ -33,9 +33,10 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(tes
 			fileName: "pages/_document.tsx",
 			source:   "import Document, { Html, Main, NextScript } from 'next/document'\n                  import ScriptComponent from 'next/script'\n\n                  class MyDocument extends Document {\n                    render() {\n                      return (\n                        <Html>\n                          <Head>\n                            <meta charSet=\"utf-8\" />\n                          </Head>\n                          <body>\n                            <Main />\n                            <NextScript />\n                            <ScriptComponent\n                              id=\"scriptBeforeInteractive\"\n                              src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                            ></ScriptComponent>\n                          </body>\n                        </Html>\n                      )\n                    }\n                  }\n\n                  export default MyDocument\n\t\t\t",
 		},
+		// Not a machine path: upstream's own test input, a file the rule only reads by name
 		{
 			name:     "an app directory layout, exempt before the tag name is even read",
-			fileName: "/Users/user_name/projects/project-name/app/layout.tsx", // Not a machine path: upstream's own test input, a file the rule only reads by name
+			fileName: "/Users/user_name/projects/project-name/app/layout.tsx",
 			source:   "import Script from \"next/script\";\n\n                  export default function Index() {\n                    return (\n                      <html lang=\"en\">\n                        <body className={inter.className}>{children}</body>\n                        <Script\n                          src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                          strategy='beforeInteractive'\n                        />\n                      </html>\n                    );\n                  }\n\t\t\t",
 		},
 		{
@@ -43,9 +44,10 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(tes
 			fileName: "C:\\Users\\username\\projects\\project-name\\app\\layout.tsx",
 			source:   "import Script from \"next/script\";\n\n                  export default function test() {\n                    return (\n                      <html lang=\"en\">\n                        <body className={inter.className}>{children}</body>\n                        <Script\n                          src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                          strategy='beforeInteractive'\n                        />\n                      </html>\n                    );\n                  }\n\t\t\t",
 		},
+		// Not a machine path: upstream's own test input, a file the rule only reads by name
 		{
 			name:     "a src app directory layout",
-			fileName: "/Users/user_name/projects/project-name/src/app/layout.tsx", // Not a machine path: upstream's own test input, a file the rule only reads by name
+			fileName: "/Users/user_name/projects/project-name/src/app/layout.tsx",
 			source:   "import Script from \"next/script\";\n\n                  export default function Index() {\n                    return (\n                      <html lang=\"en\">\n                        <body className={inter.className}>{children}</body>\n                        <Script\n                          src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                          strategy='beforeInteractive'\n                        />\n                      </html>\n                    );\n                  }\n\t\t\t",
 		},
 		{
@@ -88,9 +90,10 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(test *
 			fileName: "components/outside-known-dirs.js",
 			source:   " import Head from \"next/head\";\n             import Script from \"next/script\";\n\n             export default function Index() {\n               return (\n                 <Script\n                   id=\"scriptBeforeInteractive\"\n                   src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                   strategy=\"beforeInteractive\"\n                 ></Script>\n               );\n             }\n\t\t\t",
 		},
+		// Not a machine path: upstream's own test input, a file the rule only reads by name
 		{
 			name:     "a pages file that is not the document, absolute POSIX path",
-			fileName: "/Users/user_name/projects/project-name/pages/layout.tsx", // Not a machine path: upstream's own test input, a file the rule only reads by name
+			fileName: "/Users/user_name/projects/project-name/pages/layout.tsx",
 			source:   " import Script from \"next/script\";\n\n                  export default function Index() {\n                    return (\n                      <html lang=\"en\">\n                        <body className={inter.className}>{children}</body>\n                        <Script\n                          src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                          strategy='beforeInteractive'\n                        />\n                      </html>\n                    );\n                  }\n\t\t\t",
 		},
 		{
@@ -98,9 +101,10 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(test *
 			fileName: "C:\\Users\\username\\projects\\project-name\\pages\\layout.tsx",
 			source:   " import Script from \"next/script\";\n\n                  export default function Index() {\n                    return (\n                      <html lang=\"en\">\n                        <body className={inter.className}>{children}</body>\n                        <Script\n                          src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                          strategy='beforeInteractive'\n                        />\n                      </html>\n                    );\n                  }\n\t\t\t",
 		},
+		// Not a machine path: upstream's own test input, a file the rule only reads by name
 		{
 			name:     "a src pages file that is not the document",
-			fileName: "/Users/user_name/projects/project-name/src/pages/layout.tsx", // Not a machine path: upstream's own test input, a file the rule only reads by name
+			fileName: "/Users/user_name/projects/project-name/src/pages/layout.tsx",
 			source:   " import Script from \"next/script\";\n\n                  export default function Index() {\n                    return (\n                      <html lang=\"en\">\n                        <body className={inter.className}>{children}</body>\n                        <Script\n                          src=\"https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.20/lodash.min.js?a=scriptBeforeInteractive\"\n                          strategy='beforeInteractive'\n                        />\n                      </html>\n                    );\n                  }\n\t\t\t",
 		},
 		{

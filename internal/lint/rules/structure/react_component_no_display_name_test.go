@@ -35,7 +35,8 @@ func TestReactComponentNoDisplayNameFires(test *testing.T) {
 		},
 		{
 			"a class component",
-			"import React from 'react';\nexport class Field extends React.Component { render() { return <div />; } }\n" +
+			"import React from 'react';\n" +
+				"export class Field extends React.Component { render() { return <div />; } }\n" +
 				"Field.displayName = 'Field';\n",
 			1,
 		},

@@ -239,11 +239,11 @@ func impliedEvalCalleeName(ruleContext rule.Context, callee *ast.Node) (string, 
 // key lives on `ArgumentExpression` instead. Probed rather than assumed, because reading both
 // through `Name()` compiles, passes every dotted fixture, and silently loses every bracketed one:
 //
-//	window.setTimeout('foo')      KindPropertyAccessExpression   Name() -> KindIdentifier
-//	window['setTimeout']('foo')   KindElementAccessExpression    Name() -> nil
-//	                                                             ArgumentExpression -> KindStringLiteral
-//	window[`setTimeout`]('foo')   KindElementAccessExpression    Name() -> nil
-//	                                                             ArgumentExpression -> KindNoSubstitutionTemplateLiteral
+//	window.setTimeout('foo')     KindPropertyAccessExpression  Name() -> KindIdentifier
+//	window['setTimeout']('foo')  KindElementAccessExpression   Name() -> nil
+//	                                                           ArgumentExpression -> KindStringLiteral
+//	window[`setTimeout`]('foo')  KindElementAccessExpression   Name() -> nil
+//	                                                           ArgumentExpression -> KindNoSubstitutionTemplateLiteral
 //
 // Upstream's corpus has 24 bracketed cases and all 24 went silent on the first version of this
 // function, which is what sent the probe after the node shape.
