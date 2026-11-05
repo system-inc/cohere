@@ -129,9 +129,9 @@ var physicalToLogical = []directionMapping{
 // The lesson generalises past this rule: a ported name is not cosmetic, because the suppression
 // surface is keyed on it. A rule renamed in the port silently ignores every disable comment written
 // for it, and the symptom is extra findings rather than an error.
-var NoPhysicalDirection = rule.Rule{
+var NoPhysicalDirection = rule.Rule[rule.NoOptions]{
 	Name: "structure/tailwind-no-physical-direction",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

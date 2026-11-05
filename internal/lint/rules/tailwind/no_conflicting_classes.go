@@ -70,11 +70,11 @@ type NoConflictingClassesOptions struct {
 // renders, and only the author knows which one was meant. The edit engine never applies
 // suggestions, so this is the difference between a repair a human chooses and one that silently
 // picks for them.
-var NoConflictingClasses = rule.Rule{
+var NoConflictingClasses = rule.Rule[NoConflictingClassesOptions]{
 	Name: "better-tailwindcss/no-conflicting-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoConflictingClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -82,7 +82,7 @@ var NoConflictingClasses = rule.Rule{
 		// Read before the design system is resolved: reading is pure, and a run that declines for want
 		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
 		// never looks at this rule (#zwd43jn).
-		configured, isConfigured := rule.OptionsAs[NoConflictingClassesOptions](options)
+		configured, isConfigured := options.Read()
 
 		// Resolved once per file and before the listeners are built, matching the other migrated
 		// rules. A project with no Tailwind is silence with nothing wrong; a project whose CSS will

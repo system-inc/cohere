@@ -73,18 +73,16 @@ type EnforceConsistentImportantPositionOptions struct {
 //
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
-var EnforceConsistentImportantPosition = rule.Rule{
+var EnforceConsistentImportantPosition = rule.Rule[EnforceConsistentImportantPositionOptions]{
 	Name: "better-tailwindcss/enforce-consistent-important-position",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentImportantPositionOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
 		position := importantPositionRecommended
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentImportantPositionOptions](
-			options,
-		); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Position == importantPositionLegacy {
 				position = importantPositionLegacy

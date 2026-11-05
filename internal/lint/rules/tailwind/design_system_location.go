@@ -71,13 +71,12 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 	*Options
 	anchorAt(directory string)
 	compileClassLiterals() error
-}]() func(raw []byte, base rule.OptionsBase) (any, error) {
-	var declared Options
+}]() func(raw []byte, base rule.OptionsBase) (Options, error) {
 	keys := map[string]bool{}
-	for _, key := range rule.OptionKeys(&declared) {
+	for _, key := range rule.OptionKeys[Options]() {
 		keys[key] = true
 	}
-	return func(raw []byte, base rule.OptionsBase) (any, error) {
+	return func(raw []byte, base rule.OptionsBase) (Options, error) {
 		var decoded Options
 		merged := map[string]json.RawMessage{}
 		if settings := tailwindSettings(base.Settings); len(settings) > 0 {
@@ -194,14 +193,13 @@ func tailwindRegistration[Options any, Settled interface {
 	*Options
 	anchorAt(directory string)
 	compileClassLiterals() error
-}](tailwindRule rule.Rule) rule.Registration {
-	var declared Options
+}](tailwindRule rule.Rule[Options]) rule.Registration[Options] {
 	keys := map[string]bool{}
-	for _, key := range rule.OptionKeys(&declared) {
+	for _, key := range rule.OptionKeys[Options]() {
 		keys[key] = true
 	}
 	tailwindOptionKeys[tailwindRule.Name] = keys
-	return rule.Registration{Rule: tailwindRule, DecodeAt: decodeTailwindOptionsAt[Options, Settled]()}
+	return rule.Registration[Options]{Rule: tailwindRule, DecodeAt: decodeTailwindOptionsAt[Options, Settled]()}
 }
 
 // ErrTailwindNotInstalled is returned when no `tailwindcss` resolves from a configured `cwd`. Upstream

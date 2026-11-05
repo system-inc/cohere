@@ -29,7 +29,7 @@ func init() {
 		tailwindRegistration[NoDuplicateClassesOptions](NoDuplicateClasses),
 		tailwindRegistration[NoUnknownClassesOptions](NoUnknownClasses),
 		tailwindRegistration[NoUnnecessaryWhitespaceOptions](NoUnnecessaryWhitespace),
-		rule.Registration{Rule: NoPhysicalDirection},
+		rule.Registration[rule.NoOptions]{Rule: NoPhysicalDirection},
 	)
 	rule.RegisterSettings(rule.SettingsRegistration{
 		Namespaces: tailwindSettingsNamespaces,

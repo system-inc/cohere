@@ -140,16 +140,19 @@ func designSystemProgram(program *compiler.Program) rule.Program {
 	return rule.ViewProgram(
 		program,
 		nil,
-		rule.Rule{Name: "test/design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem},
+		rule.Traits{
+			Name:         "test/design-system",
+			ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
+		},
 	)
 }
 
-func (probe *designSystemProbe) rule() rule.Rule {
-	return rule.Rule{
+func (probe *designSystemProbe) rule() rule.Rule[rule.NoOptions] {
+	return rule.Rule[rule.NoOptions]{
 		Name: "tailwind-design-system-probe",
 		// What DesignSystemForProgram reads. ctx.Program refuses anything undeclared.
 		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-		Run: func(ruleContext rule.Context, _ any) rule.Listeners {
+		Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
 			result := DesignSystemForProgram(ruleContext.Program)
 			probe.mutex.Lock()
 			probe.results = append(probe.results, result)
@@ -165,7 +168,7 @@ func (probe *designSystemProbe) rule() rule.Rule {
 // The real `program.Graph.Walk` rather than a hand-rolled traversal, because the property under
 // test is a concurrency property: the walk runs up to 16 goroutines striding over files, and a
 // single-threaded harness would pass against a cache with no mutex at all.
-func designSystemWalk(test *testing.T, root string, subject rule.Rule) *program.Graph {
+func designSystemWalk(test *testing.T, root string, subject rule.Rule[rule.NoOptions]) *program.Graph {
 	test.Helper()
 
 	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: root})

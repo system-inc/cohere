@@ -58,15 +58,15 @@ type NoDuplicateClassesOptions struct {
 // name would not match it, and an unmatched rule is not an error: it runs over zero files and
 // reports zero findings, which reads exactly like a clean tree. That was the first thing this rule
 // did, and only the coverage line's "listened to no files" note caught it.
-var NoDuplicateClasses = rule.Rule{
+var NoDuplicateClasses = rule.Rule[NoDuplicateClassesOptions]{
 	Name: "better-tailwindcss/no-duplicate-classes",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoDuplicateClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
-		if configured, isConfigured := rule.OptionsAs[NoDuplicateClassesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 
