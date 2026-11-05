@@ -36,7 +36,9 @@ func TestAFailedWriteIsANonzeroExit(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var arrivedOutput, arrivedErrors, lastResort bytes.Buffer
+			var arrivedOutput bytes.Buffer
+			var arrivedErrors bytes.Buffer
+			var lastResort bytes.Buffer
 			output, errorsStream := bufio.NewWriter(&arrivedOutput), bufio.NewWriter(&arrivedErrors)
 			if testCase.outputFails {
 				output = bufio.NewWriter(failingWriter{})
@@ -68,7 +70,9 @@ func TestAFailedWriteIsANonzeroExit(test *testing.T) {
 // again, since the run cache finishes before its verdict and the exit finishes once more.
 func TestAReportedFailureIsCountedAndSaidOnce(test *testing.T) {
 	test.Parallel()
-	var arrivedOutput, arrivedErrors, lastResort bytes.Buffer
+	var arrivedOutput bytes.Buffer
+	var arrivedErrors bytes.Buffer
+	var lastResort bytes.Buffer
 	output, errorsStream := bufio.NewWriter(&arrivedOutput), bufio.NewWriter(&arrivedErrors)
 	state := &delivery{}
 	state.report(errors.New("copying to the terminal: the reader is gone"))
