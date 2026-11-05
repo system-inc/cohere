@@ -3,7 +3,6 @@ package javascript
 import (
 	"sync"
 
-	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
 )
 
@@ -81,20 +80,6 @@ func concat(parts ...Doc) Doc {
 	return result
 }
 
-// docMemory is where one format's docs come from: concat's parts, groups and indents, cut from chunks that
-// are reset once the doc is laid out and reused by the next format (#fyw36kf). Made one at a time they
-// were concat's 3.9M slices, and 1.7M groups and indents, a pass on ahra. A released doc reads as
-// poisonedDoc under cohere_poison, so a doc read after its file was printed shows in the output.
-//
-// An array doc from here is a *doc.Sequence: a Concat is a slice, and putting one in a Doc allocates a cell
-// for its header every time, 3.6M of them a pass on ahra; a pointer from the arena costs nothing.
-type docMemory struct {
-	parts     arena.Slab[doc.Doc]
-	sequences arena.Arena[doc.Sequence]
-	groups    arena.Arena[doc.Group]
-	indents   arena.Arena[doc.Indent]
-}
-
 var poisonedDoc Doc = doc.Text("CoherePoisonedDoc")
 
 var docMemories = sync.Pool{New: func() any {
@@ -114,15 +99,6 @@ func acquireDocMemory() *docMemory {
 		panic("javascript: the doc memory pool held something other than a *docMemory")
 	}
 	return memory
-}
-
-// release resets the memory and returns it to the pool. Every doc it handed out is gone.
-func (memory *docMemory) release() {
-	memory.parts.Reset()
-	memory.sequences.Reset()
-	memory.groups.Reset()
-	memory.indents.Reset()
-	docMemories.Put(memory)
 }
 
 // docMemoryOf is the path's print's docMemory, or nil for the heap.
@@ -180,7 +156,7 @@ func groupWithIn(path *Path, contents Doc, options doc.GroupOptions) Doc {
 		return groupWith(contents, options)
 	}
 	return memory.groups.New(doc.Group{
-		ID:             options.ID,
+		Id:             options.Id,
 		Contents:       orEmptyDoc(contents),
 		Break:          options.ShouldBreak,
 		ExpandedStates: options.ExpandedStates,
@@ -230,13 +206,13 @@ func ifBreak(breakContents Doc, flatContents Doc) Doc {
 }
 
 // ifBreakWithGroup is upstream's ifBreak(breakContents, flatContents, { groupId }).
-func ifBreakWithGroup(breakContents Doc, flatContents Doc, groupID *doc.GroupID) Doc {
-	return doc.NewIfBreak(orEmptyDoc(breakContents), orEmptyDoc(flatContents), groupID)
+func ifBreakWithGroup(breakContents Doc, flatContents Doc, groupId *doc.GroupId) Doc {
+	return doc.NewIfBreak(orEmptyDoc(breakContents), orEmptyDoc(flatContents), groupId)
 }
 
 // indentIfBreak is upstream's indentIfBreak(contents, { groupId, negate }).
-func indentIfBreak(contents Doc, groupID *doc.GroupID, negate bool) Doc {
-	return doc.NewIndentIfBreak(orEmptyDoc(contents), groupID, negate)
+func indentIfBreak(contents Doc, groupId *doc.GroupId, negate bool) Doc {
+	return doc.NewIndentIfBreak(orEmptyDoc(contents), groupId, negate)
 }
 
 // label is upstream's label(name, contents).
@@ -245,8 +221,8 @@ func label(name string, contents Doc) Doc { return doc.NewLabel(name, orEmptyDoc
 // join is upstream's join(separator, parts).
 func join(separator Doc, parts []Doc) Doc { return doc.Join(orEmptyDoc(separator), parts) }
 
-// newGroupID is upstream's Symbol(name) used as a group id.
-func newGroupID(name string) *doc.GroupID { return doc.NewGroupID(name) }
+// newGroupId is upstream's Symbol(name) used as a group id.
+func newGroupId(name string) *doc.GroupId { return doc.NewGroupId(name) }
 
 // labelOf is upstream's `doc.label`, the label of a labelled doc, or "".
 func labelOf(document Doc) string {

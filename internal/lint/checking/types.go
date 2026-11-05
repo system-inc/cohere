@@ -53,7 +53,7 @@ func UnionTypeParts(subjectType *checker.Type) []*checker.Type {
 	return []*checker.Type{subjectType}
 }
 
-// UnionTypePartsSeq yields what UnionTypeParts returns, for a caller that only loops over it, as
+// UnionTypePartsSequence yields what UnionTypeParts returns, for a caller that only loops over it, as
 // strings.SplitSeq does for strings.Split.
 //
 // UnionTypeParts builds a one-element slice for every type that is not a union, and that slice
@@ -61,7 +61,7 @@ func UnionTypeParts(subjectType *checker.Type) []*checker.Type {
 // is most of it), so the compiler cannot see the caller drop it. That was 1.05M objects on a cold ahra
 // run, three quarters of them from strict-void-return (#rwsffzm). This one is small enough to inline,
 // so a range loop over it allocates nothing, which TestUnionTypePartsSeqAllocatesNothing holds.
-func UnionTypePartsSeq(subjectType *checker.Type) iter.Seq[*checker.Type] {
+func UnionTypePartsSequence(subjectType *checker.Type) iter.Seq[*checker.Type] {
 	return func(yield func(*checker.Type) bool) {
 		if !IsUnionType(subjectType) {
 			yield(subjectType)
@@ -188,7 +188,7 @@ func IsCallback(
 		}
 	}
 
-	for subType := range UnionTypePartsSeq(subjectType) {
+	for subType := range UnionTypePartsSequence(subjectType) {
 		if len(GetCallSignatures(typeChecker, subType)) != 0 {
 			return true
 		}
@@ -209,7 +209,7 @@ func IsThenableType(
 	if thenableType == nil {
 		thenableType = typeChecker.GetTypeAtLocation(node)
 	}
-	for typePart := range UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, thenableType)) {
+	for typePart := range UnionTypePartsSequence(checker.Checker_getApparentType(typeChecker, thenableType)) {
 		then := checker.Checker_getPropertyOfType(typeChecker, typePart, "then")
 		if then == nil {
 			continue
@@ -217,7 +217,7 @@ func IsThenableType(
 
 		thenType := typeChecker.GetTypeOfSymbolAtLocation(then, node)
 
-		for subTypePart := range UnionTypePartsSeq(thenType) {
+		for subTypePart := range UnionTypePartsSequence(thenType) {
 			for _, signature := range checker.Checker_getSignaturesOfType(
 				typeChecker,
 				subTypePart,

@@ -28,7 +28,7 @@ import (
 // alone runs can skip itself. The corpus walks in high_level_intermediate_representation read it.
 const fastTierVariable = "COHERE_FAST_TIER"
 
-// fastBudgetCPUSeconds is what a package, or part of one, must cost in CPU, user plus system, measured alone
+// fastBudgetCpuSeconds is what a package, or part of one, must cost in CPU, user plus system, measured alone
 // with -count=1 and its test binary already built, to join landingGateOnly. Anything at or under it stays
 // in the edit loop. TestEveryLandingGateOnlyEntryStillEarnsItsPlace holds every entry's recorded cost above
 // it.
@@ -42,15 +42,15 @@ const fastTierVariable = "COHERE_FAST_TIER"
 // command/cohere read 926 to 933s of CPU at load 105 to 166 against 49.4s at load about 10, and
 // crosscompile 36 to 41s against 26. Every change load made was upward, so a reading at low load is the
 // low one.
-const fastBudgetCPUSeconds = 15
+const fastBudgetCpuSeconds = 15
 
-// fastEvictionCPUSeconds is what an entry, measured again now, must fall to before
+// fastEvictionCpuSeconds is what an entry, measured again now, must fall to before
 // TestEveryLandingGateOnlyEntryStillEarnsItsPlace sends it back to the edit loop: a third under the budget
 // to join, because a live measurement scatters and one threshold judged both ways flips on the scatter.
 // hir's corpus walks, a difference of two runs, read 14.9s in one of build's land runs, 18.5s at load 10
 // and 24.8s at load 13 to 50, all on 2026-10-05, and failed build's land at 14.9 against a single bar of
 // 15. Under 10 is a change in what the tests do, not in who else is running.
-const fastEvictionCPUSeconds = 10
+const fastEvictionCpuSeconds = 10
 
 // landingGateEntry is one thing the fast tier leaves to the full gate.
 type landingGateEntry struct {

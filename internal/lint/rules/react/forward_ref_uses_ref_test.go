@@ -127,9 +127,9 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(test *testing.T) {
 	test.Parallel()
 
 	for _, testCase := range []struct {
-		source     string
-		wantRemove string
-		wantAddRef string
+		source           string
+		wantRemove       string
+		wantAddReference string
 	}{
 		{"forwardRef((a) => {})", "(a) => {}", "forwardRef((a, ref) => {})"},
 		// Whitespace between the call's `(` and the function is the function node's leading
@@ -179,8 +179,8 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(test *testing.T) {
 		if addReference.Message.Id != "forwardRefAddRefParameter" {
 			test.Errorf("%q add-ref suggestion was %q", testCase.source, addReference.Message.Id)
 		}
-		if got := applySuggestion(testCase.source, addReference); got != testCase.wantAddRef {
-			test.Errorf("%q add-ref produced %q, want %q", testCase.source, got, testCase.wantAddRef)
+		if got := applySuggestion(testCase.source, addReference); got != testCase.wantAddReference {
+			test.Errorf("%q add-ref produced %q, want %q", testCase.source, got, testCase.wantAddReference)
 		}
 	}
 }
@@ -371,8 +371,8 @@ func TestForwardRefUsesRefRewritesAwkwardParameterLists(test *testing.T) {
 	test.Parallel()
 
 	for _, testCase := range []struct {
-		source     string
-		wantAddRef string
+		source           string
+		wantAddReference string
 	}{
 		// A type annotation sits inside the parameter's own range, so scanning to the next `)`
 		// after the last parameter does not stop early on the one inside a function type.
@@ -399,8 +399,8 @@ func TestForwardRefUsesRefRewritesAwkwardParameterLists(test *testing.T) {
 		suggestions := result.Diagnostics[0].Suggestions
 		addReference := suggestions[len(suggestions)-1]
 		got := applySuggestion(testCase.source, addReference)
-		if got != testCase.wantAddRef {
-			test.Errorf("%q add-ref produced %q, want %q", testCase.source, got, testCase.wantAddRef)
+		if got != testCase.wantAddReference {
+			test.Errorf("%q add-ref produced %q, want %q", testCase.source, got, testCase.wantAddReference)
 		}
 		if !strings.Contains(got, ", ref)") {
 			test.Errorf("%q did not gain a ref parameter", testCase.source)

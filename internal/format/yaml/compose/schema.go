@@ -17,35 +17,6 @@ const (
 	defaultKey
 )
 
-// Tag is a schema tag, upstream's ScalarTag or CollectionTag.
-type Tag struct {
-	Tag string
-	// Collection is "map" or "seq" for a collection tag, "" for a scalar tag (undefined).
-	Collection string
-	Default    tagDefault
-	// Test is the tag's test regular expression, nil when it has none. It is matched against the
-	// asciiView of the value, which every test's ASCII-only classes read the same way.
-	Test   *regexp.Regexp
-	Format string
-	// NodeClass is the collection class the tag constructs, "" when it has none.
-	NodeClass string
-
-	// resolveScalar is a scalar tag's resolve. It returns a *Node when upstream's returns a Scalar,
-	// otherwise the raw value, and an error where upstream's throws.
-	resolveScalar func(value []uint16, onError func(message string), options *Options) (any, error)
-	// resolveCollection is a collection tag's resolve.
-	resolveCollection func(collection *Node, onError func(message string)) *Node
-
-	// prototypeProperty marks what knownTag finds for a tag named like a property every JavaScript
-	// object inherits: something with no tag, collection, test or resolve.
-	prototypeProperty bool
-}
-
-// test is `tag.test?.test(value)`.
-func (tag *Tag) test(value []uint16) bool {
-	return tag.Test != nil && tag.Test.MatchString(asciiView(value))
-}
-
 // Schema is a Document's schema.
 type Schema struct {
 	Name string
@@ -135,11 +106,11 @@ func copyTag(tag *Tag) *Tag {
 
 // The tag names composing compares against.
 const (
-	mapTagName  = "tag:yaml.org,2002:map"
-	seqTagName  = "tag:yaml.org,2002:seq"
-	strTagName  = "tag:yaml.org,2002:str"
-	omapTagName = "tag:yaml.org,2002:omap"
-	setTagName  = "tag:yaml.org,2002:set"
+	mapTagName    = "tag:yaml.org,2002:map"
+	seqTagName    = "tag:yaml.org,2002:seq"
+	stringTagName = "tag:yaml.org,2002:str"
+	omapTagName   = "tag:yaml.org,2002:omap"
+	setTagName    = "tag:yaml.org,2002:set"
 )
 
 // Ported from dist/schema/common/: map.js, seq.js, string.js, null.js.
@@ -163,7 +134,7 @@ var seqTag = &Tag{
 	NodeClass:  "YAMLSeq",
 	Tag:        seqTagName,
 	resolveCollection: func(collection *Node, onError func(message string)) *Node {
-		if !IsSeq(collection) {
+		if !IsSequence(collection) {
 			onError("Expected a sequence for this tag")
 		}
 		return collection
@@ -172,7 +143,7 @@ var seqTag = &Tag{
 
 var stringTag = &Tag{
 	Default: defaultTrue,
-	Tag:     strTagName,
+	Tag:     stringTagName,
 	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
 		return unitsToString(value), nil
 	},
@@ -237,7 +208,7 @@ var coreIntHexTag = &Tag{
 // floatNaNResolve is floatNaN's resolve, the same in both schemas.
 func floatNaNResolve(value []uint16, _ func(string), _ *Options) (any, error) {
 	last := slice(value, -3, len(value))
-	if len(last) == 3 && toLowerASCII(last) == "nan" {
+	if len(last) == 3 && toLowerAscii(last) == "nan" {
 		return nan(), nil
 	}
 	if characterAt(value, 0) == '-' {
@@ -246,9 +217,9 @@ func floatNaNResolve(value []uint16, _ func(string), _ *Options) (any, error) {
 	return positiveInfinity(), nil
 }
 
-// toLowerASCII is `text.toLowerCase()` for text whose comparison is against an ASCII literal: any
+// toLowerAscii is `text.toLowerCase()` for text whose comparison is against an ASCII literal: any
 // non-ASCII unit stays non-ASCII, so it can never compare equal.
-func toLowerASCII(text []uint16) string {
+func toLowerAscii(text []uint16) string {
 	lowered := []byte(asciiView(text))
 	for index, character := range lowered {
 		if character >= 'A' && character <= 'Z' {

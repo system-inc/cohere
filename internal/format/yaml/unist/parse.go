@@ -67,7 +67,7 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, parseError error)
 	cstTokens := slices.Collect(parser.Parse(units, false))
 	for parsedDocument := range composer.Compose(cstTokens, true, len(units)) {
 		if len(parsedDocument.Errors) > 0 {
-			return nil, context.newYAMLSyntaxError(parsedDocument.Errors[0], offsets)
+			return nil, context.newYamlSyntaxError(parsedDocument.Errors[0], offsets)
 		}
 		parsedDocuments = append(parsedDocuments, parsedDocument)
 	}
@@ -92,10 +92,6 @@ func Parse(text string, nodes *arena.Arena[Node]) (root *Node, parseError error)
 	return root, nil
 }
 
-// unitOffsets maps a UTF-16 unit index to its byte offset in the text, the conversion the printer's tree
-// loader makes.
-type unitOffsets []int
-
 // newUnitOffsets appends text's offsets to offsets, which may be a table kept from an earlier parse.
 func newUnitOffsets(text string, offsets unitOffsets) unitOffsets {
 	offsets = slices.Grow(offsets, len(text)+1)
@@ -118,32 +114,4 @@ func appendUnits(units []uint16, text string) []uint16 {
 		units = utf16.AppendRune(units, character)
 	}
 	return units
-}
-
-// byteOffset is the unit's byte offset. Past the end of the text, each unit is one byte further.
-func (offsets unitOffsets) byteOffset(unit int) int {
-	last := len(offsets) - 1
-	if unit > last {
-		return offsets[last] + unit - last
-	}
-	if unit < 0 {
-		return unit
-	}
-	return offsets[unit]
-}
-
-// convert is the position as Node.Position holds it.
-func (offsets unitOffsets) convert(position *position) Position {
-	return Position{
-		Start: Point{
-			Line:   position.start.line,
-			Column: position.start.column,
-			Offset: offsets.byteOffset(position.start.offset),
-		},
-		End: Point{
-			Line:   position.end.line,
-			Column: position.end.column,
-			Offset: offsets.byteOffset(position.end.offset),
-		},
-	}
 }

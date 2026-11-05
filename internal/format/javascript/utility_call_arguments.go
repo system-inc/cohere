@@ -18,20 +18,20 @@ import (
 // upstream's callers (canAttachComment, isTestCall, isSimpleCallArgument) do not have, so the Go
 // computes it each time and keeps upstream's one-argument signature.
 func getCallArguments(node Node) []Node {
-	var args []Node
+	var arguments []Node
 	if node.Is("ImportExpression", "TSImportType") {
-		args = []Node{node.Child("source")}
+		arguments = []Node{node.Child("source")}
 
 		if node.Truthy("options") {
-			args = append(args, node.Child("options"))
+			arguments = append(arguments, node.Child("options"))
 		}
 	} else if node.Is("TSExternalModuleReference") {
-		args = []Node{node.Child("expression")}
+		arguments = []Node{node.Child("expression")}
 	} else {
-		args = node.List("arguments")
+		arguments = node.List("arguments")
 	}
 
-	return args
+	return arguments
 }
 
 // iterateCallArgumentsPath is upstream's iterateCallArgumentsPath.
@@ -164,21 +164,21 @@ func isInsideCallOrNewExpressionParentheses(callOrNewExpression Node, nodeOrComm
 // Logic to check for args with multiple anonymous functions. For instance,
 // the following call should be split on multiple lines for readability:
 // source.pipe(map((x) => x + x), filter((x) => x % 2 === 0))
-func isFunctionCompositionArguments(args []Node) bool {
-	if len(args) <= 1 {
+func isFunctionCompositionArguments(arguments []Node) bool {
+	if len(arguments) <= 1 {
 		return false
 	}
 	count := 0
-	for _, arg := range args {
-		if isFunctionOrArrowExpression(arg) {
+	for _, argument := range arguments {
+		if isFunctionOrArrowExpression(argument) {
 			count += 1
 			if count > 1 {
 				return true
 			}
 		} else {
-			arg = stripChainElementWrappers(arg)
-			if isCallExpression(arg) {
-				for _, childArgument := range getCallArguments(arg) {
+			argument = stripChainElementWrappers(argument)
+			if isCallExpression(argument) {
+				for _, childArgument := range getCallArguments(argument) {
 					if isFunctionOrArrowExpression(childArgument) {
 						return true
 					}
@@ -253,12 +253,12 @@ func isSimpleCallArgument(node Node, depth int) bool {
 	if isCallLikeExpression(unwrapped) {
 		if unwrapped.Is("ImportExpression") ||
 			isSimpleCallArgument(unwrapped.Child("callee"), depth) {
-			args := getCallArguments(unwrapped)
-			if len(args) > depth {
+			arguments := getCallArguments(unwrapped)
+			if len(arguments) > depth {
 				return false
 			}
-			for _, arg := range args {
-				if !isChildSimple(arg) {
+			for _, argument := range arguments {
+				if !isChildSimple(argument) {
 					return false
 				}
 			}

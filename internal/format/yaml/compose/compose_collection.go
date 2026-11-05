@@ -16,7 +16,7 @@ func resolveCollection(
 	case "block-map":
 		coll = resolveBlockMap(composition, token, onError, tag)
 	case "block-seq":
-		coll = resolveBlockSeq(composition, token, onError, tag)
+		coll = resolveBlockSequence(composition, token, onError, tag)
 	default:
 		coll = resolveFlowCollection(composition, token, onError, tag)
 	}
@@ -41,7 +41,7 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 		})
 	}
 	if token.Type == "block-seq" {
-		anchor, nl := properties.anchor, properties.newlineAfterProp
+		anchor, nl := properties.anchor, properties.newlineAfterProperty
 		var lastProperty *cst.Token
 		if anchor != nil && tagToken != nil {
 			if anchor.Offset > tagToken.Offset {
@@ -60,7 +60,7 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 		}
 	}
 	expType := "seq"
-	if token.Type == "block-map" || token.Type == "flow-collection" && equalsASCII(token.FlowStart.Source, "{") {
+	if token.Type == "block-map" || token.Type == "flow-collection" && equalsAscii(token.FlowStart.Source, "{") {
 		expType = "map"
 	}
 	// shortcut: check if it's a generic YAMLMap or YAMLSeq
@@ -133,14 +133,6 @@ func knownTag(schema *Schema, tagName string) *Tag {
 		return &Tag{prototypeProperty: true}
 	}
 	return nil
-}
-
-// tagString is `${tag.tag}`: "undefined" for an inherited property, which has no tag.
-func (tag *Tag) tagString() string {
-	if tag.prototypeProperty {
-		return "undefined"
-	}
-	return tag.Tag
 }
 
 type scalarResolution struct {
@@ -250,7 +242,7 @@ func findScalarTagByName(
 		schema.Tags = append(schema.Tags, copied)
 		return kt
 	}
-	onError(tagToken, "TAG_RESOLVE_FAILED", "Unresolved tag: "+tagName, tagName != strTagName)
+	onError(tagToken, "TAG_RESOLVE_FAILED", "Unresolved tag: "+tagName, tagName != stringTagName)
 	return schema.scalarTag()
 }
 

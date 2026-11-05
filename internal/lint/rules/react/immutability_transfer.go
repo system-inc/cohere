@@ -48,7 +48,7 @@ func immutabilityTransfer(
 	// changes what the program sees and not what React saw. Measured: the same mutation before the
 	// JSX is clean and after it reports.
 	case *high_level_intermediate_representation.JsxExpression:
-		for _, attribute := range instructionValue.Props {
+		for _, attribute := range instructionValue.Properties {
 			// A callback handed to JSX is held by React past the end of this render, exactly as one
 			// handed to a hook is, so the known-mutable-function check belongs here too. Measured:
 			// `let l = 0; const cb = () => { l = 1; }; return <div onClick={cb} />;` reports twice
@@ -222,7 +222,7 @@ func immutabilityTransfer(
 			state,
 			instruction,
 			instructionValue.Callee.Identifier,
-			instructionValue.Args,
+			instructionValue.Arguments,
 			target,
 			collected,
 			order,
@@ -297,7 +297,8 @@ func immutabilityCheckWrite(
 	// `refs.go` owns the render-time half of this question and reports a ref access during render
 	// under its own rule, so the exemption here loses no coverage; it routes the finding to the rule
 	// whose name matches it.
-	if immutabilityIsRefValue(ruleContext, function, state, object) || immutabilityWriteTargetIsRef(ruleContext, node) {
+	if immutabilityIsRefValue(ruleContext, function, state, object) ||
+		immutabilityWriteTargetIsReference(ruleContext, node) {
 		return findings
 	}
 	current := state.kindOf(object)
@@ -378,7 +379,7 @@ func immutabilityCallTransfer(
 	state *immutabilityState,
 	instruction *high_level_intermediate_representation.Instruction,
 	callee static_single_assignment.IdentifierId,
-	args []high_level_intermediate_representation.Argument,
+	arguments []high_level_intermediate_representation.Argument,
 	target static_single_assignment.IdentifierId,
 	findings []immutabilityFinding,
 	order *int,
@@ -393,7 +394,7 @@ func immutabilityCallTransfer(
 	}
 
 	collected := findings
-	for _, argument := range args {
+	for _, argument := range arguments {
 		// Handing a function that reassigns a local to a hook is the "known mutable function"
 		// finding: React will hold the function past render and calling it later writes to a
 		// variable whose value the next render has already forgotten.
@@ -537,7 +538,7 @@ func immutabilityMethodCallTransfer(
 		return findings
 	}
 	collected := findings
-	for _, argument := range value.Args {
+	for _, argument := range value.Arguments {
 		collected = immutabilityCheckFrozenFunction(
 			state,
 			argument.Place.Identifier,
@@ -663,7 +664,7 @@ func immutabilityNestedFunctionTransfer(
 	return collected
 }
 
-// immutabilityWriteTargetIsRef asks the checker whether the thing being written to is a ref.
+// immutabilityWriteTargetIsReference asks the checker whether the thing being written to is a ref.
 //
 // Asked through the write's own syntax rather than through the value's identifier, and that is the
 // whole trick. A property store's object is a temporary produced by a load, so
@@ -681,7 +682,7 @@ func immutabilityNestedFunctionTransfer(
 // the real tree rather than in a fixture: `rule_testing`'s tsconfig sets `types: []` and resolves no
 // `node_modules`, so `@types/react` never resolves there and every symbol is nil. The fixtures
 // therefore cannot see this exemption at all, and the two ref fixtures below pin the name half only.
-func immutabilityWriteTargetIsRef(ruleContext rule.Context, node *ast.Node) bool {
+func immutabilityWriteTargetIsReference(ruleContext rule.Context, node *ast.Node) bool {
 	if ruleContext.TypeChecker == nil || node == nil {
 		return false
 	}
@@ -868,7 +869,7 @@ func immutabilityCapturedWriteFinding(
 	if names[object] != "" && refsIsRefLikeName(names[object]) {
 		return findings
 	}
-	if immutabilityWriteTargetIsRef(ruleContext, instruction.Node) {
+	if immutabilityWriteTargetIsReference(ruleContext, instruction.Node) {
 		return findings
 	}
 	switch immutabilityMutate(current.Kind) {

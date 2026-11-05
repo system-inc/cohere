@@ -153,7 +153,7 @@ func (parser *parser) combinator() {
 			sourceEdgeOf(node, "end")["column"] = parser.nextToken().at(3)
 			sourceEdgeOf(node, "end")["line"] = parser.nextToken().at(2)
 			node.Set("sourceIndex", parser.nextToken().at(4))
-		} else if parser.prevToken() != nil && parser.prevToken().kind == "combinator" {
+		} else if parser.previousToken() != nil && parser.previousToken().kind == "combinator" {
 			spacesOf(node)["after"] = parser.parseSpace(parser.currToken().value, "")
 		} else if parser.currToken().kind == "combinator" {
 			node.Set("value", parser.currToken().value)
@@ -210,8 +210,8 @@ func (parser *parser) missingSquareBracket() {
 func (parser *parser) namespace() {
 	// this.prevToken && this.prevToken[1] || true: a token's value is never empty.
 	var before any = true
-	if parser.prevToken() != nil && parser.prevToken().value != "" {
-		before = parser.prevToken().value
+	if parser.previousToken() != nil && parser.previousToken().value != "" {
+		before = parser.previousToken().value
 	}
 	if parser.nextToken() == nil {
 		throwTypeError("0")
@@ -331,7 +331,7 @@ func (parser *parser) pseudo() {
 func (parser *parser) space() {
 	token := parser.currToken()
 	// Handle space before and after the selector
-	if parser.position == 0 || parser.prevToken().kind == "," || parser.prevToken().kind == "(" {
+	if parser.position == 0 || parser.previousToken().kind == "," || parser.previousToken().kind == "(" {
 		parser.spaces = parser.parseSpace(token.value, "")
 		parser.position++
 	} else if parser.position == len(parser.tokens)-1 ||
@@ -396,19 +396,19 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 	// The indexes below are UTF-16, as the column and sourceIndex arithmetic needs.
 	units := wtf8ToUnits(word)
 	hasClass := indexesOf(units, ".")
-	hasID := indexesOf(units, "#")
+	hasId := indexesOf(units, "#")
 	// Eliminate Sass interpolations from the list of id indexes
 	interpolations := indexesOf(units, "#{")
 	if len(interpolations) > 0 {
 		filtered := []int{}
-		for _, hashIndex := range hasID {
+		for _, hashIndex := range hasId {
 			if !containsInt(interpolations, hashIndex) {
 				filtered = append(filtered, hashIndex)
 			}
 		}
-		hasID = filtered
+		hasId = filtered
 	}
-	indices := sortAscending(uniq(flatten([]int{0}, hasClass, hasID)))
+	indices := sortAscending(uniq(flatten([]int{0}, hasClass, hasId)))
 	for indexIndex, ind := range indices {
 		index := len(units)
 		if indexIndex+1 < len(indices) && indices[indexIndex+1] != 0 {
@@ -416,7 +416,7 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 		}
 		value := units[ind:index]
 		if indexIndex == 0 && firstCallback != nil {
-			firstCallback(unitsToWTF8(value), len(indices))
+			firstCallback(unitsToWtf8(value), len(indices))
 			continue
 		}
 		currToken := parser.currToken()
@@ -429,19 +429,19 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 		var node *estree.Node
 		if containsInt(hasClass, ind) {
 			node = newSelectorNode(typeClass,
-				"value", unitsToWTF8(value[1:]),
+				"value", unitsToWtf8(value[1:]),
 				"source", nodeSource,
 				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
-		} else if containsInt(hasID, ind) {
-			node = newSelectorNode(typeID,
-				"value", unitsToWTF8(value[1:]),
+		} else if containsInt(hasId, ind) {
+			node = newSelectorNode(typeId,
+				"value", unitsToWtf8(value[1:]),
 				"source", nodeSource,
 				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
 		} else {
 			node = newSelectorNode(typeTag,
-				"value", unitsToWTF8(value),
+				"value", unitsToWtf8(value),
 				"source", nodeSource,
 				"sourceIndex", jsAdd(currToken.loose(6), indices[indexIndex]),
 			)
@@ -550,9 +550,9 @@ func sourceEdgeOf(node *estree.Node, edge string) map[string]any {
 }
 
 // currToken, nextToken and prevToken are upstream's getters, nil past either end of the tokens.
-func (parser *parser) currToken() *token { return parser.tokenAt(parser.position) }
-func (parser *parser) nextToken() *token { return parser.tokenAt(parser.position + 1) }
-func (parser *parser) prevToken() *token { return parser.tokenAt(parser.position - 1) }
+func (parser *parser) currToken() *token     { return parser.tokenAt(parser.position) }
+func (parser *parser) nextToken() *token     { return parser.tokenAt(parser.position + 1) }
+func (parser *parser) previousToken() *token { return parser.tokenAt(parser.position - 1) }
 
 func (parser *parser) tokenAt(index int) *token {
 	if index < 0 || index >= len(parser.tokens) {
@@ -640,7 +640,7 @@ func jsSliceOneFromEach(text string) string {
 	if len(units) < 2 {
 		return ""
 	}
-	return unitsToWTF8(units[1 : len(units)-1])
+	return unitsToWtf8(units[1 : len(units)-1])
 }
 
 // jsAdd is `left + right` where left is a token field that may be undefined: undefined plus a number

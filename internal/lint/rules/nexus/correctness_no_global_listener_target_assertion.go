@@ -303,7 +303,7 @@ func correctnessNoGlobalListenerTargetAssertionAt(
 // is a specific element type, with at least one such member.
 func correctnessNoGlobalListenerTargetAssertionIsSpecific(ruleContext rule.Context, asserted *checker.Type) bool {
 	specific := false
-	for part := range type_checking.UnionTypePartsSeq(asserted) {
+	for part := range type_checking.UnionTypePartsSequence(asserted) {
 		if type_checking.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
 			continue
 		}

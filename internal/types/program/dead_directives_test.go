@@ -33,7 +33,7 @@ func deadDirectiveGraph(test *testing.T, root, source string) *program.Graph {
 	test.Helper()
 	graph, buildError := program.Build(program.Options{
 		ConfigFileName: "tsconfig.json", CurrentDirectory: root,
-		FileSystem: program.NewMemoryFS(map[string]string{
+		FileSystem: program.NewMemoryFileSystem(map[string]string{
 			filepath.Join(root, "tsconfig.json"): minimalConfig,
 			filepath.Join(root, "main.ts"):       source,
 		}),

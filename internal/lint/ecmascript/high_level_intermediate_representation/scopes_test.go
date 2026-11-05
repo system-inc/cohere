@@ -123,8 +123,8 @@ func TestScopeHullMatchesReact(test *testing.T) {
 			set.Union(members)
 
 			scopes := AssignReactiveScopesWithSets(function, ranges, set)
-			if scopes.Len() != 1 {
-				test.Fatalf("got %d scopes, want exactly 1; the class did not form", scopes.Len())
+			if scopes.Length() != 1 {
+				test.Fatalf("got %d scopes, want exactly 1; the class did not form", scopes.Length())
 			}
 			got := scopes.RangeOf(scopes.Ids()[0])
 			if got != testCase.want {
@@ -189,8 +189,8 @@ func TestScopeIsOnePerEquivalenceClass(test *testing.T) {
 	set.Union([]static_single_assignment.IdentifierId{4, 5})
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
-	if scopes.Len() != 2 {
-		test.Fatalf("got %d scopes for 2 classes over 5 values; a scope must name a class", scopes.Len())
+	if scopes.Length() != 2 {
+		test.Fatalf("got %d scopes for 2 classes over 5 values; a scope must name a class", scopes.Length())
 	}
 	if a, b, c := scopes.ScopeOf(1), scopes.ScopeOf(2), scopes.ScopeOf(3); a != b || b != c {
 		test.Errorf("values 1,2,3 are one class but got scopes %d,%d,%d", a, b, c)
@@ -290,13 +290,13 @@ func TestScopeAssignmentIsDeterministic(test *testing.T) {
 		}
 	`
 	_, first := scopesFor(test, source)
-	if first.Len() == 0 {
+	if first.Length() == 0 {
 		test.Fatal("no scopes formed, so this test measured nothing")
 	}
 	for attempt := 0; attempt < 8; attempt++ {
 		_, again := scopesFor(test, source)
-		if again.Len() != first.Len() {
-			test.Fatalf("run %d produced %d scopes, first run produced %d", attempt, again.Len(), first.Len())
+		if again.Length() != first.Length() {
+			test.Fatalf("run %d produced %d scopes, first run produced %d", attempt, again.Length(), first.Length())
 		}
 		for index, id := range first.Ids() {
 			if again.Ids()[index] != id {
@@ -352,8 +352,8 @@ func TestScopeAssignmentIsASinglePass(test *testing.T) {
 	}
 
 	scopes := AssignReactiveScopesWithSets(function, ranges, set)
-	if scopes.Len() != classes {
-		test.Fatalf("got %d scopes for %d classes", scopes.Len(), classes)
+	if scopes.Length() != classes {
+		test.Fatalf("got %d scopes for %d classes", scopes.Length(), classes)
 	}
 
 	seen := map[static_single_assignment.IdentifierId]ScopeId{}
@@ -394,8 +394,8 @@ func TestScopeAssignmentIsIdempotent(test *testing.T) {
 	first := AssignReactiveScopesWithSets(function, ranges, set)
 	second := AssignReactiveScopesWithSets(function, ranges, set)
 
-	if first.Len() != second.Len() {
-		test.Fatalf("second run produced %d scopes, first produced %d", second.Len(), first.Len())
+	if first.Length() != second.Length() {
+		test.Fatalf("second run produced %d scopes, first produced %d", second.Length(), first.Length())
 	}
 	for _, id := range first.Ids() {
 		if first.RangeOf(id) != second.RangeOf(id) {
@@ -408,11 +408,11 @@ func TestScopeAssignmentIsIdempotent(test *testing.T) {
 func TestScopeHandlesANilFunction(test *testing.T) {
 	test.Parallel()
 
-	if got := AssignReactiveScopes(nil); got == nil || got.Len() != 0 {
+	if got := AssignReactiveScopes(nil); got == nil || got.Length() != 0 {
 		test.Error("a nil function must produce an empty table rather than a nil one or a panic")
 	}
 	var empty *ReactiveScopes
-	if empty.ScopeOf(1) != 0 || empty.Len() != 0 || empty.MembersOf(1) != nil {
+	if empty.ScopeOf(1) != 0 || empty.Length() != 0 || empty.MembersOf(1) != nil {
 		test.Error("the nil table must read as empty rather than panicking")
 	}
 	if got := empty.RangeOf(1); got.IsSet() {
@@ -745,8 +745,8 @@ func TestValidateScopesCatchesAnEmptyHull(test *testing.T) {
 	set.Union([]static_single_assignment.IdentifierId{unsetA, unsetB})
 
 	scopes := AssignReactiveScopesWithSets(function, handmade, set)
-	if scopes.Len() != 1 {
-		test.Fatalf("got %d scopes, want 1", scopes.Len())
+	if scopes.Length() != 1 {
+		test.Fatalf("got %d scopes, want 1", scopes.Length())
 	}
 	if got := scopes.RangeOf(scopes.Ids()[0]); got.IsSet() {
 		test.Fatalf("the all-unset class hulled to [%d,%d); React hulls it to [0,0)", got.Start, got.End)
@@ -913,9 +913,9 @@ func TestScopeMatchesTheDisjointSetPartition(test *testing.T) {
 							assigned := AssignReactiveScopesWithSets(function, ranges, set)
 
 							classes := set.Sets()
-							if len(classes) != assigned.Len() {
+							if len(classes) != assigned.Length() {
 								test.Fatalf("%s: %d classes became %d scopes", fileName,
-									len(classes), assigned.Len())
+									len(classes), assigned.Length())
 							}
 							for index, class := range classes {
 								scope := assigned.Ids()[index]

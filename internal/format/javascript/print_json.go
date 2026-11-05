@@ -15,10 +15,10 @@ import (
 // The json parser does not come here. It prints with the JavaScript printer (estreePrinter), the way
 // upstream's createParser defaults its astFormat to estree.
 
-// estreeJSONPrinter is upstream's estree-json printer. The json-stringify parser refuses comments,
+// estreeJsonPrinter is upstream's estree-json printer. The json-stringify parser refuses comments,
 // so none of the comment hooks are needed.
-var estreeJSONPrinter = &printing.Printer[*estree.Node]{
-	Print:       printJSON,
+var estreeJsonPrinter = &printing.Printer[*estree.Node]{
+	Print:       printJson,
 	LocStart:    estree.LocStart,
 	LocEnd:      estree.LocEnd,
 	VisitorKeys: jsonVisitorKeys,
@@ -43,8 +43,8 @@ func jsonVisitorKeys(node Node) []string {
 	return nil
 }
 
-// printJSON is upstream's printJson.
-func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
+// printJson is upstream's printJson.
+func printJson(path *Path, options *Options, print PrintFunc, _ any) Doc {
 	current := node(path)
 	switch current.Type() {
 	case "JsonRoot":
@@ -102,7 +102,7 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		// Upstream compares String(Number(raw)) with raw. The literal's value stands in for Number(raw):
 		// the two differ only where raw has a numeric separator, and then neither string equals raw.
 		raw := getRaw(current)
-		if isJSONObjectKey(path) {
+		if isJsonObjectKey(path) {
 			value, isNumber := current.Get("value").(float64)
 			if !isNumber {
 				// Invariant: estree.ParseJSON builds every NumericLiteral with a float64 value.
@@ -114,7 +114,7 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		}
 		return doc.Text(raw)
 	case "Identifier":
-		if isJSONObjectKey(path) {
+		if isJsonObjectKey(path) {
 			return doc.Text(jsonStringify(current.String("name")))
 		}
 		return doc.Text(current.String("name"))
@@ -137,7 +137,7 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 	panic(fmt.Sprintf("unknown JSON node type %q", current.Type()))
 }
 
-// isJSONObjectKey is upstream's isObjectKey in print/json.js.
-func isJSONObjectKey(path *Path) bool {
+// isJsonObjectKey is upstream's isObjectKey in print/json.js.
+func isJsonObjectKey(path *Path) bool {
 	return keyOf(path) == "key" && parentOf(path).Is("ObjectProperty")
 }

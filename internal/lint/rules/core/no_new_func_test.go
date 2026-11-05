@@ -111,9 +111,9 @@ func TestNoNewFuncReportsTheInvokingExpression(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		sourceText string
-		wantPos    int
-		wantEnd    int
+		sourceText   string
+		wantPosition int
+		wantEnd      int
 	}{
 		{"var a = new Function(\"b\", \"c\", \"return b+c\");", 8, 44},
 		{"var a = Function(\"b\", \"c\", \"return b+c\");", 8, 40},
@@ -130,11 +130,11 @@ func TestNoNewFuncReportsTheInvokingExpression(test *testing.T) {
 			}
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			got := result.Diagnostics[0].Range
-			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
+			if got.Pos() != testCase.wantPosition || got.End() != testCase.wantEnd {
 				test.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
 					got.Pos(), got.End(), onDisk[got.Pos():got.End()],
-					testCase.wantPos, testCase.wantEnd,
-					onDisk[testCase.wantPos:testCase.wantEnd])
+					testCase.wantPosition, testCase.wantEnd,
+					onDisk[testCase.wantPosition:testCase.wantEnd])
 			}
 		})
 	}

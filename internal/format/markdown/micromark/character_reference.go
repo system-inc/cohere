@@ -47,7 +47,7 @@ func tokenizeCharacterReference(self *Self, effects *Effects, ok State, nok Stat
 		}
 
 		effects.Enter(TypeCharacterReferenceValue, nil)
-		maximum = characterReferenceNamedSizeMax
+		maximum = characterReferenceNamedSizeMaximum
 		test = asciiAlphanumeric
 		named = true
 		return value(code)
@@ -65,13 +65,13 @@ func tokenizeCharacterReference(self *Self, effects *Effects, ok State, nok Stat
 			effects.Consume(code)
 			effects.Exit(TypeCharacterReferenceMarkerHexadecimal)
 			effects.Enter(TypeCharacterReferenceValue, nil)
-			maximum = characterReferenceHexadecimalSizeMax
+			maximum = characterReferenceHexadecimalSizeMaximum
 			test = asciiHexDigit
 			return value
 		}
 
 		effects.Enter(TypeCharacterReferenceValue, nil)
-		maximum = characterReferenceDecimalSizeMax
+		maximum = characterReferenceDecimalSizeMaximum
 		test = asciiDigit
 		return value(code)
 	}

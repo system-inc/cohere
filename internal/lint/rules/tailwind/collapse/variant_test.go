@@ -300,7 +300,7 @@ func variantOrderRegistryForCase(
 // variantOrderDefaultBreakpointScale is Tailwind 4.3.3's own `--breakpoint-*`, which both corpus repositories
 // inherit unchanged.
 //
-// Hardcoded here and only here, in the test's resolver, never in variant.go. The port reads
+// Hardcoded here and only here, in the test's resolver, never in variant_registry.go. The port reads
 // breakpoints from the theme; this table exists so the differential can answer the same question
 // without taking a dependency on a sibling component's port.
 var variantOrderDefaultBreakpointScale = map[string]string{
@@ -370,8 +370,8 @@ func checkVariantOrderIndices(
 	}
 
 	order := registry.BuildVariantOrder(variants)
-	if order.Len() != fixture.Size {
-		test.Errorf("%s: the port ordered %d variants and the engine ordered %d", name, order.Len(), fixture.Size)
+	if order.Length() != fixture.Size {
+		test.Errorf("%s: the port ordered %d variants and the engine ordered %d", name, order.Length(), fixture.Size)
 	}
 
 	compared := 0
@@ -1179,8 +1179,8 @@ func TestBitmaskExceedsSixtyFourBits(test *testing.T) {
 	}
 
 	order := registry.BuildVariantOrder(variants)
-	if order.Len() != 100 {
-		test.Fatalf("expected 100 distinct variants, got %d", order.Len())
+	if order.Length() != 100 {
+		test.Fatalf("expected 100 distinct variants, got %d", order.Length())
 	}
 
 	highest := variants[len(variants)-1]

@@ -54,10 +54,10 @@ const FullCommandName = "cohere"
 // for it.
 const launcherRelativePath = "bin/" + FullCommandName
 
-// RepositoryURL is where the source lives, recorded in every published package. In npm's own form,
+// RepositoryUrl is where the source lives, recorded in every published package. In npm's own form,
 // git+https with .git, because npm rewrites any other spelling at publish time and warns about it on
 // every package, which buries the warnings that matter.
-const RepositoryURL = "git+https://github.com/system-inc/cohere.git"
+const RepositoryUrl = "git+https://github.com/system-inc/cohere.git"
 
 // PlatformManifest is the package.json for one platform's binary package.
 //
@@ -73,7 +73,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 		"description": fmt.Sprintf("The cohere binary for %s.", target),
 		"license":     LicenseExpression,
 		"author":      CopyrightHolder,
-		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
+		"repository":  map[string]string{"type": "git", "url": RepositoryUrl},
 
 		"os":  []string{NpmOperatingSystem(target.GoOperatingSystem)},
 		"cpu": []string{NpmArchitecture(target.GoArchitecture)},
@@ -111,7 +111,7 @@ func DispatcherManifest(version string) ([]byte, error) {
 		"description": "Type-check, lint, fix, and format a TypeScript codebase in one process.",
 		"license":     LicenseExpression,
 		"author":      CopyrightHolder,
-		"repository":  map[string]string{"type": "git", "url": RepositoryURL},
+		"repository":  map[string]string{"type": "git", "url": RepositoryUrl},
 
 		"bin": map[string]string{
 			ShortCommandName: launcherRelativePath,

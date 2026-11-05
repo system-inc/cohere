@@ -2,9 +2,9 @@
 // the declarations that dropped, substituting resolved nodes into a parsed value, and the
 // registration-time normalization of `--value()` argument lists.
 //
-// Split out of utility.go because these are mechanics rather than semantics. The rules that decide
+// Split out of utility_evaluation.go because these are mechanics rather than semantics. The rules that decide
 // a reading live there; what is here is the tree surgery those rules ask for, and keeping them
-// apart is what lets utility.go read as the same sequence of branches upstream's `createCssUtility`
+// apart is what lets utility_evaluation.go read as the same sequence of branches upstream's `createCssUtility`
 // is.
 //
 // Ported from `src/utilities.ts` and `src/ast.ts` at Tailwind 4.3.3.

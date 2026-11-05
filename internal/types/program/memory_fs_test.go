@@ -92,7 +92,7 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 	memoryFiles, memoryOurs, memoryDiagnostics := buildReport(test, program.Options{
 		ConfigFileName:   "tsconfig.json",
 		CurrentDirectory: directory,
-		FileSystem:       program.NewMemoryFS(inMemory(directory, memoryFixture)),
+		FileSystem:       program.NewMemoryFileSystem(inMemory(directory, memoryFixture)),
 	})
 	if !slices.Equal(diskFiles, memoryFiles) {
 		test.Fatalf("the memory program holds different files:\ndisk   %v\nmemory %v", diskFiles, memoryFiles)
@@ -116,7 +116,7 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 	_, elsewhereOurs, elsewhereDiagnostics := buildReport(test, program.Options{
 		ConfigFileName:   "tsconfig.json",
 		CurrentDirectory: elsewhere,
-		FileSystem:       program.NewMemoryFS(inMemory(elsewhere, memoryFixture)),
+		FileSystem:       program.NewMemoryFileSystem(inMemory(elsewhere, memoryFixture)),
 	})
 	if !slices.Equal(elsewhereOurs, diskOurs) || !slices.Equal(elsewhereDiagnostics, diskDiagnostics) {
 		test.Fatalf(
@@ -131,7 +131,7 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 	missing := inMemory(directory, memoryFixture)
 	delete(missing, filepath.ToSlash(filepath.Join(directory, "src/nested/shared.ts")))
 	_, _, missingDiagnostics := buildReport(test, program.Options{
-		ConfigFileName: "tsconfig.json", CurrentDirectory: directory, FileSystem: program.NewMemoryFS(missing),
+		ConfigFileName: "tsconfig.json", CurrentDirectory: directory, FileSystem: program.NewMemoryFileSystem(missing),
 	})
 	if slices.Equal(missingDiagnostics, diskDiagnostics) {
 		test.Fatalf(
@@ -143,9 +143,9 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 
 // A MemoryFS answers as a directory tree does: each directory lists its files and subdirectories once,
 // sorted, the root included, and nothing is there that was not given. Writes fail rather than vanish.
-func TestAMemoryFSListsItsTree(test *testing.T) {
+func TestAMemoryFileSystemListsItsTree(test *testing.T) {
 	test.Parallel()
-	memory := program.NewMemoryFS(map[string]string{
+	memory := program.NewMemoryFileSystem(map[string]string{
 		"/project/a.ts":          "a",
 		"/project/sub/b.ts":      "b",
 		"/project/sub/c.ts":      "c",
@@ -189,7 +189,7 @@ func TestAMemoryFSListsItsTree(test *testing.T) {
 // MemoryFS reads a file's bytes as the disk does, case by case against osvfs, the filesystem every real build
 // reads. A fixture holds bytes as they would sit in a file, and the compiler must see what it would see
 // there, so the corpus rows about byte order marks and irregular whitespace mean the same from memory.
-func TestMemoryFSReadsBytesAsTheDiskDoes(test *testing.T) {
+func TestMemoryFileSystemReadsBytesAsTheDiskDoes(test *testing.T) {
 	test.Parallel()
 
 	directory := test.TempDir()
@@ -213,7 +213,9 @@ func TestMemoryFSReadsBytesAsTheDiskDoes(test *testing.T) {
 				test.Fatal(writeError)
 			}
 			fromDisk, diskOk := osvfs.FS().ReadFile(tspath.RootedFilePath(onDisk))
-			fromMemory, memoryOk := program.NewMemoryFS(map[string]string{"/fixture/a.ts": testCase.bytes}).ReadFile(
+			fromMemory, memoryOk := program.NewMemoryFileSystem(
+				map[string]string{"/fixture/a.ts": testCase.bytes},
+			).ReadFile(
 				"/fixture/a.ts",
 			)
 			if fromMemory != fromDisk || memoryOk != diskOk {

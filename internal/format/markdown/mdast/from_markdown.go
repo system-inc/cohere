@@ -40,33 +40,6 @@ type tokenStackEntry struct {
 	errorHandler func(context *compileContext, left *micromark.Token, right *micromark.Token)
 }
 
-// compileContext is upstream's CompileContext, with the event's sliceSerialize bound per handler call.
-type compileContext struct {
-	stack      []*Node
-	tokenStack []tokenStackEntry
-	config     *config
-	data       compileData
-
-	tokenizer *micromark.TokenizeContext
-	offsets   []int
-
-	// nodes is where the tree's nodes come from, nil to allocate each (#93dpede).
-	nodes *arena.Arena[Node]
-}
-
-func (context *compileContext) sliceSerialize(token *micromark.Token) string {
-	return context.tokenizer.SliceSerialize(token, false)
-}
-
-func (context *compileContext) top() *Node {
-	return context.stack[len(context.stack)-1]
-}
-
-// point converts a micromark point, whose offset counts UTF-16 units, to a tree point in bytes.
-func (context *compileContext) point(point micromark.Point) Point {
-	return Point{Line: point.Line, Column: point.Column, Offset: context.offsets[point.Offset]}
-}
-
 // FromMarkdown parses markdown the way the fork's parseMarkdown does with the given source, and returns
 // the tree. source is the text micromark reads (front matter already blanked by the caller); original is
 // the text positions refer to, which has the same UTF-16 length.
@@ -157,9 +130,9 @@ func newConfig() *config {
 			"emphasis":                    opener(newParent("emphasis"), nil),
 			"hardBreakEscape":             opener(newHardBreak, nil),
 			"hardBreakTrailing":           opener(newHardBreak, nil),
-			"htmlFlow":                    opener(newHTML, buffer),
+			"htmlFlow":                    opener(newHtml, buffer),
 			"htmlFlowData":                onEnterData,
-			"htmlText":                    opener(newHTML, buffer),
+			"htmlText":                    opener(newHtml, buffer),
 			"htmlTextData":                onEnterData,
 			"image":                       opener(newImage, nil),
 			"label":                       buffer,
@@ -205,9 +178,9 @@ func newConfig() *config {
 			"emphasis":                            closer(nil),
 			"hardBreakEscape":                     closer(onExitHardBreak),
 			"hardBreakTrailing":                   closer(onExitHardBreak),
-			"htmlFlow":                            closer(onExitHTMLFlow),
+			"htmlFlow":                            closer(onExitHtmlFlow),
 			"htmlFlowData":                        onExitData,
-			"htmlText":                            closer(onExitHTMLText),
+			"htmlText":                            closer(onExitHtmlText),
 			"htmlTextData":                        onExitData,
 			"image":                               closer(onExitImage),
 			"label":                               onExitLabel,
@@ -451,18 +424,6 @@ func buffer(context *compileContext, _ *micromark.Token) {
 	)
 }
 
-func (context *compileContext) enter(
-	node *Node,
-	token *micromark.Token,
-	errorHandler func(*compileContext, *micromark.Token, *micromark.Token),
-) {
-	parent := context.top()
-	parent.Children = append(parent.Children, node)
-	context.stack = append(context.stack, node)
-	context.tokenStack = append(context.tokenStack, tokenStackEntry{token: token, errorHandler: errorHandler})
-	node.Position = &Position{Start: context.point(token.Start)}
-}
-
 // closer is upstream's closer: run `and`, then exit.
 func closer(and handle) handle {
 	return func(context *compileContext, token *micromark.Token) {
@@ -471,41 +432,6 @@ func closer(and handle) handle {
 		}
 		context.exit(token, nil)
 	}
-}
-
-func (context *compileContext) exit(
-	token *micromark.Token,
-	onExitError func(*compileContext, *micromark.Token, *micromark.Token),
-) {
-	node := context.stack[len(context.stack)-1]
-	context.stack = context.stack[:len(context.stack)-1]
-
-	if len(context.tokenStack) == 0 {
-		panic(fmt.Sprintf("Cannot close `%s`: it’s not open", token.Type))
-	}
-	open := context.tokenStack[len(context.tokenStack)-1]
-	context.tokenStack = context.tokenStack[:len(context.tokenStack)-1]
-
-	if open.token.Type != token.Type {
-		if onExitError != nil {
-			onExitError(context, token, open.token)
-		} else {
-			handler := open.errorHandler
-			if handler == nil {
-				handler = defaultOnError
-			}
-			handler(context, token, open.token)
-		}
-	}
-
-	node.Position.End = context.point(token.End)
-}
-
-// resume pops the top node and returns its text.
-func (context *compileContext) resume() string {
-	node := context.stack[len(context.stack)-1]
-	context.stack = context.stack[:len(context.stack)-1]
-	return ToString(node)
 }
 
 func defaultOnError(_ *compileContext, left *micromark.Token, right *micromark.Token) {
@@ -594,7 +520,7 @@ func onExitDefinitionTitleString(context *compileContext, _ *micromark.Token) {
 
 func onExitDefinitionDestinationString(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
-	context.top().URL = data
+	context.top().Url = data
 }
 
 func onExitAtxHeadingSequence(context *compileContext, token *micromark.Token) {
@@ -666,12 +592,12 @@ func onExitHardBreak(context *compileContext, _ *micromark.Token) {
 	context.data.atHardBreak = true
 }
 
-func onExitHTMLFlow(context *compileContext, _ *micromark.Token) {
+func onExitHtmlFlow(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
 	context.top().Value = data
 }
 
-func onExitHTMLText(context *compileContext, _ *micromark.Token) {
+func onExitHtmlText(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
 	context.top().Value = data
 }
@@ -694,7 +620,7 @@ func onExitLink(context *compileContext, _ *micromark.Token) {
 
 		node.NodeType += "Reference"
 		node.ReferenceType = referenceType
-		node.URL = ""
+		node.Url = ""
 		node.Title = nil
 	} else {
 		node.Identifier = ""
@@ -733,7 +659,7 @@ func onExitLabel(context *compileContext, _ *micromark.Token) {
 
 func onExitResourceDestinationString(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
-	context.top().URL = data
+	context.top().Url = data
 }
 
 func onExitResourceTitleString(context *compileContext, _ *micromark.Token) {
@@ -788,12 +714,12 @@ func onExitCharacterReference(context *compileContext, token *micromark.Token) {
 
 func onExitAutolinkProtocol(context *compileContext, token *micromark.Token) {
 	onExitData(context, token)
-	context.top().URL = context.sliceSerialize(token)
+	context.top().Url = context.sliceSerialize(token)
 }
 
 func onExitAutolinkEmail(context *compileContext, token *micromark.Token) {
 	onExitData(context, token)
-	context.top().URL = "mailto:" + context.sliceSerialize(token)
+	context.top().Url = "mailto:" + context.sliceSerialize(token)
 }
 
 //
@@ -820,7 +746,7 @@ func newHeading(*micromark.Token) Node {
 
 func newHardBreak(*micromark.Token) Node { return Node{NodeType: "break"} }
 
-func newHTML(*micromark.Token) Node { return Node{NodeType: "html", IsLiteral: true} }
+func newHtml(*micromark.Token) Node { return Node{NodeType: "html", IsLiteral: true} }
 
 func newImage(*micromark.Token) Node { return Node{NodeType: "image"} }
 

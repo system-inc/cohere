@@ -271,38 +271,6 @@ var ConsistencyRequireMatchingReturnType = rule.Rule[rule.NoOptions]{
 	},
 }
 
-// consistencyRequireMatchingReturnTypeVerdict is what one function's returns are judged against.
-type consistencyRequireMatchingReturnTypeVerdict struct {
-	kind consistencyRequireMatchingReturnTypeKind
-
-	// functionKind names the function in the message: "function", "async function", "method",
-	// "callback", "getter", "generator", "constructor", "setter".
-	functionKind string
-
-	// rendered and source describe a value verdict's type and where it came from.
-	rendered string
-	source   policy.MessageOption
-
-	// voidReason says why a void verdict is void, as a clause, and written is the type it names when
-	// the reason is a `void` type rather than a constructor or a setter.
-	voidReason policy.MessageOption
-	written    string
-
-	// admitsUndefined is whether `undefined` is a member of a value verdict's type, which is what
-	// makes the bare-return fix type-safe as well as behaviour-safe.
-	admitsUndefined bool
-}
-
-// voidValues are the values the undefined-return message takes: the function's kind, and the type its
-// reason names when the reason is a `void` type.
-func (verdict consistencyRequireMatchingReturnTypeVerdict) voidValues() map[string]string {
-	values := map[string]string{"functionKind": verdict.functionKind}
-	if verdict.written != "" {
-		values["written"] = verdict.written
-	}
-	return values
-}
-
 // consistencyRequireMatchingReturnTypeContainer is the function a `return` belongs to, or nil.
 //
 // Written out rather than `ast.GetContainingFunction`, because that walks through a class static
@@ -455,7 +423,7 @@ func consistencyRequireMatchingReturnTypeContextualReturnType(
 		return nil
 	}
 	var returnTypes []*checker.Type
-	for part := range type_checking.UnionTypePartsSeq(contextual) {
+	for part := range type_checking.UnionTypePartsSequence(contextual) {
 		if part == nil {
 			continue
 		}
@@ -527,7 +495,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 	// The union's constituents `OR`'d, not the type's own flags: `string | void` is a union whose own
 	// flags carry no Void bit, and the shelf's `IsTypeFlagSet` would answer false for it.
 	var combined checker.TypeFlags
-	for part := range type_checking.UnionTypePartsSeq(judged) {
+	for part := range type_checking.UnionTypePartsSequence(judged) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}

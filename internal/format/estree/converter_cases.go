@@ -49,7 +49,7 @@ func (converter *Converter) convertMethod(node *ast.Node, parent *ast.Node) *Nod
 			methodDefinitionType = "TSAbstractMethodDefinition"
 		}
 		result = converter.createNode(node, methodDefinitionType,
-			"accessibility", getTSNodeAccessibility(node),
+			"accessibility", getTsNodeAccessibility(node),
 			"computed", isComputedProperty(node.Name()),
 			"decorators", converter.convertChildren(decorators(node), nil),
 			"key", converter.convertChild(node.Name(), nil),
@@ -120,7 +120,7 @@ func (converter *Converter) convertConstructor(node *ast.Node) *Node {
 		kind = "method"
 	}
 	return converter.createNode(node, methodType,
-		"accessibility", getTSNodeAccessibility(node),
+		"accessibility", getTsNodeAccessibility(node),
 		"computed", false,
 		"decorators", noNodes,
 		"key", constructorKey,
@@ -252,7 +252,7 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 	}
 	if len(modifiers(node)) > 0 {
 		return converter.createNode(node, "TSParameterProperty",
-			"accessibility", getTSNodeAccessibility(node),
+			"accessibility", getTsNodeAccessibility(node),
 			"decorators", noNodes,
 			"override", hasModifier(ast.KindOverrideKeyword, node),
 			"parameter", result,

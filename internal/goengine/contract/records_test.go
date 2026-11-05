@@ -393,13 +393,13 @@ func TestEveryRecordWritesTheContractsFields(test *testing.T) {
 	}
 }
 
-// TestFixtureRecordsReencodeToTheSameJSON decodes every fixture line into its record type and writes it
+// TestFixtureRecordsReencodeToTheSameJson decodes every fixture line into its record type and writes it
 // back through one Writer per fixture, so every name and value matches the stream the front door's tests
 // pin, and each fixture's order passes the Writer's refusals. The comparison is of decoded values, not
 // bytes: the fixtures captured from real Swift runs have their keys sorted by Swift's encoder, and key
 // order is not part of JSON. Provenance is exempt, since it leaves out the Swift library versions on
 // purpose, and so is a fix record from before `changedFiles`, which this engine always writes.
-func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
+func TestFixtureRecordsReencodeToTheSameJson(test *testing.T) {
 	test.Parallel()
 	newRecord := map[Kind]func() Record{
 		KindProvenance: func() Record { return &ProvenanceRecord{} },

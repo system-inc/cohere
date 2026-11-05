@@ -128,16 +128,6 @@ type extractedContext struct {
 	UnlistedStatics map[string]*reading `json:"unlistedStatics"`
 }
 
-// pathList collects a repeatable flag.
-type pathList []string
-
-func (list *pathList) String() string { return strings.Join(*list, ",") }
-
-func (list *pathList) Set(value string) error {
-	*list = append(*list, value)
-	return nil
-}
-
 // system is one design system's pair of extractions.
 type system struct {
 	table   extractedTable
@@ -183,8 +173,8 @@ func main() {
 	systems := make([]system, 0, len(inputPaths))
 	for index := range inputPaths {
 		var loaded system
-		readJSON(inputPaths[index], &loaded.table)
-		readJSON(contextPaths[index], &loaded.context)
+		readJson(inputPaths[index], &loaded.table)
+		readJson(contextPaths[index], &loaded.context)
 		if len(loaded.table.Roots) == 0 || len(loaded.table.Statics) == 0 || loaded.table.TailwindVersion == "" {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 			fmt.Fprintf(
@@ -275,7 +265,7 @@ func systems0Version(systems []system) string {
 	return systems[0].table.TailwindVersion
 }
 
-func readJSON[Target any](path string, into *Target) {
+func readJson[Target any](path string, into *Target) {
 	raw, readError := os.ReadFile(path)
 	if readError != nil {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.

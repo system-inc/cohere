@@ -453,9 +453,9 @@ func sourceSnapshot(test *testing.T) string {
 		"unicodeproperties",
 	} {
 		source := filepath.Join(moduleRoot, directory)
-		walkError := filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkError error) error {
-			if walkError != nil {
-				return walkError
+		walkError := filepath.WalkDir(source, func(path string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			relative, relativePathError := filepath.Rel(moduleRoot, path)
 			if relativePathError != nil {

@@ -26,7 +26,7 @@ func TestCleanDocMatchesMapDoc(test *testing.T) {
 		if after := showDoc(document); after != before {
 			test.Fatalf("case %d: CleanDoc changed its input from\n%s\nto\n%s", index, before, after)
 		}
-		expected := MapDoc(buildSpec(spec), cleanDocFn)
+		expected := MapDoc(buildSpec(spec), cleanDoc)
 		if got, want := showDoc(cleaned), showDoc(expected); got != want {
 			test.Fatalf("case %d: CleanDoc built\n%s\nmapDoc(cleanDocFn) built\n%s", index, got, want)
 		}

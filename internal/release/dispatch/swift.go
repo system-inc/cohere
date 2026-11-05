@@ -27,34 +27,11 @@ import (
 // then come from a binary no hash vouches for.
 const SwiftEngineOverrideVariable = "COHERE_SWIFT_ENGINE"
 
-// SwiftEngineDirectory is where the Swift engine's package lives inside the cohere module.
-func (paths Paths) SwiftEngineDirectory() string {
-	return filepath.Join(paths.ModuleDirectory, "swift")
-}
-
-// SwiftBuildDirectory is the scratch path the engine is built in.
-//
-// Its own, rather than the package's `.build`: that one belongs to whoever is developing the engine,
-// and a build here taking its lock, or replacing its products mid-test, would be one process breaking
-// another for no reason a reader of either could see.
-func (paths Paths) SwiftBuildDirectory() string {
-	return filepath.Join(paths.CacheDirectory, "swift-build")
-}
-
-// SwiftEngineBinaryPath is where the engine built from inputs with this hash lives, named the way
-// BinaryPath names cohere's, platform included.
-func (paths Paths) SwiftEngineBinaryPath(hash string) string {
-	return filepath.Join(
-		paths.BinaryDirectory(),
-		fmt.Sprintf("cohere-swift-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash),
-	)
-}
-
 // buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
 //
 // A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,
 // measured at 225s, and the decisions worth testing are which tree is built and when, not SwiftPM.
-var buildSwiftProduct = buildSwiftProductWithSwiftPM
+var buildSwiftProduct = buildSwiftProductWithSwiftPm
 
 // ResolveSwiftEngine returns the path to a cohere-swift binary matching the engine's sources and the
 // installed toolchain, building it when there is none.
@@ -243,7 +220,7 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 	}
 }
 
-// buildSwiftProductWithSwiftPM builds the engine in release mode and copies the product to binaryPath.
+// buildSwiftProductWithSwiftPm builds the engine in release mode and copies the product to binaryPath.
 //
 // A cold build compiles swift-syntax and swift-format and takes minutes, so it announces itself on
 // stderr before starting, whatever the verbosity: a command that is silent for three minutes reads as
@@ -251,7 +228,7 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 //
 // Copied rather than linked, because the next build replaces the product in place, and a link would
 // turn every hash-named binary into whichever engine was built last.
-func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory string, binaryPath string) error {
+func buildSwiftProductWithSwiftPm(packageDirectory string, scratchDirectory string, binaryPath string) error {
 	if createDirectoryError := os.MkdirAll(filepath.Dir(binaryPath), 0o755); createDirectoryError != nil {
 		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}

@@ -150,7 +150,7 @@ func run(verb string, arguments []string) int {
 		})
 	case "vet":
 		return withToken("go vet "+strings.Join(commandArguments, " "), func(environment []string) int {
-			return runCommand(withoutVCSStamping(environment), "go", append([]string{"vet"}, commandArguments...))
+			return runCommand(withoutVcsStamping(environment), "go", append([]string{"vet"}, commandArguments...))
 		})
 	}
 
@@ -168,7 +168,7 @@ func run(verb string, arguments []string) int {
 			return 2
 		}
 		return withToken("go test --fast "+strings.Join(testArguments, " "), func(environment []string) int {
-			return fastTest(withoutVCSStamping(environment), testArguments)
+			return fastTest(withoutVcsStamping(environment), testArguments)
 		})
 	}
 	if wholeModule(testArguments) && countsOnce(testArguments) {
@@ -190,11 +190,11 @@ func run(verb string, arguments []string) int {
 		testArguments = expanded
 	}
 	return withToken("go test "+strings.Join(testArguments, " "), func(environment []string) int {
-		return goTest(withoutVCSStamping(environment), testArguments)
+		return goTest(withoutVcsStamping(environment), testArguments)
 	})
 }
 
-// withoutVCSStamping adds -buildvcs=false to a test or vet run's `GOFLAGS`, unless the caller chose a -buildvcs
+// withoutVcsStamping adds -buildvcs=false to a test or vet run's `GOFLAGS`, unless the caller chose a -buildvcs
 // of their own. Most worktrees are made with TypeScript a symlink to another checkout's, git status refuses
 // that tree, and so every go build a test runs failed "error obtaining VCS status": four of
 // @system_cohere_go's Circles set it by hand on 2026-11-05. The landing gate has run with it since
@@ -203,7 +203,7 @@ func run(verb string, arguments []string) int {
 // Not for build or exec: a binary someone keeps is read for its stamp. packaging's version.go prints its
 // commit and whether its tree was modified, and the bench record marks a run dirty from it, so a build
 // without the stamp would read as clean.
-func withoutVCSStamping(environment []string) []string {
+func withoutVcsStamping(environment []string) []string {
 	stamped := make([]string, 0, len(environment)+1)
 	hasFlags := false
 	for _, variable := range environment {

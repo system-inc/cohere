@@ -56,7 +56,7 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(test *testing.T) {
 
 	for _, step := range []struct {
 		name         string
-		aTS          string
+		aTs          string
 		wantErrors   int
 		mostReplayed int
 	}{
@@ -66,7 +66,7 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(test *testing.T) {
 		{"a type error in the edited file", "export function value(): number {\n    return 'one';\n}\n", 1, 6},
 		{"the type error removed", original, 0, 6},
 	} {
-		write("source/a.ts", step.aTS)
+		write("source/a.ts", step.aTs)
 		warm, cold := run(), run("--no-cache")
 		warmErrors, coldErrors := typeError.FindAllString(warm, -1), typeError.FindAllString(cold, -1)
 		if strings.Join(warmErrors, "\n") != strings.Join(coldErrors, "\n") || len(coldErrors) != step.wantErrors {
@@ -132,14 +132,14 @@ func TestTypeDiagnosticsReplayOnAScopedRun(test *testing.T) {
 
 	for _, step := range []struct {
 		name       string
-		aTS        string
+		aTs        string
 		wantErrors int
 	}{
 		{"a body edit", "export function value(): number {\n    return 2;\n}\n", 0},
 		{"an export edit the scoped file cannot take", "export function value(): string {\n    return 'two';\n}\n", 1},
 		{"the export edit undone", original, 0},
 	} {
-		write("source/a.ts", step.aTS)
+		write("source/a.ts", step.aTs)
 		warm, _ := runCohere(test, binary, root, scoped...)
 		cold, _ := runCohere(test, binary, root, append([]string{"--no-cache"}, scoped...)...)
 		warmErrors, coldErrors := typeError.FindAllString(warm, -1), typeError.FindAllString(cold, -1)

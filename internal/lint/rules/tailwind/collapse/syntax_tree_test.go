@@ -68,7 +68,7 @@ type fixtureNode struct {
 	Kind         string            `json:"kind"`
 	Selector     string            `json:"selector"`
 	Name         string            `json:"name"`
-	Params       string            `json:"params"`
+	Parameters   string            `json:"params"`
 	Property     string            `json:"property"`
 	Value        *string           `json:"value"`
 	ValuePresent bool              `json:"valuePresent"`
@@ -85,7 +85,7 @@ func (fixture *fixtureNode) toNode(test *testing.T) *Node {
 	case KindRule:
 		node.Selector = fixture.Selector
 	case KindAtRule:
-		node.Name, node.Params = fixture.Name, fixture.Params
+		node.Name, node.Parameters = fixture.Name, fixture.Parameters
 	case KindDeclaration:
 		node.Property, node.Important, node.ValuePresent = fixture.Property, fixture.Important, fixture.ValuePresent
 		if fixture.Value != nil {
@@ -108,7 +108,7 @@ func (fixture *fixtureNode) toNode(test *testing.T) *Node {
 	return node
 }
 
-func loadASTCorpus(test *testing.T) astCorpus {
+func loadAstCorpus(test *testing.T) astCorpus {
 	test.Helper()
 	raw, readError := os.ReadFile(filepath.Join("testdata", "ast_fixtures.json"))
 	if readError != nil {
@@ -128,7 +128,7 @@ func loadASTCorpus(test *testing.T) astCorpus {
 // PropertySort produces the reading the engine produced.
 func TestPropertySortMatchesEngine(test *testing.T) {
 	test.Parallel()
-	corpus := loadASTCorpus(test)
+	corpus := loadAstCorpus(test)
 
 	withAtRoot := 0
 	withTwSort := 0
@@ -176,7 +176,7 @@ func TestPropertySortMatchesEngine(test *testing.T) {
 // happen to agree.
 func TestPropertySortIsBreadthFirst(test *testing.T) {
 	test.Parallel()
-	corpus := loadASTCorpus(test)
+	corpus := loadAstCorpus(test)
 	if len(corpus.TraversalCases) == 0 {
 		test.Fatal("fixture carries no traversal-divergence cases, so breadth-first is not actually pinned")
 	}
@@ -223,7 +223,7 @@ func TestPropertySortIsBreadthFirst(test *testing.T) {
 // scope decision rests on, and a scope decision with no test is a comment.
 func TestShadowArbitraryVariableReading(test *testing.T) {
 	test.Parallel()
-	corpus := loadASTCorpus(test)
+	corpus := loadAstCorpus(test)
 
 	found := false
 	for _, testCase := range corpus.Cases {
@@ -361,7 +361,7 @@ func TestPropertySortTwSortLatch(test *testing.T) {
 // already sorted.
 func TestPropertySortOrderIsAscendingAndDeduplicated(test *testing.T) {
 	test.Parallel()
-	corpus := loadASTCorpus(test)
+	corpus := loadAstCorpus(test)
 
 	for _, testCase := range corpus.Cases {
 		node := testCase.Node.toNode(test)
@@ -382,7 +382,7 @@ func TestPropertySortOrderIsAscendingAndDeduplicated(test *testing.T) {
 // while the reading does not, so the invariance is demonstrated rather than assumed.
 func TestVariantsDoNotChangeTheReading(test *testing.T) {
 	test.Parallel()
-	corpus := loadASTCorpus(test)
+	corpus := loadAstCorpus(test)
 
 	withVariants := 0
 	whereEmittedDiffers := 0

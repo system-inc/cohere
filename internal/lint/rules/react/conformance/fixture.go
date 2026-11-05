@@ -200,27 +200,27 @@ func Load(root string) ([]Fixture, error) {
 
 	fixtures := make([]Fixture, 0, len(inputPaths))
 	for _, inputPath := range inputPaths {
-		name, err := filepath.Rel(root, inputPath)
-		if err != nil {
-			return nil, err
+		name, relativePathError := filepath.Rel(root, inputPath)
+		if relativePathError != nil {
+			return nil, relativePathError
 		}
 		// Slashed, because the stated divergences are keyed `new-mutability/error.x.js`, and on Windows
 		// Rel answers with `\`, so every lookup missed and a known divergence scored as a new one.
 		name = filepath.ToSlash(name)
 
-		sourceBytes, err := os.ReadFile(inputPath)
-		if err != nil {
-			return nil, err
+		sourceBytes, readError := os.ReadFile(inputPath)
+		if readError != nil {
+			return nil, readError
 		}
 		source := string(sourceBytes)
 
 		expectPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".expect.md"
-		expectBytes, err := os.ReadFile(expectPath)
-		if err != nil {
+		expectBytes, readError := os.ReadFile(expectPath)
+		if readError != nil {
 			return nil, fmt.Errorf(
 				"%s: expectation missing; upstream pairs these 1:1 and a fixture without one cannot be scored: %w",
 				name,
-				err,
+				readError,
 			)
 		}
 
@@ -235,9 +235,10 @@ func Load(root string) ([]Fixture, error) {
 
 		var expectation Expectation
 		if errorNamed {
-			expectation, err = ParseExpectation(string(expectBytes))
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", name, err)
+			var parseExpectationError error
+			expectation, parseExpectationError = ParseExpectation(string(expectBytes))
+			if parseExpectationError != nil {
+				return nil, fmt.Errorf("%s: %w", name, parseExpectationError)
 			}
 		} else if strings.Contains("\n"+string(expectBytes), "\n## Error") {
 			// The other direction of the same set equality, and it is the one that matters for a
@@ -430,4 +431,55 @@ func parseLocation(line string) (file string, lineNumber int, column int, ok boo
 		return "", 0, 0, false
 	}
 	return file, lineNumber, column, true
+}
+
+// Categories returns the categories a fixture's diagnostics belong to, and whether every one was
+// attributed.
+//
+// The bool is not decoration. A fixture with an unattributed diagnostic must not be scored against
+// any rule, because the rule that owns it is exactly the unknown; scoring it would credit or blame
+// whichever rule happened to be running.
+func (fixture Fixture) Categories() (categories []string, complete bool) {
+	seen := map[string]bool{}
+	complete = true
+	for _, expectedError := range fixture.Expected.Errors {
+		category, found := CategoryForMessage(expectedError.Message)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[category] {
+			seen[category] = true
+			categories = append(categories, category)
+		}
+	}
+	return categories, complete
+}
+
+// Rules returns the upstream rule names a fixture's diagnostics belong to.
+func (fixture Fixture) Rules() (rules []string, complete bool) {
+	categories, complete := fixture.Categories()
+	seen := map[string]bool{}
+	for _, category := range categories {
+		rule, found := RuleForCategory(category)
+		if !found {
+			complete = false
+			continue
+		}
+		if !seen[rule] {
+			seen[rule] = true
+			rules = append(rules, rule)
+		}
+	}
+	return rules, complete
+}
+
+// ResolvesReactTypes reports whether a fixture could resolve `@types/react`.
+func (fixture Fixture) ResolvesReactTypes() bool {
+	return reactImportPattern.MatchString(fixture.Source)
+}
+
+// CallsHook reports whether a fixture calls anything named like a hook.
+func (fixture Fixture) CallsHook() bool {
+	return hookCallPattern.MatchString(fixture.Source)
 }

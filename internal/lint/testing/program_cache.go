@@ -205,7 +205,7 @@ func buildProgramInto(
 		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		LibraryParses:    libraryParses,
-		FileSystem:       program.NewMemoryFS(contents),
+		FileSystem:       program.NewMemoryFileSystem(contents),
 		// One checker rather than several: a fixture is one file, and the parallel path adds
 		// scheduling nondeterminism to a test whose whole value is being deterministic.
 		SingleThreaded: true,

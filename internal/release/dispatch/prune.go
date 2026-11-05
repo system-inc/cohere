@@ -54,41 +54,10 @@ var prunedByName = map[string]string{
 	"cohere-swift-current.tmp":      "@system_cohere_swift's engine mid-install",
 }
 
-// PrunePlan is what a prune would do, decided without touching anything.
-type PrunePlan struct {
-	// Examined is how many entries the binary directory held. A plan that examined nothing says so,
-	// so a prune pointed at the wrong directory cannot read as a tidy cache.
-	Examined int
-
-	// Remove are the files to delete, each with its size.
-	Remove []PrunedFile
-
-	// Unrecognised are names the prune kept because it could not classify them.
-	Unrecognised []string
-
-	// StaleCompilers are compiler extractions to remove: not the current build's, and unused for the
-	// in-flight window. Bytes is the extraction's total size.
-	StaleCompilers []PrunedFile
-
-	// StaleSnapshots are snapshot directories a killed build left behind, older than the window.
-	StaleSnapshots []PrunedFile
-}
-
 // PrunedFile is one file, or one directory of the compiler or snapshot cache, that a prune removes.
 type PrunedFile struct {
 	Name  string
 	Bytes int64
-}
-
-// Bytes is the total a plan reclaims.
-func (plan PrunePlan) Bytes() int64 {
-	total := int64(0)
-	for _, list := range [][]PrunedFile{plan.Remove, plan.StaleCompilers, plan.StaleSnapshots} {
-		for _, file := range list {
-			total += file.Bytes
-		}
-	}
-	return total
 }
 
 // PlanPrune decides what to remove from the binary directory.
@@ -96,9 +65,9 @@ func (plan PrunePlan) Bytes() int64 {
 // keep names binaries that must survive whatever their age, such as the one just built. currentCompiler
 // is the compiler extraction in use, or empty when it is not known.
 func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time) (PrunePlan, error) {
-	entries, err := os.ReadDir(paths.BinaryDirectory())
-	if err != nil {
-		return PrunePlan{}, fmt.Errorf("reading the binary cache %s: %w", paths.BinaryDirectory(), err)
+	entries, readDirectoryError := os.ReadDir(paths.BinaryDirectory())
+	if readDirectoryError != nil {
+		return PrunePlan{}, fmt.Errorf("reading the binary cache %s: %w", paths.BinaryDirectory(), readDirectoryError)
 	}
 
 	plan := PrunePlan{Examined: len(entries)}
@@ -170,14 +139,20 @@ func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time
 	// Without the current compiler named, nothing says which extraction a build is reading, so none is
 	// removed.
 	if currentCompiler != "" {
-		plan.StaleCompilers, err = planStaleDirectories(paths.CompilerDirectory(), filepath.Base(currentCompiler), now)
-		if err != nil {
-			return PrunePlan{}, fmt.Errorf("reading the compiler cache: %w", err)
+		var planStaleDirectoriesError error
+		plan.StaleCompilers, planStaleDirectoriesError = planStaleDirectories(
+			paths.CompilerDirectory(),
+			filepath.Base(currentCompiler),
+			now,
+		)
+		if planStaleDirectoriesError != nil {
+			return PrunePlan{}, fmt.Errorf("reading the compiler cache: %w", planStaleDirectoriesError)
 		}
 	}
-	plan.StaleSnapshots, err = planStaleDirectories(paths.SnapshotDirectory(), "", now)
-	if err != nil {
-		return PrunePlan{}, fmt.Errorf("reading the snapshot cache: %w", err)
+	var planStaleDirectoriesError error
+	plan.StaleSnapshots, planStaleDirectoriesError = planStaleDirectories(paths.SnapshotDirectory(), "", now)
+	if planStaleDirectoriesError != nil {
+		return PrunePlan{}, fmt.Errorf("reading the snapshot cache: %w", planStaleDirectoriesError)
 	}
 	return plan, nil
 }
@@ -291,11 +266,6 @@ func ApplyPrune(paths Paths, plan PrunePlan) ([]PrunedFile, error) {
 		}
 	}
 	return removed, nil
-}
-
-// PruneLogPath is where every prune records what it examined and removed.
-func (paths Paths) PruneLogPath() string {
-	return filepath.Join(paths.CacheDirectory, "prune.log")
 }
 
 // RecordPrune appends one prune's outcome to the log, names included, so a removal that matters later

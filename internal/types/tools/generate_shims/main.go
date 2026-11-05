@@ -214,36 +214,36 @@ func main() {
 			return ""
 		}
 
-		emitGoLinknameDirective := func(localName string, fn *types.Func) {
+		emitGoLinknameDirective := func(localName string, function *types.Func) {
 			// //go:linkname only allowed in Go files that import "unsafe"
 			importPackage("unsafe", false)
 			importPackage(goPackage.Types.Path(), false)
 			shimBuilder.WriteString("//go:linkname ")
 			shimBuilder.WriteString(localName)
 			shimBuilder.WriteByte(' ')
-			shimBuilder.WriteString(fn.Pkg().Path())
+			shimBuilder.WriteString(function.Pkg().Path())
 			shimBuilder.WriteByte('.')
-			if recv := fn.Signature().Recv(); recv != nil {
+			if recv := function.Signature().Recv(); recv != nil {
 				shimBuilder.WriteByte('(')
 				shimBuilder.WriteString(types.TypeString(recv.Type(), qualifierEmptyPackageName))
 				shimBuilder.WriteByte(')')
 				shimBuilder.WriteByte('.')
 			}
-			shimBuilder.WriteString(fn.Name())
+			shimBuilder.WriteString(function.Name())
 			shimBuilder.WriteByte('\n')
 		}
 
-		emitLinkedFunction := func(fn *types.Func) bool {
-			if fn.Signature().TypeParams() != nil {
+		emitLinkedFunction := func(function *types.Func) bool {
+			if function.Signature().TypeParams() != nil {
 				// https://github.com/golang/go/issues/60425
 				// linking to functions with generics is not supported in go:linkname
 				return false
 			}
-			name := cases.Title(language.English, cases.NoLower).String(fn.Name())
-			emitGoLinknameDirective(name, fn)
+			name := cases.Title(language.English, cases.NoLower).String(function.Name())
+			emitGoLinknameDirective(name, function)
 			shimBuilder.WriteString("func ")
 			shimBuilder.WriteString(name)
-			types.WriteSignature(&tempBuffer, fn.Signature(), qualifierOnlyPackageName)
+			types.WriteSignature(&tempBuffer, function.Signature(), qualifierOnlyPackageName)
 			shimBuilder.Write(tempBuffer.Bytes())
 			tempBuffer.Reset()
 			shimBuilder.WriteString("\n")
@@ -272,9 +272,9 @@ func main() {
 		for _, name := range scope.Names() {
 			object := scope.Lookup(name)
 			if !object.Exported() {
-				fn, isFunc := object.(*types.Func)
+				function, isFunc := object.(*types.Func)
 				if _, exists := matchedExtraFunctions[name]; isFunc && exists {
-					if emitLinkedFunction(fn) {
+					if emitLinkedFunction(function) {
 						matchedExtraFunctions[name] = true
 					}
 				}
@@ -480,12 +480,12 @@ func main() {
 		}
 
 		exit := false
-		for fnName, found := range matchedExtraFunctions {
+		for functionName, found := range matchedExtraFunctions {
 			if found {
 				continue
 			}
 			// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
-			fmt.Printf("ERROR: couldn't find %v function\n", fnName)
+			fmt.Printf("ERROR: couldn't find %v function\n", functionName)
 			exit = true
 		}
 		for name, methods := range matchedExtraMethods {

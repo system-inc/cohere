@@ -6,10 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
-	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // LibraryParses is one parse of each bundled lib file, shared read-only by every program built with it
@@ -64,8 +62,8 @@ func NewLibraryParses() *LibraryParses {
 	return &LibraryParses{entries: map[libraryParseKey]*libraryParse{}, hashes: map[string][sha256.Size]byte{}}
 }
 
-// Len is how many distinct parses the cache holds.
-func (parses *LibraryParses) Len() int {
+// Length is how many distinct parses the cache holds.
+func (parses *LibraryParses) Length() int {
 	parses.mutex.Lock()
 	defer parses.mutex.Unlock()
 	return len(parses.entries)
@@ -119,21 +117,4 @@ func (parses *LibraryParses) sourceFile(
 		entry.file = parser.ParseSourceFile(options, text, key.scriptKind)
 	})
 	return entry.file, entry.file != nil
-}
-
-// libraryParsesHost serves bundled lib files from a shared cache and loads everything else as the host
-// beneath it does.
-type libraryParsesHost struct {
-	compiler.CompilerHost
-	parses *LibraryParses
-}
-
-func (host *libraryParsesHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
-	if file, shared := host.parses.sourceFile(
-		options,
-		func(path string) (string, bool) { return host.FS().ReadFile(tspath.RootedFilePath(path)) },
-	); shared {
-		return file
-	}
-	return host.CompilerHost.GetSourceFile(options)
 }

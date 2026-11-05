@@ -93,14 +93,14 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 		visit(typed.Property, PlaceRoleUse)
 	case *CallExpression:
 		visit(typed.Callee, PlaceRoleUse)
-		eachArgumentPlace(typed.Args, visit)
+		eachArgumentPlace(typed.Arguments, visit)
 	case *MethodCall:
 		visit(typed.Receiver, PlaceRoleReceiver)
 		visit(typed.Property, PlaceRoleUse)
-		eachArgumentPlace(typed.Args, visit)
+		eachArgumentPlace(typed.Arguments, visit)
 	case *NewExpression:
 		visit(typed.Callee, PlaceRoleUse)
-		eachArgumentPlace(typed.Args, visit)
+		eachArgumentPlace(typed.Arguments, visit)
 	case *BinaryExpression:
 		visit(typed.Left, PlaceRoleUse)
 		visit(typed.Right, PlaceRoleUse)
@@ -162,7 +162,7 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 		if typed.Tag.Place != nil {
 			visit(*typed.Tag.Place, PlaceRoleUse)
 		}
-		for _, property := range typed.Props {
+		for _, property := range typed.Properties {
 			visit(property.Value, PlaceRoleUse)
 		}
 		for _, child := range typed.Children {
@@ -200,9 +200,9 @@ func EachInstructionPlace(instruction *Instruction, visit func(place Place, role
 	EachPlace(instruction.Value, visit)
 }
 
-func eachArgumentPlace(args []Argument, visit func(place Place, role PlaceRole)) {
-	for _, arg := range args {
-		visit(arg.Place, PlaceRoleUse)
+func eachArgumentPlace(arguments []Argument, visit func(place Place, role PlaceRole)) {
+	for _, argument := range arguments {
+		visit(argument.Place, PlaceRoleUse)
 	}
 }
 

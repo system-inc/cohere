@@ -379,24 +379,6 @@ func checkRegexPatternMapped(
 	checkRegexPatternWithReporter(pattern, flagsText, source, collector.report)
 }
 
-// mappedFindingCollector reports a finding at the raw offsets its cooked span maps to.
-type mappedFindingCollector struct {
-	ctx       rule.Context
-	bodyStart int
-	offsets   []int
-}
-
-func (collector *mappedFindingCollector) report(finding pendingMisleadingFinding) {
-	if finding.start >= len(collector.offsets) || finding.end >= len(collector.offsets) {
-		return
-	}
-	collector.ctx.ReportRange(
-		core.NewTextRange(
-			collector.bodyStart+collector.offsets[finding.start],
-			collector.bodyStart+collector.offsets[finding.end]),
-		finding.message)
-}
-
 // checkRegexPattern reports every misleading sequence in every character class of a pattern.
 //
 // suggestions is called only for the without-flag surrogate finding, which is the one finding whose
@@ -450,7 +432,7 @@ func checkRegexPatternWithReporter(
 	// flag entirely, and rejects `/[👍-￿]/` which upstream reports on. Trading two false
 	// positives for four false negatives is not a trade, so the one construct that matters is
 	// tested directly.
-	if flags.UV() && patternHasLoneQuantifierBrace(pattern, flags) {
+	if flags.UnicodeMode() && patternHasLoneQuantifierBrace(pattern, flags) {
 		return
 	}
 
@@ -551,7 +533,7 @@ func characterSequences(
 		// starts and the low half is the whole character. So a pair of halves points at the whole
 		// character, and a join ending at a high half, as in `👨‍👩` read without the flag, stops
 		// where 👩 starts, which is where ESLint's span stops too.
-		if !flags.UV() && value > 0xFFFF && !isCodePointEscape {
+		if !flags.UnicodeMode() && value > 0xFFFF && !isCodePointEscape {
 			high := 0xD800 + ((value - 0x10000) >> 10)
 			low := 0xDC00 + ((value - 0x10000) & 0x3FF)
 			current = append(current,
@@ -575,7 +557,7 @@ func characterSequences(
 			minimumEnd, maximumStart := rangeEndpointBounds(pattern, element, flags)
 			appendCharacter(element.Value, element.Start, minimumEnd, element.IsUBrace)
 			flush()
-			appendCharacter(element.Max, maximumStart, element.End, element.MaxIsUBrace)
+			appendCharacter(element.Maximum, maximumStart, element.End, element.MaxIsUBrace)
 		default:
 			appendCharacter(element.Value, element.Start, element.End, element.IsUBrace)
 		}
@@ -602,7 +584,7 @@ func rangeEndpointBounds(
 	switch {
 	case pattern[start] != '\\':
 		_, width = utf8.DecodeRuneInString(pattern[start:])
-	case flags.UV() && element.Value > 0xFFFF && start+2 < len(pattern) && pattern[start+1] == 'u' &&
+	case flags.UnicodeMode() && element.Value > 0xFFFF && start+2 < len(pattern) && pattern[start+1] == 'u' &&
 		pattern[start+2] != '{':
 		// `👍` under a unicode flag is two escapes the parser folded into one member.
 		width = 12

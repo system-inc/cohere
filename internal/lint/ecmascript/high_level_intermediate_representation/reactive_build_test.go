@@ -480,8 +480,8 @@ func hasScopeTerminalInLoopValueBlock(function *Function) bool {
 			valueBlocks = append(valueBlocks, terminal.Init)
 		}
 	}
-	for _, blockID := range valueBlocks {
-		block, ok := function.Block(blockID)
+	for _, blockId := range valueBlocks {
+		block, ok := function.Block(blockId)
 		if !ok {
 			continue
 		}

@@ -69,9 +69,9 @@ func underscoredInternalPackageNames(test *testing.T) map[string]bool {
 	test.Helper()
 
 	names := map[string]bool{}
-	walkError := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
+	walkError := filepath.WalkDir("../..", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && entry.Name() == "testdata" {
 			return filepath.SkipDir
@@ -108,9 +108,9 @@ func ruleMessageDescriptionsOnDisk(test *testing.T) []messageDescription {
 
 	var found []messageDescription
 	fileSet := token.NewFileSet()
-	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
+	walkError := filepath.WalkDir("../rules", func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		if entry.IsDir() && entry.Name() == "testdata" {
 			return filepath.SkipDir

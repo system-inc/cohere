@@ -224,7 +224,7 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	if options.PropNamePattern != "render*" {
 		test.Errorf("empty input gave pattern %q, want render*", options.PropNamePattern)
 	}
-	if options.AllowAsProps {
+	if options.AllowAsProperties {
 		test.Error("empty input enabled allowAsProps")
 	}
 
@@ -275,9 +275,9 @@ func TestNoUnstableNestedComponentsNilOptions(test *testing.T) {
 	rule_testing.ExpectClean(test, result)
 }
 
-// TestNoUnstableNestedComponentsAllowAsProps pins the option against the same source with it off,
+// TestNoUnstableNestedComponentsAllowAsProperties pins the option against the same source with it off,
 // so the case cannot pass by the rule being silent for an unrelated reason.
-func TestNoUnstableNestedComponentsAllowAsProps(test *testing.T) {
+func TestNoUnstableNestedComponentsAllowAsProperties(test *testing.T) {
 	test.Parallel()
 
 	source := `function ParentComponent() {
@@ -290,8 +290,8 @@ func TestNoUnstableNestedComponentsAllowAsProps(test *testing.T) {
 
 	allowed := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
 		"Component.tsx", source, NoUnstableNestedComponentsOptions{
-			AllowAsProps:    true,
-			PropNamePattern: "render*",
+			AllowAsProperties: true,
+			PropNamePattern:   "render*",
 		})
 	rule_testing.ExpectClean(test, allowed)
 }

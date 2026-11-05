@@ -64,8 +64,8 @@ package cst
 // The control characters the lexer emits besides slices of the input, upstream's `BOM`, `DOCUMENT`, `FLOW_END`
 // and `SCALAR`.
 const (
-	// BOM is the byte order mark.
-	BOM uint16 = 0xFEFF
+	// Bom is the byte order mark.
+	Bom uint16 = 0xFEFF
 	// Document is the start of doc-mode (C0: Start of Text).
 	Document uint16 = 0x02
 	// FlowEnd is an unexpected end of flow-mode (C0: Cancel).
@@ -73,78 +73,6 @@ const (
 	// Scalar says the next token is a scalar value (C0: Unit Separator).
 	Scalar uint16 = 0x1F
 )
-
-// Token is any CST token, upstream's Token union. See the package comment for which fields each type has.
-type Token struct {
-	Type   string
-	Offset int
-	Indent int
-	Source []uint16
-
-	// Message is an error token's message.
-	Message string
-
-	// Start is a document's start: the tokens before its value.
-	Start []*Token
-	// FlowStart is a flow collection's start, its { or [ token.
-	FlowStart *Token
-	// Value is a document's value, nil when absent.
-	Value *Token
-	// End is the tokens after a document, document end marker, flow scalar or flow collection; nil when
-	// absent.
-	End []*Token
-	// Props is a block scalar's header, and the comments and spaces on its line.
-	Props []*Token
-	// Items is a block map's, block sequence's or flow collection's items.
-	Items []*CollectionItem
-
-	// indentAbsent marks a token whose upstream object has no indent field: a document, directive,
-	// document end or error token the parser builds. SourceTokens always have one, whatever their type.
-	indentAbsent bool
-}
-
-// HasIndent is upstream's `'indent' in token`.
-func (token *Token) HasIndent() bool { return !token.indentAbsent }
-
-// HasSource is upstream's `'source' in token`: every token but a document and a collection has one.
-func (token *Token) HasSource() bool {
-	switch token.Type {
-	case "document", "block-map", "block-seq", "flow-collection":
-		return false
-	}
-	return true
-}
-
-// CollectionItem is an item of a block map, block sequence or flow collection, upstream's CollectionItem
-// and the item types of BlockMap and BlockSequence.
-type CollectionItem struct {
-	Start []*Token
-	// Key is nil when absent or null; HasKey tells which.
-	Key *Token
-	// Sep is nil when absent. Present and empty is truthy upstream.
-	Sep   []*Token
-	Value *Token
-	// ExplicitKey is `explicitKey: true`; upstream never sets it false.
-	ExplicitKey bool
-
-	// keyPresent is `'key' in item`: true for a key that is a token or null.
-	keyPresent bool
-}
-
-// HasKey is `'key' in item`: whether the item has a key field, perhaps null.
-func (item *CollectionItem) HasKey() bool { return item.keyPresent }
-
-// setKey is `item.key = key` (or Object.assign with a key), where a nil key is null.
-func (item *CollectionItem) setKey(key *Token) {
-	item.Key = key
-	item.keyPresent = true
-}
-
-// deleteKey is `delete item.key`.
-func (item *CollectionItem) deleteKey() {
-	item.Key = nil
-	item.keyPresent = false
-}
 
 // TokenType identifies the type of a lexer token, upstream's tokenType. It returns "" for upstream's
 // null, an unknown token.
@@ -155,7 +83,7 @@ func TokenType(source []uint16) string {
 		return "newline"
 	case 1:
 		switch source[0] {
-		case BOM:
+		case Bom:
 			return "byte-order-mark"
 		case Document:
 			return "doc-mode"

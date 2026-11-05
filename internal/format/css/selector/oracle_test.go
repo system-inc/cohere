@@ -360,7 +360,7 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			if !utf8.Valid(source) {
 				return fmt.Errorf("%s is not UTF-8, which the comparison cannot carry through JSON", path)
 			}
-			inputs = append(inputs, input{Name: path, Text: string(source), CSS: true})
+			inputs = append(inputs, input{Name: path, Text: string(source), Css: true})
 			corpusFiles++
 			return nil
 		})
@@ -508,7 +508,7 @@ var prettierRefusedFixtures = map[string]string{
 type oracleInput struct {
 	Name string `json:"name"`
 	Text string `json:"text"`
-	CSS  bool   `json:"css,omitempty"`
+	Css  bool   `json:"css,omitempty"`
 }
 
 // runSelectorOracle runs the oracle script on inputs and returns its records in order.

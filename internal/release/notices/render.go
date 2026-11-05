@@ -84,7 +84,7 @@ func renderThirdPartyNotices(
 	}
 	writeEntry(
 		&builder,
-		entry{Name: "The Go toolchain and standard library", URL: "https://go.dev", License: "BSD-3-Clause",
+		entry{Name: "The Go toolchain and standard library", Url: "https://go.dev", License: "BSD-3-Clause",
 			Carries: "The runtime and standard library linked into every Go binary.", Text: string(goLicense)},
 	)
 
@@ -94,7 +94,7 @@ func renderThirdPartyNotices(
 	}
 	writeEntry(&builder, entry{
 		Name:    "TypeScript (typescript-go)",
-		URL:     "https://github.com/microsoft/typescript-go",
+		Url:     "https://github.com/microsoft/typescript-go",
 		License: "Apache-2.0",
 		Carries: "The TypeScript compiler, built from System, Inc.'s modified fork " +
 			compilerFork +
@@ -143,7 +143,7 @@ func renderThirdPartyNotices(
 		}
 		writeEntry(
 			&builder,
-			entry{Name: pin.Identity, URL: pin.Location, Version: pin.Version, License: license.Expression,
+			entry{Name: pin.Identity, Url: pin.Location, Version: pin.Version, License: license.Expression,
 				Carries: "A Swift package compiled into cohere-swift.", Text: string(text)},
 		)
 	}
@@ -174,7 +174,7 @@ func renderThirdPartyNotices(
 // entry is one credited project, as it is written.
 type entry struct {
 	Name    string
-	URL     string
+	Url     string
 	Version string
 	License string
 	Carries string
@@ -191,7 +191,7 @@ type entry struct {
 
 func writeEntry(builder *strings.Builder, entry entry) {
 	builder.WriteString("### " + entry.Name + "\n\n")
-	builder.WriteString("- Source: " + entry.URL + "\n")
+	builder.WriteString("- Source: " + entry.Url + "\n")
 	if entry.Version != "" {
 		builder.WriteString("- Version: " + entry.Version + "\n")
 	}
@@ -241,7 +241,7 @@ func writeModule(builder *strings.Builder, module Module, carries string) error 
 	}
 	writeEntry(builder, entry{
 		Name:           module.Path,
-		URL:            "https://pkg.go.dev/" + module.Path + "@" + module.Version,
+		Url:            "https://pkg.go.dev/" + module.Path + "@" + module.Version,
 		Version:        module.Version,
 		License:        license,
 		Carries:        described,
@@ -259,7 +259,7 @@ func writeUpstream(builder *strings.Builder, upstream Upstream) error {
 	if upstream.LicenseFile == "" {
 		writeEntry(
 			builder,
-			entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
+			entry{Name: upstream.Name, Url: upstream.Url, Version: upstream.Version, License: upstream.License,
 				Carries: upstream.Carries, Note: upstream.Note},
 		)
 		return nil
@@ -275,7 +275,7 @@ func writeUpstream(builder *strings.Builder, upstream Upstream) error {
 	}
 	writeEntry(
 		builder,
-		entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
+		entry{Name: upstream.Name, Url: upstream.Url, Version: upstream.Version, License: upstream.License,
 			Carries: upstream.Carries, Text: string(text)},
 	)
 	return nil

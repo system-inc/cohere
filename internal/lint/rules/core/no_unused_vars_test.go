@@ -202,16 +202,16 @@ func TestDecodeNoUnusedVarsOptions(test *testing.T) {
 		if decodeNoUnusedVariablesOptionsError != nil {
 			test.Fatalf("decoding empty options failed: %v", decodeNoUnusedVariablesOptionsError)
 		}
-		if decoded.Vars != "all" {
-			test.Errorf("vars default is %q, want %q", decoded.Vars, "all")
+		if decoded.Variables != "all" {
+			test.Errorf("vars default is %q, want %q", decoded.Variables, "all")
 		}
-		if decoded.Args != "after-used" {
-			test.Errorf("args default is %q, want %q, not \"all\"", decoded.Args, "after-used")
+		if decoded.Arguments != "after-used" {
+			test.Errorf("args default is %q, want %q, not \"all\"", decoded.Arguments, "after-used")
 		}
 		if decoded.CaughtErrors != "all" {
 			test.Errorf("caughtErrors default is %q, want %q", decoded.CaughtErrors, "all")
 		}
-		if decoded.VarsIgnorePattern != "" ||
+		if decoded.VariablesIgnorePattern != "" ||
 			decoded.ArgsIgnorePattern != "" ||
 			decoded.CaughtErrorsIgnorePattern != "" {
 			test.Error("an absent ignore pattern must stay absent, which ignores nothing, ESLint's default")
@@ -225,11 +225,11 @@ func TestDecodeNoUnusedVarsOptions(test *testing.T) {
 		if decodeNoUnusedVariablesOptionsError != nil {
 			test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 		}
-		if decoded.Args != "none" {
-			test.Errorf("args is %q, want %q", decoded.Args, "none")
+		if decoded.Arguments != "none" {
+			test.Errorf("args is %q, want %q", decoded.Arguments, "none")
 		}
-		if decoded.VarsIgnorePattern != "^ignore" {
-			test.Errorf("varsIgnorePattern is %q, want %q", decoded.VarsIgnorePattern, "^ignore")
+		if decoded.VariablesIgnorePattern != "^ignore" {
+			test.Errorf("varsIgnorePattern is %q, want %q", decoded.VariablesIgnorePattern, "^ignore")
 		}
 	})
 }
@@ -832,7 +832,7 @@ func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(test *testing.T) {
 			test.Parallel()
 			var options rule.Given[NoUnusedVarsOptions]
 			if strings.Contains(testCase.name, "args all") {
-				options = rule.Configured(NoUnusedVarsOptions{Args: "all"})
+				options = rule.Configured(NoUnusedVarsOptions{Arguments: "all"})
 			}
 			result := rule_testing.RunTypedGiven(test, NoUnusedVars, "a.ts", testCase.source, options)
 			var got []string

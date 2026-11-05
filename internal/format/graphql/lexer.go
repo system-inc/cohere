@@ -26,24 +26,6 @@ import (
 // Token offsets are bytes. Error positions are bytes too, and an error's line and column are computed
 // as graphql-js's getLocation computes them, the column in UTF-16 units, so the message matches.
 
-// SyntaxError is graphql-js's GraphQLError from syntaxError(source, position, description), as Prettier
-// reports it: createParseError reads the error's first location into Prettier's createError, whose
-// message appends " (line:column)".
-type SyntaxError struct {
-	// Description is syntaxError's description, without graphql-js's "Syntax Error: " prefix.
-	Description string
-	// Position is the byte offset in the text where graphql-js's error points.
-	Position int
-	// Line and Column are graphql-js's error.locations[0]: 1-indexed, the column in UTF-16 code units.
-	Line   int
-	Column int
-}
-
-// Error is Prettier's message for the error: GraphQLError's message, then the location.
-func (syntaxError *SyntaxError) Error() string {
-	return fmt.Sprintf("Syntax Error: %s (%d:%d)", syntaxError.Description, syntaxError.Line, syntaxError.Column)
-}
-
 // syntaxError produces a GraphQLError representing a syntax error, containing useful descriptive
 // information about the syntax error's position in the source. The lexer and parser throw it, so here
 // they panic with it, and Parse recovers it into its error return: threading an error through every
@@ -108,7 +90,7 @@ type lexer struct {
 }
 
 func newLexer(body string) *lexer {
-	startOfFileToken := newToken(tokenKindSOF, 0, 0, 0, 0)
+	startOfFileToken := newToken(tokenKindSof, 0, 0, 0, 0)
 
 	return &lexer{
 		body:      body,
@@ -129,7 +111,7 @@ func (lexer *lexer) advance() *token {
 // lookahead looks ahead and returns the next non-ignored token, but does not change the state of Lexer.
 func (lexer *lexer) lookahead() *token {
 	token := lexer.token
-	if token.kind != tokenKindEOF {
+	if token.kind != tokenKindEof {
 		for {
 			if token.next != nil {
 				token = token.next
@@ -137,7 +119,7 @@ func (lexer *lexer) lookahead() *token {
 				// Read the next token and form a link in the token linked-list.
 				nextToken := readNextToken(lexer, token.end)
 				token.next = nextToken
-				nextToken.prev = token
+				nextToken.previous = token
 				token = nextToken
 			}
 			if token.kind != tokenKindComment {
@@ -239,7 +221,7 @@ func isTrailingSurrogate(code int) bool {
 // U+1234).
 func printCodePointAt(lexer *lexer, location int) string {
 	if location >= len(lexer.body) {
-		return string(tokenKindEOF)
+		return string(tokenKindEof)
 	}
 	code, _ := codePointAt(lexer.body, location)
 	if code >= 0x0020 && code <= 0x007e {
@@ -404,7 +386,7 @@ func readNextToken(lexer *lexer, start int) *token {
 		}
 	}
 
-	return createToken(lexer, tokenKindEOF, bodyLength, bodyLength)
+	return createToken(lexer, tokenKindEof, bodyLength, bodyLength)
 }
 
 // readComment reads a comment token from the source file.

@@ -254,7 +254,7 @@ func TestInlineDefinesTheCallResultOnEveryPathToTheContinuation(test *testing.T)
 					defined[phi.Place.Identifier] = true
 				}
 			}
-			for _, parameter := range function.Params {
+			for _, parameter := range function.Parameters {
 				defined[parameter.Identifier] = true
 			}
 			for _, contextValue := range function.Context {
@@ -532,7 +532,7 @@ func TestInlineFindsAMemoCallbackAcrossBlocks(test *testing.T) {
 			case *FunctionExpression:
 				definitions[instruction.LValue.Identifier] = block.Id
 			case *CallExpression:
-				if len(value.Args) == 0 {
+				if len(value.Arguments) == 0 {
 					calls[value.Callee.Identifier] = block.Id
 				}
 			}

@@ -216,7 +216,7 @@ func reportDerivedComputationsInEffects(
 					ruleContext,
 					function,
 					value.Callee,
-					value.Args,
+					value.Arguments,
 					candidateDependencies,
 					functions,
 					locals,
@@ -228,7 +228,7 @@ func reportDerivedComputationsInEffects(
 					ruleContext,
 					function,
 					value.Property,
-					value.Args,
+					value.Arguments,
 					candidateDependencies,
 					functions,
 					locals,
@@ -257,23 +257,23 @@ func derivedEffectCandidate(
 	ruleContext rule.Context,
 	function *high_level_intermediate_representation.Function,
 	callee high_level_intermediate_representation.Place,
-	args []high_level_intermediate_representation.Argument,
+	arguments []high_level_intermediate_representation.Argument,
 	candidateDependencies map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.ArrayExpression,
 	functions map[static_single_assignment.IdentifierId]*high_level_intermediate_representation.FunctionExpression,
 	locals map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId,
 ) {
-	if len(args) != 2 || args[0].Spread || args[1].Spread {
+	if len(arguments) != 2 || arguments[0].Spread || arguments[1].Spread {
 		return
 	}
 	if !isUseEffectExactly(ruleContext, function, callee) {
 		return
 	}
 
-	effectFunction, hasFunction := functions[args[0].Place.Identifier]
+	effectFunction, hasFunction := functions[arguments[0].Place.Identifier]
 	if !hasFunction {
 		return
 	}
-	deps, hasDeps := candidateDependencies[args[1].Place.Identifier]
+	deps, hasDeps := candidateDependencies[arguments[1].Place.Identifier]
 	// The `len == 0` half is upstream's `deps.elements.length !== 0` and it is subsumed here,
 	// deliberately kept rather than deleted. Its mutant survives the whole suite and no fixture can
 	// catch it, so the equivalence is stated with the measurement rather than left as a blind spot.
@@ -496,13 +496,13 @@ func validateDerivedEffect(
 				// Measured both ways on the spread shape: pristine 0, mutant 0. The argument-count
 				// half of this condition is load-bearing and its own mutant dies on
 				// `setterCalledWithTwoArguments`.
-				if !isCall || len(call.Args) != 1 || call.Args[0].Spread {
+				if !isCall || len(call.Arguments) != 1 || call.Arguments[0].Spread {
 					break
 				}
 				if !isSetterTyped(ruleContext, effectFunction, call.Callee) {
 					break
 				}
-				deps, hasDeps := values[call.Args[0].Place.Identifier]
+				deps, hasDeps := values[call.Arguments[0].Place.Identifier]
 				if hasDeps && distinctCount(deps) == len(effectDeps) {
 					setStateLocations = append(setStateLocations, call.Callee)
 					break

@@ -31,8 +31,8 @@ const (
 	refsFindingPassedToFunction
 	// refsFindingUpdate is writing `ref.current` during render.
 	refsFindingUpdate
-	// refsFindingFunctionAccessesRef is calling a function whose body reads a ref.
-	refsFindingFunctionAccessesRef
+	// refsFindingFunctionAccessesReference is calling a function whose body reads a ref.
+	refsFindingFunctionAccessesReference
 	// refsFindingDidNotConverge is the invariant: the sweep was still moving after ten rounds.
 	refsFindingDidNotConverge
 )
@@ -58,37 +58,6 @@ type refsFinding struct {
 	Node *ast.Node
 }
 
-// refsEnvironment is the per-identifier lattice map plus the temporaries side map.
-//
-// `temporaries` is upstream's `Env::temporaries`: an aliasing side table letting a load or a store
-// resolve to the value it ultimately names, so a chain of assignments behaves like the value at its
-// head without the lattice map carrying an entry per link.
-type refsEnvironment struct {
-	changed     bool
-	data        map[static_single_assignment.IdentifierId]*refsAccessType
-	temporaries map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId
-	// names carries a source binding name onto the temporary that loaded it.
-	//
-	// Populated only from LoadLocal, which is upstream's `set_name` and is called from exactly one
-	// instruction arm (`infer_types.rs:482`). That single restriction is what makes
-	// `props.fooRef.current` silent while `const fooRef = x; fooRef.current` reports: a property
-	// load's result never receives a name, so the name test finds nothing to match on the outer
-	// access. Propagating names through property loads as well would look more thorough and would
-	// disagree with React on real code, measured on the executable in both directions.
-	names map[static_single_assignment.IdentifierId]string
-	// propertyNames is the property a load read, keyed by the value it produced. Consulted only by
-	// the exact `props.ref` shape; see setPropertyName's call site.
-	propertyNames map[static_single_assignment.IdentifierId]string
-	// declarations and byDeclaration recover a value whose single-assignment numbering did not
-	// unify. See `get`.
-	// accessNodes is the member-expression node a ref value came from, so a finding underlines the
-	// whole access rather than only the object identifier.
-	accessNodes   map[static_single_assignment.IdentifierId]*ast.Node
-	declarations  map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId
-	byDeclaration map[static_single_assignment.DeclarationId]*refsAccessType
-	refIdSeed     int
-}
-
 func newRefsEnvironment() *refsEnvironment {
 	return &refsEnvironment{
 		data:          map[static_single_assignment.IdentifierId]*refsAccessType{},
@@ -98,163 +67,6 @@ func newRefsEnvironment() *refsEnvironment {
 		accessNodes:   map[static_single_assignment.IdentifierId]*ast.Node{},
 		declarations:  map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId{},
 		byDeclaration: map[static_single_assignment.DeclarationId]*refsAccessType{},
-	}
-}
-
-// nextRefId mints a fresh ref identity. Every call site of this is a place the convergence equality
-// must not look, which is why it is funnelled through one method.
-func (environment *refsEnvironment) nextRefId() int {
-	environment.refIdSeed++
-	return environment.refIdSeed
-}
-
-// operandId resolves an identifier through the temporaries side map.
-func (environment *refsEnvironment) operandId(
-	key static_single_assignment.IdentifierId,
-) static_single_assignment.IdentifierId {
-	if resolved, found := environment.temporaries[key]; found {
-		return resolved
-	}
-	return key
-}
-
-func (environment *refsEnvironment) define(
-	key static_single_assignment.IdentifierId,
-	value static_single_assignment.IdentifierId,
-) {
-	resolved := environment.operandId(value)
-	environment.temporaries[key] = resolved
-	// The access node travels with the value along an alias chain, so `const v = ref.current;`
-	// still underlines `ref.current` when the finding is raised at the read of `v`.
-	if node, ok := environment.accessNodes[resolved]; ok {
-		environment.accessNodes[key] = node
-	} else if node, ok := environment.accessNodes[value]; ok {
-		environment.accessNodes[key] = node
-	}
-}
-
-// carryAccessNode copies a recorded access node from one value to another.
-func (environment *refsEnvironment) carryAccessNode(
-	to static_single_assignment.IdentifierId,
-	from static_single_assignment.IdentifierId,
-) {
-	if node, ok := environment.accessNodes[environment.operandId(from)]; ok {
-		environment.accessNodes[to] = node
-		return
-	}
-	if node, ok := environment.accessNodes[from]; ok {
-		environment.accessNodes[to] = node
-	}
-}
-
-// setName carries a source name onto a temporary, upstream's `set_name`.
-func (environment *refsEnvironment) setName(
-	function *high_level_intermediate_representation.Function,
-	target static_single_assignment.IdentifierId,
-	source static_single_assignment.IdentifierId,
-) {
-	if name := refsIdentifierName(function, source); name != "" {
-		environment.names[target] = name
-	}
-}
-
-// setName2 records a name directly onto a value, used for a global's own name.
-func (environment *refsEnvironment) setName2(target static_single_assignment.IdentifierId, name string) {
-	if name != "" {
-		environment.names[target] = name
-	}
-}
-
-// setPropertyName records the property a load read, as the result's name in this position.
-func (environment *refsEnvironment) setPropertyName(target static_single_assignment.IdentifierId, property string) {
-	if property != "" {
-		environment.propertyNames[target] = property
-	}
-}
-
-// nameOf is the value's own binding name, or the one a LoadLocal carried onto it.
-func (environment *refsEnvironment) nameOf(
-	function *high_level_intermediate_representation.Function,
-	id static_single_assignment.IdentifierId,
-) string {
-	if name := refsIdentifierName(function, id); name != "" {
-		return name
-	}
-	return environment.names[id]
-}
-
-func (environment *refsEnvironment) get(key static_single_assignment.IdentifierId) *refsAccessType {
-	if found, ok := environment.data[environment.operandId(key)]; ok {
-		return found
-	}
-	// Fall back to whatever the same source binding holds elsewhere in this function.
-	//
-	// This exists because single-assignment renaming is not total in our lowering: measured on the
-	// corpus fixture `error.invalid-aliased-ref-in-callback-invoked-during-render-`, a closure that
-	// builds an alias chain produces two identifiers for one `const current`, ids 8 and 20, both
-	// carrying declaration 3, and the load reads id 8 while the store wrote id 20. Without the
-	// alias in the same closure the two coincide and everything works, which is why this is
-	// invisible on all but one fixture.
-	//
-	// So the value is looked up by declaration when the identifier itself has no entry. That is
-	// sound here because a declaration groups exactly the values one source binding takes
-	// (`high_level_intermediate_representation.Identifier.Declaration`), and it is conservative in the direction this
-	// rule wants: it can only find a ref that some other numbering of the same binding already proved.
-	//
-	// This is a workaround for a representation defect rather than a transcription of upstream,
-	// which has no such gap. It belongs in lowering; see the report.
-	for _, candidate := range [2]static_single_assignment.IdentifierId{key, environment.operandId(key)} {
-		if declaration, ok := environment.declarations[candidate]; ok {
-			if found, ok := environment.byDeclaration[declaration]; ok {
-				return found
-			}
-		}
-	}
-	return nil
-}
-
-// set widens rather than overwrites, and records whether the element moved.
-//
-// The widening join is what makes the sweep monotone, and the `changed` flag it maintains is the
-// fixpoint's only termination signal. The comparison uses `refsTypeEqual`, which ignores minted ref
-// identity: reading that comparison as ordinary equality is the defect that would prevent
-// convergence.
-func (environment *refsEnvironment) set(key static_single_assignment.IdentifierId, value *refsAccessType) {
-	operandId := environment.operandId(key)
-	current, hadCurrent := environment.data[operandId]
-	widened := refsJoin(value, current, environment.nextRefId)
-	if !hadCurrent && widened.Kind == refsNone {
-		environment.data[operandId] = widened
-		return
-	}
-	if !hadCurrent || !refsTypeEqual(current, widened) {
-		environment.changed = true
-	}
-	environment.data[operandId] = widened
-	// Record against the original key's declaration as well as the resolved one: an alias chain
-	// resolves a named binding onto an unnamed temporary, so the declaration lives on the key that
-	// was asked about rather than on the value it resolved to.
-	if widened.Kind != refsNone {
-		if declaration, ok := environment.declarations[key]; ok {
-			environment.byDeclaration[declaration] = widened
-		}
-		if declaration, ok := environment.declarations[operandId]; ok {
-			environment.byDeclaration[declaration] = widened
-		}
-	}
-}
-
-// noteDeclaration records which source binding a value belongs to, so `get` can recover a value
-// whose single-assignment numbering did not unify with the one that was written.
-func (environment *refsEnvironment) noteDeclaration(
-	function *high_level_intermediate_representation.Function,
-	id static_single_assignment.IdentifierId,
-) {
-	if function == nil || int(id) >= len(function.Identifiers) {
-		return
-	}
-	if identifier := function.Identifiers[id]; identifier != nil && identifier.Name != "" {
-		environment.declarations[id] = identifier.Declaration
 	}
 }
 
@@ -435,7 +247,7 @@ func refsRunOneRound(
 
 	// Parameters are seeded from their declared type. A parameter that is a ref by type or by name
 	// enters as one, which is how `function Component({ref})` reports with no `useRef` in sight.
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		env.set(parameter.Identifier, refsSeedType(ruleContext, function, parameter.Identifier, env))
 	}
 
@@ -565,7 +377,7 @@ func refsSeedType(
 	env *refsEnvironment,
 ) *refsAccessType {
 	if refsIsRefBinding(ruleContext, function, env, id) {
-		return &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true}
+		return &refsAccessType{Kind: refsReference, RefId: env.nextRefId(), HasRefId: true}
 	}
 	return &refsAccessType{Kind: refsNone}
 }
@@ -585,7 +397,7 @@ func refsApplyDeclaredType(
 		return
 	}
 	current := env.get(id)
-	if current != nil && current.Kind == refsRef {
+	if current != nil && current.Kind == refsReference {
 		return
 	}
 	// A value already known to be a function is never widened into a ref by the name test. The
@@ -600,7 +412,7 @@ func refsApplyDeclaredType(
 	if current != nil && current.Kind == refsStructure && current.Function != nil {
 		return
 	}
-	env.set(id, &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true})
+	env.set(id, &refsAccessType{Kind: refsReference, RefId: env.nextRefId(), HasRefId: true})
 }
 
 // refsCheckDirectValueAccess reports only a bare ref value, not a function that reads one.
@@ -663,7 +475,7 @@ func refsCheckPassedToFunction(
 	}
 	resolved := refsDestructure(current)
 	switch {
-	case resolved.Kind == refsRef || resolved.Kind == refsRefValue:
+	case resolved.Kind == refsReference || resolved.Kind == refsRefValue:
 		return append(findings, refsFinding{Kind: refsFindingPassedToFunction, Value: id, HasValue: true})
 	case resolved.Kind == refsStructure && resolved.Function != nil && resolved.Function.ReadRefEffect:
 		return append(findings, refsFinding{Kind: refsFindingPassedToFunction, Value: id, HasValue: true})
@@ -683,7 +495,7 @@ func refsCheckUpdate(
 		return findings
 	}
 	resolved := refsDestructure(current)
-	if resolved.Kind == refsRef || resolved.Kind == refsRefValue {
+	if resolved.Kind == refsReference || resolved.Kind == refsRefValue {
 		return append(findings, refsFinding{Kind: refsFindingUpdate, Value: id, HasValue: true, Node: node})
 	}
 	return findings
@@ -898,7 +710,7 @@ func refsTransfer(
 			// test that caught this exemption when it was written one step too wide.
 			isRefObject := false
 			if current := env.get(place.Identifier); current != nil {
-				isRefObject = refsDestructure(current).Kind == refsRef
+				isRefObject = refsDestructure(current).Kind == refsReference
 			}
 			if !isRefObject || !refsAggregateIsExempt(ruleContext, function, env, instruction) {
 				collected = refsCheckDirectValueAccess(env, place.Identifier, collected)
@@ -994,11 +806,11 @@ func refsTransfer(
 	return collected
 }
 
-// refsCallResultIsRef asks the checker what a call yields, through the call's own syntax.
+// refsCallResultIsReference asks the checker what a call yields, through the call's own syntax.
 //
 // `refsIsRefBinding` reaches the checker through `Identifier.Node`, which a call's temporary lvalue
 // does not have. This asks the same question of the call expression instead.
-func refsCallResultIsRef(
+func refsCallResultIsReference(
 	ruleContext rule.Context,
 	instruction *high_level_intermediate_representation.Instruction,
 ) bool {
@@ -1068,21 +880,21 @@ func refsAggregateIsExempt(
 			if candidate == nil || candidate.Id <= instruction.Id {
 				continue
 			}
-			var args []high_level_intermediate_representation.Argument
+			var arguments []high_level_intermediate_representation.Argument
 			switch call := candidate.Value.(type) {
 			case *high_level_intermediate_representation.CallExpression:
-				args = call.Args
+				arguments = call.Arguments
 			case *high_level_intermediate_representation.MethodCall:
-				args = call.Args
+				arguments = call.Arguments
 			default:
 				continue
 			}
-			for _, argument := range args {
+			for _, argument := range arguments {
 				if env.operandId(argument.Place.Identifier) != env.operandId(aggregate) {
 					continue
 				}
 				if refsIsRefBinding(ruleContext, function, env, candidate.LValue.Identifier) ||
-					refsCallResultIsRef(ruleContext, candidate) {
+					refsCallResultIsReference(ruleContext, candidate) {
 					return true
 				}
 				calleeName := ""
@@ -1140,7 +952,7 @@ func refsPropertyLoadTransfer(
 		env.set(target, objectType)
 	case objectType != nil && objectType.Kind == refsStructure && objectType.Value != nil:
 		env.set(target, objectType.Value)
-	case objectType != nil && objectType.Kind == refsRef:
+	case objectType != nil && objectType.Kind == refsReference:
 		if instruction.Node != nil {
 			env.accessNodes[target] = instruction.Node
 		}
@@ -1202,7 +1014,7 @@ func refsNestedFunctionTransfer(
 	// nothing is nil, nothing panics, and every message-id fixture that does not involve a nested
 	// closure stays green.
 	innerEnvironment := newRefsEnvironment()
-	innerEnvironment.refIdSeed = env.refIdSeed
+	innerEnvironment.referenceIdSeed = env.referenceIdSeed
 
 	// A captured value must be translated into the inner function's identifier space before the
 	// inner sweep can see it. `Function.Context` is the capture edge that performs the translation:
@@ -1229,7 +1041,7 @@ func refsNestedFunctionTransfer(
 	innerFindings := refsRunOneRound(ruleContext, inner, innerEnvironment)
 	// Ref identity is minted from a single counter so two functions cannot collide on an id; the
 	// seed travels back out rather than the whole environment.
-	env.refIdSeed = innerEnvironment.refIdSeed
+	env.referenceIdSeed = innerEnvironment.referenceIdSeed
 	functionType := &refsFunctionType{ReturnType: &refsAccessType{Kind: refsNone}}
 	if len(innerFindings) == 0 {
 		if returned := innerEnvironment.get(refsReturnedValue(inner)); returned != nil {
@@ -1346,7 +1158,7 @@ func refsCallTransfer(
 			didError = true
 			collected = append(
 				collected,
-				refsFinding{Kind: refsFindingFunctionAccessesRef, Value: callee, HasValue: true},
+				refsFinding{Kind: refsFindingFunctionAccessesReference, Value: callee, HasValue: true},
 			)
 		}
 	}
@@ -1360,7 +1172,7 @@ func refsCallTransfer(
 		// Measured on Kirk's tree: without this the eight `mergeReferences([inner, ref])` sites all
 		// report, and upstream is silent on that exact input.
 		isRefResult := refsIsRefBinding(ruleContext, function, env, target) ||
-			refsCallResultIsRef(ruleContext, instruction)
+			refsCallResultIsReference(ruleContext, instruction)
 		hookName := env.nameOf(function, callee)
 		isHook := refsIsHookName(hookName)
 		// `useState`, `useReducer` and `useMemo` are not exempt, because each runs the argument it
@@ -1431,7 +1243,9 @@ func refsStoreTransfer(
 ) []refsFinding {
 	collected := findings
 	foundSafe := false
-	if target := env.get(object); target != nil && target.Kind == refsRef && target.HasRefId && computedKey == nil {
+	if target := env.get(
+		object,
+	); target != nil && target.Kind == refsReference && target.HasRefId && computedKey == nil {
 		for index, safe := range *safeBlocks {
 			if safe.RefId == target.RefId {
 				*safeBlocks = append((*safeBlocks)[:index], (*safeBlocks)[index+1:]...)

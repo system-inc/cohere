@@ -108,7 +108,7 @@ type Machine struct {
 	Processor   string `json:"processor"`
 	Cores       int    `json:"cores"`
 	MemoryBytes int64  `json:"memoryBytes"`
-	OS          string `json:"os"`
+	Os          string `json:"os"`
 }
 
 // Run is one measured run.

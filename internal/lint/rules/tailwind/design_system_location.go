@@ -15,49 +15,6 @@ import (
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
 )
 
-// TailwindLocationOptions are upstream's options that say where Tailwind and its stylesheet are, and how
-// the stylesheet's imports resolve, shared by every better-tailwindcss rule: `entryPoint`,
-// `tailwindConfig`, `cwd` and `tsconfig` (see tsconfig_paths.go for the last).
-//
-// Upstream resolves all three in `getTailwindConfigPath` (utils/context.js at 4.7.0). `cwd` is
-// resolved against the directory ESLint runs from and is where `tailwindcss` is resolved from. The
-// stylesheet is `entryPoint ?? tailwindConfig`, looked for from `cwd` by findPathRecursive. When it is
-// not found, or neither is set, upstream reads Tailwind's own default theme, `tailwindcss/theme.css`.
-//
-// Here, a rule given none of the three keeps finding the project's stylesheet by FindEntryPoint, as it
-// always has, and a rule given any of them follows upstream exactly. On a rule that never reads the
-// design system they change nothing, in upstream as here.
-type TailwindLocationOptions struct {
-	EntryPoint     string `json:"entryPoint"`
-	TailwindConfig string `json:"tailwindConfig"`
-	Cwd            string `json:"cwd"`
-	Tsconfig       string `json:"tsconfig"`
-
-	// anchor is the directory the config was written in, which stands for ESLint's working directory,
-	// set by the decoder from rule.OptionsBase.
-	anchor string
-}
-
-// Location is the design system these options name.
-func (options TailwindLocationOptions) Location() DesignSystemLocation {
-	configurationPath := options.EntryPoint
-	if configurationPath == "" {
-		configurationPath = options.TailwindConfig
-	}
-	return DesignSystemLocation{
-		Anchor:     options.anchor,
-		Cwd:        options.Cwd,
-		ConfigPath: configurationPath,
-		Tsconfig:   options.Tsconfig,
-	}
-}
-
-// anchorAt records where the config was written. Promoted onto every options struct that embeds
-// TailwindLocationOptions, so the decoder can set it.
-func (options *TailwindLocationOptions) anchorAt(directory string) {
-	options.anchor = directory
-}
-
 // tailwindSettingsNamespaces are the two keys upstream reads its settings from, the first preferred:
 // `eslintContext.settings["eslint-plugin-better-tailwindcss"] ?? settings["better-tailwindcss"]`.
 // registry.CheckSettings refuses a config writing both, so at most one is ever here.
@@ -236,8 +193,8 @@ func ConfiguredEntryPoint(
 		anchor = projectRoot
 	}
 	cwd := anchor
-	if location.Cwd != "" {
-		cwd = resolvePath(anchor, location.Cwd)
+	if location.WorkingDirectory != "" {
+		cwd = resolvePath(anchor, location.WorkingDirectory)
 	}
 
 	packageRoot := findTailwindPackageRoot(cwd, fileExists)
@@ -277,10 +234,10 @@ func LocationInSettings(settings map[string]json.RawMessage, anchor string) (Des
 		return value
 	}
 	location := TailwindLocationOptions{
-		EntryPoint:     read("entryPoint"),
-		TailwindConfig: read("tailwindConfig"),
-		Cwd:            read("cwd"),
-		Tsconfig:       read("tsconfig"),
+		EntryPoint:       read("entryPoint"),
+		TailwindConfig:   read("tailwindConfig"),
+		WorkingDirectory: read("cwd"),
+		Tsconfig:         read("tsconfig"),
 	}
 	location.anchorAt(anchor)
 	named := location.Location()
@@ -295,7 +252,7 @@ func WritesSettings(settings map[string]json.RawMessage) bool {
 // loadConfiguredDesignSystem is upstream's resolution for a rule that named a location.
 func loadConfiguredDesignSystem(
 	projectRoot string,
-	fileSystem *rule.RecordingFS,
+	fileSystem *rule.RecordingFileSystem,
 	location DesignSystemLocation,
 ) DesignSystemResult {
 	entryPoint, packageRoot, configuredEntryPointError := ConfiguredEntryPoint(
@@ -330,19 +287,6 @@ func loadConfiguredDesignSystem(
 	return loadedDesignSystemResult(system, entryPoint)
 }
 
-// cwdFrom is upstream's `ctx.cwd` for this location: the anchor, or the project root when there is none,
-// with `cwd` resolved against it when written.
-func (location DesignSystemLocation) cwdFrom(projectRoot string) string {
-	anchor := location.Anchor
-	if anchor == "" {
-		anchor = projectRoot
-	}
-	if location.Cwd != "" {
-		return resolvePath(anchor, location.Cwd)
-	}
-	return anchor
-}
-
 // stylesheetResolverAt is the resolver a design system's `@import`s go through: the installed
 // tailwindcss's, with the tsconfig upstream would find from cwd in front of it. Every question about
 // the disk goes through fileSystem, so the tsconfig, everything it extends and every path it maps are
@@ -351,7 +295,7 @@ func stylesheetResolverAt(
 	cwd string,
 	configured string,
 	packageRoot string,
-	fileSystem *rule.RecordingFS,
+	fileSystem *rule.RecordingFileSystem,
 ) (tailwindengine.StylesheetResolver, error) {
 	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 	readFile := func(path string) (string, bool) { return fileSystem.ReadFile(tspath.RootedFilePath(path)) }
@@ -390,4 +334,39 @@ func resolvePath(base string, path string) string {
 		return filepath.Clean(path)
 	}
 	return filepath.Join(base, path)
+}
+
+// DesignSystemLocation is where a rule's options say the design system is: upstream's `cwd`,
+// `entryPoint` and `tailwindConfig`, with the directory a relative path anchors to. The zero value is
+// the default, the project's own stylesheet found by FindEntryPoint.
+type DesignSystemLocation struct {
+	// Anchor is upstream's `ctx.cwd`, the directory ESLint runs from, which is the config file's
+	// directory here. Empty means the project root.
+	Anchor string
+	// WorkingDirectory is upstream's `cwd`, as written: where Tailwind and the stylesheet are looked for from,
+	// relative to Anchor when relative.
+	WorkingDirectory string
+	// ConfigPath is upstream's `entryPoint ?? tailwindConfig`, as written.
+	ConfigPath string
+	// Tsconfig is upstream's `tsconfig`, as written. It never chooses the stylesheet, only how its
+	// imports resolve, so it leaves a location default.
+	Tsconfig string
+}
+
+// isDefault reports whether no option named a location, so the project's own stylesheet is used.
+func (location DesignSystemLocation) isDefault() bool {
+	return location.WorkingDirectory == "" && location.ConfigPath == ""
+}
+
+// cwdFrom is upstream's `ctx.cwd` for this location: the anchor, or the project root when there is none,
+// with `cwd` resolved against it when written.
+func (location DesignSystemLocation) cwdFrom(projectRoot string) string {
+	anchor := location.Anchor
+	if anchor == "" {
+		anchor = projectRoot
+	}
+	if location.WorkingDirectory != "" {
+		return resolvePath(anchor, location.WorkingDirectory)
+	}
+	return anchor
 }

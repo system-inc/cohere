@@ -69,7 +69,7 @@ func tokenizeLiquid(self *Self, effects *Effects, ok State, nok State) State {
 
 	// mayClose returns inside without consuming when the code is not `}`, so the tokenizer feeds the same
 	// code again, to inside. That leans on the production build's missing consume assertion, which the
-	// Go core also leaves out (tokenizer.go, goCode). It means `{{ a }x }}` and `{% a %% }` stay open past
+	// Go core also leaves out (tokenize_context.go, goCode). It means `{{ a }x }}` and `{% a %% }` stay open past
 	// the first closing code, and `{{ a }\n}}` takes the line ending into the node.
 	mayClose = func(code Code) State {
 		if code == CodeRightCurlyBrace {

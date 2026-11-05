@@ -36,18 +36,6 @@ func (oracle trimmingOracle) Format(fileName string, text string) (string, error
 	return strings.Join(lines, "\n"), nil
 }
 
-// unchanged returns its input. It is the candidate that flatters an overall score.
-type unchanged struct{}
-
-func (unchanged) Handles(string) bool                          { return true }
-func (unchanged) Format(_ string, text string) (string, error) { return text, nil }
-
-// refuser handles nothing, which is what a native printer looks like before it exists.
-type refuser struct{}
-
-func (refuser) Handles(string) bool                   { return false }
-func (refuser) Format(string, string) (string, error) { return "", errors.New("unreachable") }
-
 func factory(formatter Formatter) NewFormatter {
 	return func() (Formatter, error) { return formatter, nil }
 }

@@ -5,16 +5,6 @@ package compose
 
 import "github.com/system-inc/cohere/internal/format/yaml/cst"
 
-// composeContext is upstream's ComposeContext, one object shared and mutated down the whole document:
-// atKey and atRoot are switched as composing descends.
-type composeContext struct {
-	atKey      bool
-	atRoot     bool
-	directives *Directives
-	options    *Options
-	schema     *Schema
-}
-
 func composeDoc(options Options, directives *Directives, token *cst.Token, onError onErrorFunc) *Document {
 	offset, start, value, end := token.Offset, token.Start, token.Value, token.End
 	doc := newDocument(directives, options)
@@ -30,7 +20,7 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	if next == nil && len(end) > 0 {
 		next = end[0]
 	}
-	properties := resolveProps(start, resolvePropsOptions{
+	properties := resolveProperties(start, resolvePropsOptions{
 		indicator:      "doc-start",
 		next:           next,
 		offset:         offset,
@@ -97,7 +87,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 		onError(anchor, "BAD_ALIAS", "Anchor cannot be an empty string", false)
 	}
 	if atKey && composition.options.StringKeys && (!IsScalar(node) || !isString(node.ScalarValue) ||
-		node.Tag != "" && node.Tag != strTagName) {
+		node.Tag != "" && node.Tag != stringTagName) {
 		message := "With stringKeys, all keys must be strings"
 		var source any = token
 		if tag != nil {
@@ -116,7 +106,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 		}
 	}
 	if composition.options.KeepSourceTokens && isSourceToken {
-		node.SrcToken = token
+		node.SourceToken = token
 	}
 	return node
 }

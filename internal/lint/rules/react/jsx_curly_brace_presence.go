@@ -46,7 +46,7 @@ const (
 // interchangeable. Measured: `["always"]` leaves `<App horror=<div /> />` clean, while
 // `[{props: "always", children: "always", propElementValues: "always"}]` reports it.
 type JsxCurlyBracePresenceOptions struct {
-	Props             jsxCurlyBracePresenceSetting
+	Properties        jsxCurlyBracePresenceSetting `json:"Props"`
 	Children          jsxCurlyBracePresenceSetting
 	PropElementValues jsxCurlyBracePresenceSetting
 }
@@ -54,7 +54,7 @@ type JsxCurlyBracePresenceOptions struct {
 // DefaultJsxCurlyBracePresenceOptions is the configuration a bare `"error"` gets.
 func DefaultJsxCurlyBracePresenceOptions() JsxCurlyBracePresenceOptions {
 	return JsxCurlyBracePresenceOptions{
-		Props:             jsxCurlyBracePresenceNever,
+		Properties:        jsxCurlyBracePresenceNever,
 		Children:          jsxCurlyBracePresenceNever,
 		PropElementValues: jsxCurlyBracePresenceIgnore,
 	}
@@ -82,7 +82,7 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (JsxCurlyBracePresenceOption
 			return settings, nil
 		}
 		return JsxCurlyBracePresenceOptions{
-			Props:             value,
+			Properties:        value,
 			Children:          value,
 			PropElementValues: jsxCurlyBracePresenceIgnore,
 		}, nil
@@ -93,7 +93,7 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (JsxCurlyBracePresenceOption
 	// distinguishable in the result but must be distinguishable while decoding, since the default
 	// for `propElementValues` differs from the other two.
 	var wire struct {
-		Props             *string `json:"props"`
+		Properties        *string `json:"props"`
 		Children          *string `json:"children"`
 		PropElementValues *string `json:"propElementValues"`
 	}
@@ -104,7 +104,7 @@ func DecodeJsxCurlyBracePresenceOptions(raw []byte) (JsxCurlyBracePresenceOption
 		value  *string
 		target *jsxCurlyBracePresenceSetting
 	}{
-		{wire.Props, &settings.Props},
+		{wire.Properties, &settings.Properties},
 		{wire.Children, &settings.Children},
 		{wire.PropElementValues, &settings.PropElementValues},
 	} {
@@ -206,7 +206,7 @@ var JsxCurlyBracePresence = rule.Rule[JsxCurlyBracePresenceOptions]{
 				// Upstream reaches this through two selectors that can both match one node. The
 				// element-valued-prop selector runs first and short-circuits, matching the order
 				// ESLint visits them in, which matters because both would otherwise report.
-				if jsxCurlyBracePresenceIsElementValuedProp(node) {
+				if jsxCurlyBracePresenceIsElementValuedProperty(node) {
 					if settings.PropElementValues == jsxCurlyBracePresenceNever {
 						jsxCurlyBracePresenceReportUnnecessary(ruleContext, node)
 					}
@@ -266,9 +266,9 @@ func jsxCurlyBracePresenceCheckBareElementAttribute(
 	}
 }
 
-// jsxCurlyBracePresenceIsElementValuedProp matches `JSXAttribute > JSXExpressionContainer >
+// jsxCurlyBracePresenceIsElementValuedProperty matches `JSXAttribute > JSXExpressionContainer >
 // JSXElement`, the shape upstream gives its own listener.
-func jsxCurlyBracePresenceIsElementValuedProp(container *ast.Node) bool {
+func jsxCurlyBracePresenceIsElementValuedProperty(container *ast.Node) bool {
 	if container.Parent == nil || container.Parent.Kind != ast.KindJsxAttribute {
 		return false
 	}
@@ -371,7 +371,7 @@ func jsxCurlyBracePresenceConditionsSatisfied(
 	wanted jsxCurlyBracePresenceSetting,
 ) bool {
 	if parent.Kind == ast.KindJsxAttribute {
-		return settings.Props == wanted
+		return settings.Properties == wanted
 	}
 	if jsxCurlyBracePresenceIsJsx(parent) {
 		return settings.Children == wanted

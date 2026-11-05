@@ -50,14 +50,14 @@ type JsxNoScriptUrlComponent struct {
 	// Name is the JSX tag name to check, matched exactly.
 	Name string
 
-	// Props are the attribute names on that tag whose string values are examined.
-	Props []string
+	// Properties are the attribute names on that tag whose string values are examined.
+	Properties []string `json:"Props"`
 }
 
 // jsxNoScriptUrlWireComponent is the JSON shape of one legacy entry.
 type jsxNoScriptUrlWireComponent struct {
-	Name  string   `json:"name"`
-	Props []string `json:"props"`
+	Name       string   `json:"name"`
+	Properties []string `json:"props"`
 }
 
 // jsxNoScriptUrlWireObject is the JSON shape of the object arm.
@@ -226,7 +226,7 @@ func jsxNoScriptUrlHasJavaScriptProtocol(value string) bool {
 func jsxNoScriptUrlLinkComponents(options JsxNoScriptUrlOptions) map[string][]string {
 	components := map[string][]string{"a": {"href"}}
 	for _, entry := range options.Legacy {
-		components[entry.Name] = entry.Props
+		components[entry.Name] = entry.Properties
 	}
 	return components
 }

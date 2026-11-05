@@ -382,7 +382,7 @@ func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(test *testing.T) {
 	}
 }
 
-// TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps covers the argument-count gate.
+// TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProperties covers the argument-count gate.
 //
 // Added for a surviving mutant rather than from the corpus, which writes no call shorter than two
 // arguments. The gate is not an optimization: the code below it reads `arguments.Nodes[1]`
@@ -392,7 +392,7 @@ func TestNoDangerWithChildrenIsRegisteredWithoutItsNamespace(test *testing.T) {
 //
 // Upstream states the same gate as its own first move, with the reason that a call this short is
 // not a proper createElement call.
-func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProps(test *testing.T) {
+func TestNoDangerWithChildrenDeclinesCallsTooShortToCarryProperties(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

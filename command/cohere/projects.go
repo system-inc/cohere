@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -75,9 +74,9 @@ func checkDiscoveredProjects(
 	lintConfigFileName string,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
-	patterns, err := rootIgnorePatterns(root)
-	if err != nil {
-		return 0, false, err
+	patterns, rootIgnorePatternsError := rootIgnorePatterns(root)
+	if rootIgnorePatternsError != nil {
+		return 0, false, rootIgnorePatternsError
 	}
 	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
 	// file that every run makes. A file the command line named is the Swift engine's to read wherever it
@@ -92,12 +91,13 @@ func checkDiscoveredProjects(
 			return 0, false, checkSwiftBlockHasAReaderError
 		}
 	}
-	found, err := discoverProjects(root, patterns)
-	if err != nil {
-		return 0, false, err
+	found, discoverProjectsError := discoverProjects(root, patterns)
+	if discoverProjectsError != nil {
+		return 0, false, discoverProjectsError
 	}
-	if found.Ownership, err = resolveOwnership(&found); err != nil {
-		return 0, false, err
+	var resolveOwnershipError error
+	if found.Ownership, resolveOwnershipError = resolveOwnership(&found); resolveOwnershipError != nil {
+		return 0, false, resolveOwnershipError
 	}
 	// Before the one-project check, so a package and the dependency its run checks are the one project they
 	// are, and run here as `cohere --directory` on the package would.
@@ -151,83 +151,6 @@ func childArguments(arguments []string, lintConfigFileName string) []string {
 	return append(kept, "--lint-config", lintConfigFileName)
 }
 
-// isTheLocatedProject reports whether discovery found exactly the one project the walk up located, which
-// a run then checks in this process, the way it always did.
-func (found discovery) isTheLocatedProject(location projectLocation, locateError error) bool {
-	if locateError != nil || len(found.Projects) != 1 {
-		return false
-	}
-	project := found.Projects[0]
-	return project.Engine == location.Engine && project.ConfigFile == "" &&
-		filepath.Clean(filepath.Join(found.Root, project.Directory)) == filepath.Clean(location.Root)
-}
-
-// notes are the lines a run carries about markers discovery found and did not run, which a reader could have
-// expected checked: those the root's ignorePatterns refuse, solution roots, projects left with no file of
-// their own, and Swift packages another package's run covers. So is a Go module that runs on its own below a
-// workspace, which a reader could have expected the workspace to build. Ignored and dependency directories are
-// not named, since skipping them is what everyone expects, and neither is a nested repository: one inside a
-// program, such as Structure or Base, is checked as part of it, its drift reported read-only, as it always was.
-// They are counted on the summary line. A Swift coverage query that failed is named too, since its packages may
-// then be checked twice, and so is each directory of Swift files no package holds, since nothing checks them.
-func (found discovery) notes() []string {
-	var lines []string
-	for _, marker := range found.Refused {
-		lines = append(lines, fmt.Sprintf("%s not checked: the root's ignorePatterns match it", marker))
-	}
-	for _, label := range found.Ownership.Solutions {
-		lines = append(lines, fmt.Sprintf(
-			"%s not run: a solution tsconfig, which includes no file and references the projects checked instead",
-			label,
-		))
-	}
-	for _, label := range found.Ownership.Yielding {
-		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
-	}
-	for _, workspace := range found.BrokenWorkspaces {
-		lines = append(lines, fmt.Sprintf("%s claims no module, so each module below it runs on its own: %s",
-			path.Join(workspace.Directory, goWorkspaceMarker), workspace.Reason))
-	}
-	for _, module := range found.UnusedModules {
-		lines = append(lines, fmt.Sprintf("%s runs as its own module: %s does not use it",
-			path.Join(module.Directory, goModuleMarker), path.Join(module.Workspace, goWorkspaceMarker)))
-	}
-	for _, covered := range found.SwiftCoverage.Covered {
-		if covered.Vendored {
-			lines = append(lines, fmt.Sprintf(
-				"%s not run: vendored in %s, whose run lists it as not checked",
-				covered.Label,
-				covered.CoveredBy,
-			))
-			continue
-		}
-		lines = append(lines, fmt.Sprintf("%s not run: checked as part of %s", covered.Label, covered.CoveredBy))
-	}
-	for _, failed := range found.SwiftCoverage.FailedQueries {
-		lines = append(lines, fmt.Sprintf(
-			"%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
-			failed.Label,
-			failed.Reason,
-		))
-	}
-	for _, unclaimed := range found.UnclaimedSwift {
-		lines = append(lines, fmt.Sprintf(
-			"%s: %s no Swift package checks",
-			unclaimed.Directory,
-			counted(unclaimed.Files, "Swift file", "Swift files"),
-		))
-	}
-	// Last, since only these are sorted: a map has no order of its own.
-	for label := range found.Ownership.SharedDirectory {
-		lines = append(lines, fmt.Sprintf(
-			"%s ran with the cache off: another tsconfig's run keeps its cache in the same directory",
-			label,
-		))
-	}
-	sort.Strings(lines[len(lines)-len(found.Ownership.SharedDirectory):])
-	return lines
-}
-
 // projectRun is one project's run, as its child reported it.
 type projectRun struct {
 	open    *openReport
@@ -258,7 +181,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// failures is where this run's own failure lines go: with the report in the human views, and on stderr
 	// under `--json`, whose stdout is records only.
 	failures := out
-	if activeOutput.Mode == outputJSON {
+	if activeOutput.Mode == outputJson {
 		failures = streams.Errors
 	}
 	executable, executableError := os.Executable()
@@ -315,7 +238,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			running <- struct{}{}
 			defer func() { <-running }()
 			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, openPath, children,
-				activeOutput.Mode == outputJSON)
+				activeOutput.Mode == outputJson)
 		}()
 	}
 	group.Wait()
@@ -383,7 +306,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts := overallFactsOf(runs, time.Since(processStart))
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.UnclaimedSwift = found.UnclaimedSwift
-	if activeOutput.Mode != outputJSON {
+	if activeOutput.Mode != outputJson {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
 	}
 	// A run stopped by a signal ends the way the signal would have ended it, after every child has, so the
@@ -392,25 +315,6 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		return 128 + received
 	}
 	return worst
-}
-
-// swiftYield is what a Swift project's run leaves to others: the directories of the other running Swift
-// projects strictly below it, absolute, each checked by its own run. A nested package that runs on its own and
-// an Xcode project inside a package's directory are both there, and the run's not-checked notes leave their
-// files out, since those runs account for them. A package another run covers is not, since the covering run
-// checks its files itself, and found.Projects holds only the projects that run.
-func (found discovery) swiftYield(project discoveredProject) projectYield {
-	yield := projectYield{}
-	for _, other := range found.Projects {
-		if other.Engine == engineSwift && isBelow(other.Directory, project.Directory) {
-			yield.Directories = append(
-				yield.Directories,
-				filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
-			)
-		}
-	}
-	sort.Strings(yield.Directories)
-	return yield
 }
 
 // overallFactsOf is what the overall verdict says of the projects' runs: how many of each engine, the ones

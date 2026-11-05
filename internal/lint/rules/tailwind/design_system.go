@@ -120,28 +120,6 @@ var designSystemCache struct {
 	results map[DesignSystemLocation]DesignSystemResult
 }
 
-// DesignSystemLocation is where a rule's options say the design system is: upstream's `cwd`,
-// `entryPoint` and `tailwindConfig`, with the directory a relative path anchors to. The zero value is
-// the default, the project's own stylesheet found by FindEntryPoint.
-type DesignSystemLocation struct {
-	// Anchor is upstream's `ctx.cwd`, the directory ESLint runs from, which is the config file's
-	// directory here. Empty means the project root.
-	Anchor string
-	// Cwd is upstream's `cwd`, as written: where Tailwind and the stylesheet are looked for from,
-	// relative to Anchor when relative.
-	Cwd string
-	// ConfigPath is upstream's `entryPoint ?? tailwindConfig`, as written.
-	ConfigPath string
-	// Tsconfig is upstream's `tsconfig`, as written. It never chooses the stylesheet, only how its
-	// imports resolve, so it leaves a location default.
-	Tsconfig string
-}
-
-// isDefault reports whether no option named a location, so the project's own stylesheet is used.
-func (location DesignSystemLocation) isDefault() bool {
-	return location.Cwd == "" && location.ConfigPath == ""
-}
-
 // DesignSystemForProgram returns this run's design system, building it at most once.
 //
 // Every rule that calls this must declare `ReadsCompilerOptions | ReadsDesignSystem`. The program reaches every file in
@@ -201,7 +179,7 @@ func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocat
 // loadDesignSystemThrough is the load itself, asking fileSystem every question about the disk.
 func loadDesignSystemThrough(
 	program rule.Program,
-	fileSystem *rule.RecordingFS,
+	fileSystem *rule.RecordingFileSystem,
 	location DesignSystemLocation,
 ) DesignSystemResult {
 	projectRoot := projectRootOf(program)

@@ -7,7 +7,7 @@
 // in internal/format/css. Parse here is only postcss.
 //
 // ParseSCSS is postcss-scss 4.0.9's parser over the same machinery (scss_parse.go, scss_parser.go,
-// scss_tokenize.go, nested_declaration.go), as Prettier's parseScss calls it.
+// scss_tokenizer.go, nested_declaration.go), as Prettier's parseScss calls it.
 //
 // # Units
 //
@@ -21,7 +21,6 @@
 package postcss
 
 import (
-	"strconv"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -38,8 +37,8 @@ import (
 type input struct {
 	// css is this.css, the text after the byte order mark.
 	css string
-	// hasBOM is this.hasBOM.
-	hasBOM bool
+	// hasBom is this.hasBom.
+	hasBom bool
 
 	// units are css's UTF-16 code units, what charCodeAt reads. A byte that is not UTF-8 is one unit,
 	// U+FFFD, as Node decodes it.
@@ -60,10 +59,10 @@ func newInput(css string) *input {
 	if len(in.css) >= 3 &&
 		in.css[0] == 0xEF &&
 		((in.css[1] == 0xBB && in.css[2] == 0xBF) || (in.css[1] == 0xBF && in.css[2] == 0xBE)) {
-		in.hasBOM = true
+		in.hasBom = true
 		in.css = in.css[3:]
 	} else {
-		in.hasBOM = false
+		in.hasBom = false
 	}
 
 	in.units = make([]uint16, 0, len(in.css))
@@ -199,38 +198,4 @@ func (input *input) errorAtLineAndColumn(message string, line int, column int) *
 		Column: column,
 		Offset: input.byteOffset(input.fromLineAndColumn(line, column)),
 	}
-}
-
-// CssSyntaxError is lib/css-syntax-error.js's error as the parser throws it, with the input fields
-// Input.error attaches (offset and endOffset, here in bytes).
-//
-// Prettier reads name, reason, line and column from it to build its own error
-// (`${name}: ${reason}` at { line, column }), so those are kept exactly; Column and EndColumn are in
-// UTF-16 units, as postcss counts them.
-type CssSyntaxError struct {
-	// Reason is error.reason, the message without the position.
-	Reason string
-	// Line and Column are where the problem starts, one-based.
-	Line   int
-	Column int
-	// EndLine and EndColumn are where it ends, when HasEnd.
-	EndLine   int
-	EndColumn int
-	// Offset and EndOffset are error.input.offset and error.input.endOffset, in bytes.
-	Offset    int
-	EndOffset int
-	HasEnd    bool
-}
-
-// Name is error.name.
-func (*CssSyntaxError) Name() string { return "CssSyntaxError" }
-
-// Error is setMessage's message: no plugin, no file, so "<css input>:line:column: reason".
-func (syntaxError *CssSyntaxError) Error() string {
-	return "<css input>:" +
-		strconv.Itoa(syntaxError.Line) +
-		":" +
-		strconv.Itoa(syntaxError.Column) +
-		": " +
-		syntaxError.Reason
 }

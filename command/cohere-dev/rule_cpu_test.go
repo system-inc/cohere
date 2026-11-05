@@ -13,11 +13,11 @@ import (
 // The stand-in changes its verdict without changing the land command: failure
 // must stop before ordinary tests and fast-forward, and a later attempt must run
 // it again rather than use the previous result.
-func TestLandRefusesTheRuleCPUBudgetBeforeTests(test *testing.T) {
+func TestLandRefusesTheRuleCpuBudgetBeforeTests(test *testing.T) {
 	test.Parallel()
 	fixture := newLandFixture(test)
 	worktreeA := fixture.worktree("a")
-	path := filepath.Join(worktreeA, ruleCPUCheck)
+	path := filepath.Join(worktreeA, ruleCpuCheck)
 	if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
@@ -87,9 +87,9 @@ exit 0
 	}
 }
 
-func TestCohereHasTheRuleCPUCheckTheGateRuns(test *testing.T) {
+func TestCohereHasTheRuleCpuCheckTheGateRuns(test *testing.T) {
 	test.Parallel()
-	source, readError := os.ReadFile(filepath.Join("..", "..", ruleCPUCheck))
+	source, readError := os.ReadFile(filepath.Join("..", "..", ruleCpuCheck))
 	if readError != nil {
 		test.Fatal(readError)
 	}

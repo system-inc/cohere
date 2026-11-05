@@ -28,28 +28,28 @@ import (
 // a field removed or renamed or a meaning changed, raises it; a new optional field does not.
 const outputSchemaVersion = 1
 
-// findingJSON is one finding's line: the finding's own fields beside its kind.
-type findingJSON struct {
+// findingJson is one finding's line: the finding's own fields beside its kind.
+type findingJson struct {
 	Kind string `json:"kind"`
 	runFinding
 }
 
-func findingAsJSON(finding runFinding) findingJSON {
-	return findingJSON{Kind: "finding", runFinding: finding}
+func findingAsJson(finding runFinding) findingJson {
+	return findingJson{Kind: "finding", runFinding: finding}
 }
 
-// changedFileJSON is one file the run rewrote, by fixing or by formatting.
-type changedFileJSON struct {
+// changedFileJson is one file the run rewrote, by fixing or by formatting.
+type changedFileJson struct {
 	Kind string `json:"kind"`
 	Path string `json:"path"`
 	// Rules are the rules whose fixes were applied, for a fixed file, each once.
 	Rules []string `json:"rules,omitempty"`
 }
 
-// changedFilesAsJSON is a line per kind of rewrite: a file both fixed and formatted is a `fixed` line and
+// changedFilesAsJson is a line per kind of rewrite: a file both fixed and formatted is a `fixed` line and
 // a `formatted` line, so a reader counting either kind counts it.
-func changedFilesAsJSON(files []changedFile) []changedFileJSON {
-	lines := make([]changedFileJSON, 0, len(files))
+func changedFilesAsJson(files []changedFile) []changedFileJson {
+	lines := make([]changedFileJson, 0, len(files))
 	for _, file := range files {
 		if file.Fixed {
 			rules := make([]string, 0, len(file.FixedBy))
@@ -57,17 +57,17 @@ func changedFilesAsJSON(files []changedFile) []changedFileJSON {
 				rules = append(rules, rule)
 			}
 			sort.Strings(rules)
-			lines = append(lines, changedFileJSON{Kind: "fixed", Path: file.Path, Rules: rules})
+			lines = append(lines, changedFileJson{Kind: "fixed", Path: file.Path, Rules: rules})
 		}
 		if file.Formatted {
-			lines = append(lines, changedFileJSON{Kind: "formatted", Path: file.Path})
+			lines = append(lines, changedFileJson{Kind: "formatted", Path: file.Path})
 		}
 	}
 	return lines
 }
 
-// summaryJSON is runSummary as the last line. Durations are seconds, as a reader would compare them.
-type summaryJSON struct {
+// summaryJson is runSummary as the last line. Durations are seconds, as a reader would compare them.
+type summaryJson struct {
 	Kind          string      `json:"kind"`
 	SchemaVersion int         `json:"schemaVersion"`
 	Label         string      `json:"label,omitempty"`
@@ -75,7 +75,7 @@ type summaryJSON struct {
 	Seconds       float64     `json:"seconds"`
 	GraphSeconds  float64     `json:"graphSeconds"`
 	Rules         int         `json:"rules"`
-	Phases        []phaseJSON `json:"phases"`
+	Phases        []phaseJson `json:"phases"`
 	// FormattingSeconds is the part of the fix phase's seconds with a format in flight, absent when no
 	// formatter ran.
 	FormattingSeconds float64  `json:"formattingSeconds,omitempty"`
@@ -99,16 +99,16 @@ type summaryJSON struct {
 	Adamic *readinessSummary `json:"adamic,omitempty"`
 }
 
-// phaseJSON is one phase's outcome.
-type phaseJSON struct {
+// phaseJson is one phase's outcome.
+type phaseJson struct {
 	Name    string  `json:"name"`
 	Outcome string  `json:"outcome"`
 	Seconds float64 `json:"seconds"`
 	Detail  string  `json:"detail,omitempty"`
 }
 
-// summaryAsJSON is the summary's last line.
-func summaryAsJSON(summary runSummary) summaryJSON {
+// summaryAsJson is the summary's last line.
+func summaryAsJson(summary runSummary) summaryJson {
 	verdict := "pass"
 	if summary.failed() {
 		verdict = "fail"
@@ -117,16 +117,16 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 	if adamic == nil && summary.AdamicRequested {
 		adamic = notMeasured("lint did not run")
 	}
-	phases := make([]phaseJSON, 0, len(summary.Phases))
+	phases := make([]phaseJson, 0, len(summary.Phases))
 	for _, record := range summary.Phases {
-		phases = append(phases, phaseJSON{
+		phases = append(phases, phaseJson{
 			Name:    string(record.Name),
 			Outcome: string(record.Outcome),
 			Seconds: record.Elapsed.Seconds(),
 			Detail:  record.Detail,
 		})
 	}
-	return summaryJSON{
+	return summaryJson{
 		Kind:              "summary",
 		SchemaVersion:     outputSchemaVersion,
 		Label:             summary.Label,
@@ -152,8 +152,8 @@ func summaryAsJSON(summary runSummary) summaryJSON {
 	}
 }
 
-// writeJSONLine writes one object as one line.
-func writeJSONLine[Value any](out *bufio.Writer, value Value) {
+// writeJsonLine writes one object as one line.
+func writeJsonLine[Value any](out *bufio.Writer, value Value) {
 	fmt.Fprint(out, jsonLine(value))
 }
 

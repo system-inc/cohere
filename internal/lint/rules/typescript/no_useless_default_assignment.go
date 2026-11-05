@@ -139,7 +139,7 @@ var NoUselessDefaultAssignment = rule.Rule[NoUselessDefaultAssignmentOptions]{
 			if type_checking.IsTypeAnyType(subject) || type_checking.IsTypeUnknownType(subject) {
 				return true
 			}
-			for part := range type_checking.UnionTypePartsSeq(subject) {
+			for part := range type_checking.UnionTypePartsSequence(subject) {
 				if type_checking.IsTypeFlagSet(part, checker.TypeFlagsUndefined) {
 					return true
 				}
@@ -406,7 +406,7 @@ func contextualParameterType(ruleContext rule.Context, node *ast.Node) (*checker
 		if type_checking.IsTypeAnyType(parameterType) || type_checking.IsTypeUnknownType(parameterType) {
 			return nil, false
 		}
-		for part := range type_checking.UnionTypePartsSeq(parameterType) {
+		for part := range type_checking.UnionTypePartsSequence(parameterType) {
 			if type_checking.IsTypeFlagSet(part, checker.TypeFlagsUndefined) {
 				return nil, false
 			}

@@ -25,9 +25,6 @@ import (
 // SetDirectory is where the sets live in the module, and what their names are relative to.
 const SetDirectory = "internal/lint/configuration/sets"
 
-// Bump is how much a version must move.
-type Bump int
-
 const (
 	// Patch is a release whose sets changed nothing that can fail a project that passed.
 	Patch Bump = iota
@@ -38,36 +35,6 @@ const (
 	// loads.
 	Major
 )
-
-func (bump Bump) String() string {
-	return [...]string{"patch", "minor", "major"}[bump]
-}
-
-// SetChanges is what changed in one set between two releases.
-type SetChanges struct {
-	// Added is a set that did not exist before, Removed one that no longer exists.
-	Added   bool
-	Removed bool
-
-	// TurnedOn are rules that now report, with their severity; TurnedOff are rules that no longer do.
-	TurnedOn  []string
-	TurnedOff []string
-	// Severity are rules that report at another severity, as "rule: before -> after".
-	Severity []string
-	// Options are rules that report at the same severity with other options.
-	Options []string
-	// Settings are the set's other keys that changed: format, ignorePatterns, overrides and the rest.
-	Settings []string
-
-	// Bump is the smallest version these changes allow.
-	Bump Bump
-}
-
-// Empty reports a set that did not change.
-func (changes SetChanges) Empty() bool {
-	return !changes.Added && !changes.Removed && len(changes.TurnedOn)+len(changes.TurnedOff)+len(changes.Severity)+
-		len(changes.Options)+len(changes.Settings) == 0
-}
 
 // severity ranks a rule entry's severity: 0 off, 1 warn, 2 error, the way ESLint does, from a string, a
 // number, or the first element of a list.

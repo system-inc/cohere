@@ -30,7 +30,7 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(test *testing.T) {
 	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	recording := NewRecordingFs(osvfs.FS())
+	recording := NewRecordingFileSystem(osvfs.FS())
 
 	recording.FileExists(tspath.RootedFilePath(project + "/source/theme.css"))
 	recording.FileExists(tspath.RootedFilePath(project + "/app/globals.css"))

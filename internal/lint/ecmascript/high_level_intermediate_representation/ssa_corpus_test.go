@@ -29,7 +29,7 @@ import (
 )
 
 // Run SSA over a real tree with a real checker and cohere every function.
-func TestSSAOverRealCodebase(test *testing.T) {
+func TestSsaOverRealCodebase(test *testing.T) {
 	test.Parallel()
 
 	root := corpusRoot(test)
@@ -67,23 +67,23 @@ func TestSSAOverRealCodebase(test *testing.T) {
 			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
-						forEachFunctionLike(node, func(fnNode *ast.Node) {
-							fn := Lower(fnNode, ruleContext.TypeChecker)
-							if fn == nil {
+						forEachFunctionLike(node, func(functionNode *ast.Node) {
+							function := Lower(functionNode, ruleContext.TypeChecker)
+							if function == nil {
 								return
 							}
-							Construct(fn)
+							Construct(function)
 							var each func(*Function)
 							each = func(f *Function) {
 								totalFns++
-								st := CollectSSAStats(f)
+								st := CollectSsaStats(f)
 								totalPhis += st.Phis
 								totalNamed += st.NamedValues
 								totalUses += st.Uses
 								if st.Phis > 0 {
 									withPhis++
 								}
-								for _, violation := range VerifySSA(f) {
+								for _, violation := range VerifySsa(f) {
 									violations++
 									if violations <= 8 {
 										test.Errorf("%s: %s", filepath.Base(path), violation.Detail)
@@ -131,7 +131,7 @@ func TestSSAOverRealCodebase(test *testing.T) {
 									each(n)
 								}
 							}
-							each(fn)
+							each(function)
 						})
 					},
 				}

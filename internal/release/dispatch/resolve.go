@@ -23,17 +23,6 @@ import (
 // largely the same packages stored twice.
 var ReleaseBuildFlags = []string{"-trimpath", "-ldflags=-s -w"}
 
-// Paths locates the pieces of the cache relative to a module.
-type Paths struct {
-	// ModuleDirectory is the root of the cohere module.
-	ModuleDirectory string
-
-	// CacheDirectory holds both the built binaries and the Go build cache. It lives inside the
-	// module so that other Go work neither shares it nor evicts it: Go's default cache trims
-	// entries unused for about five days, which would silently turn a warm rebuild into a cold one.
-	CacheDirectory string
-}
-
 // DefaultPaths puts the cache at `.cache/cohere/` inside the module, which the repo already
 // ignores.
 func DefaultPaths(moduleDirectory string) Paths {
@@ -41,11 +30,6 @@ func DefaultPaths(moduleDirectory string) Paths {
 		ModuleDirectory: moduleDirectory,
 		CacheDirectory:  filepath.Join(moduleDirectory, ".cache", "cohere"),
 	}
-}
-
-// BinaryDirectory holds the hash-named binaries.
-func (paths Paths) BinaryDirectory() string {
-	return filepath.Join(paths.CacheDirectory, "bin")
 }
 
 // executableSuffix ends every binary the launcher builds, `.exe` on Windows and nothing elsewhere.
@@ -57,26 +41,8 @@ var executableSuffix = func() string {
 	return ""
 }()
 
-// BinaryPath is where the committed-tree binary with this hash lives.
-//
-// The name carries the platform as well as the hash. A cache directory can outlive a change of
-// machine, and a binary for the wrong architecture fails in a far more confusing way than a miss.
-func (paths Paths) BinaryPath(hash string) string {
-	return filepath.Join(paths.BinaryDirectory(), platformBinaryPrefix()+hash+executableSuffix)
-}
-
 // developmentBinaryName is the `--dev` binary's file name.
 var developmentBinaryName = "cohere-dev" + executableSuffix
-
-// DevelopmentBinaryPath is the stable path used by `--dev`.
-//
-// A hash-named binary is a new filename on every change, and Go does not cache link output, so
-// every rule edit pays a full link. Measured: 2.03s for a leaf rule edit against a 0.29s no-op when
-// nothing changed. The stable path is what makes the no-op reachable, so the authoring loop gets
-// the cheap case whenever the tree has not actually moved.
-func (paths Paths) DevelopmentBinaryPath() string {
-	return filepath.Join(paths.BinaryDirectory(), developmentBinaryName)
-}
 
 // ResolveWorkingTree returns the `--dev` binary, built from the working tree as it is on disk.
 //
@@ -118,11 +84,6 @@ func ResolveWorkingTree(paths Paths, packagePath string) (string, bool, error) {
 	}
 
 	return binaryPath, true, nil
-}
-
-// developmentHashPath records which inputs the development binary was built from.
-func (paths Paths) developmentHashPath() string {
-	return paths.DevelopmentBinaryPath() + ".hash"
 }
 
 // developmentBinaryIsCurrent reports whether the stable-path binary matches the current inputs.

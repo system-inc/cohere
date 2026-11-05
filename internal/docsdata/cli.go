@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-// Cli is cli.json: the flags the binary's own flag set prints, and each verb's.
-type Cli struct {
-	Flags []CliFlag `json:"flags"`
-	Verbs []CliVerb `json:"verbs,omitempty"`
+// CommandLineInterface is cli.json: the flags the binary's own flag set prints, and each verb's.
+type CommandLineInterface struct {
+	Flags []CommandLineInterfaceFlag `json:"flags"`
+	Verbs []CommandLineInterfaceVerb `json:"verbs,omitempty"`
 }
 
-// CliFlag is one flag as the flag package describes it.
-type CliFlag struct {
+// CommandLineInterfaceFlag is one flag as the flag package describes it.
+type CommandLineInterfaceFlag struct {
 	Name string `json:"name"`
 	// Argument is the name the help gives the flag's value: a backquoted word in its usage, or else its
 	// type. Empty for a boolean flag, which takes none.
@@ -26,13 +26,13 @@ type CliFlag struct {
 	Default string `json:"default,omitempty"`
 }
 
-// CliVerb is a subcommand with a flag set of its own.
-type CliVerb struct {
+// CommandLineInterfaceVerb is a subcommand with a flag set of its own.
+type CommandLineInterfaceVerb struct {
 	Name string `json:"name"`
 	// Usage is the verb's synopsis lines, and Summary the prose its help prints before the flags.
-	Usage   []string  `json:"usage"`
-	Summary string    `json:"summary,omitempty"`
-	Flags   []CliFlag `json:"flags"`
+	Usage   []string                   `json:"usage"`
+	Summary string                     `json:"summary,omitempty"`
+	Flags   []CommandLineInterfaceFlag `json:"flags"`
 }
 
 // flagHeading is the first line of one flag in flag.PrintDefaults: two spaces, the name, and the
@@ -42,13 +42,13 @@ var flagHeading = regexp.MustCompile(`^  -([^\s]+)(?: (\S+))?$`)
 // flagDefault is the suffix PrintDefaults appends to a non-zero default: quoted for a string flag.
 var flagDefault = regexp.MustCompile(` \(default ("(?:[^"\\]|\\.)*"|[^()"]*)\)$`)
 
-// parseCli reads the top-level help and each verb's.
-func parseCli(help []byte, verbHelp map[string][]byte) (Cli, error) {
+// parseCommandLineInterface reads the top-level help and each verb's.
+func parseCommandLineInterface(help []byte, verbHelp map[string][]byte) (CommandLineInterface, error) {
 	_, flags, parseFlagHelpError := parseFlagHelp(help)
 	if parseFlagHelpError != nil {
-		return Cli{}, fmt.Errorf("docsdata: cohere -help: %w", parseFlagHelpError)
+		return CommandLineInterface{}, fmt.Errorf("docsdata: cohere -help: %w", parseFlagHelpError)
 	}
-	cli := Cli{Flags: flags}
+	cli := CommandLineInterface{Flags: flags}
 	verbs := make([]string, 0, len(verbHelp))
 	for verb := range verbHelp {
 		verbs = append(verbs, verb)
@@ -57,9 +57,9 @@ func parseCli(help []byte, verbHelp map[string][]byte) (Cli, error) {
 	for _, verb := range verbs {
 		preamble, flags, parseFlagHelpError := parseFlagHelp(verbHelp[verb])
 		if parseFlagHelpError != nil {
-			return Cli{}, fmt.Errorf("docsdata: cohere %s -help: %w", verb, parseFlagHelpError)
+			return CommandLineInterface{}, fmt.Errorf("docsdata: cohere %s -help: %w", verb, parseFlagHelpError)
 		}
-		entry := CliVerb{Name: verb, Flags: flags}
+		entry := CommandLineInterfaceVerb{Name: verb, Flags: flags}
 		var summary []string
 		for _, line := range preamble {
 			trimmed := strings.TrimSpace(line)
@@ -74,7 +74,7 @@ func parseCli(help []byte, verbHelp map[string][]byte) (Cli, error) {
 			}
 		}
 		if len(entry.Usage) == 0 {
-			return Cli{}, fmt.Errorf("docsdata: cohere %s -help printed no usage line", verb)
+			return CommandLineInterface{}, fmt.Errorf("docsdata: cohere %s -help printed no usage line", verb)
 		}
 		entry.Summary = strings.Join(summary, " ")
 		cli.Verbs = append(cli.Verbs, entry)
@@ -86,9 +86,9 @@ func parseCli(help []byte, verbHelp map[string][]byte) (Cli, error) {
 // flag.PrintDefaults writes them: each flag a heading line, then its usage on lines indented four
 // spaces and a tab. A flag whose usage is missing refuses the parse, so a change in the format fails
 // here rather than publishing flags with no description.
-func parseFlagHelp(help []byte) ([]string, []CliFlag, error) {
+func parseFlagHelp(help []byte) ([]string, []CommandLineInterfaceFlag, error) {
 	var preamble []string
-	var flags []CliFlag
+	var flags []CommandLineInterfaceFlag
 	var usage []string
 	finish := func() error {
 		if len(flags) == 0 {
@@ -120,7 +120,7 @@ func parseFlagHelp(help []byte) ([]string, []CliFlag, error) {
 			if finishError := finish(); finishError != nil {
 				return nil, nil, finishError
 			}
-			flags = append(flags, CliFlag{Name: match[1], Argument: match[2]})
+			flags = append(flags, CommandLineInterfaceFlag{Name: match[1], Argument: match[2]})
 			continue
 		}
 		if len(flags) == 0 {

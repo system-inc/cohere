@@ -65,7 +65,7 @@ type Node struct {
 	Meta *string
 
 	// Link, image, definition and their references.
-	URL           string
+	Url           string
 	Title         *string
 	Alt           *string
 	Label         *string
@@ -89,10 +89,10 @@ type Node struct {
 	// Sentence, word and whitespace nodes, made by splitText. UsesCJSpaces caches a sentence's answer
 	// once whitespace.js computes it, as upstream injects the property.
 	Kind                   string
-	IsCJ                   bool
+	IsCj                   bool
 	HasLeadingPunctuation  bool
 	HasTrailingPunctuation bool
-	UsesCJSpaces           *bool
+	UsesCjSpaces           *bool
 
 	comments printing.CommentFields[*Node]
 }

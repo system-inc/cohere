@@ -225,8 +225,8 @@ func sortedScopes(set map[ScopeId]bool) []ScopeId {
 	return keys
 }
 
-// Len reports how many declarations the graph holds, for measurement.
-func (graph *MemoizationGraph) Len() int {
+// Length reports how many declarations the graph holds, for measurement.
+func (graph *MemoizationGraph) Length() int {
 	if graph == nil {
 		return 0
 	}

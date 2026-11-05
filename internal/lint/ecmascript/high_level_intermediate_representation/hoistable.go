@@ -99,78 +99,8 @@ type pathNode struct {
 	hasOptional        bool
 }
 
-// pathRegistry interns every access path seen, upstream's `PropertyPathRegistry`.
-//
-// This lives here rather than in `dependencies.go` because it belongs to this machinery: upstream
-// declares it inside `CollectHoistablePropertyLoads.ts`, which is this pass, and the dependency tree
-// in `dependencies.go` is a different structure that happens to also be a property trie. Conflating
-// them is easy and was the seam error that sent one agent back; the registry indexes paths for this
-// dataflow, the dependency tree reduces accesses to a minimal set.
-type pathRegistry struct {
-	nodes []pathNode
-	roots map[static_single_assignment.IdentifierId]int
-}
-
 func newPathRegistry() *pathRegistry {
 	return &pathRegistry{roots: map[static_single_assignment.IdentifierId]int{}}
-}
-
-// identifierNode returns the interned node for a bare root, creating it if absent.
-func (registry *pathRegistry) identifierNode(id static_single_assignment.IdentifierId, reactive bool) int {
-	if index, ok := registry.roots[id]; ok {
-		return index
-	}
-	index := len(registry.nodes)
-	registry.nodes = append(registry.nodes, pathNode{
-		properties:         map[string]int{},
-		optionalProperties: map[string]int{},
-		fullPath:           ReactiveScopeDependency{Identifier: id, Reactive: reactive},
-	})
-	registry.roots[id] = index
-	return index
-}
-
-// propertyNode returns the interned node one step below parent, creating it if absent.
-//
-// The new node's `fullPath` is the parent's path with the entry appended, copied rather than shared:
-// two children of one parent must not alias a backing array, or extending one would corrupt the
-// other.
-func (registry *pathRegistry) propertyNode(parent int, entry DependencyPathEntry) int {
-	table := registry.nodes[parent].properties
-	if entry.Optional {
-		table = registry.nodes[parent].optionalProperties
-	}
-	if index, ok := table[entry.Property]; ok {
-		return index
-	}
-
-	parentPath := registry.nodes[parent].fullPath
-	path := make([]DependencyPathEntry, len(parentPath.Path), len(parentPath.Path)+1)
-	copy(path, parentPath.Path)
-	path = append(path, entry)
-
-	index := len(registry.nodes)
-	registry.nodes = append(registry.nodes, pathNode{
-		properties:         map[string]int{},
-		optionalProperties: map[string]int{},
-		fullPath: ReactiveScopeDependency{
-			Identifier: parentPath.Identifier,
-			Reactive:   parentPath.Reactive,
-			Path:       path,
-		},
-		hasOptional: registry.nodes[parent].hasOptional || entry.Optional,
-	})
-	table[entry.Property] = index
-	return index
-}
-
-// pathIndex interns a whole dependency, returning the node naming it.
-func (registry *pathRegistry) pathIndex(dep ReactiveScopeDependency) int {
-	current := registry.identifierNode(dep.Identifier, dep.Reactive)
-	for _, entry := range dep.Path {
-		current = registry.propertyNode(current, entry)
-	}
-	return current
 }
 
 // ---------------------------------------------------------------------------
@@ -288,54 +218,6 @@ const (
 // showing real code converges in at most 3.
 const hoistableIterationCap = 100
 
-// HoistableAnalysis is what this pass produces: the non-null accesses at every block, and whether
-// the analysis actually converged.
-//
-// `Converged` is the field that does not exist upstream in a readable form, and it is the point of
-// this type. React throws when the loop hits the cap; oxc silently exits and returns a truncated
-// answer indistinguishable from a real one. A linter can do neither, so it reports.
-type HoistableAnalysis struct {
-	blocks    map[static_single_assignment.BlockId]map[int]bool
-	registry  *pathRegistry
-	converged bool
-	// iterations is how many outer passes ran, for measuring how close real code comes to the cap.
-	iterations int
-}
-
-// Converged reports whether the fixed point was reached inside the iteration cap.
-//
-// A false result means the answer is partial: correct as far as it goes, because every pass only
-// adds proven-non-null accesses, but potentially missing some. A caller that needs upstream's
-// behaviour treats false as an error; a caller that prefers a shallower dependency treats it as a
-// smaller hoistable set, which is the safe direction.
-func (analysis *HoistableAnalysis) Converged() bool {
-	return analysis != nil && analysis.converged
-}
-
-// Iterations reports how many outer passes ran, for measurement.
-func (analysis *HoistableAnalysis) Iterations() int {
-	if analysis == nil {
-		return 0
-	}
-	return analysis.iterations
-}
-
-// hoistableAt returns the non-null access paths proven at one block.
-func (analysis *HoistableAnalysis) hoistableAt(block static_single_assignment.BlockId) []ReactiveScopeDependency {
-	if analysis == nil || analysis.blocks == nil {
-		return nil
-	}
-	set, ok := analysis.blocks[block]
-	if !ok {
-		return nil
-	}
-	paths := make([]ReactiveScopeDependency, 0, len(set))
-	for _, index := range sortedNodeIndices(set) {
-		paths = append(paths, analysis.registry.nodes[index].fullPath)
-	}
-	return paths
-}
-
 // collectNonNullsInBlocks seeds each block with the accesses it proves non-null by itself.
 //
 // Upstream's `collectNonNullsInBlocks`. Sources of seed:
@@ -382,7 +264,7 @@ func collectNonNullsInBlocks(
 	// direction. The verdict expires if the seed ever becomes load-bearing, which it would the
 	// moment a component reads a parameter property that nothing else dereferences.
 	if isLikelyComponentFunction(function) {
-		known[registry.identifierNode(function.Params[0].Identifier, true)] = true
+		known[registry.identifierNode(function.Parameters[0].Identifier, true)] = true
 	}
 
 	// The loads that exist only to build a memo call's dependency array, which must not be read as
@@ -490,13 +372,13 @@ func collectNonNullsInBlocks(
 // approximated here by name as `isLikelyComponentFunction` already does -- see the divergence note
 // at `collectNonNullsInBlocks` for why a name rather than an inferred function type.
 func isKnownImmutableParameter(function *Function, id static_single_assignment.IdentifierId) bool {
-	if function == nil || len(function.Params) == 0 {
+	if function == nil || len(function.Parameters) == 0 {
 		return false
 	}
 	if !isLikelyComponentFunction(function) && !isHookName(function.Name) {
 		return false
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		if parameter.Identifier == id {
 			return true
 		}
@@ -506,7 +388,7 @@ func isKnownImmutableParameter(function *Function, id static_single_assignment.I
 
 // isLikelyComponentFunction reports whether this function is one React would seed as a component.
 func isLikelyComponentFunction(function *Function) bool {
-	if function == nil || len(function.Params) == 0 || function.Name == "" {
+	if function == nil || len(function.Parameters) == 0 || function.Name == "" {
 		return false
 	}
 	runes := []rune(function.Name)

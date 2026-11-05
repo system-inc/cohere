@@ -158,9 +158,9 @@ func buildThemeForCase(test *testing.T, aCase themeCase) (*Theme, []SkippedDirec
 		return theme, skipped, true
 	}
 
-	nodes, parseCSSError := ParseCSS(aCase.Input)
-	if parseCSSError != nil {
-		test.Fatalf("parse synthetic stylesheet: %v", parseCSSError)
+	nodes, parseCssError := ParseCss(aCase.Input)
+	if parseCssError != nil {
+		test.Fatalf("parse synthetic stylesheet: %v", parseCssError)
 	}
 	loader := &themeLoader{theme: NewTheme(), visiting: make(map[string]bool)}
 	if ingestError := loader.ingest(nodes, aCase.Name); ingestError != nil {
@@ -339,14 +339,14 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 			for _, want := range aCase.Theme.Resolutions {
 				candidatePresent := !want.CandidateValueIsNull
 
-				gotResolve, gotResolveOK := theme.Resolve(
+				gotResolve, gotResolveOk := theme.Resolve(
 					want.CandidateValue,
 					candidatePresent,
 					want.ThemeKeys,
 					ThemeOptionNone,
 				)
 				assertOptionalString(
-					test, gotResolve, gotResolveOK, want.Resolve,
+					test, gotResolve, gotResolveOk, want.Resolve,
 					fmt.Sprintf(
 						"Resolve(%s, %v)",
 						describeCandidate(want.CandidateValue, candidatePresent),
@@ -354,9 +354,9 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 					),
 				)
 
-				gotValue, gotValueOK := theme.ResolveValue(want.CandidateValue, candidatePresent, want.ThemeKeys)
+				gotValue, gotValueOk := theme.ResolveValue(want.CandidateValue, candidatePresent, want.ThemeKeys)
 				assertOptionalString(
-					test, gotValue, gotValueOK, want.ResolveValue,
+					test, gotValue, gotValueOk, want.ResolveValue,
 					fmt.Sprintf(
 						"ResolveValue(%s, %v)",
 						describeCandidate(want.CandidateValue, candidatePresent),
@@ -368,12 +368,12 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 
 			// ResolveWith and its nested keys, the `-*--nested` suffix form.
 			for _, want := range aCase.Theme.ResolveWithResults {
-				gotValue, gotExtra, gotOK := theme.ResolveWith(want.CandidateValue, want.ThemeKeys, want.NestedKeys)
+				gotValue, gotExtra, gotOk := theme.ResolveWith(want.CandidateValue, want.ThemeKeys, want.NestedKeys)
 				assertOptionalString(
-					test, gotValue, gotOK, want.Value,
+					test, gotValue, gotOk, want.Value,
 					fmt.Sprintf("ResolveWith(%q, %v, %v)", want.CandidateValue, want.ThemeKeys, want.NestedKeys),
 				)
-				if !gotOK {
+				if !gotOk {
 					continue
 				}
 				if len(gotExtra) != len(want.Extra) {
@@ -406,8 +406,8 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 			// decides whether Resolve returns a `var()` or a literal, so a port that stored the
 			// values correctly and the bits wrongly would pass every count above.
 			for _, want := range aCase.Theme.OptionQueries {
-				gotGet, gotGetOK := theme.Get([]string{want.Key})
-				assertOptionalString(test, gotGet, gotGetOK, want.Get, fmt.Sprintf("Get([%q])", want.Key))
+				gotGet, gotGetOk := theme.Get([]string{want.Key})
+				assertOptionalString(test, gotGet, gotGetOk, want.Get, fmt.Sprintf("Get([%q])", want.Key))
 
 				if got := theme.HasDefault(want.Key); got != want.HasDefault {
 					test.Errorf("HasDefault(%q) = %v, engine says %v", want.Key, got, want.HasDefault)
@@ -582,12 +582,12 @@ func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(test *testin
 
 	var names []string
 	for _, skipped := range system.SkippedDirectives {
-		names = append(names, skipped.Name+" "+skipped.Params)
+		names = append(names, skipped.Name+" "+skipped.Parameters)
 		if filepath.Base(skipped.Path) != "settings.css" {
 			test.Errorf(
 				"%s %s was reported in %s, and it is written in settings.css",
 				skipped.Name,
-				skipped.Params,
+				skipped.Parameters,
 				skipped.Path,
 			)
 		}
@@ -722,10 +722,10 @@ func TestEscapeRoundTrip(test *testing.T) {
 	}
 
 	for _, aCase := range cases {
-		if got := escapeCSSIdentifier(aCase.value); got != aCase.escape {
+		if got := escapeCssIdentifier(aCase.value); got != aCase.escape {
 			test.Errorf("escapeCSSIdentifier(%q) = %q, want %q", aCase.value, got, aCase.escape)
 		}
-		if got := unescapeCSSIdentifier(aCase.escape); got != aCase.value {
+		if got := unescapeCssIdentifier(aCase.escape); got != aCase.value {
 			test.Errorf("unescapeCSSIdentifier(%q) = %q, want %q", aCase.escape, got, aCase.value)
 		}
 	}
@@ -742,7 +742,7 @@ func TestEscapeRoundTrip(test *testing.T) {
 		{"--a\\\U0001F49Cb", "--a\U0001F49Cb"},
 	}
 	for _, aCase := range unescapeOnly {
-		if got := unescapeCSSIdentifier(aCase.escaped); got != aCase.want {
+		if got := unescapeCssIdentifier(aCase.escaped); got != aCase.want {
 			test.Errorf("unescapeCSSIdentifier(%q) = %q, want %q", aCase.escaped, got, aCase.want)
 		}
 	}

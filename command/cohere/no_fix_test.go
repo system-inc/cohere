@@ -15,19 +15,19 @@ import (
 func treeSnapshot(test *testing.T, root string) map[string]string {
 	test.Helper()
 	snapshot := map[string]string{}
-	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkError error) error {
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
 		// cohere's own cache for the project is outside `--no-fix`'s promise, which is about source: it is
 		// cohere's to keep, and `--no-cache` is the flag that writes none of it. So is a nested
 		// repository's, where the drift check keeps that repository's format record.
-		if walkError == nil && entry.IsDir() && filepath.Base(filepath.Dir(path)) == ".cache" {
+		if pathError == nil && entry.IsDir() && filepath.Base(filepath.Dir(path)) == ".cache" {
 			if owner := filepath.Dir(
 				filepath.Dir(path),
 			); path == cacheDirectory(owner) && (owner == root || formatfiles.HasOwnRepository(owner)) {
 				return filepath.SkipDir
 			}
 		}
-		if walkError != nil || entry.IsDir() {
-			return walkError
+		if pathError != nil || entry.IsDir() {
+			return pathError
 		}
 		contents, readError := os.ReadFile(path)
 		if readError != nil {

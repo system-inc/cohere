@@ -43,27 +43,6 @@ const (
 // that opens with one of them ends at column NaN, and later ones end where the previous token did.
 const undefinedNext = math.MinInt
 
-// token is upstream's token array: [type, value, startLine, startColumn, endLine, endColumn, index].
-type token struct {
-	kind        string
-	value       []uint16
-	startLine   int
-	startColumn int
-	endLine     int
-	endColumn   int
-	// endColumnIsNaN is an end column computed from an undefined `next`.
-	endColumnIsNaN bool
-	index          int
-}
-
-// endColumnValue is token[5] as JavaScript holds it: a number, or NaN.
-func (token *token) endColumnValue() any {
-	if token.endColumnIsNaN {
-		return math.NaN()
-	}
-	return token.endColumn
-}
-
 // atEnd is upstream's /[ \n\t\r\{\(\)'"\\;,/]/g.
 func atEnd(code uint16) bool {
 	switch code {
@@ -84,8 +63,8 @@ func wordEnd(css []uint16, index int) bool {
 	return false
 }
 
-// wordEndNum is upstream's /[ \n\t\r\(\)\{\}\*:;@!&'"\-\+\|~>,\[\]\\]|\//g at one index.
-func wordEndNum(css []uint16, index int) bool {
+// endsNumberWord is upstream's /[ \n\t\r\(\)\{\}\*:;@!&'"\-\+\|~>,\[\]\\]|\//g at one index.
+func endsNumberWord(css []uint16, index int) bool {
 	switch css[index] {
 	case ' ', '\n', '\t', '\r', '(', ')', '{', '}', '*', ':', ';', '@', '!', '&', '\'', '"', '-', '+', '|', '~', '>', ',', '[', ']', '\\', '/':
 		return true
@@ -93,9 +72,9 @@ func wordEndNum(css []uint16, index int) bool {
 	return false
 }
 
-// alphaNum is upstream's /^[a-z0-9]/i. JavaScript's case-insensitive class without the u flag folds
+// alphanumeric is upstream's /^[a-z0-9]/i. JavaScript's case-insensitive class without the u flag folds
 // only within ASCII here, so this is a plain ASCII test.
-func alphaNum(code uint16) bool {
+func alphanumeric(code uint16) bool {
 	return (code >= 'a' && code <= 'z') || (code >= 'A' && code <= 'Z') || (code >= '0' && code <= '9')
 }
 
@@ -394,7 +373,7 @@ func tokenize(input []uint16, options Options) []token {
 				line = nextLine
 				position = next
 
-			} else if code == pound && !(position+1 < length && alphaNum(css[position+1])) {
+			} else if code == pound && !(position+1 < length && alphanumeric(css[position+1])) {
 				next = position + 1
 
 				push("#", slice(position, next), line, position-offset, line, next-offset, position)
@@ -427,7 +406,7 @@ func tokenize(input []uint16, options Options) []token {
 				// we're dealing with a word that starts with a number
 				// those get treated differently
 				if code >= digit0 && code <= digit9 {
-					regex = wordEndNum
+					regex = endsNumberWord
 					isWordEndNumber = true
 				}
 
@@ -448,7 +427,7 @@ func tokenize(input []uint16, options Options) []token {
 					if (ncode == lowerE || ncode == upperE) &&
 						(ncode1 == minus || ncode1 == plus) &&
 						(ncode2 >= digit0 && ncode2 <= digit9) {
-						lastIndex := regexLastIndex(css, next+2, wordEndNum)
+						lastIndex := regexLastIndex(css, next+2, endsNumberWord)
 
 						if lastIndex == 0 {
 							next = length - 1

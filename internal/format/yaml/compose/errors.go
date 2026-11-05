@@ -9,31 +9,13 @@ import (
 	"strings"
 )
 
-// YAMLError is a YAMLParseError or a YAMLWarning.
-type YAMLError struct {
-	// Name is "YAMLParseError" or "YAMLWarning".
-	Name string
-	// Code is upstream's ErrorCode, such as "BAD_INDENT" or "MISSING_CHAR".
-	Code    string
-	Message string
-	// Pos is the [start, end] of the error in UTF-16 code units.
-	Pos [2]int
+func newYamlParseError(position [2]int, code string, message string) *YamlError {
+	return &YamlError{Name: "YAMLParseError", Code: code, Message: message, Position: position}
 }
 
-func (yamlError *YAMLError) Error() string { return yamlError.Message }
-
-func newYAMLParseError(position [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLParseError", Code: code, Message: message, Pos: position}
+func newYamlWarning(position [2]int, code string, message string) *YamlError {
+	return &YamlError{Name: "YAMLWarning", Code: code, Message: message, Position: position}
 }
-
-func newYAMLWarning(position [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLWarning", Code: code, Message: message, Pos: position}
-}
-
-// errorString is an Error upstream throws, whose message a caller catches and reports.
-type errorString string
-
-func (message errorString) Error() string { return string(message) }
 
 // containsSameValueZero is `array.includes(value)`: SameValueZero, so NaN finds NaN and objects (a
 // MergeKey, Date or Binary here) find only themselves.

@@ -584,7 +584,7 @@ func TestNoUnescapedEntitiesRepairsCoverTheWholeNode(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "unescapedEntityAlts", "unescapedEntityAlts")
 
 	// The JsxText node is `a'b"c`, which the parser places at offsets 15..20.
-	const wantPos = 15
+	const wantPosition = 15
 	const wantEnd = 20
 	for findingIndex, diagnostic := range result.Diagnostics {
 		for suggestionIndex, suggestion := range diagnostic.Suggestions {
@@ -593,9 +593,9 @@ func TestNoUnescapedEntitiesRepairsCoverTheWholeNode(test *testing.T) {
 					findingIndex, suggestionIndex, len(suggestion.Fixes))
 			}
 			fixRange := suggestion.Fixes[0].Range
-			if fixRange.Pos() != wantPos || fixRange.End() != wantEnd {
+			if fixRange.Pos() != wantPosition || fixRange.End() != wantEnd {
 				test.Fatalf("finding %d suggestion %d: fix covers %d..%d, expected the whole JsxText %d..%d",
-					findingIndex, suggestionIndex, fixRange.Pos(), fixRange.End(), wantPos, wantEnd)
+					findingIndex, suggestionIndex, fixRange.Pos(), fixRange.End(), wantPosition, wantEnd)
 			}
 		}
 	}

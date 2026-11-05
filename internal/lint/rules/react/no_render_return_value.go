@@ -115,7 +115,7 @@ var NoRenderReturnValue = rule.Rule[rule.NoOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				callee := reactDOMRenderCallee(node.AsCallExpression().Expression)
+				callee := reactDomRenderCallee(node.AsCallExpression().Expression)
 				if callee == nil {
 					return
 				}
@@ -143,11 +143,11 @@ var NoRenderReturnValue = rule.Rule[rule.NoOptions]{
 // The one receiver and the one method this rule is about. `React.render` is a deliberate upstream
 // pass; see the doc comment on the rule.
 const (
-	reactDOMReceiver = "ReactDOM"
+	reactDomReceiver = "ReactDOM"
 	renderMethod     = "render"
 )
 
-// reactDOMRenderAcceptedKeys is the set of key spellings that can name `render` the way upstream
+// reactDomRenderAcceptedKeys is the set of key spellings that can name `render` the way upstream
 // reads one.
 //
 // `Numeric` and `Private` are excluded because no number and no `#name` can render as `render`, so
@@ -163,9 +163,9 @@ const (
 // `KindComputedPropertyName` into `Name` at all, reading a property access's name node and an
 // element access's subscript expression directly. Read out of the accessor's body rather than
 // inferred from the flag's name, since the flag reads as though it should apply here.
-const reactDOMRenderAcceptedKeys = property.Named | property.Quoted | property.Templated
+const reactDomRenderAcceptedKeys = property.Named | property.Quoted | property.Templated
 
-// reactDOMRenderCallee returns the member access when a callee reads `render` off `ReactDOM`, and
+// reactDomRenderCallee returns the member access when a callee reads `render` off `ReactDOM`, and
 // nil otherwise.
 //
 // The returned node is the member access rather than a boolean because it is also the report
@@ -186,7 +186,7 @@ const reactDOMRenderAcceptedKeys = property.Named | property.Quoted | property.T
 // `Node.Text()` panics on a `KindComputedPropertyName`, and this rule anchors on the shape most
 // likely to meet one, so the read goes through the shelf function that guards it rather than
 // through `Name()` directly.
-func reactDOMRenderCallee(callee *ast.Node) *ast.Node {
+func reactDomRenderCallee(callee *ast.Node) *ast.Node {
 	if callee == nil {
 		return nil
 	}
@@ -205,11 +205,11 @@ func reactDOMRenderCallee(callee *ast.Node) *ast.Node {
 	// `member_expr.object()` directly, so `(ReactDOM).render(...)` is a `ParenthesizedExpression`
 	// there and does not match. `react.IsNamespacedMember` skips them, which is one of two reasons
 	// it cannot serve this rule even setting its hardcoded receiver aside.
-	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != reactDOMReceiver {
+	if receiver == nil || receiver.Kind != ast.KindIdentifier || receiver.Text() != reactDomReceiver {
 		return nil
 	}
 
-	name, ok := property.AccessedName(callee, reactDOMRenderAcceptedKeys)
+	name, ok := property.AccessedName(callee, reactDomRenderAcceptedKeys)
 	if !ok || name != renderMethod {
 		return nil
 	}

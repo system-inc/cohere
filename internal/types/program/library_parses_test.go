@@ -78,8 +78,8 @@ func TestLibraryParsesShareEachLibFileAcrossPrograms(test *testing.T) {
 	if libraries < 10 || shared != libraries {
 		test.Fatalf("shared %d of %d lib files, and an ES2022 program loads dozens", shared, libraries)
 	}
-	if parses.Len() != libraries {
-		test.Errorf("the cache holds %d parses for %d lib files", parses.Len(), libraries)
+	if parses.Length() != libraries {
+		test.Errorf("the cache holds %d parses for %d lib files", parses.Length(), libraries)
 	}
 }
 

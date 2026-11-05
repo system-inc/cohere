@@ -106,7 +106,7 @@ func collectReactiveNames(function *Function, found map[string]bool) {
 		}
 		EachTerminalPlace(block.Terminal, func(place Place, role PlaceRole) { record(place) })
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		record(parameter)
 	}
 	for _, nested := range function.Functions {

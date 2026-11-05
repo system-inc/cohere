@@ -777,7 +777,7 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	}
 
 	// The list as `--json` writes it: each file with its reason, under the key the schema names.
-	encoded, encodeError := json.Marshal(summaryAsJSON(activeSummary))
+	encoded, encodeError := json.Marshal(summaryAsJson(activeSummary))
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
@@ -789,12 +789,12 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	wantJSON := []map[string]string{}
+	wantJson := []map[string]string{}
 	for _, file := range wantGap {
-		wantJSON = append(wantJSON, map[string]string{"file": file.File, "reason": file.Reason})
+		wantJson = append(wantJson, map[string]string{"file": file.File, "reason": file.Reason})
 	}
-	if !reflect.DeepEqual(decoded.Gaps.UncheckedSwift, wantJSON) {
-		test.Errorf("under --json the gap is %v, want %v:\n%s", decoded.Gaps.UncheckedSwift, wantJSON, encoded)
+	if !reflect.DeepEqual(decoded.Gaps.UncheckedSwift, wantJson) {
+		test.Errorf("under --json the gap is %v, want %v:\n%s", decoded.Gaps.UncheckedSwift, wantJson, encoded)
 	}
 }
 
@@ -1136,7 +1136,7 @@ func TestASwiftRunUnderNoCacheSaysItsCacheWasOff(test *testing.T) {
 	defer func() { cacheOff, activeOutput = savedCacheOff, savedOutput }()
 	for _, off := range []bool{true, false} {
 		cacheOff = off
-		activeOutput = outputSettings{Mode: outputJSON}
+		activeOutput = outputSettings{Mode: outputJson}
 		output, _, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
 		if renderRecordsError != nil {
 			test.Fatalf("rendering under cacheOff %t: %v", off, renderRecordsError)

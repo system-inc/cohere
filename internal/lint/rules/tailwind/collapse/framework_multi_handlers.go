@@ -515,31 +515,3 @@ var frameworkMultiLiteralEmitters = map[string]map[string]FrameworkEmitter{
 		"none": declareProperties("translate"),
 	},
 }
-
-// Emit returns the declarations this root's handle body produces for a resolved value.
-//
-// The literal branch runs first and on the candidate's own value rather than on the resolved one,
-// matching ReadingFor and matching upstream: a root-defined keyword is answered by the handler
-// directly and never reaches the theme. Checking after resolution would let a repository declaring
-// `--ease-initial` shadow the literal, which the engine does not allow.
-//
-// Returns nil for a root with no ported emitter, for the same reason the single-declaration Emit
-// does: a fallback would leave the acceptance test comparing a table against itself.
-func (utility FrameworkMultiDeclarationUtility) Emit(
-	root string,
-	literal string,
-	resolved ResolvedUtilityValue,
-) []*Node {
-	if literal != "" {
-		if byLiteral, found := frameworkMultiLiteralEmitters[root]; found {
-			if emitter, found := byLiteral[literal]; found {
-				return emitter(resolved)
-			}
-		}
-	}
-	emitter, ported := frameworkMultiEmitters[root]
-	if !ported {
-		return nil
-	}
-	return emitter(resolved)
-}

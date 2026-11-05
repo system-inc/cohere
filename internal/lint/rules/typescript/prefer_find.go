@@ -95,7 +95,7 @@ var PreferFind = rule.Rule[rule.NoOptions]{
 		// reports, and at least one real array must remain, so `null | undefined` alone does not.
 		isArrayish := func(subject *checker.Type) bool {
 			foundArray := false
-			for unionPart := range type_checking.UnionTypePartsSeq(subject) {
+			for unionPart := range type_checking.UnionTypePartsSequence(subject) {
 				if type_checking.IsTypeFlagSet(unionPart, checker.TypeFlagsNull) ||
 					type_checking.IsTypeFlagSet(unionPart, checker.TypeFlagsUndefined) {
 					continue

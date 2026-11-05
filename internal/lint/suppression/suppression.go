@@ -30,9 +30,6 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/directives"
 )
 
-// Kind is the scope a directive covers.
-type Kind int
-
 const (
 	// KindNextLine silences the line after the comment. 372 of 387 directives in the corpus, so this
 	// is the form to get exactly right; the others are rounding.
@@ -45,89 +42,6 @@ const (
 	// 4 in the corpus, all of them around a run of declarations.
 	KindFile
 )
-
-// String names a kind for a failure message, so a fixture that fails says which form it got.
-func (kind Kind) String() string {
-	switch kind {
-	case KindNextLine:
-		return "next-line"
-	case KindSameLine:
-		return "same-line"
-	case KindFile:
-		return "file"
-	}
-	return "unknown"
-}
-
-// Directive is one suppression comment, resolved to the lines and rules it covers.
-type Directive struct {
-	Kind Kind
-
-	// Rules are the rule names the comment named. Empty means it named none, which silences
-	// everything in its scope: a blanket, and the shape most worth being able to count.
-	Rules []string
-
-	// Reason is the text after ` -- `, trimmed. Empty means the author did not say why.
-	Reason string
-
-	// Line is the zero-based line the comment starts on.
-	Line int
-
-	// StartLine and EndLine are the inclusive zero-based line span this directive covers.
-	StartLine int
-	EndLine   int
-
-	// Pos and End are the comment's own byte range, so an unused directive can be reported where it
-	// actually sits rather than at the finding it failed to silence.
-	Pos int
-	End int
-
-	// applied counts the findings this directive actually withheld.
-	applied int
-
-	// appliedRules records the registry names whose findings this comment withheld.
-	appliedRules map[string]bool
-}
-
-// HasReason is whether the author said why.
-func (directive *Directive) HasReason() bool {
-	return directive.Reason != ""
-}
-
-// Covers is whether this directive applies to ruleName on a zero-based line.
-//
-// A directive naming no rules covers every rule; one naming rules covers only those, matched by
-// plugin-qualified suffix so `nexus/consistency-no-enum` in a comment resolves against the bare
-// `consistency-no-enum` a rule registers under. The corpus writes the plugin prefix and cohere's
-// registry does not, and reconciling that here is cheaper than making every rule carry a prefix it
-// has no other use for.
-func (directive *Directive) Covers(ruleName string, line int) bool {
-	if line < directive.StartLine || line > directive.EndLine {
-		return false
-	}
-	if len(directive.Rules) == 0 {
-		return true
-	}
-	for _, named := range directive.Rules {
-		if matchesRuleName(named, ruleName) {
-			return true
-		}
-	}
-	return false
-}
-
-// Names is whether this directive could silence ruleName on some line: it names that rule, or names none.
-func (directive *Directive) Names(ruleName string) bool {
-	if len(directive.Rules) == 0 {
-		return true
-	}
-	for _, named := range directive.Rules {
-		if matchesRuleName(named, ruleName) {
-			return true
-		}
-	}
-	return false
-}
 
 // matchesRuleName resolves a comment's rule name against a registry rule name.
 //
@@ -148,16 +62,9 @@ func matchesRuleName(named string, ruleName string) bool {
 // Enables are included because ESLint checks them too: `/* eslint-enable no-such-rule */` reports
 // the unknown name exactly as a disable does, measured on 10.8.1.
 type RuleReference struct {
-	Name string
-	Pos  int
-	End  int
-}
-
-// Index is every directive in one file, ready to answer whether a finding is suppressed.
-type Index struct {
-	directives     []*Directive
-	ruleReferences []RuleReference
-	lineOf         func(offset int) int
+	Name     string
+	Position int
+	End      int
 }
 
 // Build scans source text once and resolves every directive in it.
@@ -167,23 +74,26 @@ func Build(sourceText string) *Index {
 	references := []RuleReference{}
 
 	for _, comment := range scanComments(sourceText) {
-		commentText := sourceText[comment.pos:comment.end]
+		commentText := sourceText[comment.position:comment.end]
 		parsed := parseDirective(commentText)
 		if parsed == nil {
 			if names, isEnable := directives.ParseEnable(commentText); isEnable {
 				for _, name := range names {
-					references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
+					references = append(
+						references,
+						RuleReference{Name: name, Position: comment.position, End: comment.end},
+					)
 				}
 			}
 			continue
 		}
 		for _, name := range parsed.Rules {
-			references = append(references, RuleReference{Name: name, Pos: comment.pos, End: comment.end})
+			references = append(references, RuleReference{Name: name, Position: comment.position, End: comment.end})
 		}
 
-		parsed.Pos = comment.pos
+		parsed.Position = comment.position
 		parsed.End = comment.end
-		parsed.Line = lineOf(comment.pos)
+		parsed.Line = lineOf(comment.position)
 
 		switch parsed.Kind {
 		case KindNextLine:
@@ -206,14 +116,6 @@ func Build(sourceText string) *Index {
 	resolveFileScopeEnds(found, sourceText, lineOf)
 
 	return &Index{directives: found, ruleReferences: references, lineOf: lineOf}
-}
-
-// RuleReferences returns every rule name a disable or enable comment named, in source order.
-func (suppressionIndex *Index) RuleReferences() []RuleReference {
-	if suppressionIndex == nil {
-		return nil
-	}
-	return suppressionIndex.ruleReferences
 }
 
 // resolveFileScopeEnds closes each file-scope directive at the enable comment that matches it.
@@ -263,135 +165,4 @@ func namesIntersect(enableRules []string, blockRules []string) bool {
 		}
 	}
 	return false
-}
-
-// Suppresses is whether a finding for ruleName at a byte offset is silenced, and records that the
-// directive responsible was used.
-//
-// Recording on the query rather than in a separate pass is what makes an unused directive
-// detectable at all: nothing else in the system knows which findings were never reported.
-func (suppressionIndex *Index) Suppresses(ruleName string, offset int) bool {
-	return suppressionIndex.SuppressedBy(ruleName, offset) >= 0
-}
-
-// SuppressedBy is Suppresses answering with which directive silenced the finding, by its index in Directives,
-// or -1 when none did. The findings cache keeps the index, so a replay can mark the same directive applied
-// without producing the finding again (MarkApplied).
-func (suppressionIndex *Index) SuppressedBy(ruleName string, offset int) int {
-	if suppressionIndex == nil || len(suppressionIndex.directives) == 0 {
-		return -1
-	}
-
-	line := suppressionIndex.lineOf(offset)
-	reportsOnDirectives := directives.IsSubject(ruleName)
-	for index, candidate := range suppressionIndex.directives {
-		if reportsOnDirectives && !coversAFindingAboutADirective(candidate, line) {
-			continue
-		}
-		if candidate.Covers(ruleName, line) {
-			suppressionIndex.MarkApplied(index, ruleName)
-			return index
-		}
-	}
-	return -1
-}
-
-// MarkApplied records that the directive at index withheld a finding this run did not produce, because the
-// findings cache replayed the rule that would have, and reports false when no directive is at index. The index
-// is SuppressedBy's from a run over the same bytes, so it names the same directive.
-func (suppressionIndex *Index) MarkApplied(index int, ruleName string) bool {
-	if suppressionIndex == nil || index < 0 || index >= len(suppressionIndex.directives) {
-		return false
-	}
-	directive := suppressionIndex.directives[index]
-	directive.applied++
-	if directive.appliedRules == nil {
-		directive.appliedRules = map[string]bool{}
-	}
-	directive.appliedRules[ruleName] = true
-	return true
-}
-
-// AppliedTo reports whether this directive withheld a finding for the named rule, resolving
-// its spelling just as Covers does. A live name must survive removal of a dead sibling name.
-func (directive *Directive) AppliedTo(named string) bool {
-	for registered := range directive.appliedRules {
-		if matchesRuleName(named, registered) {
-			return true
-		}
-	}
-	return false
-}
-
-// Directives returns every directive found, in source order.
-func (suppressionIndex *Index) Directives() []*Directive {
-	if suppressionIndex == nil {
-		return nil
-	}
-	return suppressionIndex.directives
-}
-
-// AppliedCount is how many findings the directive at an index actually withheld.
-func (suppressionIndex *Index) AppliedCount(index int) int {
-	if suppressionIndex == nil || index < 0 || index >= len(suppressionIndex.directives) {
-		return 0
-	}
-	return suppressionIndex.directives[index].applied
-}
-
-// TotalApplied is how many findings this file's directives withheld, for the coverage line.
-func (suppressionIndex *Index) TotalApplied() int {
-	if suppressionIndex == nil {
-		return 0
-	}
-	total := 0
-	for _, candidate := range suppressionIndex.directives {
-		total += candidate.applied
-	}
-	return total
-}
-
-// Unused returns the directives that never withheld anything.
-//
-// This only means what it says after a full run with every rule a directive could name. A run
-// filtered to one rule shows every directive of every other rule as unused, so the caller decides
-// whether to report them.
-func (suppressionIndex *Index) Unused() []*Directive {
-	if suppressionIndex == nil {
-		return nil
-	}
-	unused := []*Directive{}
-	for _, candidate := range suppressionIndex.directives {
-		if candidate.applied == 0 {
-			unused = append(unused, candidate)
-		}
-	}
-	return unused
-}
-
-// WithoutReason returns the directives that never said why.
-//
-// Measured before it is enforced. Across the codebase cohere gates, 281 of the 306 directives
-// naming one of our own rules carry no reason, so a hard requirement on day one would turn working
-// code red rather than teaching anyone anything. The count is the argument for the requirement;
-// the requirement is a policy the caller sets.
-func (suppressionIndex *Index) WithoutReason() []*Directive {
-	if suppressionIndex == nil {
-		return nil
-	}
-	bare := []*Directive{}
-	for _, candidate := range suppressionIndex.directives {
-		if !candidate.HasReason() {
-			bare = append(bare, candidate)
-		}
-	}
-	return bare
-}
-
-// LineOf is the zero-based line a byte offset falls on.
-func (suppressionIndex *Index) LineOf(offset int) int {
-	if suppressionIndex == nil {
-		return 0
-	}
-	return suppressionIndex.lineOf(offset)
 }

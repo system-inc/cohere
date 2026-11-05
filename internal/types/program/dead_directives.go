@@ -88,13 +88,13 @@ func ReportDeadDirectives(
 				strings.Join(dead, ", ") +
 				" (no findings from these rules were suppressed)."
 		}
-		comment := sourceFile.Text()[directive.Pos:directive.End]
+		comment := sourceFile.Text()[directive.Position:directive.End]
 		report(rule.Diagnostic{
 			RuleName: "unused-disable", SourceFile: sourceFile,
-			Range:   core.NewTextRange(directive.Pos, directive.End),
+			Range:   core.NewTextRange(directive.Position, directive.End),
 			Message: rule.Message{Id: "unusedDisable", Description: description},
 			Fixes: []rule.Fix{
-				{Range: core.NewTextRange(directive.Pos, directive.End), Text: withoutDeadNames(comment, kept)},
+				{Range: core.NewTextRange(directive.Position, directive.End), Text: withoutDeadNames(comment, kept)},
 			},
 		})
 	}

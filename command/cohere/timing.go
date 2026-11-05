@@ -59,16 +59,16 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 
 	// CPU is summed across workers, so it exceeds wall clock by roughly the worker count. Shares are
 	// taken against the rules' total, which is the number they are actually a share of.
-	ruleCPU := timings.TotalCPU()
+	ruleCpu := timings.TotalCpu()
 
 	// The unit is in the first line, because the table this replaced printed wall time under the same
 	// columns and was read as cost (#8qyzmxw): a rule descheduled mid-call was billed for the wait.
 	fmt.Fprintf(out, "\ntiming: rule CPU, from each walk thread's own CPU clock, not wall time: "+
 		"%d rules, %s of rule CPU across all workers, %s wall clock\n",
-		len(sorted), formatMilliseconds(ruleCPU), formatMilliseconds(lintDuration))
+		len(sorted), formatMilliseconds(ruleCpu), formatMilliseconds(lintDuration))
 	perCall := time.Duration(0)
 	if account.Calls > 0 {
-		perCall = account.InstrumentCPU / time.Duration(account.Calls)
+		perCall = account.InstrumentCpu / time.Duration(account.Calls)
 	}
 	fmt.Fprintf(
 		out,
@@ -84,15 +84,15 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 
 	for _, timing := range sorted {
 		share := ""
-		if ruleCPU > 0 {
-			share = fmt.Sprintf(" %5.1f%%", 100*float64(timing.TotalCPU())/float64(ruleCPU))
+		if ruleCpu > 0 {
+			share = fmt.Sprintf(" %5.1f%%", 100*float64(timing.TotalCpu())/float64(ruleCpu))
 		}
 
 		fmt.Fprintf(out, "  %-42s %9s %9s %9s %8d %8d %8d%s\n",
 			timing.Name,
-			formatMilliseconds(timing.TotalCPU()),
-			formatMilliseconds(timing.SetupCPU),
-			formatMilliseconds(timing.ListenerCPU),
+			formatMilliseconds(timing.TotalCpu()),
+			formatMilliseconds(timing.SetupCpu),
+			formatMilliseconds(timing.ListenerCpu),
 			timing.FilesListened,
 			timing.NodesOffered,
 			timing.Findings,
@@ -118,7 +118,7 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 // function at a time, each costing 0.00ms and none of them actionable. The family is the label the
 // fill's CPU carries, so the collapse happens where it is measured.
 func printSharedFills(out *bufio.Writer, timings *program.Timings) {
-	shared := timings.SharedCPU()
+	shared := timings.SharedCpu()
 	if len(shared) == 0 {
 		return
 	}
@@ -167,7 +167,7 @@ func printTimingNotes(out *bufio.Writer, sorted []program.RuleTiming) {
 		if timing.NodesOffered > 0 {
 			perNode = fmt.Sprintf(
 				", %.0fns per node",
-				float64(timing.TotalCPU().Nanoseconds())/float64(timing.NodesOffered),
+				float64(timing.TotalCpu().Nanoseconds())/float64(timing.NodesOffered),
 			)
 		}
 		fmt.Fprintf(out,
@@ -249,7 +249,7 @@ func costRange(sorted []program.RuleTiming, names []string) costExtremes {
 		if !named[timing.Name] {
 			continue
 		}
-		total := timing.TotalCPU()
+		total := timing.TotalCpu()
 		if extremes.cheapestName == "" || total < extremes.cheapestCost {
 			extremes.cheapestName, extremes.cheapestCost = timing.Name, total
 		}
@@ -288,13 +288,13 @@ func formatMilliseconds(duration time.Duration) string {
 // The process's CPU outside the workers is read the same way.
 func printCoverage(out *bufio.Writer, timings *program.Timings) {
 	account := timings.Account
-	ruleCPU := timings.TotalCPU()
-	var sharedCPU time.Duration
-	for _, cost := range timings.SharedCPU() {
-		sharedCPU += cost
+	ruleCpu := timings.TotalCpu()
+	var sharedCpu time.Duration
+	for _, cost := range timings.SharedCpu() {
+		sharedCpu += cost
 	}
-	workersCPU := ruleCPU + sharedCPU + account.InstrumentCPU + account.WalkCPU
-	if workersCPU <= 0 {
+	workersCpu := ruleCpu + sharedCpu + account.InstrumentCpu + account.WalkCpu
+	if workersCpu <= 0 {
 		// Nothing measured on the walk workers means no share to state. A share computed from a zero
 		// would be worse than the silence it replaces.
 		return
@@ -304,12 +304,12 @@ func printCoverage(out *bufio.Writer, timings *program.Timings) {
 		"  coverage: the walk workers spent %s of CPU: rules %.0f%%, shared derivations %.0f%%, measuring %.0f%%, "+
 			"and %.0f%% the walk itself (traversal, dispatch, configuration). Another %s of process CPU ran on no "+
 			"walk worker (the garbage collector, the runtime).\n",
-		formatMilliseconds(workersCPU),
-		100*float64(ruleCPU)/float64(workersCPU),
-		100*float64(sharedCPU)/float64(workersCPU),
-		100*float64(account.InstrumentCPU)/float64(workersCPU),
-		100*float64(account.WalkCPU)/float64(workersCPU),
-		formatMilliseconds(account.OtherCPU),
+		formatMilliseconds(workersCpu),
+		100*float64(ruleCpu)/float64(workersCpu),
+		100*float64(sharedCpu)/float64(workersCpu),
+		100*float64(account.InstrumentCpu)/float64(workersCpu),
+		100*float64(account.WalkCpu)/float64(workersCpu),
+		formatMilliseconds(account.OtherCpu),
 	)
 }
 

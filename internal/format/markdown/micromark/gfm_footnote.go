@@ -18,8 +18,8 @@ const (
 	typeGfmFootnoteDefinitionLabelString = "gfmFootnoteDefinitionLabelString"
 	typeGfmFootnoteDefinitionWhitespace  = "gfmFootnoteDefinitionWhitespace"
 	typeGfmFootnoteDefinitionIndent      = "gfmFootnoteDefinitionIndent"
-	// gfmFootnoteLabelSizeMax is upstream's inline 999, the same cap as linkReferenceSizeMax.
-	gfmFootnoteLabelSizeMax = 999
+	// gfmFootnoteLabelSizeMaximum is upstream's inline 999, the same cap as linkReferenceSizeMax.
+	gfmFootnoteLabelSizeMaximum = 999
 )
 
 var gfmFootnoteIndent = &Construct{Tokenize: tokenizeGfmFootnoteIndent, Partial: true}
@@ -247,7 +247,7 @@ func tokenizeGfmFootnoteCall(self *Self, effects *Effects, ok State, nok State) 
 	callData = func(code Code) State {
 		if
 		// Too long.
-		size > gfmFootnoteLabelSizeMax ||
+		size > gfmFootnoteLabelSizeMaximum ||
 			// Closing brace with nothing.
 			(code == CodeRightSquareBracket && !data) ||
 			// Space or tab is not supported by GFM for some reason.
@@ -353,7 +353,7 @@ func tokenizeGfmFootnoteDefinitionStart(self *Self, effects *Effects, ok State, 
 	labelInside = func(code Code) State {
 		if
 		// Too long.
-		size > gfmFootnoteLabelSizeMax ||
+		size > gfmFootnoteLabelSizeMaximum ||
 			// Closing brace with nothing.
 			(code == CodeRightSquareBracket && !data) ||
 			// Space or tab is not supported by GFM for some reason.

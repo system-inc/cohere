@@ -2,8 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -294,7 +292,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		// asked whether it is used. `vars: "local"` first, then an ignored array element, then a class
 		// with a static block, then the two kinds a mode skips whole, then each kind's ignore pattern,
 		// then `using`. See isExemptFromUnusedReport for what follows.
-		if settings.Vars == "local" && isGlobalScopeBinding(ruleContext.SourceFile, candidate) {
+		if settings.Variables == "local" && isGlobalScopeBinding(ruleContext.SourceFile, candidate) {
 			continue
 		}
 		name := candidate.name.Text()
@@ -332,7 +330,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		if candidate.kind == bindingCaughtError && settings.CaughtErrors == "none" {
 			continue
 		}
-		if candidate.kind == bindingParameter && settings.Args == "none" {
+		if candidate.kind == bindingParameter && settings.Arguments == "none" {
 			continue
 		}
 		if matchesIgnorePattern(candidate, settings) {
@@ -774,7 +772,7 @@ func isExemptFromUnusedReport(
 		if isStructurallyRequiredParameter(declaringParameter(candidate)) {
 			return true
 		}
-		if settings.Args != "all" && candidate.declaration.Kind == ast.KindParameter &&
+		if settings.Arguments != "all" && candidate.declaration.Kind == ast.KindParameter &&
 			isParameterBeforeAUsedOne(ruleContext, candidate, all, reads) {
 			return true
 		}
@@ -1517,7 +1515,7 @@ func ignorePatternFor(kind unusedBindingKind, settings NoUnusedVarsOptions) (str
 	case bindingCaughtError:
 		return "caughtErrorsIgnorePattern", settings.CaughtErrorsIgnorePattern, "a caught error"
 	}
-	return "varsIgnorePattern", settings.VarsIgnorePattern, "a variable"
+	return "varsIgnorePattern", settings.VariablesIgnorePattern, "a variable"
 }
 
 // hasStaticBlock reports whether a class's body holds a `static {}` block, which
@@ -1563,7 +1561,7 @@ func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVarsOptio
 // binding does not have yet: whether prefixing an underscore would silence it, which decides
 // whether the message may offer that escape.
 func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUnusedVarsOptions) bool {
-	pattern := settings.VarsIgnorePattern
+	pattern := settings.VariablesIgnorePattern
 	switch kind {
 	case bindingParameter:
 		pattern = settings.ArgsIgnorePattern
@@ -1586,62 +1584,6 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 	return compiled.TestOrTimeout(name)
 }
 
-// NoUnusedVarsOptions is the rule's configuration surface.
-//
-// Every field is taken from oxc's `options.rs` rather than from the inventory, which records this
-// rule as having no options and is wrong: the option module alone is 891 lines. The defaults are
-// ESLint's. Two are not the zero value and are pinned with fixtures: `args` defaults to
-// `after-used` rather than to `all`, and `caughtErrors` defaults to `all`. Every ignore pattern
-// defaults to nothing, so an unconfigured rule exempts no name.
-//
-// Every field is read. `vars`, `caughtErrors` and `destructuredArrayIgnorePattern` were decoded and
-// never consulted until #6esg2nx, so a config setting them changed nothing; the registry guard
-// TestEveryOptionFieldARuleDecodesIsRead now fails on a field like that.
-//
-// `ignoreClassWithStaticInitBlock`, `ignoreUsingDeclarations` and `reportUsedIgnorePattern` are
-// typescript-eslint 8.71's and ESLint 10.8.1's core schema's too, and `enableAutofixRemoval` is
-// typescript-eslint's alone, all ported against upstream's rows (#e1zk9s0). Each defaults to false,
-// the zero value.
-type NoUnusedVarsOptions struct {
-	// Vars is `all` or `local`. Default `all`. `local` skips a binding in the global scope, which
-	// only a script has; see isGlobalScopeBinding.
-	Vars string `json:"vars"`
-	// VarsIgnorePattern is a regular expression naming variables to skip.
-	VarsIgnorePattern string `json:"varsIgnorePattern"`
-	// Args is `all`, `after-used`, or `none`. Default `after-used`.
-	Args string `json:"args"`
-	// ArgsIgnorePattern is a regular expression naming parameters to skip.
-	ArgsIgnorePattern string `json:"argsIgnorePattern"`
-	// CaughtErrors is `all` or `none`. Default `all`, which is oxc's answer and differs from older
-	// ESLint releases where it defaulted to `none`. `none` skips every caught error, including each
-	// name destructured out of one.
-	CaughtErrors string `json:"caughtErrors"`
-	// CaughtErrorsIgnorePattern is a regular expression naming catch bindings to skip, and names
-	// destructured out of a catch binding with them.
-	CaughtErrorsIgnorePattern string `json:"caughtErrorsIgnorePattern"`
-	// IgnoreRestSiblings keeps a binding alive when it sits beside a rest element, which is the
-	// idiom for omitting a property: `const { removed, ...rest } = o`. Default false, as upstream's.
-	// See hasRestSiblingDeclarationOrWrite.
-	IgnoreRestSiblings bool `json:"ignoreRestSiblings"`
-	// DestructuredArrayIgnorePattern is a regular expression naming array-destructured elements to
-	// skip: `const [_first, second] = pair`. It is asked before the other patterns and applies to a
-	// parameter or a caught error destructured from an array too. See isDestructuredFromAnArray.
-	DestructuredArrayIgnorePattern string `json:"destructuredArrayIgnorePattern"`
-	// IgnoreClassWithStaticInitBlock exempts a class whose body holds a `static {}` block, which runs
-	// when the class is defined. See hasStaticBlock.
-	IgnoreClassWithStaticInitBlock bool `json:"ignoreClassWithStaticInitBlock"`
-	// IgnoreUsingDeclarations exempts a `using` or `await using` binding, which exists to dispose of
-	// its value. See isUsingDeclaration.
-	IgnoreUsingDeclarations bool `json:"ignoreUsingDeclarations"`
-	// ReportUsedIgnorePattern reports `usedIgnoredVar` on a name an ignore pattern sets aside that is
-	// used, so the pattern cannot hide a name that lies about itself. See reportUsedIgnoredName.
-	ReportUsedIgnorePattern bool `json:"reportUsedIgnorePattern"`
-	// EnableAutofixRemoval is typescript-eslint's alone (core ESLint has no fixer here). Its one key,
-	// imports, makes the removal of an unused import a fix the edit engine applies; off, the default,
-	// the same removal is offered as a suggestion. See importRemoval.
-	EnableAutofixRemoval NoUnusedVarsAutofixRemoval `json:"enableAutofixRemoval"`
-}
-
 // NoUnusedVarsAutofixRemoval is enableAutofixRemoval's object. Decoded strictly like the rest, so a key
 // upstream's schema does not name is refused.
 type NoUnusedVarsAutofixRemoval struct {
@@ -1659,40 +1601,17 @@ var noUnusedVarsModes = []struct {
 	allowed []string
 	value   func(*NoUnusedVarsOptions) string
 }{
-	{"vars", []string{"all", "local"}, func(options *NoUnusedVarsOptions) string { return options.Vars }},
-	{"args", []string{"all", "after-used", "none"}, func(options *NoUnusedVarsOptions) string { return options.Args }},
+	{"vars", []string{"all", "local"}, func(options *NoUnusedVarsOptions) string { return options.Variables }},
+	{
+		"args",
+		[]string{"all", "after-used", "none"},
+		func(options *NoUnusedVarsOptions) string { return options.Arguments },
+	},
 	{
 		"caughtErrors",
 		[]string{"all", "none"},
 		func(options *NoUnusedVarsOptions) string { return options.CaughtErrors },
 	},
-}
-
-// UnmarshalJSON reads upstream's two forms: the object, decoded strictly, and the bare string
-// `"all"` or `"local"`, which is shorthand for `{"vars": ...}` (`["error", "local"]`). A mode value
-// outside upstream's enum is refused by key and value.
-func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
-	var shorthand string
-	if decodeError := json.Unmarshal(raw, &shorthand); decodeError == nil {
-		if shorthand != "all" && shorthand != "local" {
-			return fmt.Errorf("the string form is \"all\" or \"local\", and the config gives %q", shorthand)
-		}
-		*options = NoUnusedVarsOptions{Vars: shorthand}
-		return nil
-	}
-	var fields noUnusedVarsOptionFields
-	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &fields); unmarshalOptionsError != nil {
-		return unmarshalOptionsError
-	}
-	decoded := NoUnusedVarsOptions(fields)
-	for _, mode := range noUnusedVarsModes {
-		value := mode.value(&decoded)
-		if value != "" && !slices.Contains(mode.allowed, value) {
-			return fmt.Errorf("%s is one of %q, and the config gives %q", mode.key, mode.allowed, value)
-		}
-	}
-	*options = decoded
-	return nil
 }
 
 // resolveNoUnusedVarsOptions applies the defaults to whatever the config supplied.
@@ -1704,11 +1623,11 @@ func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 func resolveNoUnusedVarsOptions(options rule.Given[NoUnusedVarsOptions]) NoUnusedVarsOptions {
 	settings, _ := options.Read()
 
-	if settings.Vars == "" {
-		settings.Vars = "all"
+	if settings.Variables == "" {
+		settings.Variables = "all"
 	}
-	if settings.Args == "" {
-		settings.Args = "after-used"
+	if settings.Arguments == "" {
+		settings.Arguments = "after-used"
 	}
 	if settings.CaughtErrors == "" {
 		settings.CaughtErrors = "all"

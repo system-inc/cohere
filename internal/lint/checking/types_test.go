@@ -8,14 +8,14 @@ import (
 
 var unionTypePartsSink *checker.Type
 
-// TestUnionTypePartsSeqAllocatesNothing holds the reason UnionTypePartsSeq exists: a range loop over
+// TestUnionTypePartsSequenceAllocatesNothing holds the reason UnionTypePartsSeq exists: a range loop over
 // it allocates nothing for a type that is not a union, where UnionTypeParts allocates its
 // one-element slice. The first half proves the measurement can see an allocation, so a zero in the
 // second half is the iterator's and not the instrument's.
 //
 // Not parallel: testing.AllocsPerRun reads the process-wide allocation count, so a test running
 // beside it would add its allocations to this one's.
-func TestUnionTypePartsSeqAllocatesNothing(test *testing.T) {
+func TestUnionTypePartsSequenceAllocatesNothing(test *testing.T) {
 	plain := new(checker.Type)
 
 	sliced := testing.AllocsPerRun(100, func() {
@@ -28,7 +28,7 @@ func TestUnionTypePartsSeqAllocatesNothing(test *testing.T) {
 	}
 
 	iterated := testing.AllocsPerRun(100, func() {
-		for part := range UnionTypePartsSeq(plain) {
+		for part := range UnionTypePartsSequence(plain) {
 			unionTypePartsSink = part
 		}
 	})

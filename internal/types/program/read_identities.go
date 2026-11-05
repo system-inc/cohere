@@ -4,9 +4,6 @@ import (
 	"io"
 	"os"
 	"sync"
-
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
 
 // readIdentities is the stat each file's bytes were read under, for a program built without a content pack,
@@ -15,24 +12,6 @@ import (
 type readIdentities struct {
 	mutex  sync.Mutex
 	byPath map[string]fileIdentity
-}
-
-// identityFS stats each file before reading it, as the content pack does, so the identity it records can only
-// be older than the bytes read after it, and records it when both succeed. Everything else passes through.
-type identityFS struct {
-	vfs.FS
-	identities *readIdentities
-}
-
-func (fileSystem *identityFS) ReadFile(path tspath.RootedFilePath) (string, bool) {
-	identity, statted := statIdentity(path.AsString())
-	contents, ok := fileSystem.FS.ReadFile(path)
-	if statted && ok {
-		fileSystem.identities.mutex.Lock()
-		fileSystem.identities.byPath[path.AsString()] = identity
-		fileSystem.identities.mutex.Unlock()
-	}
-	return contents, ok
 }
 
 // identity is the stat path was read under, when one was recorded.

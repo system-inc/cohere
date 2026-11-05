@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -242,9 +243,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	if repository == "" {
 		repository = root
 	}
-	rootScope, err := newIgnoreScope(repository)
-	if err != nil {
-		return discovery{}, err
+	rootScope, newIgnoreScopeError := newIgnoreScope(repository)
+	if newIgnoreScopeError != nil {
+		return discovery{}, newIgnoreScopeError
 	}
 	fromRepository := func(relative string) string {
 		// Ignored: repository is root or a directory above it, both absolute, and Rel fails only between paths
@@ -257,8 +258,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return inRepository
 	}
 	if prefix := fromRepository("."); prefix != "" {
-		if rootScope, err = rootScope.Enter(prefix); err != nil {
-			return discovery{}, err
+		var enterError error
+		if rootScope, enterError = rootScope.Enter(prefix); enterError != nil {
+			return discovery{}, enterError
 		}
 	}
 
@@ -289,10 +291,10 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	visit = func(relative string, scope ignoreScope) {
 		defer group.Done()
 		reading <- struct{}{}
-		entries, err := os.ReadDir(filepath.Join(root, relative))
+		entries, readDirectoryError := os.ReadDir(filepath.Join(root, relative))
 		<-reading
-		if err != nil {
-			fail(fmt.Errorf("reading %s: %w", filepath.Join(root, relative), err))
+		if readDirectoryError != nil {
+			fail(fmt.Errorf("reading %s: %w", filepath.Join(root, relative), readDirectoryError))
 			return
 		}
 		found.Listings.Add(filepath.Join(root, relative), entries)
@@ -317,8 +319,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		}
 		directoryScope := scope
 		if relative != "." {
-			if directoryScope, err = scope.Enter(fromRepository(relative)); err != nil {
-				fail(err)
+			var enterError error
+			if directoryScope, enterError = scope.Enter(fromRepository(relative)); enterError != nil {
+				fail(enterError)
 				return
 			}
 		}
@@ -331,7 +334,8 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				continue
 			}
 			filePath := path.Join(relative, entry.Name())
-			if directoryScope.Ignored(fromRepository(filePath), false) || configuration.MatchAny(ignorePatterns, filePath) {
+			if directoryScope.Ignored(fromRepository(filePath), false) ||
+				configuration.MatchAny(ignorePatterns, filePath) {
 				continue
 			}
 			swiftFileCount++
@@ -658,4 +662,141 @@ func rootIgnorePatterns(root string) ([]string, error) {
 		return nil, nil
 	}
 	return configuration.IgnorePatternsOf(settings)
+}
+
+// isTheLocatedProject reports whether discovery found exactly the one project the walk up located, which
+// a run then checks in this process, the way it always did.
+func (found discovery) isTheLocatedProject(location projectLocation, locateError error) bool {
+	if locateError != nil || len(found.Projects) != 1 {
+		return false
+	}
+	project := found.Projects[0]
+	return project.Engine == location.Engine && project.ConfigFile == "" &&
+		filepath.Clean(filepath.Join(found.Root, project.Directory)) == filepath.Clean(location.Root)
+}
+
+// notes are the lines a run carries about markers discovery found and did not run, which a reader could have
+// expected checked: those the root's ignorePatterns refuse, solution roots, projects left with no file of
+// their own, and Swift packages another package's run covers. So is a Go module that runs on its own below a
+// workspace, which a reader could have expected the workspace to build. Ignored and dependency directories are
+// not named, since skipping them is what everyone expects, and neither is a nested repository: one inside a
+// program, such as Structure or Base, is checked as part of it, its drift reported read-only, as it always was.
+// They are counted on the summary line. A Swift coverage query that failed is named too, since its packages may
+// then be checked twice, and so is each directory of Swift files no package holds, since nothing checks them.
+func (found discovery) notes() []string {
+	var lines []string
+	for _, marker := range found.Refused {
+		lines = append(lines, fmt.Sprintf("%s not checked: the root's ignorePatterns match it", marker))
+	}
+	for _, label := range found.Ownership.Solutions {
+		lines = append(lines, fmt.Sprintf(
+			"%s not run: a solution tsconfig, which includes no file and references the projects checked instead",
+			label,
+		))
+	}
+	for _, label := range found.Ownership.Yielding {
+		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
+	}
+	for _, workspace := range found.BrokenWorkspaces {
+		lines = append(lines, fmt.Sprintf("%s claims no module, so each module below it runs on its own: %s",
+			path.Join(workspace.Directory, goWorkspaceMarker), workspace.Reason))
+	}
+	for _, module := range found.UnusedModules {
+		lines = append(lines, fmt.Sprintf("%s runs as its own module: %s does not use it",
+			path.Join(module.Directory, goModuleMarker), path.Join(module.Workspace, goWorkspaceMarker)))
+	}
+	for _, covered := range found.SwiftCoverage.Covered {
+		if covered.Vendored {
+			lines = append(lines, fmt.Sprintf(
+				"%s not run: vendored in %s, whose run lists it as not checked",
+				covered.Label,
+				covered.CoveredBy,
+			))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s not run: checked as part of %s", covered.Label, covered.CoveredBy))
+	}
+	for _, failed := range found.SwiftCoverage.FailedQueries {
+		lines = append(lines, fmt.Sprintf(
+			"%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
+			failed.Label,
+			failed.Reason,
+		))
+	}
+	for _, unclaimed := range found.UnclaimedSwift {
+		lines = append(lines, fmt.Sprintf(
+			"%s: %s no Swift package checks",
+			unclaimed.Directory,
+			counted(unclaimed.Files, "Swift file", "Swift files"),
+		))
+	}
+	// Last, since only these are sorted: a map has no order of its own.
+	for label := range found.Ownership.SharedDirectory {
+		lines = append(lines, fmt.Sprintf(
+			"%s ran with the cache off: another tsconfig's run keeps its cache in the same directory",
+			label,
+		))
+	}
+	sort.Strings(lines[len(lines)-len(found.Ownership.SharedDirectory):])
+	return lines
+}
+
+// swiftYield is what a Swift project's run leaves to others: the directories of the other running Swift
+// projects strictly below it, absolute, each checked by its own run. A nested package that runs on its own and
+// an Xcode project inside a package's directory are both there, and the run's not-checked notes leave their
+// files out, since those runs account for them. A package another run covers is not, since the covering run
+// checks its files itself, and found.Projects holds only the projects that run.
+func (found discovery) swiftYield(project discoveredProject) projectYield {
+	yield := projectYield{}
+	for _, other := range found.Projects {
+		if other.Engine == engineSwift && isBelow(other.Directory, project.Directory) {
+			yield.Directories = append(
+				yield.Directories,
+				filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
+			)
+		}
+	}
+	sort.Strings(yield.Directories)
+	return yield
+}
+
+// configPath is the absolute path of a TypeScript project's tsconfig.
+func (found discovery) configPath(project discoveredProject) string {
+	name := project.ConfigFile
+	if name == "" {
+		name = projectMarker
+	}
+	return filepath.Join(found.Root, filepath.FromSlash(project.Directory), name)
+}
+
+// projectAt is the project a referenced tsconfig defines, and whether it lies in the repository discovery
+// walked and outside what it never enters: a dependency, build or cache directory, a repository of its
+// own, or a marker the root's ignorePatterns refused.
+func (found discovery) projectAt(configurationFile string) (discoveredProject, bool) {
+	relative, relativePathError := filepath.Rel(found.Root, configurationFile)
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return discoveredProject{}, false
+	}
+	relative = filepath.ToSlash(relative)
+	for _, segment := range strings.Split(path.Dir(relative), "/") {
+		if neverDescended[segment] {
+			return discoveredProject{}, false
+		}
+	}
+	for _, repository := range found.NestedRepositories {
+		if isBelow(path.Dir(relative), repository) || path.Dir(relative) == repository {
+			return discoveredProject{}, false
+		}
+	}
+	if slices.Contains(found.Refused, relative) {
+		return discoveredProject{}, false
+	}
+	if !isRegularFile(configurationFile) {
+		return discoveredProject{}, false
+	}
+	project := discoveredProject{Directory: path.Dir(relative), Engine: engineTypeScript}
+	if name := path.Base(relative); name != projectMarker {
+		project.ConfigFile = name
+	}
+	return project, true
 }

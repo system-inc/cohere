@@ -162,10 +162,10 @@ func TestNoExtendNativeReportsTheWholeExtension(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
-		sourceText string
-		wantPos    int
-		wantEnd    int
-		builtin    string
+		sourceText   string
+		wantPosition int
+		wantEnd      int
+		builtin      string
 	}{
 		{"Object.prototype.p = 0", 0, 22, "Object"},
 		{"Object.defineProperty(Array.prototype, 'p', {value: 0})", 0, 55, "Array"},
@@ -183,10 +183,10 @@ func TestNoExtendNativeReportsTheWholeExtension(test *testing.T) {
 			}
 			onDisk := strings.TrimSpace(testCase.sourceText) + "\n"
 			got := result.Diagnostics[0].Range
-			if got.Pos() != testCase.wantPos || got.End() != testCase.wantEnd {
+			if got.Pos() != testCase.wantPosition || got.End() != testCase.wantEnd {
 				test.Fatalf("reported [%d:%d) which is %q, wanted [%d:%d) which is %q",
 					got.Pos(), got.End(), onDisk[got.Pos():got.End()],
-					testCase.wantPos, testCase.wantEnd, onDisk[testCase.wantPos:testCase.wantEnd])
+					testCase.wantPosition, testCase.wantEnd, onDisk[testCase.wantPosition:testCase.wantEnd])
 			}
 		})
 	}

@@ -114,9 +114,9 @@ func (workspace Workspace) RefuseUnlistedModules() error {
 		used[directory] = true
 	}
 	var unlisted []string
-	walkError := filepath.WalkDir(workspace.Root, func(path string, entry fs.DirEntry, walkError error) error {
-		if walkError != nil {
-			return walkError
+	walkError := filepath.WalkDir(workspace.Root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
 		}
 		relative, relativeError := filepath.Rel(workspace.Root, path)
 		if relativeError != nil {

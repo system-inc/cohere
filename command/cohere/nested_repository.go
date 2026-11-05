@@ -392,7 +392,7 @@ func printNestedDrift(out *bufio.Writer, check nestedDriftCheck) {
 				Column:    1,
 				Severity:  "error",
 				Rule:      "format",
-				MessageID: "nested-drift",
+				MessageId: "nested-drift",
 				Message:   message,
 			},
 			fmt.Sprintf("%s:1:1 - %s [format/nested-drift]\n", drift.FileName, message))

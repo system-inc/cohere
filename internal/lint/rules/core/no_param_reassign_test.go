@@ -838,7 +838,7 @@ func TestNoParamReassignOptions(test *testing.T) {
 		if decodeNoParameterReassignOptionsError != nil {
 			test.Fatalf("decoding empty input: %v", decodeNoParameterReassignOptionsError)
 		}
-		if decoded.Props {
+		if decoded.Properties {
 			test.Error("empty input decoded to props on, which widens the rule by default")
 		}
 	})

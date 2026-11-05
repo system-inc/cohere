@@ -471,8 +471,8 @@ func TestNamesMatchAsUpstreamsMatchesName(test *testing.T) {
 	}
 }
 
-// TestCalleeNameAndPathIsUpstreamsGetESCalleeName pins both readings of a callee.
-func TestCalleeNameAndPathIsUpstreamsGetESCalleeName(test *testing.T) {
+// TestCalleeNameAndPathIsUpstreamsGetEsCalleeName pins both readings of a callee.
+func TestCalleeNameAndPathIsUpstreamsGetEsCalleeName(test *testing.T) {
 	test.Parallel()
 	testCases := []struct {
 		callee, name, path string

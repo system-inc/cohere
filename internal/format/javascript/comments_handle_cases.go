@@ -41,8 +41,8 @@ func handleAssignmentLikeComments(context *commentContext) bool {
 	return false
 }
 
-// handleTSFunctionTrailingComments is upstream's handleTSFunctionTrailingComments.
-func handleTSFunctionTrailingComments(context *commentContext) bool {
+// handleTsFunctionTrailingComments is upstream's handleTsFunctionTrailingComments.
+func handleTsFunctionTrailingComments(context *commentContext) bool {
 	comment, enclosingNode, precedingNode, followingNode, text := context.Comment, context.Enclosing,
 		context.Preceding, context.Following, context.Text
 	if followingNode == nil &&
@@ -74,8 +74,8 @@ func isBeforeMappedTypeOpeningBracket(node Node, comment Node, options *Options)
 	return locEnd(comment) < bracketIndex
 }
 
-// handleTSMappedTypeComments is upstream's handleTSMappedTypeComments.
-func handleTSMappedTypeComments(context *commentContext) bool {
+// handleTsMappedTypeComments is upstream's handleTsMappedTypeComments.
+func handleTsMappedTypeComments(context *commentContext) bool {
 	comment, enclosingNode, options := context.Comment, context.Enclosing, context.Options
 	if !enclosingNode.Is("TSMappedType") {
 		return false

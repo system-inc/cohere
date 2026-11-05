@@ -32,7 +32,7 @@ type embedPrinter struct {
 // embedPrinters is upstream's printers list, in its order: the first whose test passes prints.
 var embedPrinters = []embedPrinter{
 	{test: isEmbedCss, print: printEmbedCss},
-	{test: isEmbedGraphQL, print: printEmbedGraphQL},
+	{test: isEmbedGraphQl, print: printEmbedGraphQl},
 	{test: isEmbedHtml, print: printEmbedUnsupported("html")},
 	{test: isAngularComponentTemplate, print: printEmbedUnsupported("angular")},
 	{test: isEmbedMarkdown, print: printEmbedUnsupported("markdown")},
@@ -123,12 +123,6 @@ func printEmbedUnsupported(language string) embedPrint {
 	return func(textToDoc printing.TextToDoc, _ PrintFunc, _ *Path, _ *Options) (Doc, error) {
 		return nil, unsupportedEmbedError(language)
 	}
-}
-
-type unsupportedEmbedError string
-
-func (language unsupportedEmbedError) Error() string {
-	return "no native printer embeds " + string(language) + " in a template literal yet"
 }
 
 // predicate adapts a (node, key) test to the print core's path.match predicate.
@@ -363,15 +357,15 @@ func isStyledComponents(path *Path) bool {
 	return false
 }
 
-// isCssProp is upstream's isCssProp: the css={`...`} JSX attribute.
-func isCssProp(path *Path) bool {
+// isCssProperty is upstream's isCssProperty: the css={`...`} JSX attribute.
+func isCssProperty(path *Path) bool {
 	parent, grandparent := parentOf(path), grandparentOf(path)
 	return grandparent.Is("JSXAttribute") && parent.Is("JSXExpressionContainer") &&
 		grandparent.Child("name").Is("JSXIdentifier") && grandparent.Child("name").String("name") == "css"
 }
 
 func isEmbedCss(path *Path) bool {
-	return isStyledJsx(path) || isStyledComponents(path) || isCssProp(path) || isAngularComponentStyles(path)
+	return isStyledJsx(path) || isStyledComponents(path) || isCssProperty(path) || isAngularComponentStyles(path)
 }
 
 // embed/html.js's test.
@@ -399,8 +393,8 @@ func isEmbedMarkdown(path *Path) bool {
 // commentAtLineEnd is upstream's /#[^\n\r]*$/ over one line.
 var commentAtLineEnd = regexp.MustCompile(`#[^\n\r]*$`)
 
-// printEmbedGraphQL is upstream's printEmbedGraphQL.
-func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
+// printEmbedGraphQl is upstream's printEmbedGraphQl.
+func printEmbedGraphQl(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
 	current := node(path)
 	quasis := current.List("quasis")
 	quasiCount := len(quasis)
@@ -525,7 +519,7 @@ func printGraphqlComments(lines []string) Doc {
 	return join(hardline, parts)
 }
 
-// isEmbedGraphQL is upstream's isEmbedGraphQL:
+// isEmbedGraphQl is upstream's isEmbedGraphQl:
 //
 //	react-relay and graphql-tag
 //	graphql`...`
@@ -535,7 +529,7 @@ func printGraphqlComments(lines []string) Doc {
 //
 // This intentionally excludes Relay Classic tags, as Prettier does not
 // support Relay Classic formatting.
-func isEmbedGraphQL(path *Path) bool {
+func isEmbedGraphQl(path *Path) bool {
 	parent := parentOf(path)
 	if hasLanguageComment(path, "GraphQL") {
 		return true

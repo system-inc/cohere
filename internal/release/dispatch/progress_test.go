@@ -172,7 +172,7 @@ func TestAPruneIsSilentUnlessVerbose(test *testing.T) {
 //
 // Not parallel: it swaps the package variable Report, which every build writes through, and puts a fake
 // swift first on PATH with test.Setenv.
-func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
+func TestSwiftPmSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 	bin := test.TempDir()
 	product := test.TempDir()
 	writeFile(test, filepath.Join(product, "cohere-swift"), "#!/bin/sh\n")
@@ -189,12 +189,12 @@ func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 		previous := Report
 		Report = NewProgress(&out, verbose, false)
 		defer func() { Report = previous }()
-		buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(
+		buildSwiftProductWithSwiftPmError := buildSwiftProductWithSwiftPm(
 			test.TempDir(),
 			test.TempDir(),
 			filepath.Join(test.TempDir(), "bin", "cohere-swift"),
 		)
-		return out.String(), buildSwiftProductWithSwiftPMError
+		return out.String(), buildSwiftProductWithSwiftPmError
 	}
 
 	if output, buildError := build(false); buildError != nil || output != "" {

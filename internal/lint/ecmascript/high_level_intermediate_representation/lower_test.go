@@ -654,11 +654,11 @@ func TestLowerJsx(test *testing.T) {
 	if jsx.Tag.Name != "div" {
 		test.Errorf("the host element tag is %q, want div", jsx.Tag.Name)
 	}
-	if len(jsx.Props) != 2 {
-		test.Errorf("the element has %d props, want 2 (one named, one spread)", len(jsx.Props))
+	if len(jsx.Properties) != 2 {
+		test.Errorf("the element has %d props, want 2 (one named, one spread)", len(jsx.Properties))
 	}
 	spreads := 0
-	for _, property := range jsx.Props {
+	for _, property := range jsx.Properties {
 		if property.Spread {
 			spreads++
 		}

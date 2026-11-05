@@ -25,8 +25,8 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
-// lowerTypedForSSA lowers the first function in code with a real type checker attached.
-func lowerTypedForSSA(test *testing.T, code string) *Function {
+// lowerTypedForSsa lowers the first function in code with a real type checker attached.
+func lowerTypedForSsa(test *testing.T, code string) *Function {
 	test.Helper()
 	var lowered *Function
 	probe := rule.Rule[rule.NoOptions]{
@@ -59,7 +59,7 @@ func cohereEverywhere(test *testing.T, function *Function) {
 	test.Helper()
 	var each func(*Function)
 	each = func(function *Function) {
-		for _, violation := range VerifySSA(function) {
+		for _, violation := range VerifySsa(function) {
 			test.Errorf("SSA violation: %s", violation.Detail)
 		}
 		for _, nested := range function.Functions {
@@ -69,7 +69,7 @@ func cohereEverywhere(test *testing.T, function *Function) {
 	each(function)
 }
 
-func TestSSAMatchesReactSpecFixtures(test *testing.T) {
+func TestSsaMatchesReactSpecFixtures(test *testing.T) {
 	test.Parallel()
 
 	for _, source := range []string{
@@ -77,50 +77,50 @@ func TestSSAMatchesReactSpecFixtures(test *testing.T) {
 		"export function f(){ let x = 1; while (x < 10) { x = x + 1; } return x; }\n",
 		"export function f(){ let x = 1; try { x = 2; } finally { x = 3; } return x; }\n",
 	} {
-		fn := lowerTypedForSSA(test, source)
-		Construct(fn)
-		test.Logf("SRC %s\n%s", source, Print(fn))
-		if violations := VerifySSA(fn); len(violations) > 0 {
+		function := lowerTypedForSsa(test, source)
+		Construct(function)
+		test.Logf("SRC %s\n%s", source, Print(function))
+		if violations := VerifySsa(function); len(violations) > 0 {
 			for _, one := range violations {
 				test.Errorf("VIOLATION: %s", one)
 			}
 		}
-		test.Logf("stats %+v", CollectSSAStats(fn))
+		test.Logf("stats %+v", CollectSsaStats(function))
 	}
 }
 
 // Deliberately corrupt a correct SSA function four different ways and confirm
 // VerifySSA reports each one. A checker that has never been shown to fail is
 // not evidence that the property holds.
-func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
+func TestSsaVerifierDetectsEachViolationClass(test *testing.T) {
 	test.Parallel()
 
 	build := func() *Function {
-		fn := lowerTypedForSSA(
+		function := lowerTypedForSsa(
 			test,
 			"export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n",
 		)
-		Construct(fn)
-		if violations := VerifySSA(fn); len(violations) != 0 {
+		Construct(function)
+		if violations := VerifySsa(function); len(violations) != 0 {
 			test.Fatalf("baseline should be clean, got %v", violations)
 		}
-		return fn
+		return function
 	}
 
 	// 1. Misplace a phi: move it from the join to a block that does not dominate its uses.
 	test.Run("phi moved off the join", func(test *testing.T) {
 		test.Parallel()
-		fn := build()
+		function := build()
 		var moved *Phi
 		var from *BasicBlock
 		var to *BasicBlock
-		for _, block := range fn.Blocks {
+		for _, block := range function.Blocks {
 			if len(block.Phis) > 0 {
 				moved, from = block.Phis[0], block
 				break
 			}
 		}
-		for _, block := range fn.Blocks {
+		for _, block := range function.Blocks {
 			if block.Id != from.Id && len(block.Predecessors) == 1 {
 				to = block
 				break
@@ -131,7 +131,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		}
 		from.Phis = nil
 		to.Phis = append(to.Phis, moved)
-		violations := VerifySSA(fn)
+		violations := VerifySsa(function)
 		if len(violations) == 0 {
 			test.Fatal("moving a phi off its join was NOT detected")
 		}
@@ -141,9 +141,9 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 	// 2. Point a use at a value defined on a sibling branch.
 	test.Run("use reads a sibling branch definition", func(test *testing.T) {
 		test.Parallel()
-		fn := build()
+		function := build()
 		var join *BasicBlock
-		for _, block := range fn.Blocks {
+		for _, block := range function.Blocks {
 			if len(block.Phis) > 0 {
 				join = block
 				break
@@ -156,7 +156,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		operand := join.Phis[0].Operands.At(PhiOperandsInOrder(join.Phis[0])[0])
 		done := false
 		for _, id := range join.Instructions {
-			EachInstructionPlacePointer(fn.Instructions[id], func(place *Place, role PlaceRole) {
+			EachInstructionPlacePointer(function.Instructions[id], func(place *Place, role PlaceRole) {
 				if role != PlaceRoleDefine && !done {
 					place.Identifier = operand.Identifier
 					done = true
@@ -166,7 +166,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 				break
 			}
 		}
-		violations := VerifySSA(fn)
+		violations := VerifySsa(function)
 		if len(violations) == 0 {
 			test.Fatal("a use reading a non-dominating sibling definition was NOT detected")
 		}
@@ -176,12 +176,12 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 	// 3. Define one value twice.
 	test.Run("value defined twice", func(test *testing.T) {
 		test.Parallel()
-		fn := build()
+		function := build()
 		var first *Instruction
 		var second *Instruction
-		for _, block := range fn.Blocks {
+		for _, block := range function.Blocks {
 			for _, id := range block.Instructions {
-				ins := fn.Instructions[id]
+				ins := function.Instructions[id]
 				if first == nil {
 					first = ins
 				} else if second == nil {
@@ -193,7 +193,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 			test.Skip("too few instructions")
 		}
 		second.LValue.Identifier = first.LValue.Identifier
-		violations := VerifySSA(fn)
+		violations := VerifySsa(function)
 		if len(violations) == 0 {
 			test.Fatal("a doubly-defined value was NOT detected")
 		}
@@ -205,15 +205,15 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 	// which is unambiguously a backwards read inside one block.
 	test.Run("use before definition in the same block", func(test *testing.T) {
 		test.Parallel()
-		fn := build()
-		entry, _ := fn.Block(fn.Entry)
+		function := build()
+		entry, _ := function.Block(function.Entry)
 		if len(entry.Instructions) < 3 {
 			test.Skip("entry too short")
 		}
-		last := fn.Instructions[entry.Instructions[len(entry.Instructions)-1]]
-		first := fn.Instructions[entry.Instructions[0]]
+		last := function.Instructions[entry.Instructions[len(entry.Instructions)-1]]
+		first := function.Instructions[entry.Instructions[0]]
 		first.Value = &LoadLocal{Place: Place{Identifier: last.LValue.Identifier}}
-		violations := VerifySSA(fn)
+		violations := VerifySsa(function)
 		if len(violations) == 0 {
 			test.Fatal("a use before its definition was NOT detected")
 		}
@@ -223,7 +223,7 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 
 // Constructs the corpus sample did not contain, plus the loop shapes most likely
 // to break a construction that only looks right on straight-line code.
-func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
+func TestSsaAcrossEveryControlFlowConstruct(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct{ name, code string }{
@@ -272,22 +272,22 @@ func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
 	for _, one := range cases {
 		test.Run(one.name, func(test *testing.T) {
 			test.Parallel()
-			fn := lowerTypedForSSA(test, one.code)
-			if fn == nil {
+			function := lowerTypedForSsa(test, one.code)
+			if function == nil {
 				test.Fatal("did not lower")
 			}
-			Construct(fn)
+			Construct(function)
 			var each func(*Function)
 			each = func(f *Function) {
-				for _, violation := range VerifySSA(f) {
+				for _, violation := range VerifySsa(f) {
 					test.Errorf("violation: %s", violation.Detail)
 				}
 				for _, n := range f.Functions {
 					each(n)
 				}
 			}
-			each(fn)
-			st := CollectSSAStats(fn)
+			each(function)
+			st := CollectSsaStats(function)
 			test.Logf("phis=%d named=%d uses=%d", st.Phis, st.NamedValues, st.Uses)
 		})
 	}
@@ -322,9 +322,9 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 		&ComputedLoad{Object: place(1), Property: place(2)},
 		&ComputedStore{Object: place(1), Property: place(2), Value: place(3)},
 		&ComputedDelete{Object: place(1), Property: place(2)},
-		&CallExpression{Callee: place(1), Args: []Argument{{Place: place(2)}}},
-		&MethodCall{Receiver: place(1), Property: place(2), Args: []Argument{{Place: place(3)}}},
-		&NewExpression{Callee: place(1), Args: []Argument{{Place: place(2)}}},
+		&CallExpression{Callee: place(1), Arguments: []Argument{{Place: place(2)}}},
+		&MethodCall{Receiver: place(1), Property: place(2), Arguments: []Argument{{Place: place(3)}}},
+		&NewExpression{Callee: place(1), Arguments: []Argument{{Place: place(2)}}},
 		&BinaryExpression{Left: place(1), Right: place(2)},
 		&UnaryExpression{Value: place(1)},
 		&PrefixUpdate{LValue: place(1), Value: place(2)},
@@ -343,7 +343,7 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 		&GetIterator{Value: place(1)},
 		&IteratorNext{Iterator: place(1), Collection: place(2)},
 		&NextPropertyOf{Value: place(1)},
-		&JsxExpression{Props: []JsxAttribute{{Value: place(1)}}, Children: []Place{place(2)}},
+		&JsxExpression{Properties: []JsxAttribute{{Value: place(1)}}, Children: []Place{place(2)}},
 		&JsxFragment{Children: []Place{place(1)}},
 		&JsxText{},
 		// Both root kinds, because the walkers skip a global root (it carries a name, not a
@@ -441,7 +441,7 @@ func TestConstructionIsIdempotent(test *testing.T) {
 	// produce.
 	countStale := func(function *Function) (phis int, stale int) {
 		defined := map[static_single_assignment.IdentifierId]bool{}
-		for _, parameter := range function.Params {
+		for _, parameter := range function.Parameters {
 			defined[parameter.Identifier] = true
 		}
 		for _, block := range function.Blocks {
