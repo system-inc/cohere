@@ -79,6 +79,10 @@ type discovery struct {
 	// Ownership is what reading the TypeScript projects decided. See ownership.go.
 	Ownership ownership
 
+	// SwiftCoverage is what asking the Swift projects which packages their runs cover decided. See
+	// swift_coverage.go.
+	SwiftCoverage swiftCoverage
+
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
 	// enumeration from rather than listing the same directories again (#bjv0tg4).
 	Listings *program.DirectoryListings

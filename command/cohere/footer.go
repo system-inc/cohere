@@ -220,6 +220,10 @@ type overallFacts struct {
 	Failed []string
 	// Unfinished is the projects whose run did not finish, which checked nothing anyone can rely on.
 	Unfinished int
+	// CoverageUnknown is the Swift packages whose coverage query failed. Everything they might check ran as
+	// its own project too, so some files may be counted twice, and that is said here rather than only in
+	// `--verbose`'s notes (#sxs26s3).
+	CoverageUnknown int
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -254,6 +258,10 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 	if facts.Unfinished > 0 {
 		line += " • ⚠ " + counted(facts.Unfinished, "project did not finish", "projects did not finish")
+	}
+	if facts.CoverageUnknown > 0 {
+		line += " • ⚠ " + counted(facts.CoverageUnknown, "Swift coverage query failed, so some files may be counted twice",
+			"Swift coverage queries failed, so some files may be counted twice")
 	}
 	return line
 }

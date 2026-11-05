@@ -69,6 +69,9 @@ func checkDiscoveredProjects(location projectLocation, locateError error, workin
 	if found.Ownership, err = resolveOwnership(&found); err != nil {
 		return 0, false, err
 	}
+	// Before the one-project check, so a package and the dependency its run checks are the one project they
+	// are, and run here as `cohere --directory` on the package would.
+	found.SwiftCoverage = resolveSwiftCoverage(&found)
 	if len(found.Projects) == 0 {
 		// Nothing to check is a failure, never a green over nothing.
 		solutions := ""
@@ -130,10 +133,12 @@ func (found discovery) isTheLocatedProject(location projectLocation, locateError
 }
 
 // notes are the lines a run carries about markers discovery found and did not run, which a reader could have
-// expected checked: those the root's ignorePatterns refuse, solution roots, and projects left with no file of
-// their own. Ignored and dependency directories are not named, since skipping them is what everyone
-// expects, and neither is a nested repository: one inside a program, such as Structure or Base, is checked
-// as part of it, its drift reported read-only, as it always was. They are counted on the summary line.
+// expected checked: those the root's ignorePatterns refuse, solution roots, projects left with no file of
+// their own, and Swift packages another package's run covers. Ignored and dependency directories are not
+// named, since skipping them is what everyone expects, and neither is a nested repository: one inside a
+// program, such as Structure or Base, is checked as part of it, its drift reported read-only, as it always
+// was. They are counted on the summary line. A Swift coverage query that failed is named too, since its
+// packages may then be checked twice.
 func (found discovery) notes() []string {
 	var lines []string
 	for _, marker := range found.Refused {
@@ -145,6 +150,18 @@ func (found discovery) notes() []string {
 	for _, label := range found.Ownership.Yielding {
 		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
 	}
+	for _, covered := range found.SwiftCoverage.Covered {
+		if covered.Vendored {
+			lines = append(lines, fmt.Sprintf("%s not run: vendored in %s, whose run lists it as not checked", covered.Label, covered.CoveredBy))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s not run: checked as part of %s", covered.Label, covered.CoveredBy))
+	}
+	for _, failed := range found.SwiftCoverage.FailedQueries {
+		lines = append(lines, fmt.Sprintf("%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
+			failed.Label, failed.Reason))
+	}
+	// Last, since only these are sorted: a map has no order of its own.
 	for label := range found.Ownership.SharedDirectory {
 		lines = append(lines, fmt.Sprintf("%s ran with the cache off: another tsconfig's run keeps its cache in the same directory", label))
 	}
@@ -269,6 +286,7 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 	// The overall verdict, last, in the human views. Under `--json` each project's own summary line, with its
 	// label, is the record, and a program reads the worst from them.
 	facts := overallFactsOf(runs, time.Since(processStart))
+	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	if activeOutput.Mode != outputJSON {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
 	}
@@ -397,10 +415,17 @@ func summaryLine(found discovery, runs []projectRun) string {
 	if failed > 0 {
 		verdict = fmt.Sprintf("%d failed", failed)
 	}
-	notRun := ""
+	var notRunParts []string
 	if len(found.Ownership.Solutions) > 0 || len(found.Ownership.Yielding) > 0 {
-		notRun = fmt.Sprintf("; not run: %d solution tsconfigs, %d whose every file a nearer tsconfig owns",
-			len(found.Ownership.Solutions), len(found.Ownership.Yielding))
+		notRunParts = append(notRunParts, fmt.Sprintf("%d solution tsconfigs, %d whose every file a nearer tsconfig owns",
+			len(found.Ownership.Solutions), len(found.Ownership.Yielding)))
+	}
+	if len(found.SwiftCoverage.Covered) > 0 {
+		notRunParts = append(notRunParts, fmt.Sprintf("%d Swift packages another package's run covers", len(found.SwiftCoverage.Covered)))
+	}
+	notRun := ""
+	if len(notRunParts) > 0 {
+		notRun = "; not run: " + strings.Join(notRunParts, ", ")
 	}
 	return fmt.Sprintf("projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
 		"%d dependency, build, cache or fixture directories, %d nested repositories",
