@@ -606,8 +606,7 @@ func returnsJsxValue(ruleContext rule.Context, node *ast.Node, acceptNull bool) 
 	}
 
 	found := false
-	var considerReturned func(*ast.Node)
-	considerReturned = func(returned *ast.Node) {
+	considerReturned := func(returned *ast.Node) {
 		if found || returned == nil {
 			return
 		}

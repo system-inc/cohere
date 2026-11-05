@@ -431,7 +431,11 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 		if decodeNoImplicitGlobalsOptionsError != nil {
 			test.Fatalf("the decoder refused an absent option: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		if decoded.(NoImplicitGlobalsSettings).LexicalBindings {
+		settings, ok := decoded.(NoImplicitGlobalsSettings)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoImplicitGlobalsSettings", decoded)
+		}
+		if settings.LexicalBindings {
 			test.Error("expected lexicalBindings to default to false")
 		}
 	})
@@ -442,7 +446,11 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 		if decodeNoImplicitGlobalsOptionsError != nil {
 			test.Fatalf("the decoder refused an empty object: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		if decoded.(NoImplicitGlobalsSettings).LexicalBindings {
+		settings, ok := decoded.(NoImplicitGlobalsSettings)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoImplicitGlobalsSettings", decoded)
+		}
+		if settings.LexicalBindings {
 			test.Error("expected lexicalBindings to stay false")
 		}
 	})
@@ -453,7 +461,11 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 		if decodeNoImplicitGlobalsOptionsError != nil {
 			test.Fatalf("the decoder refused an explicit true: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		if !decoded.(NoImplicitGlobalsSettings).LexicalBindings {
+		settings, ok := decoded.(NoImplicitGlobalsSettings)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not NoImplicitGlobalsSettings", decoded)
+		}
+		if !settings.LexicalBindings {
 			test.Error("expected lexicalBindings to be true")
 		}
 	})

@@ -299,7 +299,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 				isSubtractionNode(iNode)) &&
 			(hasEmptyRawBefore(iNextNode) ||
 				(isMathOperator &&
-					(iPrevNode == nil || (iPrevNode != nil && isMathOperatorNode(iPrevNode))))) {
+					(iPrevNode == nil || isMathOperatorNode(iPrevNode)))) {
 			continue
 		}
 

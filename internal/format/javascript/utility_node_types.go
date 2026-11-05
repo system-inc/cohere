@@ -62,11 +62,6 @@ func isTypeParameterInstantiation(node Node) bool {
 	return node.Is("TSTypeParameterInstantiation", "TypeParameterInstantiation")
 }
 
-// isBigIntLiteral is upstream's isBigIntLiteral.
-func isBigIntLiteral(node Node) bool {
-	return node.Is("BigIntLiteral") || node.Is("Literal") && node.Truthy("bigint")
-}
-
 // isBooleanLiteral is upstream's isBooleanLiteral.
 func isBooleanLiteral(node Node) bool {
 	if node.Is("BooleanLiteral") {

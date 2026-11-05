@@ -116,17 +116,6 @@ type UtilityBranch struct {
 	Value string
 }
 
-// valueOr returns the branch's value, falling back to the sentinel every property-name caller wants.
-//
-// One place rather than a check at each `Declaration` call, so a new arm gets the behaviour by
-// construction instead of by remembering.
-func (branch UtilityBranch) valueOr() string {
-	if branch.Value != "" {
-		return branch.Value
-	}
-	return gapEmitterValue
-}
-
 // UtilityBranchFor builds a branch from a parsed candidate and the root's own type list.
 //
 // The colour question is passed in rather than asked here, for the reason on the field. Everything

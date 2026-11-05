@@ -589,7 +589,10 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 		if decodeNoUnknownPropertyOptionsError != nil {
 			test.Fatalf("decoding both keys: %v", decodeNoUnknownPropertyOptionsError)
 		}
-		options := decoded.(NoUnknownPropertyOptions)
+		options, ok := decoded.(NoUnknownPropertyOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want NoUnknownPropertyOptions", decoded)
+		}
 		if strings.Join(options.Ignore, ",") != "a,b" {
 			test.Fatalf("ignore list is %v", options.Ignore)
 		}

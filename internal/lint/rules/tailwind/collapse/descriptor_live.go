@@ -177,7 +177,7 @@ func (table *Table) addThemeNamespaces(theme *Theme) {
 func (table *Table) addRepositoryStatics(system *LoadedDesignSystem) {
 	for root, nodes := range system.staticUtilityNodes {
 		sorted := PropertySort(nodes)
-		table.Statics[root] = Reading{Order: sorted.Order, Count: sorted.Count}
+		table.Statics[root] = Reading(sorted)
 	}
 }
 

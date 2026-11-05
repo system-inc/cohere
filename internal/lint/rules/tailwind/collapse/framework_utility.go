@@ -249,7 +249,7 @@ func (utility FrameworkFunctionalUtility) Reading(root string, candidate *Parsed
 	}
 
 	sorted := PropertySort(nodes)
-	return Reading{Order: sorted.Order, Count: sorted.Count}, true
+	return Reading(sorted), true
 }
 
 // FrameworkFunctionalUtilities is the table.

@@ -2,6 +2,7 @@ package javascript
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -396,7 +397,13 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		templateElement := quasis[index]
 		isFirst := index == 0
 		isLast := index == numQuasis-1
-		text := *templateElement.Get("value").(*estree.TemplateValue).Cooked
+		value, isTemplateValue := templateElement.Get("value").(*estree.TemplateValue)
+		if !isTemplateValue || value == nil || value.Cooked == nil {
+			// embed sends no template here whose hasInvalidCookedValue holds, so a miss is a tree that broke
+			// that; failing the embed prints the template as written.
+			return nil, fmt.Errorf("reading quasi %d of a graphql template: its value is a %T with no cooked text", index, templateElement.Get("value"))
+		}
+		text := *value.Cooked
 
 		lines := strings.Split(text, "\n")
 		numLines := len(lines)

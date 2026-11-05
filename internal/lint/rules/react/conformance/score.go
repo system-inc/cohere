@@ -225,7 +225,7 @@ func Compare(expected Expectation, result Result) FixtureScore {
 	}
 	got := map[pair]int{}
 	for _, reportedError := range result.Errors {
-		got[pair{reportedError.Heading, reportedError.Message, reportedError.Line}]++
+		got[pair(reportedError)]++
 	}
 
 	var missing, unexpected []string

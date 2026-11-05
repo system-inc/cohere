@@ -83,8 +83,9 @@ type DiskCalls struct {
 }
 
 // Summed is every call's duration, added up.
-func (d DiskTiming) Summed() time.Duration {
-	return d.Reads.Summed + d.Existence.Summed + d.Stats.Summed + d.Listings.Summed + d.Realpaths.Summed
+func (timing DiskTiming) Summed() time.Duration {
+	return timing.Reads.Summed + timing.Existence.Summed + timing.Stats.Summed + timing.Listings.Summed +
+		timing.Realpaths.Summed
 }
 
 // diskCounters accumulates calls from many goroutines at once. Atomic rather than locked, because a
@@ -121,16 +122,16 @@ func (c *diskCounters) snapshot() DiskTiming {
 	}
 }
 
-func (a DiskTiming) plus(b DiskTiming) DiskTiming {
-	sum := func(x DiskCalls, y DiskCalls) DiskCalls {
-		return DiskCalls{Count: x.Count + y.Count, Summed: x.Summed + y.Summed}
+func (timing DiskTiming) plus(other DiskTiming) DiskTiming {
+	sum := func(left DiskCalls, right DiskCalls) DiskCalls {
+		return DiskCalls{Count: left.Count + right.Count, Summed: left.Summed + right.Summed}
 	}
 	return DiskTiming{
-		Reads:     sum(a.Reads, b.Reads),
-		Existence: sum(a.Existence, b.Existence),
-		Stats:     sum(a.Stats, b.Stats),
-		Listings:  sum(a.Listings, b.Listings),
-		Realpaths: sum(a.Realpaths, b.Realpaths),
+		Reads:     sum(timing.Reads, other.Reads),
+		Existence: sum(timing.Existence, other.Existence),
+		Stats:     sum(timing.Stats, other.Stats),
+		Listings:  sum(timing.Listings, other.Listings),
+		Realpaths: sum(timing.Realpaths, other.Realpaths),
 	}
 }
 

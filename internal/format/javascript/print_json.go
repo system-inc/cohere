@@ -89,8 +89,15 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		// Upstream compares String(Number(raw)) with raw. The literal's value stands in for Number(raw):
 		// the two differ only where raw has a numeric separator, and then neither string equals raw.
 		raw := getRaw(current)
-		if isJSONObjectKey(path) && javaScriptNumberString(current.Get("value").(float64)) == raw {
-			return doc.Text(`"` + raw + `"`)
+		if isJSONObjectKey(path) {
+			value, isNumber := current.Get("value").(float64)
+			if !isNumber {
+				// Invariant: estree.ParseJSON builds every NumericLiteral with a float64 value.
+				panic(fmt.Sprintf("javascript: a NumericLiteral's value is a %T, not a float64", current.Get("value")))
+			}
+			if javaScriptNumberString(value) == raw {
+				return doc.Text(`"` + raw + `"`)
+			}
 		}
 		return doc.Text(raw)
 	case "Identifier":
@@ -102,7 +109,12 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		// There is only one `TemplateElement`
 		return print([]any{"quasis", 0}, nil)
 	case "TemplateElement":
-		return doc.Text(jsonStringify(*current.Get("value").(*estree.TemplateValue).Cooked))
+		value, isTemplateValue := current.Get("value").(*estree.TemplateValue)
+		if !isTemplateValue || value == nil || value.Cooked == nil {
+			// Invariant: estree.ParseJSON builds every TemplateElement with a TemplateValue whose cooked text is set.
+			panic(fmt.Sprintf("javascript: a JSON TemplateElement's value is a %T with no cooked text", current.Get("value")))
+		}
+		return doc.Text(jsonStringify(*value.Cooked))
 	}
 	panic(fmt.Sprintf("unknown JSON node type %q", current.Type()))
 }

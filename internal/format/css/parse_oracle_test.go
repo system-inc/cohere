@@ -229,7 +229,11 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
-		oracle[record["name"].(string)] = record
+		name, isString := record["name"].(string)
+		if !isString {
+			test.Fatalf("the oracle printed a record without a name: %s", line)
+		}
+		oracle[name] = record
 	}
 
 	identical, refusedByBoth, corpusRefused, different, nullEnds := 0, 0, 0, 0, 0
@@ -326,7 +330,13 @@ func dumpGlueValue(value any, toUTF16 func(int) any) any {
 			case key == "source":
 				result[key] = dumpGlueSource(child, toUTF16)
 			case typed.Type() == "front-matter" && (key == "start" || key == "end"):
-				position := dumpGlueValue(child, toUTF16).(map[string]any)
+				dumped := dumpGlueValue(child, toUTF16)
+				position, isPosition := dumped.(map[string]any)
+				if !isPosition {
+					// Not an object: kept as dumped, so the comparison with the fork names it.
+					result[key] = dumped
+					continue
+				}
 				if index, isNumber := position["index"].(int); isNumber {
 					position["index"] = toUTF16(index)
 				}
@@ -395,7 +405,13 @@ func dumpGlueSource(value any, toUTF16 func(int) any) any {
 				result[key] = dumpGlueValue(child, toUTF16)
 				continue
 			}
-			converted := dumpGlueValue(position, toUTF16).(map[string]any)
+			dumped := dumpGlueValue(position, toUTF16)
+			converted, isConverted := dumped.(map[string]any)
+			if !isConverted {
+				// Not an object: kept as dumped, so the comparison with the fork names it.
+				result[key] = dumped
+				continue
+			}
 			if offset, isNumber := position["offset"].(int); isNumber {
 				converted["offset"] = toUTF16(offset)
 			}

@@ -93,21 +93,6 @@ var sortCompKnownLifecycleNames = func() map[string]bool {
 	return names
 }()
 
-// sortCompShapePredicates are the order entries that select members by SHAPE rather than by name.
-//
-// Listed here only so the set is greppable and so `sortCompRegexPattern` is never consulted for
-// one of them; the dispatch itself is the switch in `sortCompGroupMatches`, which follows
-// upstream's if/else chain in order.
-var sortCompShapePredicates = map[string]bool{
-	"getters":            true,
-	"setters":            true,
-	"type-annotations":   true,
-	"static-variables":   true,
-	"static-methods":     true,
-	"instance-variables": true,
-	"instance-methods":   true,
-}
-
 // sortCompRegexPattern is upstream's `regExpRegExp`, matching a `/body/flags` order entry.
 //
 // Upstream writes `/\/(.*)\/([gimsuy]*)/` and applies it with `String.prototype.match`, which is

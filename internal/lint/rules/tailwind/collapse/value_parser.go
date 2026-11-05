@@ -138,8 +138,7 @@ func ParseValue(input string) []ValueNode {
 		parent := nodesFor(stack[frame].container)
 		return parent[stack[frame].index].Nodes
 	}
-	var setNodes func(frame int, nodes []ValueNode)
-	setNodes = func(frame int, nodes []ValueNode) {
+	setNodes := func(frame int, nodes []ValueNode) {
 		if frame < 0 {
 			ast = nodes
 			return

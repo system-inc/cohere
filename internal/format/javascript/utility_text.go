@@ -15,9 +15,8 @@ import (
 const notFound = -2
 
 var (
-	skipSpaces     = printing.SkipSpaces
-	skipWhitespace = printing.SkipWhitespace
-	skipToLineEnd  = printing.SkipToLineEnd
+	skipSpaces    = printing.SkipSpaces
+	skipToLineEnd = printing.SkipToLineEnd
 )
 
 // hasNewline is upstream's hasNewline(text, index).

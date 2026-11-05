@@ -20,6 +20,8 @@
 package javascript
 
 import (
+	"fmt"
+
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
@@ -60,8 +62,6 @@ type settings struct {
 	// set by main/multiparser.js's textToDoc on every embed, "" for a file of its own.
 	ParentParser string
 
-	callArguments      map[Node][]Node
-	functionParameters map[Node][]Node
 	// strippedText is the text without its comments, shared with the parse's postprocess when it ran one.
 	strippedText *estree.StrippedText
 
@@ -75,7 +75,13 @@ type settings struct {
 
 // settingsOf is the per-format state carried in options.Settings.
 func settingsOf(options *Options) *settings {
-	return options.Settings.(*settings)
+	formatSettings, isSettings := options.Settings.(*settings)
+	if !isSettings {
+		// Invariant: every Options this package prints with is built with a *settings, in printer.go's format
+		// and in isLoneShortArgument's stand-in for upstream's `{ printWidth }`.
+		panic(fmt.Sprintf("javascript: options.Settings is a %T, not a *settings", options.Settings))
+	}
+	return formatSettings
 }
 
 // printArguments are upstream's `args` to print: an object a parent passes to shape a child's print.
@@ -90,14 +96,6 @@ type printArguments struct {
 func argsOf(args any) *printArguments {
 	typed, _ := args.(*printArguments)
 	return typed
-}
-
-// printWith calls print with args, keeping a missing args an untyped nil.
-func printWith(print PrintFunc, selector any, args *printArguments) Doc {
-	if args == nil {
-		return print(selector, nil)
-	}
-	return print(selector, args)
 }
 
 // node is path.node.

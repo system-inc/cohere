@@ -193,7 +193,7 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(test *testing.T) {
 			}
 			emitted := EmitGapRoot(root, probe.branch)
 			sorted := PropertySort(emitted)
-			computed := Reading{Order: sorted.Order, Count: sorted.Count}
+			computed := Reading(sorted)
 
 			compared++
 			if computed.Equal(probe.reading) {
@@ -299,8 +299,8 @@ func TestGapRootPropertyNamesAreDistinctPerArm(test *testing.T) {
 			continue
 		}
 		if readingsEqual(
-			Reading{Order: ordinary.Order, Count: ordinary.Count},
-			Reading{Order: colour.Order, Count: colour.Count},
+			Reading(ordinary),
+			Reading(colour),
 		) {
 			identical++
 			continue
@@ -443,21 +443,6 @@ func TestGapRootArbitraryAndNamedCanDiffer(test *testing.T) {
 		test.Error("scale reads the same for an arbitrary and a named value, so IsArbitrary is deletable and this " +
 			"slice's branch model is carrying a field nothing turns on")
 	}
-}
-
-// joinStrings renders a property list for a failure message.
-//
-// A `[]string` formats readably with %v, and this is spelled out so the message reads as prose
-// rather than as a Go literal beside describeDeclarations' output, which is also prose.
-func joinStrings(values []string) string {
-	rendered := ""
-	for index, value := range values {
-		if index > 0 {
-			rendered += ", "
-		}
-		rendered += value
-	}
-	return rendered
 }
 
 // TestGapRootExemptionsAreExactlyTheStaticCollision pins the size and the shape of the hole.

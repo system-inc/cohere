@@ -172,7 +172,7 @@ func (utility FrameworkMultiDeclarationUtility) readingOf(root, literal string, 
 		return Reading{}, false
 	}
 	sorted := PropertySort(nodes)
-	return Reading{Order: sorted.Order, Count: sorted.Count}, true
+	return Reading(sorted), true
 }
 
 // FrameworkMultiDeclarationUtilities is the table.

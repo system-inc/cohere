@@ -489,8 +489,12 @@ func TestDecodePreferEs6ClassOptions(test *testing.T) {
 			if decodePreferEs6ClassOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodePreferEs6ClassOptionsError)
 			}
-			if decoded.(PreferEs6ClassOptions).Mode != testCase.want {
-				test.Errorf("mode = %q, wanted %q", decoded.(PreferEs6ClassOptions).Mode, testCase.want)
+			options, ok := decoded.(PreferEs6ClassOptions)
+			if !ok {
+				test.Fatalf("decoded to %T, want PreferEs6ClassOptions", decoded)
+			}
+			if options.Mode != testCase.want {
+				test.Errorf("mode = %q, wanted %q", options.Mode, testCase.want)
 			}
 		})
 	}

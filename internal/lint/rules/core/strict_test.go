@@ -526,7 +526,11 @@ func TestDecodeStrictOptions(test *testing.T) {
 		if decodeStrictOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeStrictOptionsError)
 		}
-		if mode := decoded.(StrictMode); mode != StrictSafe {
+		mode, ok := decoded.(StrictMode)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not StrictMode", decoded)
+		}
+		if mode != StrictSafe {
 			test.Errorf("mode came back %q, wanted upstream's default %q", mode, StrictSafe)
 		}
 	})
@@ -537,7 +541,11 @@ func TestDecodeStrictOptions(test *testing.T) {
 		if decodeStrictOptionsError != nil {
 			test.Fatalf("upstream's own `[\"error\", \"never\"]` was refused: %v", decodeStrictOptionsError)
 		}
-		if mode := decoded.(StrictMode); mode != StrictNever {
+		mode, ok := decoded.(StrictMode)
+		if !ok {
+			test.Fatalf("the decoder returned %T, not StrictMode", decoded)
+		}
+		if mode != StrictNever {
 			test.Errorf("mode came back %q, wanted %q", mode, StrictNever)
 		}
 	})

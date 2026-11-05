@@ -98,21 +98,6 @@ type enumeration struct {
 	VerifiedAgainst []string `json:"-"`
 }
 
-// utilityProperties is one utility and the CSS property names it declares.
-type utilityProperties struct {
-	Root       string   `json:"root"`
-	Name       string   `json:"name"`
-	Properties []string `json:"properties"`
-}
-
-// key returns whichever identifier the producer supplied.
-func (u utilityProperties) key() string {
-	if u.Name != "" {
-		return u.Name
-	}
-	return u.Root
-}
-
 // family is one collapse: two roots that merge into a third when everything else about them agrees.
 type family struct {
 	Inputs            []string `json:"inputs"`
@@ -676,15 +661,6 @@ var VariantOrder = map[string]int{
 	fmt.Fprintln(&buffer, "}")
 
 	return format.Source(buffer.Bytes())
-}
-
-// quotedList renders a string slice as Go literal elements.
-func quotedList(values []string) string {
-	quoted := make([]string, 0, len(values))
-	for _, value := range values {
-		quoted = append(quoted, fmt.Sprintf("%q", value))
-	}
-	return strings.Join(quoted, ", ")
 }
 
 // exampleFamily names a real entry in the doc comment, so the file explains itself with something

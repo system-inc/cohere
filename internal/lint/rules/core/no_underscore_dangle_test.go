@@ -29,7 +29,6 @@ type noUnderscoreDangleCase struct {
 	source      string
 	optionsJson string
 	findings    []noUnderscoreDangleExpectation
-	reason      string
 }
 
 // decodeNoUnderscoreDangleOptionsForTest routes a case's options through the SHIPPED decoder.

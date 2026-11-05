@@ -393,7 +393,10 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding the string arm: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options := decoded.(ForbidDomPropsOptions)
+		options, ok := decoded.(ForbidDomPropsOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
+		}
 		if len(options.Forbid) != 2 {
 			test.Fatalf("forbid list is %v, want two entries", options.Forbid)
 		}
@@ -410,7 +413,10 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding an absent disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options := decoded.(ForbidDomPropsOptions)
+		options, ok := decoded.(ForbidDomPropsOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
+		}
 		if options.Forbid[0].DisallowedForWasGiven {
 			test.Fatal("an absent disallowedFor was recorded as given")
 		}
@@ -425,7 +431,10 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding an empty disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		options := decoded.(ForbidDomPropsOptions)
+		options, ok := decoded.(ForbidDomPropsOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
+		}
 		if !options.Forbid[0].DisallowedForWasGiven {
 			test.Fatal("an empty disallowedFor was not recorded as given, so it reads as absent")
 		}
@@ -440,7 +449,11 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding a named disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
-		entry := decoded.(ForbidDomPropsOptions).Forbid[0]
+		options, ok := decoded.(ForbidDomPropsOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want ForbidDomPropsOptions", decoded)
+		}
+		entry := options.Forbid[0]
 		if !forbidDomPropsIsForbidden(entry, "div") || !forbidDomPropsIsForbidden(entry, "span") {
 			test.Fatal("a named tag was declined")
 		}

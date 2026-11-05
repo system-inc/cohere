@@ -486,7 +486,7 @@ func TestUtilityDropIsNotDefault(test *testing.T) {
 			}
 			mutatedSort := PropertySort(mutated)
 			want := Reading{Order: exception.Order, Count: exception.Count}
-			if !(Reading{Order: mutatedSort.Order, Count: mutatedSort.Count}).Equal(want) {
+			if !Reading(mutatedSort).Equal(want) {
 				caught++
 				continue
 			}
@@ -541,7 +541,7 @@ func TestUtilityRatioSpliceIsLoadBearing(test *testing.T) {
 				continue
 			}
 			mutatedSort := PropertySort(mutated)
-			if (Reading{Order: mutatedSort.Order, Count: mutatedSort.Count}).Equal(real) {
+			if Reading(mutatedSort).Equal(real) {
 				unaffected++
 				continue
 			}

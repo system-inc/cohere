@@ -270,7 +270,7 @@ func reportArrowBodyStyleWantingNoBraces(
 	body *ast.Node,
 	blockBody []*ast.Node,
 ) {
-	message := messageArrowBodyStyleUnexpectedOtherBlock
+	var message rule.Message
 	switch {
 	case len(blockBody) == 0:
 		message = messageArrowBodyStyleUnexpectedEmptyBlock

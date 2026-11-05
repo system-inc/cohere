@@ -261,7 +261,10 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
-		settings := decoded.(NoDangerOptions)
+		settings, ok := decoded.(NoDangerOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want NoDangerOptions", decoded)
+		}
 		if len(settings.CustomComponentNames) != 2 || settings.CustomComponentNames[0] != "A" || settings.CustomComponentNames[1] != "B*" {
 			test.Fatalf("decoded to %v", settings.CustomComponentNames)
 		}
@@ -273,7 +276,11 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
-		if len(decoded.(NoDangerOptions).CustomComponentNames) != 0 {
+		settings, ok := decoded.(NoDangerOptions)
+		if !ok {
+			test.Fatalf("decoded to %T, want NoDangerOptions", decoded)
+		}
+		if len(settings.CustomComponentNames) != 0 {
 			test.Fatal("unknown key changed the options")
 		}
 	})

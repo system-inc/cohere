@@ -676,7 +676,11 @@ func TestNoStringRefsRefusesUnknownOptionKeys(test *testing.T) {
 	if err != nil {
 		test.Fatalf("baseline: %v", err)
 	}
-	if got := decoded.(NoStringRefsOptions); got != (NoStringRefsOptions{NoTemplateLiterals: true}) {
+	got, ok := decoded.(NoStringRefsOptions)
+	if !ok {
+		test.Fatalf("decoded to %T, want NoStringRefsOptions", decoded)
+	}
+	if got != (NoStringRefsOptions{NoTemplateLiterals: true}) {
 		test.Errorf("decoded to %+v", got)
 	}
 	_, err = DecodeNoStringRefsOptions([]byte(`{"bogus":true,"noTemplateLiterals":true}`))

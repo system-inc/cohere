@@ -82,7 +82,7 @@ func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
 		if noInnerDeclarationsApplyFirstError != nil {
 			return DefaultNoInnerDeclarationsSettings(), noInnerDeclarationsApplyFirstError
 		}
-		settings = applied.(NoInnerDeclarationsOptions)
+		settings = applied
 	}
 	if len(positional) > 1 {
 		var second noInnerDeclarationsSecondOption
@@ -109,7 +109,10 @@ func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
 }
 
 // noInnerDeclarationsApplyFirst reads upstream's first enum, which is "functions" or "both".
-func noInnerDeclarationsApplyFirst(settings NoInnerDeclarationsOptions, value string) (any, error) {
+func noInnerDeclarationsApplyFirst(
+	settings NoInnerDeclarationsOptions,
+	value string,
+) (NoInnerDeclarationsOptions, error) {
 	switch value {
 	case "functions":
 		both := false
