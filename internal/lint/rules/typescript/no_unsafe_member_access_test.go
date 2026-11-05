@@ -20,7 +20,7 @@ func noUnsafeMemberAccessCaseName(index int) string {
 // The options text is the bare object rather than upstream's one-element array, because cohere's
 // config layer unwraps the severity tuple before a decoder ever sees it. Going through the decoder
 // is what puts the wire key name and the absent-versus-explicit-false handling under test.
-func noUnsafeMemberAccessDecoded(test *testing.T, optionsJson string) any {
+func noUnsafeMemberAccessDecoded(test *testing.T, optionsJson string) NoUnsafeMemberAccessOptions {
 	test.Helper()
 	decoded, decodeNoUnsafeMemberAccessOptionsError := DecodeNoUnsafeMemberAccessOptions([]byte(optionsJson))
 	if decodeNoUnsafeMemberAccessOptionsError != nil {

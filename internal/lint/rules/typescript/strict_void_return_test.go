@@ -14,7 +14,7 @@ func strictVoidReturnCaseName(index int) string {
 	return "case" + strconv.Itoa(index)
 }
 
-func strictVoidReturnOptionsFor(test *testing.T, optionsJson string) any {
+func strictVoidReturnOptionsFor(test *testing.T, optionsJson string) StrictVoidReturnOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultStrictVoidReturnSettings()
@@ -1029,8 +1029,8 @@ func TestStrictVoidReturnFallsBackToTheDefaultOnNilOptions(test *testing.T) {
 
 	const anyReturning = "declare function takes(cb: () => void): void;\ndeclare function makeAny(): any;\ntakes(() => makeAny());"
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
-		strictVoidReturnFile, anyReturning, nil), "nonVoidReturn")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, StrictVoidReturn,
+		strictVoidReturnFile, anyReturning), "nonVoidReturn")
 
 	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile, anyReturning,

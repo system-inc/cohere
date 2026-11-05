@@ -195,7 +195,7 @@ type preferNullishCoalescingCase struct {
 
 func runPreferNullishCoalescing(test *testing.T, testCase preferNullishCoalescingCase) rule_testing.Result {
 	test.Helper()
-	var options any
+	var options PreferNullishCoalescingOptions
 	if testCase.optionsJson != "" {
 		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(
 			json.RawMessage(testCase.optionsJson),

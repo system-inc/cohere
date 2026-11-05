@@ -22,7 +22,7 @@ func restrictTemplateExpressionsCaseName(index int) string {
 // standard-library types rather than an empty list.
 //
 // The empty string is the shape a bare `"error"` delivers: no bytes at all.
-func restrictTemplateExpressionsSettingsFor(test *testing.T, wire string) any {
+func restrictTemplateExpressionsSettingsFor(test *testing.T, wire string) RestrictTemplateExpressionsOptions {
 	test.Helper()
 	decoded, decodeRestrictTemplateExpressionsOptionsError := DecodeRestrictTemplateExpressionsOptions([]byte(wire))
 	if decodeRestrictTemplateExpressionsOptionsError != nil {
@@ -789,15 +789,15 @@ func TestRestrictTemplateExpressionsReadsNilOptionsAsUpstreamsDefault(test *test
 		test.Run(restrictTemplateExpressionsCaseName(index), func(test *testing.T) {
 			test.Parallel()
 			// nil rather than a decoded struct, which is what the config layer delivers.
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test,
-				RestrictTemplateExpressions, restrictTemplateExpressionsFile, sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test,
+				RestrictTemplateExpressions, restrictTemplateExpressionsFile, sourceText))
 		})
 	}
 
 	// The control: something no default allows still reports through the same path, so the silence
 	// above is the defaults applying rather than the rule declining to run at all.
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
-		restrictTemplateExpressionsFile, "declare const o: object;\n`${o}`;\n", nil), "invalidType")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, RestrictTemplateExpressions,
+		restrictTemplateExpressionsFile, "declare const o: object;\n`${o}`;\n"), "invalidType")
 }
 
 // TestRestrictTemplateExpressionsRequiresTheTypedHarness pins that the rule cannot work without a
@@ -818,8 +818,8 @@ func TestRestrictTemplateExpressionsRequiresTheTypedHarness(test *testing.T) {
 
 	// The control, so the silence above is the guard declining rather than the rule being blind to
 	// this shape.
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
-		restrictTemplateExpressionsFile, sourceText, nil), "invalidType")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, RestrictTemplateExpressions,
+		restrictTemplateExpressionsFile, sourceText), "invalidType")
 }
 
 // TestRestrictTemplateExpressionsAllowReplacesTheDefault pins how a configured `allow` interacts

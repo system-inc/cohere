@@ -44,238 +44,286 @@ func TestRestrictPlusOperandsStaysSilent(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[RestrictPlusOperandsOptions]
 	}{
-		{"upstream valid 0", "let x = 5;", nil},
-		{"upstream valid 1", "let y = '10';", nil},
-		{"upstream valid 2", "let z = 8.2;", nil},
-		{"upstream valid 3", "let w = '6.5';", nil},
-		{"upstream valid 4", "let foo = 5 + 10;", nil},
-		{"upstream valid 5", "let foo = '5.5' + '10';", nil},
-		{"upstream valid 6", "let foo = parseInt('5.5', 10) + 10;", nil},
-		{"upstream valid 7", "let foo = parseFloat('5.5', 10) + 10;", nil},
-		{"upstream valid 8", "let foo = 1n + 1n;", nil},
-		{"upstream valid 9", "let foo = BigInt(1) + 1n;", nil},
-		{"upstream valid 10", "\nlet foo = 1n;\nfoo + 2n;\n    ", nil},
+		{"upstream valid 0", "let x = 5;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 1", "let y = '10';", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 2", "let z = 8.2;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 3", "let w = '6.5';", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 4", "let foo = 5 + 10;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 5", "let foo = '5.5' + '10';", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 6", "let foo = parseInt('5.5', 10) + 10;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 7", "let foo = parseFloat('5.5', 10) + 10;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 8", "let foo = 1n + 1n;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 9", "let foo = BigInt(1) + 1n;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 10", "\nlet foo = 1n;\nfoo + 2n;\n    ", rule.Given[RestrictPlusOperandsOptions]{}},
 		{
 			"upstream valid 11",
 			"\nfunction test(s: string, n: number): number {\n  return 2;\n}\nlet foo = test('5.5', 10) + 10;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
-		{"upstream valid 12", "\nlet x = 5;\nlet z = 8.2;\nlet foo = x + z;\n    ", nil},
-		{"upstream valid 13", "\nlet w = '6.5';\nlet y = '10';\nlet foo = y + w;\n    ", nil},
-		{"upstream valid 14", "let foo = 1 + 1;", nil},
-		{"upstream valid 15", "let foo = '1' + '1';", nil},
+		{
+			"upstream valid 12",
+			"\nlet x = 5;\nlet z = 8.2;\nlet foo = x + z;\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
+		{
+			"upstream valid 13",
+			"\nlet w = '6.5';\nlet y = '10';\nlet foo = y + w;\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
+		{"upstream valid 14", "let foo = 1 + 1;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 15", "let foo = '1' + '1';", rule.Given[RestrictPlusOperandsOptions]{}},
 		{
 			"upstream valid 16",
 			"\nlet pair: { first: number; second: string } = { first: 5, second: '10' };\nlet foo = pair.first + 10;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 17",
 			"\nlet pair: { first: number; second: string } = { first: 5, second: '10' };\nlet foo = pair.first + (10 as number);\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 18",
 			"\nlet pair: { first: number; second: string } = { first: 5, second: '10' };\nlet foo = '5.5' + pair.second;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 19",
 			"\nlet pair: { first: number; second: string } = { first: 5, second: '10' };\nlet foo = ('5.5' as string) + pair.second;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 20",
 			"\nconst foo =\n  'hello' +\n  (someBoolean ? 'a' : 'b') +\n  (() => (someBoolean ? 'c' : 'd'))() +\n  'e';\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
-		{"upstream valid 21", "const balls = true;", nil},
-		{"upstream valid 22", "balls === true;", nil},
-		{"upstream valid 23", "\nfunction foo<T extends string>(a: T) {\n  return a + '';\n}\n    ", nil},
-		{"upstream valid 24", "\nfunction foo<T extends 'a' | 'b'>(a: T) {\n  return a + '';\n}\n    ", nil},
-		{"upstream valid 25", "\nfunction foo<T extends number>(a: T) {\n  return a + 1;\n}\n    ", nil},
-		{"upstream valid 26", "\nfunction foo<T extends 1>(a: T) {\n  return a + 1;\n}\n    ", nil},
-		{"upstream valid 27", "\ndeclare const a: {} & string;\ndeclare const b: string;\nconst x = a + b;\n    ", nil},
+		{"upstream valid 21", "const balls = true;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{"upstream valid 22", "balls === true;", rule.Given[RestrictPlusOperandsOptions]{}},
+		{
+			"upstream valid 23",
+			"\nfunction foo<T extends string>(a: T) {\n  return a + '';\n}\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
+		{
+			"upstream valid 24",
+			"\nfunction foo<T extends 'a' | 'b'>(a: T) {\n  return a + '';\n}\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
+		{
+			"upstream valid 25",
+			"\nfunction foo<T extends number>(a: T) {\n  return a + 1;\n}\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
+		{
+			"upstream valid 26",
+			"\nfunction foo<T extends 1>(a: T) {\n  return a + 1;\n}\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
+		{
+			"upstream valid 27",
+			"\ndeclare const a: {} & string;\ndeclare const b: string;\nconst x = a + b;\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
 		{
 			"upstream valid 28",
 			"\ndeclare const a: unknown & string;\ndeclare const b: string;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 29",
 			"\ndeclare const a: string & string;\ndeclare const b: string;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 30",
 			"\ndeclare const a: 'string literal' & string;\ndeclare const b: string;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
-		{"upstream valid 31", "\ndeclare const a: {} & number;\ndeclare const b: number;\nconst x = a + b;\n    ", nil},
+		{
+			"upstream valid 31",
+			"\ndeclare const a: {} & number;\ndeclare const b: number;\nconst x = a + b;\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
 		{
 			"upstream valid 32",
 			"\ndeclare const a: unknown & number;\ndeclare const b: number;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 33",
 			"\ndeclare const a: number & number;\ndeclare const b: number;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
-		{"upstream valid 34", "\ndeclare const a: 42 & number;\ndeclare const b: number;\nconst x = a + b;\n    ", nil},
-		{"upstream valid 35", "\ndeclare const a: {} & bigint;\ndeclare const b: bigint;\nconst x = a + b;\n    ", nil},
+		{
+			"upstream valid 34",
+			"\ndeclare const a: 42 & number;\ndeclare const b: number;\nconst x = a + b;\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
+		{
+			"upstream valid 35",
+			"\ndeclare const a: {} & bigint;\ndeclare const b: bigint;\nconst x = a + b;\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
 		{
 			"upstream valid 36",
 			"\ndeclare const a: unknown & bigint;\ndeclare const b: bigint;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 37",
 			"\ndeclare const a: bigint & bigint;\ndeclare const b: bigint;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 38",
 			"\ndeclare const a: 42n & bigint;\ndeclare const b: bigint;\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 39",
 			"\nfunction A(s: string) {\n  return `a${s}b` as const;\n}\nconst b = A('') + '!';\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
 		{
 			"upstream valid 40",
 			"\ndeclare const a: `template${string}`;\ndeclare const b: '';\nconst x = a + b;\n    ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 		},
-		{"upstream valid 41", "\nconst a: `template${0}`;\ndeclare const b: '';\nconst x = a + b;\n    ", nil},
+		{
+			"upstream valid 41",
+			"\nconst a: `template${0}`;\ndeclare const b: '';\nconst x = a + b;\n    ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+		},
 		{
 			"upstream valid 42",
 			"\ndeclare const a: RegExp;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(true),
-			},
+			}),
 		},
 		{
 			"upstream valid 43",
 			"\nconst a = /regexp/;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(true),
-			},
+			}),
 		},
 		{
 			"upstream valid 44",
 			"\nconst f = (a: RegExp, b: RegExp) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowRegExp: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowRegExp: restrictPlusOperandsBool(true)}),
 		},
 		{
 			"upstream valid 45",
 			"\nlet foo: string | undefined;\nfoo = foo + 'some data';\n      ",
-			RestrictPlusOperandsOptions{AllowNullish: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNullish: restrictPlusOperandsBool(true)}),
 		},
 		{
 			"upstream valid 46",
 			"\nlet foo: string | null;\nfoo = foo + 'some data';\n      ",
-			RestrictPlusOperandsOptions{AllowNullish: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNullish: restrictPlusOperandsBool(true)}),
 		},
 		{
 			"upstream valid 47",
 			"\nlet foo: string | null | undefined;\nfoo = foo + 'some data';\n      ",
-			RestrictPlusOperandsOptions{AllowNullish: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNullish: restrictPlusOperandsBool(true)}),
 		},
-		{"upstream valid 48", "\nlet foo = '';\nfoo += 0;\n      ", RestrictPlusOperandsOptions{
+		{"upstream valid 48", "\nlet foo = '';\nfoo += 0;\n      ", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:                restrictPlusOperandsBool(false),
 			AllowBoolean:            restrictPlusOperandsBool(false),
 			AllowNullish:            restrictPlusOperandsBool(false),
 			AllowNumberAndString:    restrictPlusOperandsBool(false),
 			AllowRegExp:             restrictPlusOperandsBool(false),
 			SkipCompoundAssignments: true,
-		}},
-		{"upstream valid 49", "\nlet foo = 0;\nfoo += '';\n      ", RestrictPlusOperandsOptions{
+		})},
+		{"upstream valid 49", "\nlet foo = 0;\nfoo += '';\n      ", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:                restrictPlusOperandsBool(false),
 			AllowBoolean:            restrictPlusOperandsBool(false),
 			AllowNullish:            restrictPlusOperandsBool(false),
 			AllowNumberAndString:    restrictPlusOperandsBool(false),
 			AllowRegExp:             restrictPlusOperandsBool(false),
 			SkipCompoundAssignments: true,
-		}},
+		})},
 		{
 			"upstream valid 50",
 			"\nconst f = (a: any, b: any) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)}),
 		},
 		{
 			"upstream valid 51",
 			"\nconst f = (a: any, b: string) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)}),
 		},
 		{
 			"upstream valid 52",
 			"\nconst f = (a: any, b: bigint) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)}),
 		},
 		{
 			"upstream valid 53",
 			"\nconst f = (a: any, b: number) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)}),
 		},
-		{"upstream valid 54", "\nconst f = (a: any, b: boolean) => a + b;\n      ", RestrictPlusOperandsOptions{
-			AllowAny:     restrictPlusOperandsBool(true),
-			AllowBoolean: restrictPlusOperandsBool(true),
-		}},
+		{
+			"upstream valid 54",
+			"\nconst f = (a: any, b: boolean) => a + b;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:     restrictPlusOperandsBool(true),
+				AllowBoolean: restrictPlusOperandsBool(true),
+			}),
+		},
 		{
 			"upstream valid 55",
 			"\nconst f = (a: string, b: string | number) => a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(true),
 				AllowBoolean:         restrictPlusOperandsBool(true),
 				AllowNullish:         restrictPlusOperandsBool(true),
 				AllowNumberAndString: restrictPlusOperandsBool(true),
 				AllowRegExp:          restrictPlusOperandsBool(true),
-			},
+			}),
 		},
 		{
 			"upstream valid 56",
 			"\nconst f = (a: string | number, b: number) => a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(true),
 				AllowBoolean:         restrictPlusOperandsBool(true),
 				AllowNullish:         restrictPlusOperandsBool(true),
 				AllowNumberAndString: restrictPlusOperandsBool(true),
 				AllowRegExp:          restrictPlusOperandsBool(true),
-			},
+			}),
 		},
 		{
 			"upstream valid 57",
 			"\nconst f = (a: string | number, b: string | number) => a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(true),
 				AllowBoolean:         restrictPlusOperandsBool(true),
 				AllowNullish:         restrictPlusOperandsBool(true),
 				AllowNumberAndString: restrictPlusOperandsBool(true),
 				AllowRegExp:          restrictPlusOperandsBool(true),
-			},
+			}),
 		},
 		{
 			"upstream valid 58",
 			"let foo = '1' + 1n;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(true)}),
 		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				RestrictPlusOperands,
 				restrictPlusOperandsFile,
@@ -298,474 +346,544 @@ func TestRestrictPlusOperandsFires(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[RestrictPlusOperandsOptions]
 		wantIds    []string
 	}{
 		{
 			"upstream invalid 0",
 			"let foo = '1' + 1;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{"mismatched"},
 		},
-		{"upstream invalid 1", "let foo = '1' + 1;", RestrictPlusOperandsOptions{
+		{"upstream invalid 1", "let foo = '1' + 1;", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:             restrictPlusOperandsBool(false),
 			AllowBoolean:         restrictPlusOperandsBool(false),
 			AllowNullish:         restrictPlusOperandsBool(false),
 			AllowNumberAndString: restrictPlusOperandsBool(false),
 			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"mismatched"}},
-		{"upstream invalid 2", "let foo = [] + {};", nil, []string{"invalid", "invalid"}},
-		{"upstream invalid 3", "let foo = 5 + '10';", RestrictPlusOperandsOptions{
+		}), []string{"mismatched"}},
+		{
+			"upstream invalid 2",
+			"let foo = [] + {};",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"invalid", "invalid"},
+		},
+		{"upstream invalid 3", "let foo = 5 + '10';", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:             restrictPlusOperandsBool(false),
 			AllowBoolean:         restrictPlusOperandsBool(false),
 			AllowNullish:         restrictPlusOperandsBool(false),
 			AllowNumberAndString: restrictPlusOperandsBool(false),
 			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"mismatched"}},
-		{"upstream invalid 4", "let foo = [] + 5;", nil, []string{"invalid"}},
-		{"upstream invalid 5", "let foo = [] + [];", nil, []string{"invalid", "invalid"}},
-		{"upstream invalid 6", "let foo = 5 + [3];", nil, []string{"invalid"}},
-		{"upstream invalid 7", "let foo = '5' + {};", nil, []string{"invalid"}},
+		}), []string{"mismatched"}},
+		{"upstream invalid 4", "let foo = [] + 5;", rule.Given[RestrictPlusOperandsOptions]{}, []string{"invalid"}},
+		{
+			"upstream invalid 5",
+			"let foo = [] + [];",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"invalid", "invalid"},
+		},
+		{"upstream invalid 6", "let foo = 5 + [3];", rule.Given[RestrictPlusOperandsOptions]{}, []string{"invalid"}},
+		{"upstream invalid 7", "let foo = '5' + {};", rule.Given[RestrictPlusOperandsOptions]{}, []string{"invalid"}},
 		{
 			"upstream invalid 8",
 			"let foo = 5.5 + '5';",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 9",
 			"let foo = '5.5' + 5;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 10",
 			"\nlet x = 5;\nlet y = '10';\nlet foo = x + y;\n      ",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 11",
 			"\nlet x = 5;\nlet y = '10';\nlet foo = y + x;\n      ",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{"mismatched"},
 		},
-		{"upstream invalid 12", "\nlet x = 5;\nlet foo = x + {};\n      ", nil, []string{"invalid"}},
-		{"upstream invalid 13", "\nlet y = '10';\nlet foo = [] + y;\n      ", nil, []string{"invalid"}},
+		{
+			"upstream invalid 12",
+			"\nlet x = 5;\nlet foo = x + {};\n      ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"invalid"},
+		},
+		{
+			"upstream invalid 13",
+			"\nlet y = '10';\nlet foo = [] + y;\n      ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"invalid"},
+		},
 		{
 			"upstream invalid 14",
 			"\nlet pair = { first: 5, second: '10' };\nlet foo = pair + pair;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid", "invalid"},
 		},
 		{
 			"upstream invalid 15",
 			"\ntype Valued = { value: number };\nlet value: Valued = { value: 0 };\nlet combined = value + 0;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
-		{"upstream invalid 16", "let foo = 1n + 1;", nil, []string{"bigintAndNumber"}},
-		{"upstream invalid 17", "let foo = 1 + 1n;", nil, []string{"bigintAndNumber"}},
-		{"upstream invalid 18", "\nlet foo = 1n;\nfoo + 1;\n      ", nil, []string{"bigintAndNumber"}},
-		{"upstream invalid 19", "\nlet foo = 1;\nfoo + 1n;\n      ", nil, []string{"bigintAndNumber"}},
+		{
+			"upstream invalid 16",
+			"let foo = 1n + 1;",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"bigintAndNumber"},
+		},
+		{
+			"upstream invalid 17",
+			"let foo = 1 + 1n;",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"bigintAndNumber"},
+		},
+		{
+			"upstream invalid 18",
+			"\nlet foo = 1n;\nfoo + 1;\n      ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"bigintAndNumber"},
+		},
+		{
+			"upstream invalid 19",
+			"\nlet foo = 1;\nfoo + 1n;\n      ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{"bigintAndNumber"},
+		},
 		{
 			"upstream invalid 20",
 			"\nfunction foo<T extends string>(a: T) {\n  return a + 1;\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 21",
 			"\nfunction foo<T extends 'a' | 'b'>(a: T) {\n  return a + 1;\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 22",
 			"\nfunction foo<T extends number>(a: T) {\n  return a + '';\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 23",
 			"\nfunction foo<T extends 1>(a: T) {\n  return a + '';\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 24",
 			"\ndeclare const a: `template${number}`;\ndeclare const b: number;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"mismatched"},
 		},
 		{
 			"upstream invalid 25",
 			"\ndeclare const a: never;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 26",
 			"\ndeclare const a: never & string;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 27",
 			"\ndeclare const a: boolean & string;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 28",
 			"\ndeclare const a: any & string;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 29",
 			"\ndeclare const a: { a: 1 } & { b: 2 };\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 30",
 			"\ninterface A {\n  a: 1;\n}\ndeclare const a: A;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 31",
 			"\ninterface A {\n  a: 1;\n}\ninterface A2 extends A {\n  b: 2;\n}\ndeclare const a: A2;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 32",
 			"\ntype A = { a: 1 } & { b: 2 };\ndeclare const a: A;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 33",
 			"\ndeclare const a: { a: 1 } & { b: 2 };\ndeclare const b: number;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 34",
 			"\ndeclare const a: never;\ndeclare const b: bigint;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 35",
 			"\ndeclare const a: any;\ndeclare const b: bigint;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 36",
 			"\ndeclare const a: { a: 1 } & { b: 2 };\ndeclare const b: bigint;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 37",
 			"\ndeclare const a: RegExp;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 38",
 			"\nconst a = /regexp/;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 39",
 			"\ndeclare const a: Symbol;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 40",
 			"\ndeclare const a: symbol;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 41",
 			"\ndeclare const a: unique symbol;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 42",
 			"\nconst a = Symbol('');\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 43",
 			"\nlet foo: string | undefined;\nfoo += 'some data';\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:                restrictPlusOperandsBool(false),
 				AllowBoolean:            restrictPlusOperandsBool(false),
 				AllowNullish:            restrictPlusOperandsBool(false),
 				AllowNumberAndString:    restrictPlusOperandsBool(false),
 				AllowRegExp:             restrictPlusOperandsBool(false),
 				SkipCompoundAssignments: false,
-			},
+			}),
 			[]string{"invalid"},
 		},
-		{"upstream invalid 44", "\nlet foo: string | null;\nfoo += 'some data';\n      ", RestrictPlusOperandsOptions{
+		{
+			"upstream invalid 44",
+			"\nlet foo: string | null;\nfoo += 'some data';\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:             restrictPlusOperandsBool(false),
+				AllowBoolean:         restrictPlusOperandsBool(false),
+				AllowNullish:         restrictPlusOperandsBool(false),
+				AllowNumberAndString: restrictPlusOperandsBool(false),
+				AllowRegExp:          restrictPlusOperandsBool(false),
+			}),
+			[]string{"invalid"},
+		},
+		{
+			"upstream invalid 45",
+			"\nlet foo: string = '';\nfoo += 1;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:             restrictPlusOperandsBool(false),
+				AllowBoolean:         restrictPlusOperandsBool(false),
+				AllowNullish:         restrictPlusOperandsBool(false),
+				AllowNumberAndString: restrictPlusOperandsBool(false),
+				AllowRegExp:          restrictPlusOperandsBool(false),
+			}),
+			[]string{"mismatched"},
+		},
+		{"upstream invalid 46", "\nlet foo = 0;\nfoo += '';\n      ", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:             restrictPlusOperandsBool(false),
 			AllowBoolean:         restrictPlusOperandsBool(false),
 			AllowNullish:         restrictPlusOperandsBool(false),
 			AllowNumberAndString: restrictPlusOperandsBool(false),
 			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"invalid"}},
-		{"upstream invalid 45", "\nlet foo: string = '';\nfoo += 1;\n      ", RestrictPlusOperandsOptions{
-			AllowAny:             restrictPlusOperandsBool(false),
-			AllowBoolean:         restrictPlusOperandsBool(false),
-			AllowNullish:         restrictPlusOperandsBool(false),
-			AllowNumberAndString: restrictPlusOperandsBool(false),
-			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"mismatched"}},
-		{"upstream invalid 46", "\nlet foo = 0;\nfoo += '';\n      ", RestrictPlusOperandsOptions{
-			AllowAny:             restrictPlusOperandsBool(false),
-			AllowBoolean:         restrictPlusOperandsBool(false),
-			AllowNullish:         restrictPlusOperandsBool(false),
-			AllowNumberAndString: restrictPlusOperandsBool(false),
-			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"mismatched"}},
-		{"upstream invalid 47", "\nconst f = (a: any, b: boolean) => a + b;\n      ", RestrictPlusOperandsOptions{
-			AllowAny:     restrictPlusOperandsBool(true),
-			AllowBoolean: restrictPlusOperandsBool(false),
-		}, []string{"invalid"}},
+		}), []string{"mismatched"}},
+		{
+			"upstream invalid 47",
+			"\nconst f = (a: any, b: boolean) => a + b;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:     restrictPlusOperandsBool(true),
+				AllowBoolean: restrictPlusOperandsBool(false),
+			}),
+			[]string{"invalid"},
+		},
 		{
 			"upstream invalid 48",
 			"\nconst f = (a: any, b: []) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)}),
 			[]string{"invalid"},
 		},
-		{"upstream invalid 49", "\nconst f = (a: any, b: boolean) => a + b;\n      ", RestrictPlusOperandsOptions{
-			AllowAny:     restrictPlusOperandsBool(false),
-			AllowBoolean: restrictPlusOperandsBool(true),
-		}, []string{"invalid"}},
+		{
+			"upstream invalid 49",
+			"\nconst f = (a: any, b: boolean) => a + b;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:     restrictPlusOperandsBool(false),
+				AllowBoolean: restrictPlusOperandsBool(true),
+			}),
+			[]string{"invalid"},
+		},
 		{
 			"upstream invalid 50",
 			"\nconst f = (a: any, b: any) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)}),
 			[]string{"invalid", "invalid"},
 		},
 		{
 			"upstream invalid 51",
 			"\nconst f = (a: any, b: string) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 52",
 			"\nconst f = (a: any, b: bigint) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 53",
 			"\nconst f = (a: any, b: number) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(false)}),
 			[]string{"invalid"},
 		},
-		{"upstream invalid 54", "\nconst f = (a: any, b: boolean) => a + b;\n      ", RestrictPlusOperandsOptions{
-			AllowAny:     restrictPlusOperandsBool(false),
-			AllowBoolean: restrictPlusOperandsBool(false),
-		}, []string{"invalid", "invalid"}},
+		{
+			"upstream invalid 54",
+			"\nconst f = (a: any, b: boolean) => a + b;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:     restrictPlusOperandsBool(false),
+				AllowBoolean: restrictPlusOperandsBool(false),
+			}),
+			[]string{"invalid", "invalid"},
+		},
 		{
 			"upstream invalid 55",
 			"\nconst f = (a: number, b: RegExp) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowRegExp: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowRegExp: restrictPlusOperandsBool(true)}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 56",
 			"\nlet foo: string | boolean;\nfoo = foo + 'some data';\n      ",
-			RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)}),
 			[]string{"invalid"},
 		},
 		{
 			"upstream invalid 57",
 			"\nlet foo: boolean;\nfoo = foo + 'some data';\n      ",
-			RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)}),
 			[]string{"invalid"},
 		},
-		{"upstream invalid 58", "\nconst f = (a: any, b: unknown) => a + b;\n      ", RestrictPlusOperandsOptions{
-			AllowAny:     restrictPlusOperandsBool(true),
-			AllowBoolean: restrictPlusOperandsBool(true),
-			AllowNullish: restrictPlusOperandsBool(true),
-			AllowRegExp:  restrictPlusOperandsBool(true),
-		}, []string{"invalid"}},
+		{
+			"upstream invalid 58",
+			"\nconst f = (a: any, b: unknown) => a + b;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:     restrictPlusOperandsBool(true),
+				AllowBoolean: restrictPlusOperandsBool(true),
+				AllowNullish: restrictPlusOperandsBool(true),
+				AllowRegExp:  restrictPlusOperandsBool(true),
+			}),
+			[]string{"invalid"},
+		},
 		{
 			"upstream invalid 59",
 			"let foo = '1' + 1n;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{"mismatched"},
 		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				RestrictPlusOperands,
 				restrictPlusOperandsFile,
@@ -793,52 +911,52 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 	cases := []struct {
 		name         string
 		sourceText   string
-		options      any
+		options      rule.Given[RestrictPlusOperandsOptions]
 		wantMessages []string
 	}{
 		{
 			"upstream invalid 0",
 			"let foo = '1' + 1;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `string` + `number`.",
 			},
 		},
-		{"upstream invalid 1", "let foo = '1' + 1;", RestrictPlusOperandsOptions{
+		{"upstream invalid 1", "let foo = '1' + 1;", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:             restrictPlusOperandsBool(false),
 			AllowBoolean:         restrictPlusOperandsBool(false),
 			AllowNullish:         restrictPlusOperandsBool(false),
 			AllowNumberAndString: restrictPlusOperandsBool(false),
 			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"Operands of '+' operations must be a number or string. Got `string` + `number`."}},
-		{"upstream invalid 2", "let foo = [] + {};", nil, []string{
+		}), []string{"Operands of '+' operations must be a number or string. Got `string` + `number`."}},
+		{"upstream invalid 2", "let foo = [] + {};", rule.Given[RestrictPlusOperandsOptions]{}, []string{
 			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `never[]`.",
 			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `{}`.",
 		}},
-		{"upstream invalid 3", "let foo = 5 + '10';", RestrictPlusOperandsOptions{
+		{"upstream invalid 3", "let foo = 5 + '10';", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:             restrictPlusOperandsBool(false),
 			AllowBoolean:         restrictPlusOperandsBool(false),
 			AllowNullish:         restrictPlusOperandsBool(false),
 			AllowNumberAndString: restrictPlusOperandsBool(false),
 			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"Operands of '+' operations must be a number or string. Got `number` + `string`."}},
-		{"upstream invalid 4", "let foo = [] + 5;", nil, []string{
+		}), []string{"Operands of '+' operations must be a number or string. Got `number` + `string`."}},
+		{"upstream invalid 4", "let foo = [] + 5;", rule.Given[RestrictPlusOperandsOptions]{}, []string{
 			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `never[]`.",
 		}},
-		{"upstream invalid 5", "let foo = [] + [];", nil, []string{
+		{"upstream invalid 5", "let foo = [] + [];", rule.Given[RestrictPlusOperandsOptions]{}, []string{
 			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `never[]`.",
 			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `never[]`.",
 		}},
-		{"upstream invalid 6", "let foo = 5 + [3];", nil, []string{
+		{"upstream invalid 6", "let foo = 5 + [3];", rule.Given[RestrictPlusOperandsOptions]{}, []string{
 			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `number[]`.",
 		}},
-		{"upstream invalid 7", "let foo = '5' + {};", nil, []string{
+		{"upstream invalid 7", "let foo = '5' + {};", rule.Given[RestrictPlusOperandsOptions]{}, []string{
 			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `{}`.",
 		}},
 		{
 			"upstream invalid 8",
 			"let foo = 5.5 + '5';",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `number` + `string`.",
 			},
@@ -846,7 +964,7 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 9",
 			"let foo = '5.5' + 5;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `string` + `number`.",
 			},
@@ -854,7 +972,7 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 10",
 			"\nlet x = 5;\nlet y = '10';\nlet foo = x + y;\n      ",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `number` + `string`.",
 			},
@@ -862,27 +980,37 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 11",
 			"\nlet x = 5;\nlet y = '10';\nlet foo = y + x;\n      ",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `string` + `number`.",
 			},
 		},
-		{"upstream invalid 12", "\nlet x = 5;\nlet foo = x + {};\n      ", nil, []string{
-			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `{}`.",
-		}},
-		{"upstream invalid 13", "\nlet y = '10';\nlet foo = [] + y;\n      ", nil, []string{
-			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `never[]`.",
-		}},
+		{
+			"upstream invalid 12",
+			"\nlet x = 5;\nlet foo = x + {};\n      ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{
+				"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `{}`.",
+			},
+		},
+		{
+			"upstream invalid 13",
+			"\nlet y = '10';\nlet foo = [] + y;\n      ",
+			rule.Given[RestrictPlusOperandsOptions]{},
+			[]string{
+				"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `never[]`.",
+			},
+		},
 		{
 			"upstream invalid 14",
 			"\nlet pair = { first: 5, second: '10' };\nlet foo = pair + pair;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `{ first: number; second: string; }`.",
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `{ first: number; second: string; }`.",
@@ -891,157 +1019,157 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 15",
 			"\ntype Valued = { value: number };\nlet value: Valued = { value: 0 };\nlet combined = value + 0;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `Valued`."},
 		},
 		{
 			"upstream invalid 16",
 			"let foo = 1n + 1;",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 			[]string{"Numeric '+' operations must either be both bigints or both numbers. Got `bigint` + `number`."},
 		},
 		{
 			"upstream invalid 17",
 			"let foo = 1 + 1n;",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 			[]string{"Numeric '+' operations must either be both bigints or both numbers. Got `number` + `bigint`."},
 		},
 		{
 			"upstream invalid 18",
 			"\nlet foo = 1n;\nfoo + 1;\n      ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 			[]string{"Numeric '+' operations must either be both bigints or both numbers. Got `bigint` + `number`."},
 		},
 		{
 			"upstream invalid 19",
 			"\nlet foo = 1;\nfoo + 1n;\n      ",
-			nil,
+			rule.Given[RestrictPlusOperandsOptions]{},
 			[]string{"Numeric '+' operations must either be both bigints or both numbers. Got `number` + `bigint`."},
 		},
 		{
 			"upstream invalid 20",
 			"\nfunction foo<T extends string>(a: T) {\n  return a + 1;\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Operands of '+' operations must be a number or string. Got `string` + `number`."},
 		},
 		{
 			"upstream invalid 21",
 			"\nfunction foo<T extends 'a' | 'b'>(a: T) {\n  return a + 1;\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Operands of '+' operations must be a number or string. Got `string` + `number`."},
 		},
 		{
 			"upstream invalid 22",
 			"\nfunction foo<T extends number>(a: T) {\n  return a + '';\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Operands of '+' operations must be a number or string. Got `number` + `string`."},
 		},
 		{
 			"upstream invalid 23",
 			"\nfunction foo<T extends 1>(a: T) {\n  return a + '';\n}\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Operands of '+' operations must be a number or string. Got `number` + `string`."},
 		},
 		{
 			"upstream invalid 24",
 			"\ndeclare const a: `template${number}`;\ndeclare const b: number;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Operands of '+' operations must be a number or string. Got `string` + `number`."},
 		},
 		{
 			"upstream invalid 25",
 			"\ndeclare const a: never;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `never`."},
 		},
 		{
 			"upstream invalid 26",
 			"\ndeclare const a: never & string;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `never`."},
 		},
 		{
 			"upstream invalid 27",
 			"\ndeclare const a: boolean & string;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `never`."},
 		},
 		{
 			"upstream invalid 28",
 			"\ndeclare const a: any & string;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `any`."},
 		},
 		{
 			"upstream invalid 29",
 			"\ndeclare const a: { a: 1 } & { b: 2 };\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `{ a: 1; } & { b: 2; }`.",
 			},
@@ -1049,49 +1177,49 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 30",
 			"\ninterface A {\n  a: 1;\n}\ndeclare const a: A;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `A`."},
 		},
 		{
 			"upstream invalid 31",
 			"\ninterface A {\n  a: 1;\n}\ninterface A2 extends A {\n  b: 2;\n}\ndeclare const a: A2;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `A2`."},
 		},
 		{
 			"upstream invalid 32",
 			"\ntype A = { a: 1 } & { b: 2 };\ndeclare const a: A;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `A`."},
 		},
 		{
 			"upstream invalid 33",
 			"\ndeclare const a: { a: 1 } & { b: 2 };\ndeclare const b: number;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `{ a: 1; } & { b: 2; }`.",
 			},
@@ -1099,37 +1227,37 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 34",
 			"\ndeclare const a: never;\ndeclare const b: bigint;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `never`."},
 		},
 		{
 			"upstream invalid 35",
 			"\ndeclare const a: any;\ndeclare const b: bigint;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `any`."},
 		},
 		{
 			"upstream invalid 36",
 			"\ndeclare const a: { a: 1 } & { b: 2 };\ndeclare const b: bigint;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `{ a: 1; } & { b: 2; }`.",
 			},
@@ -1137,61 +1265,61 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 37",
 			"\ndeclare const a: RegExp;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `RegExp`."},
 		},
 		{
 			"upstream invalid 38",
 			"\nconst a = /regexp/;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `RegExp`."},
 		},
 		{
 			"upstream invalid 39",
 			"\ndeclare const a: Symbol;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `Symbol`."},
 		},
 		{
 			"upstream invalid 40",
 			"\ndeclare const a: symbol;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"Invalid operand for a '+' operation. Operands must each be a number or string. Got `symbol`."},
 		},
 		{
 			"upstream invalid 41",
 			"\ndeclare const a: unique symbol;\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `unique symbol`.",
 			},
@@ -1199,13 +1327,13 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 42",
 			"\nconst a = Symbol('');\ndeclare const b: string;\nconst x = a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `unique symbol`.",
 			},
@@ -1213,14 +1341,14 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 43",
 			"\nlet foo: string | undefined;\nfoo += 'some data';\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:                restrictPlusOperandsBool(false),
 				AllowBoolean:            restrictPlusOperandsBool(false),
 				AllowNullish:            restrictPlusOperandsBool(false),
 				AllowNumberAndString:    restrictPlusOperandsBool(false),
 				AllowRegExp:             restrictPlusOperandsBool(false),
 				SkipCompoundAssignments: false,
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | undefined`.",
 			},
@@ -1228,35 +1356,40 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 44",
 			"\nlet foo: string | null;\nfoo += 'some data';\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string. Got `string | null`.",
 			},
 		},
-		{"upstream invalid 45", "\nlet foo: string = '';\nfoo += 1;\n      ", RestrictPlusOperandsOptions{
+		{
+			"upstream invalid 45",
+			"\nlet foo: string = '';\nfoo += 1;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:             restrictPlusOperandsBool(false),
+				AllowBoolean:         restrictPlusOperandsBool(false),
+				AllowNullish:         restrictPlusOperandsBool(false),
+				AllowNumberAndString: restrictPlusOperandsBool(false),
+				AllowRegExp:          restrictPlusOperandsBool(false),
+			}),
+			[]string{"Operands of '+' operations must be a number or string. Got `string` + `number`."},
+		},
+		{"upstream invalid 46", "\nlet foo = 0;\nfoo += '';\n      ", rule.Configured(RestrictPlusOperandsOptions{
 			AllowAny:             restrictPlusOperandsBool(false),
 			AllowBoolean:         restrictPlusOperandsBool(false),
 			AllowNullish:         restrictPlusOperandsBool(false),
 			AllowNumberAndString: restrictPlusOperandsBool(false),
 			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"Operands of '+' operations must be a number or string. Got `string` + `number`."}},
-		{"upstream invalid 46", "\nlet foo = 0;\nfoo += '';\n      ", RestrictPlusOperandsOptions{
-			AllowAny:             restrictPlusOperandsBool(false),
-			AllowBoolean:         restrictPlusOperandsBool(false),
-			AllowNullish:         restrictPlusOperandsBool(false),
-			AllowNumberAndString: restrictPlusOperandsBool(false),
-			AllowRegExp:          restrictPlusOperandsBool(false),
-		}, []string{"Operands of '+' operations must be a number or string. Got `number` + `string`."}},
+		}), []string{"Operands of '+' operations must be a number or string. Got `number` + `string`."}},
 		{
 			"upstream invalid 48",
 			"\nconst f = (a: any, b: []) => a + b;\n      ",
-			RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowAny: restrictPlusOperandsBool(true)}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `[]`.",
 			},
@@ -1264,10 +1397,10 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 49",
 			"\nconst f = (a: any, b: boolean) => a + b;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:     restrictPlusOperandsBool(false),
 				AllowBoolean: restrictPlusOperandsBool(true),
-			},
+			}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `boolean`, `null`, `RegExp`, `undefined`. Got `any`.",
 			},
@@ -1275,7 +1408,7 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 56",
 			"\nlet foo: string | boolean;\nfoo = foo + 'some data';\n      ",
-			RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `null`, `RegExp`, `undefined`. Got `string | boolean`.",
 			},
@@ -1283,23 +1416,28 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 		{
 			"upstream invalid 57",
 			"\nlet foo: boolean;\nfoo = foo + 'some data';\n      ",
-			RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowBoolean: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `null`, `RegExp`, `undefined`. Got `boolean`.",
 			},
 		},
-		{"upstream invalid 58", "\nconst f = (a: any, b: unknown) => a + b;\n      ", RestrictPlusOperandsOptions{
-			AllowAny:     restrictPlusOperandsBool(true),
-			AllowBoolean: restrictPlusOperandsBool(true),
-			AllowNullish: restrictPlusOperandsBool(true),
-			AllowRegExp:  restrictPlusOperandsBool(true),
-		}, []string{
-			"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `unknown`.",
-		}},
+		{
+			"upstream invalid 58",
+			"\nconst f = (a: any, b: unknown) => a + b;\n      ",
+			rule.Configured(RestrictPlusOperandsOptions{
+				AllowAny:     restrictPlusOperandsBool(true),
+				AllowBoolean: restrictPlusOperandsBool(true),
+				AllowNullish: restrictPlusOperandsBool(true),
+				AllowRegExp:  restrictPlusOperandsBool(true),
+			}),
+			[]string{
+				"Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `unknown`.",
+			},
+		},
 		{
 			"upstream invalid 59",
 			"let foo = '1' + 1n;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{
 				"Operands of '+' operations must be a number or string, allowing a string + any of: `any`, `boolean`, `null`, `RegExp`, `undefined`. Got `string` + `bigint`.",
 			},
@@ -1307,7 +1445,7 @@ func TestRestrictPlusOperandsMessages(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				RestrictPlusOperands,
 				restrictPlusOperandsFile,
@@ -1343,59 +1481,59 @@ func TestRestrictPlusOperandsSpans(test *testing.T) {
 	cases := []struct {
 		name       string
 		sourceText string
-		options    any
+		options    rule.Given[RestrictPlusOperandsOptions]
 		wantSpans  []string
 	}{
 		{
 			"upstream invalid 0",
 			"let foo = '1' + 1;",
-			RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)},
+			rule.Configured(RestrictPlusOperandsOptions{AllowNumberAndString: restrictPlusOperandsBool(false)}),
 			[]string{"'1' + 1"},
 		},
-		{"upstream invalid 2", "let foo = [] + {};", nil, []string{"[]", "{}"}},
-		{"upstream invalid 4", "let foo = [] + 5;", nil, []string{"[]"}},
+		{"upstream invalid 2", "let foo = [] + {};", rule.Given[RestrictPlusOperandsOptions]{}, []string{"[]", "{}"}},
+		{"upstream invalid 4", "let foo = [] + 5;", rule.Given[RestrictPlusOperandsOptions]{}, []string{"[]"}},
 		{
 			"upstream invalid 14",
 			"\nlet pair = { first: 5, second: '10' };\nlet foo = pair + pair;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"pair", "pair"},
 		},
 		{
 			"upstream invalid 15",
 			"\ntype Valued = { value: number };\nlet value: Valued = { value: 0 };\nlet combined = value + 0;\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:             restrictPlusOperandsBool(false),
 				AllowBoolean:         restrictPlusOperandsBool(false),
 				AllowNullish:         restrictPlusOperandsBool(false),
 				AllowNumberAndString: restrictPlusOperandsBool(false),
 				AllowRegExp:          restrictPlusOperandsBool(false),
-			},
+			}),
 			[]string{"value"},
 		},
-		{"upstream invalid 16", "let foo = 1n + 1;", nil, []string{"1n + 1"}},
+		{"upstream invalid 16", "let foo = 1n + 1;", rule.Given[RestrictPlusOperandsOptions]{}, []string{"1n + 1"}},
 		{
 			"upstream invalid 43",
 			"\nlet foo: string | undefined;\nfoo += 'some data';\n      ",
-			RestrictPlusOperandsOptions{
+			rule.Configured(RestrictPlusOperandsOptions{
 				AllowAny:                restrictPlusOperandsBool(false),
 				AllowBoolean:            restrictPlusOperandsBool(false),
 				AllowNullish:            restrictPlusOperandsBool(false),
 				AllowNumberAndString:    restrictPlusOperandsBool(false),
 				AllowRegExp:             restrictPlusOperandsBool(false),
 				SkipCompoundAssignments: false,
-			},
+			}),
 			[]string{"foo"},
 		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				RestrictPlusOperands,
 				restrictPlusOperandsFile,
@@ -1631,15 +1769,15 @@ func TestRestrictPlusOperandsIndividualComplaintSuppressesThePair(test *testing.
 
 	test.Run("an impossible operand suppresses the bigint pair complaint", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile,
-			"declare const a: number | {};\nconst x = a + 1n;", nil)
+		result := rule_testing.RunTyped(test, RestrictPlusOperands, restrictPlusOperandsFile,
+			"declare const a: number | {};\nconst x = a + 1n;")
 		rule_testing.ExpectFindings(test, result, "invalid")
 	})
 
 	test.Run("the mismatched arm is off by default, so this shape cannot see the gate", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunTypedWithOptions(test, RestrictPlusOperands, restrictPlusOperandsFile,
-			"declare const a: string | symbol;\nconst x = a + 1;", nil)
+		result := rule_testing.RunTyped(test, RestrictPlusOperands, restrictPlusOperandsFile,
+			"declare const a: string | symbol;\nconst x = a + 1;")
 		rule_testing.ExpectFindings(test, result, "invalid")
 	})
 

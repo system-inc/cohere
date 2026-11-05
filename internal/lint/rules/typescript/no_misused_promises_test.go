@@ -336,19 +336,19 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decodedAny, err := decode([]byte(testCase.config))
+			decoded, err := decode([]byte(testCase.config))
 			if err != nil {
 				test.Fatalf("decoding %s: %v", testCase.config, err)
 			}
-			testCase.assert(test, decodedAny)
+			testCase.assert(test, decoded)
 		})
 	}
 }
 
 // TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled pins the bare-"error" configuration path.
 //
-// A rule configured as bare "error" is handed nil options rather than a zero struct, and
-// `options.(NoMisusedPromisesOptions)` on nil yields the zero value with every pointer nil. For a
+// A rule configured as bare "error" is handed no options rather than a zero struct, and reading
+// them yields the zero value with every pointer nil. For a
 // rule whose nine options ALL default to true, getting that wrong would turn the entire rule off for
 // the most common way anyone configures it, while every fixture above (each of which reaches the
 // rule through an explicit options value) stayed green. This bypasses the decoder deliberately.
@@ -379,13 +379,7 @@ func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
-				test,
-				NoMisusedPromises,
-				testCase.fileName,
-				testCase.sourceText,
-				nil,
-			)
+			result := rule_testing.RunTyped(test, NoMisusedPromises, testCase.fileName, testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}

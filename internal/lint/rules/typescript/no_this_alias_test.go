@@ -15,7 +15,7 @@ const thisAliasFile = "/repository/source/Thing.ts"
 // than by building the internal struct directly. That is deliberate: the decoder is where the
 // `allowDestructuring` inversion and the `allowNames` alias live, so a fixture that skipped it
 // would test the rule while leaving the two most breakable lines in the port unasserted.
-func decodeThisAliasOptionsForTest(test *testing.T, configuration string) any {
+func decodeThisAliasOptionsForTest(test *testing.T, configuration string) NoThisAliasOptions {
 	test.Helper()
 	options, decodeNoThisAliasOptionsError := DecodeNoThisAliasOptions(json.RawMessage(configuration))
 	if decodeNoThisAliasOptionsError != nil {

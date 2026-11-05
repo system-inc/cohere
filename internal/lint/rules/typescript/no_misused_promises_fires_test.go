@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -25,7 +26,7 @@ func TestNoMisusedPromisesFires(test *testing.T) {
 		name       string
 		fileName   string
 		sourceText string
-		options    any
+		options    rule.Given[NoMisusedPromisesOptions]
 		wantIds    []string
 	}{
 		{
@@ -35,7 +36,6 @@ func TestNoMisusedPromisesFires(test *testing.T) {
 if (Promise.resolve()) {
 }
       `,
-			options: nil,
 			wantIds: []string{"conditional"},
 		},
 		{
@@ -47,35 +47,30 @@ if (Promise.resolve()) {
 } else {
 }
       `,
-			options: nil,
 			wantIds: []string{"conditional", "conditional"},
 		},
 		{
 			name:       "upstream invalid 2",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `for (let i; Promise.resolve(); i++) {}`,
-			options:    nil,
 			wantIds:    []string{"conditional"},
 		},
 		{
 			name:       "upstream invalid 3",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `do {} while (Promise.resolve());`,
-			options:    nil,
 			wantIds:    []string{"conditional"},
 		},
 		{
 			name:       "upstream invalid 4",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `while (Promise.resolve()) {}`,
-			options:    nil,
 			wantIds:    []string{"conditional"},
 		},
 		{
 			name:       "upstream invalid 5",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `Promise.resolve() ? 123 : 456;`,
-			options:    nil,
 			wantIds:    []string{"conditional"},
 		},
 		{
@@ -85,14 +80,12 @@ if (Promise.resolve()) {
 if (!Promise.resolve()) {
 }
       `,
-			options: nil,
 			wantIds: []string{"conditional"},
 		},
 		{
 			name:       "upstream invalid 7",
 			fileName:   noMisusedPromisesFile,
 			sourceText: `Promise.resolve() || false;`,
-			options:    nil,
 			wantIds:    []string{"conditional"},
 		},
 		{
@@ -103,7 +96,6 @@ if (!Promise.resolve()) {
   await val;
 });
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -115,7 +107,6 @@ new Promise(async (resolve, reject) => {
   resolve();
 });
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -130,7 +121,6 @@ fnWithCallback('val', async (err, res) => {
   await res;
 });
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -143,7 +133,6 @@ const fnWithCallback = (arg: string, cb: (err: any, res: string) => void) => {
 
 fnWithCallback('val', (err, res) => Promise.resolve(res));
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -162,7 +151,6 @@ fnWithCallback('val', (err, res) => {
   }
 });
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -177,7 +165,6 @@ const fnWithCallback:
 
 fnWithCallback?.('val', (err, res) => Promise.resolve(res));
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -198,7 +185,6 @@ fnWithCallback('val', (err, res) => {
   }
 });
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -210,7 +196,6 @@ function test(bool: boolean, p: Promise<void>) {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"conditional"},
 		},
 		{
@@ -222,7 +207,6 @@ function test(bool: boolean, p: Promise<void>) {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"conditional"},
 		},
 		{
@@ -234,7 +218,6 @@ function test(a: any, p: Promise<void>) {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"conditional"},
 		},
 		{
@@ -246,7 +229,6 @@ function test(p: Promise<void> | undefined) {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"conditional"},
 		},
 		{
@@ -258,7 +240,6 @@ f = async () => {
   return 3;
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnVariable"},
 		},
 		{
@@ -270,9 +251,9 @@ f = async () => {
   return 3;
 };
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
 				NoMisusedPromisesChecksVoidReturnOptions{Variables: type_checking.Ref(true)},
-			)},
+			)}),
 			wantIds: []string{"voidReturnVariable"},
 		},
 		{
@@ -285,7 +266,6 @@ const f: () => void = async () => {
 const g = async () => 1,
   h: () => void = async () => {};
       `,
-			options: nil,
 			wantIds: []string{"voidReturnVariable", "voidReturnVariable"},
 		},
 		{
@@ -299,7 +279,6 @@ obj.f = async () => {
   return 0;
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnVariable"},
 		},
 		{
@@ -311,7 +290,6 @@ const obj: O = {
   f: async () => 'foo',
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -323,9 +301,9 @@ const obj: O = {
   f: async () => 'foo',
 };
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
 				NoMisusedPromisesChecksVoidReturnOptions{Properties: type_checking.Ref(true)},
-			)},
+			)}),
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -338,7 +316,6 @@ const obj: O = {
   f,
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -352,7 +329,6 @@ const obj: O = {
   },
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -371,7 +347,6 @@ function f(): O {
   };
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty", "voidReturnProperty", "voidReturnProperty"},
 		},
 		{
@@ -382,7 +357,6 @@ function f(): () => void {
   return async () => 0;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnReturnValue"},
 		},
 		{
@@ -393,9 +367,9 @@ function f(): () => void {
   return async () => 0;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
 				NoMisusedPromisesChecksVoidReturnOptions{Returns: type_checking.Ref(true)},
-			)},
+			)}),
 			wantIds: []string{"voidReturnReturnValue"},
 		},
 		{
@@ -408,7 +382,6 @@ type O = {
 const Component = (obj: O) => null;
 <Component func={async () => 0} />;
       `,
-			options: nil,
 			wantIds: []string{"voidReturnAttribute"},
 		},
 		{
@@ -422,7 +395,6 @@ const g = async () => 'foo';
 const Component = (obj: O) => null;
 <Component func={g} />;
       `,
-			options: nil,
 			wantIds: []string{"voidReturnAttribute"},
 		},
 		{
@@ -438,7 +410,6 @@ declare const it: ItLike;
 
 it('', async () => {});
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -456,7 +427,6 @@ declare const it: ItLike;
 
 it('', async () => {});
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -474,7 +444,6 @@ declare const it: ItLike;
 
 it('', async () => {});
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -483,7 +452,6 @@ it('', async () => {});
 			sourceText: `
 console.log({ ...Promise.resolve({ key: 42 }) });
       `,
-			options: nil,
 			wantIds: []string{"spread"},
 		},
 		{
@@ -497,7 +465,6 @@ console.log({
   ...getData(),
 });
       `,
-			options: nil,
 			wantIds: []string{"spread"},
 		},
 		{
@@ -511,7 +478,6 @@ console.log({ ...(condition || Promise.resolve({ key: 42 })) });
 console.log({ ...(condition ? {} : Promise.resolve({ key: 42 })) });
 console.log({ ...(condition ? Promise.resolve({ key: 42 }) : {}) });
       `,
-			options: nil,
 			wantIds: []string{"spread", "spread", "spread", "spread"},
 		},
 		{
@@ -528,7 +494,6 @@ restPromises(
   () => Promise.resolve('Hello'),
 );
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument", "voidReturnArgument", "voidReturnArgument"},
 		},
 		{
@@ -540,7 +505,6 @@ type MyUnion = (() => void) | boolean;
 function restUnion(first: string, ...callbacks: Array<MyUnion>): void {}
 restUnion('Testing', false, () => Promise.resolve(true));
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -550,7 +514,6 @@ restUnion('Testing', false, () => Promise.resolve(true));
 function restTupleOne(first: string, ...callbacks: [() => void]): void {}
 restTupleOne('My string', () => Promise.resolve(1));
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -564,7 +527,6 @@ function restTupleTwo(
 
 restTupleTwo(true, undefined, () => Promise.resolve(true), undefined);
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -584,7 +546,6 @@ restTupleFour(
   () => Promise.resolve(1),
 );
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument", "voidReturnArgument"},
 		},
 		{
@@ -603,7 +564,6 @@ new TakesVoidCb(
   () => Promise.resolve(true),
 );
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -617,7 +577,6 @@ function restTuple(..._args: any[]): void {}
 restTuple();
 restTuple(true, () => Promise.resolve(1));
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -630,7 +589,6 @@ const test: ReturnsRecord = () => {
   return { asynchronous: async () => {} };
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -640,7 +598,6 @@ const test: ReturnsRecord = () => {
 let value: Record<string, () => void>;
 value.asynchronous = async () => {};
       `,
-			options: nil,
 			wantIds: []string{"voidReturnVariable"},
 		},
 		{
@@ -655,7 +612,6 @@ const test: ReturnsRecord = () => {
   return { asynchronous };
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -666,7 +622,6 @@ declare function foo(cb: undefined | (() => void));
 declare const bar: undefined | (() => Promise<void>);
 foo(bar);
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -677,7 +632,6 @@ declare function foo(cb: string & (() => void));
 declare const bar: string & (() => Promise<void>);
 foo(bar);
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -691,7 +645,6 @@ let cbs: Array<() => Promise<boolean>> = [
 ];
 consume(...cbs);
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -702,7 +655,6 @@ function consume(..._callbacks: Array<() => void>): void {}
 let cbs = [() => Promise.resolve(true), () => Promise.resolve(true)] as const;
 consume(...cbs);
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -713,7 +665,6 @@ function consume(..._callbacks: Array<() => void>): void {}
 let cbs = [() => Promise.resolve(true), () => Promise.resolve(true)];
 consume(...cbs);
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -732,7 +683,6 @@ class MySubclassExtendsMyClass extends MyClass {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -749,7 +699,6 @@ abstract class MyAbstractClassExtendsMyClass extends MyClass {
   abstract setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -766,7 +715,6 @@ interface MyInterfaceExtendsMyClass extends MyClass {
   setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -783,7 +731,6 @@ class MySubclassExtendsMyAbstractClass extends MyAbstractClass {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -798,7 +745,6 @@ abstract class MyAbstractSubclassExtendsMyAbstractClass extends MyAbstractClass 
   abstract setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -813,7 +759,6 @@ interface MyInterfaceExtendsMyAbstractClass extends MyAbstractClass {
   setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -830,7 +775,6 @@ class MyInterfaceSubclass implements MyInterface {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -845,7 +789,6 @@ abstract class MyAbstractClassImplementsMyInterface implements MyInterface {
   abstract setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -864,7 +807,6 @@ class MySubclassExtendsMyClass extends MyClass {
   };
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -879,7 +821,6 @@ abstract class MySubclassExtendsMyClass extends MyClass {
   abstract accessor setThing: () => Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -894,7 +835,6 @@ interface MySubInterface extends MyInterface {
   setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -910,7 +850,6 @@ class MyClassImplementsMyTypeIntersection implements MyTypeIntersection {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -925,7 +864,6 @@ interface MyAsyncInterface extends MyGenericType<false> {
   setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -944,7 +882,6 @@ interface MyThirdInterface extends MyInterface, MyOtherInterface {
   setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod", "voidReturnInheritedMethod"},
 		},
 		{
@@ -967,7 +904,6 @@ interface MyInterface extends MyClass, MyOtherClass {
   setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod", "voidReturnInheritedMethod"},
 		},
 		{
@@ -994,7 +930,6 @@ class MySubclass extends MyClass implements MyAsyncInterface, MySyncInterface {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod", "voidReturnInheritedMethod"},
 		},
 		{
@@ -1011,7 +946,6 @@ const MyClassExpressionExtendsMyClass = class implements MyInterface {
   }
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -1030,7 +964,6 @@ class MyClassExtendsMyClassExpression extends MyClassExpression {
   }
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -1048,7 +981,6 @@ interface MyInterfaceExtendsMyClassExpression extends MyClassExpressionType {
   setThing(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -1072,7 +1004,6 @@ interface MyAsyncInterface extends MySyncInterface {
   myMethod(): Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod"},
 		},
 		{
@@ -1111,7 +1042,6 @@ interface MyInterface extends MyCall, MyIndex, MyConstruct, MyMethods {
   syncMethodProperty: () => Promise<void>;
 }
       `,
-			options: nil,
 			wantIds: []string{"voidReturnInheritedMethod", "voidReturnInheritedMethod"},
 		},
 		{
@@ -1121,7 +1051,6 @@ interface MyInterface extends MyCall, MyIndex, MyConstruct, MyMethods {
 declare function isTruthy(value: unknown): Promise<boolean>;
 [0, 1, 2].filter(isTruthy);
       `,
-			options: nil,
 			wantIds: []string{"predicate"},
 		},
 		{
@@ -1131,7 +1060,6 @@ declare function isTruthy(value: unknown): Promise<boolean>;
 const array: number[] = [];
 array.every(() => Promise.resolve(true));
       `,
-			options: nil,
 			wantIds: []string{"predicate"},
 		},
 		{
@@ -1141,7 +1069,6 @@ array.every(() => Promise.resolve(true));
 const array: (string[] & { foo: 'bar' }) | (number[] & { bar: 'foo' }) = [];
 array.every(() => Promise.resolve(true));
       `,
-			options: nil,
 			wantIds: []string{"predicate"},
 		},
 		{
@@ -1151,7 +1078,7 @@ array.every(() => Promise.resolve(true));
 const tuple: [number, number, number] = [1, 2, 3];
 tuple.find(() => Promise.resolve(false));
       `,
-			options: NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(true)},
+			options: rule.Configured(NoMisusedPromisesOptions{ChecksConditionals: type_checking.Ref(true)}),
 			wantIds: []string{"predicate"},
 		},
 		{
@@ -1165,7 +1092,6 @@ declare const useCallback: <T extends (...args: unknown[]) => unknown>(
 declare const useCallbackReturningVoid: typeof useCallback<ReturnsVoid>;
 useCallbackReturningVoid(async () => {});
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -1178,7 +1104,6 @@ declare const useCallback: <T extends (...args: unknown[]) => unknown>(
 ) => T;
 useCallback<ReturnsVoid>(async () => {});
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -1193,7 +1118,6 @@ declare const foo: Foo<void>;
 
 foo(async () => {});
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument"},
 		},
 		{
@@ -1209,7 +1133,6 @@ tupleFn<() => void>(
   async () => {},
 );
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument", "voidReturnArgument"},
 		},
 		{
@@ -1225,7 +1148,6 @@ arrayFn<() => void>(
   async () => {},
 );
       `,
-			options: nil,
 			wantIds: []string{"voidReturnArgument", "voidReturnArgument"},
 		},
 		{
@@ -1242,7 +1164,6 @@ const o: HasVoidMethod = {
   },
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -1259,7 +1180,6 @@ const o: HasVoidMethod = {
   },
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -1275,7 +1195,6 @@ const obj: HasVoidMethod = {
   },
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -1291,7 +1210,6 @@ const obj: HasVoidMethod = {
   },
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -1304,7 +1222,6 @@ const obj: O = {
   f: asyncFunction,
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -1316,7 +1233,6 @@ const obj: O = {
   f: async (): Promise<string> => 'foo',
 };
       `,
-			options: nil,
 			wantIds: []string{"voidReturnProperty"},
 		},
 	}
@@ -1324,7 +1240,7 @@ const obj: O = {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				NoMisusedPromises,
 				testCase.fileName,

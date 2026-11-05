@@ -94,7 +94,7 @@ func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
 
 	disagreements := 0
 	for _, testCase := range cases {
-		result := rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil)
+		result := rule_testing.RunTyped(test, NoRedeclare, redeclareFile, testCase.sourceText)
 		got := len(result.Diagnostics)
 		if got != testCase.wantCount {
 			disagreements++
@@ -149,7 +149,7 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(test *testing.T) {
 			test.Parallel()
 			// Default options, which is what the live config gives this rule.
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil),
+				rule_testing.RunTyped(test, NoRedeclare, redeclareFile, testCase.sourceText),
 				"redeclared")
 
 			// And with the merge exemptions explicitly off, which must not move the verdict. This is
@@ -174,7 +174,7 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(test *testing.T) {
 		"class X {}\nnamespace X { export function create() {} }",
 	} {
 		rule_testing.ExpectClean(test,
-			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, sourceText, nil))
+			rule_testing.RunTyped(test, NoRedeclare, redeclareFile, sourceText))
 		rule_testing.ExpectFindings(test,
 			rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, sourceText, redeclareOptions(false)),
 			"redeclared")
