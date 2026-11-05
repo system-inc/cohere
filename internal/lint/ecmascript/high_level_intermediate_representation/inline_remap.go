@@ -299,8 +299,10 @@ func deepCopy[Value any](value Value) Value {
 	// Reflected through a pointer so the value keeps its static type. `reflect.ValueOf(value)` on an
 	// interface type sees only the dynamic value inside, and on a nil interface sees nothing at all;
 	// through the pointer a nil `Terminal` is a nil interface value, and deepCopyValue hands it back
-	// as the nil it was.
-	reflect.ValueOf(&copied).Elem().Set(deepCopyValue(reflect.ValueOf(&value).Elem()))
+	// as the nil it was. The pointer is to a local holding the value, so nothing can reach the
+	// parameter through it.
+	original := value
+	reflect.ValueOf(&copied).Elem().Set(deepCopyValue(reflect.ValueOf(&original).Elem()))
 	return copied
 }
 
