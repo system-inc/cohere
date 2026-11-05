@@ -251,9 +251,9 @@ func TestAFindingWithNoFixChangesNothing(test *testing.T) {
 // proves it fires on a proposal that arrived through the real rule interface, which is the path a
 // genuinely wrong rule would take. A rule cannot damage a file it has no way to write to, and this
 // is what that sentence actually means in practice.
-var breakingRule = rule.Rule{
+var breakingRule = rule.Rule[rule.NoOptions]{
 	Name: "probe-break-syntax",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				body := node.AsFunctionDeclaration().Body
@@ -317,9 +317,9 @@ func TestARuleProposingBrokenSyntaxIsRefused(test *testing.T) {
 // guard is worth having precisely because it is unreachable now: it costs nothing today and the
 // first rule to get this wrong will be caught by the engine rather than by a developer reading a
 // file full of nested braces.
-var nonSilencingRule = rule.Rule{
+var nonSilencingRule = rule.Rule[rule.NoOptions]{
 	Name: "probe-never-silences",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCaseBlock: func(node *ast.Node) {
 				caseBlock := node.AsCaseBlock()
@@ -435,9 +435,9 @@ func TestNonConvergenceNamesTheRule(test *testing.T) {
 // the same way it judges rivals. Nothing shipped can reach this: every ReportNodeWithFixes site
 // emits exactly one fix. It is built because the alternative is a documented property nobody has
 // watched happen, and a property stated by code and never observed is a claim, not a guarantee.
-var siblingOverlapRule = rule.Rule{
+var siblingOverlapRule = rule.Rule[rule.NoOptions]{
 	Name: "probe-sibling-overlap",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindStringLiteral: func(node *ast.Node) {
 				start, end := node.Loc.Pos(), node.Loc.End()
