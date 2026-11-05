@@ -2,8 +2,9 @@
 //
 // A line past the limit runs off the edge of a review pane or a split editor, and its end goes unread. gofmt never
 // wraps a line, so the limit is the writer's to keep. What cannot wrap is left alone: a generated file, an import
-// path, a //go: directive, a raw string's body, a string literal alone on its line, and a comment that overruns only
-// on one token too long for a comment line of its own, such as a URL.
+// path, a //go: directive, a raw string's body, a string literal alone on its line or after only a struct field's
+// names and type or a return, and a comment that overruns only on one token too long for a comment line of its own,
+// such as a URL.
 package consistency_no_long_line
 
 import (
@@ -31,7 +32,8 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_long_line",
 	Doc: "Flags a line longer than 120 columns, a tab counted as 4 and every other rune as 1, at its 121st column. " +
 		"A generated file, an import line, a //go: directive, a raw string's body, a string literal alone on its " +
-		"line, and a comment that overruns only on one token too long to wrap, such as a URL, are left alone.",
+		"line or after only a struct field's names and type or a return, and a comment that overruns only on one " +
+		"token too long to wrap, such as a URL, are left alone.",
 	Run: run,
 }
 
@@ -61,6 +63,11 @@ type sourceFile struct {
 	// stringLiterals and comments are in source order, so the one holding an offset is a binary search away.
 	stringLiterals []*ast.BasicLit
 	comments       []*ast.Comment
+	// unwrappableOpenings maps the offset a line's code opens at to the string literal that line may overrun on,
+	// when nothing from that offset to the literal could move to a line of its own: the literal itself, a struct
+	// field's names and type before its tag, or the return keyword before a lone returned string, since a newline
+	// after return makes it a bare return.
+	unwrappableOpenings map[int]*ast.BasicLit
 }
 
 func run(pass *analysis.Pass) (any, error) {
@@ -86,7 +93,12 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourceFile {
-	source := &sourceFile{tokenFile: tokenFile, content: content, exemptLines: map[int]bool{}}
+	source := &sourceFile{
+		tokenFile:           tokenFile,
+		content:             content,
+		exemptLines:         map[int]bool{},
+		unwrappableOpenings: map[int]*ast.BasicLit{},
+	}
 	for _, declaration := range file.Decls {
 		general, isGeneral := declaration.(*ast.GenDecl)
 		if !isGeneral || general.Tok != token.IMPORT {
@@ -112,8 +124,24 @@ func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourc
 		}
 	}
 	ast.Inspect(file, func(node ast.Node) bool {
-		if literal, isLiteral := node.(*ast.BasicLit); isLiteral && literal.Kind == token.STRING {
-			source.stringLiterals = append(source.stringLiterals, literal)
+		switch node := node.(type) {
+		case *ast.BasicLit:
+			if node.Kind == token.STRING {
+				source.stringLiterals = append(source.stringLiterals, node)
+				source.unwrappableOpenings[source.offsetOf(node.Pos())] = node
+			}
+		case *ast.Field:
+			// A field's names, type and tag are one declaration Go reads to the end of its line, and the tag is
+			// one literal, so a line holding only them has nothing that could wrap.
+			if node.Tag != nil {
+				source.unwrappableOpenings[source.offsetOf(node.Pos())] = node.Tag
+			}
+		case *ast.ReturnStmt:
+			if len(node.Results) == 1 {
+				if literal, isLiteral := node.Results[0].(*ast.BasicLit); isLiteral && literal.Kind == token.STRING {
+					source.unwrappableOpenings[source.offsetOf(node.Pos())] = literal
+				}
+			}
 		}
 		return true
 	})
@@ -153,24 +181,33 @@ func judgeFile(pass *analysis.Pass, source *sourceFile) {
 }
 
 // isRawStringBody is whether the overflow falls in a raw string's body on a line after the one the string opens on:
-// data with its own line structure, which a break would change.
+// data with its own line structure, which a break would change. On the line the string closes on, code after it is
+// code like any other and could wrap, so only closing punctuation may follow.
 func (source *sourceFile) isRawStringBody(line int, overflow int) bool {
 	literal, found := nodeHolding(source, source.stringLiterals, overflow)
-	return found && strings.HasPrefix(literal.Value, "`") && source.lineOf(literal.Pos()) < line
-}
-
-// isLoneStringLiteral is whether the line's code is one string literal and then only closing punctuation, with the
-// overflow in them: the shape a formatter prints for a long string, which leaves nothing to break but the string.
-// Code before the literal, or more code after it, could move to a line of its own, so either is a finding.
-func (source *sourceFile) isLoneStringLiteral(line int, overflow int) bool {
-	codeStart := source.codeStart(line)
-	literal, found := nodeHolding(source, source.stringLiterals, codeStart)
-	if !found || source.offsetOf(literal.Pos()) != codeStart || overflow < codeStart {
+	if !found || !strings.HasPrefix(literal.Value, "`") || source.lineOf(literal.Pos()) >= line {
 		return false
 	}
+	return source.closesTheLine(literal, line)
+}
+
+// isLoneStringLiteral is whether the line's code opens where nothing before a string literal could wrap, with only
+// closing punctuation after the literal and the overflow in the literal or that punctuation: the shape a formatter
+// prints for a long string, a long tag or a long returned string, which leaves nothing to break but the string. Code
+// before that, overflowing ahead of the literal, or more code after it, could move or be shortened, so is a finding.
+func (source *sourceFile) isLoneStringLiteral(line int, overflow int) bool {
+	literal, found := source.unwrappableOpenings[source.codeStart(line)]
+	if !found || source.lineOf(literal.Pos()) != line || overflow < source.offsetOf(literal.Pos()) {
+		return false
+	}
+	return source.closesTheLine(literal, line)
+}
+
+// closesTheLine is whether nothing but closing punctuation follows literal on line, which holds as well for a raw
+// string that runs on past it.
+func (source *sourceFile) closesTheLine(literal *ast.BasicLit, line int) bool {
 	lineEnd := source.lineEnd(line)
 	literalEnd := source.offsetOf(literal.End())
-	// A raw string that runs on past this line leaves nothing after it here.
 	if literalEnd >= lineEnd {
 		return true
 	}

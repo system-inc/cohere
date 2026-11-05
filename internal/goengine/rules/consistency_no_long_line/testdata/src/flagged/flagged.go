@@ -39,4 +39,14 @@ the rest of the raw string`)
 	// The closing line of a raw string, with code after the backtick that runs on past the limit.
 	_ = use(`a raw string
 whose closing line is short`, argument, name, argument, name, argument, name, argument, name, "and so on and so on and so on") // want `This line is \d+ columns, a tab counted as four, and the house limit is 120\.`
+	// A //go: comment after code is no directive, so it is a comment like any other, and it wraps.
+	_ = name //go:generate echo a directive after code is no directive, so it is prose and wrapsand so on and so on and so onx // want `This line is \d+ columns, a tab counted as four, and the house limit is 120\.`
+	// A raw string whose closing line runs its data past the limit, with code after it that could wrap.
+	_ = use(`a raw string
+whose closing line runs its data past the limit and then has code after its backtickand so on and so on and so on and so on`, argument, name, use()) // want `This line is \d+ columns, a tab counted as four, and the house limit is 120\.`
+}
+
+// Record carries the long tag after names and a type that are past the limit before the tag starts.
+type Record struct {
+	FirstName, SecondName map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]map[string]string `json:"name" description:"a struct field's tag past the limit, after only a short name and typeand so on and"` // want `This line is \d+ columns, a tab counted as four, and the house limit is 120\.`
 }
