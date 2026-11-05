@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	goenginerule "github.com/system-inc/cohere/internal/goengine/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
@@ -71,13 +72,19 @@ type SwiftVerdict struct {
 }
 
 var ruleSourceNotes = map[string]string{
-	"name":            "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
-	"language":        "the registry the row comes from: the Go engine's for TypeScript, swift/Rules.json for Swift",
-	"namespace":       "the registered name, before its last slash",
-	"origin":          "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json)",
-	"upstreamName":    "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json)",
-	"category":        "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
-	"typeAware":       "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares",
+	"name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
+	"language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), " +
+		"the Go engine's (internal/goengine/rules), swift/Rules.json for Swift",
+	"namespace": "the registered name, before its last slash",
+	"origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; " +
+		"for Swift, the origin each rule declares (swift/Rules.json); " +
+		"for Go, the origin each rule declares (internal/goengine/rules)",
+	"upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; " +
+		"for Swift, the id a ported rule declares (swift/Rules.json); " +
+		"for Go, the analyzer or check a ported rule names (internal/goengine/rules)",
+	"category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
+	"typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares, " +
+		"or for Go the TypeAware its registration declares",
 	"options":         "the rule's registration: which decoder it carries and whether it requires options",
 	"messageIds":      "the message ids the rule's own tests assert (examples/<rule>.json)",
 	"fixKind":         "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
@@ -174,6 +181,11 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		return Rules{}, err
 	}
 	rows = append(rows, swiftRows...)
+	goRows, err := buildGoRows(inputs.GoRules)
+	if err != nil {
+		return Rules{}, err
+	}
+	rows = append(rows, goRows...)
 	sort.Slice(rows, func(left, right int) bool { return rows[left].Name < rows[right].Name })
 	return Rules{SourceNotes: ruleSourceNotes, Count: len(rows), Rules: rows}, nil
 }
@@ -233,6 +245,37 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 		}
 		sort.Strings(dangling)
 		return nil, fmt.Errorf("docsdata: the Swift verdicts name %v, which swift/Rules.json does not hold", dangling)
+	}
+	return rows, nil
+}
+
+// buildGoRows renders one row per Go engine rule. The registry's own Validate refuses a rule outside the
+// namespace, with an origin it does not know, or with an upstream name its origin forbids or lacks, and a
+// house rule outside the naming scheme refuses the build here, as a TypeScript or Swift one does.
+func buildGoRows(registered []goenginerule.Rule) ([]RuleRow, error) {
+	namespace := strings.TrimSuffix(goenginerule.Namespace, "/")
+	rows := make([]RuleRow, 0, len(registered))
+	for _, goRule := range registered {
+		if validateError := goRule.Validate(); validateError != nil {
+			return nil, fmt.Errorf("docsdata: %w", validateError)
+		}
+		row := RuleRow{
+			Name:         goRule.Name,
+			Language:     "Go",
+			Namespace:    namespace,
+			Origin:       string(goRule.Origin),
+			UpstreamName: goRule.UpstreamName,
+			TypeAware:    goRule.TypeAware,
+		}
+		if goRule.Origin == goenginerule.OriginHouse {
+			leaf := strings.TrimPrefix(goRule.Name, goenginerule.Namespace)
+			parsed, parseError := policy.Naming.ParseRuleName(namespace, leaf)
+			if parseError != nil {
+				return nil, fmt.Errorf("docsdata: %s: %w", goRule.Name, parseError)
+			}
+			row.Category = parsed.Category
+		}
+		rows = append(rows, row)
 	}
 	return rows, nil
 }

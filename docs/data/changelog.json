@@ -1,5 +1,11 @@
 [
     {
+        "version": "0.2.0",
+        "unreleased": true,
+        "anchor": "020-unreleased",
+        "body": "No rule set changed.\n\n### Added\n\n- Go. A directory with a `go.work` or a `go.mod` is a Go project, checked by the Go engine, which is\n  `cohere` itself run as a child of itself (`cohere go-engine`), so there is nothing more to install. A\n  repository holding TypeScript, Swift and Go gets one report and one footer, counting each engine's\n  projects, and the worst exit wins. A workspace checks every module its `go.work` uses, and a module\n  no workspace uses runs on its own, with a note when a workspace above it leaves it out. A Go engine\n  that crashes, prints nothing or stops early is reported as nothing checked, never as green.\n\n### Changed\n\n- A failure cohere prints is one sentence: its first letter capitalized and a closing period, as in\n  `cohere: No tsconfig.json, Package.swift, go.work or go.mod in /repo or any directory above it, ...`.\n  A path, a file, a quoted value or another tool's output at the end keeps its spelling. A script that\n  matched the old lowercase opening of a failure line should match the new one.\n- The errors that name the markers cohere looks for name all four.\n"
+    },
+    {
         "version": "0.1.1",
         "date": "2026-11-03",
         "anchor": "011-2026-11-03",

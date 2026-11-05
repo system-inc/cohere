@@ -155,7 +155,7 @@ func TestFormatOnlyBuildsNoGraph(t *testing.T) {
 		".gitignore":               ".cache/\n",
 		"Tidy.ts":                  "export const tidy = 1;\n",
 	})
-	if output, code := runCohere(t, binary, root, "--no-fix"); code == 0 || !strings.Contains(output, "building the type graph") {
+	if output, code := runCohere(t, binary, root, "--no-fix"); code == 0 || !strings.Contains(output, "Building the type graph") {
 		t.Fatalf("the tsconfig built a program, so this test proves nothing, exit %d:\n%s", code, output)
 	}
 

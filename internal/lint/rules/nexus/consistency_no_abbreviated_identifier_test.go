@@ -375,7 +375,7 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(t *testing.T) {
 		// One occurrence at a time, which is what JavaScript's non-global String.replace does and
 		// what the original means. Expanding every occurrence at once would hand a reader a name
 		// they did not ask for in a position the rule never reported.
-		{"a repeated segment expands once", "const srcDirDstDir = 1;\n", `Use "srcDirectoryDstDir"`},
+		{"a repeated segment expands once", "const rootDirCacheDir = 1;\n", `Use "rootDirectoryCacheDir"`},
 		{"a repeated millisecond unit expands once", "const ageMsHalfMs = 1;\n", `Use "ageInMillisecondsHalfMs"`},
 		// `arguments` is a reserved binding, so a bare `args` names no replacement and says why.
 		{"args offers alternatives instead of one name", "const args = 1;\n", `"commandLineArguments"`},

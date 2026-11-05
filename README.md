@@ -29,12 +29,22 @@ engine the two macOS packages ship beside `cohere`. It runs on macOS 15 and late
 package with the Swift toolchain already on your machine. On Linux and Windows there is no Swift
 engine, and `cohere` refuses a Swift package by name and exits 1 rather than checking nothing.
 
+## Go
+
+A directory with a `go.work` or a `go.mod` is checked as Go, by the Go engine, which is `cohere` itself
+run as a child of itself, so it ships on every platform `cohere` does. It loads every package once, with
+its types, through the `go` on your `PATH`, formats with gofmt, and runs vet's analyzers and the house
+rules over what it loaded. A `go.work` is one project over every module it uses, so a module a workspace
+uses is checked as part of that workspace, and a `go.mod` no workspace uses is a project of its own. Its
+rules are set under a `go` key in `CohereSettings.json`, and a finding is suppressed with
+`//cohere:ignore <rule> <reason>`, where the reason is required.
+
 ## Running it
 
-Run it anywhere in a repository. It starts from the project you're in, the nearest `tsconfig.json` or
-`Package.swift` at or above you, or from the repository's root when there's none, and checks that
-project and every project below it: each TypeScript program and each Swift package, each with its own
-engine and its own settings, all at once. A repository holding more than one gets one report, a section
+Run it anywhere in a repository. It starts from the project you're in, the nearest `tsconfig.json`,
+`Package.swift`, `go.work` or `go.mod` at or above you, or from the repository's root when there's none,
+and checks that project and every project below it: each TypeScript program, each Swift package and each
+Go workspace or module, each with its own engine and its own settings, all at once. A repository holding more than one gets one report, a section
 per project, a line per project and one summary, and the exit code is the worst of theirs, so it's green
 only when every project is. A run that finds no project fails, and so does one whose every project was
 skipped, such as a Swift package alone under `--format-only`: it checked nothing.

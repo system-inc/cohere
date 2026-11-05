@@ -27,9 +27,9 @@ func TestAConfigReadAheadOfTheGraphRefusesWhatItAlwaysRefused(t *testing.T) {
 		name, settings, refusal, absent string
 	}{
 		{"settings no rule reads", `{"extends": ["cohere:react"], "settings": {"nobody-reads-this": {"a": 1}}}`,
-			`validating the lint config: settings names "nobody-reads-this", which no rule cohere runs reads`, ""},
+			`Validating the lint config: settings names "nobody-reads-this", which no rule cohere runs reads`, ""},
 		{"an override reaching no file, before bad settings", `{"extends": ["cohere:react"], ` + vacuous + `, "settings": {"nobody-reads-this": {"a": 1}}}`,
-			`validating the lint config: lint config declares override 1 pattern "nowhere/**", which matched none`, "nobody-reads-this"},
+			`Validating the lint config: lint config declares override 1 pattern "nowhere/**", which matched none`, "nobody-reads-this"},
 	}
 	for _, refused := range cases {
 		t.Run(refused.name, func(t *testing.T) {

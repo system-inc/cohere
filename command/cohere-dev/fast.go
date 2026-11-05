@@ -105,7 +105,7 @@ var landingGateOnly = []landingGateEntry{
 func fastTest(base []string, arguments []string) int {
 	fmt.Fprintf(os.Stderr, "cohere-dev: fast tier, at load %s\n", machineLoad())
 
-	packages, err := modulePackages()
+	packages, err := modulePackages(base)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
 		return 1
@@ -165,16 +165,23 @@ func fastTest(base []string, arguments []string) int {
 //
 // The root module's only: the fast tier is not the landing gate, so it leaves the other modules go.work
 // names (the shims, static_single_assignment) to the gate and to `cohere-dev test ./...` (workspace.go).
-func modulePackages() (map[string]bool, error) {
-	return modulePackagesIn("")
+func modulePackages(environment []string) (map[string]bool, error) {
+	return modulePackagesIn("", environment)
 }
 
-// modulePackagesIn is modulePackages for the module at root, or the working directory's when it is empty.
-func modulePackagesIn(root string) (map[string]bool, error) {
+// modulePackagesIn is modulePackages for the module at root, or the working directory's when it is empty,
+// listed in the environment the run's tests get. It once listed in the caller's own, so in a worktree with
+// TypeScript a symlink, from a shell with no go flags, go list failed on VCS stamping and the fast tier
+// stopped there (2026-11-05). go's stderr goes in the error, which said only "exit status 1" without it.
+func modulePackagesIn(root string, environment []string) (map[string]bool, error) {
 	command := exec.Command("go", "list", "-f", "{{.ImportPath}} {{.Module.Path}}", "./...")
 	command.Dir = root
+	command.Env = environment
 	output, err := command.Output()
 	if err != nil {
+		if exited, ok := err.(*exec.ExitError); ok && len(exited.Stderr) > 0 {
+			return nil, fmt.Errorf("listing the module's packages: %w\n%s", err, strings.TrimSpace(string(exited.Stderr)))
+		}
 		return nil, fmt.Errorf("listing the module's packages: %w", err)
 	}
 	packages := map[string]bool{}
