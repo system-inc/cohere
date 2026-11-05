@@ -772,6 +772,9 @@ func newAliasingNode(id static_single_assignment.IdentifierId, value aliasingNod
 // choice. The index is compared against the mutation's index to decide whether the edge already
 // existed, so keeping the earliest makes the edge visible to the widest set of mutations. Keeping
 // the latest would silently narrow every range that flows through a repeated alias.
+//
+// Mutates: into the edge is recorded in the node's own map, which every caller passes for exactly that
+// Mutates: order the edge is appended to the node's own insertion order, which every caller passes for exactly that
 func insertBackEdge(
 	into map[static_single_assignment.IdentifierId]int,
 	order *[]static_single_assignment.IdentifierId,
@@ -867,6 +870,9 @@ func (state *aliasingState) freeze(id static_single_assignment.IdentifierId) boo
 	return state.freezeWithSeen(id, map[static_single_assignment.IdentifierId]bool{})
 }
 
+// freezeWithSeen is freeze, carrying the values this walk has already frozen so a cycle of sources ends.
+//
+// Mutates: seen each value visited is added, so the recursive calls share one record of the walk
 func (state *aliasingState) freezeWithSeen(
 	id static_single_assignment.IdentifierId,
 	seen map[static_single_assignment.IdentifierId]bool,

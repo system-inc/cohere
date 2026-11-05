@@ -329,15 +329,16 @@ func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, fun
 	blocks = blocks[:reached]
 
 	intersect := func(a, b int) int {
-		for a != b {
-			for a > b {
-				a = tree.immediate[a]
+		left, right := a, b
+		for left != right {
+			for left > right {
+				left = tree.immediate[left]
 			}
-			for b > a {
-				b = tree.immediate[b]
+			for right > left {
+				right = tree.immediate[right]
 			}
 		}
-		return a
+		return left
 	}
 
 	for changed := true; changed; {
@@ -377,7 +378,7 @@ func realReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G,
 		next       int
 	}
 	var stack []frame
-	scratch := edgeScratchPool.Get().(*edgeScratch)
+	scratch := takeEdgeScratch()
 	defer edgeScratchPool.Put(scratch)
 	enter := func(id BlockId) {
 		block, ok := graph.Block(function, id)

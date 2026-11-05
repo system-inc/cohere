@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"go/format"
+	"log"
 	"os"
 	"slices"
 
@@ -20,11 +21,11 @@ func main() {
 	flag.Parse()
 	t, err := ucd.Build()
 	if err != nil {
-		panic(err)
+		log.Fatalf("building the Unicode tables: %v", err)
 	}
 	if *inventory {
 		if err = json.NewEncoder(os.Stdout).Encode(t); err != nil {
-			panic(err)
+			log.Fatalf("writing the inventory: %v", err)
 		}
 		return
 	}
@@ -58,20 +59,22 @@ func main() {
 	fmt.Fprintln(&b, "}")
 	data, err := format.Source(b.Bytes())
 	if err != nil {
-		panic(err)
+		log.Fatalf("formatting the generated tables: %v", err)
 	}
 	if *check {
 		old, e := os.ReadFile(*output)
 		if e != nil {
-			panic(e)
+			log.Fatalf("reading %s: %v", *output, e)
 		}
 		if !bytes.Equal(old, data) {
+			// Ignored: stderr is where this command reports, so a failed write there has nowhere else to go, and
+			// the exit status below still says the tables are stale.
 			fmt.Fprintln(os.Stderr, "Unicode property tables are stale; run go generate ./unicodeproperties")
 			os.Exit(1)
 		}
 		return
 	}
-	if err = os.WriteFile(*output, data, 0644); err != nil {
-		panic(err)
+	if err = os.WriteFile(*output, data, 0o644); err != nil {
+		log.Fatalf("writing %s: %v", *output, err)
 	}
 }

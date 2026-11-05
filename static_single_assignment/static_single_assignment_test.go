@@ -95,19 +95,23 @@ func (function *testFunction) value(name string) testPlace {
 	return testPlace{id: id, tag: name}
 }
 
+// define appends an instruction that stores a new value of the variable name.
+//
+// Mutates: block a test builds its function by appending instructions to the blocks it made
 func (function *testFunction) define(block *testBlock, name string) *testInstruction {
 	instruction := &testInstruction{defines: []testPlace{function.value(name)}}
 	block.instructions = append(block.instructions, instruction)
 	return instruction
 }
 
+// use appends an instruction that reads the variable name.
+//
+// Mutates: block a test builds its function by appending instructions to the blocks it made
 func (function *testFunction) use(block *testBlock, name string) *testInstruction {
 	instruction := &testInstruction{uses: []testPlace{function.value(name)}}
 	block.instructions = append(block.instructions, instruction)
 	return instruction
 }
-
-func (function *testFunction) name(id ssa.IdentifierId) string { return function.identifiers[id].name }
 
 type testGraph struct{}
 
@@ -117,7 +121,9 @@ func (testGraph) Block(f *testFunction, id ssa.BlockId) (*testBlock, bool) {
 	block, ok := f.table[id]
 	return block, ok
 }
-func (testGraph) Blocks(f *testFunction) []*testBlock            { return f.blocks }
+func (testGraph) Blocks(f *testFunction) []*testBlock { return f.blocks }
+
+// Mutates: f the passes hand their new block order back through this setter, as through a real IR's
 func (testGraph) SetBlocks(f *testFunction, blocks []*testBlock) { f.blocks = blocks }
 func (testGraph) Retain(f *testFunction, keep func(ssa.BlockId) bool) {
 	for id := range f.table {
@@ -134,10 +140,14 @@ func (testGraph) Placeholder(f *testFunction, block *testBlock) *testBlock {
 }
 func (testGraph) Id(block *testBlock) ssa.BlockId             { return block.id }
 func (testGraph) Predecessors(block *testBlock) []ssa.BlockId { return block.predecessors }
+
+// Mutates: block the passes record its recomputed predecessors through this setter, as through a real IR's
 func (testGraph) SetPredecessors(block *testBlock, predecessors []ssa.BlockId) {
 	block.predecessors = predecessors
 }
-func (testGraph) Phis(block *testBlock) []*ssa.Phi[testPlace]          { return block.phis }
+func (testGraph) Phis(block *testBlock) []*ssa.Phi[testPlace] { return block.phis }
+
+// Mutates: block the passes record its phis through this setter, as through a real IR's
 func (testGraph) SetPhis(block *testBlock, phis []*ssa.Phi[testPlace]) { block.phis = phis }
 func (testGraph) EachEdge(block *testBlock, visit func(ssa.BlockId, ssa.Edge)) {
 	for _, edge := range block.edges {
@@ -167,7 +177,11 @@ func (testGraph) ContextStoreDefines(f *testFunction, block *testBlock, index in
 func (testGraph) SetInstructionOrder(f *testFunction, block *testBlock, index int, order ssa.EvaluationOrder) {
 	block.instructions[index].order = order
 }
-func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.Role)) {}
+func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.Role)) {
+	// A test block's terminal is its edges and a return flag, which hold no place to visit.
+}
+
+// Mutates: block the passes record its terminal's evaluation order through this setter, as through a real IR's
 func (testGraph) SetTerminalOrder(block *testBlock, order ssa.EvaluationOrder) {
 	block.terminalOrder = order
 }
@@ -179,6 +193,8 @@ func (testGraph) Declaration(f *testFunction, id ssa.IdentifierId) ssa.Declarati
 func (testGraph) Contextual(f *testFunction, declaration ssa.DeclarationId) bool {
 	return f.contextual[declaration]
 }
+
+// Mutates: f construction mints each renamed value through this, which records it in the test function's table
 func (testGraph) Mint(f *testFunction, original ssa.IdentifierId) ssa.IdentifierId {
 	source := f.identifiers[original]
 	id := ssa.IdentifierId(len(f.identifiers))
@@ -213,6 +229,9 @@ func construct(test *testing.T, f *testFunction) {
 	}
 }
 
+// goTo adds a real edge from one block to each of the others.
+//
+// Mutates: from a test builds its function by adding edges to the blocks it made
 func goTo(from *testBlock, to ...*testBlock) {
 	for _, block := range to {
 		from.edges = append(from.edges, testEdge{to: block.id, kind: ssa.Real})
