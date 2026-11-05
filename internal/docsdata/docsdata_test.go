@@ -14,6 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/benchresults"
 	"github.com/system-inc/cohere/internal/docsdata/capture"
+	goenginerules "github.com/system-inc/cohere/internal/goengine/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -23,29 +24,29 @@ import (
 // directory, two below it.
 const moduleRoot = "../.."
 
-func sourceInputs(test *testing.T) Inputs {
-	test.Helper()
+func sourceInputs(t *testing.T) Inputs {
+	t.Helper()
 	inputs, err := SourceInputs(moduleRoot)
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	return inputs
 }
 
-func built(test *testing.T, inputs Inputs) map[string][]byte {
-	test.Helper()
+func built(t *testing.T, inputs Inputs) map[string][]byte {
+	t.Helper()
 	files, err := Build(inputs)
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	return files
 }
 
-func staleAgainstCommitted(test *testing.T, files map[string][]byte) []string {
-	test.Helper()
+func staleAgainstCommitted(t *testing.T, files map[string][]byte) []string {
+	t.Helper()
 	stale, err := Stale(moduleRoot, files)
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	return stale
 }
@@ -53,41 +54,41 @@ func staleAgainstCommitted(test *testing.T, files map[string][]byte) []string {
 // TestTheRenderedFilesAreCurrent: docs/data is what Build renders now from the committed examples, every
 // file but cli.json, which needs the binary built. It is -check-rendering's depth: the examples themselves
 // are recaptured only by the generator's -check, which takes minutes and runs in the release's module check.
-func TestTheRenderedFilesAreCurrent(test *testing.T) {
-	test.Parallel()
-	if stale := staleAgainstCommitted(test, built(test, sourceInputs(test))); len(stale) > 0 {
-		test.Errorf("stale: %v; run go run ./internal/docsdata/tools/generate", stale)
+func TestTheRenderedFilesAreCurrent(t *testing.T) {
+	t.Parallel()
+	if stale := staleAgainstCommitted(t, built(t, sourceInputs(t))); len(stale) > 0 {
+		t.Errorf("stale: %v; run go run ./internal/docsdata/tools/generate", stale)
 	}
 }
 
 // TestCheckSeesARegistryChange is -check's contract for the registry, in both directions: the committed
 // files pass as they are, and fail once a rule is removed or added.
-func TestCheckSeesARegistryChange(test *testing.T) {
-	test.Parallel()
-	inputs := sourceInputs(test)
-	if stale := staleAgainstCommitted(test, built(test, inputs)); len(stale) > 0 {
-		test.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
+func TestCheckSeesARegistryChange(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
+	if stale := staleAgainstCommitted(t, built(t, inputs)); len(stale) > 0 {
+		t.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
 	}
 
 	removed := inputs
 	removed.Registrations = inputs.Registrations[1:]
-	if stale := staleAgainstCommitted(test, built(test, removed)); !slices.Contains(stale, RulesPath) {
-		test.Errorf("removing %s from the registry left rules.json current: %v", inputs.Registrations[0].Rule.Name, stale)
+	if stale := staleAgainstCommitted(t, built(t, removed)); !slices.Contains(stale, RulesPath) {
+		t.Errorf("removing %s from the registry left rules.json current: %v", inputs.Registrations[0].Rule.Name, stale)
 	}
 
 	added := inputs
 	added.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
 		Rule: rule.Rule{Name: "nexus/consistency-no-docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
 	})
-	if stale := staleAgainstCommitted(test, built(test, added)); !slices.Contains(stale, RulesPath) {
-		test.Errorf("adding a rule to the registry left rules.json current: %v", stale)
+	if stale := staleAgainstCommitted(t, built(t, added)); !slices.Contains(stale, RulesPath) {
+		t.Errorf("adding a rule to the registry left rules.json current: %v", stale)
 	}
 }
 
 // TestCheckSeesATierChange: a rule set resolving differently makes sets.json and rules.json stale.
-func TestCheckSeesATierChange(test *testing.T) {
-	test.Parallel()
-	inputs := sourceInputs(test)
+func TestCheckSeesATierChange(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
 	changedSet := inputs.SetNames[0]
 	var changedRule string
 	loadSet := inputs.LoadSet
@@ -110,10 +111,10 @@ func TestCheckSeesATierChange(test *testing.T) {
 		resolved.Rules[changedRule] = setting
 		return resolved, nil
 	}
-	stale := staleAgainstCommitted(test, built(test, inputs))
+	stale := staleAgainstCommitted(t, built(t, inputs))
 	for _, path := range []string{SetsPath, RulesPath} {
 		if !slices.Contains(stale, path) {
-			test.Errorf("changing %s's severity in %s left %s current: %v", changedRule, changedSet, path, stale)
+			t.Errorf("changing %s's severity in %s left %s current: %v", changedRule, changedSet, path, stale)
 		}
 	}
 }
@@ -121,29 +122,32 @@ func TestCheckSeesATierChange(test *testing.T) {
 // TestEveryRegisteredRuleHasOneRow: rules.json names every rule each engine registers exactly once, under
 // that engine's language, and nothing else. The Swift registry is read from swift/Rules.json, which a
 // Swift test holds to the Swift engine's registry.
-func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
-	test.Parallel()
+func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
+	t.Parallel()
 	committed, err := os.ReadFile(filepath.Join(moduleRoot, RulesPath))
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	var rules Rules
 	if err := json.Unmarshal(committed, &rules); err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	swiftRegistry, err := os.ReadFile(filepath.Join(moduleRoot, "swift", "Rules.json"))
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	var swiftEntries []struct {
 		Name string `json:"name"`
 	}
 	if err := json.Unmarshal(swiftRegistry, &swiftEntries); err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
-	registered := map[string][]string{"TypeScript": registry.Names()}
+	registered := map[string][]string{"TypeScript": registry.Names(), "Go": {}}
 	for _, entry := range swiftEntries {
 		registered["Swift"] = append(registered["Swift"], entry.Name)
+	}
+	for _, goRule := range goenginerules.All() {
+		registered["Go"] = append(registered["Go"], goRule.Name)
 	}
 
 	rows := map[string]map[string]int{}
@@ -153,45 +157,48 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 		}
 		rows[row.Language][row.Name]++
 	}
-	for _, language := range []string{"TypeScript", "Swift"} {
-		if len(registered[language]) == 0 {
-			test.Fatalf("no %s rule is registered, so the rows were checked against nothing", language)
+	// Go is held to its registry in both directions like the others, but is not refused when empty: its
+	// rules arrive one unit at a time, and until the first does, zero Go rows is the true answer. The
+	// vacuity guard stays on the two engines that have always registered rules.
+	for _, language := range []string{"TypeScript", "Swift", "Go"} {
+		if len(registered[language]) == 0 && language != "Go" {
+			t.Fatalf("no %s rule is registered, so the rows were checked against nothing", language)
 		}
 		names := map[string]bool{}
 		for _, name := range registered[language] {
 			names[name] = true
 			if rows[language][name] != 1 {
-				test.Errorf("%s is a registered %s rule and has %d %s rows in rules.json", name, language, rows[language][name], language)
+				t.Errorf("%s is a registered %s rule and has %d %s rows in rules.json", name, language, rows[language][name], language)
 			}
 		}
 		for name := range rows[language] {
 			if !names[name] {
-				test.Errorf("rules.json has a %s row for %s, which that engine does not register", language, name)
+				t.Errorf("rules.json has a %s row for %s, which that engine does not register", language, name)
 			}
 		}
 	}
 	for language := range rows {
 		if registered[language] == nil {
-			test.Errorf("rules.json has rows in %s, which no engine registers", language)
+			t.Errorf("rules.json has rows in %s, which no engine registers", language)
 		}
 	}
 	if rules.Count != len(rules.Rules) {
-		test.Errorf("rules.json says count %d over %d rows", rules.Count, len(rules.Rules))
+		t.Errorf("rules.json says count %d over %d rows", rules.Count, len(rules.Rules))
 	}
 }
 
 // TestCheckSeesASwiftRegistryChange: a Swift rule removed from swift/Rules.json makes rules.json stale, and
 // a Swift rule with an unknown origin, a misnamed house rule, or a verdict naming a missing Swift rule
 // refuses the build.
-func TestCheckSeesASwiftRegistryChange(test *testing.T) {
-	test.Parallel()
-	inputs := sourceInputs(test)
-	if stale := staleAgainstCommitted(test, built(test, inputs)); len(stale) > 0 {
-		test.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
+func TestCheckSeesASwiftRegistryChange(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
+	if stale := staleAgainstCommitted(t, built(t, inputs)); len(stale) > 0 {
+		t.Fatalf("the committed files are already stale (%v), so a change could not be told apart", stale)
 	}
 	var entries []map[string]any
 	if err := json.Unmarshal(inputs.SwiftRules, &entries); err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	withEntries := func(change func([]map[string]any) []map[string]any) Inputs {
 		copied := make([]map[string]any, 0, len(entries))
@@ -204,7 +211,7 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 		}
 		encoded, err := json.Marshal(change(copied))
 		if err != nil {
-			test.Fatal(err)
+			t.Fatal(err)
 		}
 		changed := inputs
 		changed.SwiftRules = encoded
@@ -219,11 +226,11 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 				return append(entries[:index], entries[index+1:]...)
 			}
 		}
-		test.Fatal("no ported Swift rule to remove")
+		t.Fatal("no ported Swift rule to remove")
 		return nil
 	})
-	if stale := staleAgainstCommitted(test, built(test, removed)); !slices.Contains(stale, RulesPath) {
-		test.Errorf("removing a Swift rule left rules.json current: %v", stale)
+	if stale := staleAgainstCommitted(t, built(t, removed)); !slices.Contains(stale, RulesPath) {
+		t.Errorf("removing a Swift rule left rules.json current: %v", stale)
 	}
 
 	for name, change := range map[string]func([]map[string]any) []map[string]any{
@@ -240,39 +247,39 @@ func TestCheckSeesASwiftRegistryChange(test *testing.T) {
 					return append(entries[:index], entries[index+1:]...)
 				}
 			}
-			test.Fatal("the bare-throw rule, which a verdict names, is not in swift/Rules.json")
+			t.Fatal("the bare-throw rule, which a verdict names, is not in swift/Rules.json")
 			return nil
 		},
 	} {
 		if _, err := Build(withEntries(change)); err == nil {
-			test.Errorf("%s built", name)
+			t.Errorf("%s built", name)
 		}
 	}
 }
 
 // TestEveryHouseRuleFollowsTheNamingScheme: every house rule builds with a category and no port carries
 // one, and a house rule registered under a name outside the scheme refuses the build.
-func TestEveryHouseRuleFollowsTheNamingScheme(test *testing.T) {
-	test.Parallel()
-	inputs := sourceInputs(test)
+func TestEveryHouseRuleFollowsTheNamingScheme(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
 	var rules Rules
-	if err := json.Unmarshal(built(test, inputs)[RulesPath], &rules); err != nil {
-		test.Fatal(err)
+	if err := json.Unmarshal(built(t, inputs)[RulesPath], &rules); err != nil {
+		t.Fatal(err)
 	}
 	house := 0
 	for _, row := range rules.Rules {
 		switch {
 		case row.Origin == houseOrigin && row.Category == "":
-			test.Errorf("%s is a house rule with no category", row.Name)
+			t.Errorf("%s is a house rule with no category", row.Name)
 		case row.Origin != houseOrigin && row.Category != "":
-			test.Errorf("%s is a port and carries the category %q", row.Name, row.Category)
+			t.Errorf("%s is a port and carries the category %q", row.Name, row.Category)
 		}
 		if row.Origin == houseOrigin {
 			house++
 		}
 	}
 	if house == 0 {
-		test.Fatal("no house rule was built, so the scheme was checked against nothing")
+		t.Fatal("no house rule was built, so the scheme was checked against nothing")
 	}
 
 	misnamed := inputs
@@ -280,54 +287,54 @@ func TestEveryHouseRuleFollowsTheNamingScheme(test *testing.T) {
 		Rule: rule.Rule{Name: "nexus/docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
 	})
 	if _, err := Build(misnamed); err == nil || !strings.Contains(err.Error(), "nexus/docsdata-test-rule") {
-		test.Errorf("a house rule named outside the scheme built: %v", err)
+		t.Errorf("a house rule named outside the scheme built: %v", err)
 	}
 }
 
 // TestBuildIsDeterministic: two builds give the same bytes, so a regeneration diffs to nothing.
-func TestBuildIsDeterministic(test *testing.T) {
-	test.Parallel()
-	inputs := sourceInputs(test)
-	first, second := built(test, inputs), built(test, inputs)
+func TestBuildIsDeterministic(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
+	first, second := built(t, inputs), built(t, inputs)
 	if len(first) != len(second) {
-		test.Fatalf("%d files, then %d", len(first), len(second))
+		t.Fatalf("%d files, then %d", len(first), len(second))
 	}
 	for path, contents := range first {
 		if !bytes.Equal(contents, second[path]) {
-			test.Errorf("%s differs between two builds", path)
+			t.Errorf("%s differs between two builds", path)
 		}
 	}
 }
 
 // TestEveryFieldHasASourceNote: rules.json says where each field of a row comes from, and names no field
 // a row does not have.
-func TestEveryFieldHasASourceNote(test *testing.T) {
-	test.Parallel()
+func TestEveryFieldHasASourceNote(t *testing.T) {
+	t.Parallel()
 	encoded, err := json.Marshal(RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
 		Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-", TypeScriptRules: []string{""}})
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(encoded, &fields); err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	for field := range fields {
 		if ruleSourceNotes[field] == "" {
-			test.Errorf("rules.json rows carry %q and sourceNotes does not say where it comes from", field)
+			t.Errorf("rules.json rows carry %q and sourceNotes does not say where it comes from", field)
 		}
 	}
 	for field := range ruleSourceNotes {
 		if _, present := fields[field]; !present {
-			test.Errorf("sourceNotes describes %q, which a row does not carry", field)
+			t.Errorf("sourceNotes describes %q, which a row does not carry", field)
 		}
 	}
 }
 
 // TestTheHelpParserReadsWhatTheFlagPackageWrites: a flag set with every shape the binary uses, printed by
 // the flag package itself, parses back to exactly what the set holds.
-func TestTheHelpParserReadsWhatTheFlagPackageWrites(test *testing.T) {
-	test.Parallel()
+func TestTheHelpParserReadsWhatTheFlagPackageWrites(t *testing.T) {
+	t.Parallel()
 	set := flag.NewFlagSet("cohere", flag.ContinueOnError)
 	set.String("tsconfig", "tsconfig.json", "the tsconfig, quoted \"here\"")
 	set.String("directory", "", "the root (default: the nearest tsconfig.json)")
@@ -343,7 +350,7 @@ func TestTheHelpParserReadsWhatTheFlagPackageWrites(test *testing.T) {
 	set.PrintDefaults()
 	_, parsed, err := parseFlagHelp(printed.Bytes())
 	if err != nil {
-		test.Fatalf("%v\n%s", err, printed.String())
+		t.Fatalf("%v\n%s", err, printed.String())
 	}
 
 	var want []CliFlag
@@ -356,71 +363,71 @@ func TestTheHelpParserReadsWhatTheFlagPackageWrites(test *testing.T) {
 		want = append(want, entry)
 	})
 	if len(parsed) != len(want) {
-		test.Fatalf("parsed %d flags, the set holds %d:\n%s", len(parsed), len(want), printed.String())
+		t.Fatalf("parsed %d flags, the set holds %d:\n%s", len(parsed), len(want), printed.String())
 	}
 	for index := range want {
 		if parsed[index] != want[index] {
-			test.Errorf("flag %d: parsed %+v, want %+v", index, parsed[index], want[index])
+			t.Errorf("flag %d: parsed %+v, want %+v", index, parsed[index], want[index])
 		}
 	}
 }
 
 // TestTheVerbHelpKeepsItsSynopsis: a verb's usage lines and summary are told apart from its flags.
-func TestTheVerbHelpKeepsItsSynopsis(test *testing.T) {
-	test.Parallel()
+func TestTheVerbHelpKeepsItsSynopsis(t *testing.T) {
+	t.Parallel()
 	help := "usage: cohere rename <file>:<line>:<column> <newName>\n" +
 		"       cohere rename <name> <newName>\n\n" +
 		"Renames a symbol.\nNothing is written without --write.\n\n" +
 		"  -write\n    \tapply the rename\n"
 	cli, err := parseCli([]byte("  -fix\n    \tapply fixes only\n"), map[string][]byte{"rename": []byte(help)})
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	verb := cli.Verbs[0]
 	if strings.Join(verb.Usage, "|") != "cohere rename <file>:<line>:<column> <newName>|cohere rename <name> <newName>" {
-		test.Errorf("usage %q", verb.Usage)
+		t.Errorf("usage %q", verb.Usage)
 	}
 	if verb.Summary != "Renames a symbol. Nothing is written without --write." {
-		test.Errorf("summary %q", verb.Summary)
+		t.Errorf("summary %q", verb.Summary)
 	}
 	if len(verb.Flags) != 1 || verb.Flags[0].Name != "write" {
-		test.Errorf("flags %+v", verb.Flags)
+		t.Errorf("flags %+v", verb.Flags)
 	}
 }
 
 // TestTheChangelogParsesEveryRelease: every release heading in CHANGELOG.md becomes one entry, and a
 // second-level heading that is not a release refuses the parse.
-func TestTheChangelogParsesEveryRelease(test *testing.T) {
-	test.Parallel()
+func TestTheChangelogParsesEveryRelease(t *testing.T) {
+	t.Parallel()
 	changelog, err := os.ReadFile(filepath.Join(moduleRoot, "CHANGELOG.md"))
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	entries, err := parseChangelog(changelog)
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	if want := strings.Count("\n"+string(changelog), "\n## "); len(entries) != want {
-		test.Errorf("%d entries for %d release headings", len(entries), want)
+		t.Errorf("%d entries for %d release headings", len(entries), want)
 	}
 	for _, entry := range entries {
 		if strings.TrimSpace(entry.Body) == "" {
-			test.Errorf("%s has an empty body", entry.Version)
+			t.Errorf("%s has an empty body", entry.Version)
 		}
 	}
 	if headingAnchor("1.0.0 (unreleased)") != "100-unreleased" {
-		test.Errorf("anchor %q", headingAnchor("1.0.0 (unreleased)"))
+		t.Errorf("anchor %q", headingAnchor("1.0.0 (unreleased)"))
 	}
 	if _, err := parseChangelog([]byte("# Changelog\n\n## Notes\n")); err == nil {
-		test.Error("a second-level heading that is not a release parsed")
+		t.Error("a second-level heading that is not a release parsed")
 	}
 }
 
 // TestPickExamplesPrefersWhatAReaderCanRun: the shortest case run without options and without other
 // files wins, a rule with an asserted fix shows its fixed source, and the message ids and fix kind cover
 // every asserted case, those run with options included.
-func TestPickExamplesPrefersWhatAReaderCanRun(test *testing.T) {
-	test.Parallel()
+func TestPickExamplesPrefersWhatAReaderCanRun(t *testing.T) {
+	t.Parallel()
 	finding := func(id string, fix bool) []capture.Finding {
 		return []capture.Finding{{Line: 1, Column: 1, MessageId: id, Fix: fix}}
 	}
@@ -434,13 +441,13 @@ func TestPickExamplesPrefersWhatAReaderCanRun(test *testing.T) {
 	})
 	examples := picked["r"]
 	if examples.Firing == nil || examples.Firing.FixedSource != "fixed" {
-		test.Errorf("a rule with an asserted fix should show it: %+v", examples.Firing)
+		t.Errorf("a rule with an asserted fix should show it: %+v", examples.Firing)
 	}
 	if examples.Clean == nil || examples.Clean.Source != "clean" {
-		test.Errorf("clean %+v", examples.Clean)
+		t.Errorf("clean %+v", examples.Clean)
 	}
 	if strings.Join(examples.MessageIds(), ",") != "fixed,other,plain,withOptions" || examples.FixKind() != "fix" {
-		test.Errorf("ids %v, fix kind %q", examples.MessageIds(), examples.FixKind())
+		t.Errorf("ids %v, fix kind %q", examples.MessageIds(), examples.FixKind())
 	}
 
 	unfixed, _ := PickExamples([]capture.Record{
@@ -449,14 +456,14 @@ func TestPickExamplesPrefersWhatAReaderCanRun(test *testing.T) {
 		{Rule: "r", File: "a.ts", Source: "xyz", Outcome: capture.OutcomeFindings},
 	})
 	if unfixed["r"].Firing.Source != "xyz" {
-		test.Errorf("the case a reader can run as shown should win: %+v", unfixed["r"].Firing)
+		t.Errorf("the case a reader can run as shown should win: %+v", unfixed["r"].Firing)
 	}
 }
 
 // TestACaseRunWithOptionsIsNeverShown: a rule whose only asserted cases ran with options has no example,
 // and its message ids still count.
-func TestACaseRunWithOptionsIsNeverShown(test *testing.T) {
-	test.Parallel()
+func TestACaseRunWithOptionsIsNeverShown(t *testing.T) {
+	t.Parallel()
 	picked, withOptions := PickExamples([]capture.Record{
 		{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"Mode": "TypeAnnotation"}`), Outcome: capture.OutcomeFindings,
 			Findings: []capture.Finding{{MessageId: "only"}}},
@@ -464,21 +471,21 @@ func TestACaseRunWithOptionsIsNeverShown(test *testing.T) {
 	})
 	examples := picked["r"]
 	if examples.Firing != nil || examples.Clean != nil {
-		test.Errorf("a case run with options was shown: %+v", examples)
+		t.Errorf("a case run with options was shown: %+v", examples)
 	}
 	if strings.Join(examples.MessageIds(), ",") != "only" || withOptions != 2 {
-		test.Errorf("ids %v, %d with options", examples.MessageIds(), withOptions)
+		t.Errorf("ids %v, %d with options", examples.MessageIds(), withOptions)
 	}
 }
 
 // TestPickExamplesCountsACaseOnce: one case asserted twice, as findings and then as its fixed source, or
 // as findings by two tests, is counted once per outcome, and the fixed record is the one shown.
-func TestPickExamplesCountsACaseOnce(test *testing.T) {
-	test.Parallel()
+func TestPickExamplesCountsACaseOnce(t *testing.T) {
+	t.Parallel()
 	findings := capture.Record{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"a":1}`), Outcome: capture.OutcomeFindings}
 	_, withOptions := PickExamples([]capture.Record{findings, findings})
 	if withOptions != 1 {
-		test.Errorf("one case asserted twice counted %d times", withOptions)
+		t.Errorf("one case asserted twice counted %d times", withOptions)
 	}
 
 	asserted := capture.Record{Rule: "r", File: "a.ts", Source: "debugger;", Outcome: capture.OutcomeFindings,
@@ -487,57 +494,57 @@ func TestPickExamplesCountsACaseOnce(test *testing.T) {
 	fixed.Outcome, fixed.FixedSource = capture.OutcomeFixed, "\n"
 	picked, _ := PickExamples([]capture.Record{asserted, fixed, asserted})
 	if picked["r"].Firing == nil || picked["r"].Firing.FixedSource != "\n" {
-		test.Errorf("the fixed record should be the one shown: %+v", picked["r"].Firing)
+		t.Errorf("the fixed record should be the one shown: %+v", picked["r"].Firing)
 	}
 }
 
 // TestBenchmarksHoldEveryRecordNewestFirst: benchmarks.json is every committed record, as recorded, newest
 // first, with a later record placed ahead of the committed ones.
-func TestBenchmarksHoldEveryRecordNewestFirst(test *testing.T) {
-	test.Parallel()
-	inputs := sourceInputs(test)
+func TestBenchmarksHoldEveryRecordNewestFirst(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
 	committed, err := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	if len(committed) == 0 {
-		test.Fatal("bench/results holds no record, so this test would compare nothing")
+		t.Fatal("bench/results holds no record, so this test would compare nothing")
 	}
 	later := committed[0]
 	later.RecordedAt = "2999-01-01T00:00:00Z"
 	inputs.Benchmarks = append(slices.Clone(committed), later)
 
 	var benchmarks Benchmarks
-	if err := json.Unmarshal(built(test, inputs)[BenchmarksPath], &benchmarks); err != nil {
-		test.Fatal(err)
+	if err := json.Unmarshal(built(t, inputs)[BenchmarksPath], &benchmarks); err != nil {
+		t.Fatal(err)
 	}
 	if len(benchmarks.Records) != len(committed)+1 {
-		test.Fatalf("%d records published for %d given", len(benchmarks.Records), len(committed)+1)
+		t.Fatalf("%d records published for %d given", len(benchmarks.Records), len(committed)+1)
 	}
 	if benchmarks.Records[0].RecordedAt != later.RecordedAt {
-		test.Errorf("the newest record is not first: %s", benchmarks.Records[0].RecordedAt)
+		t.Errorf("the newest record is not first: %s", benchmarks.Records[0].RecordedAt)
 	}
 	for index := 1; index < len(benchmarks.Records); index++ {
 		if benchmarks.Records[index-1].RecordedAt < benchmarks.Records[index].RecordedAt {
-			test.Errorf("records %d and %d are oldest first", index-1, index)
+			t.Errorf("records %d and %d are oldest first", index-1, index)
 		}
 	}
 	if benchmarks.SourceNote == "" {
-		test.Error("benchmarks.json says nothing about where its numbers come from")
+		t.Error("benchmarks.json says nothing about where its numbers come from")
 	}
 }
 
 // TestAnUnearnedQuietNumberRefusesTheBuild: a record whose mode claims a quiet summary its runs did not earn
 // is refused by Build, not published.
-func TestAnUnearnedQuietNumberRefusesTheBuild(test *testing.T) {
-	test.Parallel()
-	inputs := sourceInputs(test)
+func TestAnUnearnedQuietNumberRefusesTheBuild(t *testing.T) {
+	t.Parallel()
+	inputs := sourceInputs(t)
 	committed, err := benchresults.Read(filepath.Join(moduleRoot, benchresults.Directory))
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	if len(committed) == 0 {
-		test.Fatal("bench/results holds no record, so this test would plant nothing")
+		t.Fatal("bench/results holds no record, so this test would plant nothing")
 	}
 	tampered := committed[0]
 	tampered.Modes = map[benchresults.Mode]benchresults.ModeSummary{}
@@ -549,6 +556,6 @@ func TestAnUnearnedQuietNumberRefusesTheBuild(test *testing.T) {
 	tampered.Modes[benchresults.ModeCold] = cold
 	inputs.Benchmarks = []benchresults.Record{tampered}
 	if _, err := Build(inputs); err == nil {
-		test.Error("a quiet number the runs did not earn was published")
+		t.Error("a quiet number the runs did not earn was published")
 	}
 }

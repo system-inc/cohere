@@ -19,7 +19,9 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -192,6 +194,27 @@ func readModuleLicense(module Module) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("%s@%s has no license file in %s (looked for %s)", module.Path, module.Version, module.Directory, strings.Join(moduleLicenseFileNames, ", "))
+}
+
+// moduleThirdPartyFileNames are the names a Go module ships its own credit for code it includes under,
+// beside its license: the spellings the module cache holds at a module's root, honnef.co/go/tools'
+// LICENSE-THIRD-PARTY and github.com/mholt/acmez's THIRD-PARTY.
+var moduleThirdPartyFileNames = []string{"LICENSE-THIRD-PARTY", "THIRD-PARTY"}
+
+// readModuleThirdPartyCredit reads a module's own credit for the code it includes, and the name it was
+// found under. A module that ships none returns an empty name, since most don't.
+func readModuleThirdPartyCredit(module Module) (name string, contents string, readError error) {
+	for _, fileName := range moduleThirdPartyFileNames {
+		fileContents, fileError := os.ReadFile(filepath.Join(module.Directory, fileName))
+		if errors.Is(fileError, fs.ErrNotExist) {
+			continue
+		}
+		if fileError != nil {
+			return "", "", fmt.Errorf("reading %s@%s's %s: %w", module.Path, module.Version, fileName, fileError)
+		}
+		return fileName, string(fileContents), nil
+	}
+	return "", "", nil
 }
 
 // swiftPin is one package the Swift engine resolves, from swift/Package.resolved.

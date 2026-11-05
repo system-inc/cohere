@@ -76,7 +76,7 @@ func TestAGateWidensWhenThePoolGoesIdleBetweenItsCommands(t *testing.T) {
 	if err := landing.Start(); err != nil {
 		t.Fatal(err)
 	}
-	if line := gate.line(t, "vet"); !strings.Contains(line, "flags=-p=2 -buildvcs=false threads=2") {
+	if line := gate.line(t, "vet"); !strings.Contains(line, "flags=-p=2 -buildvcs=false -trimpath threads=2") {
 		t.Errorf("go vet on a full pool ran at %q, want the pool's own share", line)
 	}
 	for _, token := range held {
@@ -88,7 +88,7 @@ func TestAGateWidensWhenThePoolGoesIdleBetweenItsCommands(t *testing.T) {
 	if err := landing.Wait(); err != nil {
 		t.Fatalf("the landing failed: %v\n%s", err, &output)
 	}
-	if line := gate.line(t, "test"); !strings.Contains(line, "flags=-p=4 -buildvcs=false threads=3") {
+	if line := gate.line(t, "test"); !strings.Contains(line, "flags=-p=4 -buildvcs=false -trimpath threads=3") {
 		t.Errorf("the tests, once the pool went idle, ran at %q, want three tokens' share, 4 packages on 3 threads", line)
 	}
 	if !strings.Contains(output.String(), "the pool went idle, so the test run borrows") {
@@ -108,7 +108,7 @@ func TestAGateGivesBorrowedTokensBackToAWaiterBetweenItsCommands(t *testing.T) {
 	if err := landing.Start(); err != nil {
 		t.Fatal(err)
 	}
-	if line := gate.line(t, "vet"); !strings.Contains(line, "flags=-p=4 -buildvcs=false threads=3") {
+	if line := gate.line(t, "vet"); !strings.Contains(line, "flags=-p=4 -buildvcs=false -trimpath threads=3") {
 		t.Errorf("go vet on an idle pool ran at %q, want three tokens' share", line)
 	}
 	// The one token borrowing left free goes to the test, so the run after it has to wait.
@@ -140,7 +140,7 @@ func TestAGateGivesBorrowedTokensBackToAWaiterBetweenItsCommands(t *testing.T) {
 	if _, err := os.Stat(done); err != nil {
 		t.Error("the waiter never ran")
 	}
-	if line := gate.line(t, "test"); !strings.Contains(line, "flags=-p=2 -buildvcs=false threads=2") {
+	if line := gate.line(t, "test"); !strings.Contains(line, "flags=-p=2 -buildvcs=false -trimpath threads=2") {
 		t.Errorf("the tests, with someone waiting, ran at %q, want the gate's own share", line)
 	}
 	if !strings.Contains(output.String(), "the pool is busy now, so the test run gives back 2 borrowed tokens") {

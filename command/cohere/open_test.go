@@ -14,10 +14,10 @@ import (
 	"testing"
 )
 
-func TestOpenFlag(test *testing.T) {
-	test.Parallel()
-	binary := buildCohere(test)
-	for _, testCase := range []struct {
+func TestOpenFlag(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	for _, test := range []struct {
 		name, source, settings string
 		args                   []string
 		paths                  []string
@@ -32,31 +32,31 @@ func TestOpenFlag(test *testing.T) {
 		{"fixed", "debugger;\nexport {};\n", `{"rules":{"no-debugger":"error"}}`, nil, nil, true},
 		{"refused", "export {};\n", `{"rules":`, []string{"--lint"}, nil, false},
 	} {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			root := test.TempDir()
-			writeTree(test, root, map[string]string{"tsconfig.json": `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022"},"include":["*.ts"]}`, "CohereSettings.json": testCase.settings, "A.ts": testCase.source})
-			if len(testCase.paths) > 0 {
-				writeTree(test, root, map[string]string{"B.ts": testCase.source})
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			writeTree(t, root, map[string]string{"tsconfig.json": `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022"},"include":["*.ts"]}`, "CohereSettings.json": test.settings, "A.ts": test.source})
+			if len(test.paths) > 0 {
+				writeTree(t, root, map[string]string{"B.ts": test.source})
 			}
-			editor := test.TempDir()
+			editor := t.TempDir()
 			log := filepath.Join(editor, "opened")
 			if err := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0755); err != nil {
-				test.Fatal(err)
+				t.Fatal(err)
 			}
-			if testCase.name == "missing editor" {
+			if test.name == "missing editor" {
 				if err := os.Remove(filepath.Join(editor, "code")); err != nil {
-					test.Fatal(err)
+					t.Fatal(err)
 				}
 			}
-			if testCase.name == "failed editor" {
+			if test.name == "failed editor" {
 				if err := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nexit 42\n"), 0755); err != nil {
-					test.Fatal(err)
+					t.Fatal(err)
 				}
 			}
 			run := func(open bool) (string, int) {
-				test.Helper()
-				args := append([]string{"--directory", root, "--no-format", "--no-cache", "--json"}, testCase.args...)
+				t.Helper()
+				args := append([]string{"--directory", root, "--no-format", "--no-cache", "--json"}, test.args...)
 				if open {
 					args = append(args, "--open")
 				}
@@ -70,21 +70,21 @@ func TestOpenFlag(test *testing.T) {
 				if exited, ok := err.(*exec.ExitError); ok {
 					return string(output), exited.ExitCode()
 				}
-				test.Fatal(err)
+				t.Fatal(err)
 				return "", -1
 			}
 			_, before := run(false)
 			// A fixing run consumes its plant; restore it before checking --open.
-			writeTree(test, root, map[string]string{"A.ts": testCase.source})
-			if len(testCase.paths) > 0 {
-				writeTree(test, root, map[string]string{"B.ts": testCase.source})
+			writeTree(t, root, map[string]string{"A.ts": test.source})
+			if len(test.paths) > 0 {
+				writeTree(t, root, map[string]string{"B.ts": test.source})
 			}
 			output, code := run(true)
 			if code != before {
-				test.Errorf("exit changed: %d -> %d\n%s", before, code, output)
+				t.Errorf("exit changed: %d -> %d\n%s", before, code, output)
 			}
-			if strings.Contains(output, "No findings.") != testCase.none || (testCase.none && strings.Count(output, "No findings.\n") != 1) {
-				test.Errorf("No findings mismatch, want %v:\n%s", testCase.none, output)
+			if strings.Contains(output, "No findings.") != test.none || (test.none && strings.Count(output, "No findings.\n") != 1) {
+				t.Errorf("No findings mismatch, want %v:\n%s", test.none, output)
 			}
 			var reported []string
 			seen := map[string]bool{}
@@ -99,31 +99,31 @@ func TestOpenFlag(test *testing.T) {
 				}
 			}
 			var want []string
-			for _, path := range testCase.paths {
+			for _, path := range test.paths {
 				want = append(want, filepath.Join(root, path))
 			}
-			if testCase.name == "missing editor" || testCase.name == "failed editor" {
-				want := "cohere: could not open editor: code is not on PATH\n"
-				if testCase.name == "failed editor" {
-					want = "cohere: could not open editor: exit status 42\n"
+			if test.name == "missing editor" || test.name == "failed editor" {
+				want := "cohere: Could not open editor: code is not on PATH.\n"
+				if test.name == "failed editor" {
+					want = "cohere: Could not open editor: exit status 42.\n"
 				}
 				if strings.Count(output, want) != 1 {
-					test.Errorf("want exactly one %q in %s", want, output)
+					t.Errorf("want exactly one %q in %s", want, output)
 				}
 				return
 			}
 			contents, err := os.ReadFile(log)
 			if len(want) == 0 {
 				if err == nil {
-					test.Errorf("unexpected editor invocation: %s", contents)
+					t.Errorf("unexpected editor invocation: %s", contents)
 				}
 			} else {
 				expected := "invocation\n--\n" + strings.Join(want, "\n") + "\n"
 				if string(contents) != expected {
-					test.Errorf("editor got %q (%v), want %q; reported %v\n%s", contents, err, expected, reported, output)
+					t.Errorf("editor got %q (%v), want %q; reported %v\n%s", contents, err, expected, reported, output)
 				}
 				if !reflect.DeepEqual(reported, want) {
-					test.Errorf("fixture reported %v, want %v", reported, want)
+					t.Errorf("fixture reported %v, want %v", reported, want)
 				}
 			}
 		})
@@ -132,9 +132,9 @@ func TestOpenFlag(test *testing.T) {
 
 // The collector's mixed stream includes both phases even though a single TypeScript project
 // currently gates lint behind types. The injected launcher also proves no editor runs on emptiness.
-func TestOpenReport(test *testing.T) {
-	test.Parallel()
-	for _, testCase := range []struct {
+func TestOpenReport(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
 		name        string
 		paths       []string
 		checked     bool
@@ -146,23 +146,23 @@ func TestOpenReport(test *testing.T) {
 		{"none", nil, true, nil, nil, "No findings.\n"},
 		{"unchecked", nil, false, nil, nil, ""},
 		{"global finding", []string{""}, true, nil, nil, ""},
-		{"editor failure", []string{"types.ts"}, true, errors.New("planted failure"), []string{"types.ts"}, "cohere: could not open editor: planted failure\n"},
+		{"editor failure", []string{"types.ts"}, true, errors.New("planted failure"), []string{"types.ts"}, "cohere: Could not open editor: planted failure.\n"},
 	} {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			report := &openReport{Checked: testCase.checked}
-			for _, path := range testCase.paths {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			report := &openReport{Checked: test.checked}
+			for _, path := range test.paths {
 				report.add(path)
 			}
 			var output bytes.Buffer
 			var opened []string
 			calls := 0
-			report.open(&output, func(paths []string) error { calls++; opened = append(opened, paths...); return testCase.launchError })
+			report.open(&output, func(paths []string) error { calls++; opened = append(opened, paths...); return test.launchError })
 			var want []string
-			for _, path := range testCase.wantPaths {
+			for _, path := range test.wantPaths {
 				absolute, err := filepath.Abs(path)
 				if err != nil {
-					test.Fatal(err)
+					t.Fatal(err)
 				}
 				want = append(want, absolute)
 			}
@@ -170,22 +170,22 @@ func TestOpenReport(test *testing.T) {
 			if len(want) > 0 {
 				wantCalls = 1
 			}
-			if !reflect.DeepEqual(opened, want) || calls != wantCalls || output.String() != testCase.wantOutput {
-				test.Fatalf("opened %v in %d calls, output %q; want %v in %d calls, output %q", opened, calls, output.String(), want, wantCalls, testCase.wantOutput)
+			if !reflect.DeepEqual(opened, want) || calls != wantCalls || output.String() != test.wantOutput {
+				t.Fatalf("opened %v in %d calls, output %q; want %v in %d calls, output %q", opened, calls, output.String(), want, wantCalls, test.wantOutput)
 			}
 		})
 	}
 }
 
-func TestOpenDiscoveredProjects(test *testing.T) {
-	test.Parallel()
-	binary := buildCohere(test)
+func TestOpenDiscoveredProjects(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
 	// cohere reports real paths, and on macOS the temp directory sits behind the /tmp symlink.
-	root, err := filepath.EvalSymlinks(test.TempDir())
+	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
-	writeTree(test, root, map[string]string{
+	writeTree(t, root, map[string]string{
 		"types/tsconfig.json":       `{"compilerOptions":{"strict":true,"noEmit":true},"include":["*.ts"]}`,
 		"types/CohereSettings.json": `{"rules":{}}`,
 		"types/Types.ts":            "export const value: number = 'x';\n",
@@ -193,68 +193,68 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 		"lint/CohereSettings.json":  `{"rules":{"no-debugger":"error"}}`,
 		"lint/Lint.ts":              "debugger;\nexport {};\n",
 	})
-	editor := test.TempDir()
+	editor := t.TempDir()
 	log := filepath.Join(editor, "opened")
 	if err := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0755); err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
 	cmd := exec.Command(binary, "--no-fix", "--no-format", "--no-cache", "--json", "--open")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "PATH="+editor, "OPEN_LOG="+log)
 	output, err := cmd.CombinedOutput()
 	if exited, ok := err.(*exec.ExitError); !ok || exited.ExitCode() != 1 {
-		test.Fatalf("exit %v: %s", err, output)
+		t.Fatalf("exit %v: %s", err, output)
 	}
 	contents, err := os.ReadFile(log)
 	want := "invocation\n--\n" + filepath.Join(root, "lint", "Lint.ts") + "\n" + filepath.Join(root, "types", "Types.ts") + "\n"
 	if err != nil || string(contents) != want {
-		test.Fatalf("editor got %q (%v), want %q\n%s", contents, err, want, output)
+		t.Fatalf("editor got %q (%v), want %q\n%s", contents, err, want, output)
 	}
 	if !strings.Contains(string(output), "TS2322") || !strings.Contains(string(output), "no-debugger") {
-		test.Fatalf("missing the planted type or lint finding: %s", output)
+		t.Fatalf("missing the planted type or lint finding: %s", output)
 	}
 }
 
-func TestOpenCrash(test *testing.T) {
-	test.Parallel()
-	binary := filepath.Join(test.TempDir(), "cohere")
+func TestOpenCrash(t *testing.T) {
+	t.Parallel()
+	binary := filepath.Join(t.TempDir(), "cohere")
 	build := exec.Command("go", "build", "-buildvcs=false", "-tags", "cohere_planted_panic", "-o", binary, ".")
 	if output, err := build.CombinedOutput(); err != nil {
-		test.Fatalf("build: %v\n%s", err, output)
+		t.Fatalf("build: %v\n%s", err, output)
 	}
-	root := test.TempDir()
-	writeTree(test, root, map[string]string{"tsconfig.json": fixScopeTsconfig, "CohereSettings.json": `{"rules":{"cohere-test/panics-on-marked-file":"error"}}`})
+	root := t.TempDir()
+	writeTree(t, root, map[string]string{"tsconfig.json": fixScopeTsconfig, "CohereSettings.json": `{"rules":{"cohere-test/panics-on-marked-file":"error"}}`})
 	for _, plant := range []bool{true, false} {
 		source := "export {};\n"
 		if plant {
 			source = "// cohere-test: panic here\n" + source
 		}
-		writeTree(test, root, map[string]string{"Crash.ts": source})
+		writeTree(t, root, map[string]string{"Crash.ts": source})
 		cmd := exec.Command(binary, "--directory", root, "--lint", "--no-format", "--no-cache", "--open")
-		cmd.Env = append(os.Environ(), "PATH="+test.TempDir())
+		cmd.Env = append(os.Environ(), "PATH="+t.TempDir())
 		output, err := cmd.CombinedOutput()
 		if plant {
 			if exited, ok := err.(*exec.ExitError); !ok || exited.ExitCode() != 1 || !strings.Contains(string(output), "planted:") {
-				test.Fatalf("crash plant: %v\n%s", err, output)
+				t.Fatalf("crash plant: %v\n%s", err, output)
 			}
 		} else if err != nil {
-			test.Fatalf("clean control: %v\n%s", err, output)
+			t.Fatalf("clean control: %v\n%s", err, output)
 		}
 		if strings.Contains(string(output), "No findings.") == plant {
-			test.Errorf("plant=%v, wrong empty report: %s", plant, output)
+			t.Errorf("plant=%v, wrong empty report: %s", plant, output)
 		}
 	}
 }
 
-func TestOpenSwiftArguments(test *testing.T) {
-	test.Parallel()
+func TestOpenSwiftArguments(t *testing.T) {
+	t.Parallel()
 	location := projectLocation{Root: "/work/project"}
-	baseline, mode, err := swiftEngineArguments(location, map[string]bool{}, func(string) string { return "true" }, nil)
+	baseline, mode, err := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{}, func(string) string { return "true" }, nil)
 	if err != nil {
-		test.Fatal(err)
+		t.Fatal(err)
 	}
-	arguments, openMode, err := swiftEngineArguments(location, map[string]bool{"open": true}, func(string) string { return "true" }, nil)
+	arguments, openMode, err := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"open": true}, func(string) string { return "true" }, nil)
 	if err != nil || mode != openMode || !reflect.DeepEqual(arguments, baseline) {
-		test.Fatalf("--open must be handled by the Go front door: %v, %v, %v", arguments, openMode, err)
+		t.Fatalf("--open must be handled by the Go front door: %v, %v, %v", arguments, openMode, err)
 	}
 }

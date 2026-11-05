@@ -47,6 +47,13 @@ var topLevelDescriptions = map[string]string{
 	"jsPlugins": "Accepted and ignored: paths to the JavaScript rule implementations oxlint loads. cohere's " +
 		"rules are compiled in, so there is nothing to load.",
 
+	"go": "Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the " +
+		"one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, " +
+		"exactly as written) or [severity, options] with one options object. With no go block, every Go rule runs at " +
+		"error and every run says so. A rule name the engine does not know, any key besides rules, and a format key " +
+		"are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this " +
+		"block alone.",
+
 	"output": "How a run prints, for this repository. phases: true puts where the time went (graph, fix, format, " +
 		"types, lint) first in the footer's parentheses, as --phases does. Read only from the file cohere reads " +
 		"first, and a key outside this block's is refused.",

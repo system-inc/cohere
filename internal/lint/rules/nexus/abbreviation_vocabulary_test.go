@@ -18,8 +18,8 @@ import (
 // Order matters only where entries can both match one name, and the test pins all of it anyway:
 // `ms` between `params` and `ref` is observable (`timeoutMsRef` reports the millisecond form), and
 // `vars` before `var` decides which replacement a name gets.
-func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
-	test.Parallel()
+func TestAbbreviationVocabularyCarriesEveryWordInOrder(t *testing.T) {
+	t.Parallel()
 
 	abbreviationsOf := func(entries []*abbreviationEntry) []string {
 		words := make([]string, 0, len(entries))
@@ -39,22 +39,24 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 		got  []string
 		want []string
 	}{
-		// The switch (13), the early group (7) and exactAbbreviations (10). Whole-word matches cannot
-		// overlap, so this one is compared as a set.
+		// The switch (13), the early group (7), exactAbbreviations (10) and the thirteen Go words @system_cohere
+		// added for every engine on #ec8mvbg. Whole-word matches cannot overlap, so this one is compared as a set.
 		{"whole", wholeWords, sortedCopy([]string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "acc", "char", "fn", "str",
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
+			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 		})},
 		// The early group's loop, in its order.
 		{"early prefix", abbreviationsOf(vocabulary.earlyPrefixes), []string{
 			"ctx", "db", "tx", "opts", "cur", "pct", "prev",
 		}},
-		// The late group (9), the role prefixes (3) and prefixAbbreviations (10). No two of these can
-		// match one name, so their relative order was never observable; the file's order is pinned.
+		// The late group (9), the role prefixes (3), prefixAbbreviations (10) and the thirteen Go words. No two
+		// of these can match one name, so their relative order was never observable; the file's order is pinned.
 		{"late prefix", abbreviationsOf(vocabulary.latePrefixes), []string{
 			"prop", "props", "param", "params", "ref", "config", "idx", "arg", "args", "char", "fn", "str",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
+			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 		}},
 		// The hand-written suffix chain (12), the millisecond check where it ran, and
 		// suffixAbbreviations (10), in the chain's order.
@@ -62,22 +64,24 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 			"prop", "props", "param", "params", "ms", "ref", "config", "idx", "arg", "args", "char", "fn", "str",
 			"val", "arr", "obj", "num", "res", "err", "req", "msg", "min", "max",
 		}},
-		// wordSegmentAbbreviations (10), in order.
+		// wordSegmentAbbreviations (10), in order, then the thirteen Go words @system_cohere added for every engine
+		// on #ec8mvbg, after them so no earlier entry's order moves.
 		{"segment", abbreviationsOf(vocabulary.segments), []string{
 			"cwd", "dir", "env", "cli", "len", "seq", "db", "tx", "vars", "var",
+			"buf", "tmp", "pkg", "src", "dst", "conn", "cmd", "cfg", "pos", "wg", "mu", "ch", "sb",
 		}},
 		{"allowed segment", vocabulary.allowedSegments, []string{"InnoDb"}},
 	}
 	for _, testCase := range cases {
-		test.Run(testCase.form, func(test *testing.T) {
-			test.Parallel()
+		t.Run(testCase.form, func(t *testing.T) {
+			t.Parallel()
 			if !slices.Equal(testCase.got, testCase.want) {
-				test.Errorf("%d entries %v, want %d %v", len(testCase.got), testCase.got, len(testCase.want), testCase.want)
+				t.Errorf("%d entries %v, want %d %v", len(testCase.got), testCase.got, len(testCase.want), testCase.want)
 			}
 		})
 	}
 	if len(vocabulary.allowedNames) != 1 || !vocabulary.allowedNames["URLSearchParams"] {
-		test.Errorf("allowed names %v, want only URLSearchParams", vocabulary.allowedNames)
+		t.Errorf("allowed names %v, want only URLSearchParams", vocabulary.allowedNames)
 	}
 }
 
@@ -86,14 +90,14 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 //
 // The table above proves the entries are present; this proves each one is wired to the branch it
 // names, which a form read into the wrong table would fail.
-func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
-	test.Parallel()
+func TestAbbreviationVocabularyJudgesEveryForm(t *testing.T) {
+	t.Parallel()
 
 	judged := 0
 	for word := range vocabulary.wholeByName {
 		finding, found := vocabulary.find(word)
 		if !found || finding.form != "whole" || finding.message.Id != abbreviatedIdentifierText.Id {
-			test.Errorf("whole %q: got %+v, want %s", word, finding, abbreviatedIdentifierText.Id)
+			t.Errorf("whole %q: got %+v, want %s", word, finding, abbreviatedIdentifierText.Id)
 		}
 		judged++
 	}
@@ -101,7 +105,7 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		name := entry.Abbreviation + "Widget"
 		finding, found := vocabulary.find(name)
 		if !found || finding.form != "prefix" || finding.message.Id != abbreviatedIdentifierText.Id {
-			test.Errorf("prefix %q: got %+v, want %s", name, finding, abbreviatedIdentifierText.Id)
+			t.Errorf("prefix %q: got %+v, want %s", name, finding, abbreviatedIdentifierText.Id)
 		}
 		judged++
 	}
@@ -113,7 +117,7 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		}
 		finding, found := vocabulary.find(name)
 		if !found || finding.form != "suffix" || finding.message.Id != wantId {
-			test.Errorf("suffix %q: got %+v, want %s", name, finding, wantId)
+			t.Errorf("suffix %q: got %+v, want %s", name, finding, wantId)
 		}
 		judged++
 	}
@@ -121,20 +125,40 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		name := "widget" + capitalizeAbbreviation(entry.Abbreviation) + "Name"
 		finding, found := vocabulary.find(name)
 		if !found || finding.form != "segment" || finding.entry != entry {
-			test.Errorf("segment %q: got %+v, want %s", name, finding, entry.Abbreviation)
+			t.Errorf("segment %q: got %+v, want %s", name, finding, entry.Abbreviation)
 		}
 		judged++
 	}
-	// 30 whole, 29 prefix, 23 suffix, 10 segment: the counts the table above pins.
-	if judged != 92 {
-		test.Errorf("judged %d forms, want 92", judged)
+	// 43 whole, 42 prefix, 23 suffix, 23 segment: the counts the table above pins.
+	if judged != 131 {
+		t.Errorf("judged %d forms, want 131", judged)
+	}
+}
+
+// TestAbbreviationSegmentsJudgeOnlyTheWholeWord: the short Go words are judged only as a whole camelCase word, so a
+// name that holds their letters inside a longer word is not an abbreviation. `ch` must never read `Check`, nor `pos`
+// read `Posix`, nor `buf` read `Buffer`.
+func TestAbbreviationSegmentsJudgeOnlyTheWholeWord(test *testing.T) {
+	test.Parallel()
+	for _, name := range []string{
+		"checkName", "widgetCheckName", "changeSet", "posixPath", "postOffice", "bufferSize", "widgetBuffer",
+		"muteButton", "multiplier", "temporaryFile", "sourceMap", "commandLine", "packageName", "position",
+	} {
+		if finding, found := vocabulary.find(name); found {
+			test.Errorf("%q reads as an abbreviation: %+v", name, finding)
+		}
+	}
+	for _, name := range []string{"chList", "readCh", "posValue", "bufSize", "widgetMu", "sb"} {
+		if _, found := vocabulary.find(name); !found {
+			test.Errorf("%q holds a whole abbreviated word and was not judged", name)
+		}
 	}
 }
 
 // TestAbbreviationVocabularyRefusesAMalformedFile checks the loader fails loudly rather than
 // reading a file into a vocabulary that quietly judges less.
-func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
-	test.Parallel()
+func TestAbbreviationVocabularyRefusesAMalformedFile(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		name string
@@ -151,15 +175,15 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
 		{"a retired per-word messageId", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}`},
 	}
 	for _, testCase := range cases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			if _, err := loadAbbreviationVocabulary([]byte(testCase.file)); err == nil {
-				test.Errorf("the loader accepted it")
+				t.Errorf("the loader accepted it")
 			}
 		})
 	}
 	if _, err := loadAbbreviationVocabulary(policy.AbbreviationsFile()); err != nil {
-		test.Fatalf("policy's file itself is refused: %v", err)
+		t.Fatalf("policy's file itself is refused: %v", err)
 	}
 }
 
@@ -175,8 +199,8 @@ func sortedCopy(words []string) []string {
 // finding. `var` cannot match inside `Vars`, since the lowercase `s` is no word boundary, so `vars`
 // before `var` is visible only in a name holding both words. No name in the ahra corpus does, which
 // is why the 82,704-name run could not see a swap and this case exists.
-func TestAbbreviationVocabularyOrderIsObservableWhereItMatters(test *testing.T) {
-	test.Parallel()
+func TestAbbreviationVocabularyOrderIsObservableWhereItMatters(t *testing.T) {
+	t.Parallel()
 
 	cases := []struct {
 		name        string
@@ -188,14 +212,14 @@ func TestAbbreviationVocabularyOrderIsObservableWhereItMatters(test *testing.T) 
 		{"dbVal", "abbreviatedIdentifier", `Use "databaseVal".`},
 	}
 	for _, testCase := range cases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
 			finding, found := vocabulary.find(testCase.name)
 			if !found || finding.message.Id != testCase.wantId {
-				test.Fatalf("got %+v, want %s", finding, testCase.wantId)
+				t.Fatalf("got %+v, want %s", finding, testCase.wantId)
 			}
 			if !strings.Contains(finding.message.Description, testCase.wantMessage) {
-				test.Errorf("message %q does not contain %q", finding.message.Description, testCase.wantMessage)
+				t.Errorf("message %q does not contain %q", finding.message.Description, testCase.wantMessage)
 			}
 		})
 	}

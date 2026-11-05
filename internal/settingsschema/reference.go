@@ -24,6 +24,7 @@ var examples = map[string]string{
 	"jsPlugins":      `["./code-quality/lint/rules/index.js"]`,
 	"settings":       `{ "better-tailwindcss": { "entryPoint": "./app/theme.css", "callees": ["cn", "clsx"] } }`,
 	"output":         `{ "phases": true }`,
+	"go":             `{ "rules": { "cohere-go/performance-require-parallel-test": ["warn", {}] } }`,
 	FormatKey:        `{ "printWidth": 120, "tabWidth": 4, "singleQuote": true, "ignore": ["pnpm-lock.yaml", "*.sqlite"] }`,
 }
 
@@ -61,6 +62,8 @@ func reference(ruleNames []string) string {
 			where = "any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only"
 		case "settings", "output":
 			where = "the file cohere reads first"
+		case "go":
+			where = "the file beside go.work or go.mod, or the one --lint-config names"
 		}
 		write("| [`%s`](#%s) | %s | %s |\n", key.Name, anchor(key.Name), typeName(key), where)
 	}

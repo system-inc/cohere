@@ -23,7 +23,7 @@ func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(t *testing.T) {
 
 	render := func(sourceCommit string) string {
 		var out bytes.Buffer
-		run := newSwiftRun(&out, swiftModeVersion, "", time.Now())
+		run := newEngineRun(&out, engineModeVersion, swiftLanguage, "", time.Now())
 		run.engineSourceCommit = sourceCommit
 		if err := run.accept([]byte(provenance)); err != nil {
 			t.Fatal(err)

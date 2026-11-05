@@ -1669,6 +1669,53 @@
             },
             "type": "object"
         },
+        "go": {
+            "additionalProperties": false,
+            "description": "Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, exactly as written) or [severity, options] with one options object. With no go block, every Go rule runs at error and every run says so. A rule name the engine does not know, any key besides rules, and a format key are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this block alone.",
+            "properties": {
+                "rules": {
+                    "additionalProperties": {
+                        "description": "A severity, or [severity, options] with one options object.",
+                        "oneOf": [
+                            {
+                                "enum": [
+                                    "error",
+                                    "warn",
+                                    "warning",
+                                    "off"
+                                ],
+                                "type": "string"
+                            },
+                            {
+                                "maxItems": 2,
+                                "minItems": 1,
+                                "prefixItems": [
+                                    {
+                                        "enum": [
+                                            "error",
+                                            "warn",
+                                            "warning",
+                                            "off"
+                                        ],
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object"
+                                    }
+                                ],
+                                "type": "array"
+                            }
+                        ]
+                    },
+                    "description": "Each cohere-go/<rule> the Go engine runs, and its severity.",
+                    "type": "object"
+                }
+            },
+            "required": [
+                "rules"
+            ],
+            "type": "object"
+        },
         "ignorePatterns": {
             "description": "Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends.",
             "items": {

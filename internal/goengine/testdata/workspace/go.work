@@ -1,0 +1,7 @@
+go 1.24
+
+use (
+	./alpha
+	./beta
+	./third_party/lib
+)

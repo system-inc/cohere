@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"runtime/pprof"
+
+	"github.com/system-inc/cohere/internal/sentence"
 )
 
 // profileFile is the open `--profile` file while the CPU profile is running, nil otherwise.
@@ -34,7 +36,7 @@ func exitProcess(code int) {
 	if profileFile != nil {
 		pprof.StopCPUProfile()
 		if err := profileFile.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "cohere: closing the profile: %v\n", err)
+			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(fmt.Errorf("closing the profile: %w", err)))
 		}
 		profileFile = nil
 	}

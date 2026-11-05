@@ -1,0 +1,12 @@
+{"kind":"provenance","contract":3,"engine":"cohere-go","version":"test","commit":"test","sourceTreeModified":false,"toolchain":"test"}
+{"kind":"project","root":"/project","package":"example.com/clean","elapsedMilliseconds":0,"filesInPackage":2,"filesOurs":2,"filesInScope":2,"scopeDescription":"","targets":[{"name":"example.com/clean","kind":"module","files":2,"languageMode":"1.24"}],"excluded":[]}
+{"kind":"unreadable","file":"/project/clean.go","error":"permission denied"}
+{"kind":"fix","filesConsidered":1,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[]}
+{"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}
+{"kind":"finding","source":"compiler","file":"/project/go.mod","line":1,"column":1,"severity":"error","rule":"","messageId":"List","message":"open /project/clean.go: permission denied","fixes":[],"suggestions":[]}
+{"kind":"finding","source":"compiler","file":"/project/clean_test.go","line":7,"column":5,"severity":"error","rule":"","messageId":"Type","message":"undefined: Double","fixes":[],"suggestions":[]}
+{"kind":"types","diagnostics":2,"files":1,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps -test, type-checked from source: N packages, 1 in the workspace"}
+{"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}
+{"kind":"phase","name":"lint","outcome":"notReached","elapsedMilliseconds":0,"detail":"types bailed: 2 type errors, so lint findings against wrong semantics would be noise"}
+{"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
+{"kind":"summary","findings":2,"complete":false,"exitCode":1}

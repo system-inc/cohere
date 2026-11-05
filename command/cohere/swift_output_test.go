@@ -16,9 +16,9 @@ func TestASwiftWarningIsAWarning(t *testing.T) {
 	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
 
 	var out bytes.Buffer
-	run := newSwiftRun(&out, swiftModeCheck, "", time.Now())
+	run := newEngineRun(&out, engineModeCheck, swiftLanguage, "", time.Now())
 	for _, severity := range []string{"warning", "error"} {
-		record := &swiftFindingRecord{Source: "compiler", File: "Sources/A.swift", Line: 3, Column: 7,
+		record := &engineFindingRecord{Source: "compiler", File: "Sources/A.swift", Line: 3, Column: 7,
 			Severity: severity, Rule: "VariableNeverMutated", Message: "never mutated"}
 		if err := run.acceptFinding(record); err != nil {
 			t.Fatal(err)
@@ -47,8 +47,8 @@ func TestASwiftGapSaysItself(t *testing.T) {
 		{0, 3, "3 files nothing checked: 3 unreadable"},
 		{0, 0, ""},
 	} {
-		if got := swiftUncheckedFiles(testCase.withoutRecord, testCase.unreadable); got != testCase.want {
-			t.Errorf("swiftUncheckedFiles(%d, %d) = %q, want %q", testCase.withoutRecord, testCase.unreadable, got, testCase.want)
+		if got := engineUncheckedFiles(testCase.withoutRecord, testCase.unreadable); got != testCase.want {
+			t.Errorf("engineUncheckedFiles(%d, %d) = %q, want %q", testCase.withoutRecord, testCase.unreadable, got, testCase.want)
 		}
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/goengine/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
@@ -178,7 +179,41 @@ var ignoredKeyShapes = map[string]func() map[string]any{
 			},
 		}
 	},
+	"go":      goShape,
 	FormatKey: formatShape,
+}
+
+// goShape is the Go engine's block, as internal/goengine/settings reads it: rules alone, each a severity or
+// [severity] or [severity, options object]. Its severities are that loader's own list, exact, so the schema
+// never allows what the engine refuses. Rule names are left open, since the Go engine's registry is not the
+// TypeScript one this package lists; the engine refuses a name it does not know.
+func goShape() map[string]any {
+	severity := map[string]any{"type": "string", "enum": settings.SeveritySpellings}
+	setting := map[string]any{
+		"description": "A severity, or [severity, options] with one options object.",
+		"oneOf": []any{
+			severity,
+			map[string]any{
+				"type":        "array",
+				"minItems":    1,
+				"maxItems":    2,
+				"prefixItems": []any{severity, map[string]any{"type": "object"}},
+			},
+		},
+	}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		// The engine refuses a go block with no rules, since it reads as configured and configures nothing.
+		"required": []string{"rules"},
+		"properties": map[string]any{
+			"rules": map[string]any{
+				"type":                 "object",
+				"description":          "Each cohere-go/<rule> the Go engine runs, and its severity.",
+				"additionalProperties": setting,
+			},
+		},
+	}
 }
 
 func formatShape() map[string]any {
