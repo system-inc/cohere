@@ -61,7 +61,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// The folder is read from the import path, whose last element names the package's folder, rather than from a
 	// file's path, which for a cgo package is a translation in the build cache and which a //line directive can
 	// rename. Only the last element is judged: the pass does not know where the module starts, and judging every
-	// element would flag a module path or a GOPATH folder nobody inside the package can rename. An external test
+	// element would flag a module path or a `GOPATH` folder nobody inside the package can rename. An external test
 	// package's import path ends in _test, so its folder, the one the package it tests already answers for, is
 	// never reported twice.
 	folder := path.Base(pass.Pkg.Path())
