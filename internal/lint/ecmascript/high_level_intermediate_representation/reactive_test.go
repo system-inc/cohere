@@ -80,6 +80,9 @@ func reactiveNames(test *testing.T, source string) []string {
 	return names
 }
 
+// collectReactiveNames records the name of every reactive place in a function.
+//
+// Mutates: found the caller gathers the names across every function the probe visits into one set
 func collectReactiveNames(function *Function, found map[string]bool) {
 	record := func(place Place) {
 		if !place.Reactive {
@@ -590,7 +593,8 @@ export function Component(props: {c: boolean, n: number}) {
   return value;
 }
 `
-	var first, second []string
+	var first []string
+	var second []string
 	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-idempotent-harness",
 		NeedsTypeChecker: true,

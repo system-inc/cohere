@@ -124,10 +124,11 @@ func isDescriptorObject(descriptor *ast.Node, isGlobal func(identifier *ast.Node
 // `(Object?.defineProperty)(o, "k", { get: fn })` is three of ESLint's rows, and without this the
 // parenthesized callee shifts every parent index and the descriptor stops being found.
 func skipParenthesesUpward(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.Parent
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.Parent
 	}
-	return node
+	return current
 }
 
 // descriptorCallee reads a callee as `Object.member` or `Reflect.member`, answering the identifier and
@@ -138,19 +139,19 @@ func skipParenthesesUpward(node *ast.Node) *ast.Node {
 // the caller's question; `foo.defineProperty(...)` is never one, because a method with the right name
 // on the wrong object is not the platform builtin.
 func descriptorCallee(callee *ast.Node) (*ast.Node, string) {
-	callee = skipParenthesesDownward(callee)
-	if callee == nil {
+	unwrapped := skipParenthesesDownward(callee)
+	if unwrapped == nil {
 		return nil, ""
 	}
 	var object *ast.Node
 	var member string
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		object = access.Expression
 		member = KeyName(access.Name())
 	case ast.KindElementAccessExpression:
-		access := callee.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		object = access.Expression
 		argument := skipParenthesesDownward(access.ArgumentExpression)
 		if argument == nil ||
@@ -170,8 +171,9 @@ func descriptorCallee(callee *ast.Node) (*ast.Node, string) {
 
 // skipParenthesesDownward unwraps parentheses around an expression.
 func skipParenthesesDownward(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }

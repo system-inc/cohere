@@ -226,6 +226,7 @@ func formatReading(reading Reading) string {
 	if len(reading.Order) == 0 {
 		return "[]#" + itoa(reading.Count)
 	}
+	// Ignored: Order is a slice of ints, which json.Marshal cannot fail to encode.
 	raw, _ := json.Marshal(reading.Order)
 	return string(raw) + "#" + itoa(reading.Count)
 }
@@ -257,7 +258,7 @@ func loadWave1DesignSystem(test *testing.T) *LoadedDesignSystem {
 	test.Helper()
 	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{
 		EntryPoint:          corpus.Resolve(test, "ahra:app/_theme/styles/theme.css"),
-		TailwindPackageRoot: vendored.TailwindPackageRoot(),
+		TailwindPackageRoot: vendored.TailwindPackageRootForTest(test),
 	})
 	if loadDesignSystemError != nil {
 		test.Fatalf("%s is set, but its design system does not load: %v", corpus.Ahra.Variable, loadDesignSystemError)

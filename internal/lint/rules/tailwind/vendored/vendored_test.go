@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ import (
 // fails here rather than as a design system that quietly builds from less.
 func TestTheSnapshotIsWholeAndTheVersionItSays(test *testing.T) {
 	test.Parallel()
-	root := TailwindPackageRoot()
+	root := TailwindPackageRootForTest(test)
 	for _, name := range []string{
 		"index.css",
 		"theme.css",
@@ -79,5 +80,19 @@ func TestTheSourceDirectoryIsFoundUnderEitherBuild(test *testing.T) {
 		test.TempDir(),
 	); sourceDirectoryError == nil {
 		test.Error("a module path was resolved with no go.mod above the working directory")
+	}
+}
+
+// A -trimpath build names this file by its import path, which is found only from a working directory inside
+// cohere's module, so from outside one the snapshot is an error the caller reports, not a panic that stops the
+// whole test binary.
+// Not parallel: it moves the working directory with test.Chdir
+func TestTheSnapshotFromOutsideTheModuleIsAnError(test *testing.T) {
+	if _, file, _, _ := runtime.Caller(0); filepath.IsAbs(file) {
+		test.Skip("built without -trimpath, the source file is a path on disk, found from any working directory")
+	}
+	test.Chdir(test.TempDir())
+	if root, rootError := TailwindPackageRoot(); rootError == nil {
+		test.Errorf("from outside cohere's module the snapshot was found at %s", root)
 	}
 }

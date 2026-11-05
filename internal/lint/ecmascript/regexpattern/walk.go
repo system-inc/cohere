@@ -180,15 +180,17 @@ func quantifierAt(pattern string, index int) (int, bool) {
 	if index >= len(pattern) {
 		return index, false
 	}
+	// The index past the quantifier, once it is read.
+	var past int
 	switch pattern[index] {
 	case '*', '+', '?':
-		index++
+		past = index + 1
 	case '{':
 		end, ok := braceQuantifierEnd(pattern, index)
 		if !ok {
 			return index, false
 		}
-		index = end
+		past = end
 	default:
 		return index, false
 	}
@@ -198,10 +200,10 @@ func quantifierAt(pattern string, index int) (int, bool) {
 	// governing nothing and step past it, so a sweep finds this line deletable. It stays because
 	// the alternative is a walk that is right by coincidence, and a reader asking whether lazy
 	// quantifiers are handled should find the answer here rather than infer it from elsewhere.
-	if index < len(pattern) && pattern[index] == '?' {
-		index++
+	if past < len(pattern) && pattern[past] == '?' {
+		past++
 	}
-	return index, true
+	return past, true
 }
 
 // applyQuantifier consumes a quantifier following the element that just ended, and reports the
@@ -214,9 +216,11 @@ func (walker *walker) applyQuantifier(index int) int {
 	if index >= len(walker.pattern) {
 		return index
 	}
+	// The index past the quantifier, once it is read.
+	var past int
 	switch walker.pattern[index] {
 	case '*', '+', '?':
-		index++
+		past = index + 1
 	case '{':
 		end, ok := braceQuantifierEnd(walker.pattern, index)
 		if !ok {
@@ -224,15 +228,15 @@ func (walker *walker) applyQuantifier(index int) int {
 			// default branch. Returning the index unchanged lets the loop move past it.
 			return index
 		}
-		index = end
+		past = end
 	default:
 		return index
 	}
 	// A lazy quantifier's question mark is part of the quantifier rather than another one.
-	if index < len(walker.pattern) && walker.pattern[index] == '?' {
-		index++
+	if past < len(walker.pattern) && walker.pattern[past] == '?' {
+		past++
 	}
-	return index
+	return past
 }
 
 // walkClass reports the characters inside a class body, with the class depth raised.

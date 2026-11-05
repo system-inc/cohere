@@ -144,7 +144,8 @@ var CorrectnessRequireChildProcessErrorListener = rule.Rule[rule.NoOptions]{
 				}
 				fate, bound := correctnessRequireChildProcessErrorListenerFollow(ruleContext, node)
 				switch fate {
-				case correctnessRequireChildProcessErrorListenerHandled, correctnessRequireChildProcessErrorListenerEscaped:
+				case correctnessRequireChildProcessErrorListenerHandled,
+					correctnessRequireChildProcessErrorListenerEscaped:
 					return
 				case correctnessRequireChildProcessErrorListenerBound:
 					symbol := ruleContext.TypeChecker.GetSymbolAtLocation(bound)

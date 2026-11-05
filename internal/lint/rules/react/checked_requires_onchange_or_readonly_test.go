@@ -569,9 +569,8 @@ func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(
-				[]byte(testCase.raw),
-			)
+			decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError :=
+				DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(testCase.raw))
 			if decodeCheckedRequiresOnChangeOrReadOnlyOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError)
 			}

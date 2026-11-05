@@ -359,19 +359,20 @@ func jsxNoConstructedContextValuesIsCreateContextCallee(callee *ast.Node) bool {
 	if callee == nil {
 		return false
 	}
-	for callee.Kind == ast.KindParenthesizedExpression {
-		callee = callee.AsParenthesizedExpression().Expression
-		if callee == nil {
+	unwrapped := callee
+	for unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
+		if unwrapped == nil {
 			return false
 		}
 	}
 
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text() == "createContext"
+		return unwrapped.Text() == "createContext"
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		receiver := access.Expression
 		for receiver != nil && receiver.Kind == ast.KindParenthesizedExpression {
 			receiver = receiver.AsParenthesizedExpression().Expression

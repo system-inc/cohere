@@ -120,7 +120,8 @@ func TestNoConstructorReturnStaysSilent(test *testing.T) {
 		"const fn = function () { if (kumiko) { return kumiko } }",
 		"const fn = () => { return }",
 		"const fn = () => { if (kumiko) { return kumiko } }",
-		"return 'Kumiko Oumae'", // upstream sets globalReturn for this one; our parser accepts a top-level return without it
+		// upstream sets globalReturn for this one; our parser accepts a top-level return without it
+		"return 'Kumiko Oumae'",
 		"class C {  }",
 		"class C { constructor() {} }",
 		"class C { constructor() { let v } }",

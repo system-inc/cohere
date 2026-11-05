@@ -125,7 +125,10 @@ type utilityReadingFixture struct {
 //
 // The vendored snapshot of 4.3.3, the version the fixture was generated against, so it is present on any
 // machine (#sycrdr6).
-var utilityTailwindPackageRoot = vendored.TailwindPackageRoot()
+func utilityTailwindPackageRoot(test *testing.T) string {
+	test.Helper()
+	return vendored.TailwindPackageRootForTest(test)
+}
 
 func utilityLoadCorpus(test *testing.T, name string) utilityCorpus {
 	test.Helper()
@@ -155,7 +158,10 @@ func utilityBuildEvaluator(test *testing.T, fixture utilityCorpus) *UtilityEvalu
 	test.Helper()
 
 	entryPath := corpus.Resolve(test, fixture.EntryPath)
-	theme, _, loadThemeFromFileError := LoadThemeFromFile(entryPath, NodeStylesheetResolver(utilityTailwindPackageRoot))
+	theme, _, loadThemeFromFileError := LoadThemeFromFile(
+		entryPath,
+		NodeStylesheetResolver(utilityTailwindPackageRoot(test)),
+	)
 	if loadThemeFromFileError != nil {
 		test.Fatalf("load theme from %s: %v", entryPath, loadThemeFromFileError)
 	}

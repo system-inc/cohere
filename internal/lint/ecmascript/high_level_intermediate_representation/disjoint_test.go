@@ -75,14 +75,12 @@ func classOfName(
 func TestDisjointSetMatchesReact(test *testing.T) {
 	test.Parallel()
 
-	const (
-		a static_single_assignment.IdentifierId = 1
-		b static_single_assignment.IdentifierId = 2
-		c static_single_assignment.IdentifierId = 3
-		d static_single_assignment.IdentifierId = 4
-		e static_single_assignment.IdentifierId = 5
-		f static_single_assignment.IdentifierId = 6
-	)
+	const a static_single_assignment.IdentifierId = 1
+	const b static_single_assignment.IdentifierId = 2
+	const c static_single_assignment.IdentifierId = 3
+	const d static_single_assignment.IdentifierId = 4
+	const e static_single_assignment.IdentifierId = 5
+	const f static_single_assignment.IdentifierId = 6
 
 	tests := []struct {
 		name     string
@@ -747,7 +745,8 @@ export function count(limit: number) {
 `)
 	set := FindDisjointMutableValuesWithRanges(function, ranges)
 
-	var phis, fired int
+	var phis int
+	var fired int
 	for _, block := range function.Blocks {
 		firstOrder := mutation_aliasing.BlockFirstOrder(rangeGraph{}, function, block)
 		for _, phi := range block.Phis {
@@ -1216,7 +1215,11 @@ func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 		test.Fatalf("the corpus holds only %d files; the path is probably wrong", len(files))
 	}
 
-	var functions, members, classes, singletons, largest int
+	var functions int
+	var members int
+	var classes int
+	var singletons int
+	var largest int
 
 	for _, path := range files {
 		contents, readError := os.ReadFile(path)

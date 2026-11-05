@@ -292,6 +292,8 @@ func ParseRegexCharacterClass(pattern string, start int, flags RegexFlags) ([]Re
 	return parseRegexCharacterClass(pattern, start, flags, 0)
 }
 
+const maxRegexCharacterClassPreallocation = 16 << 10
+
 // ParseRegexCharacterClassWithEnd is ParseRegexCharacterClass with a
 // previously discovered class end. Non-v callers use the known byte span as
 // an element-capacity hint to avoid repeated slice growth for large classes.
@@ -321,8 +323,6 @@ func ParseRegexCharacterClassWithEnd(pattern string, start, end int, flags Regex
 	}
 	return elements, parsedEnd, true
 }
-
-const maxRegexCharacterClassPreallocation = 16 << 10
 
 func parseRegexCharacterClass(
 	pattern string,

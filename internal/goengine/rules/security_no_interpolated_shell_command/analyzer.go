@@ -256,11 +256,11 @@ func isBuilt(pass *analysis.Pass, expression ast.Expr, depth int) bool {
 	if depth > depthLimit {
 		return false
 	}
-	expression = ast.Unparen(expression)
-	if pass.TypesInfo.Types[expression].Value != nil {
+	unwrapped := ast.Unparen(expression)
+	if pass.TypesInfo.Types[unwrapped].Value != nil {
 		return false
 	}
-	switch built := expression.(type) {
+	switch built := unwrapped.(type) {
 	case *ast.CallExpr:
 		return isFunction(pass, built, "fmt", "Sprintf")
 	case *ast.BinaryExpr:
@@ -302,43 +302,44 @@ func flatten(pass *analysis.Pass, expression ast.Expr, depth int, pieces []piece
 	if depth > depthLimit {
 		return nil, false
 	}
-	expression = ast.Unparen(expression)
-	if value := pass.TypesInfo.Types[expression].Value; value != nil {
+	unwrapped := ast.Unparen(expression)
+	gathered := pieces
+	if value := pass.TypesInfo.Types[unwrapped].Value; value != nil {
 		// A numeric constant handed to Sprintf prints digits, which hold no shell syntax and no <<.
 		if value.Kind() == constant.String {
-			pieces = append(pieces, piece{text: constant.StringVal(value)})
+			gathered = append(gathered, piece{text: constant.StringVal(value)})
 		}
-		return pieces, true
+		return gathered, true
 	}
-	switch built := expression.(type) {
+	switch built := unwrapped.(type) {
 	case *ast.CallExpr:
 		if isFunction(pass, built, "fmt", "Sprintf") && len(built.Args) > 0 {
 			if built.Ellipsis.IsValid() {
 				// The arguments are a slice built elsewhere, whose elements and their types are not seen here.
-				return append(pieces, piece{value: built, unknown: true}), true
+				return append(gathered, piece{value: built, unknown: true}), true
 			}
 			for _, argument := range built.Args {
 				var isFlattened bool
-				if pieces, isFlattened = flatten(pass, argument, depth+1, pieces); !isFlattened {
+				if gathered, isFlattened = flatten(pass, argument, depth+1, gathered); !isFlattened {
 					return nil, false
 				}
 			}
-			return pieces, true
+			return gathered, true
 		}
 	case *ast.BinaryExpr:
 		if built.Op == token.ADD && isString(pass.TypesInfo.TypeOf(built)) {
 			var isFlattened bool
-			if pieces, isFlattened = flatten(pass, built.X, depth+1, pieces); !isFlattened {
+			if gathered, isFlattened = flatten(pass, built.X, depth+1, gathered); !isFlattened {
 				return nil, false
 			}
-			return flatten(pass, built.Y, depth+1, pieces)
+			return flatten(pass, built.Y, depth+1, gathered)
 		}
 	case *ast.Ident:
 		if initializer := onlyValue(pass, built); initializer != nil {
-			return flatten(pass, initializer, depth+1, pieces)
+			return flatten(pass, initializer, depth+1, gathered)
 		}
 	}
-	return append(pieces, piece{value: expression}), true
+	return append(gathered, piece{value: unwrapped}), true
 }
 
 // judge is what a value spliced into a script holds. A boolean, integer or float, and the text strconv formats one

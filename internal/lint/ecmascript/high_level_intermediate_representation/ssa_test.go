@@ -112,7 +112,8 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 		test.Parallel()
 		fn := build()
 		var moved *Phi
-		var from, to *BasicBlock
+		var from *BasicBlock
+		var to *BasicBlock
 		for _, b := range fn.Blocks {
 			if len(b.Phis) > 0 {
 				moved, from = b.Phis[0], b
@@ -176,7 +177,8 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 	test.Run("value defined twice", func(test *testing.T) {
 		test.Parallel()
 		fn := build()
-		var first, second *Instruction
+		var first *Instruction
+		var second *Instruction
 		for _, b := range fn.Blocks {
 			for _, id := range b.Instructions {
 				ins := fn.Instructions[id]
@@ -356,7 +358,11 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 	}
 
 	for _, value := range values {
-		var byValue, byPointer []struct {
+		var byValue []struct {
+			id   static_single_assignment.IdentifierId
+			role PlaceRole
+		}
+		var byPointer []struct {
 			id   static_single_assignment.IdentifierId
 			role PlaceRole
 		}

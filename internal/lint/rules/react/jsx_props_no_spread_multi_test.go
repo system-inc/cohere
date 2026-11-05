@@ -441,7 +441,8 @@ func TestJsxPropsNoSpreadMultiRendersBothMessages(test *testing.T) {
 	if len(identifierResult.Diagnostics) != 1 {
 		test.Fatalf("want 1 finding, got %d", len(identifierResult.Diagnostics))
 	}
-	if got := identifierResult.Diagnostics[0].Message.Description; got != messageJsxPropsNoSpreadMultiIdentifier.Description {
+	if got := identifierResult.Diagnostics[0].Message.Description; got !=
+		messageJsxPropsNoSpreadMultiIdentifier.Description {
 		test.Fatalf("want the identifier message, got %q", got)
 	}
 
@@ -450,7 +451,8 @@ func TestJsxPropsNoSpreadMultiRendersBothMessages(test *testing.T) {
 	if len(memberResult.Diagnostics) != 1 {
 		test.Fatalf("want 1 finding, got %d", len(memberResult.Diagnostics))
 	}
-	if got := memberResult.Diagnostics[0].Message.Description; got != messageJsxPropsNoSpreadMultiMemberExpression.Description {
+	if got := memberResult.Diagnostics[0].Message.Description; got !=
+		messageJsxPropsNoSpreadMultiMemberExpression.Description {
 		test.Fatalf("want the member message, got %q", got)
 	}
 	if messageJsxPropsNoSpreadMultiIdentifier.Description == messageJsxPropsNoSpreadMultiMemberExpression.Description {

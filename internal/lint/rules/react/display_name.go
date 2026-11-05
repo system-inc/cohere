@@ -283,11 +283,11 @@ func hasTranspilerName(node *ast.Node) bool {
 
 // isModuleExportsAssignmentTarget reports whether an assignment target is `module.exports`.
 func isModuleExportsAssignmentTarget(target *ast.Node) bool {
-	target = skipParenthesesOptional(target)
-	if target == nil || target.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := skipParenthesesOptional(target)
+	if unwrapped == nil || unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := target.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	object := skipParenthesesOptional(access.Expression)
 	if object == nil || object.Kind != ast.KindIdentifier || object.Text() != "module" {
 		return false
@@ -420,11 +420,11 @@ func isDisplayNameKey(key *ast.Node) bool {
 //
 // Never index blindly either way; the list is what the question wants.
 func resolvedDeclarationsOf(ruleContext rule.Context, expression *ast.Node) []*ast.Node {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil || ruleContext.TypeChecker == nil {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil || ruleContext.TypeChecker == nil {
 		return nil
 	}
-	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil {
 		return nil
 	}
@@ -643,11 +643,11 @@ func collectContextObjects(contextCheckerHolder rule.Context, sourceFile *ast.No
 // isCreateContextCall reports whether an expression is a call to `createContext`, bare or through
 // any receiver.
 func isCreateContextCall(expression *ast.Node) bool {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil || expression.Kind != ast.KindCallExpression {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
 		return false
 	}
-	callee := skipParenthesesOptional(expression.AsCallExpression().Expression)
+	callee := skipParenthesesOptional(unwrapped.AsCallExpression().Expression)
 	if callee == nil {
 		return false
 	}

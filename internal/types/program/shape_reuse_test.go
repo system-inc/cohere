@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/lint/rules/core"
 	"github.com/system-inc/cohere/internal/lint/rules/next"
 	"github.com/system-inc/cohere/internal/lint/rules/react"
 	"github.com/system-inc/cohere/internal/lint/rules/typescript"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -65,10 +65,11 @@ func shapeWalk(
 	}
 	// A first walk has its signatures computed, as a project with build info does, so the tests below are
 	// about shapes rather than about a first run's content-keyed fallback.
-	if previousShapes == nil {
-		previousShapes = program.RecordedRealSignatures(graph)
+	baselineShapes := previousShapes
+	if baselineShapes == nil {
+		baselineShapes = program.RecordedRealSignatures(graph)
 	}
-	shapes, _ := graph.Signatures(context.Background(), previousShapes)
+	shapes, _ := graph.Signatures(context.Background(), baselineShapes)
 	graph.Shapes = shapes
 	reuse := program.NewFindingsReuse(program.HashRuleSet([]string{"fixture"}), previous, program.PathAnchor{})
 	graph.FindingsReuse = reuse

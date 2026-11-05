@@ -33,7 +33,8 @@ var correctnessNoImportCycleLoadTimeReadText = policy.MessageOf(
 //	         export const BaseErrorIdentifiers = { ...RateLimiterModuleErrors };
 //	invalid: import { Base } from './B'; export class Derived extends Base {}
 //	invalid: import * as b from './B'; export const limit = b.Limit * 2;
-//	valid:   import { RateLimiterModuleErrors } from './B'; export function all() { return { ...RateLimiterModuleErrors }; }
+//	valid:   import { RateLimiterModuleErrors } from './B';
+//	         export function all() { return { ...RateLimiterModuleErrors }; }
 //	valid:   import { helper } from './B'; export const value = helper(); // `function helper` is hoisted
 //	valid:   import type { Shape } from './B'; // no runtime edge, so no cycle
 //

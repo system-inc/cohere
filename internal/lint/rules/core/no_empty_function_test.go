@@ -11192,7 +11192,8 @@ func TestNoEmptyFunctionSpansTheBody(test *testing.T) {
 				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
 			source := result.SourceFile.Text()
-			if got := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != testCase.wantReported {
+			diagnostic := result.Diagnostics[0]
+			if got := source[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantReported {
 				test.Errorf("the finding points at %q, want %q", got, testCase.wantReported)
 			}
 		})

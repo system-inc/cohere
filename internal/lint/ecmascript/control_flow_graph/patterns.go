@@ -183,7 +183,7 @@ func (builder *Builder[E]) bindWithDefault(target *ast.Node, fallback *ast.Node)
 // isDestructuringTarget reports whether an assignment's left-hand side is an
 // object or array pattern.
 func isDestructuringTarget(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	return node != nil &&
-		(node.Kind == ast.KindObjectLiteralExpression || node.Kind == ast.KindArrayLiteralExpression)
+	unwrapped := ast.SkipParentheses(node)
+	return unwrapped != nil &&
+		(unwrapped.Kind == ast.KindObjectLiteralExpression || unwrapped.Kind == ast.KindArrayLiteralExpression)
 }

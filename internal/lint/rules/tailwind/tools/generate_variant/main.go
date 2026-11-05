@@ -4,7 +4,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_variant -package-root <tailwindcss package> [-corpus <corpus.json>] [-output <file.json>] [-check]
+//	go run ./internal/lint/rules/tailwind/tools/generate_variant \
+//	    -package-root <tailwindcss package> [-corpus <corpus.json>] [-output <file.json>] [-check]
 //
 // The distinction this tool enforces is the one generate_theme enforces, and for this component
 // it lands on `getVariantOrder`. Reading `variants.ts` suggests every variant holds a fixed
@@ -288,8 +289,8 @@ func harvestClassLists(sourceRoot string, maximum int) ([][]string, error) {
 			return nil
 		}
 
-		contents, err := os.ReadFile(path)
-		if err != nil {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
 			return nil //nolint:nilerr
 		}
 

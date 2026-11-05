@@ -6857,7 +6857,7 @@
             "namespace": "cohere-go",
             "origin": "house",
             "category": "consistency",
-            "typeAware": false
+            "typeAware": true
         },
         {
             "name": "cohere-go/consistency-no-grouped-var",

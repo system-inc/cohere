@@ -296,8 +296,8 @@ var NoStringRefs = rule.Rule[NoStringRefsOptions]{
 // 'ThisExpression'`, where the parenthesis skip is what reproduces ESTree rather than what widens
 // past it.
 func reportRefsUsage(ruleContext rule.Context, node *ast.Node, object *ast.Node) {
-	object = ast.SkipParentheses(object)
-	if object == nil || object.Kind != ast.KindThisKeyword {
+	unwrapped := ast.SkipParentheses(object)
+	if unwrapped == nil || unwrapped.Kind != ast.KindThisKeyword {
 		return
 	}
 	if !hasEnclosingComponent(node) {

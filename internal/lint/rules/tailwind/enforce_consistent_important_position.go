@@ -31,6 +31,13 @@ type EnforceConsistentImportantPositionOptions struct {
 	Position string `json:"position"`
 }
 
+const (
+	// importantPositionRecommended is v4's trailing marker: `flex!`.
+	importantPositionRecommended = "recommended"
+	// importantPositionLegacy is v3's leading marker: `!flex`.
+	importantPositionLegacy = "legacy"
+)
+
 // EnforceConsistentImportantPosition reports an important marker on the wrong side of a utility.
 //
 //	valid:   <div className="text-red-500!" />
@@ -110,13 +117,6 @@ var EnforceConsistentImportantPosition = rule.Rule[EnforceConsistentImportantPos
 		return listeners
 	},
 }
-
-const (
-	// importantPositionRecommended is v4's trailing marker: `flex!`.
-	importantPositionRecommended = "recommended"
-	// importantPositionLegacy is v3's leading marker: `!flex`.
-	importantPositionLegacy = "legacy"
-)
 
 // correctedImportantPosition returns the class with its marker on the configured side.
 //

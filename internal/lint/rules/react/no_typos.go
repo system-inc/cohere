@@ -497,13 +497,14 @@ func noTyposReturnsJsx(node *ast.Node) bool {
 // Written as a loop rather than with `ast.SkipParentheses`, which dereferences its argument, and the
 // thing being unwrapped here is a return argument that is legitimately absent for a bare `return;`.
 func noTyposIsJsxExpression(expression *ast.Node) bool {
-	for expression != nil && expression.Kind == ast.KindParenthesizedExpression {
-		expression = expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if expression == nil {
+	if unwrapped == nil {
 		return false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 	}

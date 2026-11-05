@@ -992,7 +992,11 @@ func TestRulesOfHooksFires(test *testing.T) {
             ({g() { useState(); }});
             const {j = () => { useState(); }} = {};
             ({k = () => { useState(); }} = {});
-        `, ids: []string{"rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent"}},
+        `, ids: []string{
+			"rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent",
+			"rulesOfHooksNotComponent", "rulesOfHooksNotComponent", "rulesOfHooksNotComponent",
+			"rulesOfHooksNotComponent", "rulesOfHooksNotComponent",
+		}},
 		{name: "upstream102", source: `
                 function useHook() {
                     if (a) return;
@@ -1223,7 +1227,9 @@ func TestRulesOfHooksFires(test *testing.T) {
             Hook.use42();
             Hook.useHook();
             Hook.use_hook();
-        `, ids: []string{"rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel"}},
+        `, ids: []string{
+			"rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel", "rulesOfHooksTopLevel",
+		}},
 		{name: "upstream134", source: `
                 function notAComponent() {
                     use(promise);

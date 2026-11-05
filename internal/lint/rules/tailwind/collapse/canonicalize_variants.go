@@ -17,7 +17,7 @@ import "strings"
 // rewrite, never make one upstream would not.
 func (canonicalizer *Canonicalizer) modernizeArbitraryValuesVariant(variant ParsedVariant) []ParsedVariant {
 	system := canonicalizer.system
-	top := &variant
+	modernized := variant
 
 	// upstream's walkVariants yields a variant and then, if it is still a compound once the visit is
 	// done, its nested variant, so a variant replaced in place is walked as what it became.
@@ -31,15 +31,17 @@ func (canonicalizer *Canonicalizer) modernizeArbitraryValuesVariant(variant Pars
 		}
 		return nil
 	}
-	if result := visit(top, nil); result != nil {
+	if result := visit(&modernized, nil); result != nil {
 		return result
 	}
-	return []ParsedVariant{*top}
+	return []ParsedVariant{modernized}
 }
 
 // modernizeOne is the loop body of upstream's pass for one variant of the walk. It rewrites the variant in
 // place, as upstream's replaceObject does, and returns true only where upstream returns from the whole
 // pass, which is the split into two variants.
+//
+// Mutates: variant is rewritten in place, so the walk goes on into what it became and the pass returns it
 func (canonicalizer *Canonicalizer) modernizeOne(
 	variant *ParsedVariant,
 	parent *ParsedVariant,
@@ -214,6 +216,8 @@ func (canonicalizer *Canonicalizer) modernizeOne(
 //
 // The `:not` hoist for a pseudo class with no named variant compares two signatures, and is answered as
 // if they differ, which is upstream's own answer then: no variant.
+//
+// Mutates: compoundNot is cleared where odd and even swap under `:not`, so the caller adds no `not-`
 func pseudoClassVariant(targetNode SelectorNode, compoundNot *bool) (string, bool) {
 	isFunctionOfOne := targetNode.Kind == SelectorNodeKindFunction && len(targetNode.Nodes) == 1
 	argument := ""

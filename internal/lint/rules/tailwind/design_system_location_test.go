@@ -44,7 +44,7 @@ func TestFindPathRecursiveIsUpstreamsSearch(test *testing.T) {
 // `brand-glow` is known.
 func runLocationFixture(test *testing.T, options NoUnknownClassesOptions) rule_testing.Result {
 	test.Helper()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so there is no design system to read")
 	}
@@ -99,7 +99,7 @@ func TestTailwindLocationOptions(test *testing.T) {
 // A cache keyed on the program alone would hand the second rule the first rule's design system.
 func TestDesignSystemIsCachedPerLocation(test *testing.T) {
 	test.Parallel()
-	packageRoot := unknownFixturePackageRoot()
+	packageRoot := unknownFixturePackageRoot(test)
 	if packageRoot == "" {
 		test.Skip("no installed tailwindcss on this machine, so there is no design system to read")
 	}

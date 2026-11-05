@@ -67,10 +67,11 @@ func DecodeStylePropObjectOptions(raw []byte) (StylePropObjectOptions, error) {
 // check rather than `ast.SkipParentheses`, which dereferences its argument: every caller here is
 // handed an optional expression, and an empty container is one of the shapes the parser produces.
 func stylePropObjectUnwrapParentheses(expression *ast.Node) *ast.Node {
-	for expression != nil && expression.Kind == ast.KindParenthesizedExpression {
-		expression = expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return expression
+	return unwrapped
 }
 
 // stylePropObjectIsNonNullLiteral reports whether an expression is a literal other than `null`.

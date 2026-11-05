@@ -3,7 +3,8 @@
 //
 // Usage:
 //
-//	go run ./internal/lint/rules/tailwind/tools/generate_descriptor_table -input <table.json> -output <table.go> [-package <name>] [-variable <name>]
+//	go run ./internal/lint/rules/tailwind/tools/generate_descriptor_table \
+//	    -input <table.json> -output <table.go> [-package <name>] [-variable <name>]
 //
 // The input is what `internal/lint/rules/tailwind/tools/generate_descriptors/extract.mjs --json` writes, which is the
 // uncompacted diagnostic shape: a full `{order, count}` per bucket per root across all three
@@ -503,6 +504,9 @@ func writeAxis(
 // and false of everything else. Pass a nil fallback to keep every entry, which is what ByNamespace
 // and ByLiteral need: a miss in either continues the bare-value precedence to a later step that
 // answers differently, so an elided entry is not the same answer as an absent one.
+//
+// Mutates: stats every bucket read and every bucket kept is counted into the caller's totals, which the
+// summary prints as what the elision dropped
 func writeStringReadingMap(
 	out *bytes.Buffer,
 	name string,

@@ -11,6 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/adamic"
 	"github.com/system-inc/cohere/internal/lint/rules/nexus"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 	"github.com/system-inc/cohere/rule_runner"
 )
@@ -53,11 +54,11 @@ func buildProject(test *testing.T, files map[string]string) *program.Graph {
 func walkAndRun(
 	test *testing.T,
 	files map[string]string,
-	subject rule.Rule,
+	subject rule.Rule[rule.NoOptions],
 ) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
 	test.Helper()
 	graph := buildProject(test, files)
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{subject})
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, subject))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -118,7 +119,7 @@ func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(test *testing.T) {
 	test.Parallel()
 	const configuration = `{"compilerOptions":{"strict":true,"exactOptionalPropertyTypes":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["*.ts"]}`
 	for _, testCase := range []struct {
-		subject rule.Rule
+		subject rule.Rule[rule.NoOptions]
 		source  string
 	}{
 		{

@@ -112,6 +112,8 @@ export function useSyncExternalStore<T>(subscribe: (onStoreChange: () => void) =
 // The chunk is where identifiers are allocated, not part of the graph: a copy starts without one, and
 // comparing it would report a difference no pass can see. The identifiers themselves stay where they
 // are, so the graph compares exactly as before.
+//
+// Mutates: function the chunk is dropped in place, so the graph the caller compares no longer holds one
 func forgetIdentifierSlabs(function *Function) {
 	function.identifierSlab = nil
 	for _, nested := range function.Functions {

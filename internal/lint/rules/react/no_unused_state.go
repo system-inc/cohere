@@ -1006,20 +1006,21 @@ func noUnusedStateLiteralText(node *ast.Node) (string, bool) {
 // verdict: the right side of a state assignment, the receiver of the assignment target, the object
 // of a read, a setState argument, a setState callee, and the right side of an alias assignment.
 func noUnusedStateUnwrap(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	unwrapped := node
+	for unwrapped != nil {
+		switch unwrapped.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			unwrapped = unwrapped.AsParenthesizedExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			unwrapped = unwrapped.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			unwrapped = unwrapped.AsSatisfiesExpression().Expression
 		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
+			unwrapped = unwrapped.AsTypeAssertion().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			unwrapped = unwrapped.AsNonNullExpression().Expression
 		default:
-			return node
+			return unwrapped
 		}
 	}
 	return nil

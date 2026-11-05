@@ -18,20 +18,21 @@ import (
 // is the distinction `Optional.Optional` records -- "whether this specific link is the one that
 // tests" -- and getting it wrong here would lower `a?.b.c` as a chain plus a stray load.
 func isOptionalChainLink(node *ast.Node) bool {
-	for node != nil {
-		switch node.Kind {
+	link := node
+	for link != nil {
+		switch link.Kind {
 		case ast.KindPropertyAccessExpression:
-			expression := node.AsPropertyAccessExpression()
+			expression := link.AsPropertyAccessExpression()
 			if expression.QuestionDotToken != nil {
 				return true
 			}
-			node = expression.Expression
+			link = expression.Expression
 		case ast.KindElementAccessExpression:
-			expression := node.AsElementAccessExpression()
+			expression := link.AsElementAccessExpression()
 			if expression.QuestionDotToken != nil {
 				return true
 			}
-			node = expression.Expression
+			link = expression.Expression
 		default:
 			return false
 		}

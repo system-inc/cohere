@@ -658,7 +658,8 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) declarationMa
 		return true
 	}
 	switch declaration.Kind {
-	case ast.KindFunctionDeclaration, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+	case ast.KindFunctionDeclaration, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor,
+		ast.KindSetAccessor:
 		if declaration.Body() == nil {
 			// An overload signature, whose implementation is another declaration of the same
 			// symbol and is read there. A `declare`d function, or an abstract or interface-shaped

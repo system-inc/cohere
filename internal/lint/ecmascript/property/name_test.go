@@ -139,7 +139,8 @@ func TestNameTaggedSeparatesNumbersFromStrings(test *testing.T) {
 		})
 	}
 	// The number and string spellings of one text must not collide.
-	var numeric, quoted string
+	var numeric string
+	var quoted string
 	firstKey(test, "({ 1.0: 1 });", func(k *ast.Node) { numeric, _ = property.NameTagged(k, property.Static) })
 	firstKey(test, "({ '1.0': 1 });", func(k *ast.Node) { quoted, _ = property.NameTagged(k, property.Static) })
 	if numeric == quoted {

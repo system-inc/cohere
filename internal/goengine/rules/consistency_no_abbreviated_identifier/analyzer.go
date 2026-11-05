@@ -146,10 +146,11 @@ func fixedByAnotherPackage(pass *analysis.Pass, reachable reach, method *types.F
 
 // receiverNamed is the named type a method's receiver is, through its pointer, or nil when there is none.
 func receiverNamed(receiverType types.Type) *types.Named {
+	dereferenced := receiverType
 	if pointer, isPointer := types.Unalias(receiverType).(*types.Pointer); isPointer {
-		receiverType = pointer.Elem()
+		dereferenced = pointer.Elem()
 	}
-	named, isNamed := types.Unalias(receiverType).(*types.Named)
+	named, isNamed := types.Unalias(dereferenced).(*types.Named)
 	if !isNamed {
 		return nil
 	}

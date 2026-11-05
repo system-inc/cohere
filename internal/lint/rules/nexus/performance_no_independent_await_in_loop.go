@@ -29,7 +29,8 @@ func messagePerformanceNoIndependentAwaitInLoop() rule.Message {
 // each other for no reason the code can show.
 //
 //	invalid: for (const tree of trees) { results.push(await checkTree(tree)); }
-//	invalid: for (const adapter of this.adapters) { try { results.push(await adapter.fetch()); } catch (error) { results.push(failed(error)); } }
+//	invalid: for (const adapter of this.adapters) { try { results.push(await adapter.fetch()); }
+//	         catch (error) { results.push(failed(error)); } }
 //	invalid: for (let index = 0; index < files.length; index++) { await upload(files[index]); }
 //	valid:   while (hasMore) { const page = await list(cursor); cursor = page.next; }
 //	valid:   for (const page of pages) { cursor = await fetchPage(page, cursor); }

@@ -25,10 +25,14 @@ func correctnessNoUnclearedRaceTimeoutMessage() rule.Message {
 // CorrectnessNoUnclearedRaceTimeout reports a timeout armed inside a `Promise.race` whose timer
 // handle nothing can reach, so the timer is never cleared when the other side wins.
 //
-//	invalid: await Promise.race([work(), new Promise((_resolve, reject) => { setTimeout(() => reject(new Error('timeout')), ms); })]);
-//	invalid: await Promise.race([work(), new Promise((_resolve, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
-//	invalid: const timeout = new Promise<never>((_resolve, reject) => { const timer = setTimeout(reject, ms); }); await Promise.race([work(), timeout]);
-//	valid:   let timer; try { await Promise.race([work(), new Promise((_r, reject) => { timer = setTimeout(reject, ms); })]); } finally { clearTimeout(timer); }
+//	invalid: await Promise.race([work(), new Promise((_resolve, reject) => {
+//	         setTimeout(() => reject(new Error('timeout')), ms); })]);
+//	invalid: await Promise.race([work(), new Promise((_resolve, reject) =>
+//	         setTimeout(() => reject(new Error('timeout')), ms))]);
+//	invalid: const timeout = new Promise<never>((_resolve, reject) => { const timer = setTimeout(reject, ms); });
+//	         await Promise.race([work(), timeout]);
+//	valid:   let timer; try { await Promise.race([work(), new Promise((_r, reject) => {
+//	         timer = setTimeout(reject, ms); })]); } finally { clearTimeout(timer); }
 //	valid:   await Promise.race([work(), new Promise((_r, reject) => { setTimeout(reject, ms).unref(); })]);
 //	valid:   await Promise.race([work(), timeoutAfter(ms)]);
 //

@@ -155,7 +155,7 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 			NoListener: rule.NoListenerAnswersInRun,
 		},
 		{
-			Name:       "test-set-off",
+			Name: "test-set-off",
 			Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
 				ran = true
 				return nil

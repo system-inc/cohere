@@ -96,6 +96,9 @@ func loadTsconfigPaths(
 	compilerOptions := configuration.compilerOptions()
 	var baseUrl string
 	if raw, isWritten := compilerOptions["baseUrl"]; isWritten {
+		// Ignored: a baseUrl that is not a string reads as none, the tsconfig's own directory, as tsc reads it:
+		// tsoptions' convertJsonOption reports the wrong type and hands back nil, which onPropertySet never sets
+		// (TypeScript/tsc/internal/tsoptions/tsconfigparsing.go).
 		_ = json.Unmarshal(raw, &baseUrl)
 	}
 	absoluteBaseUrl := resolvePath(filepath.Dir(configurationPath), baseUrl)
@@ -159,11 +162,16 @@ type tsconfigFile map[string]json.RawMessage
 
 func (file tsconfigFile) compilerOptions() map[string]json.RawMessage {
 	options := map[string]json.RawMessage{}
+	// Ignored: an absent compilerOptions has no options, and one that is not an object is dropped whole, as
+	// tsoptions' convertOptionsFromJson drops it (TypeScript/tsc/internal/tsoptions/tsconfigparsing.go).
 	_ = json.Unmarshal(file["compilerOptions"], &options)
 	return options
 }
 
 // loadTsconfig is tsconfig-paths' loadTsconfig: the file, with whatever it extends merged under it.
+//
+// Mutates: visiting the file is marked while its extends chain loads and unmarked on return, so the caller's
+// set holds the chain being loaded and a file that extends itself is refused
 func loadTsconfig(
 	configurationPath string,
 	readFile func(path string) (string, bool),
@@ -234,13 +242,14 @@ func loadTsconfigFromExtends(
 	fileExists func(path string) bool,
 	visiting map[string]bool,
 ) (tsconfigFile, error) {
-	if !strings.Contains(value, ".json") {
-		value += ".json"
+	extendsFile := value
+	if !strings.Contains(extendsFile, ".json") {
+		extendsFile += ".json"
 	}
 	directory := filepath.Dir(configurationPath)
-	extendedPath := filepath.Join(directory, value)
-	if strings.Contains(value, "/") && strings.Contains(value, ".") && !fileExists(extendedPath) {
-		extendedPath = filepath.Join(directory, "node_modules", value)
+	extendedPath := filepath.Join(directory, extendsFile)
+	if strings.Contains(extendsFile, "/") && strings.Contains(extendsFile, ".") && !fileExists(extendedPath) {
+		extendedPath = filepath.Join(directory, "node_modules", extendsFile)
 	}
 	configuration, loadTsconfigError := loadTsconfig(extendedPath, readFile, fileExists, visiting)
 	if loadTsconfigError != nil || configuration == nil {
@@ -249,8 +258,16 @@ func loadTsconfigFromExtends(
 	options := configuration.compilerOptions()
 	var baseUrl string
 	if raw, isWritten := options["baseUrl"]; isWritten && json.Unmarshal(raw, &baseUrl) == nil && baseUrl != "" {
-		options["baseUrl"], _ = json.Marshal(filepath.Join(filepath.Dir(value), baseUrl))
-		configuration["compilerOptions"], _ = json.Marshal(options)
+		rebasedBaseUrl, encodeError := json.Marshal(filepath.Join(filepath.Dir(extendsFile), baseUrl))
+		if encodeError != nil {
+			return nil, fmt.Errorf("encoding %s's rebased baseUrl: %w", extendedPath, encodeError)
+		}
+		options["baseUrl"] = rebasedBaseUrl
+		encodedOptions, encodeError := json.Marshal(options)
+		if encodeError != nil {
+			return nil, fmt.Errorf("encoding %s's compilerOptions: %w", extendedPath, encodeError)
+		}
+		configuration["compilerOptions"] = encodedOptions
 	}
 	return configuration, nil
 }
@@ -269,6 +286,8 @@ func mergeTsconfigs(base, configuration tsconfigFile) tsconfigFile {
 	for key, value := range configuration.compilerOptions() {
 		options[key] = value
 	}
+	// Ignored: every value in options was decoded from a tsconfig or encoded by json.Marshal, so each is valid
+	// JSON and encoding the map cannot fail.
 	merged["compilerOptions"], _ = json.Marshal(options)
 	return merged
 }

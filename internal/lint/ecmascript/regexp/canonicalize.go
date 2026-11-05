@@ -88,6 +88,11 @@ func CaseEquivalenceGroups(unicodeMode bool) [][]rune {
 	return groups
 }
 
+var (
+	uppercaseTables = sync.OnceValues(func() (map[rune][]rune, [][]rune) { return buildCaseTables(false) })
+	foldTables      = sync.OnceValues(func() (map[rune][]rune, [][]rune) { return buildCaseTables(true) })
+)
+
 // caseTables groups the characters that canonicalize alike, under whichever
 // reading the caller's flags select. Each table is built on first use, so a
 // caller that never compares without regard to case pays for neither, and one
@@ -98,11 +103,6 @@ func caseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 	}
 	return uppercaseTables()
 }
-
-var (
-	uppercaseTables = sync.OnceValues(func() (map[rune][]rune, [][]rune) { return buildCaseTables(false) })
-	foldTables      = sync.OnceValues(func() (map[rune][]rune, [][]rune) { return buildCaseTables(true) })
-)
 
 // buildCaseTables collects the characters that canonicalize alike. A group of
 // one has nothing to widen, so only the rest are kept: as a lookup by member,

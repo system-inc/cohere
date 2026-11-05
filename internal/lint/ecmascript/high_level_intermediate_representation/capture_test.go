@@ -464,7 +464,8 @@ export function Outer(flag: boolean) {
 
 	// Break it the way a mis-placed phi breaks it: move a phi off its join.
 	var moved *Phi
-	var from, to *BasicBlock
+	var from *BasicBlock
+	var to *BasicBlock
 	for _, block := range nested.Blocks {
 		if len(block.Phis) > 0 {
 			moved, from = block.Phis[0], block

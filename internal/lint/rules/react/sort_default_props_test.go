@@ -26,12 +26,13 @@ const sortDefaultPropsFile = "/repository/source/SortDefaultProps.tsx"
 // generated table readable; collapsing them here keeps the decoder receiving what it will see.
 func sortDefaultPropsDecode(test *testing.T, raw string) any {
 	test.Helper()
+	payload := raw
 	if raw == `""` {
-		raw = ""
+		payload = ""
 	}
-	decoded, decodeSortDefaultPropertiesOptionsError := DecodeSortDefaultPropsOptions([]byte(raw))
+	decoded, decodeSortDefaultPropertiesOptionsError := DecodeSortDefaultPropsOptions([]byte(payload))
 	if decodeSortDefaultPropertiesOptionsError != nil {
-		test.Fatalf("decoding %s returned %v", raw, decodeSortDefaultPropertiesOptionsError)
+		test.Fatalf("decoding %s returned %v", payload, decodeSortDefaultPropertiesOptionsError)
 	}
 	return decoded
 }

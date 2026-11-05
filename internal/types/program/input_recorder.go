@@ -53,10 +53,10 @@ func (recorder *InputRecorder) note(path string, present bool, depended bool) {
 	if recorder == nil || path == "" {
 		return
 	}
-	path = withoutTrailingSlash(path)
+	trimmed := withoutTrailingSlash(path)
 	recorder.mutex.Lock()
-	recorder.existed[path] = recorder.existed[path] || present
-	recorder.depended[path] = recorder.depended[path] || depended
+	recorder.existed[trimmed] = recorder.existed[trimmed] || present
+	recorder.depended[trimmed] = recorder.depended[trimmed] || depended
 	recorder.mutex.Unlock()
 }
 
@@ -122,10 +122,11 @@ func hasPathBeneath(sorted []string, directory string) bool {
 
 // withoutTrailingSlash is path with any trailing slash removed, the root excepted.
 func withoutTrailingSlash(path string) string {
-	for len(path) > 1 && strings.HasSuffix(path, "/") {
-		path = path[:len(path)-1]
+	trimmed := path
+	for len(trimmed) > 1 && strings.HasSuffix(trimmed, "/") {
+		trimmed = trimmed[:len(trimmed)-1]
 	}
-	return path
+	return trimmed
 }
 
 // recordingFS is a vfs.FS that reports each path it serves to an InputRecorder.
@@ -146,10 +147,11 @@ type recordingFS struct {
 //
 // depended says whether the answer depended on more than existence: a read, a listing or a stat.
 func (fileSystem *recordingFS) noteAnswer(path string, positive bool, depended bool) {
+	present := positive
 	if !positive {
-		positive = fileSystem.FS.Stat(tspath.RootedPath(path)) != nil
+		present = fileSystem.FS.Stat(tspath.RootedPath(path)) != nil
 	}
-	fileSystem.recorder.note(path, positive, depended)
+	fileSystem.recorder.note(path, present, depended)
 }
 
 func (fileSystem *recordingFS) FileExists(path tspath.RootedFilePath) bool {
@@ -214,8 +216,8 @@ func (fileSystem *recordingFS) Chtimes(path tspath.RootedPath, accessTime time.T
 }
 
 func (fileSystem *recordingFS) markWritten(path string) {
-	path = withoutTrailingSlash(path)
+	trimmed := withoutTrailingSlash(path)
 	fileSystem.recorder.mutex.Lock()
-	fileSystem.recorder.written[path] = true
+	fileSystem.recorder.written[trimmed] = true
 	fileSystem.recorder.mutex.Unlock()
 }

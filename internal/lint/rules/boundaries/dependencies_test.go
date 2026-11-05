@@ -41,7 +41,8 @@ const projectModuleMessage = "A module cannot import from a worker. It is regist
 const projectModuleOptions = `{
 	"default": "allow",
 	"policies": [
-		{"from": {"element": {"type": "project-module"}}, "disallow": {"to": {"element": {"type": "project-worker"}}}, "message": "` + projectModuleMessage + `"}
+		{"from": {"element": {"type": "project-module"}}, ` +
+	`"disallow": {"to": {"element": {"type": "project-worker"}}}, "message": "` + projectModuleMessage + `"}
 	],
 	"elements": [
 		{"type": "project-module", "pattern": "source/modules/*", "capture": ["moduleName"]},
@@ -446,7 +447,8 @@ func TestDependenciesEntrySelectorWinsOverThePolicys(test *testing.T) {
 
 	entryWins := decodeForTest(
 		test,
-		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"from": {"element": {"type": "foundation"}}, "to": {"element": {"type": "cli"}}}}], `+
+		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, `+
+			`"disallow": {"from": {"element": {"type": "foundation"}}, "to": {"element": {"type": "cli"}}}}], `+
 			elements+
 			`}`,
 	)
@@ -454,7 +456,8 @@ func TestDependenciesEntrySelectorWinsOverThePolicys(test *testing.T) {
 
 	outerOnly := decodeForTest(
 		test,
-		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"to": {"element": {"type": "cli"}}}}], `+
+		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, `+
+			`"disallow": {"to": {"element": {"type": "cli"}}}}], `+
 			elements+
 			`}`,
 	)
@@ -472,7 +475,8 @@ func TestDependenciesEntryTypesWinOverThePolicys(test *testing.T) {
 	source := "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;"
 	options := decodeForTest(
 		test,
-		`{"default": "allow", "policies": [{"to": {"element": {"types": {"anyOf": ["foundation"]}}}, "disallow": {"to": {"element": {"types": {"anyOf": ["cli"]}}}}}], `+
+		`{"default": "allow", "policies": [{"to": {"element": {"types": {"anyOf": ["foundation"]}}}, `+
+			`"disallow": {"to": {"element": {"types": {"anyOf": ["cli"]}}}}}], `+
 			elements+
 			`}`,
 	)
@@ -613,7 +617,8 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 		},
 		{
 			"a captured selector",
-			`{"policies": [{"from": {"element": {"type": "api", "captured": {"name": "x"}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+			`{"policies": [{"from": {"element": {"type": "api", "captured": {"name": "x"}}}, ` +
+				`"allow": {"to": {"element": {"type": "api"}}}}], ` +
 				elements +
 				`}`,
 			"captured",
@@ -627,7 +632,8 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 		},
 		{
 			"an allOf query",
-			`{"policies": [{"from": {"element": {"types": {"allOf": ["api"]}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+			`{"policies": [{"from": {"element": {"types": {"allOf": ["api"]}}}, ` +
+				`"allow": {"to": {"element": {"type": "api"}}}}], ` +
 				elements +
 				`}`,
 			"allOf",

@@ -139,6 +139,12 @@ func reportVariantOrder(ruleContext rule.Context, literal ClassLiteral, designSy
 	}
 }
 
+// globalVariantFlag is upstream's `VARIANT_ORDER_FLAGS.GLOBAL`, 1 << 16.
+//
+// The value is upstream's rather than an arbitrary sentinel, so a registration order and a flagged
+// order can never collide: the framework's highest registration is under a hundred.
+const globalVariantFlag = 65536
+
 // sortedVariantSpelling returns the class rewritten with its variants in the engine's order.
 //
 // Reports false when the class has fewer than two variants, when the parser declined it, or when
@@ -247,12 +253,6 @@ func compareVariantOrder(left int, right int) int {
 	}
 	return -1
 }
-
-// globalVariantFlag is upstream's `VARIANT_ORDER_FLAGS.GLOBAL`, 1 << 16.
-//
-// The value is upstream's rather than an arbitrary sentinel, so a registration order and a flagged
-// order can never collide: the framework's highest registration is under a hundred.
-const globalVariantFlag = 65536
 
 // globalSelectorVariants is upstream's `hasGlobalSelector` as a set, because cohere cannot compute it.
 //

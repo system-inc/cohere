@@ -9,8 +9,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/lint/rules/nexus"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -250,10 +250,12 @@ func TestDeadDisableWireKeysUseTheRealAbbreviationRule(test *testing.T) {
 	// all three are dead. last_modified carries no directive at the interface, since snake case isn't this
 	// rule's to report.
 	source := "interface Payload {\nlast_modified: number;\n" +
-		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\ndurationMs: number;\n" +
+		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\n" +
+		"durationMs: number;\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nmax: number;\n}\n" +
 		"export const payload: Payload = {\n" +
-		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nlast_modified: 1,\n" +
+		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\n" +
+		"last_modified: 1,\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\ndurationMs: 2,\n" +
 		"// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- wire spelling\nmax: 3,\n};\n"
 	subject := nexus.ConsistencyNoAbbreviatedIdentifier

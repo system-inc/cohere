@@ -580,8 +580,8 @@ func TestObjectShorthandFires(test *testing.T) {
 			fixed:          pointerTo("var x = { foo }"),
 			declinesRepair: false,
 		},
-		// #7mztrdd: controls for the JavaScript-read patterns below. In Node, new RegExp("^a(?=bar)", "u") tests false on
-		// afoob and new RegExp("^foo\\sbar$", "u") tests false on "foo\u00a0baz", so the method is still reported.
+		// #7mztrdd: controls for the JavaScript-read patterns below. In Node, new RegExp("^a(?=bar)", "u") tests false
+		// on afoob and new RegExp("^foo\\sbar$", "u") tests false on "foo\u00a0baz", so the method is still reported.
 		{
 			source:         "var x = { afoob: function() {} }",
 			settings:       objectShorthandOf("[\"always\", {\"methodsIgnorePattern\": \"^a(?=bar)\"}]"),

@@ -320,11 +320,11 @@ func checkPropTypesValue(
 	pattern *esregexp.RegExp,
 	report func(*ast.Node, string),
 ) {
-	value = skipParenthesesOptional(value)
-	if value == nil || value.Kind != ast.KindObjectLiteralExpression {
+	unwrapped := skipParenthesesOptional(value)
+	if unwrapped == nil || unwrapped.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	runBooleanPropCheck(value.AsObjectLiteralExpression().Properties, settings, pattern, report)
+	runBooleanPropCheck(unwrapped.AsObjectLiteralExpression().Properties, settings, pattern, report)
 }
 
 // runBooleanPropCheck walks one propTypes object's own properties.
@@ -381,8 +381,8 @@ func runBooleanPropCheck(
 // `PropTypes.oneOfType([...])` and any other call reach the recursion too. Reproduced rather than
 // narrowed: the corpus writes `shape` and `arrayOf` both.
 func isNestedPropTypesCall(value *ast.Node) bool {
-	value = skipParenthesesOptional(value)
-	return value != nil && value.Kind == ast.KindCallExpression
+	unwrapped := skipParenthesesOptional(value)
+	return unwrapped != nil && unwrapped.Kind == ast.KindCallExpression
 }
 
 // isBooleanPropTypeValue reports whether a declared prop type names one of the boolean prop-type
@@ -398,18 +398,18 @@ func isNestedPropTypesCall(value *ast.Node) bool {
 // The `isRequired` peel is one level only, matching upstream: it reads `node.value.object.property`
 // and stops, so `PropTypes.bool.isRequired.isRequired` yields nothing and is silent.
 func isBooleanPropTypeValue(value *ast.Node, propertyTypeNames []string) bool {
-	value = skipParenthesesOptional(value)
-	if value == nil {
+	unwrapped := skipParenthesesOptional(value)
+	if unwrapped == nil {
 		return false
 	}
 
 	name := ""
-	switch value.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		name = value.Text()
+		name = unwrapped.Text()
 
 	case ast.KindPropertyAccessExpression:
-		access := value.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		property := access.Name()
 		if property == nil || property.Kind != ast.KindIdentifier {
 			return false

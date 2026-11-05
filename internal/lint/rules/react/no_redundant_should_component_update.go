@@ -192,17 +192,17 @@ func isPureComponentBase(expression *ast.Node) bool {
 	if expression == nil {
 		return false
 	}
-	expression = ast.SkipParentheses(expression)
-	if expression == nil {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return expression.Text() == "PureComponent"
+		return unwrapped.Text() == "PureComponent"
 
 	case ast.KindPropertyAccessExpression:
-		access := expression.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		// The object must be exactly `React`. Upstream builds its regex from the configured pragma
 		// and compares the whole rendered text, so `Preact.PureComponent` and `Foo.PureComponent`
 		// both decline on that anchor. Both measured silent.

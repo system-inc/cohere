@@ -693,7 +693,8 @@ func TestSecurityNoInterpolatedSqlStringDeclinesWithoutAChecker(test *testing.T)
 }
 
 // securityNoInterpolatedSqlValueWording is the bare-value message, written out here.
-const securityNoInterpolatedSqlValueWording = "This value is written into a SQL statement without quotes, right after a comparison, so it becomes " +
+const securityNoInterpolatedSqlValueWording = "This value is written into a SQL statement without quotes, " +
+	"right after a comparison, so it becomes " +
 	"part of the SQL rather than a value: a space, a keyword or a quote in it changes what the query does, " +
 	"and a crafted value runs as SQL. Quoting it does not help, since the value can close the quote. Pass it " +
 	"as a bound parameter (`WHERE id = ?` with the value beside the query). Where the query language has no " +

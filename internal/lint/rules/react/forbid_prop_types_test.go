@@ -1457,7 +1457,8 @@ func TestForbidPropTypesForeignPackageGuard(test *testing.T) {
 func TestForbidPropTypesCollectsImportsBeforeJudging(test *testing.T) {
 	test.Parallel()
 
-	source := "class C extends React.Component { static propTypes = { a: PropTypes.any }; render() { return null; } }\n" +
+	source := "class C extends React.Component { static propTypes = { a: PropTypes.any }; " +
+		"render() { return null; } }\n" +
 		"import { PropTypes } from 'other-lib';\n"
 	result := runForbidPropTypes(test, source, nil)
 	rule_testing.ExpectClean(test, result)

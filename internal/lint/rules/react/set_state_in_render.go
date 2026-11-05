@@ -30,9 +30,11 @@ var setStateInUseMemoMessage = rule.Message{
 
 // SetStateInRender flags a `useState` setter called unconditionally during render.
 //
-//	valid:   function Component() { const [x, setX] = useState(0); return <button onClick={() => setX(1)}>{x}</button>; }
+//	valid:   function Component() { const [x, setX] = useState(0);
+//	         return <button onClick={() => setX(1)}>{x}</button>; }
 //	valid:   function Component(props) { const [x, setX] = useState(0); if (props.c) { setX(1); } return x; }
-//	valid:   function Component(props) { const [x, setX] = useState(0); if (props.c) { return null; } setX(1); return x; }
+//	valid:   function Component(props) { const [x, setX] = useState(0);
+//	         if (props.c) { return null; } setX(1); return x; }
 //	valid:   function Component() { const [x, setX] = useState(0); try { setX(1); } catch (e) {} return x; }
 //	invalid: function Component() { const [x, setX] = useState(0); setX(1); return x; }
 //	invalid: function Component() { const [x, setX] = useState(0); const a = setX; a(1); return x; }
@@ -177,9 +179,9 @@ var SetStateInRender = rule.Rule[CompilerRuleOptions]{
 					return
 				}
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
-					// Shared with the other rules that lower this same function; see high_level_intermediate_representation.ForFunction.
-					// Construct runs inside the cached computation, because it mutates in place and is
-					// not idempotent.
+					// Shared with the other rules that lower this same function; see
+					// high_level_intermediate_representation.ForFunction. Construct runs inside the cached
+					// computation, because it mutates in place and is not idempotent.
 					lowered := high_level_intermediate_representation.ForFunction(ruleContext, functionNode)
 					if lowered == nil {
 						return
@@ -215,9 +217,15 @@ func analyzeSetStateSubject(ruleContext rule.Context, function *high_level_inter
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
+	compilationUnit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
-	reportSetStateInRender(ruleContext, function, function.Node, true, map[static_single_assignment.IdentifierId]bool{})
+	reportSetStateInRender(
+		ruleContext,
+		compilationUnit,
+		compilationUnit.Node,
+		true,
+		map[static_single_assignment.IdentifierId]bool{},
+	)
 }
 
 // reportSetStateInRender is upstream's `validate_impl` over one lowered function.
@@ -269,13 +277,13 @@ func reportSetStateInRender(
 				continue
 			}
 
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			// Reading and writing carry the "this value calls a setter unconditionally" property
 			// along, which is what makes an alias chain of any length behave like its head. The
 			// setter's own type is followed by the checker instead, so these two arms exist only
 			// for values that are not setters themselves but call one.
 			case *high_level_intermediate_representation.LoadLocal:
-				if unconditionalSetStateFunctions[value.Place.Identifier] {
+				if unconditionalSetStateFunctions[instructionValue.Place.Identifier] {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 			// Reading a captured binding carries the property too. Upstream has no counterpart to
@@ -285,12 +293,12 @@ func reportSetStateInRender(
 			// else. Without this arm the three-level fixture is silent: inside `bar`, the call is
 			// `Call $4()` where `$4 = LoadContext foo$1`.
 			case *high_level_intermediate_representation.LoadContext:
-				if unconditionalSetStateFunctions[value.Place.Identifier] {
+				if unconditionalSetStateFunctions[instructionValue.Place.Identifier] {
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 			case *high_level_intermediate_representation.StoreLocal:
-				if unconditionalSetStateFunctions[value.Value.Identifier] {
-					unconditionalSetStateFunctions[value.LValue.Identifier] = true
+				if unconditionalSetStateFunctions[instructionValue.Value.Identifier] {
+					unconditionalSetStateFunctions[instructionValue.LValue.Identifier] = true
 					unconditionalSetStateFunctions[instruction.LValue.Identifier] = true
 				}
 
@@ -299,7 +307,7 @@ func reportSetStateInRender(
 			// callback in every component would be walked, and with it the walk is bounded by what
 			// the function can actually reach.
 			case *high_level_intermediate_representation.FunctionExpression:
-				nested := nestedFunction(function, value)
+				nested := nestedFunction(function, instructionValue)
 				if nested == nil {
 					continue
 				}
@@ -309,7 +317,7 @@ func reportSetStateInRender(
 				nestedSetters, capturesOne := setterCapturesOf(
 					ruleContext,
 					function,
-					value,
+					instructionValue,
 					nested,
 					unconditionalSetStateFunctions,
 				)
@@ -350,18 +358,23 @@ func reportSetStateInRender(
 
 			case *high_level_intermediate_representation.CallExpression:
 				// An optional call is silent upstream. See the rule comment.
-				if value.Optional {
+				if instructionValue.Optional {
 					continue
 				}
-				if !isStateSetter(ruleContext, function, value.Callee.Identifier) &&
-					!unconditionalSetStateFunctions[value.Callee.Identifier] {
+				if !isStateSetter(ruleContext, function, instructionValue.Callee.Identifier) &&
+					!unconditionalSetStateFunctions[instructionValue.Callee.Identifier] {
 					continue
 				}
 				// The memoized test comes first, matching upstream's branch order, so a call inside
 				// a `useMemo` reports even where it is conditional within that callback.
 				if isUseMemoCallbackOf(function.Node, compiledUnit) {
 					if emit {
-						reportSetterCall(ruleContext, function, value.Callee.Identifier, setStateInUseMemoMessage)
+						reportSetterCall(
+							ruleContext,
+							function,
+							instructionValue.Callee.Identifier,
+							setStateInUseMemoMessage,
+						)
 					}
 					reported = true
 					continue
@@ -370,7 +383,7 @@ func reportSetStateInRender(
 					continue
 				}
 				if emit {
-					reportSetterCall(ruleContext, function, value.Callee.Identifier, setStateInRenderMessage)
+					reportSetterCall(ruleContext, function, instructionValue.Callee.Identifier, setStateInRenderMessage)
 				}
 				reported = true
 			}

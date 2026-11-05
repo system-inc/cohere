@@ -159,8 +159,9 @@ type RequireAtomicUpdatesOptions struct {
 //
 // The divergence is a strict superset in favour of reporting, and it is the right direction here:
 // the reason upstream skips an unresolved name is that it cannot tell a global from a typo, not that
-// a global cannot race. A global is in fact the most racy thing in the file. `TestRequireAtomicUpdatesResolutionDivergence`
-// pins it so the next reader sees a measurement rather than inherits an argument.
+// a global cannot race. A global is in fact the most racy thing in the file.
+// `TestRequireAtomicUpdatesResolutionDivergence` pins it so the next reader sees a measurement rather than
+// inherits an argument.
 //
 // On the real tree this accounts for 7 of the 8 extras, all of them the same shape: a handler saved
 // into a local, replaced, and restored in a `finally` after an await.

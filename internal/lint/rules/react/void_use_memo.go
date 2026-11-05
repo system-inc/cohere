@@ -229,19 +229,19 @@ var VoidUseMemo = rule.Rule[CompilerRuleOptions]{
 // is excluded and an optional *call* is not, which is upstream's asymmetry rather than an
 // approximation here. All four measured.
 func isUseMemoCallee(callee *ast.Node, enclosing *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
+	unwrapped := ast.SkipParentheses(callee)
+	if unwrapped == nil {
 		return false
 	}
 
-	if callee.Kind == ast.KindIdentifier {
-		return callee.Text() == "useMemo" && !isShadowedWithin("useMemo", callee, enclosing)
+	if unwrapped.Kind == ast.KindIdentifier {
+		return unwrapped.Text() == "useMemo" && !isShadowedWithin("useMemo", unwrapped, enclosing)
 	}
 
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	if unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := callee.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	// `React?.useMemo(...)` is clean upstream while `useMemo?.(...)` reports, so the optional token
 	// is declined here and never at the call. Measured both ways.
 	if access.QuestionDotToken != nil {

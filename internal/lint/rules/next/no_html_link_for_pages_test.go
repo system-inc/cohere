@@ -680,7 +680,8 @@ func TestNoHtmlLinkForPagesPointsAtTheOpeningElement(test *testing.T) {
 			)
 			rule_testing.ExpectFindings(test, result, messageNoHtmlLinkForPages.Id)
 			diagnostic := result.Diagnostics[0]
-			if reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; reported != testCase.reported {
+			reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
+			if reported != testCase.reported {
 				test.Errorf("finding points at %q, want %q", reported, testCase.reported)
 			}
 		})

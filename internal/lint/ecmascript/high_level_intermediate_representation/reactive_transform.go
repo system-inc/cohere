@@ -100,6 +100,8 @@ type ReactiveTransformer struct {
 // In place, matching upstream, because every consumer of this walks a function it owns and a copy
 // would double the peak memory of a pass whose whole job is to make the tree smaller. The function
 // is mutated; a caller wanting the original keeps its own copy.
+//
+// Mutates: function the transform rewrites the caller's body in place, for the memory reason above
 func TransformReactiveFunction(function *ReactiveFunction, transformer ReactiveTransformer) {
 	if function == nil {
 		return
@@ -154,7 +156,9 @@ func (walker *reactiveTransformWalker) transformStatement(statement ReactiveStat
 	switch shape := statement.(type) {
 	case *ReactiveInstructionStatement:
 		if walker.transformer.Instruction != nil {
-			return walker.transformer.Instruction(shape, func() {})
+			return walker.transformer.Instruction(shape, func() {
+				// An instruction statement holds no nested block, so there is nothing to descend into.
+			})
 		}
 		return KeepStatement()
 

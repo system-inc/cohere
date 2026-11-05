@@ -33,10 +33,13 @@ func correctnessNoCallbackInParseTryMessage() rule.Message {
 //	invalid: try { onEvent(JSON.parse(line)); } catch { /* heartbeat or partial frame */ }
 //	invalid: try { callback(null, JSON.parse(text)); } catch { callback(new Error('bad JSON')); }
 //	invalid: try { return parseJsonOrThrow(read(), 'settings', isSettings); } catch { return null; }
-//	valid:   let message: unknown; try { message = JSON.parse(line); } catch { onUnparseable?.(line); continue; } onMessage(message);
-//	valid:   const lineParse = parseJson(line, 'stream line', isMessage); if(lineParse.outcome === 'Parsed') onMessage(lineParse.value);
+//	valid:   let message: unknown; try { message = JSON.parse(line); } catch { onUnparseable?.(line); continue; }
+//	         onMessage(message);
+//	valid:   const lineParse = parseJson(line, 'stream line', isMessage);
+//	         if(lineParse.outcome === 'Parsed') onMessage(lineParse.value);
 //	valid:   try { onMessage(JSON.parse(line)); } catch(error) { if(!(error instanceof SyntaxError)) throw error; }
-//	valid:   new Promise(function(resolve, reject) { try { resolve(JSON.parse(text)); } catch { reject(new Error('bad')); } });
+//	valid:   new Promise(function(resolve, reject) { try { resolve(JSON.parse(text)); }
+//	         catch { reject(new Error('bad')); } });
 //
 // # Where it came from
 //

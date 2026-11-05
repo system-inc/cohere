@@ -28,12 +28,17 @@ func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
 // element type inside a handler registered with `document.addEventListener` or
 // `window.addEventListener`.
 //
-//	invalid: document.addEventListener('keydown', function(event) { const target = event.target as HTMLTextAreaElement; use(target.selectionStart); });
+//	invalid: document.addEventListener('keydown', function(event) {
+//	         const target = event.target as HTMLTextAreaElement; use(target.selectionStart); });
 //	invalid: window.addEventListener('click', (event) => { (event.target as HTMLInputElement).select(); });
-//	invalid: function handleKeyDown(event: KeyboardEvent) { (<HTMLInputElement>event.target).value; } document.addEventListener('keydown', handleKeyDown);
-//	valid:   document.addEventListener('keydown', function(event) { if(!(event.target instanceof HTMLTextAreaElement)) return; use(event.target.selectionStart); });
-//	valid:   document.addEventListener('click', function(event) { const target = event.target as HTMLElement; target.closest('[data-menu]'); });
-//	valid:   textarea.addEventListener('keydown', function(event) { (event.target as HTMLTextAreaElement).selectionStart; });
+//	invalid: function handleKeyDown(event: KeyboardEvent) { (<HTMLInputElement>event.target).value; }
+//	         document.addEventListener('keydown', handleKeyDown);
+//	valid:   document.addEventListener('keydown', function(event) {
+//	         if(!(event.target instanceof HTMLTextAreaElement)) return; use(event.target.selectionStart); });
+//	valid:   document.addEventListener('click', function(event) {
+//	         const target = event.target as HTMLElement; target.closest('[data-menu]'); });
+//	valid:   textarea.addEventListener('keydown', function(event) {
+//	         (event.target as HTMLTextAreaElement).selectionStart; });
 //	valid:   document.addEventListener('click', function(event) { (event.currentTarget as Document).title; });
 //
 // # Where it came from

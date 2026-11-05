@@ -161,6 +161,8 @@ func Compile(source string, flags string) (*RegExp, error) {
 func MustCompile(source string, flags string) *RegExp {
 	re, compileError := Compile(source, flags)
 	if compileError != nil {
+		// Invariant: every caller passes a pattern literal written in this repository, compiled when its
+		// package initializes, so a failure stops the first test run and is never a user's input.
 		panic(fmt.Sprintf("esregexp: cannot compile /%s/%s: %v", source, flags, compileError))
 	}
 	return re

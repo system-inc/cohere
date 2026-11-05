@@ -754,15 +754,15 @@ func isDeprecatedEs6Component(node *ast.Node) bool {
 //
 // Parentheses are skipped at both positions, for the reason recorded on the caller.
 func isDeprecatedComponentBase(expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	if expression == nil {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped == nil {
 		return false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return isDeprecatedComponentBaseName(expression.Text())
+		return isDeprecatedComponentBaseName(unwrapped.Text())
 	case ast.KindPropertyAccessExpression:
-		access := expression.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		object := ast.SkipParentheses(access.Expression)
 		if object == nil || object.Kind != ast.KindIdentifier || object.Text() != "React" {
 			return false

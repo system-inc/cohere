@@ -281,7 +281,8 @@ func TestNoMultiAssignSpansTheInnerAssignment(test *testing.T) {
 				test.Fatalf("want %d findings, got %d", len(testCase.wantReported), len(result.Diagnostics))
 			}
 			for index, want := range testCase.wantReported {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				diagnostic := result.Diagnostics[index]
+				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != want {
 					test.Errorf("finding %d points at %q, want %q", index, reported, want)
 				}

@@ -137,14 +137,14 @@ func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
 				return nil
 			}
 			fileSet := token.NewFileSet()
-			file, err := parser.ParseFile(fileSet, path, nil, parser.ParseComments)
-			if err != nil {
-				return err
+			file, parseError := parser.ParseFile(fileSet, path, nil, parser.ParseComments)
+			if parseError != nil {
+				return parseError
 			}
 			files++
-			relative, err := filepath.Rel(moduleRoot, path)
-			if err != nil {
-				return err
+			relative, relativeError := filepath.Rel(moduleRoot, path)
+			if relativeError != nil {
+				return relativeError
 			}
 			found = append(found, goWhitespaceSitesIn(fileSet, file, filepath.ToSlash(relative))...)
 			return nil

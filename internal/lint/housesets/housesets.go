@@ -162,7 +162,8 @@ func detectTailwind(
 	}
 	entryPoint := tailwind.FindEntryPoint(projectRoot, fileExists)
 	if entryPoint == "" {
-		return "", "no Tailwind stylesheet at any of the places its rules look (app/globals.css and the others), so its rules are skipped"
+		return "", "no Tailwind stylesheet at any of the places its rules look (app/globals.css and the others), " +
+			"so its rules are skipped"
 	}
 	if contents, read := fileSystem.ReadFile(
 		tspath.RootedFilePath(entryPoint),

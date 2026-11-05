@@ -83,6 +83,7 @@ func readClassListOracle(test *testing.T, name string) (string, map[string]strin
 	if err != nil {
 		test.Fatalf("open %s: %v", name, err)
 	}
+	// Ignored: the capture is only read, so a failed close loses nothing.
 	defer file.Close()
 	reader, err := gzip.NewReader(file)
 	if err != nil {

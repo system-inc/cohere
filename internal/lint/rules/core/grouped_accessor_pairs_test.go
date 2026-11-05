@@ -445,7 +445,8 @@ func TestGroupedAccessorPairsTypeMembers(test *testing.T) {
 			}
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			diagnostic := result.Diagnostics[0]
-			if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
+			got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
+			if got != testCase.wantSpan {
 				test.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
 			}
 		})

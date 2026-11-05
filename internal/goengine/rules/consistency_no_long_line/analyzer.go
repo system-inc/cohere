@@ -5,6 +5,13 @@
 // directive, a raw string's body, a string literal alone on its line or after only a struct field's names and type, a
 // return, or a key or a name and its operator, and a comment that overruns only on one token too long for a comment
 // line of its own, such as a URL.
+//
+// A parameter, a result or a struct field alone on its line is left alone too, when it has at most one name, no tag,
+// and a type gofmt cannot break: names, selectors, pointers, slices, arrays, maps, channels, parentheses and an index
+// with one type argument. gofmt rejoins such a type however it is broken, save after a selector's dot, which the house
+// already counts as no cure for a key, so flagging the line buys no readability, and a new name or alias added only for
+// width is no cure either. A func type, a struct or interface literal, two type arguments or two names can all wrap,
+// so they are still judged, and a field with a tag is left to the tag's own exemption above.
 package consistency_no_long_line
 
 import (
@@ -32,8 +39,9 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_no_long_line",
 	Doc: "Flags a line longer than 120 columns, a tab counted as 4 and every other rune as 1, at its 121st column. " +
 		"An import line, a //go: directive, a raw string's body, a string literal alone on its line or after only a " +
-		"struct field's names and type, a return, or a key or a name and its operator, and a comment that overruns " +
-		"only on one token too long to wrap, such as a URL, are left alone.",
+		"struct field's names and type, a return, or a key or a name and its operator, a parameter, result or struct " +
+		"field alone on its line with at most one name, no tag and a type gofmt cannot break, and a comment that " +
+		"overruns only on one token too long to wrap, such as a URL, are left alone.",
 	Run: run,
 }
 
@@ -53,6 +61,10 @@ const tabColumns = 4
 // argument or element, with nothing in it that could move to the next line.
 const closingPunctuation = ",)}]; \t"
 
+// fieldClosingPunctuation is what may follow a field alone on its line: the comma after it, and the parenthesis or
+// brace that closes its list.
+const fieldClosingPunctuation = ",)} \t"
+
 // sourceFile is one file as the rule reads it: its text, its line table, and what of its syntax tree the exemptions
 // need, each gathered once.
 type sourceFile struct {
@@ -68,6 +80,9 @@ type sourceFile struct {
 	// field's names and type before its tag, the return keyword before a lone returned string, since a newline
 	// after return makes it a bare return, or a key or a name before its operator and a lone string.
 	unwrappableOpenings map[int]*ast.BasicLit
+	// unwrappableFields maps the offset a parameter, a result or a struct field opens at to that field, when it has at
+	// most one name, no tag, and a type gofmt rejoins however it is broken.
+	unwrappableFields map[int]*ast.Field
 }
 
 func run(pass *analysis.Pass) (any, error) {
@@ -94,6 +109,7 @@ func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourc
 		content:             content,
 		exemptLines:         map[int]bool{},
 		unwrappableOpenings: map[int]*ast.BasicLit{},
+		unwrappableFields:   map[int]*ast.Field{},
 	}
 	for _, declaration := range file.Decls {
 		general, isGeneral := declaration.(*ast.GenDecl)
@@ -136,6 +152,12 @@ func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourc
 			if node.Tag != nil {
 				source.unwrappableOpenings[source.offsetOf(node.Pos())] = node.Tag
 			}
+		case *ast.FuncType:
+			// A type parameter list is left out: it is not a parameter or a result, and the ruling is for those.
+			source.gatherUnwrappableFields(node.Params)
+			source.gatherUnwrappableFields(node.Results)
+		case *ast.StructType:
+			source.gatherUnwrappableFields(node.Fields)
 		case *ast.ReturnStmt:
 			if len(node.Results) == 1 {
 				if literal, isLiteral := stringLiteralOf(node.Results[0]); isLiteral {
@@ -196,7 +218,7 @@ func judgeFile(pass *analysis.Pass, source *sourceFile) {
 		}
 		overflow := start + offsetPastLimit(source.content[start:end])
 		if source.isRawStringBody(line, overflow) || source.isLoneStringLiteral(line, overflow) ||
-			source.isUnbreakableCommentToken(line, overflow) {
+			source.isUnbreakableCommentToken(line, overflow) || source.isLoneField(line) {
 			continue
 		}
 		pass.Report(analysis.Diagnostic{
@@ -237,6 +259,67 @@ func (source *sourceFile) isLoneStringLiteral(line int, overflow int) bool {
 		return false
 	}
 	return source.closesTheLine(literal, line)
+}
+
+// isLoneField is whether line holds, past its indentation, one field from unwrappableFields that opens and ends on it,
+// with no comment inside it and only closing punctuation after it. A comment, more code or the opening of a body after
+// the field could move to a line of its own, so is a finding.
+func (source *sourceFile) isLoneField(line int) bool {
+	field, found := source.unwrappableFields[source.codeStart(line)]
+	if !found || source.lineOf(field.End()) != line {
+		return false
+	}
+	fieldEnd := source.offsetOf(field.End())
+	if source.opensComment(source.codeStart(line), fieldEnd) {
+		return false
+	}
+	return len(bytes.Trim(source.content[fieldEnd:source.lineEnd(line)], fieldClosingPunctuation)) == 0
+}
+
+// gatherUnwrappableFields records each field of fields, a parameter, result or struct field list that may be absent,
+// that has at most one name, no tag, and a type gofmt cannot break. Two names could wrap after their comma. A tag is
+// the tag exemption's to judge, which leaves alone only an overflow inside the tag, so a field that overruns before
+// its tag opens is still a finding.
+func (source *sourceFile) gatherUnwrappableFields(fields *ast.FieldList) {
+	if fields == nil {
+		return
+	}
+	for _, field := range fields.List {
+		if len(field.Names) <= 1 && field.Tag == nil && isUnbreakableType(field.Type) {
+			source.unwrappableFields[source.offsetOf(field.Pos())] = field
+		}
+	}
+}
+
+// isUnbreakableType is whether a type expression has no place gofmt keeps a line break: names, selectors, pointers,
+// slices, arrays of a literal length, maps, channels and parentheses over those, and an index with one type argument.
+// gofmt rejoins every one of them however it is broken. A func type, a struct or interface literal and an index with
+// two or more type arguments can break after a comma or a brace, so they are not here.
+func isUnbreakableType(expression ast.Expr) bool {
+	switch expression := expression.(type) {
+	case *ast.Ident, *ast.SelectorExpr:
+		return isName(expression)
+	case *ast.StarExpr:
+		return isUnbreakableType(expression.X)
+	case *ast.ArrayType:
+		// A slice has no length, and an array's length is unbreakable only as a literal; [...] or a constant
+		// expression is code.
+		if expression.Len != nil {
+			if _, isLiteral := expression.Len.(*ast.BasicLit); !isLiteral {
+				return false
+			}
+		}
+		return isUnbreakableType(expression.Elt)
+	case *ast.MapType:
+		return isUnbreakableType(expression.Key) && isUnbreakableType(expression.Value)
+	case *ast.ChanType:
+		return isUnbreakableType(expression.Value)
+	case *ast.ParenExpr:
+		return isUnbreakableType(expression.X)
+	case *ast.IndexExpr:
+		return isUnbreakableType(expression.X) && isUnbreakableType(expression.Index)
+	}
+	return false
 }
 
 // opensComment is whether a comment opens at an offset from start up to, not including, end.

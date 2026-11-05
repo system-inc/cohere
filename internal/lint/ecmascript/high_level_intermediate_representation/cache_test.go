@@ -113,7 +113,8 @@ func TestForFunctionLowersOncePerFunction(test *testing.T) {
 func TestForFunctionConstructsExactlyOnce(test *testing.T) {
 	test.Parallel()
 
-	var firstPhis, lastPhis int
+	var firstPhis int
+	var lastPhis int
 
 	probe := rule.Rule[rule.NoOptions]{
 		Name:             "hir-cache-construct-probe",
@@ -298,7 +299,8 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(test *testing.T
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			var shared, erased *Function
+			var shared *Function
+			var erased *Function
 			recognised := 0
 			probe := rule.Rule[rule.NoOptions]{
 				Name:             "hir-cache-escaped-memo-probe",

@@ -547,19 +547,17 @@ func walk(node *ast.Node, listeners rule.Listeners) {
 // lineAndCharacterOfPosition converts an offset into a zero-based line and column.
 //
 // Written here rather than taken from the shim because the shim's spelling has moved before, and a
-// scoring harness that stops compiling for a rename is worse than twelve lines of arithmetic.
+// scoring harness that stops compiling for a rename is worse than a few lines of arithmetic.
 func lineAndCharacterOfPosition(sourceFile *ast.SourceFile, position int) (line int, character int) {
 	text := sourceFile.Text()
-	if position > len(text) {
-		position = len(text)
-	}
+	clamped := min(position, len(text))
 	line = 0
 	lastNewline := -1
-	for index := 0; index < position; index++ {
+	for index := 0; index < clamped; index++ {
 		if text[index] == '\n' {
 			line++
 			lastNewline = index
 		}
 	}
-	return line, position - lastNewline - 1
+	return line, clamped - lastNewline - 1
 }

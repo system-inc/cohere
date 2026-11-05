@@ -87,7 +87,8 @@ func TestStateEffectsFollowImportOrigin(test *testing.T) {
 								}
 								wantFrozen := testCase.frozen || testCase.name == "wrong package" ||
 									testCase.name == "overridden star export" || testCase.name == "typed impostor"
-								var frozenResult, frozenArgument bool
+								var frozenResult bool
+								var frozenArgument bool
 								for _, effect := range effects.Get(instruction.Id) {
 									if effect.Kind == mutation_aliasing.AliasingEffectCreate &&
 										effect.Into.Identifier == instruction.LValue.Identifier {
@@ -154,7 +155,8 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			var findings, markers int
+			var findings int
+			var markers int
 			probe := rule.Rule[rule.NoOptions]{
 				Name:             "state-method-memoization",
 				NeedsTypeChecker: true,
