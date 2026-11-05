@@ -44,6 +44,31 @@ func TestSubThroughVar(test *testing.T) {
 	}
 }
 
+func TestSubFromNowDirectly(test *testing.T) {
+	start := time.Now()
+	work()
+	if time.Now().Sub(start) > limit { // want `This test fails when its work takes longer`
+		test.Fatal("too slow")
+	}
+}
+
+func TestSubFromALocalReading(test *testing.T) {
+	start := time.Now()
+	work()
+	finished := time.Now()
+	if finished.Sub(start) > limit { // want `This test fails when its work takes longer`
+		test.Fatal("too slow")
+	}
+}
+
+// The reading may be the argument: the start was read from the clock even when the end is a fixed time.
+func TestSubWithTheReadingAsTheArgument(test *testing.T) {
+	deadline := time.Date(2100, time.January, 1, 0, 0, 0, 0, time.UTC)
+	if deadline.Sub(time.Now()) != limit { // want `This test fails when its work takes longer`
+		test.Fatal("not a second away")
+	}
+}
+
 func TestDeclaredInTheCondition(test *testing.T) {
 	start := time.Now()
 	work()
