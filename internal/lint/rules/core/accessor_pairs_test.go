@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -29,7 +30,7 @@ func accessorPairsBoolean(value bool) *bool {
 // order they are reported.
 type accessorPairsCase struct {
 	sourceText string
-	options    any
+	options    rule.Given[AccessorPairsOptions]
 	wantIds    []string
 }
 
@@ -37,15 +38,16 @@ type accessorPairsCase struct {
 // exported decoder rather than handing it a struct.
 //
 // The decoder is what applies the two true-by-default settings, so a fixture built by passing the
-// struct directly would leave the single line most likely to be wrong completely untested. A nil
-// options value is passed through as nil, which is what the config layer hands a rule configured as
+// struct directly would leave the single line most likely to be wrong completely untested. An
+// unconfigured case runs unconfigured, which is what the config layer hands a rule configured as
 // a bare severity.
 func runAccessorPairs(test *testing.T, testCase accessorPairsCase) rule_testing.Result {
 	test.Helper()
-	if testCase.options == nil {
+	settings, configured := testCase.options.Read()
+	if !configured {
 		return rule_testing.RunTyped(test, AccessorPairs, accessorPairsFile, testCase.sourceText)
 	}
-	encoded, err := json.Marshal(testCase.options)
+	encoded, err := json.Marshal(settings)
 	if err != nil {
 		test.Fatalf("could not encode options: %v", err)
 	}
@@ -70,216 +72,220 @@ func runAccessorPairs(test *testing.T, testCase accessorPairsCase) rule_testing.
 // covered there by a local binding, which is the same question asked a way this tree can ask it.
 func accessorPairsFiresCases() []accessorPairsCase {
 	return []accessorPairsCase{
-		{"var o = { set a(value) {} };", nil, []string{"missingGetterInObjectLiteral"}},
-		{"var o = { set a(value) {} };", AccessorPairsOptions{}, []string{"missingGetterInObjectLiteral"}},
+		{"var o = { set a(value) {} };", rule.Given[AccessorPairsOptions]{}, []string{"missingGetterInObjectLiteral"}},
 		{
 			"var o = { set a(value) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse},
+			rule.Configured(AccessorPairsOptions{}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set a(value) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse}),
+			[]string{"missingGetterInObjectLiteral"},
+		},
+		{
+			"var o = { set a(value) {} };",
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {} };",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get abc() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get 'abc'() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get 123() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get 1e2() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get ['abc']() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [`abc`]() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [123]() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [abc]() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [f(abc)]() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [a + b]() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { set abc(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set 'abc'(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set 123(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set 1e2(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set ['abc'](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set [`abc`](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set [123](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set [abc](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set [f(abc)](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set [a + b](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, set b(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { set a(foo) {}, get b() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral", "missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get 1() {}, set b(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, set 1(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, set 'a '(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get ' a'() {}, set 'a'(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get ''() {}, set ' '(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get ''() {}, set null(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [`a`]() {}, set b(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [a]() {}, set [b](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [a]() {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, set [a](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [a + b]() {}, set [a - b](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get [`${0} `]() {}, set [`${0}`](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, get b() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { set a(foo) {}, set b(bar) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, set b(foo) {}, set c(foo) {}, get d() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{
 				"missingSetterInObjectLiteral",
 				"missingGetterInObjectLiteral",
@@ -289,635 +295,657 @@ func accessorPairsFiresCases() []accessorPairsCase {
 		},
 		{
 			"var o1 = { get a() {} }, o2 = { set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o1 = { set a(foo) {} }, o2 = { get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral", "missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, get b() {}, set b(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get b() {}, get a() {}, set b(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get b() {}, set b(foo) {}, get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { set a(foo) {}, get b() {}, set b(bar) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get b() {}, set a(foo) {}, set b(bar) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get b() {}, set b(bar) {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get v1() {}, set i1(foo) {}, get v2() {}, set v2(bar) {}, get i2() {}, set v1(baz) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral", "missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { set a(foo) {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { a, get b() {}, c };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { a, get b() {}, c, set d(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, a:1 };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { a, get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { set a(foo) {}, a:1 };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { a, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, ...b };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { get a() {}, ...a };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = { set a(foo) {}, ...a };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = { get b() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInObjectLiteral"},
 		},
 		{
 			"var o = {\n  set [\n a](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInObjectLiteral"},
 		},
 		{
 			"var o = {d: 1};\n Object.defineProperty(o, 'c', \n{set: function(value) {\n val = value; \n} \n});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
 		{
 			"Reflect.defineProperty(obj, 'foo', {set: function(value) {}});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
 		{
 			"Object.defineProperties(obj, {foo: {set: function(value) {}}});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
-		{"Object.create(null, {foo: {set: function(value) {}}});", nil, []string{"missingGetterInPropertyDescriptor"}},
+		{
+			"Object.create(null, {foo: {set: function(value) {}}});",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{"missingGetterInPropertyDescriptor"},
+		},
 		{
 			"var o = {d: 1};\n Object?.defineProperty(o, 'c', \n{set: function(value) {\n val = value; \n} \n});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
 		{
 			"Reflect?.defineProperty(obj, 'foo', {set: function(value) {}});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
 		{
 			"Object?.defineProperties(obj, {foo: {set: function(value) {}}});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
-		{"Object?.create(null, {foo: {set: function(value) {}}});", nil, []string{"missingGetterInPropertyDescriptor"}},
+		{
+			"Object?.create(null, {foo: {set: function(value) {}}});",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{"missingGetterInPropertyDescriptor"},
+		},
 		{
 			"var o = {d: 1};\n (Object?.defineProperty)(o, 'c', \n{set: function(value) {\n val = value; \n} \n});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
 		{
 			"(Reflect?.defineProperty)(obj, 'foo', {set: function(value) {}});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
 		{
 			"(Object?.defineProperties)(obj, {foo: {set: function(value) {}}});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
 		{
 			"(Object?.create)(null, {foo: {set: function(value) {}}});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"},
 		},
-		{"class A { set a(foo) {} }", nil, []string{"missingGetterInClass"}},
-		{"class A { get a() {} set b(foo) {} }", AccessorPairsOptions{}, []string{"missingGetterInClass"}},
+		{"class A { set a(foo) {} }", rule.Given[AccessorPairsOptions]{}, []string{"missingGetterInClass"}},
+		{
+			"class A { get a() {} set b(foo) {} }",
+			rule.Configured(AccessorPairsOptions{}),
+			[]string{"missingGetterInClass"},
+		},
 		{
 			"class A { get a() {} }",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInClass"},
 		},
 		{
 			"class A { set a(foo) {} }",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInClass"},
 		},
 		{
 			"class A { static get a() {} }",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInClass"},
 		},
 		{
 			"class A { static set a(foo) {} }",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingGetterInClass"},
 		},
 		{
 			"A = class { get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInClass"},
 		},
 		{
 			"A = class { get a() {} set b(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInClass", "missingGetterInClass"},
 		},
 		{
 			"class A { set a(value) {} }",
-			AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}),
 			[]string{"missingGetterInClass"},
 		},
 		{
 			"class A { static set a(value) {} }",
-			AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}),
 			[]string{"missingGetterInClass"},
 		},
 		{
 			"A = class { set a(value) {} };",
-			AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}),
 			[]string{"missingGetterInClass"},
 		},
 		{
 			"(class A { static set a(value) {} });",
-			AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}),
 			[]string{"missingGetterInClass"},
 		},
-		{"class A { set '#a'(foo) {} }", nil, []string{"missingGetterInClass"}},
-		{"class A { set #a(foo) {} }", nil, []string{"missingGetterInClass"}},
-		{"class A { static set '#a'(foo) {} }", nil, []string{"missingGetterInClass"}},
-		{"class A { static set #a(foo) {} }", nil, []string{"missingGetterInClass"}},
-		{"class A { set a(value) {} }", AccessorPairsOptions{
+		{"class A { set '#a'(foo) {} }", rule.Given[AccessorPairsOptions]{}, []string{"missingGetterInClass"}},
+		{"class A { set #a(foo) {} }", rule.Given[AccessorPairsOptions]{}, []string{"missingGetterInClass"}},
+		{"class A { static set '#a'(foo) {} }", rule.Given[AccessorPairsOptions]{}, []string{"missingGetterInClass"}},
+		{"class A { static set #a(foo) {} }", rule.Given[AccessorPairsOptions]{}, []string{"missingGetterInClass"}},
+		{"class A { set a(value) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsFalse,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"A = class { static set a(value) {} };", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"A = class { static set a(value) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"let foo = class A { get a() {} };", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"let foo = class A { get a() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { static get a() {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { static get a() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
+		}), []string{"missingSetterInClass"}},
 		{
 			"(class { get a() {} });",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue, EnforceForClassMembers: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{
+				GetWithoutSet:          accessorPairsTrue,
+				EnforceForClassMembers: accessorPairsTrue,
+			}),
 			[]string{"missingSetterInClass"},
 		},
-		{"class A { get '#a'() {} };", AccessorPairsOptions{
+		{"class A { get '#a'() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { get #a() {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { get #a() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { static get '#a'() {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { static get '#a'() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { static get #a() {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { static get #a() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { get abc() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { get abc() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class { static set 'abc'(foo) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"A = class { static set 'abc'(foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"(class { get 123() {} });", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"(class { get 123() {} });", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { static get 1e2() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { static get 1e2() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class { get ['abc']() {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"A = class { get ['abc']() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { set [`abc`](foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { set [`abc`](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { static get [123]() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"class A { static get [123]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { get [abc]() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { get [abc]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { static get [f(abc)]() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { static get [f(abc)]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class { set [a + b](foo) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"A = class { set [a + b](foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { get ['constructor']() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"class A { get ['constructor']() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { get a() {} set b(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { get a() {} set b(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"A = class { set a(foo) {} get b() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"A = class { set a(foo) {} get b() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingSetterInClass"}},
-		{"A = class { static get a() {} static set b(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass", "missingSetterInClass"}},
+		{"A = class { static get a() {} static set b(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get a() {} set b(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get a() {} set b(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { get a() {} set b(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { get a() {} set b(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsFalse,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { get 'a '() {} set 'a'(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"class A { get 'a '() {} set 'a'(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get 'a'() {} set 1(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get 'a'() {} set 1(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get 1() {} set 2(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get 1() {} set 2(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get ''() {} set null(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get ''() {} set null(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get a() {} set [a](foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get a() {} set [a](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get [a]() {} set [b](foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get [a]() {} set [b](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get [a]() {} set [a++](foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get [a]() {} set [a++](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get [a + b]() {} set [a - b](foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get [a + b]() {} set [a - b](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get #a() {} set '#a'(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get #a() {} set '#a'(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get '#a'() {} set #a(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get '#a'() {} set #a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { get a() {} static set a(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { get a() {} static set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"A = class { static get a() {} set a(foo) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"A = class { static get a() {} set a(foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { set [a](foo) {} static get [a]() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { set [a](foo) {} static get [a]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingSetterInClass"}},
-		{"class A { static set [a](foo) {} get [a]() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass", "missingSetterInClass"}},
+		{"class A { static set [a](foo) {} get [a]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingSetterInClass"}},
-		{"class A { get a() {} get b() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass", "missingSetterInClass"}},
+		{"class A { get a() {} get b() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingSetterInClass"}},
-		{"A = class { get a() {} get [b]() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingSetterInClass"}},
+		{"A = class { get a() {} get [b]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingSetterInClass"}},
-		{"class A { get [a]() {} get [b]() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingSetterInClass"}},
+		{"class A { get [a]() {} get [b]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingSetterInClass"}},
-		{"A = class { set a(foo) {} set b(bar) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingSetterInClass"}},
+		{"A = class { set a(foo) {} set b(bar) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingGetterInClass"}},
-		{"class A { static get a() {} static get b() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass", "missingGetterInClass"}},
+		{"class A { static get a() {} static get b() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingSetterInClass"}},
-		{"A = class { static set a(foo) {} static set b(bar) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingSetterInClass"}},
+		{"A = class { static set a(foo) {} static set b(bar) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingGetterInClass"}},
-		{"class A { static get a() {} set b(foo) {} static set c(bar) {} get d() {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass", "missingGetterInClass", "missingSetterInClass"}},
-		{"class A { get a() {} } class B { set a(foo) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"A = class { set a(foo) {} }, class { get a() {} };", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingSetterInClass"}},
-		{"A = class { get a() {} }, { set a(foo) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInObjectLiteral"}},
-		{"A = { get a() {} }, class { set a(foo) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInObjectLiteral", "missingGetterInClass"}},
-		{"class A { get a() {} get b() {} set b(foo) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class { get b() {} get a() {} set b(foo) {} };", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { set b(foo) {} get b() {} set a(bar) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"A = class { static get b() {} set a(foo) {} static set b(bar) {} };", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { static set a(foo) {} get b() {} set b(bar) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { get b() {} static get a() {} set b(bar) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { static set b(foo) {} static get a() {} static get b() {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
+		}), []string{"missingGetterInClass", "missingGetterInClass"}},
 		{
-			"class A { get [v1](){} static set i1(foo){} static set v2(bar){} get [i2](){} static get i3(){} set [v1](baz){} static get v2(){} set i4(quux){} }",
-			AccessorPairsOptions{
+			"class A { static get a() {} set b(foo) {} static set c(bar) {} get d() {} }",
+			rule.Configured(AccessorPairsOptions{
 				SetWithoutGet:          accessorPairsTrue,
 				GetWithoutSet:          accessorPairsTrue,
 				EnforceForClassMembers: accessorPairsTrue,
-			},
+			}),
+			[]string{"missingSetterInClass", "missingGetterInClass", "missingGetterInClass", "missingSetterInClass"},
+		},
+		{"class A { get a() {} } class B { set a(foo) {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"A = class { set a(foo) {} }, class { get a() {} };", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingGetterInClass", "missingSetterInClass"}},
+		{"A = class { get a() {} }, { set a(foo) {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingSetterInClass", "missingGetterInObjectLiteral"}},
+		{"A = { get a() {} }, class { set a(foo) {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingSetterInObjectLiteral", "missingGetterInClass"}},
+		{"class A { get a() {} get b() {} set b(foo) {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingSetterInClass"}},
+		{"A = class { get b() {} get a() {} set b(foo) {} };", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingSetterInClass"}},
+		{"class A { set b(foo) {} get b() {} set a(bar) {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingGetterInClass"}},
+		{"A = class { static get b() {} set a(foo) {} static set b(bar) {} };", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingGetterInClass"}},
+		{"class A { static set a(foo) {} get b() {} set b(bar) {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingGetterInClass"}},
+		{"class A { get b() {} static get a() {} set b(bar) {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingSetterInClass"}},
+		{"class A { static set b(foo) {} static get a() {} static get b() {} }", rule.Configured(AccessorPairsOptions{
+			SetWithoutGet:          accessorPairsTrue,
+			GetWithoutSet:          accessorPairsTrue,
+			EnforceForClassMembers: accessorPairsTrue,
+		}), []string{"missingSetterInClass"}},
+		{
+			"class A { get [v1](){} static set i1(foo){} static set v2(bar){} get [i2](){} static get i3(){} set [v1](baz){} static get v2(){} set i4(quux){} }",
+			rule.Configured(AccessorPairsOptions{
+				SetWithoutGet:          accessorPairsTrue,
+				GetWithoutSet:          accessorPairsTrue,
+				EnforceForClassMembers: accessorPairsTrue,
+			}),
 			[]string{"missingGetterInClass", "missingSetterInClass", "missingSetterInClass", "missingGetterInClass"},
 		},
-		{"class A { get a() {} get a() {} }", AccessorPairsOptions{
+		{"class A { get a() {} get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingSetterInClass"}},
-		{"A = class { set a(foo) {} set a(foo) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingSetterInClass"}},
+		{"A = class { set a(foo) {} set a(foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingGetterInClass"}},
-		{"A = class { static get a() {} static get a() {} };", AccessorPairsOptions{
+		}), []string{"missingGetterInClass", "missingGetterInClass"}},
+		{"A = class { static get a() {} static get a() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingSetterInClass"}},
-		{"class A { set a(foo) {} set a(foo) {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingSetterInClass"}},
+		{"class A { set a(foo) {} set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass", "missingGetterInClass"}},
-		{"class A { a() {} get b() {} c() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass", "missingGetterInClass"}},
+		{"class A { a() {} get b() {} c() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class { a() {} get b() {} c() {} set d(foo) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"A = class { a() {} get b() {} c() {} set d(foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass", "missingGetterInClass"}},
-		{"class A { static a() {} get b() {} static c() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass", "missingGetterInClass"}},
+		{"class A { static a() {} get b() {} static c() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { a() {} get a() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { a() {} get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class { static a() {} set a(foo) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"A = class { static a() {} set a(foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { a() {} static get b() {} c() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"class A { a() {} static get b() {} c() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class { static a() {} static set b(foo) {} static c() {} d() {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"A = class { static a() {} static set b(foo) {} static c() {} d() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { a() {} static get a() {} a() {} }", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"class A { a() {} static get a() {} a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"class A { static set a(foo) {} static a() {} }", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"class A { static set a(foo) {} static a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { get a() {} };", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"class A { get a() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"A = class {\n  set [\n a](foo) {} };", AccessorPairsOptions{
+		}), []string{"missingSetterInClass"}},
+		{"A = class {\n  set [\n a](foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingGetterInClass"}},
-		{"class A { static get b() {} };", AccessorPairsOptions{
+		}), []string{"missingGetterInClass"}},
+		{"class A { static get b() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{"missingSetterInClass"}},
-		{"({ set prop(value) {} });", nil, []string{"missingGetterInObjectLiteral"}},
+		}), []string{"missingSetterInClass"}},
+		{"({ set prop(value) {} });", rule.Given[AccessorPairsOptions]{}, []string{"missingGetterInObjectLiteral"}},
 		{
 			"interface I { set prop(value: any): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{"missingGetterInType"},
 		},
 		{
 			"interface I { set prop(value: any): any, get other(): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{"missingGetterInType"},
 		},
 		{
 			"interface I { set prop(value: any): any, prop(): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{"missingGetterInType"},
 		},
 		{
 			"interface I { set [prop](value: any): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{"missingGetterInType"},
 		},
 		{
 			"interface I { get prop(): any } interface J { set prop(value: any): void }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{"missingGetterInType"},
 		},
 		{
 			"type T = { set prop(value: any): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{"missingGetterInType"},
 		},
 		{
 			"function fn(): { set prop(value: any): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{"missingGetterInType"},
 		},
 		{
 			"type T = { get prop(): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{
+				EnforceForTsTypes: accessorPairsTrue,
+				GetWithoutSet:     accessorPairsTrue,
+			}),
 			[]string{"missingSetterInType"},
 		},
 	}
@@ -927,577 +955,657 @@ func accessorPairsSilentCases() []accessorPairsCase {
 	return []accessorPairsCase{
 		{
 			"var { get: foo } = bar; ({ set: foo } = bar);",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var { set } = foo; ({ get } = foo);",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
-		{"var o = { get a() {} }", nil, []string{}},
-		{"var o = { get a() {} }", AccessorPairsOptions{}, []string{}},
+		{"var o = { get a() {} }", rule.Given[AccessorPairsOptions]{}, []string{}},
+		{"var o = { get a() {} }", rule.Configured(AccessorPairsOptions{}), []string{}},
 		{
 			"var o = {};",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { a: 1 };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { a };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { a: get };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { a: set };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get: function(){} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { set: function(foo){} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { set };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { [get]: function() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { [set]: function(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { set(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsFalse},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsFalse}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse}),
 			[]string{},
 		},
 		{
 			"var o = { set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsFalse},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsFalse}),
 			[]string{},
 		},
 		{
 			"var o = { set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue},
-			[]string{},
-		},
-		{"var o = { set a(foo) {} };", AccessorPairsOptions{SetWithoutGet: accessorPairsFalse}, []string{}},
-		{
-			"var o = { get a() {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
-			"var o = { get a() {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse},
+			"var o = { set a(foo) {} };",
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsFalse}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue}),
+			[]string{},
+		},
+		{
+			"var o = { get a() {}, set a(foo) {} };",
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse}),
+			[]string{},
+		},
+		{
+			"var o = { get a() {}, set a(foo) {} };",
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { set a(foo) {}, get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get 'a'() {}, set 'a'(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set 'a'(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get ['abc']() {}, set ['abc'](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [1e2]() {}, set 100(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get abc() {}, set [`abc`](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get ['123']() {}, set 123(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [a]() {}, set [a](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [a]() {}, set [(a)](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [(a)]() {}, set [a](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [a]() {}, set [ a ](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [/*comment*/a/*comment*/]() {}, set [a](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [f()]() {}, set [f()](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [f(a)]() {}, set [f(a)](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [a + b]() {}, set [a + b](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get [`${a}`]() {}, set [`${a}`](foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set a(foo) {}, get b() {}, set b(bar) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set c(foo) {}, set a(bar) {}, get b() {}, get c() {}, set b(baz) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set a(foo) {}, b: bar };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, b, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, ...b, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set a(foo) {}, ...a };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, get a() {}, set a(foo) {}, };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set a(foo) {}, get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set a(foo) {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { set a(bar) {}, get a() {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, get a() {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsFalse}),
 			[]string{},
 		},
 		{
 			"var o = { set a(foo) {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsFalse, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, set a(foo) {}, a };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { a, get a() {}, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = { get a() {}, a:1, set a(foo) {} };",
-			AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{SetWithoutGet: accessorPairsTrue, GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"var o = {a: 1};\n Object.defineProperty(o, 'b', \n{set: function(value) {\n val = value; \n},\n get: function() {\n return val; \n} \n});",
-			nil,
+			rule.Given[AccessorPairsOptions]{},
 			[]string{},
 		},
-		{"var o = {set: function() {}}", nil, []string{}},
-		{"Object.defineProperties(obj, {set: {value: function() {}}});", nil, []string{}},
-		{"Object.create(null, {set: {value: function() {}}});", nil, []string{}},
-		{"var o = {get: function() {}}", AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}, []string{}},
-		{"var o = {[set]: function() {}}", nil, []string{}},
-		{"var set = 'value'; Object.defineProperty(obj, 'foo', {[set]: function(value) {}});", nil, []string{}},
-		{"Object.defineProperty({ set: function(value) {} }, 'foo', { value: 1 });", nil, []string{}},
+		{"var o = {set: function() {}}", rule.Given[AccessorPairsOptions]{}, []string{}},
+		{
+			"Object.defineProperties(obj, {set: {value: function() {}}});",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{},
+		},
+		{"Object.create(null, {set: {value: function() {}}});", rule.Given[AccessorPairsOptions]{}, []string{}},
+		{
+			"var o = {get: function() {}}",
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
+			[]string{},
+		},
+		{"var o = {[set]: function() {}}", rule.Given[AccessorPairsOptions]{}, []string{}},
+		{
+			"var set = 'value'; Object.defineProperty(obj, 'foo', {[set]: function(value) {}});",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{},
+		},
+		{
+			"Object.defineProperty({ set: function(value) {} }, 'foo', { value: 1 });",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{},
+		},
 		{
 			"Reflect.defineProperty({ get() {} }, 'foo', { value: 1 });",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"Object.defineProperties({ foo: { get() {} } }, { bar: { value: 1 } });",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
-		{"Object.create({ foo: { set(value) {} } }, { bar: { value: 1 } });", nil, []string{}},
+		{
+			"Object.create({ foo: { set(value) {} } }, { bar: { value: 1 } });",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{},
+		},
 		{
 			"let Object; Object.defineProperty(foo, 'bar', { get() {} })",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
-		{"function f() { Reflect.defineProperty(foo, 'bar', { set(value) {} }); var Reflect;}", nil, []string{}},
-		{"function f(Object) { Object.defineProperties(foo, { bar: { set(value) {} } }) }", nil, []string{}},
+		{
+			"function f() { Reflect.defineProperty(foo, 'bar', { set(value) {} }); var Reflect;}",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{},
+		},
+		{
+			"function f(Object) { Object.defineProperties(foo, { bar: { set(value) {} } }) }",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{},
+		},
 		{
 			"if (x) { const Object = getObject(); Object.create(foo, { bar: { get() {} } }) }",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{},
 		},
-		{"class A { get a() {} }", AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}, []string{}},
-		{"class A { get #a() {} }", AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}, []string{}},
-		{"class A { set a(foo) {} }", AccessorPairsOptions{EnforceForClassMembers: accessorPairsFalse}, []string{}},
-		{"class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsFalse,
-		}, []string{}},
-		{"(class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} });", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsFalse,
-		}, []string{}},
-		{"class A { get a() {} }", AccessorPairsOptions{
+		{
+			"class A { get a() {} }",
+			rule.Configured(AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}),
+			[]string{},
+		},
+		{
+			"class A { get #a() {} }",
+			rule.Configured(AccessorPairsOptions{EnforceForClassMembers: accessorPairsTrue}),
+			[]string{},
+		},
+		{
+			"class A { set a(foo) {} }",
+			rule.Configured(AccessorPairsOptions{EnforceForClassMembers: accessorPairsFalse}),
+			[]string{},
+		},
+		{
+			"class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} }",
+			rule.Configured(AccessorPairsOptions{
+				SetWithoutGet:          accessorPairsTrue,
+				GetWithoutSet:          accessorPairsTrue,
+				EnforceForClassMembers: accessorPairsFalse,
+			}),
+			[]string{},
+		},
+		{
+			"(class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} });",
+			rule.Configured(AccessorPairsOptions{
+				SetWithoutGet:          accessorPairsTrue,
+				GetWithoutSet:          accessorPairsTrue,
+				EnforceForClassMembers: accessorPairsFalse,
+			}),
+			[]string{},
+		},
+		{"class A { get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsFalse,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static get a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsFalse,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { set a(foo) {} };", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { set a(foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsFalse,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsFalse,
-			GetWithoutSet:          accessorPairsFalse,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A {}", AccessorPairsOptions{
+		}), []string{}},
+		{
+			"class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} }",
+			rule.Configured(AccessorPairsOptions{
+				SetWithoutGet:          accessorPairsFalse,
+				GetWithoutSet:          accessorPairsFalse,
+				EnforceForClassMembers: accessorPairsTrue,
+			}),
+			[]string{},
+		},
+		{"class A {}", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"(class {})", AccessorPairsOptions{
+		}), []string{}},
+		{"(class {})", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { constructor () {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { constructor () {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static a() {} 'b'() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static a() {} 'b'() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { [a]() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { [a]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { a() {} static a() {} b() {} static c() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { a() {} static a() {} b() {} static c() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get a() {} set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { set a(foo) {} get a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { set a(foo) {} get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static get a() {} static set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static get a() {} static set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static set a(foo) {} static get a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static set a(foo) {} static get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"(class { set a(foo) {} get a() {} });", AccessorPairsOptions{
+		}), []string{}},
+		{"(class { set a(foo) {} get a() {} });", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get 'a'() {} set ['a'](foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get 'a'() {} set ['a'](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { set [`a`](foo) {} get a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { set [`a`](foo) {} get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get 'a'() {} set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get 'a'() {} set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { static get 1e2() {} static set [100](foo) {} };", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { static get 1e2() {} static set [100](foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get [a]() {} set [a](foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get [a]() {} set [a](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { set [(f())](foo) {} get [(f())]() {} };", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { set [(f())](foo) {} get [(f())]() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static set [f(a)](foo) {} static get [f(a)]() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static set [f(a)](foo) {} static get [f(a)]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} set b(foo) {} set a(bar) {} get b() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get a() {} set b(foo) {} set a(bar) {} get b() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} set a(bar) {} b() {} set c(foo) {} get c() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get a() {} set a(bar) {} b() {} set c(foo) {} get c() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"(class { get a() {} static set a(foo) {} set a(bar) {} static get a() {} });", AccessorPairsOptions{
+		}), []string{}},
+		{
+			"(class { get a() {} static set a(foo) {} set a(bar) {} static get a() {} });",
+			rule.Configured(AccessorPairsOptions{
+				SetWithoutGet:          accessorPairsTrue,
+				GetWithoutSet:          accessorPairsTrue,
+				EnforceForClassMembers: accessorPairsTrue,
+			}),
+			[]string{},
+		},
+		{"class A { get a() {} b() {} set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} b() {} set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { set a(foo) {} get a() {} b() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { set a(foo) {} get a() {} b() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { a() {} get b() {} c() {} set b(foo) {} d() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { a() {} get b() {} c() {} set b(foo) {} d() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get a() {} set a(foo) {} static a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} set a(foo) {} static a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { static get a() {} static b() {} static set a(foo) {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { static get a() {} static b() {} static set a(foo) {} };", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { static set a(foo) {} static get a() {} a() {} };", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { static set a(foo) {} static get a() {} a() {} };", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get a() {} get a() {} set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} get a() {} set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get [a]() {} set [a](foo) {} set [a](foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get [a]() {} set [a](foo) {} set [a](foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get a() {} set 'a'(foo) {} get [`a`]() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} set 'a'(foo) {} get [`a`]() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { get a() {} set a(foo) {} a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { get a() {} set a(foo) {} a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"A = class { a() {} get a() {} set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"A = class { a() {} get a() {} set a(foo) {} }", AccessorPairsOptions{
+		}), []string{}},
+		{
+			"class A { static set a(foo) {} static set a(foo) {} static get a() {} }",
+			rule.Configured(AccessorPairsOptions{
+				SetWithoutGet:          accessorPairsTrue,
+				GetWithoutSet:          accessorPairsTrue,
+				EnforceForClassMembers: accessorPairsTrue,
+			}),
+			[]string{},
+		},
+		{"class A { static get a() {} static set a(foo) {} static get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static set a(foo) {} static set a(foo) {} static get a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static set a(foo) {} static get a() {} static a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static get a() {} static set a(foo) {} static get a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { get a() {} a() {} set a(foo) {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static set a(foo) {} static get a() {} static a() {} }", AccessorPairsOptions{
+		}), []string{}},
+		{"class A { static set a(foo) {} static a() {} static get a() {} }", rule.Configured(AccessorPairsOptions{
 			SetWithoutGet:          accessorPairsTrue,
 			GetWithoutSet:          accessorPairsTrue,
 			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { get a() {} a() {} set a(foo) {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"class A { static set a(foo) {} static a() {} static get a() {} }", AccessorPairsOptions{
-			SetWithoutGet:          accessorPairsTrue,
-			GetWithoutSet:          accessorPairsTrue,
-			EnforceForClassMembers: accessorPairsTrue,
-		}, []string{}},
-		{"interface I { get prop(): any }", nil, []string{}},
-		{"type T = { set prop(value: any): void }", nil, []string{}},
+		}), []string{}},
+		{"interface I { get prop(): any }", rule.Given[AccessorPairsOptions]{}, []string{}},
+		{"type T = { set prop(value: any): void }", rule.Given[AccessorPairsOptions]{}, []string{}},
 		{
 			"interface I { get prop(): any, set prop(value: any): void }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"type T = { get prop(): any, set prop(value: any): void }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"interface I { get prop(): any, between: true, set prop(value: any): void }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"interface I { set prop(value: any): void, get prop(): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{},
 		},
 		{
 			"interface I { set prop(value: any): void, get 'prop'(): any }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{},
 		},
-		{"interface I {}", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
-		{"interface I { (...args): void }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{"interface I {}", rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}), []string{}},
+		{
+			"interface I { (...args): void }",
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
+			[]string{},
+		},
 		{
 			"interface I { new(...args): unknown }",
-			AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
 			[]string{},
 		},
-		{"interface I { prop: () => any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
-		{"interface I { method(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
-		{"type T = { get prop(): any }", AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}, []string{}},
+		{
+			"interface I { prop: () => any }",
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
+			[]string{},
+		},
+		{
+			"interface I { method(): any }",
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
+			[]string{},
+		},
+		{
+			"type T = { get prop(): any }",
+			rule.Configured(AccessorPairsOptions{EnforceForTsTypes: accessorPairsTrue}),
+			[]string{},
+		},
 	}
 }
 
@@ -1543,11 +1651,14 @@ func TestAccessorPairsGlobalShadowing(test *testing.T) {
 
 	cases := []accessorPairsCase{
 		{"Reflect.defineProperty(foo, 'bar', { get() {} })",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{"missingSetterInPropertyDescriptor"}},
-		{"/* globals Object:off */ Object.defineProperty(foo, 'bar', { set(value) {} })", nil,
-			[]string{"missingGetterInPropertyDescriptor"}},
-		{"Object.defineProperties(foo, { bar: { set(value) {} } })", nil,
+		{
+			"/* globals Object:off */ Object.defineProperty(foo, 'bar', { set(value) {} })",
+			rule.Given[AccessorPairsOptions]{},
+			[]string{"missingGetterInPropertyDescriptor"},
+		},
+		{"Object.defineProperties(foo, { bar: { set(value) {} } })", rule.Given[AccessorPairsOptions]{},
 			[]string{"missingGetterInPropertyDescriptor"}},
 	}
 	for _, testCase := range cases {
@@ -1612,31 +1723,31 @@ func TestAccessorPairsPointsAtTheAccessorHead(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[AccessorPairsOptions]
 		wantSpans  []string
 	}{
-		{"var o = { set a(v) {} };", nil, []string{"set a"}},
-		{"var o = { set 'a b'(v) {} };", nil, []string{"set 'a b'"}},
-		{"var o = { set [x](v) {} };", nil, []string{"set [x]"}},
-		{"var o = { set [ x ](v) {} };", nil, []string{"set [ x ]"}},
-		{"class A { set a(v) {} }", nil, []string{"set a"}},
-		{"class A { static set a(v) {} }", nil, []string{"static set a"}},
-		{"class A { set #a(v) {} }", nil, []string{"set #a"}},
-		{"class A { set 'a'(v) {} }", nil, []string{"set 'a'"}},
+		{"var o = { set a(v) {} };", rule.Given[AccessorPairsOptions]{}, []string{"set a"}},
+		{"var o = { set 'a b'(v) {} };", rule.Given[AccessorPairsOptions]{}, []string{"set 'a b'"}},
+		{"var o = { set [x](v) {} };", rule.Given[AccessorPairsOptions]{}, []string{"set [x]"}},
+		{"var o = { set [ x ](v) {} };", rule.Given[AccessorPairsOptions]{}, []string{"set [ x ]"}},
+		{"class A { set a(v) {} }", rule.Given[AccessorPairsOptions]{}, []string{"set a"}},
+		{"class A { static set a(v) {} }", rule.Given[AccessorPairsOptions]{}, []string{"static set a"}},
+		{"class A { set #a(v) {} }", rule.Given[AccessorPairsOptions]{}, []string{"set #a"}},
+		{"class A { set 'a'(v) {} }", rule.Given[AccessorPairsOptions]{}, []string{"set 'a'"}},
 		{"class A { static get 'x y'() {} }",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{"static get 'x y'"}},
-		{"var o = { get a() {} };", AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+		{"var o = { get a() {} };", rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			[]string{"get a"}},
 		// Both sides of a class report, in source order, each on its own head.
 		{"class A { get a() {} static set a(v) {} }",
-			AccessorPairsOptions{GetWithoutSet: accessorPairsTrue,
-				SetWithoutGet: accessorPairsTrue},
+			rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue,
+				SetWithoutGet: accessorPairsTrue}),
 			[]string{"get a", "static set a"}},
 		// The descriptor finding has no accessor to point at, so it points at the whole
 		// descriptor object. That is a different span rule for the same rule, and it is the one
 		// most likely to be silently wrong.
-		{"Object.defineProperty(foo, 'bar', { set(v) {} })", nil,
+		{"Object.defineProperty(foo, 'bar', { set(v) {} })", rule.Given[AccessorPairsOptions]{},
 			[]string{"{ set(v) {} }"}},
 	}
 
@@ -1676,32 +1787,32 @@ func TestAccessorPairsDescribesTheAccessor(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[AccessorPairsOptions]
 		wantText   string
 	}{
-		{"var o = { set a(v) {} };", nil,
+		{"var o = { set a(v) {} };", rule.Given[AccessorPairsOptions]{},
 			"This declares setter 'a' with no matching getter beside it, so the property can be " +
 				"written but always reads back as undefined. Declare both halves of the pair, or " +
 				"drop the accessor and use a plain property."},
-		{"class A { static set a(v) {} }", nil,
+		{"class A { static set a(v) {} }", rule.Given[AccessorPairsOptions]{},
 			"This declares static setter 'a' with no matching getter beside it, so the property " +
 				"can be written but always reads back as undefined. Declare both halves of the " +
 				"pair, or drop the accessor and use a plain property."},
-		{"class A { set #a(v) {} }", nil,
+		{"class A { set #a(v) {} }", rule.Given[AccessorPairsOptions]{},
 			"This declares private setter #a with no matching getter beside it, so the property " +
 				"can be written but always reads back as undefined. Declare both halves of the " +
 				"pair, or drop the accessor and use a plain property."},
-		{"class A { set '#a'(v) {} }", nil,
+		{"class A { set '#a'(v) {} }", rule.Given[AccessorPairsOptions]{},
 			"This declares setter '#a' with no matching getter beside it, so the property can be " +
 				"written but always reads back as undefined. Declare both halves of the pair, or " +
 				"drop the accessor and use a plain property."},
 		// A computed key names nothing, so the description carries no name at all.
-		{"var o = { set [x](v) {} };", nil,
+		{"var o = { set [x](v) {} };", rule.Given[AccessorPairsOptions]{},
 			"This declares setter with no matching getter beside it, so the property can be " +
 				"written but always reads back as undefined. Declare both halves of the pair, or " +
 				"drop the accessor and use a plain property."},
 		// The other half fails a different way and says so.
-		{"var o = { get a() {} };", AccessorPairsOptions{GetWithoutSet: accessorPairsTrue},
+		{"var o = { get a() {} };", rule.Configured(AccessorPairsOptions{GetWithoutSet: accessorPairsTrue}),
 			"This declares getter 'a' with no matching setter beside it, so assigning to the " +
 				"property is silently ignored in sloppy mode and throws in strict mode. Declare " +
 				"both halves of the pair, or drop the accessor and use a plain property."},
@@ -1814,21 +1925,21 @@ func TestAccessorPairsSeparatesComputedKeysByShape(test *testing.T) {
 	}
 	cases := []accessorPairsCase{
 		// An array literal wrapping the identifier is a different key from the identifier.
-		{"var o = { get [[a]]() {}, set [a](v) {} };", both,
+		{"var o = { get [[a]]() {}, set [a](v) {} };", rule.Configured(both),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"}},
 		// A call and its own argument likewise.
-		{"var o = { get [f(a)]() {}, set [a](v) {} };", both,
+		{"var o = { get [f(a)]() {}, set [a](v) {} };", rule.Configured(both),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"}},
 		// Two spellings of the same property access are still different keys, because upstream
 		// compares tokens rather than meaning.
-		{"var o = { get [a.b]() {}, set [a[`b`]](v) {} };", both,
+		{"var o = { get [a.b]() {}, set [a[`b`]](v) {} };", rule.Configured(both),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"}},
 		// An object literal and an array literal holding the same identifier.
-		{"var o = { get [{a}]() {}, set [[a]](v) {} };", both,
+		{"var o = { get [{a}]() {}, set [[a]](v) {} };", rule.Configured(both),
 			[]string{"missingSetterInObjectLiteral", "missingGetterInObjectLiteral"}},
 		// The control: identical structure pairs, so the separations above are the shape rather
 		// than a rule that never pairs a computed key at all.
-		{"var o = { get [a.b]() {}, set [a.b](v) {} };", both, []string{}},
+		{"var o = { get [a.b]() {}, set [a.b](v) {} };", rule.Configured(both), []string{}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
