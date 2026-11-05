@@ -101,9 +101,9 @@ func decodeArbitraryValue(input string) string {
 
 	ast := ParseValue(input)
 	recursivelyDecodeArbitraryValues(ast)
-	input = ValueToCss(ast)
+	printed := ValueToCss(ast)
 
-	return addWhitespaceAroundMathOperators(input)
+	return addWhitespaceAroundMathOperators(printed)
 }
 
 // convertUnderscoresToWhitespace turns `_` into a space and `\_` into a literal `_`.

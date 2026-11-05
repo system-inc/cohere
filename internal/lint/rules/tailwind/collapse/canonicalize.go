@@ -159,6 +159,24 @@ func (canonicalizer *Canonicalizer) canonicalizeClass(className string) string {
 	return className
 }
 
+// utilityCanonicalizations is upstream's UTILITY_CANONICALIZATIONS, in its order, holding the passes this
+// port runs. Upstream's list is bgGradientToLinear, themeToVarUtility, calcToSpacingFunction,
+// optimizeArbitraryValueExpressions, arbitraryUtilities, bareValueUtilities, deprecatedUtilities,
+// dropUnnecessaryDataTypes, arbitraryValueToBareValueUtility and optimizeModifier. A pass missing here
+// leaves its classes as written, which canonicalUnported counts. themeToVarUtility is not ported, and
+// stands here as a guard that aborts a class it would change, since the passes after it would otherwise
+// see a candidate upstream's never do.
+//
+// A pass answers false when it cannot tell what upstream would do, and no pass after it runs.
+var utilityCanonicalizations = []func(*Canonicalizer, ParsedCandidate) (ParsedCandidate, bool){
+	(*Canonicalizer).bgGradientToLinear,
+	(*Canonicalizer).themeToVarUtilityGuard,
+	(*Canonicalizer).calcToSpacingFunction,
+	(*Canonicalizer).optimizeArbitraryValueExpressions,
+	(*Canonicalizer).arbitraryUtilities,
+	(*Canonicalizer).deprecatedUtilities,
+}
+
 // canonicalizeUtility is upstream's createCanonicalizeUtilityCache for a class with no variants and no
 // importance: each reading through every utility pass in order, and the first that prints differently
 // from what was written is the answer.
@@ -183,22 +201,11 @@ func (canonicalizer *Canonicalizer) canonicalizeUtility(className string) string
 	return className
 }
 
-// utilityCanonicalizations is upstream's UTILITY_CANONICALIZATIONS, in its order, holding the passes this
-// port runs. Upstream's list is bgGradientToLinear, themeToVarUtility, calcToSpacingFunction,
-// optimizeArbitraryValueExpressions, arbitraryUtilities, bareValueUtilities, deprecatedUtilities,
-// dropUnnecessaryDataTypes, arbitraryValueToBareValueUtility and optimizeModifier. A pass missing here
-// leaves its classes as written, which canonicalUnported counts. themeToVarUtility is not ported, and
-// stands here as a guard that aborts a class it would change, since the passes after it would otherwise
-// see a candidate upstream's never do.
-//
-// A pass answers false when it cannot tell what upstream would do, and no pass after it runs.
-var utilityCanonicalizations = []func(*Canonicalizer, ParsedCandidate) (ParsedCandidate, bool){
-	(*Canonicalizer).bgGradientToLinear,
-	(*Canonicalizer).themeToVarUtilityGuard,
-	(*Canonicalizer).calcToSpacingFunction,
-	(*Canonicalizer).optimizeArbitraryValueExpressions,
-	(*Canonicalizer).arbitraryUtilities,
-	(*Canonicalizer).deprecatedUtilities,
+// variantCanonicalizations is upstream's VARIANT_CANONICALIZATIONS, in its order, holding the passes this
+// port runs. Upstream's list is themeToVarVariant, arbitraryValueToBareValueVariant,
+// modernizeArbitraryValuesVariant and arbitraryVariants.
+var variantCanonicalizations = []func(*Canonicalizer, ParsedVariant) []ParsedVariant{
+	(*Canonicalizer).modernizeArbitraryValuesVariant,
 }
 
 // canonicalizeVariant is upstream's createCanonicalizeVariantCache: one variant through every variant
@@ -225,13 +232,6 @@ func (canonicalizer *Canonicalizer) canonicalizeVariant(variant ParsedVariant) [
 
 	canonicalizer.variants.Store(key, replacement)
 	return replacement
-}
-
-// variantCanonicalizations is upstream's VARIANT_CANONICALIZATIONS, in its order, holding the passes this
-// port runs. Upstream's list is themeToVarVariant, arbitraryValueToBareValueVariant,
-// modernizeArbitraryValuesVariant and arbitraryVariants.
-var variantCanonicalizations = []func(*Canonicalizer, ParsedVariant) []ParsedVariant{
-	(*Canonicalizer).modernizeArbitraryValuesVariant,
 }
 
 // cloneVariant copies a variant deeply, so a pass that rewrites one in place, as upstream's

@@ -6,6 +6,139 @@ import (
 	"testing"
 )
 
+// The 82 rows the generated `ComposingRoots` held, captured here when it was deleted.
+//
+// The table was produced by compiling two values of each root through the real Tailwind engine and
+// comparing declaration text. `ComposesFor` performs the same comparison against the ported handle
+// bodies, so keeping the generator's answers as a fixture means the two remain independent
+// measurements of one fact rather than one fact read twice.
+//
+// This is a test fixture and not a table the rule reads. It never grows: a root added upstream is
+// answered by the emitters, and the only thing this pins is that the port did not lose an answer the
+// generator had. `4f23e9f` and `7a72125` both found generated tables carrying one repository's own
+// `@utility` blocks as though they were Tailwind's, which is what a live table costs and a frozen
+// fixture does not.
+var composingRootsTheGeneratorFound = map[string]bool{
+	"-backdrop-hue-rotate": true,
+	"-bg-conic":            true,
+	"-hue-rotate":          true,
+	"-mask-conic":          true,
+	"-mask-linear":         true,
+	"-rotate-x":            true,
+	"-rotate-y":            true,
+	"-rotate-z":            true,
+	"-scale":               true,
+	"-scale-x":             true,
+	"-scale-y":             true,
+	"-scale-z":             true,
+	"-skew":                true,
+	"-skew-x":              true,
+	"-skew-y":              true,
+	"-translate":           true,
+	"-translate-x":         true,
+	"-translate-y":         true,
+	"-translate-z":         true,
+	"backdrop-blur":        true,
+	"backdrop-brightness":  true,
+	"backdrop-contrast":    true,
+	"backdrop-grayscale":   true,
+	"backdrop-hue-rotate":  true,
+	"backdrop-invert":      true,
+	"backdrop-opacity":     true,
+	"backdrop-saturate":    true,
+	"backdrop-sepia":       true,
+	"bg-conic":             true,
+	"blur":                 true,
+	"border-spacing":       true,
+	"border-spacing-x":     true,
+	"border-spacing-y":     true,
+	"brightness":           true,
+	"contrast":             true,
+	"drop-shadow":          true,
+	"grayscale":            true,
+	"hue-rotate":           true,
+	"inset-ring":           true,
+	"inset-shadow":         true,
+	"invert":               true,
+	"mask-b-from":          true,
+	"mask-b-to":            true,
+	"mask-conic":           true,
+	"mask-conic-from":      true,
+	"mask-conic-to":        true,
+	"mask-l-from":          true,
+	"mask-l-to":            true,
+	"mask-linear":          true,
+	"mask-linear-from":     true,
+	"mask-linear-to":       true,
+	"mask-r-from":          true,
+	"mask-r-to":            true,
+	"mask-radial-from":     true,
+	"mask-radial-to":       true,
+	"mask-t-from":          true,
+	"mask-t-to":            true,
+	"mask-x-from":          true,
+	"mask-x-to":            true,
+	"mask-y-from":          true,
+	"mask-y-to":            true,
+	"ring":                 true,
+	"rotate-x":             true,
+	"rotate-y":             true,
+	"rotate-z":             true,
+	"saturate":             true,
+	"scale":                true,
+	"scale-x":              true,
+	"scale-y":              true,
+	"scale-z":              true,
+	"scrollbar-thumb":      true,
+	"scrollbar-track":      true,
+	"sepia":                true,
+	"shadow":               true,
+	"shadow-":              true,
+	"skew":                 true,
+	"skew-x":               true,
+	"skew-y":               true,
+	"translate":            true,
+	"translate-x":          true,
+	"translate-y":          true,
+	"translate-z":          true,
+}
+
+// Roots the computation calls composing and the generated table omits, because the generator's probe
+// values never reached them.
+//
+// Absence from the generator's table means one of two things and they are not the same: the generator
+// measured the root and found it conflicting, or the generator never measured it. The table cannot
+// tell them apart, and this map is where that difference is written down.
+//
+// # mask-radial, measured against the live engine rather than argued
+//
+//	mask-radial emits utility CSS for 0 of the generator's 15 probe values
+//	mask-linear emits for 15 of 15
+//	mask-conic  emits for 15 of 15
+//
+// The probe list is the numeric and named scales. `mask-radial` takes a radial size or shape, so
+// `mask-radial-4` compiles to nothing at all. The generator's loop takes the first probe that
+// compiles, and on `continue`ing past all fifteen it skips the root entirely rather than recording it
+// as unmeasured.
+//
+// Reached with values it accepts, the engine's own answer is that it composes:
+//
+//	mask-radial-[3px] and mask-radial-[50%] both emit
+//	  mask-image: var(--tw-mask-linear), var(--tw-mask-radial), var(--tw-mask-conic)
+//	  mask-composite: intersect
+//
+// Identical shared declarations, the value only in `--tw-mask-radial-size`, which is exactly the
+// shape its two siblings have and both of them are in the table.
+//
+// This is the fifth instance of a failure the generator's own comment names: "A check that cannot
+// fire is indistinguishable from a check nothing violates, and the same is true of a probe that
+// cannot reach its subject." It lists four found before this one. The right repair is a probe list
+// that reaches `mask-radial`, which belongs to whoever owns the generator; this map records the
+// finding rather than silently agreeing with a hole.
+var composingRootsTheGeneratorNeverReached = map[string]bool{
+	"mask-radial": true,
+}
+
 // The composing answer is computed from two emissions, and this holds it against the generated table
 // it replaces, class for class rather than as a rate.
 //
@@ -159,42 +292,6 @@ func TestComposesForAnswersGapRootsAndTheirControls(test *testing.T) {
 	}
 }
 
-// Roots the computation calls composing and the generated table omits, because the generator's probe
-// values never reached them.
-//
-// Absence from the generator's table means one of two things and they are not the same: the generator
-// measured the root and found it conflicting, or the generator never measured it. The table cannot
-// tell them apart, and this map is where that difference is written down.
-//
-// # mask-radial, measured against the live engine rather than argued
-//
-//	mask-radial emits utility CSS for 0 of the generator's 15 probe values
-//	mask-linear emits for 15 of 15
-//	mask-conic  emits for 15 of 15
-//
-// The probe list is the numeric and named scales. `mask-radial` takes a radial size or shape, so
-// `mask-radial-4` compiles to nothing at all. The generator's loop takes the first probe that
-// compiles, and on `continue`ing past all fifteen it skips the root entirely rather than recording it
-// as unmeasured.
-//
-// Reached with values it accepts, the engine's own answer is that it composes:
-//
-//	mask-radial-[3px] and mask-radial-[50%] both emit
-//	  mask-image: var(--tw-mask-linear), var(--tw-mask-radial), var(--tw-mask-conic)
-//	  mask-composite: intersect
-//
-// Identical shared declarations, the value only in `--tw-mask-radial-size`, which is exactly the
-// shape its two siblings have and both of them are in the table.
-//
-// This is the fifth instance of a failure the generator's own comment names: "A check that cannot
-// fire is indistinguishable from a check nothing violates, and the same is true of a probe that
-// cannot reach its subject." It lists four found before this one. The right repair is a probe list
-// that reaches `mask-radial`, which belongs to whoever owns the generator; this map records the
-// finding rather than silently agreeing with a hole.
-var composingRootsTheGeneratorNeverReached = map[string]bool{
-	"mask-radial": true,
-}
-
 // The exemption map must stay a record of measured findings rather than a place to put disagreements.
 //
 // Two assertions. Every entry must be a root the computation actually calls composing, so an entry
@@ -222,103 +319,6 @@ func TestTheUnreachedMapHoldsOnlyMeasuredFindings(test *testing.T) {
 			test.Errorf("%s is exempted but the table already carries it, so the exemption is dead", root)
 		}
 	}
-}
-
-// The 82 rows the generated `ComposingRoots` held, captured here when it was deleted.
-//
-// The table was produced by compiling two values of each root through the real Tailwind engine and
-// comparing declaration text. `ComposesFor` performs the same comparison against the ported handle
-// bodies, so keeping the generator's answers as a fixture means the two remain independent
-// measurements of one fact rather than one fact read twice.
-//
-// This is a test fixture and not a table the rule reads. It never grows: a root added upstream is
-// answered by the emitters, and the only thing this pins is that the port did not lose an answer the
-// generator had. `4f23e9f` and `7a72125` both found generated tables carrying one repository's own
-// `@utility` blocks as though they were Tailwind's, which is what a live table costs and a frozen
-// fixture does not.
-var composingRootsTheGeneratorFound = map[string]bool{
-	"-backdrop-hue-rotate": true,
-	"-bg-conic":            true,
-	"-hue-rotate":          true,
-	"-mask-conic":          true,
-	"-mask-linear":         true,
-	"-rotate-x":            true,
-	"-rotate-y":            true,
-	"-rotate-z":            true,
-	"-scale":               true,
-	"-scale-x":             true,
-	"-scale-y":             true,
-	"-scale-z":             true,
-	"-skew":                true,
-	"-skew-x":              true,
-	"-skew-y":              true,
-	"-translate":           true,
-	"-translate-x":         true,
-	"-translate-y":         true,
-	"-translate-z":         true,
-	"backdrop-blur":        true,
-	"backdrop-brightness":  true,
-	"backdrop-contrast":    true,
-	"backdrop-grayscale":   true,
-	"backdrop-hue-rotate":  true,
-	"backdrop-invert":      true,
-	"backdrop-opacity":     true,
-	"backdrop-saturate":    true,
-	"backdrop-sepia":       true,
-	"bg-conic":             true,
-	"blur":                 true,
-	"border-spacing":       true,
-	"border-spacing-x":     true,
-	"border-spacing-y":     true,
-	"brightness":           true,
-	"contrast":             true,
-	"drop-shadow":          true,
-	"grayscale":            true,
-	"hue-rotate":           true,
-	"inset-ring":           true,
-	"inset-shadow":         true,
-	"invert":               true,
-	"mask-b-from":          true,
-	"mask-b-to":            true,
-	"mask-conic":           true,
-	"mask-conic-from":      true,
-	"mask-conic-to":        true,
-	"mask-l-from":          true,
-	"mask-l-to":            true,
-	"mask-linear":          true,
-	"mask-linear-from":     true,
-	"mask-linear-to":       true,
-	"mask-r-from":          true,
-	"mask-r-to":            true,
-	"mask-radial-from":     true,
-	"mask-radial-to":       true,
-	"mask-t-from":          true,
-	"mask-t-to":            true,
-	"mask-x-from":          true,
-	"mask-x-to":            true,
-	"mask-y-from":          true,
-	"mask-y-to":            true,
-	"ring":                 true,
-	"rotate-x":             true,
-	"rotate-y":             true,
-	"rotate-z":             true,
-	"saturate":             true,
-	"scale":                true,
-	"scale-x":              true,
-	"scale-y":              true,
-	"scale-z":              true,
-	"scrollbar-thumb":      true,
-	"scrollbar-track":      true,
-	"sepia":                true,
-	"shadow":               true,
-	"shadow-":              true,
-	"skew":                 true,
-	"skew-x":               true,
-	"skew-y":               true,
-	"translate":            true,
-	"translate-x":          true,
-	"translate-y":          true,
-	"translate-z":          true,
 }
 
 // Asking a gap root for a value must not change what the next caller sees.

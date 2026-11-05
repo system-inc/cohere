@@ -171,6 +171,8 @@ func (system *LoadedDesignSystem) suggestionGroups() map[string][]SuggestionGrou
 
 // suggestionValues is one list resolved against the theme, in upstream's order: the default as the
 // empty string first, then the literals, the spacing scale, the theme's keys and the fractions.
+//
+// Mutates: keys is the caller's memo of each namespace list's resolved keys, filled for the next list that shares it
 func suggestionValues(list SuggestionList, theme *Theme, keys map[string][]string) []string {
 	var values []string
 	if list.HasDefault {
@@ -203,6 +205,8 @@ func suggestionValues(list SuggestionList, theme *Theme, keys map[string][]strin
 
 // addModifiers merges modifiers into an entry, keeping the first occurrence of each. An entry with none
 // yet shares the group's slice, which no caller writes into, and copies only when a second source merges.
+//
+// Mutates: entry gains the modifiers it lacked, which is the merge the caller asks for
 func addModifiers(entry *ClassListEntry, modifiers []string) {
 	if len(entry.Modifiers) == 0 {
 		entry.Modifiers = modifiers

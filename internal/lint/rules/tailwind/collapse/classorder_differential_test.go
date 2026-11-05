@@ -663,6 +663,37 @@ func classOrderUntrustworthyReasons(report Report) []string {
 	return kept
 }
 
+// classOrderMissingDescriptorRoots are roots the parser reads and the descriptor table cannot answer.
+//
+// A finding this tier made, handed to the descriptor table's owner rather than fixed here: this file
+// is the instrument, and an instrument that repairs what it measures stops being one.
+//
+// `max-w-screen` is registered as both a static and a functional utility. The parser correctly reads
+// `max-w-screen-sm` as functional rooted there; the extractor recorded the root as a static and
+// wrote no functional row, so `Lookup` declines a class the engine compiles to `[46]#1`. One class
+// on www-connected-app and none on ahra, because ahra's registry does not advertise it.
+//
+// Thirteen further roots are registered functional with no descriptor row and produce no visible
+// decline yet, only because their registry classes happen to parse to other roots:
+// `-backdrop-hue-rotate`, `-col`, `-hue-rotate`, `-row`, `backdrop-filter`, `bg-position`,
+// `bg-size`, `filter`, `flex-grow`, `flex-shrink`, `font-features`, `mask-position` and
+// `max-w-screen`. They are latent rather than acknowledged: this list holds only what actually
+// declined, so a class that starts exercising one of the other twelve fails the run.
+//
+// Named per root rather than waved through by a rate, because that is the whole point. A percentage
+// ceiling loose enough to admit the 407 declines the model makes on purpose is loose enough to hide
+// this one, which is how the first version of this assertion was written and why it is not this one.
+var classOrderMissingDescriptorRoots = map[string]bool{
+	"max-w-screen": true,
+}
+
+// classOrderExpectedPerDeclarationDeclines is the floor for declines the model makes on purpose.
+//
+// The 18 per-declaration roots carry 22 or 23 registry classes each, so the measured figure is 407
+// on ahra and 408 on connected. A floor well under that survives a repository dropping an animation
+// utility and still fails if the boundary stops applying entirely.
+const classOrderExpectedPerDeclarationDeclines = 300
+
 // classOrderAssertGoSilence checks that every class the Go side declined was declined on purpose.
 //
 // The model has exactly one declared reason to decline a functional class: `PerDeclaration`, the 18
@@ -773,37 +804,6 @@ type classOrderRootCount struct {
 	root  string
 	count int
 }
-
-// classOrderMissingDescriptorRoots are roots the parser reads and the descriptor table cannot answer.
-//
-// A finding this tier made, handed to the descriptor table's owner rather than fixed here: this file
-// is the instrument, and an instrument that repairs what it measures stops being one.
-//
-// `max-w-screen` is registered as both a static and a functional utility. The parser correctly reads
-// `max-w-screen-sm` as functional rooted there; the extractor recorded the root as a static and
-// wrote no functional row, so `Lookup` declines a class the engine compiles to `[46]#1`. One class
-// on www-connected-app and none on ahra, because ahra's registry does not advertise it.
-//
-// Thirteen further roots are registered functional with no descriptor row and produce no visible
-// decline yet, only because their registry classes happen to parse to other roots:
-// `-backdrop-hue-rotate`, `-col`, `-hue-rotate`, `-row`, `backdrop-filter`, `bg-position`,
-// `bg-size`, `filter`, `flex-grow`, `flex-shrink`, `font-features`, `mask-position` and
-// `max-w-screen`. They are latent rather than acknowledged: this list holds only what actually
-// declined, so a class that starts exercising one of the other twelve fails the run.
-//
-// Named per root rather than waved through by a rate, because that is the whole point. A percentage
-// ceiling loose enough to admit the 407 declines the model makes on purpose is loose enough to hide
-// this one, which is how the first version of this assertion was written and why it is not this one.
-var classOrderMissingDescriptorRoots = map[string]bool{
-	"max-w-screen": true,
-}
-
-// classOrderExpectedPerDeclarationDeclines is the floor for declines the model makes on purpose.
-//
-// The 18 per-declaration roots carry 22 or 23 registry classes each, so the measured figure is 407
-// on ahra and 408 on connected. A floor well under that survives a repository dropping an animation
-// utility and still fails if the boundary stops applying entirely.
-const classOrderExpectedPerDeclarationDeclines = 300
 
 // classOrderRootOf recovers the utility root a class was declined under, by parsing it.
 //

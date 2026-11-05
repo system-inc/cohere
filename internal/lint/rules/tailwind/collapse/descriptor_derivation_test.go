@@ -7,6 +7,31 @@ import (
 	"testing"
 )
 
+// Cells the emitters answer differently from the row, each measured rather than waved through.
+//
+// One entry, and it is dead data rather than a fact the emitters lack.
+//
+// `text/--drop` stores `{[] 1}`. The generator reached it by compiling `text-shadow-lg`, whose value
+// is a key in the `--drop` namespace, and filing the result under root `text`. The parser reads that
+// class as root `text-shadow`, which has its own descriptor row whose fallback is `{[] 1}`, the same
+// reading. So the cell is a second copy of a row that already exists, attributed to the wrong root.
+//
+// Measured: of the seven keys the `--drop` namespace holds in this repository, spelled as `text-*`
+// classes, 0 parse as root `text` and 7 parse as root `text-shadow`. No class can reach this cell
+// through `Lookup`'s precedence, so no answer depends on it and the emitters disagreeing with it
+// changes nothing.
+//
+// Deleting it belongs to whoever owns `generate_descriptor_base`, since the row is printed rather
+// than written, and the same probe would reproduce it. Recorded here with the measurement so the
+// disagreement is a known-dead cell rather than an unexplained one.
+//
+// An entry here is a claim that a cell is genuinely unreachable, not a way to quiet a failure. The
+// test below asserts each one still disagrees, so an entry that stops being needed fails rather than
+// sitting.
+var descriptorCellsTheEmittersCannotReach = map[string]bool{
+	"ByNamespace text/--drop": true,
+}
+
 // Whether the descriptor rows are still carrying something the ported handle bodies cannot compute.
 //
 // `baseDescriptors` is one of the two tables in this package that is not Tailwind's own data, and its
@@ -138,31 +163,6 @@ func fallbackBranchFor(descriptor *Descriptor) UtilityBranch {
 	return branch
 }
 
-// Cells the emitters answer differently from the row, each measured rather than waved through.
-//
-// One entry, and it is dead data rather than a fact the emitters lack.
-//
-// `text/--drop` stores `{[] 1}`. The generator reached it by compiling `text-shadow-lg`, whose value
-// is a key in the `--drop` namespace, and filing the result under root `text`. The parser reads that
-// class as root `text-shadow`, which has its own descriptor row whose fallback is `{[] 1}`, the same
-// reading. So the cell is a second copy of a row that already exists, attributed to the wrong root.
-//
-// Measured: of the seven keys the `--drop` namespace holds in this repository, spelled as `text-*`
-// classes, 0 parse as root `text` and 7 parse as root `text-shadow`. No class can reach this cell
-// through `Lookup`'s precedence, so no answer depends on it and the emitters disagreeing with it
-// changes nothing.
-//
-// Deleting it belongs to whoever owns `generate_descriptor_base`, since the row is printed rather
-// than written, and the same probe would reproduce it. Recorded here with the measurement so the
-// disagreement is a known-dead cell rather than an unexplained one.
-//
-// An entry here is a claim that a cell is genuinely unreachable, not a way to quiet a failure. The
-// test below asserts each one still disagrees, so an entry that stops being needed fails rather than
-// sitting.
-var descriptorCellsTheEmittersCannotReach = map[string]bool{
-	"ByNamespace text/--drop": true,
-}
-
 // The exemption map holds only cells that genuinely still disagree.
 func TestDescriptorExemptionsAreStillNeeded(test *testing.T) {
 	test.Parallel()
@@ -247,6 +247,23 @@ func TestNoClassReachesTheTextDropCell(test *testing.T) {
 
 		test.Logf("--drop keys spelled as text-*: %d checked, %d reaching root text", len(keys), reachedText)
 	})
+}
+
+// Roots whose handle body reacts to a themed modifier, which is `/none` in Tailwind 4.3.3.
+//
+// `none` is a `--leading` key, so it means something to a root that consults `--leading` for its
+// modifier and nothing to one that does not. `text/lg/none` is a font size whose line height the
+// modifier supplied, so it emits both declarations; `shadow-md/none` writes no alpha, because
+// `shadow` reads its modifier as an alpha and `none` is not one, and its Themed readings equal its
+// unmodified ones.
+//
+// `UtilityBranch` carries `HasModifier` as a bool and cannot express the difference. That is a real
+// limit of the port rather than a probe detail: an emitter for a root that reacted to both kinds
+// would need to know which was written. Measured across every gap root with a Themed axis, exactly
+// one does, so a per-root set expresses it exactly today and
+// `TestThemedModifierRootsAreTheOnesThatDiffer` fails if a second appears.
+var rootConsultsTheThemeForItsModifier = map[string]bool{
+	"text": true,
 }
 
 // The Alpha and Themed axes, which are the same rows read through a modifier.
@@ -358,23 +375,6 @@ func TestModifierAxesAgreeWithTheEmitters(test *testing.T) {
 	if totalCompared == 0 {
 		test.Fatal("no modifier cell was compared, so this test measured nothing")
 	}
-}
-
-// Roots whose handle body reacts to a themed modifier, which is `/none` in Tailwind 4.3.3.
-//
-// `none` is a `--leading` key, so it means something to a root that consults `--leading` for its
-// modifier and nothing to one that does not. `text/lg/none` is a font size whose line height the
-// modifier supplied, so it emits both declarations; `shadow-md/none` writes no alpha, because
-// `shadow` reads its modifier as an alpha and `none` is not one, and its Themed readings equal its
-// unmodified ones.
-//
-// `UtilityBranch` carries `HasModifier` as a bool and cannot express the difference. That is a real
-// limit of the port rather than a probe detail: an emitter for a root that reacted to both kinds
-// would need to know which was written. Measured across every gap root with a Themed axis, exactly
-// one does, so a per-root set expresses it exactly today and
-// `TestThemedModifierRootsAreTheOnesThatDiffer` fails if a second appears.
-var rootConsultsTheThemeForItsModifier = map[string]bool{
-	"text": true,
 }
 
 // The themed-modifier set holds exactly the roots whose Themed readings differ from their unmodified
