@@ -61,7 +61,7 @@ func resolveAnchor(
 		if node.Kind == ast.KindIdentifier {
 			span := tokenSpan(target, node)
 			if span.Pos() <= offset && offset < span.End() {
-				// Last match wins, and this is EQUIVALENT to first-match-wins rather than being a
+				// Last match wins, and this is equivalent to first-match-wins rather than being a
 				// deliberate innermost-wins rule. An earlier version of this comment claimed the
 				// latter and was wrong.
 				//
@@ -69,7 +69,7 @@ func resolveAnchor(
 				// offset. Measured on the fixture rather than argued: 25 identifiers across two
 				// files, and every offset is inside at most one identifier span — zero overlaps. The
 				// intuition that `value.toUpperCase()` nests is about the enclosing property-access
-				// EXPRESSION, which this walk never records because it only looks at identifiers.
+				// expression, which this walk never records because it only looks at identifiers.
 				//
 				// So a mutation making this take the first match instead survives, correctly and
 				// permanently: no input can distinguish them. It is recorded here rather than pinned
@@ -157,7 +157,7 @@ func ResolveBareName(
 			if node.Kind == ast.KindIdentifier && node.Text() == name && isOwnDeclarationName(node) {
 				symbol := fileChecker.GetSymbolAtLocation(node)
 				// An import specifier declares a local binding whose target lives elsewhere. Both
-				// are legitimate rename anchors and they are different acts, so the alias is NOT
+				// are legitimate rename anchors and they are different acts, so the alias is not
 				// followed here — otherwise an imported name and its export would collapse into one
 				// candidate and the ambiguity the user needs to see would be hidden.
 				if symbol != nil && !seen[symbol] {
@@ -269,7 +269,7 @@ func declarationKindName(parent *ast.Node) string {
 // tokenSpan is an identifier's own text, without the trivia before it.
 //
 // Routed through the same scanner call `rule.TokenRange` uses, and for the same reason stated at
-// length there: `node.Pos()` is the position BEFORE leading trivia, so a range built from it
+// length there: `node.Pos()` is the position before leading trivia, so a range built from it
 // includes the whitespace and any comment sitting in front of the name. A rename writing over that
 // range would delete a comment and swallow the indentation, and the result would still parse, which
 // means nothing downstream would catch it. Ranges are the whole game here.

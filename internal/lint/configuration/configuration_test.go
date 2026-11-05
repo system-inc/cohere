@@ -532,7 +532,7 @@ func TestPluginDeclarationEnablesItsRules(test *testing.T) {
 			"inserts Warn and reporting it louder than the gate does is a divergence", setting.Severity)
 	}
 
-	// A typescript rule must NOT be, since that plugin is not declared. Without this the test
+	// A typescript rule must not be, since that plugin is not declared. Without this the test
 	// passes for a resolver that enables everything.
 	if _, enabled := loaded.Rules["typescript/no-extra-non-null-assertion"]; enabled {
 		test.Error("a typescript rule was enabled by a config declaring only react, so the plugin " +

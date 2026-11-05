@@ -11,7 +11,7 @@
 // Two values that alias the same underlying object cannot be memoized independently. If `a` is
 // pushed into `b` and then `b` is mutated, caching `a` across a render where `b` changed hands back
 // a stale object. Upstream's answer is not "track the alias graph at every consumer" -- it is to
-// collapse the entangled values into ONE equivalence class up front, and let every consumer ask a
+// collapse the entangled values into one equivalence class up front, and let every consumer ask a
 // single question: what is this value's representative? That is what makes this a union-find rather
 // than a reachability walk. The structure is chosen because the consumers only ever ask for a
 // canonical name, never for a path.
@@ -25,7 +25,7 @@
 // `Find` below is that lookup and `RepresentativeOf` is the fallback form, so the gap closes on the
 // API rather than on a comment.
 //
-// # The input, measured rather than assumed, because an earlier attempt at this stage DECLINED
+// # The input, measured rather than assumed, because an earlier attempt at this stage declined
 //
 // Stage 3 was dispatched once before and correctly refused to build. At that point the widening half
 // of `InferMutableRanges` did not exist, so every mutable range had width exactly one, every
@@ -33,7 +33,7 @@
 // members in 23,256 singleton classes: an identity function that compiles, passes fixtures, and
 // tells every consumer that nothing is entangled with anything.
 //
-// The gates this file reads are NOT the width gate Stage 2.5 measured, so the input was re-measured
+// The gates this file reads are not the width gate Stage 2.5 measured, so the input was re-measured
 // against these predicates specifically, with a checker present -- a lowering without one never
 // emits `StoreContext` and reports zeroes that are facts about the harness rather than the code.
 // Over 400 corpus files, 685 outermost functions:
@@ -54,7 +54,7 @@
 // classes, largest 47, mean 2.91. That test is the guard against this pass silently reverting to the
 // identity function if a future change to ranges narrows them back.
 //
-// # DIVERGENCE FROM oxc: the loop-carried phi disjunct is NOT applied
+// # Divergence from oxc: the loop-carried phi disjunct is not applied
 //
 // oxc's phi predicate carries a third term React has no counterpart for
 // (`infer_reactive_scope_variables.rs:264-269`): a phi whose operand is defined at or after the
@@ -68,7 +68,7 @@
 // failing React's test, so applying it would union 13 additional phi groups across 400 files. Should
 // this ever need revisiting, the term is one `||` and the measurement is here.
 //
-// # PARTIAL DIVERGENCE: call-result types are projected from effect signatures
+// # Partial divergence: call-result types are projected from effect signatures
 //
 // Upstream's `mayAllocate` returns `lvalue.identifier.type.kind !== 'Primitive'` for
 // `CallExpression`, `MethodCall` and `TaggedTemplateExpression`. `InferTypes` obtains that result
@@ -95,7 +95,7 @@
 // one piece of upstream's phi handling that is absent rather than reproduced, and a reader diffing
 // against the bundle would otherwise find it missing with no explanation.
 //
-// # Termination is NOT a fixpoint, and the proof is structural
+// # Termination is not a fixpoint, and the proof is structural
 //
 // There is no worklist here and no iteration to convergence. The pass makes exactly one ordered walk
 // over blocks, phis and instructions, and every `Union` it performs is a monotone merge of two
@@ -115,9 +115,9 @@
 // # Iteration order
 //
 // `Phi.Operands` is kept sorted by predecessor block id, and it is read through
-// `PhiOperandsInOrder` here exactly as `reactive.go` reads it. Union is order-INDEPENDENT in its
+// `PhiOperandsInOrder` here exactly as `reactive.go` reads it. Union is order-independent in its
 // final partition -- the classes are the same whichever order the merges happen in -- but the chosen
-// REPRESENTATIVE is not, and the representative is what a consumer keys on. A pass whose answer is
+// representative is not, and the representative is what a consumer keys on. A pass whose answer is
 // stable but whose key varies between runs produces a table that differs between runs, which is the
 // shape that makes a cache non-deterministic. Reading in a fixed order removes it.
 package high_level_intermediate_representation
@@ -178,7 +178,7 @@ type DisjointSet struct {
 // difference is deliberate because every call site below builds the list conditionally and an empty
 // one is the ordinary outcome rather than a bug.
 //
-// Note that upstream's `union` MUTATES the caller's array through `shift()`. This takes the slice by
+// Note that upstream's `union` mutates the caller's array through `shift()`. This takes the slice by
 // value and never writes to it, which is a difference in the implementation rather than in what it
 // decides; the call sites below would be correct under either.
 func (set *DisjointSet) Union(items []static_single_assignment.IdentifierId) {
@@ -310,7 +310,7 @@ func (set *DisjointSet) Sets() [][]static_single_assignment.IdentifierId {
 // from `ForFunction`, which does. Infers ranges for itself; a caller holding a range table already
 // passes it to `FindDisjointMutableValuesWithRanges` and avoids the second inference.
 //
-// Nested functions are NOT included, for the same reason `InferMutableRanges` excludes them: an
+// Nested functions are not included, for the same reason `InferMutableRanges` excludes them: an
 // IdentifierId names one value in this function and a different value in a nested one, so a set
 // spanning two functions would confidently unify two unrelated values. Upstream runs this per
 // function for the same reason.
@@ -336,7 +336,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 		return scopeIdentifiers
 	}
 
-	// declarations maps a source binding to the FIRST value it took, which is what lets a phi reach
+	// declarations maps a source binding to the first value it took, which is what lets a phi reach
 	// back to the declaration that introduced the variable. Upstream keys it on `declarationId` and
 	// writes only when absent (`declareIdentifier`, line 32381); `DeclarationId` is this graph's
 	// counterpart and carries the same meaning, one entry per source-level binding.
@@ -358,7 +358,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 			// React's two-term test, line 32387. The first term asks whether the range is wider than
 			// a single instruction, and it is written as `start + 1 !== end` rather than
 			// `end > start + 1` because upstream means "not exactly one wide" -- on an unset range,
-			// both fields zero, `start + 1 !== end` is TRUE while `end > start + 1` is false. The
+			// both fields zero, `start + 1 !== end` is true while `end > start + 1` is false. The
 			// second term then rejects it, since an unset end of zero is never greater than a
 			// block's first order. Transcribed in upstream's spelling rather than the tidier one, so
 			// that the two terms keep their independent meanings.
@@ -378,7 +378,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 			// Read through PhiOperandsInOrder, ascending predecessor order, the order
 			// `Phi.Operands` keeps.
 			//
-			// # The order is DEFENSIVE rather than load-bearing
+			// # The order is defensive rather than load-bearing
 			//
 			// Neither the partition nor the representative depends on this loop's order, a property
 			// of `Union`: the class representative is taken from `items[0]`, which is the phi, and
@@ -386,7 +386,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 			//
 			// Verified directly rather than reasoned about: `Union([phi, decl, opA, opB])` and
 			// `Union([phi, decl, opB, opA])` produce the same class and the same root. The order
-			// that CAN move a representative is the order of separate `Union` CALLS -- `{1,2}` then
+			// that can move a representative is the order of separate `Union` calls -- `{1,2}` then
 			// `{3,2}` roots at 3, while `{3,2}` then `{1,2}` roots at 1 -- and that ordering is the
 			// block and instruction walk, which is deterministic already.
 			//
@@ -461,7 +461,7 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 				operands = appendMutableOperand(ranges, instruction, operands, value.Value)
 			case *MethodCall:
 				operands = appendMutableOperands(instruction, ranges, operands)
-				// The property is added UNCONDITIONALLY, with no range test and no mutability test
+				// The property is added unconditionally, with no range test and no mutability test
 				// (line 32411). It is the only place in the whole pass where an operand joins the
 				// class on its identity alone. Upstream's reason is that a method call's receiver
 				// and the function it resolves to are inseparable: `o.f()` can mutate through `f`,
@@ -506,7 +506,7 @@ func appendStore(
 //
 // This is upstream's paired test, `isMutable(instr, operand) && operand.mutableRange.start > 0`.
 // The two halves are not redundant: `isMutable` is `inRange`, which is already false for an unset
-// range, but a range legitimately STARTING at zero would pass `inRange` while naming a value with no
+// range, but a range legitimately starting at zero would pass `inRange` while naming a value with no
 // definition point. Upstream carries both and so does this.
 func appendMutableOperand(
 	ranges *mutation_aliasing.MutableRanges,
@@ -523,7 +523,7 @@ func appendMutableOperand(
 
 // appendMutableOperands adds every non-defining operand of the instruction that is still mutable.
 //
-// This is upstream's `eachInstructionOperand` loop, which yields the value's operands and NOT the
+// This is upstream's `eachInstructionOperand` loop, which yields the value's operands and not the
 // instruction's own lvalue -- the lvalue is handled by the range test above it and adding it here
 // would double-count. `PlaceRoleDefine` is the role that names an lvalue in this graph, so the two
 // remaining roles, Use and Receiver, are exactly upstream's operand set.

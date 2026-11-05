@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// readHead returns the commit a checkout's HEAD names, read from the repository's own files.
+// readHead returns the commit a checkout's `HEAD` names, read from the repository's own files.
 //
 // The launcher asks this on every run, and asking git cost a process each time for an answer that sits
 // in two small files. A cache hit now execs the cached binary without starting any git: the commit names
@@ -17,7 +17,7 @@ import (
 // short of git reads a packfile).
 //
 // It follows what a clone, a worktree and a submodule each lay out: `.git` as a directory or as a
-// `gitdir:` file, a worktree's `commondir`, HEAD as a commit or as a symbolic ref, and the ref as a loose
+// `gitdir:` file, a worktree's `commondir`, `HEAD` as a commit or as a symbolic ref, and the ref as a loose
 // file or a line of `packed-refs`. Anything else, such as the reftable ref store, is an error that names
 // it, never a guess: a wrong commit builds and runs the wrong rules while looking like the right ones.
 func readHead(repository string) (string, error) {

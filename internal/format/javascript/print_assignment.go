@@ -100,7 +100,7 @@ func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, ri
 		return "only-left"
 	}
 
-	// Short assignment chains (only 2 segments) are NOT formatted as chains.
+	// Short assignment chains (only 2 segments) are not formatted as chains.
 	//   1) a = b = c; (expression statements)
 	//   2) var/let/const a = b = c;
 

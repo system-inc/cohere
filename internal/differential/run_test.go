@@ -392,7 +392,7 @@ func TestAGateThatFailedWithNoOutputIsNotAnEmptyResult(test *testing.T) {
 		test.Fatalf("the gate's stderr must be surfaced, got %v", err)
 	}
 
-	// The control: the same non-zero exit WITH findings on stdout is normal and must still pass.
+	// The control: the same non-zero exit with findings on stdout is normal and must still pass.
 	output, err := runGate(context.Background(), GateCommand{
 		Name:      "finds-something",
 		Program:   "/bin/sh",

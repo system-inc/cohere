@@ -37,7 +37,7 @@ import (
 //
 // Whitespace in this grammar is JavaScript's, because ESLint's is: it trims with
 // `String.prototype.trim` and ends the directive word at `\s`. Go's `strings.TrimSpace` counts the
-// next-line character (U+0085) as space and the byte order mark (U+FEFF) as not, and JavaScript does
+// next-line character (`U+0085`) as space and the byte order mark (`U+FEFF`) as not, and JavaScript does
 // the reverse, so a Go trim read 15 of 19 comments holding one of them, a no-break space after the
 // word included, differently from ESLint (#z4nssqs, found by @system_adamic's stream P2).
 const (

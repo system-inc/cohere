@@ -63,7 +63,7 @@ func TestComputeMemoizedForcesScopeDependencies(test *testing.T) {
 			"its scope must be held or the scope invalidates more often than necessary")
 	}
 
-	// The control: the same dependency with no scope association must NOT be memoized, or the case
+	// The control: the same dependency with no scope association must not be memoized, or the case
 	// above passes because Conditional values are held unconditionally.
 	control := NewMemoizationGraph()
 	control.Record(2, MemoizationMemoized, nil)
@@ -105,7 +105,7 @@ func TestComputeMemoizedRespectsTheLevels(test *testing.T) {
 		})
 	}
 
-	// Conditional WITH a memoized dependency is the arm the table above cannot show, since it
+	// Conditional with a memoized dependency is the arm the table above cannot show, since it
 	// varies the leaf rather than the middle.
 	graph := NewMemoizationGraph()
 	graph.Record(1, MemoizationConditional, []static_single_assignment.DeclarationId{2})
@@ -211,7 +211,7 @@ func TestComputeMemoizedHandlesUnknownDeclarations(test *testing.T) {
 // Every other test in this file records each declaration exactly once, where join and assign are
 // the same function. A mutation replacing the join with an assignment survived all of them.
 //
-// Order matters to the assertion: assigning is only visibly wrong when the WEAKER level is recorded
+// Order matters to the assertion: assigning is only visibly wrong when the weaker level is recorded
 // second, because assigning a stronger level over a weaker one happens to agree with joining. So
 // both orders are checked and the answer must be the same.
 func TestRecordJoinsRatherThanAssigns(test *testing.T) {

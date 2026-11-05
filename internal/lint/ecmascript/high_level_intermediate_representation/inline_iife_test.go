@@ -2,7 +2,7 @@ package high_level_intermediate_representation
 
 // Tests for the CFG splice.
 //
-// Every assertion here is written against a graph PROPERTY rather than against a printed shape,
+// Every assertion here is written against a graph property rather than against a printed shape,
 // because a printed shape passes for the wrong reason: a splice that routes a return to the wrong
 // block still prints instructions in a plausible order. The properties asserted are the four the
 // splice can violate independently -- the call is gone, no return of the copied body remains, every
@@ -96,7 +96,7 @@ const multipleReturnIifeSource = `
 //   - The `CallExpression` survives, so the closure is still called and the capture edge that
 //     widens mutable ranges is still there. The splice then costs work and changes nothing, which
 //     is the failure mode with no symptom at all.
-//   - A `Return` in the copied body is left unrouted, so control leaves the CALLER at that point.
+//   - A `Return` in the copied body is left unrouted, so control leaves the caller at that point.
 //     Everything after the call is silently unreachable.
 //   - A rewritten return jumps somewhere other than the continuation, so the code after the call
 //     never runs on that path.
@@ -144,7 +144,7 @@ func TestInlineRemovesTheCallAndEveryReturnOfTheInlinedBody(test *testing.T) {
 				}
 			}
 
-			// Exactly one `Return` remains and it is the CALLER's own. More than one means a
+			// Exactly one `Return` remains and it is the caller's own. More than one means a
 			// return of the inlined body was left unrouted and now ends the caller.
 			returns := 0
 			for _, block := range function.Blocks {
@@ -160,7 +160,7 @@ func TestInlineRemovesTheCallAndEveryReturnOfTheInlinedBody(test *testing.T) {
 					"body was not routed to the continuation and now leaves the caller", returns)
 			}
 
-			// The code AFTER the call has to still be there, and this needed a mutation sweep to
+			// The code after the call has to still be there, and this needed a mutation sweep to
 			// find. Dropping the instructions the continuation inherits left every other assertion
 			// in this file passing: the continuation is then empty, `ReversePostorder` collects no
 			// instructions from it, and the graph that survives is internally consistent with the
@@ -200,7 +200,7 @@ func TestInlineRemovesTheCallAndEveryReturnOfTheInlinedBody(test *testing.T) {
 // TestInlineDefinesTheCallResultOnEveryPathToTheContinuation is the join half.
 //
 // The splice's whole purpose is that the call's lvalue still holds the value the body returned. A
-// return routed to the continuation WITHOUT the store that carries its value produces a graph with
+// return routed to the continuation without the store that carries its value produces a graph with
 // no dangling reference and no unreachable block -- the value is simply never defined, and every
 // later read of it reads whatever the identifier held before.
 //
@@ -208,11 +208,11 @@ func TestInlineRemovesTheCallAndEveryReturnOfTheInlinedBody(test *testing.T) {
 // per return and the direct form emits one load, and a test that counted would encode the arm
 // rather than the property.
 //
-// # The definition set includes lvalue ROLES, which took a measurement to get right
+// # The definition set includes lvalue roles, which took a measurement to get right
 //
 // Written first as "every `Instruction.LValue`, every phi, every parameter", this reported the
-// caller's own `const built` as undefined -- BEFORE any splice had happened. `StoreLocal` and
-// `DeclareLocal` name their binding inside the VALUE rather than in `Instruction.LValue`, which
+// caller's own `const built` as undefined -- before any splice had happened. `StoreLocal` and
+// `DeclareLocal` name their binding inside the value rather than in `Instruction.LValue`, which
 // carries only the store's own temporary result, so a definition set built from lvalues alone
 // misses every named binding in the function. The visitor already reports the role, so the fix is
 // to read it rather than to loosen the assertion.
@@ -290,7 +290,7 @@ func TestInlineDefinesTheCallResultOnEveryPathToTheContinuation(test *testing.T)
 				test.Error("no instruction reads any place, so this test asserted nothing")
 			}
 
-			// A DECLARATION is not a definition, and this is the part a mutation sweep had to
+			// A declaration is not a definition, and this is the part a mutation sweep had to
 			// teach. Removing the store that carries a returned value left every assertion above
 			// passing, because the labeled form emits `DeclareLocal let result` before the body and
 			// the loop above counts that as defining `result`. What remains is a `let` that is
@@ -367,7 +367,7 @@ func TestInlineLeavesEveryBlockReferenceResolvable(test *testing.T) {
 
 // TestInlineDeclinesTheCasesItCannotExpress pins each refusal.
 //
-// Each of these is a condition upstream also declines, and each would produce a WRONG graph rather
+// Each of these is a condition upstream also declines, and each would produce a wrong graph rather
 // than a missing optimisation if it were accepted: an argument has no parameter to bind to, an
 // escaping function value would be called somewhere the body no longer exists, and a named binding
 // can be read again after the call.
@@ -438,7 +438,7 @@ func TestInlineDeclinesTheCasesItCannotExpress(test *testing.T) {
 // it like upstream. This focused test deliberately uses the guarded wrapper so it can distinguish a
 // programmer-written IIFE from a rewritten memo; see `memoizedResults`.
 //
-// The fixture holds BOTH a real IIFE and a `useMemo`, which is what makes the assertion sharp: a
+// The fixture holds both a real IIFE and a `useMemo`, which is what makes the assertion sharp: a
 // guard that declined everything would also pass a fixture with only the memo in it.
 func TestInlineDeclinesADroppedMemoCallback(test *testing.T) {
 	test.Parallel()

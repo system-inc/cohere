@@ -24,12 +24,12 @@ import (
 // # Why Construct is inside the cached value rather than left to the caller
 //
 // This is the part that makes a shared lowering safe, and getting it wrong would have been silent.
-// `Construct` mutates in place: it renames identifiers and appends phis. It is NOT idempotent.
+// `Construct` mutates in place: it renames identifiers and appends phis. It is not idempotent.
 // Measured on `let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x;`, a second
 // Construct over the same graph moved it from 1 phi and 5 named values to 2 phis and 6 named
 // values.
 //
-// The dangerous part is that the doubly-constructed graph is still WELL-FORMED — `VerifySSA`
+// The dangerous part is that the doubly-constructed graph is still well-formed — `VerifySSA`
 // reports zero violations on it. So a cache that handed out a raw lowering and let each of the
 // three callers run its own Construct would have given the second and third caller a graph carrying
 // phis that correspond to no branch in the source, with no verifier, no panic, and no test
@@ -88,9 +88,9 @@ func ForFunction(ruleContext rule.Context, node *ast.Node) *Function {
 //
 // The compiler rules lower the outermost function on each branch and, when that is not a component
 // or hook, look for one among the functions nested in its lowering. A unit found that way was then
-// analyzed as a NESTED function, with the function around it as its enclosing builder, so a variable
+// analyzed as a nested function, with the function around it as its enclosing builder, so a variable
 // that function declared became a capture: a local of the component, as far as the analysis could
-// tell. React Compiler compiles such a component as a unit of its own, and its HIR builder resolves
+// tell. React Compiler compiles such a component as a unit of its own, and its `HIR` builder resolves
 // any binding outside the unit as it resolves a module-level one (`resolveIdentifier` asks the unit's
 // parent scope, and Babel's `getBinding` walks every enclosing scope).
 //

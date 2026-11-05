@@ -4,7 +4,7 @@ import "strings"
 
 // Target is one platform a release ships a binary for.
 type Target struct {
-	// GoOperatingSystem and GoArchitecture are what `go build` is asked for, as GOOS and GOARCH.
+	// GoOperatingSystem and GoArchitecture are what `go build` is asked for, as `GOOS` and `GOARCH`.
 	GoOperatingSystem string
 	GoArchitecture    string
 }

@@ -429,7 +429,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(test *testing.T) {
 
 	// Rooted, flowing from the earlier scope, and not always-invalidating.
 	//
-	// The later scope depends on TWO values where the earlier declares both, so the synthetic
+	// The later scope depends on two values where the earlier declares both, so the synthetic
 	// declarations set does not equal the dependency set and condition two cannot fire -- which is
 	// what leaves condition three as the only path and makes the type check the deciding factor.
 	// An earlier spelling used one dependency matching one declaration exactly, and condition two
@@ -463,7 +463,7 @@ func TestCanMergeScopesRequiresRootedInvalidatingFlow(test *testing.T) {
 // TestCanMergeScopesGuardsAreIndependentlyLoadBearing isolates each arm of condition three.
 //
 // A mutation sweep found the rooted-path check and the flow check both survivable: each fixture
-// that was supposed to isolate one of them was ALSO rejected by a later guard, so deleting the
+// that was supposed to isolate one of them was also rejected by a later guard, so deleting the
 // guard under test changed no answer. A test that only ever sees a rejection cannot tell which
 // guard did the rejecting.
 //

@@ -2,7 +2,7 @@
 //
 // This is a port of React's `Dominator.ts` and `ComputeUnconditionalBlocks.ts`, transcribed by oxc
 // at `oxc_react_compiler/src/react_compiler_hir/dominator.rs`. Cooper, Harvey and Kennedy, "A
-// Simple, Fast Dominance Algorithm", run over the REVERSED graph with one synthetic exit.
+// Simple, Fast Dominance Algorithm", run over the reversed graph with one synthetic exit.
 //
 // # Why this is here rather than borrowed from internal/lint/ecmascript/control_flow_graph
 //
@@ -14,10 +14,10 @@
 // does not produce. `ssa.go`'s header states the general form of this: nothing in that package applies to this graph
 // without a conversion that does not exist.
 //
-// It is also NOT the same question `ssa_verify.go`'s `computeDominance` answers, and the difference
+// It is also not the same question `ssa_verify.go`'s `computeDominance` answers, and the difference
 // is the whole point rather than an implementation detail. That one is forward dominance: does
-// every path from the entry REACH this block. This is post-dominance: does every path from the
-// entry PASS THROUGH this block on its way to a return.
+// every path from the entry reach this block. This is post-dominance: does every path from the
+// entry pass through this block on its way to a return.
 //
 // Measured on React's own rule, which is why the distinction is recorded rather than asserted:
 //
@@ -108,10 +108,10 @@ type postDominanceTree struct {
 
 // computePostDominance runs Cooper-Harvey-Kennedy over the reversed graph.
 //
-// The algorithm needs its nodes in reverse postorder OF THE GRAPH IT WALKS, and the graph it walks
+// The algorithm needs its nodes in reverse postorder of the graph it walks, and the graph it walks
 // here is the reverse of `Function.Blocks`' order rather than that order itself. So the traversal
 // below computes its own ordering from the exit backwards, instead of reusing `Function.Blocks`,
-// which is in reverse postorder of the FORWARD graph and is the wrong order for this.
+// which is in reverse postorder of the forward graph and is the wrong order for this.
 //
 // Getting that wrong does not fail loudly. Cooper-Harvey-Kennedy's `intersect` walks two pointers
 // toward each other by comparing ordering positions, so a wrong order makes it walk the wrong way
@@ -333,7 +333,7 @@ func terminalTestSatisfies(terminal Terminal, isControlValue func(place Place) b
 // postDominatorFrontier is the set of blocks that decide whether target runs.
 //
 // Upstream's `postDominatorFrontier`. A predecessor of anything target post-dominates, which target
-// does NOT post-dominate, is a block where control could have gone elsewhere: that is exactly a
+// does not post-dominate, is a block where control could have gone elsewhere: that is exactly a
 // branch target depends on.
 //
 // The walk covers target itself as well as its post-dominated set, because a branch immediately
@@ -380,7 +380,7 @@ func postDominatorFrontier(
 // immediate post-dominator is target or is already known to be post-dominated by it. A block with no
 // entry in the tree reaches no return, and upstream falls back to the block itself there, which this
 // reproduces rather than skipping: the fallback makes such a block its own post-dominator, so it
-// joins the set only if it IS the target.
+// joins the set only if it is the target.
 func postDominatorsOf(
 	function *Function,
 	tree *postDominanceTree,

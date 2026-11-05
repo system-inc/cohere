@@ -157,7 +157,7 @@ func isNodeMatchesNameOrPath(node Node, nameOrPath string) bool {
 	}
 }
 
-// precedence is upstream's PRECEDENCE, utilities/get-precedence.js.
+// precedence is upstream's precedence, utilities/get-precedence.js.
 var precedence = func() map[string]int {
 	table := map[string]int{}
 	for index, operators := range [][]string{

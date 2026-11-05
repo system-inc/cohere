@@ -51,7 +51,7 @@ func Parse(text string) (document *estree.Node, comments []*estree.Node, err err
 }
 
 // parseComments is parser-graphql.js's: the Comment tokens between the document's startToken and
-// endToken (the <SOF> and the <EOF>), which lookahead linked into the token list as it skipped them.
+// endToken (the `<SOF>` and the `<EOF>`), which lookahead linked into the token list as it skipped them.
 func parseComments(startToken *token, endToken *token) []*estree.Node {
 	comments := []*estree.Node{}
 	for token := startToken; token != endToken; token = token.next {
@@ -65,7 +65,7 @@ func parseComments(startToken *token, endToken *token) []*estree.Node {
 
 // parseOptions is the part of graphql-js's ParseOptions that Prettier sets.
 type parseOptions struct {
-	// EXPERIMENTAL:
+	// `EXPERIMENTAL:`
 	//
 	// If enabled, the parser will understand and parse fragment variable definitions and arguments on
 	// fragment spreads. Fragment variable definitions will be represented in the `variableDefinitions`

@@ -112,7 +112,7 @@ func TestNameOf(test *testing.T) {
 		{"class C { get p() { marker; return 1; } }", ""},
 		{"class C { set p(v: number) { marker; } }", ""},
 		{"class C { constructor() { marker; } }", ""},
-		// Only the IMMEDIATE parent supplies a borrowed name. A function passed directly as an
+		// Only the immediate parent supplies a borrowed name. A function passed directly as an
 		// argument has a call expression as its parent and borrows nothing, where the same function
 		// assigned to a variable would borrow that variable's name.
 		{"call(function () { marker; });", ""},

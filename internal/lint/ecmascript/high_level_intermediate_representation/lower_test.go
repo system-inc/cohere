@@ -175,7 +175,7 @@ func requireInstruction(test *testing.T, function *Function, want string) {
 // TestLowerTryFinally is the first of the four shapes the brief named as where lowering designs
 // break.
 //
-// The property asserted is the divergence this package chose: the finally body is lowered ONCE.
+// The property asserted is the divergence this package chose: the finally body is lowered once.
 // cohere's `controlflow` lays it out twice and both copies carry the same source positions; see the
 // Try terminal's comment for why an IR cannot do that.
 func TestLowerTryFinally(test *testing.T) {
@@ -410,7 +410,7 @@ func TestLowerSwitch(test *testing.T) {
 	}
 }
 
-// TestLowerSwitchWithoutDefaultCanSkipEveryCase pins the one place a fallthrough IS a real edge.
+// TestLowerSwitchWithoutDefaultCanSkipEveryCase pins the one place a fallthrough is a real edge.
 //
 // A switch with no default can fall past every case, so `EachSuccessor` must yield the fallthrough
 // for it and must not for a switch that has one. Treating it uniformly either way is wrong.
@@ -448,7 +448,7 @@ func TestLowerSwitchWithoutDefaultCanSkipEveryCase(test *testing.T) {
 
 // TestLowerDestructuring covers the fourth named shape.
 //
-// The property asserted is that the pattern stays STRUCTURED rather than being expanded into
+// The property asserted is that the pattern stays structured rather than being expanded into
 // property loads. See pattern.go: the flattening is recoverable from the structure and the
 // structure is not recoverable from the flattening.
 func TestLowerDestructuring(test *testing.T) {
@@ -671,7 +671,7 @@ func TestLowerJsx(test *testing.T) {
 	}
 }
 
-// TestLowerJsxComponentTagIsAValueReference pins that `<Foo />` is a USE of Foo.
+// TestLowerJsxComponentTagIsAValueReference pins that `<Foo />` is a use of Foo.
 //
 // A rule asking what a component depends on reads uses. If the tag stayed a string, every component
 // reference would be invisible to that question.
@@ -781,8 +781,8 @@ func TestLowerNestedFunction(test *testing.T) {
 }
 
 // TestLowerShorthandPropertyReadsLocalBinding pins the checker-specific symbol lookup for `{temp}`.
-// TypeScript's generic symbol accessor returns the PROPERTY symbol at the shorthand name; lowering
-// needs the shorthand's VALUE symbol so the read stays connected to the local declaration.
+// TypeScript's generic symbol accessor returns the property symbol at the shorthand name; lowering
+// needs the shorthand's value symbol so the read stays connected to the local declaration.
 func TestLowerShorthandPropertyReadsLocalBinding(test *testing.T) {
 	test.Parallel()
 

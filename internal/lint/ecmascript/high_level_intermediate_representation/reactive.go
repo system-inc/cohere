@@ -12,20 +12,20 @@
 // assigned under a branch whose test is reactive becomes reactive even when its own operands are
 // not. Everything not reachable from a source stays false.
 //
-// # The source set is React's, and the middle two entries are NOT what a summary of this pass says
+// # The source set is React's, and the middle two entries are not what a summary of this pass says
 //
 // It is worth stating the sources as upstream actually computes them, because the natural
 // paraphrase - "props, state, context values, and hook return values" - is four things and the code
 // is two.
 //
-// `useState`'s state element and `useContext`'s value are NOT separate sources. They are reactive
-// because they are the result of a hook CALL, which is the one rule that covers all three. Writing
+// `useState`'s state element and `useContext`'s value are not separate sources. They are reactive
+// because they are the result of a hook call, which is the one rule that covers all three. Writing
 // state and context as their own sources would be redundant with the hook rule for the cases the
 // hook rule already reaches, and wrong for the cases it does not: a state value destructured out of
 // a call this pass cannot see as a hook does not become reactive by being called state.
 //
 // The inverse matters more, and it is the reason `stable` below exists. A `useState` call returns a
-// tuple whose SETTER is deliberately NOT reactive, because React guarantees the setter's identity
+// tuple whose setter is deliberately not reactive, because React guarantees the setter's identity
 // is stable across renders. So the hook rule marks the whole call result reactive and the stability
 // side-map then exempts the individual elements React promises never change: the setter from
 // `useState`, the dispatch from `useReducer`, the ref object from `useRef`. Without that exemption
@@ -54,15 +54,15 @@
 //
 // Two things follow and both are load-bearing.
 //
-// The stable values are identifiable and the reactive ones are not. `Dispatch` is a type ALIAS and
-// `RefObject` is an INTERFACE, so they land in different fields, which is why the predicate below
+// The stable values are identifiable and the reactive ones are not. `Dispatch` is a type alias and
+// `RefObject` is an interface, so they land in different fields, which is why the predicate below
 // asks the alias first and falls back to the symbol. That fallback is not this file's invention:
 // `internal/utilities/typecheck/specifier.go:39` has done exactly this since it was vendored, and three
 // agents have now re-derived it independently. It is reached here through `stableTypeName` rather
 // than copied, so a fourth does not.
 //
 // And the reactive values are indistinguishable from any other call result, which is why the hook
-// test below keys on the CALLEE rather than on the result. `useContext<T>(c): T` returns a bare
+// test below keys on the callee rather than on the result. `useContext<T>(c): T` returns a bare
 // generic; there is no type on `ctx` that separates it from `plain`. What the checker does give is
 // the callee's own symbol name, `useState`, `useContext`, `useCustomThing`, which is precisely
 // React's own naming convention and is what `high_level_intermediate_representation.FunctionKind` already classifies
@@ -70,7 +70,7 @@
 // weaker test than upstream's shape registry and it is weaker in a specific, stated direction; see
 // `isHookCallee`.
 //
-// # What this pass does NOT do, and why that is a decline rather than an omission
+// # What this pass does not do, and why that is a decline rather than an omission
 //
 // Upstream's loop has a third marking rule this one does not run: after the operand and control
 // tests, it walks every operand of a reactive instruction and marks those whose `Place.Effect` is
@@ -91,14 +91,14 @@
 // is stated. `ReactiveGap` below names it in the API rather than in a comment alone, so a caller
 // that needs mutation-derived reactivity can ask instead of discovering it.
 //
-// The consequence is a strict UNDER-approximation, which is the safe direction for the consumers
+// The consequence is a strict under-approximation, which is the safe direction for the consumers
 // this exists for: a validator asking "is this dependency reactive" gets false where upstream gets
 // true only for values made reactive solely by being mutated with a reactive argument. It never
 // reports reactive where upstream reports non-reactive. `TestReactiveIsAnUnderApproximation` pins
 // that direction.
 //
-// Filling `Place.Effect` was deliberately NOT attempted as part of this. The `Effect` doc comment
-// in high_level_intermediate_representation.go explains why at length: `Effect` is an OUTPUT of an abstract
+// Filling `Place.Effect` was deliberately not attempted as part of this. The `Effect` doc comment
+// in high_level_intermediate_representation.go explains why at length: `Effect` is an output of an abstract
 // interpretation over a disjoint `ValueKind` lattice whose join is not a max over the declaration order, and a pass
 // that invented effects to feed this one would be self-consistent and wrong.
 //
@@ -111,7 +111,7 @@
 // a hang - so the shape of the comparison is a correctness property rather than a tidiness one.
 //
 // Upstream's `ReactivityMap` makes the same choice visibly. Its `isReactive` has a side effect,
-// writing `place.reactive = true`, but `hasChanges` flips ONLY in `markReactive` and ONLY when an
+// writing `place.reactive = true`, but `hasChanges` flips only in `markReactive` and only when an
 // id is newly inserted into the set. Marking a place whose identifier is already in the set is not
 // a change. Reproduced exactly by `reactivity.mark` below.
 //
@@ -126,9 +126,9 @@
 //
 // # Iteration order
 //
-// `Phi.Operands` is kept sorted by predecessor block id, so its order is fixed. Upstream BREAKS out
+// `Phi.Operands` is kept sorted by predecessor block id, so its order is fixed. Upstream breaks out
 // of the operand loop at the first reactive operand, so the order that loop reads operands in is
-// part of its behavior. It does not change THIS pass's answer, because the result is "was any
+// part of its behavior. It does not change this pass's answer, because the result is "was any
 // operand reactive", which is order-independent - but the predecessor loop underneath it is
 // order-dependent in upstream's own code, and both loops read operands through
 // `PhiOperandsInOrder`, ascending predecessor order, so the walk is deterministic whatever a later
@@ -209,7 +209,7 @@ type reactivity struct {
 	typeChecker *shimchecker.Checker
 
 	// reactive is the fixpoint value. Membership is by IdentifierId alone, which is what makes
-	// "unchanged" cheap and, more importantly, TERMINATING. See the package comment.
+	// "unchanged" cheap and, more importantly, terminating. See the package comment.
 	reactive map[static_single_assignment.IdentifierId]bool
 
 	// stable holds values React guarantees do not change identity between renders, so that they are
@@ -255,7 +255,7 @@ func (r *reactivity) run() {
 	}
 
 	// The frontier depends only on the control-flow graph, which nothing here mutates, so it is
-	// computed once. Which of those frontier blocks branches on a REACTIVE test changes as the set
+	// computed once. Which of those frontier blocks branches on a reactive test changes as the set
 	// grows, so `controlled` is refreshed every round from the frontier rather than cached.
 	frontiers := r.postDominatorFrontiers()
 	controlled := make(map[static_single_assignment.BlockId]bool, len(frontiers))
@@ -266,7 +266,7 @@ func (r *reactivity) run() {
 	// many rounds as there are identifiers; the bound is far above that and exists to turn a future
 	// non-monotone edit into a stop rather than a hang.
 	//
-	// This is NOT upstream's bound. Upstream's `do/while` is unbounded here (its ten-round cap is
+	// This is not upstream's bound. Upstream's `do/while` is unbounded here (its ten-round cap is
 	// in a different pass, the one `refs.go` reproduces), and on a set that only grows that is
 	// sound. The bound is additive safety, not a behavioural difference: it is never reached, and
 	// `TestReactiveConvergesInFewRounds` records what real code actually costs.
@@ -319,7 +319,7 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 			continue
 		}
 
-		// A phi whose operands are all non-reactive is STILL reactive when control reached it
+		// A phi whose operands are all non-reactive is still reactive when control reached it
 		// through a branch on a reactive test, because which value it holds then depends on
 		// something that varies between renders. `let x = 1; if (props.c) { x = 2; } use(x);` makes
 		// `x` reactive with two constant operands.
@@ -341,7 +341,7 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 
 		hasReactiveInput := false
 		EachPlace(instruction.Value, func(place Place, role PlaceRole) {
-			// No early exit: upstream evaluates isReactive on EVERY operand rather than stopping at
+			// No early exit: upstream evaluates isReactive on every operand rather than stopping at
 			// the first, because its isReactive writes the flag onto the place as a side effect and
 			// stopping would leave later operands unflagged. This pass writes flags in a separate
 			// pass at the end, so the side effect is gone, but the traversal is kept identical so
@@ -361,7 +361,7 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 				hasReactiveInput = true
 			}
 		case *MethodCall:
-			// Upstream tests the PROPERTY rather than the receiver, so `React.useState(0)` is a
+			// Upstream tests the property rather than the receiver, so `React.useState(0)` is a
 			// hook call while `state.useState` as a receiver is not.
 			if r.isHookCallee(value.Property.Identifier) {
 				hasReactiveInput = true
@@ -389,7 +389,7 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 
 // isReactive reports whether a value is in the reactive set.
 //
-// Unlike upstream's, this has NO side effect on any place. Upstream's `isReactive` writes
+// Unlike upstream's, this has no side effect on any place. Upstream's `isReactive` writes
 // `place.reactive = true` as it goes, which is why its traversal is careful to visit operands it
 // does not otherwise need; this pass writes every flag once at the end from the settled set, in
 // `applyToPlaces`. The separation is what makes this idempotent where `Construct` is not.
@@ -409,26 +409,26 @@ func (r *reactivity) mark(id static_single_assignment.IdentifierId) {
 // The stable exemption covers values whose identity React guarantees is stable across renders.
 //
 // This is upstream's `StableSidemap`, reduced to what the checker can answer. Upstream tracks two
-// kinds: a stable value itself (a setter, a ref object) and a CONTAINER of one (the tuple
+// kinds: a stable value itself (a setter, a ref object) and a container of one (the tuple
 // `useState` returns), propagating through destructuring, property loads, and local copies. Here
 // the container half is unnecessary: the checker types each destructured binding directly, so the
 // element that is a `Dispatch` is identifiable at the point it is bound without tracking the tuple
 // it came out of.
 //
-// # The alias propagation is upstream's and is NOT reproduced, because the checker subsumes it
+// # The alias propagation is upstream's and is not reproduced, because the checker subsumes it
 //
 // Upstream also propagates stability along `LoadLocal` and `StoreLocal`, so `const a = setX;` keeps
 // `a` stable by copying a map entry. That was written here first and then deleted, because a mutant
-// removing it SURVIVED the whole suite while a mutant removing the checker test was caught, and
+// removing it survived the whole suite while a mutant removing the checker test was caught, and
 // mutating both together failed the same five assertions as the checker test alone.
 //
 // Measured rather than argued: for `const [count, setCount] = useState(0); const aliased = setCount;
-// const chained = aliased;` the checker reports setCount, aliased AND chained all as
+// const chained = aliased;` the checker reports setCount, aliased and chained all as
 // typeName="Dispatch", and count as none. TypeScript propagates the type along the assignment
 // itself, at any chain depth, so asking the checker at each binding returns exactly what the
 // side-map would have carried.
 //
-// This is CONTRIBUTING.md's "fidelity is to what a rule DECIDES, not how it OBTAINS what it needs":
+// This is `CONTRIBUTING.md`'s "fidelity is to what a rule DECIDES, not how it OBTAINS what it needs":
 // upstream needs the side-map because it has no checker to ask. Keeping it here would be a second
 // mechanism holding one fact, which is the redundancy that leaves a mutation sweep unable to see
 // either copy.
@@ -533,7 +533,7 @@ func (r *reactivity) isStable(id static_single_assignment.IdentifierId) bool {
 // and the second is not reachable by name, which is recorded rather than hidden.
 //
 // The alias-then-symbol fallback is the measured part and it is why this does not simply read one
-// field: `Dispatch` is a type ALIAS and lands in the alias, `RefObject` is an INTERFACE and lands
+// field: `Dispatch` is a type alias and lands in the alias, `RefObject` is an interface and lands
 // in the symbol. A predicate keyed on either one alone silently answers false for the other, which
 // has now happened to three separate agents in this tree.
 func (r *reactivity) isStableType(id static_single_assignment.IdentifierId) bool {
@@ -542,7 +542,7 @@ func (r *reactivity) isStableType(id static_single_assignment.IdentifierId) bool
 	case "Dispatch", "ActionDispatch", "TransitionStartFunction":
 		return true
 	case "RefObject":
-		// A ref is stable only when it came from a `useRef` call in THIS function.
+		// A ref is stable only when it came from a `useRef` call in this function.
 		//
 		// Upstream does not ask a type here at all. Its `isUseRefType` reads
 		// `id.type.shapeId === 'BuiltInUseRefId'` (`HIR.ts:1822`), and that shape is assigned by
@@ -556,10 +556,10 @@ func (r *reactivity) isStableType(id static_single_assignment.IdentifierId) bool
 		// upstream still says it is not a ref. Marking it stable there suppresses the hook-call
 		// reactivity above, the dependency is then pruned as non-reactive, and the rule stays
 		// silent where upstream reports.
-		// The CALL only, not the name.
+		// The call only, not the name.
 		//
 		// Upstream keeps two questions apart that both read `BuiltInUseRefId`, and this arm answers
-		// the second one. `isUseRefType` asks whether a value has a ref's SHAPE, and a ref-like name
+		// the second one. `isUseRefType` asks whether a value has a ref's shape, and a ref-like name
 		// is one of the two ways to acquire it (`InferTypes.ts:536`). Stability is a different
 		// question, answered by `StableSidemap`, whose only seed is a known hook call:
 		// `evaluatesToStableTypeOrContainer` switches on `getHookKind(env, callee.identifier)` and
@@ -586,9 +586,9 @@ func (r *reactivity) isStableType(id static_single_assignment.IdentifierId) bool
 // 'Object', shapeId: BuiltInUseRefId}` (`Globals.ts:689`). So the question is which values came out
 // of a `useRef` call, and a call site is visible here even though a type is not.
 //
-// Deliberately only the DIRECT call. Upstream propagates the shape through assignments and returns
+// Deliberately only the direct call. Upstream propagates the shape through assignments and returns
 // with its own inference, and the two `ref-like-name-not-a-ref` fixtures turn on the fact that it
-// does NOT carry it across a user function boundary: `useCustomRef()` returns `useRef(...)` and
+// does not carry it across a user function boundary: `useCustomRef()` returns `useRef(...)` and
 // upstream still says the result is not a ref. Following aliases further than upstream does would
 // re-break those two fixtures in the other direction.
 func useRefResultValues(function *Function) map[static_single_assignment.IdentifierId]bool {
@@ -657,7 +657,7 @@ func useRefResultValues(function *Function) map[static_single_assignment.Identif
 //
 // This is the same alias-then-symbol order as `type_checking.typeMatchesStringSpecifier`. That function
 // is unexported and takes a specifier rather than an identifier, so it cannot be called from here;
-// the ORDER is what matters and it is taken from there rather than re-derived, which is the point
+// the order is what matters and it is taken from there rather than re-derived, which is the point
 // of naming it. If that helper is ever exported in a form this can use, this should call it.
 func (r *reactivity) stableTypeName(id static_single_assignment.IdentifierId) string {
 	if r.typeChecker == nil {
@@ -687,10 +687,10 @@ func (r *reactivity) stableTypeName(id static_single_assignment.IdentifierId) st
 // # Why this asks the name and not the type, which is the opposite of every other predicate here
 //
 // The stable predicates above key on the type because `@types/react` gives those values a
-// distinctive one. A hook's RESULT has no such type: `useContext<T>(c): T` and `useMemo<T>(f): T`
+// distinctive one. A hook's result has no such type: `useContext<T>(c): T` and `useMemo<T>(f): T`
 // return a bare generic, so the result of `useContext(Ctx)` is type-indistinguishable from the
 // result of any other call. Measured on our own checker: `ctx`, `memo` and an ordinary call result
-// all report `alias=<nil> symbol=<nil>`, while their CALLEES report `symbol=useContext`,
+// all report `alias=<nil> symbol=<nil>`, while their callees report `symbol=useContext`,
 // `symbol=useMemo` and `symbol=notAHook`. The name is where the information is.
 //
 // So this resolves the callee to its declaration and tests the declared name against React's own
@@ -708,7 +708,7 @@ func (r *reactivity) stableTypeName(id static_single_assignment.IdentifierId) st
 // named this way and forbids the convention for anything else, so a name matching the pattern and
 // not being a hook is already a lint error under a different rule.
 //
-// The `use` operator is a genuine divergence and it is NOT reproduced. Upstream tests
+// The `use` operator is a genuine divergence and it is not reproduced. Upstream tests
 // `isUseOperator`, a shape id on the builtin `use`, and marks it a source. Bare `use` does not
 // match `use` + capital-or-digit, and there is no type on it to key on, so a `use(promise)` call is
 // invisible here. That is one missing source, it under-approximates in the same safe direction as
@@ -733,13 +733,13 @@ func IsHookCallee(function *Function, id static_single_assignment.IdentifierId) 
 		return false
 	}
 
-	// The SYNTACTIC NODE is the name, not `Identifier.Name`, and that is measured rather than
+	// The syntactic node is the name, not `Identifier.Name`, and that is measured rather than
 	// assumed. This was originally written to test `identifier.Name` first and fall back to the
 	// node; a mutation disabling the name branch survived every test, and disabling the node branch
 	// alone failed eight assertions.
 	//
 	// The reason is how a callee lowers. An imported or global `useState` becomes a `LoadGlobal`,
-	// whose result is a TEMPORARY: `Identifier.Name` is empty for a temporary by construction, and
+	// whose result is a temporary: `Identifier.Name` is empty for a temporary by construction, and
 	// the name lives only on `Identifier.Node`. Probed over `useState`, `useContext`,
 	// `useCustomThing` and `notAHook` in one component, the counts were byName=0, byNode=3,
 	// neither=1. So the name branch was not a fallback for an uncommon shape, it was unreachable
@@ -753,7 +753,7 @@ func IsHookCallee(function *Function, id static_single_assignment.IdentifierId) 
 	// has to be re-argued rather than assumed to still hold.
 	//
 	// Re-checked when this was lifted for `pruneNonEscapingScopes`: that pass also asks about a
-	// CALLEE place, so the verdict still holds. It would not hold for a caller asking about an
+	// callee place, so the verdict still holds. It would not hold for a caller asking about an
 	// arbitrary value.
 	return identifier.Node != nil && ast.IsIdentifier(identifier.Node) && isHookName(identifier.Node.Text())
 }
@@ -797,7 +797,7 @@ func eachInstructionLValue(instruction *Instruction, visit func(Place)) {
 	})
 }
 
-// The refresh runs BEFORE each sweep rather than after, and the loop exits only on a sweep that
+// The refresh runs before each sweep rather than after, and the loop exits only on a sweep that
 // added nothing to the reactive set. So a block that becomes controlled in round N is acted on in
 // round N's own sweep; if that marks anything, `changed` is set and there is another round. A
 // refresh that newly controls a block whose phis were all already reactive adds nothing, which is
@@ -807,7 +807,7 @@ func eachInstructionLValue(instruction *Instruction, visit func(Place)) {
 //
 // This is upstream's `createControlDominators`, and the shape of the question is the reason it is
 // computed once here rather than per lookup: a block is controlled when some block in its
-// POST-DOMINATOR FRONTIER ends in a conditional terminal whose test is reactive.
+// post-dominator frontier ends in a conditional terminal whose test is reactive.
 //
 // # Why the frontier and not the dominator tree
 //
@@ -821,12 +821,12 @@ func eachInstructionLValue(instruction *Instruction, visit func(Place)) {
 // `postdominator.go` already computes the tree over this graph, for `UnconditionalBlocks`. Only the
 // frontier derivation is added here, and it reads that tree rather than recomputing dominance.
 //
-// # Computed ONCE, outside the fixpoint, and why that is not an optimisation
+// # Computed once, outside the fixpoint, and why that is not an optimisation
 //
 // The frontier depends only on the control-flow graph, which no part of this pass mutates, so it is
 // invariant across iterations. oxc hoists it for cost, noting the previous code re-derived it per
-// block per phi operand per round. It is hoisted here for the same reason, but the reactive TEST
-// against it is NOT hoisted: whether a controlling block's test is reactive changes as the fixpoint
+// block per phi operand per round. It is hoisted here for the same reason, but the reactive test
+// against it is not hoisted: whether a controlling block's test is reactive changes as the fixpoint
 // grows, so the frontier is cached and the test is re-asked each round. Caching the whole answer
 // would freeze the first round's reactive set into the control decision and silently lose sources.
 // refreshControlled recomputes which blocks are reactive-controlled from the current reactive set.
@@ -885,7 +885,7 @@ func (r *reactivity) terminalTestIsReactive(terminal Terminal) bool {
 // T: collect the blocks T post-dominates, then take every predecessor of any of those that is not
 // itself post-dominated by T. Those are the blocks where control chose whether T would run.
 //
-// The tree maps a block to its IMMEDIATE post-dominator, so it is inverted into children once, and the
+// The tree maps a block to its immediate post-dominator, so it is inverted into children once, and the
 // blocks T post-dominates are T's subtree, marked in a slice by each block's position in
 // `Function.Blocks` and cleared after. It used to be one map per target sized to the whole function,
 // filled by walking every block's chain up to the root, plus another map for the frontier's duplicates:
@@ -989,7 +989,7 @@ func (r *reactivity) postDominatorFrontiers() map[static_single_assignment.Block
 // # Nested functions, and what upstream does here
 //
 // Upstream's `propagateReactivityToInnerFunctions` walks nested functions and calls `isReactive` on
-// their operands purely for the flag side effect, using the ENCLOSING function's reactive set. It
+// their operands purely for the flag side effect, using the enclosing function's reactive set. It
 // does not re-run the fixpoint per nested function and it does not treat a nested function's
 // parameters as reactive sources.
 //
@@ -1040,7 +1040,7 @@ func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 
 // propagateToNested carries the enclosing function's reactive set into a nested function's places.
 //
-// The nested function's own values are addressed in ITS identifier table, and this pass's set is
+// The nested function's own values are addressed in its identifier table, and this pass's set is
 // keyed against the outer table, so the only places that can match are those whose ids coincide.
 // The pairing that actually carries meaning across the boundary is positional, through
 // `Captures[i]` and `Context[i]`, and it is applied here before the walk so a context value inherits

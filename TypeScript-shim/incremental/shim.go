@@ -10,7 +10,7 @@
 //
 // What this buys, measured on the ahra tree rather than assumed: tsgo --noEmit --incremental
 // costs 2.11s cold and 0.85s warm, so the mechanism is worth ~1.26s to the compiler that
-// ships it. What it does NOT buy is a warm program. ReadBuildInfoProgram returns a *Program
+// ships it. What it does not buy is a warm program. ReadBuildInfoProgram returns a *Program
 // whose `program` field is nil (incremental.go:44-62), GetProgram panics on that path
 // (program.go:110), and upstream calls compiler.NewProgram unconditionally right after
 // reading the build info (tsc.go:304-310). The build info is a change-detection input, not a
@@ -26,7 +26,7 @@
 //
 // The skip does not replay stored diagnostics. It runs on content hashes. On load,
 // setSemanticDiagnostics (buildinfotosnapshot.go:152-159) seeds an empty "no diagnostics"
-// entry for every file NOT in changedFilesSet, and changedFilesSet is computed by comparing
+// entry for every file not in changedFilesSet, and changedFilesSet is computed by comparing
 // each file's hash against oldFileInfo.version (programtosnapshot.go:104-110). Then
 // collectSemanticDiagnosticsOfAffectedFiles (program.go:290-303) checks only files missing
 // from that map. So an unchanged file is seeded clean and never re-checked, which is where

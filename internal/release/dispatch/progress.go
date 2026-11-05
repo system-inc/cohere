@@ -12,7 +12,7 @@ import (
 // A default run ends in one footer line, and the launcher's lines would print above it, so each kind says
 // only as much as the caller needs:
 //
-//   - A step, such as building HEAD, extracting the compiler or building the Swift engine, takes seconds
+//   - A step, such as building `HEAD`, extracting the compiler or building the Swift engine, takes seconds
 //     to minutes, and silence through that would look hung. On a terminal it is one dim line, rewritten by
 //     the next step and cleared before cohere prints, and to a pipe or a file it is nothing.
 //   - A note, such as what a prune or a trim removed, is housekeeping already written to the prune log.

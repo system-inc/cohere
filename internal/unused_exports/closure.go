@@ -59,7 +59,7 @@ type declarationRecord struct {
 //
 // # Why this is opt-in
 //
-// The transitive claim is strictly stronger than the flat one and it FAILS DIFFERENTLY. A wrong
+// The transitive claim is strictly stronger than the flat one and it fails differently. A wrong
 // root in the flat report mis-reports one file. A wrong root here cascades: everything that was
 // alive only through that root goes dark at once, and the report gets dramatically bigger in a way
 // that looks like a discovery rather than like a bug. Keeping the flat view as the default means
@@ -90,7 +90,7 @@ func computeIslands(
 		known[record.symbol] = true
 	}
 
-	// Forward edges: marking a symbol alive must mark what IT references. The index is keyed the
+	// Forward edges: marking a symbol alive must mark what it references. The index is keyed the
 	// other way, so it is inverted once here rather than searched repeatedly.
 	reaches := make(map[*ast.Symbol][]*ast.Symbol, len(index.referencedBy))
 	for target, referrers := range index.referencedBy {
@@ -150,7 +150,7 @@ func computeIslands(
 	}
 
 	// Everything the marking never reached is dead. Grouping it into islands is a connected-component
-	// walk over the SAME edges, ignoring direction: two dead declarations belong together when one
+	// walk over the same edges, ignoring direction: two dead declarations belong together when one
 	// references the other, whichever way the reference points, because a reader deleting one will be
 	// looking at the other.
 	deadBySymbol := make(map[*ast.Symbol]DeadDeclaration, len(inventory))
@@ -250,7 +250,7 @@ func computeIslands(
 // after it. Only the first of those three is an export, and a report that inventoried exports alone
 // would print one line where the truth is a cluster of three.
 //
-// This deliberately does NOT use the checker. `node.Symbol()` is the same symbol pointer the index
+// This deliberately does not use the checker. `node.Symbol()` is the same symbol pointer the index
 // is keyed on, established by the same probe that established the referrer path, and reaching for a
 // checker call per declaration would put back exactly the cost the referrer path avoided.
 func fileDeclarations(file *ast.SourceFile, text string) []declarationRecord {

@@ -11,7 +11,7 @@
 // same way.
 //
 // The full release takes about two minutes and correctly refuses to stage a partial one when any
-// target fails to build. So exercising the INSTALL path — whether `pnpm add` links the right entry
+// target fails to build. So exercising the install path — whether `pnpm add` links the right entry
 // point, whether `require.resolve` finds the binary package, whether the `os` and `cpu` fields match
 // what npm expects — costs two minutes of cross-compilation to test a part with no Go in it.
 //

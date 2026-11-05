@@ -25,7 +25,7 @@ func scopesFor(test *testing.T, source string) (*Function, *ReactiveScopes) {
 	return function, AssignReactiveScopesWithSets(function, ranges, set)
 }
 
-// scopeOfName returns the scope holding the LAST value a named binding takes.
+// scopeOfName returns the scope holding the last value a named binding takes.
 func scopeOfName(test *testing.T, function *Function, scopes *ReactiveScopes, name string) ScopeId {
 	test.Helper()
 	var target static_single_assignment.IdentifierId
@@ -56,7 +56,7 @@ func scopeOfName(test *testing.T, function *Function, scopes *ReactiveScopes, na
 //
 // The cases exist to separate implementations rather than to confirm one. A plain
 // `min(start), max(end)` passes `simpleHull`, `singleton`, `identicalRanges` and
-// `laterStartsHigher`, and FAILS every case involving an unset member, because zero is the unset
+// `laterStartsHigher`, and fails every case involving an unset member, because zero is the unset
 // sentinel and a naive minimum drags the hull's start to zero. `firstUnset` and `runOfUnsets`
 // separate the adoption branch from the skip branch, which are two different behaviours sharing one
 // `if/else if`.
@@ -187,7 +187,7 @@ func TestScopeHullIsNotAPlainMinimum(test *testing.T) {
 
 // TestScopeIsOnePerEquivalenceClass pins the central claim: a scope names a class, not a value.
 //
-// Upstream keys its scope map on the disjoint set's GROUP representative (bundle line 32235), so
+// Upstream keys its scope map on the disjoint set's group representative (bundle line 32235), so
 // every member of a class reaches the same scope object. A pass that minted one scope per value
 // would compile, would assign a scope to everything, and would be wrong in the way that matters --
 // the consumer asks "are these two memoized together" and would always hear no.
@@ -250,7 +250,7 @@ func TestScopeAbsentValueHasNoScope(test *testing.T) {
 // TestScopeMemberRangesAreRewrittenToTheHull pins upstream's second write.
 //
 // `identifier.mutableRange = scope.range` at bundle line 32261 is the line a reader does not expect,
-// and it is not incidental: after this pass a member reports its CLASS's span rather than its own,
+// and it is not incidental: after this pass a member reports its class's span rather than its own,
 // because entangled values are memoized as one unit and therefore live as one unit. A port that
 // assigned scopes and left ranges alone would satisfy every other test in this file.
 func TestScopeMemberRangesAreRewrittenToTheHull(test *testing.T) {
@@ -275,7 +275,7 @@ func TestScopeMemberRangesAreRewrittenToTheHull(test *testing.T) {
 		}
 	}
 
-	// The INPUT table is deliberately not modified, which is where this differs from upstream.
+	// The input table is deliberately not modified, which is where this differs from upstream.
 	if got := ranges.Get(1); got != (mutation_aliasing.MutableRange{Start: 3, End: 5}) {
 		test.Errorf("the input range table was mutated to [%d,%d); this pass must leave it alone so a "+
 			"caller can still see the pre-entanglement range", got.Start, got.End)
@@ -445,13 +445,13 @@ func TestScopeHandlesANilFunction(test *testing.T) {
 }
 
 // TestScopeMembersOfIsStableAcrossCalls pins that a caller reading membership twice sees the same
-// slice contents, and documents why the defensive copy in the pass is NOT load-bearing.
+// slice contents, and documents why the defensive copy in the pass is not load-bearing.
 //
-// # A mutation removing that copy SURVIVES, and it is a genuine equivalence rather than a gap
+// # A mutation removing that copy survives, and it is a genuine equivalence rather than a gap
 //
 // The first version of this test wrote through `MembersOf` and then asserted the disjoint set was
 // unharmed. It passed, and it could not have failed: `DisjointSet.Sets` allocates a fresh outer
-// slice and fresh inner slices on EVERY call, so nothing a caller does to the result can reach the
+// slice and fresh inner slices on every call, so nothing a caller does to the result can reach the
 // set. The test was asserting a property no implementation could violate, which is the shape the
 // brief names as a fixture that is weaker than the property it claims to guard.
 //
@@ -460,11 +460,11 @@ func TestScopeHandlesANilFunction(test *testing.T) {
 // invocation gets its own slices and no second holder exists. There is no such input, so the copy
 // is equivalent to the alias and no fixture can score it.
 //
-// The copy is KEPT anyway, for the reason `disjoint.go` keeps its `PhiOperandsInOrder` read after
+// The copy is kept anyway, for the reason `disjoint.go` keeps its `PhiOperandsInOrder` read after
 // measuring the same verdict: it costs one allocation per scope, it is what a caller reading
 // `MembersOf` would assume, and the equivalence rests entirely on `Sets` continuing to allocate. A
 // change there would make this load-bearing again with nothing to announce it. This test pins what
-// IS observable -- that membership is stable and complete -- rather than pretending to pin the copy.
+// is observable -- that membership is stable and complete -- rather than pretending to pin the copy.
 func TestScopeMembersOfIsStableAcrossCalls(test *testing.T) {
 	test.Parallel()
 
@@ -604,7 +604,7 @@ func corpusScopeStats(test *testing.T, limit int) (functions, scopes, members in
 // TestScopeWidthAndMembershipAgree is this stage's headline, pinned as a test.
 //
 // A count cannot distinguish genuine structure from catastrophic over-merging, so the measurement is
-// a CROSS-TABULATION of scope width against scope membership. Over 400 corpus files and 685
+// a cross-tabulation of scope width against scope membership. Over 400 corpus files and 685
 // outermost functions:
 //
 //	                       width 1      width > 1
@@ -621,7 +621,7 @@ func corpusScopeStats(test *testing.T, limit int) (functions, scopes, members in
 // the range and mutability gates produce the entangled wide ones: two populations, two causes,
 // neither an artifact of the other.
 //
-// The thresholds below are far looser than those numbers. This guards the SHAPE, not the corpus,
+// The thresholds below are far looser than those numbers. This guards the shape, not the corpus,
 // which moves when the tree does.
 func TestScopeWidthAndMembershipAgree(test *testing.T) {
 	test.Parallel()
@@ -681,8 +681,8 @@ func TestScopeWidthAndMembershipAgree(test *testing.T) {
 //
 // That is a real risk here rather than a formality. `RangeGapLoopCarriedInversion` leaves 48 values
 // across 400 files with an unset range, and a class composed entirely of those would hull to [0,0)
-// and trip the invariant. Measured: 3,278 classes have every member's range set, 28 have SOME member
-// unset, and ZERO have every member unset -- so the invariant holds everywhere, and the 28 mixed
+// and trip the invariant. Measured: 3,278 classes have every member's range set, 28 have some member
+// unset, and zero have every member unset -- so the invariant holds everywhere, and the 28 mixed
 // classes are exactly what upstream's `start === 0` branch exists to handle.
 //
 // This test is the guard against a future change to `InferMutableRanges` widening that unset
@@ -724,7 +724,7 @@ func TestScopeRangesSatisfyUpstreamsInvariant(test *testing.T) {
 
 // TestValidateScopesCatchesAnEmptyHull pins the branch the corpus cannot reach today.
 //
-// # This fixture exists because a mutation neutralising the zero-start check SURVIVED
+// # This fixture exists because a mutation neutralising the zero-start check survived
 //
 // `TestScopeRangesSatisfyUpstreamsInvariant` measures zero empty hulls over 400 corpus files, which
 // is the good news and is also why nothing in the suite could see that branch break. The branch is
@@ -738,7 +738,7 @@ func TestScopeRangesSatisfyUpstreamsInvariant(test *testing.T) {
 // range, which React's own merge loop hulls to [0,0) -- confirmed against the 7.1.1 bundle as the
 // `allUnset` case in TestScopeHullMatchesReact.
 //
-// Upstream RAISES here (`CompilerError.invariant`, bundle line 32271). This returns the offenders
+// Upstream raises here (`CompilerError.invariant`, bundle line 32271). This returns the offenders
 // instead, so the assertion is on which scopes are named rather than on a panic.
 func TestValidateScopesCatchesAnEmptyHull(test *testing.T) {
 	test.Parallel()
@@ -779,7 +779,7 @@ func TestValidateScopesCatchesAnEmptyHull(test *testing.T) {
 		test.Errorf("ValidateScopes named scope %d, want %d", invalid[0], scopes.Ids()[0])
 	}
 
-	// Two-sided: a valid hull over the same function must NOT be named, or the check above would
+	// Two-sided: a valid hull over the same function must not be named, or the check above would
 	// pass for an implementation that condemns everything.
 	valid := &mutation_aliasing.MutableRanges{}
 	valid.Set(unsetA, mutation_aliasing.MutableRange{Start: 1, End: 3})
@@ -791,18 +791,18 @@ func TestValidateScopesCatchesAnEmptyHull(test *testing.T) {
 	}
 }
 
-// TestValidateScopesCatchesAStartOfZeroWithARealEnd pins the START half of the zero check.
+// TestValidateScopesCatchesAStartOfZeroWithARealEnd pins the start half of the zero check.
 //
-// # This is the SECOND fixture written for one survivor, and the first one was wrong
+// # This is the second fixture written for one survivor, and the first one was wrong
 //
-// A mutation neutralising `scopeRange.Start == 0` survived, and it survived AGAIN after
+// A mutation neutralising `scopeRange.Start == 0` survived, and it survived again after
 // `TestValidateScopesCatchesAnEmptyHull` was added for it. That test hulls to [0,0), where
 // `End == 0` fires first and short-circuits the whole disjunction, so the start check never gets to
 // decide the case and neutralising it changes nothing. The hypothesis about why the mutant survived
 // was right about the mechanism and wrong about which input could expose it, which is precisely the
 // failure the brief names.
 //
-// The distinguishing input is a hull whose start is zero and whose end is NOT: [0,5). Only the start
+// The distinguishing input is a hull whose start is zero and whose end is not: [0,5). Only the start
 // check can condemn it. That is reachable through the merge whenever a member carries a range of
 // [0,n) -- start at the unset sentinel, end real -- which `MutableRange.IsSet` reports as a set
 // range, so nothing upstream of here rejects it.

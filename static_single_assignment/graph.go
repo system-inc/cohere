@@ -235,7 +235,7 @@ func clearedFlags(flags []bool, length int) []bool {
 
 // MarkPredecessors recomputes every block's predecessors from the real edges.
 //
-// Fallthroughs are NOT edges and do not produce a predecessor; exceptional edges are real ones.
+// Fallthroughs are not edges and do not produce a predecessor; exceptional edges are real ones.
 //
 // This is the field single-assignment construction needs: Braun's algorithm reads a value at a
 // block join by asking each predecessor what it holds, and a missing or spurious predecessor is a

@@ -44,7 +44,7 @@ func ReversePostorder(function *Function) {
 
 // MarkPredecessors recomputes every block's Predecessors from the real edges.
 //
-// Fallthroughs are NOT edges and do not produce a predecessor. See EachSuccessor.
+// Fallthroughs are not edges and do not produce a predecessor. See EachSuccessor.
 //
 // This is the field single-assignment construction needs: Braun's algorithm reads a value at a
 // block join by asking each predecessor what it holds, and a missing or spurious predecessor is a

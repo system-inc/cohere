@@ -13,7 +13,7 @@
 // a lookup actually crosses a join with disagreeing predecessors, which means it never places one
 // that redundancy elimination would immediately remove, and it needs no dominance frontier at all.
 //
-// Dominance is still what CORRECTNESS is stated against - see `VerifySSA` - but it is computed
+// Dominance is still what correctness is stated against - see `VerifySSA` - but it is computed
 // there, over this graph, for checking rather than for construction.
 //
 // # The one property everything rests on
@@ -29,7 +29,7 @@
 // has not been processed when the header is. Braun's answer is the incomplete phi: when a lookup
 // reaches a block with unprocessed predecessors, mint the phi's result immediately, record it as
 // the block's definition so the loop body's reads bind to it, and leave the operands to be filled
-// when the last predecessor lands. Recording the definition BEFORE recursing is also what stops the
+// when the last predecessor lands. Recording the definition before recursing is also what stops the
 // lookup recursing forever around the cycle.
 //
 // # What is deliberately not here
@@ -60,7 +60,7 @@ func Construct[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 			"Graph.Entry must be a block no edge enters", entry, predecessors))
 	}
 
-	// Phis from a previous run are dropped, because this pass APPENDS them and cannot reconcile
+	// Phis from a previous run are dropped, because this pass appends them and cannot reconcile
 	// what it did not mint.
 	//
 	// A caller that restructures the graph and runs construction again is the case: inlining an
@@ -97,8 +97,8 @@ func Construct[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	// this would have to re-derive which ones are real.
 	//
 	// Both numbers moved when captures landed (from 21,654 and 2,770), in opposite directions, and
-	// the split is worth knowing. Captures ADD raw phis, because a captured binding is now a real
-	// value that gets merged at every join it crosses rather than an opaque name. They REMOVE
+	// the split is worth knowing. Captures add raw phis, because a captured binding is now a real
+	// value that gets merged at every join it crosses rather than an opaque name. They remove
 	// surviving ones, because a variable only reassigned from inside a closure now takes that write
 	// as a `StoreContext` in the nested function instead of leaving the outer versions to be merged.
 	EliminateRedundantPhis(graph, function)
@@ -107,7 +107,7 @@ func Construct[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 // ssaState is one block's view: what each original binding currently resolves to, and the phis
 // whose operands are still waiting on an unprocessed predecessor.
 type ssaState[P any] struct {
-	// defs maps a BINDING to the value it holds on entry to, or within, this block.
+	// defs maps a binding to the value it holds on entry to, or within, this block.
 	//
 	// The key is the DeclarationId rather than the IdentifierId, and that is the single most
 	// important decision in this file. Lowering already mints a fresh IdentifierId for every store
@@ -193,7 +193,7 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 
 		count := builder.graph.InstructionCount(builder.function, block)
 		for index := 0; index < count; index++ {
-			// Uses first, then definitions. `x = x + 1` must read the OLD x before the store mints
+			// Uses first, then definitions. `x = x + 1` must read the old x before the store mints
 			// the new one; visiting in the other order would make the increment read itself.
 			builder.walking = walkingUses
 			builder.graph.EachInstructionPlace(builder.function, block, index, visit)
@@ -300,7 +300,7 @@ func (builder *ssaBuilder[G, F, B, P]) defineInMaybeContext(blockId BlockId, pla
 	binding := builder.graph.Declaration(builder.function, builder.graph.IdentifierOf(*place))
 	// # A context binding is defined once and every later write reuses that definition
 	//
-	// Upstream's two writes to a reassigned-and-captured binding name the SAME identifier --
+	// Upstream's two writes to a reassigned-and-captured binding name the same identifier --
 	// measured on the pinned build, `StoreContext@2 lvalueId=2 kind=Let` and
 	// `StoreContext@17 lvalueId=2 kind=Reassign`. Lowering resolves both through one Babel binding
 	// and nothing renumbers it afterwards.
@@ -337,11 +337,11 @@ func (builder *ssaBuilder[G, F, B, P]) useIn(blockId BlockId, place *P) {
 //  1. Defined here already - the local answer wins.
 //  2. No predecessors - the entry block, and the binding was never defined. It is a global or a
 //     capture; record it and hand back the original rather than inventing a definition.
-//  3. Some predecessor unprocessed - a loop. Mint an incomplete phi. Recording it in defs BEFORE
+//  3. Some predecessor unprocessed - a loop. Mint an incomplete phi. Recording it in defs before
 //     recursing is what terminates the walk around the cycle.
 //  4. Exactly one predecessor - no merge, so recurse and cache. A phi here would be redundant by
 //     construction.
-//  5. Several predecessors - a real join. Mint the result, record it, THEN collect operands; a
+//  5. Several predecessors - a real join. Mint the result, record it, then collect operands; a
 //     predecessor whose lookup comes back around to this block must find the result already bound.
 func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) IdentifierId {
 	original := builder.graph.IdentifierOf(place)

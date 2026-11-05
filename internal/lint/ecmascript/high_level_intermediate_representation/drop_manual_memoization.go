@@ -1,5 +1,5 @@
 // Dropping manual memoization: recognising `useMemo`/`useCallback` and recording what the developer
-// WROTE before the compiler is allowed to infer anything.
+// wrote before the compiler is allowed to infer anything.
 //
 // This is React's `dropManualMemoization` (`Inference/DropManualMemoization.ts` at
 // `react_conformance.UpstreamSha`) run over this graph. oxc transcribes it at
@@ -10,18 +10,18 @@
 //
 // `react/preserve-manual-memoization` reports when a developer's hand-written dependency array
 // disagrees with the dependencies the compiler infers. The inferred half is `dependencies.go`. This
-// file is the DECLARED half, and before it existed `StartMemoize` and `FinishMemoize` were declared
+// file is the declared half, and before it existed `StartMemoize` and `FinishMemoize` were declared
 // instruction values that nothing in this tree constructed -- measured at 0 markers across 66,357
 // instructions in 677 functions while the same sweep found 455 `ArrayExpression`s, so the probe was
 // reading instructions correctly and the zero was the lowering rather than the corpus.
 //
-// That is why the pass produces MARKERS rather than a diagnostic. The comparison happens later,
+// That is why the pass produces markers rather than a diagnostic. The comparison happens later,
 // against a value this file must not compute: if this pass inferred the dependencies itself, both
 // sides of the rule's comparison would come from the same code and could never disagree.
 //
 // # What it does to the callback, which is the surprising half
 //
-// The name says "drop", and the memoization really is dropped: the call to `useMemo` is REWRITTEN
+// The name says "drop", and the memoization really is dropped: the call to `useMemo` is rewritten
 // to call the callback directly, and `useCallback` is rewritten to a plain alias of it.
 //
 //	before:  $1 = LoadGlobal useMemo      after:  $1 = LoadGlobal useMemo   (now dead)
@@ -33,23 +33,23 @@
 // invoked where it is created. Upstream's comments at `getManualMemoizationReplacement` spell both
 // rewrites out and this reproduces them exactly.
 //
-// The interaction with everything built around it is therefore REAL rather than inert, and it runs
+// The interaction with everything built around it is therefore real rather than inert, and it runs
 // in the safe direction. No instruction is deleted, no block is created or removed, and no terminal
 // is touched, so the control-flow graph is bit-identical afterwards and every analysis keyed on
 // block structure -- scope terminals, postdominators, reverse postorder -- sees exactly what it saw
-// before. What changes is one instruction VALUE per memo call, and it changes toward less
+// before. What changes is one instruction value per memo call, and it changes toward less
 // structure: a two-argument call becomes a zero-argument call or a load. Operand counts fall, which
 // means inferred mutable ranges and scope dependencies can only shrink or stay equal, never grow.
 // This was measured rather than argued; see `TestDropManualMemoizationDifferential`.
 //
-// The dead `LoadGlobal` and `ArrayExpression` are deliberately LEFT behind, matching upstream, which
+// The dead `LoadGlobal` and `ArrayExpression` are deliberately left behind, matching upstream, which
 // relies on later dead-code elimination. Removing them here would renumber instructions under the
 // markers this same pass just inserted.
 //
 // # Where it runs, and the precondition that decides the whole design
 //
 // Upstream calls this at `Pipeline.ts:169`, and what sits below that line is the specification:
-// `enterSSA` is at line 189, twenty lines LATER. This pass runs BEFORE single-assignment form.
+// `enterSSA` is at line 189, twenty lines later. This pass runs before single-assignment form.
 // Upstream's own header says so and gives the reason -- it must compose with
 // `InlineImmediatelyInvokedFunctionExpressions`, which runs immediately after it and would
 // otherwise invalidate the form.
@@ -60,12 +60,12 @@
 // `Recognise` is syntactic: it is not a shortcut, it is the only information available at this
 // point in the pipeline.
 //
-// `DropManualMemoization` therefore takes a function fresh from `Lower` and must be called BEFORE
+// `DropManualMemoization` therefore takes a function fresh from `Lower` and must be called before
 // `Construct`. That ordering is asserted rather than documented, because `Construct` is not
 // idempotent and a caller who ran it first would get markers whose operands name pre-renaming
 // identifiers -- an error that produces plausible output. See `dropAfterConstructIsRefused`.
 //
-// # DIVERGENCE FROM React: optionality is READ here, not reconstructed
+// # Divergence from React: optionality is read here, not reconstructed
 //
 // React spends the last fifty lines of its file on `findOptionalPlaces`, which walks `optional`
 // terminals and their branch arms to recover which places came from `?.`. It needs that because its
@@ -74,7 +74,7 @@
 // Ours does: `PropertyLoad.Optional` is set at lowering (`lower_expression.go:190`), so
 // `props.a?.b` arrives already marked and the reconstruction is unnecessary. Transcribing
 // `findOptionalPlaces` here would have been worse than redundant -- it would have been silently
-// EMPTY, because it keys on the `Optional` TERMINAL, which `lower.go:78` records as declared and
+// empty, because it keys on the `Optional` terminal, which `lower.go:78` records as declared and
 // never constructed in this tree. A faithful transcription would have returned an empty set at
 // every call site, marked every `?.` dependency as non-optional, and passed every test written from
 // unguarded fixtures.
@@ -83,7 +83,7 @@
 // `props?.a` differ by one character at path depth one, and upstream's `areEqualPaths` compares the
 // flag. `TestDropManualMemoizationOptionalPathsSurvive` pins it.
 //
-// # DIVERGENCE FROM React: `React.useMemo` arrives as a MethodCall with a Primitive property
+// # Divergence from React: `React.useMemo` arrives as a MethodCall with a Primitive property
 //
 // Upstream recognises the namespaced form by seeing `PropertyLoad` off a `LoadGlobal React`, then
 // matching a `CallExpression` whose callee is that load. Our lowering emits a single `MethodCall`
@@ -95,8 +95,8 @@
 // # The distribution that proves these markers are real
 //
 // A count of markers cannot separate a working pass from one that emits a marker at every call, so
-// the headline is a CROSS-TABULATION of call sites recognised against markers emitted and
-// dependencies extracted, over the corpus. The control cell is calls that are NOT memo calls: a
+// the headline is a cross-tabulation of call sites recognised against markers emitted and
+// dependencies extracted, over the corpus. The control cell is calls that are not memo calls: a
 // pass that emitted markers indiscriminately would empty it. See
 // `TestDropManualMemoizationDistributionIsReal`.
 package high_level_intermediate_representation
@@ -163,7 +163,7 @@ type ManualMemoization struct {
 
 // manualMemoSidemap is what a single forward walk learns about the temporaries in a function.
 //
-// Upstream calls this `IdentifierSidemap` and builds it in the SAME loop that does the rewriting,
+// Upstream calls this `IdentifierSidemap` and builds it in the same loop that does the rewriting,
 // relying on a temporary always being defined before its use. That holds pre-SSA in a graph built
 // from an expression tree, and it is relied on here for the same reason: a value's defining
 // instruction precedes every use of it in evaluation order.
@@ -194,7 +194,7 @@ type manualMemoSidemap struct {
 
 // DropManualMemoization rewrites `useMemo`/`useCallback` calls and records what was written.
 //
-// Must run on a function fresh from `Lower`, BEFORE `Construct`. See the package note above.
+// Must run on a function fresh from `Lower`, before `Construct`. See the package note above.
 func DropManualMemoization(function *Function) ManualMemoization {
 	result := ManualMemoization{}
 	sidemap := manualMemoSidemap{
@@ -208,7 +208,7 @@ func DropManualMemoization(function *Function) ManualMemoization {
 		anchors:       map[static_single_assignment.IdentifierId]InstructionId{},
 	}
 
-	// An optional chain in the dependency ARRAY spans blocks rather than being one `PropertyLoad`.
+	// An optional chain in the dependency array spans blocks rather than being one `PropertyLoad`.
 	//
 	// `collectManualMemoTemporaries` reads `PropertyLoad.Optional` off the instruction, and the
 	// optional lowering leaves that false by construction: optionality lives on the `Optional`
@@ -233,7 +233,7 @@ func DropManualMemoization(function *Function) ManualMemoization {
 		}
 	}
 
-	// Insertions are QUEUED against the instruction they follow rather than applied during the
+	// Insertions are queued against the instruction they follow rather than applied during the
 	// walk, exactly as upstream does, because a block's instruction list is being iterated by
 	// index and splicing into it mid-walk would either skip an instruction or revisit one.
 	var queued []queuedMarkerInsert
@@ -250,7 +250,7 @@ func DropManualMemoization(function *Function) ManualMemoization {
 
 			extracted, ok := extractManualMemoArguments(instruction, kind, &sidemap, &result)
 			if !ok {
-				// Upstream `continue`s here WITHOUT rewriting, leaving the call intact. That is
+				// Upstream `continue`s here without rewriting, leaving the call intact. That is
 				// reproduced: a call whose callback argument is missing is not a memoization this
 				// pass understands, and rewriting it would change behaviour on malformed input.
 				continue
@@ -279,7 +279,7 @@ func DropManualMemoization(function *Function) ManualMemoization {
 			memoId := result.Marked
 			result.Marked++
 
-			// `useMemo` memoizes the call's RESULT; `useCallback` memoizes the callback itself.
+			// `useMemo` memoizes the call's result; `useCallback` memoizes the callback itself.
 			// Upstream picks between `instr.lvalue` and the callback place on exactly this basis,
 			// and getting it backwards would make every `useCallback` marker name a temporary the
 			// rule cannot relate to anything.
@@ -297,7 +297,7 @@ func DropManualMemoization(function *Function) ManualMemoization {
 				Value:        declaration,
 			})
 
-			// `StartMemoize` goes after the CALLEE LOAD, not after the call, so that every
+			// `StartMemoize` goes after the callee load, not after the call, so that every
 			// temporary produced while lowering the inline callback falls between the two markers.
 			// Upstream documents this placement with a worked example and it is the reason the
 			// callee load instruction is tracked at all. Placing it just before the call instead
@@ -385,7 +385,7 @@ func newMarkerInstruction(function *Function, anchor *Instruction, value Instruc
 
 // recogniseManualMemoCall reports whether an instruction calls `useMemo`/`useCallback`.
 //
-// Returns the kind and the instruction that LOADED the callee, which is where `StartMemoize` is
+// Returns the kind and the instruction that loaded the callee, which is where `StartMemoize` is
 // anchored. Both call spellings are handled; see the namespaced-form divergence in the package note.
 func recogniseManualMemoCall(instruction *Instruction, sidemap *manualMemoSidemap) (ManualMemoKind, InstructionId) {
 	switch value := instruction.Value.(type) {
@@ -464,7 +464,7 @@ func extractManualMemoArguments(
 			// An entry that is not a simple access path, such as `[a + b]` or `[x[0]]`.
 			//
 			// Upstream calls `env.recordError` here (`DropManualMemoization.ts:356`), which is a
-			// COMPILE ERROR: the function bails and `ValidatePreservedManualMemoization` never runs
+			// compile error: the function bails and `ValidatePreservedManualMemoization` never runs
 			// on it. Counting the entry and continuing turns "this list could not be read" into
 			// "this list was empty", and those are different claims -- an empty list means the
 			// developer promised no dependencies, so every inferred one is reported as a
@@ -513,7 +513,7 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		case "React":
 			sidemap.react[target] = true
 		default:
-			// A global that is not a hook is still a valid dependency ROOT: `[SOME_CONSTANT]` is
+			// A global that is not a hook is still a valid dependency root: `[SOME_CONSTANT]` is
 			// a legal dependency array entry, and dropping it would silently shorten the list.
 			sidemap.deps[target] = ManualMemoDependency{
 				Root: ManualMemoRoot{IsGlobal: true, Name: value.Name},
@@ -570,7 +570,7 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		// A value block's result arrives through a store. Upstream tracks these so that optional
 		// chains, which lower through value blocks there, stay reachable as dependency roots.
 		//
-		// Only into an UNNAMED target. Upstream's condition is `aliased != null &&
+		// Only into an unnamed target. Upstream's condition is `aliased != null &&
 		// lvalue.name?.kind !== 'named'` (`DropManualMemoization.ts:116`), so a store into a named
 		// binding ends the chain rather than continuing it: the binding is the root a developer can
 		// write, and resolving through it would name something they did not.
@@ -693,7 +693,7 @@ func isNamedBinding(function *Function, id static_single_assignment.IdentifierId
 
 // propagateManualMemoDependency carries a path through a load, or starts one at a named binding.
 //
-// A load of a temporary that already has a path continues it. A load of a NAMED binding starts a
+// A load of a temporary that already has a path continues it. A load of a named binding starts a
 // fresh path rooted there, which is what makes `props` in `[props.items]` a root at all. An unnamed
 // temporary with no path is neither and is left absent, which is what makes `[a + b]` unextractable
 // rather than silently rooted at a meaningless place.

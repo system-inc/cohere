@@ -23,7 +23,7 @@ import (
 func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(test *testing.T) {
 	test.Parallel()
 
-	// The callable forms are here because the predicate is ONE flag check rather than upstream's
+	// The callable forms are here because the predicate is one flag check rather than upstream's
 	// two arms. A separate call-signature arm was written, then removed when a mutation sweep
 	// showed deleting it changed no answer: every callable form TypeScript has carries the Object
 	// flag. These five hold that reduction in place -- if a callable form is ever found without the
@@ -78,7 +78,7 @@ func TestIsAlwaysInvalidatingTypeSeparatesTheFourShapes(test *testing.T) {
 
 // TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker pins the conservative direction.
 //
-// Both upstream call sites use a TRUE answer to permit a merge, so a missing type must answer false
+// Both upstream call sites use a true answer to permit a merge, so a missing type must answer false
 // rather than true: declining to merge on missing information is safe, merging on it is not. A
 // predicate that defaulted the other way would still pass the separation test above.
 func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(test *testing.T) {
@@ -120,7 +120,7 @@ func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(test *testing.T) {
 //
 // The assertion is that the predicate answers rather than panicking, and that it answers false. A
 // nodeless identifier has no type to ask about, and both upstream call sites use a true answer to
-// PERMIT a merge, so the missing-information direction must be false.
+// permit a merge, so the missing-information direction must be false.
 func TestIsAlwaysInvalidatingTypeHandlesNodelessIdentifiers(test *testing.T) {
 	test.Parallel()
 
@@ -132,7 +132,7 @@ func TestIsAlwaysInvalidatingTypeHandlesNodelessIdentifiers(test *testing.T) {
 				continue
 			}
 			nodeless++
-			// The REAL checker is passed, which is the whole point. An earlier spelling passed nil
+			// The real checker is passed, which is the whole point. An earlier spelling passed nil
 			// here and returned at the checker guard without ever reaching the node guard -- so it
 			// asserted nothing about nodeless identifiers, and a mutation deleting the node guard
 			// survived it. The mutant is caught only when the lookup is actually attempted.

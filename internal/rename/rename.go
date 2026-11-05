@@ -59,7 +59,7 @@ import (
 
 // Edit is one replacement of one identifier's own span.
 //
-// Deliberately NOT a rule.Diagnostic. That type carries exactly one Range and has no secondary-span
+// Deliberately not a rule.Diagnostic. That type carries exactly one Range and has no secondary-span
 // field, so a rename touching fourteen sites across six files would have to be either fourteen
 // unrelated diagnostics with no way to say they are one act, or one diagnostic pointing at the
 // declaration while thirteen edits happen somewhere the reader was never shown. Both readings are

@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// bruteForceDominators computes dominance by the DEFINITION rather than by the algorithm: block D
+// bruteForceDominators computes dominance by the definition rather than by the algorithm: block D
 // dominates block B when every path from the entry to B passes through D, established by deleting D
 // from the graph and asking whether B is still reachable.
 //
@@ -70,7 +70,7 @@ func TestDominatorsMatchTheDefinition(test *testing.T) {
 		// deliberately collapse to a single block.
 		minimumPairs int
 	}{
-		// A straight-line body is ONE block: the builder starts a new one only at a fork, so
+		// A straight-line body is one block: the builder starts a new one only at a fork, so
 		// `a(); b(); c();` never splits. That is worth having in the table as the degenerate case
 		// the analysis must not crash on, and its pair count is 1 rather than the >= 4 the other
 		// shapes carry, which is why the vacuity guard below is per-case.
@@ -197,7 +197,7 @@ func TestDominatorsRejectABrokenTree(test *testing.T) {
 }
 
 // TestDominatorsOnKnownShapes pins the tree on shapes whose dominance a reader can cohere by eye,
-// so a future change that keeps the brute-force check happy by breaking BOTH sides still fails here.
+// so a future change that keeps the brute-force check happy by breaking both sides still fails here.
 //
 // These assert the property rather than block indices, because block numbering is construction
 // order and the graph's own doc says no analysis should depend on it.
@@ -351,7 +351,7 @@ func TestDominatorsAgreeWithFinalPathDominators(test *testing.T) {
 // which is the only property predecessors have to satisfy.
 //
 // It is written as a two-directional check rather than a count, because a predecessor array built
-// with an off-by-one in its counting sort produces the right TOTAL and the wrong grouping, and a
+// with an off-by-one in its counting sort produces the right total and the wrong grouping, and a
 // count-only test passes on it. This one does not.
 func TestPredecessorsAreTheInverseOfSuccessors(test *testing.T) {
 	test.Parallel()
@@ -360,7 +360,7 @@ func TestPredecessorsAreTheInverseOfSuccessors(test *testing.T) {
 		`function f(x, y) { while (x) { while (y) { a(); } b(); } c(); }`,
 		`function f(x) { switch (x) { case 0: a(); case 1: b(); break; default: c(); } d(); }`,
 		`function f() { try { a(); } catch (e) { b(); } finally { c(); } d(); }`,
-		// A shape with reachable edges AND an unreachable block, so the "unreachable blocks have
+		// A shape with reachable edges and an unreachable block, so the "unreachable blocks have
 		// no predecessors" branch is reached without collapsing the graph to a single block.
 		`function f(x) { if (x) { return; a(); } b(); }`,
 	} {

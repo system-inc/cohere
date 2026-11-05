@@ -8,9 +8,9 @@ import (
 // Canonicalize, which is neither Go's case folding nor the Unicode
 // folding regexp2 reaches for when told to ignore case. It is also not one
 // reading but two: `u` and `v` select simple case folding, and their absence
-// selects an uppercase mapping that never crosses into ASCII. U+212A KELVIN
-// SIGN against `k` comes out differently under each, so every entry point
-// here carries the flag through rather than picking one.
+// selects an uppercase mapping that never crosses into ASCII.
+// `U+212A KELVIN SIGN` against `k` comes out differently under each, so every
+// entry point here carries the flag through rather than picking one.
 //
 // So rather than ask regexp2 to ignore case, a pattern is widened: every
 // literal and every character class is rewritten to name each character it

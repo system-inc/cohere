@@ -5,12 +5,12 @@ import (
 	"sort"
 )
 
-// mergeWithReversedEndOrder is the merge sweep with `sortByEndDescending` INVERTED.
+// mergeWithReversedEndOrder is the merge sweep with `sortByEndDescending` inverted.
 //
 // A local reimplementation rather than a flag on `mergeSweepState`, so that the committed pass is
 // not edited to host a counterfactual. It tracks `merge_scopes.go` and the only line that differs is
 // the one marked below; `TestAlignReversedMergeTracksTheRealOne` asserts the two agree on the
-// unaligned table, which is what makes a difference on the ALIGNED table attributable to the
+// unaligned table, which is what makes a difference on the aligned table attributable to the
 // comparator rather than to this copy having drifted.
 func mergeWithReversedEndOrder(function *Function, scopes *ReactiveScopes) *MergedScopes {
 	result := &MergedScopes{}
@@ -43,7 +43,7 @@ func mergeWithReversedEndOrder(function *Function, scopes *ReactiveScopes) *Merg
 			top := state.starts[len(state.starts)-1]
 			state.starts = state.starts[:len(state.starts)-1]
 			opening := append([]ScopeId(nil), top.scopes...)
-			// THE ONE DIFFERING LINE: ascending rather than descending by end.
+			// The one differing line: ascending rather than descending by end.
 			sort.SliceStable(opening, func(i, j int) bool {
 				return state.rangeOf(opening[i]).End < state.rangeOf(opening[j]).End
 			})

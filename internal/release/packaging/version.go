@@ -62,7 +62,7 @@ type Provenance struct {
 	// Version is the published version, or "dev" for a local build.
 	Version string
 
-	// SelfCommit is the commit of THIS repository the binary was built from, or "" when the build
+	// SelfCommit is the commit of this repository the binary was built from, or "" when the build
 	// carried no version-control stamp.
 	//
 	// Separate from CompilerCommit, which names the vendored compiler and moves independently. A

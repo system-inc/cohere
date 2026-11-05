@@ -541,7 +541,7 @@ func shouldPrintDocumentEndMarker(path *astPath) bool {
 	nextDocument := nextNode(path)
 	nextHead := childAt(nextDocument, 0)
 
-	return len(nextHead.Children) > 0 || // ... %DIRECTIVE ---
+	return len(nextHead.Children) > 0 || // ... `%DIRECTIVE` ---
 		hasEndComments(nextHead) // ... # endComment ---
 }
 
@@ -550,7 +550,7 @@ func shouldPrintDocumentHeadEndMarker(path *astPath) bool {
 	document := currentNode(path)
 	head := childAt(document, 0)
 	return document.DirectivesEndMarker || // --- preserve the first document head end marker
-		len(head.Children) > 0 || // %DIRECTIVE ---
+		len(head.Children) > 0 || // `%DIRECTIVE` ---
 		hasEndComments(head) || // # end comment ---
 		hasTrailingComment(head) // --- # trailing comment
 }

@@ -21,7 +21,7 @@ import (
 // NullableTypeFlags is the mask that decides whether a type counts as nullable for parity.
 //
 // Wider than null and undefined, and the width is the interesting part. `any` and `unknown` are
-// included because they ERASE the distinction rather than answering it: a decorator saying
+// included because they erase the distinction rather than answering it: a decorator saying
 // `nullable: false` beside a value typed `any` is a claim nothing checked, so the parity rules treat
 // it as unmet rather than as satisfied. `void` is included for the same reason on the return side.
 //
@@ -36,7 +36,7 @@ const NullableTypeFlags = checker.TypeFlagsNull |
 
 // IsNullableType answers whether a type admits nothing, recursing through unions.
 //
-// A union is nullable when ANY member is, which is the opposite of how the union arm reads in a
+// A union is nullable when any member is, which is the opposite of how the union arm reads in a
 // rule about what a value may be: here the question is whether the value can be absent, and one
 // absent-admitting member is enough.
 func IsNullableType(subject *checker.Type) bool {
@@ -147,7 +147,7 @@ func HasDecoratorInSet(node *ast.Node, names map[string]struct{}) bool {
 
 // Of returns the decorators on a node, in source order.
 //
-// typescript-go keeps decorators in the MODIFIER list rather than in a field of their own, which is
+// typescript-go keeps decorators in the modifier list rather than in a field of their own, which is
 // the shape difference that matters when porting from an estree rule: there is no `.decorators`
 // to read, and a modifier list holds `public`, `readonly` and `async` alongside them.
 func Of(node *ast.Node) []*ast.Node {

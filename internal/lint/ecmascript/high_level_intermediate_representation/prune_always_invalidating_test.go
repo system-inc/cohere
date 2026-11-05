@@ -77,7 +77,7 @@ func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(test *testing.T) {
 			function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 			allocation := Place{Identifier: 1}
 
-			// The allocation sits OUTSIDE any scope, which is what makes it unmemoized; a scope
+			// The allocation sits outside any scope, which is what makes it unmemoized; a scope
 			// then depends on it and must prune.
 			scope := &ReactiveScopeBlock{Scope: 1}
 			tree := &ReactiveFunction{Body: ReactiveBlock{
@@ -113,7 +113,7 @@ func TestPruneAlwaysInvalidatingRespectsWithinScope(test *testing.T) {
 	function := &Function{Identifiers: []*Identifier{{Id: 0}, {Id: 1}}}
 	allocation := Place{Identifier: 1}
 
-	// The allocation is INSIDE a scope, so it is memoized and must not make the consumer prune.
+	// The allocation is inside a scope, so it is memoized and must not make the consumer prune.
 	producer := &ReactiveScopeBlock{Scope: 1, Instructions: ReactiveBlock{
 		&ReactiveInstructionStatement{Instruction: &ReactiveInstruction{
 			LValue: &allocation,

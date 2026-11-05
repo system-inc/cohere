@@ -718,7 +718,7 @@ func versionLineFrom(output string) string {
 // markPlantedDifferences flags the differences this run caused rather than observed.
 //
 // Matched by file rather than by rule, and that distinction was a defect for one revision. Matching
-// on the control's declared rule leaves any OTHER rule that fires on the same planted file counted
+// on the control's declared rule leaves any other rule that fires on the same planted file counted
 // as observed, and one did: the cohere-only control's file trips the gate's import-ordering rule as
 // well as the rule it was written for, so the summary read "1 observed, 2 planted" when both were
 // this harness's own footprint.

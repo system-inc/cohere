@@ -67,10 +67,10 @@ func TestMergeCollapsesTheRegionTheSpliceCreated(test *testing.T) {
 // fallthrough that pointed at it has to be repointed. A missed one is not a crash: `Block` returns
 // false and passes skip the edge, so the function analyses as though the edge were absent.
 //
-// # This runs on the SINGLE-return fixture, and the reason is a measurement
+// # This runs on the single-return fixture, and the reason is a measurement
 //
 // It was written first against the multi-return one, on the assumption that a bigger graph is a
-// better test. Measured, that fixture merges NOTHING, and correctly so: the labeled form's cut
+// better test. Measured, that fixture merges nothing, and correctly so: the labeled form's cut
 // block ends in a `Label` rather than a `Goto`, the label's target is a fallthrough-protected
 // block, and the continuation has two predecessors because both returns jump to it. All three of
 // upstream's conditions decline it, which is the pass working rather than failing.
@@ -79,7 +79,7 @@ func TestMergeCollapsesTheRegionTheSpliceCreated(test *testing.T) {
 // where it matters, because that is the one that gives straight-line code block boundaries it did
 // not have.
 //
-// The CALLER branches, which is the second thing this fixture needs. A caller that does not branch
+// The caller branches, which is the second thing this fixture needs. A caller that does not branch
 // merges all the way down to one block ending in a `Return`, and a `Return` names no block -- so
 // the repointing this test is about has nothing left to check and the vacuity guard at the bottom
 // fires. The branch leaves real references behind for the merge to get wrong.
@@ -192,20 +192,20 @@ func TestMergeLeavesTheLabeledSpliceAlone(test *testing.T) {
 // predecessors' control flow skip it entirely, and makes the join's instructions run
 // unconditionally on the one path that absorbed them. The graph still builds.
 //
-// # BOTH arms are spliced, and getting to that fixture took two measurements
+// # Both arms are spliced, and getting to that fixture took two measurements
 //
 // Written first against a plain `if`/`else`, this could not see the mutation that removes the
-// single-predecessor condition. Measured: that fixture merges NOTHING either way, because the
+// single-predecessor condition. Measured: that fixture merges nothing either way, because the
 // join's predecessors are the two arms and each arm's own predecessor is the `If` block -- the pass
 // declines on "the predecessor must end in a `Goto`" long before it reaches the count, so the
 // mutant's extra merges never happen.
 //
-// Splicing into ONE arm was the second attempt and it also survived, for a subtler version of the
+// Splicing into one arm was the second attempt and it also survived, for a subtler version of the
 // same reason: the join's predecessors are then the spliced arm's tail and the `If` block itself,
 // and the `If` is still what the `Goto` condition rejects. Measured output was byte-identical with
 // and without the mutant.
 //
-// Splicing into BOTH arms is what discriminates. Every predecessor of the join then ends in a
+// Splicing into both arms is what discriminates. Every predecessor of the join then ends in a
 // `Goto`, so the count is the only condition left standing between the pass and swallowing the
 // join -- which is the point: a guard is only tested by an input where it is the guard that
 // decides.
@@ -258,7 +258,7 @@ func TestMergeLeavesAJoinBlockAlone(test *testing.T) {
 	if branches == 0 {
 		test.Fatal("the fixture lowered no branch")
 	}
-	// Every predecessor of every join must end in a `Goto`, or some OTHER condition is what
+	// Every predecessor of every join must end in a `Goto`, or some other condition is what
 	// declines the merge and this test is measuring that one instead. Asserted rather than assumed,
 	// because two earlier fixtures failed exactly here and read as passing.
 	for id := range joins {

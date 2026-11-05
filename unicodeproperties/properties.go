@@ -1,5 +1,5 @@
 // Package unicodeproperties provides ECMAScript character properties from Unicode 17.0.0.
-// Aliases follow ECMAScript's exact, case-sensitive spellings, without UCD loose matching.
+// Aliases follow ECMAScript's exact, case-sensitive spellings, without `UCD` loose matching.
 package unicodeproperties
 
 import "slices"

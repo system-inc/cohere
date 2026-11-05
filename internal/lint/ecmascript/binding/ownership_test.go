@@ -54,7 +54,7 @@ func TestForeignPositions(test *testing.T) {
 		expectFirst(test, source, true)
 	}
 
-	// The two type positions declare the name first, so the USE is the occurrence under test. The
+	// The two type positions declare the name first, so the use is the occurrence under test. The
 	// declaration is this file's own and correctly answers owned, which is what the index picks
 	// apart here rather than asserting on whichever occurrence came first.
 	for _, c := range []struct {

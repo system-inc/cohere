@@ -233,7 +233,7 @@ func memoStatement(order static_single_assignment.EvaluationOrder, value Instruc
 //
 // The comparison and its normalization are exercised here rather than left dark, because a pass with
 // no caller and no test is the shape this package keeps finding declared and never constructed. What
-// is asserted is the state of the INPUT, since that is what the decision rests on.
+// is asserted is the state of the input, since that is what the decision rests on.
 func TestInferredDependencyComparisonIsBuiltAndGatedOnTruncation(test *testing.T) {
 	test.Parallel()
 

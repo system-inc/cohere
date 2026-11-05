@@ -37,11 +37,11 @@
 // The second obstruction is layout. `controlflow` deliberately reproduces ESLint's code-path
 // shape, and two of its properties are wrong for an IR:
 //
-//   - A `finally` body is laid out TWICE, once for normal completion and once for the abrupt path.
+//   - A `finally` body is laid out twice, once for normal completion and once for the abrupt path.
 //     Both copies carry the same source positions. An IR whose instructions are keyed by position
 //     would give a value two definitions that are not a merge of each other, and single-assignment
 //     construction over that produces a phi where the source has no join.
-//   - A `try` whose body cannot throw gets NO edge to its `catch`, and the first throwable node in
+//   - A `try` whose body cannot throw gets no edge to its `catch`, and the first throwable node in
 //     a body forks to the handler so later statements are bypassed on the throwing path. That is
 //     the right answer for reachability and the wrong one for a mutation lattice, which needs the
 //     handler to see the state the body actually left behind.
@@ -49,7 +49,7 @@
 // So this package lowers independently, and the duplication is real and accepted. What it buys is
 // that the two graphs answer different questions and neither is bent to serve the other:
 // `controlflow` keeps mirroring ESLint for the rules whose observable behaviour depends on that,
-// and this keeps mirroring React's HIR for the passes that will be ported onto it. A shared graph
+// and this keeps mirroring React's `HIR` for the passes that will be ported onto it. A shared graph
 // would have to be both, and the finally-duplication alone makes that impossible.
 //
 // # Why the shape mirrors React's compiler rather than being designed fresh
@@ -88,7 +88,7 @@
 // (`JsxExpression`, `JsxFragment`, `JsxText`, `StartMemoize`, `FinishMemoize`), and 22 terminals of
 // which 2 are React (`Scope`, `PrunedScope`).
 //
-// All 5 instruction values are HERE, in the core set. Of the 2 terminals, `Scope` is now here and
+// All 5 instruction values are here, in the core set. Of the 2 terminals, `Scope` is now here and
 // `PrunedScope` is not. The paragraphs below describe the state before reactive scopes were built
 // and the rule that governed it; they are kept because the rule still governs `PrunedScope`, and
 // because the condition they name is exactly the one that was met. See the end of this section.
@@ -113,7 +113,7 @@
 // may never be written. If reactive scopes are ever built, they add two variants then, and every
 // exhaustive switch goes red and gets read by a human. That is the correct time to pay it.
 //
-// THAT MOMENT ARRIVED, for one of the two. Reactive scopes are built: `scopes.go` assigns them,
+// That moment arrived, for one of the two. Reactive scopes are built: `scopes.go` assigns them,
 // `align_scopes.go` and `merge_scopes.go` bring them to the shape upstream's own
 // `assertValidBlockNesting` demands, and `scope_terminals.go` rewrites the graph to carry them.
 // `Scope` is therefore in the core set, added in the same commit as the pass that constructs it.
@@ -124,16 +124,16 @@
 // produces -- the exact shape of `Optional`, which this package already carries as a warning.
 //
 // The rule this follows, stated so the next person can apply it rather than re-litigate it: a
-// variant belongs in the core set when LOWERING must produce it, and belongs behind a seam when
-// only a LATER PASS would produce it and no other pass must interpret it. Lowering produces JSX
+// variant belongs in the core set when lowering must produce it, and belongs behind a seam when
+// only a later pass would produce it and no other pass must interpret it. Lowering produces JSX
 // because the grammar does. Nothing lowers to a reactive scope.
 //
 // # What this package deliberately does not do
 //
-// Single-assignment form is NOT what lowering produces, and is a separate opt-in pass. Straight out
+// Single-assignment form is not what lowering produces, and is a separate opt-in pass. Straight out
 // of `Lower`, values are named but not uniquely defined: a `let` reassigned in a loop is several
 // `Identifier`s sharing one `DeclarationId`, each store mints a fresh one, and a read binds to
-// whichever store the lowering WALK saw last rather than to the one that reaches it on the path.
+// whichever store the lowering walk saw last rather than to the one that reaches it on the path.
 // That last part is the important one: the pre-SSA graph's reads are lexically correct and
 // dataflow-wrong at any join, so a pass must not read them as reaching definitions.
 //
@@ -328,7 +328,7 @@ type BasicBlock struct {
 	// Phis are the merge points for values with several reaching definitions.
 	//
 	// Empty until `Construct` runs. After it, a phi appears here wherever a binding's value depends
-	// on which predecessor control arrived from, and every phi is a REAL merge: `Construct` runs
+	// on which predecessor control arrived from, and every phi is a real merge: `Construct` runs
 	// redundant-phi elimination, so a phi whose operands all agree has already been removed.
 	Phis []*Phi
 }
@@ -457,21 +457,21 @@ type Place struct {
 //
 // Nothing computes these yet; lowering leaves every place at EffectUnknown.
 //
-// # This ordering is NOT the lattice an effect inference joins over, and reading it that way is a
+// # This ordering is not the lattice an effect inference joins over, and reading it that way is a
 // # trap that was walked into once
 //
 // The declaration order below runs least to most constraining, which reads like the specification
 // for a meet operation. It is not one, and building a dataflow pass whose join is "take the larger
 // Effect" would produce a pass that is self-consistent, passes its own tests, and is wrong.
 //
-// Upstream's effect inference (`InferMutationAliasingEffects`, 3,297 lines) joins over a DIFFERENT
+// Upstream's effect inference (`InferMutationAliasingEffects`, 3,297 lines) joins over a different
 // and disjoint lattice, `ValueKind`: `Mutable | Frozen | Primitive | MaybeFrozen | Global |
 // Context`. Its join, `mergeValueKinds`, is not a max over an order, because it is not a total
-// order at all: `Frozen` joined with `Mutable` is `MaybeFrozen`, a THIRD element that is neither
+// order at all: `Frozen` joined with `Mutable` is `MaybeFrozen`, a third element that is neither
 // operand. No ordering of the constants below can express that, so a meet defined over this type
 // cannot be made correct by reordering it.
 //
-// `Effect` is an OUTPUT of that pass, written per reference by `applySignature` once the abstract
+// `Effect` is an output of that pass, written per reference by `applySignature` once the abstract
 // interpretation has settled what kind of value each place holds. The abstract state is keyed by
 // value, `Effect` is recorded per reference, and the two are different things: a value has one
 // kind at a program point, while the several references to it at that point can read, mutate, and

@@ -15,7 +15,7 @@ import (
 // Config lets the command join those two facts before a rule runs and prevents a misspelled glob
 // from turning an override into a clean-looking no-op.
 //
-// Each pattern is checked independently rather than treating an override's files array as one OR.
+// Each pattern is checked independently rather than treating an override's files array as one or.
 // If one of two patterns is stale, the other still makes the block run somewhere and a block-level
 // check passes while half the intended scope is absent. A pattern that reaches only globally ignored
 // files is also a no-op, so ignored files are not part of the population.

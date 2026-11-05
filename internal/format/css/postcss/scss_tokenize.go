@@ -1,6 +1,6 @@
 package postcss
 
-// postcss-scss 4.0.9, lib/scss-tokenize.js: postcss's tokenizer with the SCSS PATCH blocks (commas as
+// postcss-scss 4.0.9, lib/scss-tokenize.js: postcss's tokenizer with the `SCSS PATCH` blocks (commas as
 // words, #{} interpolation, `//` comments, nested parentheses in url(), strings that can hold
 // interpolation).
 //
@@ -11,7 +11,7 @@ package postcss
 // options.ignoreErrors and nextToken's opts.ignoreUnclosed are never set on this path (ScssParser calls
 // nextToken() with no options and Prettier passes none), so the branches that read them are false.
 
-// The SCSS PATCH constants.
+// The `SCSS PATCH` constants.
 const (
 	comma = ','
 	hash  = '#'
@@ -45,7 +45,7 @@ type scssTokenizer struct {
 	buffer   []token
 	returned []token
 
-	brackets int // SCSS PATCH
+	brackets int // `SCSS PATCH`
 }
 
 // newScssTokenizer is scssTokenize(input).
@@ -98,7 +98,7 @@ func (tokens *scssTokenizer) endOfFile() bool {
 	return len(tokens.returned) == 0 && tokens.pos >= tokens.length
 }
 
-// SCSS PATCH {
+// `SCSS PATCH` {
 func (tokens *scssTokenizer) interpolation() {
 	deep := 1
 	// stringQuote is false or a quote's char code; 0 stands for false, no quote being NUL.
@@ -132,7 +132,7 @@ func (tokens *scssTokenizer) interpolation() {
 	}
 }
 
-// } SCSS PATCH
+// } `SCSS PATCH`
 
 // nextToken returns the next token, and false where upstream returns undefined.
 func (tokens *scssTokenizer) nextToken() (token, bool) {
@@ -174,10 +174,10 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		controlCharacter := string(rune(tokens.code))
 		tokens.currentToken = token{kind: controlCharacter, value: controlCharacter, start: tokens.pos, end: -1}
 
-	// SCSS PATCH {
+	// `SCSS PATCH` {
 	case comma:
 		tokens.currentToken = token{kind: "word", value: ",", start: tokens.pos, end: tokens.pos + 1}
-	// } SCSS PATCH
+	// } `SCSS PATCH`
 
 	case openParentheses:
 		tokens.prev = ""
@@ -187,7 +187,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		}
 		tokens.n = tokens.charCodeAt(tokens.pos + 1)
 
-		// SCSS PATCH {
+		// `SCSS PATCH` {
 		if tokens.prev == "url" && tokens.n != singleQuote && tokens.n != doubleQuote {
 			tokens.brackets = 1
 			tokens.escaped = false
@@ -210,7 +210,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
 			tokens.currentToken = token{kind: "brackets", value: tokens.content, start: tokens.pos, end: tokens.next}
 			tokens.pos = tokens.next
-			// } SCSS PATCH
+			// } `SCSS PATCH`
 		} else {
 			tokens.next = tokens.indexOf(")", tokens.pos+1)
 			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
@@ -229,7 +229,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		}
 
 	case singleQuote, doubleQuote:
-		// SCSS PATCH {
+		// `SCSS PATCH` {
 		tokens.quote = tokens.code
 		tokens.next = tokens.pos
 
@@ -253,7 +253,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 				tokens.interpolation()
 			}
 		}
-		// } SCSS PATCH
+		// } `SCSS PATCH`
 
 		tokens.currentToken = token{
 			kind:  "string",
@@ -324,7 +324,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		tokens.pos = tokens.next
 
 	default:
-		// SCSS PATCH {
+		// `SCSS PATCH` {
 		tokens.n = tokens.charCodeAt(tokens.pos + 1)
 
 		if tokens.code == hash && tokens.n == openCurly {
@@ -334,7 +334,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.currentToken = token{kind: "word", value: tokens.content, start: tokens.pos, end: tokens.next}
 			tokens.pos = tokens.next
 		} else if tokens.code == slash && tokens.n == asterisk {
-			// } SCSS PATCH
+			// } `SCSS PATCH`
 			tokens.next = tokens.indexOf("*/", tokens.pos+2) + 1
 			if tokens.next == 0 {
 				// ignore and ignoreUnclosed are always false here.
@@ -349,7 +349,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			}
 			tokens.pos = tokens.next
 
-			// SCSS PATCH {
+			// `SCSS PATCH` {
 		} else if tokens.code == slash && tokens.n == slash {
 			// RE_NEW_LINE.lastIndex = pos + 1; RE_NEW_LINE.test(css).
 			match := -1
@@ -375,7 +375,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			}
 
 			tokens.pos = tokens.next
-			// } SCSS PATCH
+			// } `SCSS PATCH`
 		} else {
 			// RE_WORD_END.lastIndex = pos + 1; RE_WORD_END.test(css).
 			match := -1

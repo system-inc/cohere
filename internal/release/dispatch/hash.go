@@ -152,7 +152,7 @@ func typeScriptCommit(moduleDirectory string) (string, error) {
 // listSourceFiles returns every non-stdlib file compiled into packagePath, transitively.
 //
 // Standard-library packages are excluded because they are already covered by the toolchain version:
-// including them would hash thousands of files to learn something GOVERSION already said.
+// including them would hash thousands of files to learn something `GOVERSION` already said.
 func listSourceFiles(moduleDirectory string, packagePath string) ([]string, error) {
 	const template = `{{if not .Standard}}{{$directory := .Dir}}` +
 		`{{range .GoFiles}}{{$directory}}/{{.}}{{"\n"}}{{end}}` +

@@ -29,7 +29,7 @@ func TestIsDocumentFile(test *testing.T) {
 		// this reads as the document, and that is a real ESLint false positive oxc fixed.
 		{"a longer name sharing the prefix", "pages/_documentation.tsx", false},
 		// Upstream's directory case uses a bare `starts_with("_document")` with no trailing dot,
-		// unlike its basename case. So this DOES match, and it is recorded as upstream's behavior
+		// unlike its basename case. So this does match, and it is recorded as upstream's behavior
 		// rather than corrected: a fixture asserting the tidier answer was written first here and
 		// was wrong, which is the trap of trusting what a rule should do over what it does.
 		{"a longer directory name still matches, as upstream", "pages/_documentation/index.tsx", true},
@@ -81,11 +81,11 @@ func TestIsInApplicationDirectory(test *testing.T) {
 		{"an app route", "app/page.tsx", true},
 		{"nested under app", "src/app/settings/page.tsx", true},
 		{"the windows shape", `src\app\settings\page.tsx`, true},
-		// A near-miss that does NOT match, recorded because it is the case a reader assumes the
+		// A near-miss that does not match, recorded because it is the case a reader assumes the
 		// substring test catches: `application/` contains `app` but not `app/`, so the separator in
 		// the needle is doing real work.
 		{"a directory whose name merely starts with app", "application/thing.tsx", false},
-		// The looseness that IS real: a segment ending in `app` answers true.
+		// The looseness that is real: a segment ending in `app` answers true.
 		// Not theoretical: this is our own project directory, so every file in that checkout
 		// answers true and any rule gating on this is silent across it. Asserted so the cost is
 		// visible rather than rediscovered.
@@ -138,7 +138,7 @@ func TestIsDocumentPage(test *testing.T) {
 		{"the page suffix convention", "pages/_document.page.tsx", true},
 		{"the directory form", "pages/_document/index.js", true},
 		{"the directory form in TypeScript", "pages/_document/index.tsx", true},
-		// Upstream's own probe of the LAST split segment. Splitting on the bare word gives
+		// Upstream's own probe of the last split segment. Splitting on the bare word gives
 		// ["", "app/src/", "/_document.js"], and the last one exempts.
 		{"a directory merely beginning with the word pages", "pagesapp/src/pages/_document.js", true},
 
@@ -165,7 +165,7 @@ func TestIsDocumentPage(test *testing.T) {
 		{"the windows directory form", `pages\_document\index.tsx`, true},
 
 		// Reproduced in oxc's direction rather than ESLint's. ESLint carries a leading emptiness
-		// guard so a path ENDING in pages exempts; oxc has none, so the empty last segment fails
+		// guard so a path ending in pages exempts; oxc has none, so the empty last segment fails
 		// both prefix tests and the file is treated as an ordinary page. Unreachable in practice
 		// because a lintable file needs an extension, asserted so the choice is visible.
 		{"a path ending in the word pages", "pages", false},
@@ -233,7 +233,7 @@ func TestIsInPagesDirectory(test *testing.T) {
 		{"an api route", "pages/api/user.ts", false},
 		{"a nested api route", "pages/api/v1/user.ts", false},
 
-		// Only the segment DIRECTLY after pages exempts. A deeper api directory is an ordinary
+		// Only the segment directly after pages exempts. A deeper api directory is an ordinary
 		// route directory that happens to be named api, and upstream runs on it.
 		{"an api directory nested deeper", "pages/blog/api/x.tsx", true},
 
@@ -251,7 +251,7 @@ func TestIsInPagesDirectory(test *testing.T) {
 		{"a path ending at pages", "pages", false},
 		{"a path ending at pages with a separator", "src/pages/", false},
 
-		// The FIRST pages segment decides and the second is never consulted, matching oxc's walk,
+		// The first pages segment decides and the second is never consulted, matching oxc's walk,
 		// which returns on the component immediately after its first match.
 		{"a pages directory nested inside an api route", "pages/api/pages/x.tsx", false},
 

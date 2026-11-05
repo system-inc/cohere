@@ -44,7 +44,7 @@ type PruneNonEscapingScopesResult struct {
 	MarkersPruned int
 	// PrunedScopes is which scopes were replaced by their own instructions.
 	//
-	// The block is REPLACED rather than marked, so after this pass nothing in the tree records that
+	// The block is replaced rather than marked, so after this pass nothing in the tree records that
 	// the scope existed. Upstream keeps the same structural result and its validator still knows,
 	// because it reads a `prunedScopes` set the pass wrote. Returning the set is how a consumer here
 	// can ask the same question.
@@ -551,7 +551,7 @@ func prunePassOverScopes(
 // # The reassignment map, which is the half a shorter port would drop
 //
 // A `useMemo` that got inlined stores its result into a temporary and then reassigns, so the
-// marker's own value carries no scope and the question has to be asked of what was assigned INTO
+// marker's own value carries no scope and the question has to be asked of what was assigned into
 // it. Upstream builds that map from two instruction shapes and falls back to the marker's own
 // identifier when the map has no entry. Dropping it would leave every inlined memo unmarked, which
 // is the shape `prune-nonescaping-useMemo.ts` and its siblings are built from.
@@ -592,7 +592,7 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 
 			case *LoadLocal:
 				// The simpler inlining shape: a direct assignment to the original lvalue. Upstream
-				// requires the loaded place to HAVE a scope and the lvalue to lack one, which is
+				// requires the loaded place to have a scope and the lvalue to lack one, which is
 				// what distinguishes it from an ordinary read.
 				if instruction.LValue != nil && !scopeless(value.Place.Identifier) &&
 					scopeless(instruction.LValue.Identifier) {
@@ -611,7 +611,7 @@ func prunePassOverMemoMarkers(tree *ReactiveFunction, function *Function, scopes
 						declarations = inlined
 					}
 				}
-				// Upstream's `every`: a marker is pruned when EVERY declaration it could name is
+				// Upstream's `every`: a marker is pruned when every declaration it could name is
 				// either scopeless or in a scope this pass just pruned. One surviving memoized
 				// declaration is enough to keep the claim alive.
 				all := true

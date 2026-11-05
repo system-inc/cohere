@@ -74,7 +74,7 @@ func Write(out io.Writer, report *Report, showIntentional bool) {
 		// on a real tree has failed to propagate rather than found a flat codebase, and printing the
 		// number is what makes that visible instead of quietly doubling the report.
 		//
-		// The depth is "at least", not an invariant. It is the longest chain THIS traversal happened
+		// The depth is "at least", not an invariant. It is the longest chain this traversal happened
 		// to follow, and a worklist reaches a symbol by whichever path it pops first, so the number
 		// moves run to run — measured on the ahra tree: 8, 9 and 10 across three runs whose findings
 		// were byte-identical at 1042 clusters and 2051 declarations every time. The set is the

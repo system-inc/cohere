@@ -33,7 +33,7 @@ const PlatformPackagePrefix = DispatcherPackageName + "-"
 // platform" apart from "we could not look". Both are failures; only one is a packaging bug.
 var ErrNoBinary = errors.New("no cohere binary for this platform")
 
-// PlatformPackageName is the npm package holding the binary for a Go GOOS and GOARCH, like
+// PlatformPackageName is the npm package holding the binary for a Go `GOOS` and `GOARCH`, like
 // "@system-inc/cohere-darwin-arm64".
 //
 // The arguments are Go's names and the result is npm's, because npm is what resolves the package
@@ -56,7 +56,7 @@ func CurrentPlatformPackageName() string {
 	return PlatformPackageName(runtime.GOOS, runtime.GOARCH)
 }
 
-// NpmOperatingSystem translates a Go GOOS to the name npm's `os` field uses.
+// NpmOperatingSystem translates a Go `GOOS` to the name npm's `os` field uses.
 //
 // Only the disagreement is listed. `darwin` and `linux` are already npm's spelling, and mapping
 // them explicitly would just be a second place to keep in sync.
@@ -67,7 +67,7 @@ func NpmOperatingSystem(goOperatingSystem string) string {
 	return goOperatingSystem
 }
 
-// NpmArchitecture translates a Go GOARCH to the name npm's `cpu` field uses.
+// NpmArchitecture translates a Go `GOARCH` to the name npm's `cpu` field uses.
 func NpmArchitecture(goArchitecture string) string {
 	switch goArchitecture {
 	case "amd64":

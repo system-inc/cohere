@@ -18,7 +18,7 @@
 // # The shape, which is upstream's and is not the obvious one
 //
 // Every node has a `visitX` and a `traverseX`. `visitX` is what a subclass overrides; `traverseX`
-// is the default recursion. An override that wants to see a node AND keep descending calls
+// is the default recursion. An override that wants to see a node and keep descending calls
 // `traverse`; one that wants to prune the subtree simply does not. Go has no subclassing, so the
 // pair becomes a struct of optional function fields: a nil field means "recurse normally", and a
 // non-nil one receives the node plus the traversal to continue with.
@@ -67,7 +67,7 @@ type ReactiveVisitor struct {
 
 	// Scope is called for each scope block. Call traverse to descend into its instructions.
 	//
-	// The hook a pruning pass installs: deciding a scope does not escape and then NOT calling
+	// The hook a pruning pass installs: deciding a scope does not escape and then not calling
 	// traverse is how a subtree is skipped.
 	Scope func(scope *ReactiveScopeBlock, traverse func())
 
@@ -177,7 +177,7 @@ func (walker *reactiveWalker) traverseValue(order static_single_assignment.Evalu
 		walker.visitValue(order, shape.Alternate)
 	case *ReactiveSequenceValue:
 		// The instructions run for effect and the value is the result. Upstream visits the
-		// instructions as INSTRUCTIONS rather than as values, which matters: a pass counting
+		// instructions as instructions rather than as values, which matters: a pass counting
 		// instructions sees the ones nested inside a sequence, and a pass that only walked values
 		// would miss them. That is the same omission that cost this package 27 functions once.
 		for _, nested := range shape.Instructions {
@@ -209,7 +209,7 @@ func (walker *reactiveWalker) visitTerminal(statement *ReactiveTerminalStatement
 // traverseTerminal descends into a terminal's operands and blocks, in upstream's order.
 //
 // The order is load-bearing rather than cosmetic. A `for` visits init, test, loop, then update,
-// which is evaluation order and not field order; a `do-while` visits its body BEFORE its test for
+// which is evaluation order and not field order; a `do-while` visits its body before its test for
 // the same reason. A pass building a def-use table over this walk reads a wrong answer if either is
 // reordered, and nothing about the resulting tree would look wrong.
 func (walker *reactiveWalker) traverseTerminal(statement *ReactiveTerminalStatement) {

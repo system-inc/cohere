@@ -93,7 +93,7 @@ func TestIterateRegexCharacterClasses_DeepNesting(test *testing.T) {
 func TestIterateRegexCharacterClasses_QBraceContainsBracket(test *testing.T) {
 	test.Parallel()
 	// `\q{ab|c]d}` inside v class — the `]` inside `\q{}` is literal and
-	// must NOT close the outer class.
+	// must not close the outer class.
 	var got [][2]int
 	ok := IterateRegexCharacterClasses(`[\q{ab|c]d}]`, RegexFlags{UnicodeSets: true}, func(s, e int) {
 		got = append(got, [2]int{s, e})
@@ -165,7 +165,7 @@ func TestParseRegexCharacterClass_MultipleRangesAndSets(test *testing.T) {
 func TestIterateRegexCharacterClasses_VFlagNested(test *testing.T) {
 	test.Parallel()
 	// v-flag enables nested classes; we expect the callback to fire for
-	// EACH nesting level (innermost first thanks to recursion).
+	// each nesting level (innermost first thanks to recursion).
 	cases := []struct {
 		pattern string
 		want    [][2]int

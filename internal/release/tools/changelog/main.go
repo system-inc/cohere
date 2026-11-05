@@ -5,7 +5,7 @@
 //	go run ./internal/release/tools/changelog --version 0.1.0
 //
 // The sets are compared between the previous release's tag, v<previous>, or the commit --from names, and
-// HEAD. With no previous version it writes the first release's section, which lists the sets. The section
+// `HEAD`. With no previous version it writes the first release's section, which lists the sets. The section
 // goes to stdout for a person to paste above the last one and to add, under the same heading, what
 // changed in cohere itself, which no diff of the sets can say. The policy is the changelog package's.
 package main

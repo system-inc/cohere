@@ -454,6 +454,6 @@ func hasPrettierIgnore(path *astPath) bool {
 }
 
 // trim and trimEnd are JavaScript's String.prototype.trim and trimEnd: they strip ECMAScript WhiteSpace
-// and LineTerminator, which is not the set Go's strings.TrimSpace strips (U+FEFF is in it, U+0085 not).
+// and LineTerminator, which is not the set Go's strings.TrimSpace strips (`U+FEFF` is in it, `U+0085` not).
 func trim(value string) string    { return strings.TrimFunc(value, ecmascripttext.IsWhitespace) }
 func trimEnd(value string) string { return strings.TrimRightFunc(value, ecmascripttext.IsWhitespace) }

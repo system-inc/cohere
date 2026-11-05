@@ -19,7 +19,7 @@ import (
 func TestShimSurfaceIsReachable(test *testing.T) {
 	// Each assignment is a distinct way the shim can break: a renamed function, a moved type,
 	// a changed signature. Binding the function to a typed variable checks the signature
-	// without needing a live host, and it fails at COMPILE time rather than here — which is
+	// without needing a live host, and it fails at compile time rather than here — which is
 	// the point. A nil check would not have worked: these are package-level funcs, so the
 	// compiler rejects `== nil` as always false, and a test that cannot fail proves nothing.
 	var (

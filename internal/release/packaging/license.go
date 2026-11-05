@@ -10,7 +10,7 @@ import (
 // LicenseExpression is cohere's license, as the SPDX expression every package it publishes declares:
 // MIT or Apache-2.0, at the user's option, as Rust and Biome are licensed (Kirk, #m5wmxnk).
 //
-// The OR is uppercase because SPDX requires it. A lowercase one is not an operator, so a registry or a
+// The or is uppercase because SPDX requires it. A lowercase one is not an operator, so a registry or a
 // license scanner reads the field as one unknown license rather than a choice of two.
 const LicenseExpression = "MIT OR Apache-2.0"
 
@@ -33,7 +33,7 @@ const (
 var LegalFileNames = append(append([]string{}, LicenseFileNames...), NoticeFileName, ThirdPartyNoticesFileName)
 
 // CopyrightHolder is cohere's copyright holder, the legal name Kirk confirmed (#m5wmxnk), and
-// CopyrightLine is how LICENSE-MIT and NOTICE state it.
+// CopyrightLine is how LICENSE-MIT and `NOTICE` state it.
 const (
 	CopyrightHolder = "System, Inc."
 	CopyrightLine   = "Copyright (c) 2026 " + CopyrightHolder

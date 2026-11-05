@@ -11,7 +11,7 @@ import (
 // elsewhere.
 //
 // This pass reads a seed it does not compute: `Place.Reactive`, written by `InferReactive`. A caller
-// that forgets to run that pass gets an empty seed and prunes EVERY dependency, which is a total
+// that forgets to run that pass gets an empty seed and prunes every dependency, which is a total
 // loss of the rule's comparison surface and would still satisfy any assertion phrased about pruning
 // alone. So both directions are asserted, on real source, before any specific claim.
 func TestPruneNonReactiveDependenciesKeepsAndPrunes(test *testing.T) {
@@ -159,7 +159,7 @@ func TestPruneNonReactiveDependenciesDoesNotPropagateFromAnInertScope(test *test
 func TestPruneNonReactiveDependenciesVisitsInnermostFirst(test *testing.T) {
 	test.Parallel()
 
-	// The inner scope sits INSIDE the outer one. Inner depends on reactive value 1 and declares
+	// The inner scope sits inside the outer one. Inner depends on reactive value 1 and declares
 	// value 2; outer depends on value 2, which is reactive only by propagation from inner.
 	inner := &ReactiveScopeBlock{Scope: 1}
 	outer := &ReactiveScopeBlock{Scope: 2, Instructions: ReactiveBlock{inner}}

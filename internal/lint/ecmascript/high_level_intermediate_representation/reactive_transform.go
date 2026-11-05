@@ -85,7 +85,7 @@ func ReplaceStatements(statements []ReactiveStatement) ReactiveTransformed {
 // whether to descend, and separately what to do with the statement it was handed.
 //
 // Those two decisions are independent and both matter. `pruneNonEscapingScopes` traverses a scope
-// (to rewrite what is inside it) and THEN decides whether the scope itself survives.
+// (to rewrite what is inside it) and then decides whether the scope itself survives.
 type ReactiveTransformer struct {
 	// Instruction rewrites an instruction statement.
 	Instruction func(statement *ReactiveInstructionStatement, traverse func()) ReactiveTransformed
@@ -125,7 +125,7 @@ func (walker *reactiveTransformWalker) transformBlock(block ReactiveBlock) React
 			}
 		case ReactiveTransformRemove:
 			if rebuilt == nil {
-				// The prefix is copied at THIS index rather than after the loop, because every
+				// The prefix is copied at this index rather than after the loop, because every
 				// later statement appends to the copy and the original must not be written while
 				// it is still being read.
 				rebuilt = append(ReactiveBlock{}, block[:index]...)

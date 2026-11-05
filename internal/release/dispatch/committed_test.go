@@ -283,7 +283,7 @@ func run(test *testing.T, binary string, arguments ...string) string {
 // machine, and keeps none of its own (#3kr3x59). The caller's cache here is the test's, empty before the
 // build, so its filling is the build's.
 //
-// Not parallel: it points GOCACHE at its own directory with test.Setenv, which a parallel test may not call.
+// Not parallel: it points `GOCACHE` at its own directory with test.Setenv, which a parallel test may not call.
 func TestALaunchedBuildUsesTheCallersGoCache(test *testing.T) {
 	fixture := newCommittedFixture(test)
 	shared := test.TempDir()

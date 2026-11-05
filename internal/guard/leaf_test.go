@@ -117,7 +117,7 @@ func TestRulePackagesStayLeaves(test *testing.T) {
 	test.Parallel()
 
 	/*
-	 * A rule package is one that REGISTERS rules, not merely one that lives under `rules/`.
+	 * A rule package is one that registers rules, not merely one that lives under `rules/`.
 	 *
 	 * The two were the same thing while every directory under `rules/` held rules and nothing else.
 	 * They came apart when each namespace's own machinery moved in beside its rules: the Tailwind

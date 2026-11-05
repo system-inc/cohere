@@ -14,7 +14,7 @@ import (
  * UTF-8, so these step by rune instead: forward by decoding the rune at the cursor, backward by decoding
  * the rune that ends at it. For ASCII the two agree exactly. They differ for the characters these
  * functions actually test that are not ASCII: U+2028 and U+2029, which skipNewline treats as newlines,
- * and the Unicode whitespace JavaScript's \s matches (U+00A0, U+3000, U+FEFF and the rest). A byte-wise
+ * and the Unicode whitespace JavaScript's \s matches (`U+00A0`, `U+3000`, `U+FEFF` and the rest). A byte-wise
  * port would land inside those characters and report a position that is not a character boundary.
  *
  * Upstream returns false for "no position". Here that is -2, notFound, so every function stays one int
