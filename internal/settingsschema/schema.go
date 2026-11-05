@@ -106,12 +106,12 @@ func document(ruleNames []string, nexusTier bool) (*schemaNode, error) {
 	}
 
 	title := "CohereSettings.json"
-	summary := "cohere's settings for one repository: what it checks, how strictly, how it formats, and which paths it " +
-		"never touches. With no file at all, cohere applies the house stack and the house format."
+	summary := "cohere's settings for one repository: what it checks, how strictly, how it formats, and which paths " +
+		"it never touches. With no file at all, cohere applies the house stack and the house format."
 	if nexusTier {
 		title = "NexusCohereSettings.json"
-		summary = "The Nexus tier our repositories' settings reach. In a chain extending a cohere:system-inc set it is the " +
-			"one file that holds the format block, so every one of our repositories formats the same way."
+		summary = "The Nexus tier our repositories' settings reach. In a chain extending a cohere:system-inc set " +
+			"it is the one file that holds the format block, so every one of our repositories formats the same way."
 	}
 	schema := &schemaNode{
 		Schema:               "https://json-schema.org/draft/2020-12/schema",

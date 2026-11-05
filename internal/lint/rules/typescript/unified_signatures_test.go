@@ -388,7 +388,8 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			// overload's semicolon precedes the implementation, not either overload, so both read as
 			// undocumented and the pair still reports. A lookup that reached past a signature's own
 			// end for its comment would go quiet here. The installed build reports this row.
-			sourceText: "function f(a: string): void;\nfunction f(a: number): void; /** documents the implementation */\n" +
+			sourceText: "function f(a: string): void;\n" +
+				"function f(a: number): void; /** documents the implementation */\n" +
 				"function f(a: unknown): void {}\n",
 			options:    &UnifiedSignaturesOptions{IgnoreOverloadsWithDifferentJsDoc: true},
 			isJsx:      false,

@@ -26,7 +26,8 @@ func TestUnrunRuleReferencesAreOneNoteMostNamedFirst(test *testing.T) {
 	out.Reset()
 	writeUnrunRuleReferences(stream, map[string]int{"no-with": 1})
 	flushStream(test, stream)
-	if want := "  directives: 1 disable comment names a rule cohere doesn't run, which silences nothing here: no-with 1\n"; out.String() != want {
+	if want := "  directives: 1 disable comment names a rule cohere doesn't run, which silences nothing here: " +
+		"no-with 1\n"; out.String() != want {
 		test.Errorf("the singular note is %q, want %q", out.String(), want)
 	}
 

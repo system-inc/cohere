@@ -578,7 +578,8 @@ func TestPreferEnumInitializersReportsAComputedKeyUpstreamCannotParse(test *test
 	result := rule_testing.Run(test, PreferEnumInitializers, preferEnumInitializersFile,
 		"enum D {\n  ['computed'],\n}")
 	rule_testing.ExpectFindings(test, result, "defineInitializer")
-	if got := result.Diagnostics[0].Message.Description; got != "The value of the member '['computed']' should be explicitly defined." {
+	if got := result.Diagnostics[0].Message.Description; got != "The value of the member '['computed']' "+
+		"should be explicitly defined." {
 		test.Fatalf("message: got %q", got)
 	}
 }

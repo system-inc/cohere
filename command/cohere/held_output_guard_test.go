@@ -103,8 +103,9 @@ func heldOutputReport(stack string, waited time.Duration) string {
 	case len(holders) == 0:
 		report.WriteString(
 			"no other process holds the other end of any pipe this process reads, so the read end was most " +
-				"likely closed out from under the poller: look for a second *os.File made on one descriptor (os.NewFile on a " +
-				"descriptor something else owns), whose finalizer closes it again after its number was reused\n",
+				"likely closed out from under the poller: look for a second *os.File made on one descriptor " +
+				"(os.NewFile on a descriptor something else owns), whose finalizer closes it again after its number " +
+				"was reused\n",
 		)
 	default:
 		report.WriteString(

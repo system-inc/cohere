@@ -164,8 +164,8 @@ func TestNoDuplicateEnumValuesAnchorsNumbersAtTheFirstAndStringsAtThePrevious(te
 	numericResult := rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, numeric)
 	rule_testing.ExpectFindings(test, numericResult, "noDuplicateEnumValues", "noDuplicateEnumValues")
 	// Both findings anchor on `A`'s initializer. Line two starts at 9 and its `1` sits at 15.
-	if first, second := numericResult.Diagnostics[0].Range.Pos(), numericResult.Diagnostics[1].Range.Pos(); first != 15 ||
-		second != 15 {
+	if first, second := numericResult.Diagnostics[0].Range.Pos(),
+		numericResult.Diagnostics[1].Range.Pos(); first != 15 || second != 15 {
 		test.Fatalf("expected both numeric findings anchored at offset 15, got %d and %d", first, second)
 	}
 

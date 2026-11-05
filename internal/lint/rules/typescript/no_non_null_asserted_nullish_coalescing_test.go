@@ -192,7 +192,8 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnUpstreamFailCases(test *testin
 			if gotSpan != testCase.wantSpan {
 				test.Fatalf("span: expected %q, got %q", testCase.wantSpan, gotSpan)
 			}
-			if diagnostic.Message.Description != "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed." {
+			if diagnostic.Message.Description != "The nullish coalescing operator is designed to handle "+
+				"undefined and null - using a non-null assertion is not needed." {
 				test.Fatalf("message: got %q", diagnostic.Message.Description)
 			}
 			if diagnostic.Message.Id != "noNonNullAssertedNullishCoalescing" {

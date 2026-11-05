@@ -832,9 +832,8 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(test *tes
 	for index, testCase := range cases {
 		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions(
-				[]byte(testCase.configuration),
-			)
+			decoded, decodeNoUnnecessaryBooleanLiteralCompareOptionsError :=
+				DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(testCase.configuration))
 			if decodeNoUnnecessaryBooleanLiteralCompareOptionsError != nil {
 				test.Fatalf(
 					"decoding %s: %v",

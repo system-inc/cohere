@@ -2051,7 +2051,8 @@ func TestSwitchExhaustivenessCheckOptionsBindFromCamelCaseJson(test *testing.T) 
 	if err != nil {
 		test.Fatalf("decoding the inert option: %v", err)
 	}
-	if patternOptions, _ := withPattern.(SwitchExhaustivenessCheckOptions); patternOptions.DefaultCaseCommentPattern == nil {
+	if patternOptions, _ :=
+		withPattern.(SwitchExhaustivenessCheckOptions); patternOptions.DefaultCaseCommentPattern == nil {
 		test.Fatal("defaultCaseCommentPattern did not bind")
 	}
 }

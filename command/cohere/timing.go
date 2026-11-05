@@ -73,8 +73,8 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 	fmt.Fprintf(
 		out,
 		"  (a rule that waits, sleeps or is descheduled costs nothing here. Each of the %d measured calls "+
-			"costs about %dns to measure, subtracted from every row and counted once below. Compare rules to each other: "+
-			"the measurement makes a --timing run slower than a real one.)\n",
+			"costs about %dns to measure, subtracted from every row and counted once below. Compare rules to each "+
+			"other: the measurement makes a --timing run slower than a real one.)\n",
 		account.Calls,
 		perCall.Nanoseconds(),
 	)
@@ -301,9 +301,9 @@ func printCoverage(out *bufio.Writer, timings *program.Timings) {
 	}
 
 	fmt.Fprintf(out,
-		"  coverage: the walk workers spent %s of CPU: rules %.0f%%, shared derivations %.0f%%, measuring %.0f%%, and %.0f%% "+
-			"the walk itself (traversal, dispatch, configuration). Another %s of process CPU ran on no walk worker "+
-			"(the garbage collector, the runtime).\n",
+		"  coverage: the walk workers spent %s of CPU: rules %.0f%%, shared derivations %.0f%%, measuring %.0f%%, "+
+			"and %.0f%% the walk itself (traversal, dispatch, configuration). Another %s of process CPU ran on no "+
+			"walk worker (the garbage collector, the runtime).\n",
 		formatMilliseconds(workersCPU),
 		100*float64(ruleCPU)/float64(workersCPU),
 		100*float64(sharedCPU)/float64(workersCPU),
