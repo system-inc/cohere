@@ -76,6 +76,8 @@ func (converter *Converter) followsTypeCastComment(start int) bool {
 	return index >= 0 && TrimJavaScript(converter.text[ends[index]:start]) == ""
 }
 
+var typeCastCommentPattern = regexp.MustCompile(`@(?:type|satisfies)\b`)
+
 // IsTypeCastComment is upstream's isTypeCastComment, utilities/is-type-cast-comment.js. Upstream
 // memoizes it per comment; the answer reads only the comment's value, so computing it each time is
 // the same.
@@ -87,8 +89,6 @@ func IsTypeCastComment(comment *Node) bool {
 		// That's why we just search for "@type" and "@satisfies".
 		typeCastCommentPattern.MatchString(comment.String("value"))
 }
-
-var typeCastCommentPattern = regexp.MustCompile(`@(?:type|satisfies)\b`)
 
 // Convert parses nothing: it converts a parsed source file, and returns the Program with its comments.
 //
@@ -619,10 +619,11 @@ func isThisInTypeQuery(node *ast.Node) bool {
 	if node.Kind != ast.KindIdentifier || scanner.IdentifierToKeywordKind(node.AsIdentifier()) != ast.KindThisKeyword {
 		return false
 	}
-	for node.Parent.Kind == ast.KindQualifiedName && node.Parent.AsQualifiedName().Left == node {
-		node = node.Parent
+	current := node
+	for current.Parent.Kind == ast.KindQualifiedName && current.Parent.AsQualifiedName().Left == current {
+		current = current.Parent
 	}
-	return node.Parent.Kind == ast.KindTypeQuery
+	return current.Parent.Kind == ast.KindTypeQuery
 }
 
 // keywordTypeNames are the keyword types upstream converts to `TS${SyntaxKind[kind]}`.
@@ -2014,7 +2015,8 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 // convertParameter is upstream's Parameter case.
 func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *Node {
 	declaration := node.AsParameterDeclaration()
-	var parameter, result *Node
+	var parameter *Node
+	var result *Node
 	switch {
 	case declaration.DotDotDotToken != nil:
 		parameter = converter.createNode(node, "RestElement",
@@ -2079,7 +2081,8 @@ func (converter *Converter) convertClass(node *ast.Node) *Node {
 		classType = "ClassDeclaration"
 	}
 	classLike := node.ClassLikeData()
-	var extendsClause, implementsClause *ast.HeritageClause
+	var extendsClause *ast.HeritageClause
+	var implementsClause *ast.HeritageClause
 	if classLike.HeritageClauses != nil {
 		for _, clause := range classLike.HeritageClauses.Nodes {
 			heritage := clause.AsHeritageClause()
@@ -2337,8 +2340,9 @@ func binaryExpressionType(kind ast.Kind) (string, string) {
 	switch kind {
 	case ast.KindAmpersandAmpersandEqualsToken, ast.KindAmpersandEqualsToken, ast.KindAsteriskAsteriskEqualsToken,
 		ast.KindAsteriskEqualsToken, ast.KindBarBarEqualsToken, ast.KindBarEqualsToken, ast.KindCaretEqualsToken,
-		ast.KindEqualsToken, ast.KindGreaterThanGreaterThanEqualsToken, ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
-		ast.KindLessThanLessThanEqualsToken, ast.KindMinusEqualsToken, ast.KindPercentEqualsToken, ast.KindPlusEqualsToken,
+		ast.KindEqualsToken, ast.KindGreaterThanGreaterThanEqualsToken,
+		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken, ast.KindLessThanLessThanEqualsToken,
+		ast.KindMinusEqualsToken, ast.KindPercentEqualsToken, ast.KindPlusEqualsToken,
 		ast.KindQuestionQuestionEqualsToken, ast.KindSlashEqualsToken:
 		return "AssignmentExpression", operator
 	case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:

@@ -337,6 +337,9 @@ func (reader *jsonReader) parseTemplate() (*Node, error) {
 	return New("TemplateLiteral", start, reader.position, "expressions", []*Node{}, "quasis", []*Node{element}), nil
 }
 
+// unexpectedNumericSeparator is Babel's refusal of a separator out of place, Errors.UnexpectedNumericSeparator.
+const unexpectedNumericSeparator = "A numeric separator is only allowed between two digits."
+
 // parseNumber reads a numeric literal: decimal with fraction and exponent, or hexadecimal, octal and
 // binary with their prefixes, numeric separators allowed where Babel allows them. Legacy octal (`017`) and
 // bigint are refused.
@@ -400,9 +403,6 @@ func (reader *jsonReader) parseNumber() (*Node, error) {
 	reader.position = position
 	return New("NumericLiteral", start, position, "value", value, "raw", text[start:position]), nil
 }
-
-// unexpectedNumericSeparator is Babel's refusal of a separator out of place, Errors.UnexpectedNumericSeparator.
-const unexpectedNumericSeparator = "A numeric separator is only allowed between two digits."
 
 // separatorsBetweenDigits is Babel's check on each numeric separator in text[start:end], a literal's digits
 // in radix (its tokenizer's readInt): a separator stands only where the next character is a digit of the

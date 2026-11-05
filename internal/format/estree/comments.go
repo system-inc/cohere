@@ -71,12 +71,13 @@ func (collector *commentCollector) visit(node *ast.Node) {
 
 // scanTrivia records the comments in the trivia that starts at pos, stopping at the first token.
 func (collector *commentCollector) scanTrivia(position int, end int) {
-	for position < end {
-		next, isTrivia := collector.skipOneTrivia(position, end)
+	cursor := position
+	for cursor < end {
+		next, isTrivia := collector.skipOneTrivia(cursor, end)
 		if !isTrivia {
 			return
 		}
-		position = next
+		cursor = next
 	}
 }
 
@@ -85,24 +86,25 @@ func (collector *commentCollector) scanTrivia(position int, end int) {
 // a gap, so its contents can never be read as a comment.
 func (collector *commentCollector) scanGap(position int, end int) {
 	text := collector.text
-	for position < end {
-		next, isTrivia := collector.skipOneTrivia(position, end)
+	cursor := position
+	for cursor < end {
+		next, isTrivia := collector.skipOneTrivia(cursor, end)
 		if isTrivia {
-			position = next
+			cursor = next
 			continue
 		}
-		switch quote := text[position]; quote {
+		switch quote := text[cursor]; quote {
 		case '"', '\'', '`':
-			position++
-			for position < end && text[position] != quote {
-				if text[position] == '\\' {
-					position++
+			cursor++
+			for cursor < end && text[cursor] != quote {
+				if text[cursor] == '\\' {
+					cursor++
 				}
-				position++
+				cursor++
 			}
-			position++
+			cursor++
 		default:
-			position++
+			cursor++
 		}
 	}
 }
@@ -115,26 +117,25 @@ func (collector *commentCollector) skipOneTrivia(position int, end int) (int, bo
 	switch {
 	case character == '/' && position+1 < end && text[position+1] == '/':
 		start := position
-		position += 2
-		for position < end {
-			if size := lineTerminatorSize(text, position); size > 0 {
+		cursor := position + 2
+		for cursor < end {
+			if size := lineTerminatorSize(text, cursor); size > 0 {
 				break
 			}
-			position++
+			cursor++
 		}
-		collector.add("Line", start, position, text[start+2:position])
-		return position, true
+		collector.add("Line", start, cursor, text[start+2:cursor])
+		return cursor, true
 	case character == '/' && position+1 < end && text[position+1] == '*':
 		start := position
 		closing := strings.Index(text[position+2:end], "*/")
 		if closing < 0 {
-			position = end
-			collector.add("Block", start, position, text[start+2:position])
-			return position, true
+			collector.add("Block", start, end, text[start+2:end])
+			return end, true
 		}
-		position = position + 2 + closing + 2
-		collector.add("Block", start, position, text[start+2:position-2])
-		return position, true
+		closed := position + 2 + closing + 2
+		collector.add("Block", start, closed, text[start+2:closed-2])
+		return closed, true
 	}
 	if size := whitespaceSize(text, position); size > 0 {
 		return position + size, true

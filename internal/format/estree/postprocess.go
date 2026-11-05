@@ -16,15 +16,18 @@ import (
 // Postprocess reshapes a converted Program the way Prettier does, and returns the root. comments is
 // the file's comment list, which it may merge in place, so it returns that too, and the text stripped of
 // those comments, for the printer to share.
+//
+// Mutates: program the tree is reshaped in place, as upstream's is: the caller's Program takes the whole
+// file's range, and the nodes under it the postprocess's changes
 func Postprocess(program *Node, comments []*Node, text string) (*Node, []*Node, *StrippedText) {
-	comments = mergeNestledJsdocComments(comments)
+	merged := mergeNestledJsdocComments(comments)
 
 	// In typescript the Program does not count leading and trailing whitespace and comments.
 	program.Range = [2]int{0, len(text)}
 
-	processor := &postprocessor{text: text, stripped: NewStrippedText(text, comments)}
-	program = processor.visit(program)
-	return program, comments, processor.stripped
+	processor := &postprocessor{text: text, stripped: NewStrippedText(text, merged)}
+	root := processor.visit(program)
+	return root, merged, processor.stripped
 }
 
 type postprocessor struct {
@@ -84,6 +87,10 @@ func (processor *postprocessor) visit(node *Node) *Node {
 	return processor.onLeave(node)
 }
 
+// onEnter is the postprocess's step on a node before its children are visited.
+//
+// Mutates: node a template element's range moves to espree's positions in place, as upstream's does, since
+// the visit keeps the node it was handed
 func (processor *postprocessor) onEnter(node *Node) *Node {
 	processor.setContentEnd(node)
 
@@ -136,6 +143,8 @@ func rebalanceLogicalTree(node *Node) *Node {
 
 // setContentEnd is upstream's setContentEnd: the end of a statement before its semicolon, with the
 // comments between them stripped out of consideration.
+//
+// Mutates: node the content end is recorded on the statement itself, where the printer reads it
 func (processor *postprocessor) setContentEnd(node *Node) {
 	if !ShouldAddContentEnd(node) {
 		return
@@ -217,18 +226,19 @@ func mergeNestledJsdocComments(comments []*Node) []*Node {
 	if len(comments) < 2 {
 		return comments
 	}
+	merged := comments
 	var following *Node
-	for index := len(comments) - 1; index >= 0; index-- {
-		comment := comments[index]
+	for index := len(merged) - 1; index >= 0; index-- {
+		comment := merged[index]
 		if following != nil && LocEnd(comment) == LocStart(following) &&
 			IsIndentableBlockComment(comment) && IsIndentableBlockComment(following) {
-			comments = append(comments[:index+1], comments[index+2:]...)
+			merged = append(merged[:index+1], merged[index+2:]...)
 			comment.Set("value", comment.String("value")+"*//*"+following.String("value"))
 			comment.Range = [2]int{LocStart(comment), LocEnd(following)}
 		}
 		following = comment
 	}
-	return comments
+	return merged
 }
 
 // IndentableBlockCommentLines is upstream's getIndentableBlockCommentLines: the lines of a multi-line
