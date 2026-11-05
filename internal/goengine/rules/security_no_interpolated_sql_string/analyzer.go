@@ -236,14 +236,14 @@ type queryReader struct {
 
 // read is expression as a template: its texts where they are constants, and a hole for every value it writes in.
 func (reader queryReader) read(expression ast.Expr, depth int) template {
-	expression = ast.Unparen(expression)
+	unwrapped := ast.Unparen(expression)
 	if depth > readingDepth {
-		return holeTemplate(hole{expression: expression})
+		return holeTemplate(hole{expression: unwrapped})
 	}
-	if value := reader.pass.TypesInfo.Types[expression].Value; value != nil && value.Kind() == constant.String {
+	if value := reader.pass.TypesInfo.Types[unwrapped].Value; value != nil && value.Kind() == constant.String {
 		return textTemplate(constant.StringVal(value))
 	}
-	switch built := expression.(type) {
+	switch built := unwrapped.(type) {
 	case *ast.BinaryExpr:
 		if built.Op == token.ADD && isString(reader.pass.TypesInfo.TypeOf(built)) {
 			query := reader.read(built.X, depth+1)
@@ -261,17 +261,17 @@ func (reader queryReader) read(expression ast.Expr, depth int) template {
 			return reader.read(initializer, depth+1)
 		}
 	}
-	return holeTemplate(hole{expression: expression})
+	return holeTemplate(hole{expression: unwrapped})
 }
 
 // buildsText is whether expression is a shape read reads as more than one hole: a constant, a sum, or a
 // fmt.Sprintf.
 func (reader queryReader) buildsText(expression ast.Expr) bool {
-	expression = ast.Unparen(expression)
-	if reader.pass.TypesInfo.Types[expression].Value != nil {
+	unwrapped := ast.Unparen(expression)
+	if reader.pass.TypesInfo.Types[unwrapped].Value != nil {
 		return true
 	}
-	switch built := expression.(type) {
+	switch built := unwrapped.(type) {
 	case *ast.BinaryExpr:
 		return built.Op == token.ADD
 	case *ast.CallExpr:
@@ -430,13 +430,13 @@ func canHoldText(candidate types.Type) bool {
 // isEscaped is whether expression, or the initializer of the local it names, ends in the one escape the package
 // comment accepts.
 func (reader queryReader) isEscaped(expression ast.Expr) bool {
-	expression = ast.Unparen(expression)
-	if identifier, isIdentifier := expression.(*ast.Ident); isIdentifier {
+	resolved := ast.Unparen(expression)
+	if identifier, isIdentifier := resolved.(*ast.Ident); isIdentifier {
 		if initializer := reader.localInitializer(identifier); initializer != nil {
-			expression = ast.Unparen(initializer)
+			resolved = ast.Unparen(initializer)
 		}
 	}
-	outer, outerReceiver := reader.replaceStep(expression)
+	outer, outerReceiver := reader.replaceStep(resolved)
 	if outer == "" {
 		return false
 	}

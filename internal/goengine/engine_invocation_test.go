@@ -149,11 +149,13 @@ func TestRefusalSentence(test *testing.T) {
 func TestMainRefusesASecondRun(test *testing.T) {
 	test.Setenv("GOMEMLIMIT", "off")
 	versionArguments := append(slices.Clone(contractArguments), "--version")
-	var firstOutput, firstError bytes.Buffer
+	var firstOutput bytes.Buffer
+	var firstError bytes.Buffer
 	if exitCode := Main(versionArguments, &firstOutput, &firstError); exitCode != exitClean {
 		test.Fatalf("the first run exited %d, want %d; stderr: %s", exitCode, exitClean, firstError.String())
 	}
-	var secondOutput, secondError bytes.Buffer
+	var secondOutput bytes.Buffer
+	var secondError bytes.Buffer
 	if exitCode := Main(versionArguments, &secondOutput, &secondError); exitCode != exitRefused {
 		test.Fatalf("the second run exited %d, want %d", exitCode, exitRefused)
 	}
