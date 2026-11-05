@@ -96,3 +96,21 @@ func readLocal() (*osexec.Cmd, int) {
 	arguments := []string{"test", "-count=1"} // want "throws away the test cache"
 	return osexec.Command("go", arguments...), len(arguments)
 }
+
+// A marker with nothing after its colon excuses nothing and asks for the reason.
+func emptyReason() *osexec.Cmd {
+	// Uncached:
+	return osexec.Command("go", "test", "-count=1") // want "gives no reason"
+}
+
+// A sentence that only mentions the marker excuses nothing.
+func markerMentioned() *osexec.Cmd {
+	// This run was Uncached: once, to chase a flake.
+	return osexec.Command("go", "test", "-count=1") // want "throws away the test cache"
+}
+
+// A comment trailing the code on the line above speaks for that code.
+func markerTrailsLineAbove() (*osexec.Cmd, string) {
+	program := "go"                                          // Uncached: this line's reason, not the next's
+	return osexec.Command("go", "test", "-count=1"), program // want "throws away the test cache"
+}
