@@ -48,8 +48,8 @@ func structureFixture(importerSource string) map[string]string {
 }
 
 // derivedOptions turns the derivation on, rooted at the fixture's own directory.
-func derivedOptions(written ...PathAlias) func(directory string) any {
-	return func(directory string) any {
+func derivedOptions(written ...PathAlias) func(directory string) ImportRequirePathAliasOptions {
+	return func(directory string) ImportRequirePathAliasOptions {
 		return ImportRequirePathAliasOptions{
 			RepositoryRoot:           directory,
 			Aliases:                  written,
@@ -142,7 +142,7 @@ func TestImportRequirePathAliasDerivesNothingUnlessAsked(test *testing.T) {
 
 	rule_testing.ExpectClean(test,
 		rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, fixture, derivedImporter,
-			func(directory string) any {
+			func(directory string) ImportRequirePathAliasOptions {
 				return ImportRequirePathAliasOptions{RepositoryRoot: directory}
 			}))
 }
@@ -220,7 +220,7 @@ func TestAliasesFromCompilerPathsLeavesOutATargetOutsideTheRepository(test *test
 		"libraries/structure/TypeScriptConfiguration.json": strings.Replace(structurePathsBase,
 			`"@project/*": ["../../*"]`, `"@outside/*": ["../../../*"]`, 1),
 		derivedImporter: "import { Shared } from '../../shared/Shared';\n",
-	}, derivedImporter, func(directory string) any {
+	}, derivedImporter, func(directory string) ImportRequirePathAliasOptions {
 		// Rooted one level down, at app/, so `@outside` lands above the root and `@project` is gone.
 		return ImportRequirePathAliasOptions{RepositoryRoot: directory + "/app", AliasesFromTsconfigPaths: true}
 	})

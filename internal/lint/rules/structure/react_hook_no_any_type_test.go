@@ -527,11 +527,11 @@ func TestReactHookAnyTypeBlindedRuleDerivationReadsTheFlag(test *testing.T) {
 		named[name] = true
 	}
 
-	for _, registration := range rule.Registered() {
-		want := registration.Rule.ResolvesReactValueTypes
-		if got := named[registration.Rule.Name]; got != want {
+	for _, entry := range rule.Registered() {
+		want := entry.ResolvesReactValueTypes
+		if got := named[entry.Name]; got != want {
 			test.Errorf("rule %q declares ResolvesReactValueTypes=%v but the derivation %s it",
-				registration.Rule.Name, want, map[bool]string{true: "named", false: "did not name"}[got])
+				entry.Name, want, map[bool]string{true: "named", false: "did not name"}[got])
 		}
 	}
 }

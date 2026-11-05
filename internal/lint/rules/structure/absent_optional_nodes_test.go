@@ -68,7 +68,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
 			"    return networkService.useGraphQlQuery(Document, { identifier });\n}\n",
 	}
 
-	rules := []rule.Rule{
+	rules := []rule.Rule[rule.NoOptions]{
 		NetworkNoStringLiteralQuery,
 		NetworkRequireHookRequestSuffix,
 		NetworkRequireHookOptionsParameter,

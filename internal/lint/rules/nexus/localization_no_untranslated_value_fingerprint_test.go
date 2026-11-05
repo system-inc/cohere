@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
 // localizationNoUntranslatedValueFingerprintOf is the rule's program fingerprint over a fixture, read through
@@ -14,8 +15,8 @@ func localizationNoUntranslatedValueFingerprintOf(test *testing.T, files map[str
 	test.Helper()
 	graph, _ := buildTranslations(test, files)
 	return LocalizationNoUntranslatedValue.ProgramFingerprint(
-		rule.ViewProgram(graph.Program, nil, LocalizationNoUntranslatedValue),
-		nil,
+		rule.ViewProgram(graph.Program, nil, rule_testing.EntryOf(test, LocalizationNoUntranslatedValue).Traits),
+		rule.Given[rule.NoOptions]{},
 	)
 }
 

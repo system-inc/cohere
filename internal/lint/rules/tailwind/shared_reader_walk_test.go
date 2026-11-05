@@ -10,15 +10,27 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// sharedReaderRules are the rules that read class surfaces through ClassLiteralSurfaces.ReaderFor.
-var sharedReaderRules = []rule.Rule{
-	EnforceCanonicalClasses, EnforceConsistentClassOrder, EnforceConsistentImportantPosition,
-	EnforceConsistentVariableSyntax, EnforceConsistentVariantOrder, EnforceShorthandClasses,
-	NoConcatenatedClasses, NoConflictingClasses, NoDeprecatedClasses, NoDuplicateClasses,
-	NoUnknownClasses, NoUnnecessaryWhitespace,
+// sharedReaderRules are the rules that read class surfaces through ClassLiteralSurfaces.ReaderFor, each run
+// unconfigured.
+func sharedReaderRules(test testing.TB) []rule.Entry {
+	return []rule.Entry{
+		rule_testing.EntryOf(test, EnforceCanonicalClasses),
+		rule_testing.EntryOf(test, EnforceConsistentClassOrder),
+		rule_testing.EntryOf(test, EnforceConsistentImportantPosition),
+		rule_testing.EntryOf(test, EnforceConsistentVariableSyntax),
+		rule_testing.EntryOf(test, EnforceConsistentVariantOrder),
+		rule_testing.EntryOf(test, EnforceShorthandClasses),
+		rule_testing.EntryOf(test, NoConcatenatedClasses),
+		rule_testing.EntryOf(test, NoConflictingClasses),
+		rule_testing.EntryOf(test, NoDeprecatedClasses),
+		rule_testing.EntryOf(test, NoDuplicateClasses),
+		rule_testing.EntryOf(test, NoUnknownClasses),
+		rule_testing.EntryOf(test, NoUnnecessaryWhitespace),
+	}
 }
 
 // sharedReaderWalkSource plants a finding for every one of those rules, on all three surfaces and in
@@ -88,7 +100,7 @@ func TestSharedReaderFindsWhatEachRuleFindsAlone(test *testing.T) {
 	}
 	files := graph.ProjectFiles()
 
-	findings := func(rules []rule.Rule) []string {
+	findings := func(rules []rule.Entry) []string {
 		result, walkError := graph.Walk(context.Background(), files, rules)
 		if walkError != nil {
 			test.Fatalf("walking: %v", walkError)
@@ -102,14 +114,15 @@ func TestSharedReaderFindsWhatEachRuleFindsAlone(test *testing.T) {
 		return lines
 	}
 
-	shared := findings(sharedReaderRules)
+	rules := sharedReaderRules(test)
+	shared := findings(rules)
 	var alone []string
-	for _, subject := range sharedReaderRules {
-		alone = append(alone, findings([]rule.Rule{subject})...)
+	for _, subject := range rules {
+		alone = append(alone, findings([]rule.Entry{subject})...)
 	}
 	slices.Sort(alone)
 
-	for _, subject := range sharedReaderRules {
+	for _, subject := range rules {
 		reported := slices.ContainsFunc(
 			alone,
 			func(line string) bool { return strings.HasPrefix(line, subject.Name+" ") },

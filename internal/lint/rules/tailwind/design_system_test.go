@@ -13,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	tailwindengine "github.com/system-inc/cohere/internal/lint/rules/tailwind/collapse"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -181,7 +182,8 @@ func designSystemWalk(test *testing.T, root string, subject rule.Rule[rule.NoOpt
 		test.Fatal("the program holds no project files, so the walk would prove nothing")
 	}
 
-	if _, walkError := graph.Walk(context.Background(), files, []rule.Rule{subject}); walkError != nil {
+	_, walkError := graph.Walk(context.Background(), files, rule_testing.EntriesOf(test, subject))
+	if walkError != nil {
 		test.Fatalf("walking: %v", walkError)
 	}
 	return graph

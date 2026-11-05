@@ -9,7 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -58,7 +58,7 @@ func relationMessages(test *testing.T, files map[string]string, anotherFirst boo
 	result, err := graph.Walk(
 		context.Background(),
 		[]*ast.SourceFile{caseFile},
-		[]rule.Rule{InvariantMutable, NoOptionalWidening},
+		rule_testing.EntriesOf(test, InvariantMutable, NoOptionalWidening),
 	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
