@@ -48,9 +48,7 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 		// upstream's printDanglingComments without indent returns join(hardline, parts), an array.
 		parts, _ := doc.Parts(printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
 		if len(parts) > 0 {
-			for _, part := range parts[:len(parts)-1] {
-				danglingCommentsDoc = append(danglingCommentsDoc, part)
-			}
+			danglingCommentsDoc = append(danglingCommentsDoc, parts[:len(parts)-1]...)
 			var separator Doc = line
 			if isLineComment(lastComment) ||
 				hasNewline(options.OriginalText, locEnd(lastComment)) {

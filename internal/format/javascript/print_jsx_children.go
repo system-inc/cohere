@@ -88,9 +88,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 		current.List("children")[0].Is("JSXExpressionContainer") &&
 		current.List("children")[0].Child("expression").Is("TemplateLiteral", "TaggedTemplateExpression") {
 		parts := []Doc{openingLines}
-		for _, printed := range printAll(path, print, "children") {
-			parts = append(parts, printed)
-		}
+		parts = append(parts, printAll(path, print, "children")...)
 		parts = append(parts, closingLines)
 		return concatIn(path, parts...)
 	}
@@ -305,9 +303,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	}
 
 	flatParts := []Doc{openingLines}
-	for _, child := range children {
-		flatParts = append(flatParts, child)
-	}
+	flatParts = append(flatParts, children...)
 	flatParts = append(flatParts, closingLines)
 	return conditionalGroup([]Doc{
 		groupIn(path, concatIn(path, flatParts...)),

@@ -230,9 +230,7 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 					spacing = " "
 				}
 				single := []Doc{doc.Text("{"), textDoc(spacing)}
-				for _, specifier := range groupedSpecifiers {
-					single = append(single, specifier)
-				}
+				single = append(single, groupedSpecifiers...)
 				single = append(single, textDoc(spacing), doc.Text("}"))
 				parts = append(parts, concatIn(path, single...))
 			}

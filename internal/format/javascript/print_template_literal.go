@@ -40,9 +40,7 @@ func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
 	}, "quasis")
 
 	result := []Doc{lineSuffixBoundary, doc.Text("`")}
-	for _, part := range parts {
-		result = append(result, part)
-	}
+	result = append(result, parts...)
 	result = append(result, doc.Text("`"))
 	return concatIn(path, result...)
 }

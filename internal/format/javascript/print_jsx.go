@@ -190,9 +190,7 @@ func printJsxOpeningElement(path *Path, options *Options, print PrintFunc) Doc {
 			print("typeArguments", nil),
 			doc.Text(" "),
 		}
-		for _, printed := range printAll(path, print, "attributes") {
-			parts = append(parts, printed)
-		}
+		parts = append(parts, printAll(path, print, "attributes")...)
 		if current.Bool("selfClosing") {
 			parts = append(parts, doc.Text(" />"))
 		} else {
