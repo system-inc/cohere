@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-no-else-return"
+  },
+  "messages": {
+    "elseAfterReturn": {
+      "text": "This `else` follows a branch that always returns, so it does nothing: the code after the `if` already runs only when that branch did not return, which is all the `else` says. Drop the `else` and outdent its block, so the main path reads down the left edge and the early return reads as the exception it is, and the reader is spared a level of indentation that teaches them nothing."
+    }
+  }
+}
