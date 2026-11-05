@@ -10,6 +10,8 @@ import (
 
 // startInOwnProcessGroup makes the engine lead a process group of its own, so ending it can end
 // everything it started.
+//
+// Mutates: command the caller's command is the one started, so the group is set on it before it starts
 func startInOwnProcessGroup(command *exec.Cmd) {
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }

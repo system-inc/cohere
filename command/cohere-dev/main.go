@@ -38,16 +38,21 @@ import (
 	"github.com/system-inc/cohere/internal/streams"
 )
 
-// main is the one way out: every verb returns its exit code here, and streams.Finish delivers what was printed
-// and turns a clean exit into 1 when it did not arrive.
+// main is the one way out: it exits with the code finishedExitCode returns, once that has run its deferred show.
 func main() {
+	os.Exit(finishedExitCode())
+}
+
+// finishedExitCode runs the command line and returns the code cohere-dev exits with: every verb returns its exit
+// code here, and streams.Finish delivers what was printed and turns a clean exit into 1 when it did not arrive.
+func finishedExitCode() int {
 	// Deferred calls run while a panic unwinds, though not on os.Exit, so this delivers what was written before
-	// the panic's own report.
+	// the panic's own report, and main exits only after it has run.
 	defer func() {
 		streams.Show(streams.Errors)
 		streams.Show(streams.Output)
 	}()
-	os.Exit(streams.Finish(runCommandLine()))
+	return streams.Finish(runCommandLine())
 }
 
 // runCommandLine runs the verb the command line names and returns its exit code.

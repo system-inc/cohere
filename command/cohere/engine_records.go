@@ -499,9 +499,11 @@ func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) err
 	r.unusedPending = nil
 	r.unusedCoverage++
 
+	// The dashes here and in the items below are escaped, not changed: the report is in the TypeScript unused
+	// report's shape (internal/unused_exports/report.go, swift/Contract.md), so the two print the same bytes.
 	if !r.unusedHeadingPrinted {
 		r.unusedHeadingPrinted = true
-		fmt.Fprintf(r.out, "\nunused: a report, not a gate — nothing here fails a build\n")
+		fmt.Fprintf(r.out, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")
 	}
 	// File, line, then column, so two items on one line print in the same order on every run.
 	sort.SliceStable(items, func(first, second int) bool {
@@ -514,9 +516,9 @@ func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) err
 		return items[first].Column < items[second].Column
 	})
 	if len(items) > 0 {
-		fmt.Fprintf(r.out, "\n  %s — %d\n", swiftUnusedSection(record.Rule), len(items))
+		fmt.Fprintf(r.out, "\n  %s \u2014 %d\n", swiftUnusedSection(record.Rule), len(items))
 		for _, item := range items {
-			fmt.Fprintf(r.out, "    %s:%d:%d — %s\n", item.File, item.Line, item.Column, item.Subject)
+			fmt.Fprintf(r.out, "    %s:%d:%d \u2014 %s\n", item.File, item.Line, item.Column, item.Subject)
 		}
 	}
 	fmt.Fprintf(r.out, "  looked at %d files and %d %s (%s)\n", record.FilesChecked, record.Checked, swiftUnusedNoun(record.Rule), record.Rule)
