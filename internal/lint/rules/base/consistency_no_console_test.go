@@ -293,7 +293,7 @@ func TestNoConsoleReportsAnyBindingNamedConsole(test *testing.T) {
 	}
 }
 
-// TestNoConsoleMatchesTheSourceRepository records the whole-repository comparison.
+// The whole-repository comparison, recorded once.
 //
 // This is the check a base rule gets instead of an imported corpus, and it is stronger than one: the
 // port was run over all 1,814 TypeScript files of `api-phi-health/libraries/base` and compared
@@ -309,9 +309,5 @@ func TestNoConsoleReportsAnyBindingNamedConsole(test *testing.T) {
 // On every one of the other 1,811 files the two agree exactly, including all 87 files the real rule
 // reports on. That is the measurement this test records; it is not re-run here because it needs the
 // source repository on disk, and a test that silently skips when a path is missing would be worse
-// than a note.
-func TestNoConsoleMatchesTheSourceRepository(test *testing.T) {
-	test.Parallel()
-
-	test.Log("port 567, real rule 560, difference is 7 eslint-disable-next-line sites in 3 files")
-}
+// than a note. So it is kept as this note, not as a test: a test whose body only logs cannot fail, and would read as
+// coverage it does not give.
