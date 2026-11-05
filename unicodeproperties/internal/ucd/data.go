@@ -53,14 +53,14 @@ func span(text string) Range {
 	}
 	a, parseError := strconv.ParseInt(lo, 16, 32)
 	if parseError != nil {
-		// Invariant: every row span reads comes from the UCD zip embedded at build time, whose code points are all
-		// hex within 32 bits.
+		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
+		// time, whose code points are all hex within 32 bits.
 		panic(parseError)
 	}
 	b, parseError := strconv.ParseInt(hi, 16, 32)
 	if parseError != nil {
-		// Invariant: every row span reads comes from the UCD zip embedded at build time, whose code points are all
-		// hex within 32 bits.
+		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
+		// time, whose code points are all hex within 32 bits.
 		panic(parseError)
 	}
 	return Range{rune(a), rune(b)}

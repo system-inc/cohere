@@ -114,7 +114,7 @@ func TestAbsentCoverageReadsAsZeroRatherThanAGuess(test *testing.T) {
 func TestAnUnreadableCoverageCountReadsAsZero(test *testing.T) {
 	test.Parallel()
 	filesWalked, rulesRun := cohereCoverageFrom([]string{
-		"lint: 1 findings — 23 rules over 99999999999999999999 files, 2098302 nodes visited, in 813ms",
+		"lint: 1 findings \u2014 23 rules over 99999999999999999999 files, 2098302 nodes visited, in 813ms",
 	})
 	if filesWalked != 0 || rulesRun != 0 {
 		test.Fatalf(

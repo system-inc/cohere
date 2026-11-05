@@ -328,8 +328,8 @@ func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, fun
 	tree.immediate[0] = 0
 	blocks = blocks[:reached]
 
-	intersect := func(a, b int) int {
-		left, right := a, b
+	intersect := func(leftBlock, rightBlock int) int {
+		left, right := leftBlock, rightBlock
 		for left != right {
 			for left > right {
 				left = tree.immediate[left]
