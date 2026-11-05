@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "Go": "cohere-go/correctness-require-declared-walk"
+  },
+  "messages": {
+    "undeclaredWalk": {
+      "text": "This path takes a directory walk outside its package, and nothing declares what the walk reads, so a change to those files won't rerun this package's tests: they stay green on a stale result and the red surfaces later on someone else's change. Declare it with a `// Reads: <glob>` comment on this line or just above it, one glob per comment, and a matching reads line in {{readsFile}}."
+    }
+  }
+}
