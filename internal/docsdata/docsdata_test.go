@@ -14,6 +14,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/benchresults"
 	"github.com/system-inc/cohere/internal/docsdata/capture"
+	goenginerules "github.com/system-inc/cohere/internal/goengine/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -141,9 +142,12 @@ func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
 	if err := json.Unmarshal(swiftRegistry, &swiftEntries); err != nil {
 		t.Fatal(err)
 	}
-	registered := map[string][]string{"TypeScript": registry.Names()}
+	registered := map[string][]string{"TypeScript": registry.Names(), "Go": {}}
 	for _, entry := range swiftEntries {
 		registered["Swift"] = append(registered["Swift"], entry.Name)
+	}
+	for _, goRule := range goenginerules.All() {
+		registered["Go"] = append(registered["Go"], goRule.Name)
 	}
 
 	rows := map[string]map[string]int{}
@@ -153,8 +157,11 @@ func TestEveryRegisteredRuleHasOneRow(t *testing.T) {
 		}
 		rows[row.Language][row.Name]++
 	}
-	for _, language := range []string{"TypeScript", "Swift"} {
-		if len(registered[language]) == 0 {
+	// Go is held to its registry in both directions like the others, but is not refused when empty: its
+	// rules arrive one unit at a time, and until the first does, zero Go rows is the true answer. The
+	// vacuity guard stays on the two engines that have always registered rules.
+	for _, language := range []string{"TypeScript", "Swift", "Go"} {
+		if len(registered[language]) == 0 && language != "Go" {
 			t.Fatalf("no %s rule is registered, so the rows were checked against nothing", language)
 		}
 		names := map[string]bool{}
