@@ -78,12 +78,12 @@ func (loaded *Loaded) ErrorsAnywhere() []error {
 // packages from source, with their syntax kept for the named ones, and the rest from config.Exports. It
 // returns an error only when it cannot load at all; what the packages themselves get wrong is each
 // package's Errors.
-func Load(config Config, patterns ...string) (*Loaded, error) {
-	root, sourceModule, err := moduleAt(config.Directory)
+func Load(configuration Config, patterns ...string) (*Loaded, error) {
+	root, sourceModule, err := moduleAt(configuration.Directory)
 	if err != nil {
 		return nil, err
 	}
-	listed, err := list(config.Directory, config.Environment, patterns)
+	listed, err := list(configuration.Directory, configuration.Environment, patterns)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 			roots[listedPackage.ImportPath] = true
 		}
 	}
-	if config.Tests {
+	if configuration.Tests {
 		// go list -deps follows no test's imports, and -test is a flag a runner refuses, so what only the tests
 		// import is listed by naming it beside the patterns.
 		testImports := map[string]bool{}
@@ -113,12 +113,12 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 				extended = append(extended, imported)
 			}
 			sort.Strings(extended[len(patterns):])
-			if listed, err = list(config.Directory, config.Environment, extended); err != nil {
+			if listed, err = list(configuration.Directory, configuration.Environment, extended); err != nil {
 				return nil, err
 			}
 		}
 	}
-	environment, err := goEnvironmentValues(config.Directory, config.Environment)
+	environment, err := goEnvironmentValues(configuration.Directory, configuration.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -128,13 +128,13 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 	}
 
 	fromExports := map[string]bool{}
-	if config.Exports != nil {
+	if configuration.Exports != nil {
 		fromExports = exportSet(listed, sourceModule)
 		for path := range fromExports {
-			if path != "unsafe" && config.Exports.files[path] == "" {
+			if path != "unsafe" && configuration.Exports.files[path] == "" {
 				return nil, fmt.Errorf("the %s product (%s) holds no export data for %s, which %s imports from %s: the product "+
 					"was listed from %s, so this load reaches a package it does not; widen the product's patterns",
-					config.Exports.name, config.Exports.key[:12], path, strings.Join(patterns, " "), root, strings.Join(config.Exports.patterns, " "))
+					configuration.Exports.name, configuration.Exports.key[:12], path, strings.Join(patterns, " "), root, strings.Join(configuration.Exports.patterns, " "))
 			}
 		}
 	}
@@ -146,7 +146,7 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 			continue
 		}
 		names := listedPackage.GoFiles
-		if config.Tests && roots[listedPackage.ImportPath] {
+		if configuration.Tests && roots[listedPackage.ImportPath] {
 			names = append(append(append([]string{}, names...), listedPackage.TestGoFiles...), listedPackage.XTestGoFiles...)
 		}
 		for _, name := range names {
@@ -157,13 +157,13 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 				"nothing here can type-check it from source", listedPackage.ImportPath, strings.Join(listedPackage.CgoFiles, ", "))
 		}
 	}
-	if refuseUnreadOverlayError := refuseUnreadOverlay(config.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
+	if refuseUnreadOverlayError := refuseUnreadOverlay(configuration.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
 		return nil, refuseUnreadOverlayError
 	}
 
 	fileSet := token.NewFileSet()
 	loader := &loader{
-		config:      config,
+		config:      configuration,
 		fileSet:     fileSet,
 		sizes:       sizes,
 		listed:      listed,
@@ -172,8 +172,8 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 		checked:     map[string]*Package{},
 		done:        map[string]chan struct{}{},
 	}
-	if config.Exports != nil {
-		loader.exportImporter = config.Exports.importer(fileSet)
+	if configuration.Exports != nil {
+		loader.exportImporter = configuration.Exports.importer(fileSet)
 	}
 	return loader.load()
 }
@@ -181,13 +181,13 @@ func Load(config Config, patterns ...string) (*Loaded, error) {
 // Parse lists the packages the patterns name and parses their files, with any overlay read in place of the
 // files it names, and type-checks nothing: for a test that reads syntax alone. Each package's Errors are what
 // go list and the parser reported for it.
-func Parse(config Config, patterns ...string) ([]*Package, error) {
-	listed, listError := list(config.Directory, config.Environment, patterns)
+func Parse(configuration Config, patterns ...string) ([]*Package, error) {
+	listed, listError := list(configuration.Directory, configuration.Environment, patterns)
 	if listError != nil {
 		return nil, listError
 	}
 	fileSet := token.NewFileSet()
-	reader := &loader{config: config, fileSet: fileSet}
+	reader := &loader{config: configuration, fileSet: fileSet}
 	var parsed []*Package
 	sourceFiles := map[string]bool{}
 	for _, listedPackage := range listed.packages {
@@ -205,7 +205,7 @@ func Parse(config Config, patterns ...string) ([]*Package, error) {
 		reader.parse(listedPackage, listedPackage.GoFiles, true, read)
 		parsed = append(parsed, read)
 	}
-	if refuseUnreadOverlayError := refuseUnreadOverlay(config.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
+	if refuseUnreadOverlayError := refuseUnreadOverlay(configuration.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
 		return nil, refuseUnreadOverlayError
 	}
 	return parsed, nil

@@ -538,11 +538,11 @@ func TestConsistentReturnFires(test *testing.T) {
 
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
-				wantPos := consistentReturnOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantPosition := consistentReturnOffsetOf(test, testCase.source, expected.line, expected.column)
 				wantEnd := consistentReturnOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
-				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
+				if diagnostic.Range.Pos() != wantPosition || diagnostic.Range.End() != wantEnd {
 					test.Errorf("finding %d: expected span [%d,%d) (%d:%d-%d:%d), got [%d,%d) %q",
-						index, wantPos, wantEnd,
+						index, wantPosition, wantEnd,
 						expected.line, expected.column, expected.endLine, expected.endColumn,
 						diagnostic.Range.Pos(), diagnostic.Range.End(),
 						asTheTypedConsistentReturnHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])

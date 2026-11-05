@@ -61,7 +61,7 @@ func applyProposedFixes(
 	formatPlan func() (edit.Transform, []string),
 	writable formatScope,
 	repositoryRoot string,
-	maxPasses int,
+	maximumPasses int,
 	write bool,
 	early *earlyFormat,
 ) (edit.Summary, program.Result, *crlfFiles, error) {
@@ -126,7 +126,7 @@ func applyProposedFixes(
 		if graph != nil {
 			programs.offer(graph)
 		}
-		speculation = speculateFormat(formatCandidates, transform, maxPasses, &programs)
+		speculation = speculateFormat(formatCandidates, transform, maximumPasses, &programs)
 	}
 
 	var result program.Result
@@ -319,7 +319,7 @@ func applyProposedFixes(
 	streams.Show(streams.Errors)
 	attempts := formatInParallel(fileNames, byFileName, speculated, func(fileName string) (edit.FileResult, error) {
 		return watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
-			return process(fileName, propose(fileName, refuseToRelint), transform, maxPasses)
+			return process(fileName, propose(fileName, refuseToRelint), transform, maximumPasses)
 		})
 	})
 
@@ -330,7 +330,7 @@ func applyProposedFixes(
 			// Again for each file this loop formats, since a file before it may have failed and said so.
 			streams.Show(streams.Errors)
 			fileResult, err = watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
-				return process(fileName, propose(fileName, serially), transform, maxPasses)
+				return process(fileName, propose(fileName, serially), transform, maximumPasses)
 			})
 		}
 		if err != nil {
@@ -753,12 +753,12 @@ type formatSpeculation struct {
 // programs is where the program arrives once it is built, or nil. Every other file goes first, so the program
 // has the time to be built while they are formatted, and a TypeScript file reached before then is parsed, as
 // before: nothing waits for the program.
-func speculateFormat(candidates []string, transform edit.Transform, maxPasses int, programs *programOffer) *formatSpeculation {
-	return speculateFormatOn(candidates, transform, maxPasses, speculationWorkers(), programs)
+func speculateFormat(candidates []string, transform edit.Transform, maximumPasses int, programs *programOffer) *formatSpeculation {
+	return speculateFormatOn(candidates, transform, maximumPasses, speculationWorkers(), programs)
 }
 
 // speculateFormatOn is speculateFormat on a given number of workers.
-func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses int, workers int, programs *programOffer) *formatSpeculation {
+func speculateFormatOn(candidates []string, transform edit.Transform, maximumPasses int, workers int, programs *programOffer) *formatSpeculation {
 	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{},
 		stopped: make(chan struct{})}
 	speculation.limit.Store(int32(workers))
@@ -808,9 +808,9 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maxPasses 
 				var result edit.FileResult
 				var err error
 				if tree := programs.unchangedTreeOf(fileName); tree != nil {
-					result, err = edit.CheckTextSeeded(fileName, tree.Text(), tree, unproposed, transform, maxPasses)
+					result, err = edit.CheckTextSeeded(fileName, tree.Text(), tree, unproposed, transform, maximumPasses)
 				} else {
-					result, err = edit.CheckFileSeeded(fileName, programs.boundTreeOf(fileName), unproposed, transform, maxPasses)
+					result, err = edit.CheckFileSeeded(fileName, programs.boundTreeOf(fileName), unproposed, transform, maximumPasses)
 				}
 				// Only an unchanged result is final this early. A changed one is left to the path after the
 				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file

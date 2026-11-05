@@ -112,8 +112,8 @@ func (each *node) rawString(key string) string {
 }
 
 // setField is `node[prop] = value` for the three fields Parser.raw writes.
-func (each *node) setField(prop string, value string) {
-	switch prop {
+func (each *node) setField(property string, value string) {
+	switch property {
 	case "selector":
 		each.selector = value
 	case "params":
@@ -121,9 +121,9 @@ func (each *node) setField(prop string, value string) {
 	case "value":
 		each.value = value
 	default:
-		panic("postcss: raw writes selector, params or value, not " + prop)
+		panic("postcss: raw writes selector, params or value, not " + property)
 	}
-	each.mark(prop)
+	each.mark(property)
 }
 
 // emptyNodes is `[]`, for a parser method whose local variable is named node, as upstream's is.

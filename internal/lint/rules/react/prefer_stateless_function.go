@@ -180,7 +180,7 @@ var PreferStatelessFunction = rule.Rule{
 				// A JSX `ref` attribute anywhere in the file disqualifies every component in it.
 				// That is upstream's own scope: `markRefAsUsed` sets the flag on the component the
 				// registry currently holds, and with one component per file that is file-wide.
-				fileUsesRef := preferStatelessFunctionFileUsesRef(sourceFile)
+				fileUsesReference := preferStatelessFunctionFileUsesRef(sourceFile)
 
 				var visit func(*ast.Node)
 				visit = func(node *ast.Node) {
@@ -189,7 +189,7 @@ var PreferStatelessFunction = rule.Rule{
 							sourceFile, node,
 						)
 						if preferStatelessFunctionShouldReport(
-							node, settings, fileUsesRef, declaresChildContextTypes,
+							node, settings, fileUsesReference, declaresChildContextTypes,
 						) {
 							ruleContext.ReportNode(node, messagePreferStatelessFunction)
 						}
@@ -218,10 +218,10 @@ func preferStatelessFunctionIsCandidate(node *ast.Node) bool {
 func preferStatelessFunctionShouldReport(
 	component *ast.Node,
 	settings PreferStatelessFunctionOptions,
-	fileUsesRef bool,
+	fileUsesReference bool,
 	declaresChildContextTypes bool,
 ) bool {
-	if fileUsesRef {
+	if fileUsesReference {
 		return false
 	}
 	if settings.IgnorePureComponents && preferStatelessFunctionExtendsPureComponent(component) {

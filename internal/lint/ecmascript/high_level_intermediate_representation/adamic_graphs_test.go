@@ -184,9 +184,9 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 		instructions []instructionRecord
 		terminal     []placeRecord
 	}
-	var params []int
-	for _, param := range graph.Params(function) {
-		params = append(params, identifier(param))
+	var parameters []int
+	for _, parameter := range graph.Params(function) {
+		parameters = append(parameters, identifier(parameter))
 	}
 	returns := -1
 	if place := graph.Returns(function); place != nil {
@@ -247,8 +247,8 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 			fmt.Fprintf(out, "contextual %d\n", declarations[declaration])
 		}
 	}
-	for _, param := range params {
-		fmt.Fprintf(out, "param %d v\n", param)
+	for _, parameter := range parameters {
+		fmt.Fprintf(out, "param %d v\n", parameter)
 	}
 	if returns >= 0 {
 		fmt.Fprintf(out, "returns %d v\n", returns)

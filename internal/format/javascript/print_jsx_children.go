@@ -330,11 +330,11 @@ func printJsxChildren(
 	whitespace Doc,
 	isFacebookTranslationTag bool,
 ) []Doc {
-	var prevPart Doc = emptyDoc
-	parts := []Doc{prevPart}
+	var previousPart Doc = emptyDoc
+	parts := []Doc{previousPart}
 	// To ensure rule of `fill()`, we use `push()` and `pushLine()` instead of `parts.push()`.
 	push := func(document Doc) {
-		prevPart = document
+		previousPart = document
 		last := len(parts) - 1
 		parts[last] = concatIn(path, parts[last], document)
 	}
@@ -342,13 +342,13 @@ func printJsxChildren(
 		if isEmptyText(document) {
 			return
 		}
-		prevPart = document
+		previousPart = document
 		parts = append(parts, document, emptyDoc)
 	}
 	// prevPartText is prevPart as the string upstream passes to the separators as `child`. Where they
 	// are called with prevPart it is always the last word pushed, a string.
-	prevPartText := func() string {
-		text, _ := prevPart.(doc.Text)
+	previousPartText := func() string {
+		text, _ := previousPart.(doc.Text)
 		return string(text)
 	}
 	each(path, func(path *Path, _ int) {
@@ -410,7 +410,7 @@ func printJsxChildren(
 						pushLine(
 							separatorWithWhitespace(
 								isFacebookTranslationTag,
-								prevPartText(),
+								previousPartText(),
 								current,
 								next,
 							),
@@ -422,7 +422,7 @@ func printJsxChildren(
 					pushLine(
 						separatorNoWhitespace(
 							isFacebookTranslationTag,
-							prevPartText(),
+							previousPartText(),
 							current,
 							next,
 						),

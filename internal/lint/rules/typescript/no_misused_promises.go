@@ -407,10 +407,10 @@ var NoMisusedPromises = rule.Rule{
 		}
 
 		isFunctionParam := func(
-			param *ast.Symbol,
+			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(param, node))
+			t := checker.Checker_getApparentType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node))
 			if t == nil {
 				return false
 			}
@@ -427,23 +427,23 @@ var NoMisusedPromises = rule.Rule{
 			t := ruleContext.TypeChecker.GetTypeAtLocation(node)
 
 			for subType := range type_checking.UnionTypePartsSeq(checker.Checker_getApparentType(ruleContext.TypeChecker, t)) {
-				thenProp := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, subType, "then")
+				thenProperty := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, subType, "then")
 
 				// If one of the alternates has no then property, it is not thenable in all
 				// cases.
-				if thenProp == nil {
+				if thenProperty == nil {
 					return false
 				}
 
 				// We walk through each variation of the then property. Since we know it
 				// exists at this point, we just need at least one of the alternates to
 				// be of the right form to consider it thenable.
-				thenType := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(thenProp, node)
+				thenType := ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(thenProperty, node)
 				hasThenableSignature := false
 				for subType := range type_checking.UnionTypePartsSeq(thenType) {
 					for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, subType) {
-						params := checker.Signature_parameters(signature)
-						if len(params) != 0 && isFunctionParam(params[0], node) {
+						parameters := checker.Signature_parameters(signature)
+						if len(parameters) != 0 && isFunctionParam(parameters[0], node) {
 							hasThenableSignature = true
 						}
 					}
@@ -708,11 +708,11 @@ var NoMisusedPromises = rule.Rule{
 							} else if checker.IsTupleType(t) {
 								// Check each type in the tuple - for example, [boolean, () => void] would
 								// add the index of the second tuple parameter to 'voidReturnIndices'
-								typeArgs := checker.Checker_getTypeArguments(ruleContext.TypeChecker, t)
-								for i := index; i < len(node.Arguments()) && i-index < len(typeArgs); i++ {
+								typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, t)
+								for i := index; i < len(node.Arguments()) && i-index < len(typeArguments); i++ {
 									checkThenableOrVoidArgument(
 										node,
-										typeArgs[i-index],
+										typeArguments[i-index],
 										i,
 										&thenableReturnIndices,
 										&voidReturnIndices,
@@ -761,13 +761,13 @@ var NoMisusedPromises = rule.Rule{
 				return
 			}
 
-			voidArgs := voidFunctionArguments(node)
-			if len(voidArgs) == 0 {
+			voidArguments := voidFunctionArguments(node)
+			if len(voidArguments) == 0 {
 				return
 			}
 
 			for _, index := range thenableArguments {
-				if slices.Contains(voidArgs, index) {
+				if slices.Contains(voidArguments, index) {
 					ruleContext.ReportNode(node.Arguments()[index], buildVoidReturnArgumentMessage())
 				}
 			}
@@ -852,7 +852,7 @@ var NoMisusedPromises = rule.Rule{
 				if ast.IsComputedPropertyName(node.Name()) {
 					return
 				}
-				obj := node.Parent
+				object := node.Parent
 
 				// Below condition isn't satisfied unless something goes wrong,
 				// but is needed for type checking.
@@ -860,18 +860,18 @@ var NoMisusedPromises = rule.Rule{
 				// always an object literal expression, but after converting 'node'
 				// to TypeScript AST, its type includes MethodDeclaration which
 				// does include the case of class method declaration.
-				if !ast.IsObjectLiteralExpression(obj) {
+				if !ast.IsObjectLiteralExpression(object) {
 					return
 				}
 
 				if !returnsThenable(node) {
 					return
 				}
-				objType := checker.Checker_getContextualType(ruleContext.TypeChecker, obj, checker.ContextFlagsNone)
-				if objType == nil {
+				objectType := checker.Checker_getContextualType(ruleContext.TypeChecker, object, checker.ContextFlagsNone)
+				if objectType == nil {
 					return
 				}
-				propertySymbol := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, objType, node.Name().Text())
+				propertySymbol := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, objectType, node.Name().Text())
 				if propertySymbol == nil {
 					return
 				}

@@ -98,8 +98,8 @@ func calculateLocEnd(node *estree.Node, text string) (int, bool) {
 		if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
 			raws := rawsIn(node)
 			afterName, _ := raws["afterName"].(string)
-			params, _ := raws["params"].(string)
-			return calculateLocStart(node, text) + 1 + len(name) + len(afterName) + len(params), true
+			parameters, _ := raws["params"].(string)
+			return calculateLocStart(node, text) + 1 + len(name) + len(afterName) + len(parameters), true
 		}
 	}
 
@@ -131,10 +131,10 @@ func calculateNodeLoc(node *estree.Node, text string, rootOffset int, isRootOfTe
 	} else if source != nil || hasSourceIndex {
 		// The source exists before calculateLocEnd runs, which decides between its branches on it.
 		source = ensureSource(node)
-		maxEndOffset := rootOffset + len(text)
-		source["startOffset"] = min(calculateLocStart(node, text)+rootOffset, maxEndOffset)
+		maximumEndOffset := rootOffset + len(text)
+		source["startOffset"] = min(calculateLocStart(node, text)+rootOffset, maximumEndOffset)
 		if endOffset, isNumber := calculateLocEnd(node, text); isNumber {
-			source["endOffset"] = min(endOffset+rootOffset, maxEndOffset)
+			source["endOffset"] = min(endOffset+rootOffset, maximumEndOffset)
 		} else {
 			source["endOffset"] = nil
 		}
@@ -167,7 +167,7 @@ func getNestedLoc(parentNode *estree.Node, node *estree.Node, rootOffset int) (s
 		return firstTruthyString(node.Get("text"), node.Get("value")), getValueRootOffset(parentNode), true
 	}
 
-	if params, isNode := parentNode.Get("params").(*estree.Node); node.Type() == "media-query-list" || (isNode && params == node) {
+	if parameters, isNode := parentNode.Get("params").(*estree.Node); node.Type() == "media-query-list" || (isNode && parameters == node) {
 		return firstTruthyString(rawsIn(parentNode)["params"], node.Get("value")), getAtRuleParamsRootOffset(parentNode), true
 	}
 
@@ -182,8 +182,8 @@ func getNestedLoc(parentNode *estree.Node, node *estree.Node, rootOffset int) (s
 
 func getValueRootOffset(node *estree.Node) int {
 	result, _ := numberIn(sourceOf(node), "startOffset")
-	if prop, isString := node.Get("prop").(string); isString {
-		result += len(prop)
+	if property, isString := node.Get("prop").(string); isString {
+		result += len(property)
 	}
 
 	if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
@@ -232,20 +232,20 @@ func getSelectorText(parentNode *estree.Node, selectorNode *estree.Node) (string
 	if parentNode.Truthy("mixin") {
 		identifier, _ := parentRaws["identifier"].(string)
 		afterName, _ := parentRaws["afterName"].(string)
-		params, _ := parentRaws["params"].(string)
-		return identifier + parentNode.String("name") + afterName + params, true
+		parameters, _ := parentRaws["params"].(string)
+		return identifier + parentNode.String("name") + afterName + parameters, true
 	}
 
 	if selector, isString := parentRaws["selector"].(string); isString {
 		return selector, true
 	}
 
-	if params, isString := parentRaws["params"].(string); parentNode.Truthy("customSelector") && isString {
-		return trim(sliceJavaScript(params, len(parentNode.String("customSelector")), len(params))), true
+	if parameters, isString := parentRaws["params"].(string); parentNode.Truthy("customSelector") && isString {
+		return trim(sliceJavaScript(parameters, len(parentNode.String("customSelector")), len(parameters))), true
 	}
 
-	if params, isString := parentRaws["params"].(string); isString {
-		return params, true
+	if parameters, isString := parentRaws["params"].(string); isString {
+		return parameters, true
 	}
 
 	if value, isString := parentRaws["value"].(string); parentNode.Type() == "css-decl" && isString {
@@ -278,8 +278,8 @@ func getSelectorRootOffset(parentNode *estree.Node, selectorNode *estree.Node, s
 		return parentStartOffset + getStringOffset(selector, selectorText)
 	}
 
-	if params, isString := parentRaws["params"].(string); isString {
-		return getAtRuleParamsRootOffset(parentNode) + getStringOffset(params, selectorText)
+	if parameters, isString := parentRaws["params"].(string); isString {
+		return getAtRuleParamsRootOffset(parentNode) + getStringOffset(parameters, selectorText)
 	}
 
 	if value, isString := parentRaws["value"].(string); parentNode.Type() == "css-decl" && isString {

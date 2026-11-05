@@ -140,9 +140,9 @@ func (parser *parser) loop() *estree.Node {
 func (parser *parser) operator() {
 	// if a +|- operator is followed by a non-word character (. is allowed) and
 	// is preceded by a non-word character. (5+5)
-	char := decode(parser.currToken().value)
+	character := decode(parser.currToken().value)
 
-	if char == "+" || char == "-" {
+	if character == "+" || character == "-" {
 		// only inspect if the operator is not the first token, and we're only
 		// within a calc() function: the only spec-valid place for math expressions
 		if !parser.options.Loose {

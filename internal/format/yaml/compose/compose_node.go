@@ -30,7 +30,7 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	if next == nil && len(end) > 0 {
 		next = end[0]
 	}
-	props := resolveProps(start, resolvePropsOptions{
+	properties := resolveProps(start, resolvePropsOptions{
 		indicator:      "doc-start",
 		next:           next,
 		offset:         offset,
@@ -38,16 +38,16 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 		parentIndent:   0,
 		startOnNewline: true,
 	})
-	if props.found != nil {
+	if properties.found != nil {
 		doc.Directives.DocStart = true
-		if value != nil && (value.Type == "block-map" || value.Type == "block-seq") && !props.hasNewline {
-			onError(props.end, "MISSING_CHAR", "Block collection cannot start on same line with directives-end marker", false)
+		if value != nil && (value.Type == "block-map" || value.Type == "block-seq") && !properties.hasNewline {
+			onError(properties.end, "MISSING_CHAR", "Block collection cannot start on same line with directives-end marker", false)
 		}
 	}
 	if value != nil {
-		doc.Contents = composeNode(composition, value, props, onError)
+		doc.Contents = composeNode(composition, value, properties, onError)
 	} else {
-		doc.Contents = composeEmptyNode(composition, props.end, start, props, onError)
+		doc.Contents = composeEmptyNode(composition, properties.end, start, properties, onError)
 	}
 	contentEnd := doc.Contents.Range[2]
 	re := resolveEnd(end, contentEnd, false, onError)
@@ -58,9 +58,9 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	return doc
 }
 
-func composeNode(composition *composeContext, token *cst.Token, props props, onError onErrorFunc) *Node {
+func composeNode(composition *composeContext, token *cst.Token, properties props, onError onErrorFunc) *Node {
 	atKey := composition.atKey
-	spaceBefore, comment, anchor, tag := props.spaceBefore, props.comment, props.anchor, props.tag
+	spaceBefore, comment, anchor, tag := properties.spaceBefore, properties.comment, properties.anchor, properties.tag
 	var node *Node
 	isSrcToken := true
 	switch token.Type {
@@ -75,7 +75,7 @@ func composeNode(composition *composeContext, token *cst.Token, props props, onE
 			node.SetAnchor(unitsToString(substring(anchor.Source, 1, len(anchor.Source))))
 		}
 	case "block-map", "block-seq", "flow-collection":
-		node = composeCollectionCatching(composition, token, props, onError)
+		node = composeCollectionCatching(composition, token, properties, onError)
 	default:
 		message := "Unsupported token (type: " + token.Type + ")"
 		if token.Type == "error" {
@@ -85,7 +85,7 @@ func composeNode(composition *composeContext, token *cst.Token, props props, onE
 		isSrcToken = false
 	}
 	if node == nil {
-		node = composeEmptyNode(composition, token.Offset, nil, props, onError)
+		node = composeEmptyNode(composition, token.Offset, nil, properties, onError)
 	}
 	// `node.anchor === ''`: an alias never gets the anchor, so its anchor is undefined, not ''.
 	if anchor != nil && node.HasAnchor() && node.Anchor == "" {
@@ -93,12 +93,12 @@ func composeNode(composition *composeContext, token *cst.Token, props props, onE
 	}
 	if atKey && composition.options.StringKeys && (!IsScalar(node) || !isString(node.ScalarValue) ||
 		node.Tag != "" && node.Tag != strTagName) {
-		msg := "With stringKeys, all keys must be strings"
+		message := "With stringKeys, all keys must be strings"
 		var source any = token
 		if tag != nil {
 			source = tag
 		}
-		onError(source, "NON_STRING_KEY", msg, false)
+		onError(source, "NON_STRING_KEY", message, false)
 	}
 	if spaceBefore {
 		node.SpaceBefore = true
@@ -121,7 +121,7 @@ func composeNode(composition *composeContext, token *cst.Token, props props, onE
 // Go's stack grows instead of overflowing at V8's depth, so the port composes what upstream would have
 // given up on. The one exception the port does raise is the TypeError resolveFlowCollection meets on a
 // comment that belongs to a previous item that was never composed.
-func composeCollectionCatching(composition *composeContext, token *cst.Token, props props, onError onErrorFunc) (node *Node) {
+func composeCollectionCatching(composition *composeContext, token *cst.Token, properties props, onError onErrorFunc) (node *Node) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			message, isTypeError := recovered.(typeError)
@@ -132,9 +132,9 @@ func composeCollectionCatching(composition *composeContext, token *cst.Token, pr
 			node = nil
 		}
 	}()
-	node = composeCollection(composition, token, props, onError)
-	if props.anchor != nil {
-		node.SetAnchor(unitsToString(substring(props.anchor.Source, 1, len(props.anchor.Source))))
+	node = composeCollection(composition, token, properties, onError)
+	if properties.anchor != nil {
+		node.SetAnchor(unitsToString(substring(properties.anchor.Source, 1, len(properties.anchor.Source))))
 	}
 	return node
 }
@@ -146,26 +146,26 @@ func isString(value any) bool {
 
 // composeEmptyNode composes the empty scalar where a node is missing. before is nil for upstream's
 // undefined; upstream's pos argument is always null, so it is left out.
-func composeEmptyNode(composition *composeContext, offset int, before []*cst.Token, props props, onError onErrorFunc) *Node {
+func composeEmptyNode(composition *composeContext, offset int, before []*cst.Token, properties props, onError onErrorFunc) *Node {
 	token := &cst.Token{
 		Type:   "scalar",
 		Offset: emptyScalarPosition(offset, before),
 		Indent: -1,
 		Source: []uint16{},
 	}
-	node := composeScalar(composition, token, props.tag, onError)
-	if props.anchor != nil {
-		node.SetAnchor(unitsToString(substring(props.anchor.Source, 1, len(props.anchor.Source))))
+	node := composeScalar(composition, token, properties.tag, onError)
+	if properties.anchor != nil {
+		node.SetAnchor(unitsToString(substring(properties.anchor.Source, 1, len(properties.anchor.Source))))
 		if node.Anchor == "" {
-			onError(props.anchor, "BAD_ALIAS", "Anchor cannot be an empty string", false)
+			onError(properties.anchor, "BAD_ALIAS", "Anchor cannot be an empty string", false)
 		}
 	}
-	if props.spaceBefore {
+	if properties.spaceBefore {
 		node.SpaceBefore = true
 	}
-	if props.comment != "" {
-		node.Comment = props.comment
-		node.Range[2] = props.end
+	if properties.comment != "" {
+		node.Comment = properties.comment
+		node.Range[2] = properties.end
 	}
 	return node
 }
@@ -192,8 +192,8 @@ func composeAlias(composition *composeContext, token *cst.Token, onError onError
 // moved forward past any spaces that follow it.
 func emptyScalarPosition(offset int, before []*cst.Token) int {
 	if before != nil {
-		pos := len(before)
-		for i := pos - 1; i >= 0; i-- {
+		position := len(before)
+		for i := position - 1; i >= 0; i-- {
 			st := before[i]
 			switch st.Type {
 			case "space", "comment", "newline":

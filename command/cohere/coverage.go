@@ -214,7 +214,7 @@ var noListenerReasons = map[rule.NoListenerKind]string{
 func classifyTypeScriptCoverage(
 	rules []rule.Rule,
 	coverage program.Coverage,
-	lintConfig *configuration.Config,
+	lintConfiguration *configuration.Config,
 ) coverageSummary {
 	summary := coverageSummary{
 		FilesIgnored: coverage.FilesIgnored,
@@ -279,9 +279,9 @@ func classifyTypeScriptCoverage(
 		// Why it is off, from the file that said so, so a reader judging an off reads the decision
 		// beside it rather than in a file the run never names.
 		if entry.Category == coverageOffByTheConfig {
-			if offReason, reasoned := lintConfig.OffReasonFor(name); reasoned {
+			if offReason, reasoned := lintConfiguration.OffReasonFor(name); reasoned {
 				entry.Details = append(entry.Details, "off because "+offReason.Reason)
-			} else if lintConfig.TurnsOffAtTopLevel(name) {
+			} else if lintConfiguration.TurnsOffAtTopLevel(name) {
 				entry.OffWithoutReason = true
 			}
 		}
@@ -289,7 +289,7 @@ func classifyTypeScriptCoverage(
 		summary.Entries = append(summary.Entries, entry)
 	}
 
-	for _, name := range unportedConfiguredRules(rules, lintConfig) {
+	for _, name := range unportedConfiguredRules(rules, lintConfiguration) {
 		summary.Entries = append(summary.Entries, ruleCoverageEntry{Name: name, Category: coverageNotPorted})
 	}
 
@@ -639,8 +639,8 @@ const namedRuleGapsSentence = "the notes above name the rules that could not fin
 // and named in no rules block; they are held in `configuration.PluginDefaultRules` and resolved into
 // the config's rules on load, so a denominator taken from the block alone would understate by exactly
 // the rules nobody wrote down.
-func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config) []string {
-	if lintConfig == nil {
+func unportedConfiguredRules(rules []rule.Rule, lintConfiguration *configuration.Config) []string {
+	if lintConfiguration == nil {
 		return nil
 	}
 	implemented := make(map[string]bool, len(rules))
@@ -648,7 +648,7 @@ func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config
 		implemented[registered.Name] = true
 	}
 	missing := []string{}
-	for name, setting := range lintConfig.Rules {
+	for name, setting := range lintConfiguration.Rules {
 		if name == configuration.UnusedDisable || setting.Severity == configuration.SeverityOff {
 			continue
 		}
@@ -661,9 +661,9 @@ func unportedConfiguredRules(rules []rule.Rule, lintConfig *configuration.Config
 }
 
 // wantedConfiguredRules counts the rules the config turns on, the parity line's denominator.
-func wantedConfiguredRules(lintConfig *configuration.Config) int {
+func wantedConfiguredRules(lintConfiguration *configuration.Config) int {
 	wanted := 0
-	for name, setting := range lintConfig.Rules {
+	for name, setting := range lintConfiguration.Rules {
 		if name != configuration.UnusedDisable && setting.Severity != configuration.SeverityOff {
 			wanted++
 		}
@@ -682,15 +682,15 @@ func wantedConfiguredRules(lintConfig *configuration.Config) int {
 // within weeks: the figures drift with every rule that lands, while the reason they matter does not.
 // The live numbers belong in the line this prints, which is derived, and not in a comment. This is
 // the same omission the differential harness carried until `7b590f6`.
-func writeParityCoverage(out *bufio.Writer, rules []rule.Rule, lintConfig *configuration.Config) {
-	if lintConfig == nil {
+func writeParityCoverage(out *bufio.Writer, rules []rule.Rule, lintConfiguration *configuration.Config) {
+	if lintConfiguration == nil {
 		return
 	}
-	missing := len(unportedConfiguredRules(rules, lintConfig))
+	missing := len(unportedConfiguredRules(rules, lintConfiguration))
 	if missing == 0 {
 		return
 	}
-	wanted := wantedConfiguredRules(lintConfig)
+	wanted := wantedConfiguredRules(lintConfiguration)
 	fmt.Fprintf(out, "  parity: %d of %d rules the config asks for, so %d were not checked by anything here\n",
 		wanted-missing, wanted, missing)
 }
@@ -796,19 +796,19 @@ func writeUnrunRuleReferences(out *bufio.Writer, references map[string]int) {
 // one with no reason; printing it is what stops a reasoned one becoming a quiet allowance, because a
 // reader of any run can see each place the project and the house disagree and judge whether the reason
 // still holds.
-func writeDepartures(out *bufio.Writer, lintConfig *configuration.Config) {
-	if lintConfig == nil || len(lintConfig.Departures) == 0 {
+func writeDepartures(out *bufio.Writer, lintConfiguration *configuration.Config) {
+	if lintConfiguration == nil || len(lintConfiguration.Departures) == 0 {
 		return
 	}
-	names := make([]string, 0, len(lintConfig.Departures))
-	for name := range lintConfig.Departures {
+	names := make([]string, 0, len(lintConfiguration.Departures))
+	for name := range lintConfiguration.Departures {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		departure := lintConfig.Departures[name]
+		departure := lintConfiguration.Departures[name]
 		file := departure.File
-		if relative, relativePathError := filepath.Rel(lintConfig.Root, departure.File); relativePathError == nil {
+		if relative, relativePathError := filepath.Rel(lintConfiguration.Root, departure.File); relativePathError == nil {
 			file = relative
 		}
 		fmt.Fprintf(out, "  departure: %s is set differently from the house ruling in %s: %s\n", name, file, departure.Reason)
@@ -819,16 +819,16 @@ func writeDepartures(out *bufio.Writer, lintConfig *configuration.Config) {
 // on every run and by default. A scoped override needs no reason, so one that gives a reason is usually
 // standing in for unfinished work, and printing it keeps that work in front of whoever reads a run until
 // the override can go.
-func writeOverrideReasons(out *bufio.Writer, lintConfig *configuration.Config) {
-	if lintConfig == nil {
+func writeOverrideReasons(out *bufio.Writer, lintConfiguration *configuration.Config) {
+	if lintConfiguration == nil {
 		return
 	}
-	for _, override := range lintConfig.Overrides {
+	for _, override := range lintConfiguration.Overrides {
 		if override.Reason == "" {
 			continue
 		}
 		file := override.File
-		if relative, relativePathError := filepath.Rel(lintConfig.Root, override.File); relativePathError == nil {
+		if relative, relativePathError := filepath.Rel(lintConfiguration.Root, override.File); relativePathError == nil {
 			file = relative
 		}
 		names := make([]string, 0, len(override.Rules))

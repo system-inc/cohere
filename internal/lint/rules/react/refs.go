@@ -1123,8 +1123,8 @@ func refsRunOneRound(ruleContext rule.Context, function *high_level_intermediate
 
 	// Parameters are seeded from their declared type. A parameter that is a ref by type or by name
 	// enters as one, which is how `function Component({ref})` reports with no `useRef` in sight.
-	for _, param := range function.Params {
-		env.set(param.Identifier, refsSeedType(ruleContext, function, param.Identifier, env))
+	for _, parameter := range function.Params {
+		env.set(parameter.Identifier, refsSeedType(ruleContext, function, parameter.Identifier, env))
 	}
 
 	// A value interpolated as a JSX child is checked more leniently than one passed to a function:

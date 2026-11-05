@@ -375,11 +375,11 @@ func TestStrictFollowsTheCompilersAlwaysStrict(test *testing.T) {
 	test.Parallel()
 
 	files := map[string]string{"Strict.ts": "function foo(): number { return 1; }\nfoo();"}
-	withConfig := func(compilerOptions string) func(directory string) {
+	withConfiguration := func(compilerOptions string) func(directory string) {
 		return func(directory string) {
-			config := `{"compilerOptions": {` + compilerOptions + `, "target": "ES2022", ` +
+			configuration := `{"compilerOptions": {` + compilerOptions + `, "target": "ES2022", ` +
 				`"lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
-			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config),
+			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration),
 				0o644); writeError != nil {
 				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
@@ -393,12 +393,12 @@ func TestStrictFollowsTheCompilersAlwaysStrict(test *testing.T) {
 	test.Run("strict off leaves a script sloppy", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(test, Strict, files,
-			"Strict.ts", withConfig(`"strict": false`)), "function")
+			"Strict.ts", withConfiguration(`"strict": false`)), "function")
 	})
 	test.Run("alwaysStrict on its own implies it", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, Strict, files,
-			"Strict.ts", withConfig(`"strict": false, "alwaysStrict": true`)))
+			"Strict.ts", withConfiguration(`"strict": false, "alwaysStrict": true`)))
 	})
 }
 

@@ -136,8 +136,8 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		return Report{}, err
 	}
 
-	cohereCommand, removeConfig, err := cohereCommandWithExtraRules(options)
-	defer removeConfig()
+	cohereCommand, removeConfiguration, err := cohereCommandWithExtraRules(options)
+	defer removeConfiguration()
 	if err != nil {
 		return Report{}, err
 	}
@@ -528,8 +528,8 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	// reject ours: `CohereSettings.json` enables rules oxlint does not implement, `no-octal` among
 	// them, and an unknown rule name makes oxlint refuse to start rather than skip the line. The
 	// two files split for that reason and this side must keep pointing at oxlint's.
-	configPath := filepath.Join(options.Root, ".oxlintrc.json")
-	existing, err := os.ReadFile(configPath)
+	configurationPath := filepath.Join(options.Root, ".oxlintrc.json")
+	existing, err := os.ReadFile(configurationPath)
 	if err != nil {
 		return options.Cohere, noCleanup, fmt.Errorf("reading the lint config to extend it: %w", err)
 	}

@@ -459,7 +459,7 @@ func TestScopeMembersOfIsStableAcrossCalls(test *testing.T) {
 
 // corpusScopeStats walks the corpus once and returns what every measurement below reads.
 func corpusScopeStats(test *testing.T, limit int) (functions, scopes, members int, widths, sizes []int,
-	invalidHulls, emptyHulls, pastMax, someUnset, allUnset, widthOneMulti int) {
+	invalidHulls, emptyHulls, pastMaximum, someUnset, allUnset, widthOneMulti int) {
 	test.Helper()
 
 	var files []string
@@ -511,7 +511,7 @@ func corpusScopeStats(test *testing.T, limit int) (functions, scopes, members in
 							set := FindDisjointMutableValuesWithRanges(function, ranges)
 							assigned := AssignReactiveScopesWithSets(function, ranges, set)
 
-							pastMax += len(ValidateScopes(function, assigned))
+							pastMaximum += len(ValidateScopes(function, assigned))
 
 							for _, id := range assigned.Ids() {
 								scopes++
@@ -647,12 +647,12 @@ func TestScopeRangesSatisfyUpstreamsInvariant(test *testing.T) {
 
 	skipWithoutCorpus(test)
 
-	functions, scopes, _, _, _, invalidHulls, emptyHulls, pastMax, someUnset, allUnset, _ :=
+	functions, scopes, _, _, _, invalidHulls, emptyHulls, pastMaximum, someUnset, allUnset, _ :=
 		corpusScopeStats(test, 400)
 
 	test.Logf("functions=%d scopes=%d someMemberUnset=%d allMembersUnset=%d",
 		functions, scopes, someUnset, allUnset)
-	test.Logf("emptyHulls=%d invalidHulls=%d pastMaxInstruction=%d", emptyHulls, invalidHulls, pastMax)
+	test.Logf("emptyHulls=%d invalidHulls=%d pastMaxInstruction=%d", emptyHulls, invalidHulls, pastMaximum)
 
 	if scopes == 0 {
 		test.Fatal("no scope was created, so this test measured nothing")
@@ -665,8 +665,8 @@ func TestScopeRangesSatisfyUpstreamsInvariant(test *testing.T) {
 		test.Errorf("%d scopes hull to an inverted range (end <= start), which no combination of valid "+
 			"member ranges can produce", invalidHulls)
 	}
-	if pastMax != 0 {
-		test.Errorf("%d scopes violate upstream's invariant as ValidateScopes reports it", pastMax)
+	if pastMaximum != 0 {
+		test.Errorf("%d scopes violate upstream's invariant as ValidateScopes reports it", pastMaximum)
 	}
 	// Two-sided: the mixed classes are what the `start === 0` branch exists for, and a corpus with
 	// none of them would leave that branch unmeasured rather than proven correct.

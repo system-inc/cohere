@@ -144,8 +144,8 @@ type token struct {
 
 // tokenAt scans the token whose full start is pos, which is upstream's findNextToken: the token
 // starting at the end of the previous one, trivia included.
-func (converter *Converter) tokenAt(pos int) token {
-	converter.scan.ResetPos(pos)
+func (converter *Converter) tokenAt(position int) token {
+	converter.scan.ResetPos(position)
 	kind := converter.scan.Scan()
 	return token{kind: kind, start: converter.scan.TokenStart(), end: converter.scan.TokenEnd()}
 }
@@ -694,14 +694,14 @@ func (converter *Converter) convertNode(node *ast.Node, parent *ast.Node) *Node 
 
 	case ast.KindCatchClause:
 		catchClause := node.AsCatchClause()
-		var param *Node
+		var parameter *Node
 		if catchClause.VariableDeclaration != nil {
 			declaration := catchClause.VariableDeclaration
-			param = converter.convertBindingNameWithTypeAnnotation(declaration.Name(), declaration.Type(), nil)
+			parameter = converter.convertBindingNameWithTypeAnnotation(declaration.Name(), declaration.Type(), nil)
 		}
 		return converter.createNode(node, "CatchClause",
 			"body", converter.convertChild(catchClause.Block, nil),
-			"param", param)
+			"param", parameter)
 
 	case ast.KindWhileStatement:
 		whileStatement := node.AsWhileStatement()

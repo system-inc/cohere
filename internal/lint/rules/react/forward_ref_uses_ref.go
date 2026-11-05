@@ -264,12 +264,12 @@ func suggestionsFor(
 	function *ast.Node,
 	parameters []*ast.Node,
 ) []rule.Suggestion {
-	addRef := rule.Suggestion{
+	addReference := rule.Suggestion{
 		Message: messageForwardRefAddRefParameter,
 		Fixes:   []rule.Fix{addRefParameterFix(ruleContext, function, parameters)},
 	}
 	if !canRemoveForwardRef(function, call) {
-		return []rule.Suggestion{addRef}
+		return []rule.Suggestion{addReference}
 	}
 	return []rule.Suggestion{
 		{
@@ -285,7 +285,7 @@ func suggestionsFor(
 				ruleContext.ReplaceNode(call, functionSourceText(ruleContext, function)),
 			},
 		},
-		addRef,
+		addReference,
 	}
 }
 

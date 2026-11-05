@@ -411,20 +411,20 @@ func ValidateScopes(function *Function, scopes *ReactiveScopes) []ScopeId {
 		return nil
 	}
 
-	var maxInstruction static_single_assignment.EvaluationOrder
+	var maximumInstruction static_single_assignment.EvaluationOrder
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
 		}
 		for _, instructionId := range block.Instructions {
 			if instruction := function.Instructions[instructionId]; instruction != nil {
-				if instruction.Order > maxInstruction {
-					maxInstruction = instruction.Order
+				if instruction.Order > maximumInstruction {
+					maximumInstruction = instruction.Order
 				}
 			}
 		}
-		if order := TerminalOrder(block.Terminal); order > maxInstruction {
-			maxInstruction = order
+		if order := TerminalOrder(block.Terminal); order > maximumInstruction {
+			maximumInstruction = order
 		}
 	}
 
@@ -432,7 +432,7 @@ func ValidateScopes(function *Function, scopes *ReactiveScopes) []ScopeId {
 	for _, scope := range scopes.order {
 		scopeRange := scopes.ranges[scope]
 		if scopeRange.Start == 0 || scopeRange.End == 0 ||
-			maxInstruction == 0 || scopeRange.End > maxInstruction+1 {
+			maximumInstruction == 0 || scopeRange.End > maximumInstruction+1 {
 			invalid = append(invalid, scope)
 		}
 	}

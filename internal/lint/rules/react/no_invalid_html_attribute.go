@@ -694,11 +694,11 @@ func noInvalidHtmlAttributeCheckCreateProps(ruleContext rule.Context, call *ast.
 	if len(call.Arguments.Nodes) < 2 {
 		return
 	}
-	props := call.Arguments.Nodes[1]
-	if props.Kind != ast.KindObjectLiteralExpression {
+	properties := call.Arguments.Nodes[1]
+	if properties.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	literal := props.AsObjectLiteralExpression()
+	literal := properties.AsObjectLiteralExpression()
 	if literal == nil || literal.Properties == nil {
 		return
 	}

@@ -39,7 +39,7 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 	commentSep := ""
 	hasNewline := false
 	reqSpace := false
-	var tab, anchor, tag, newlineAfterProp, comma, found *cst.Token
+	var tab, anchor, tag, newlineAfterProperty, comma, found *cst.Token
 	start, startSet := 0, false
 	for _, token := range tokens {
 		if reqSpace {
@@ -95,7 +95,7 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 			atNewline = true
 			hasNewline = true
 			if anchor != nil || tag != nil {
-				newlineAfterProp = token
+				newlineAfterProperty = token
 			}
 			hasSpace = true
 		case "anchor":
@@ -182,7 +182,7 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 		hasNewline:       hasNewline,
 		anchor:           anchor,
 		tag:              tag,
-		newlineAfterProp: newlineAfterProp,
+		newlineAfterProp: newlineAfterProperty,
 		end:              end,
 		start:            start,
 	}

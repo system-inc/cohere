@@ -152,11 +152,11 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		encodedCli, err := encode(cli)
+		encodedCommandLineInterface, err := encode(cli)
 		if err != nil {
 			return nil, err
 		}
-		files[CliPath] = encodedCli
+		files[CliPath] = encodedCommandLineInterface
 	}
 
 	for path, contents := range inputs.SettingsSchemas {

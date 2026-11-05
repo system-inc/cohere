@@ -92,7 +92,7 @@ func (parser *parser) attribute() {
 		// end: {line: this.currToken[2], ...} when the brackets closed inside a string token.
 		throwTypeError("2")
 	}
-	attributeProps := []any{
+	attributeProperties := []any{
 		"operator", partAt(parts, 1),
 		"value", partAt(parts, 2),
 		"source", source(startingToken.at(2), startingToken.at(3), parser.currToken().at(2), parser.currToken().at(3)),
@@ -103,12 +103,12 @@ func (parser *parser) attribute() {
 		if namespace[0] == "" {
 			namespaceZero = true
 		}
-		attributeProps = append(attributeProps, "attribute", parser.parseValue(namespace[2]))
-		attributeProps = append(attributeProps, "namespace", parser.parseNamespace(namespaceZero))
+		attributeProperties = append(attributeProperties, "attribute", parser.parseValue(namespace[2]))
+		attributeProperties = append(attributeProperties, "namespace", parser.parseNamespace(namespaceZero))
 	} else {
-		attributeProps = append(attributeProps, "attribute", parser.parseValue(parts[0]))
+		attributeProperties = append(attributeProperties, "attribute", parser.parseValue(parts[0]))
 	}
-	attr := newSelectorNode(typeAttribute, attributeProps...)
+	attr := newSelectorNode(typeAttribute, attributeProperties...)
 
 	if partTwo, _ := partAt(parts, 2).(string); partTwo != "" {
 		insensitive := splitInsensitive(partTwo)
@@ -281,10 +281,10 @@ func (parser *parser) parentheses() {
 }
 
 func (parser *parser) pseudo() {
-	pseudoStr := ""
+	pseudoString := ""
 	startingToken := parser.currToken()
 	for parser.currToken() != nil && parser.currToken().kind == ":" {
-		pseudoStr += parser.currToken().value
+		pseudoString += parser.currToken().value
 		parser.position++
 	}
 	if parser.currToken() == nil {
@@ -293,9 +293,9 @@ func (parser *parser) pseudo() {
 	}
 	if parser.currToken().kind == "word" {
 		parser.splitWord(nil, func(first string, length int) {
-			pseudoStr += first
+			pseudoString += first
 			pseudo := newSelectorNode(typePseudo,
-				"value", pseudoStr,
+				"value", pseudoString,
 				"source", source(startingToken.at(2), startingToken.at(3), parser.currToken().loose(4), parser.currToken().loose(5)),
 				"sourceIndex", startingToken.at(4),
 			)

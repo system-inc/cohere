@@ -123,8 +123,8 @@ func StyleRule(selector string, nodes ...*Node) *Node {
 }
 
 // AtRule builds a KindAtRule node. name includes its leading `@`.
-func AtRule(name, params string, nodes ...*Node) *Node {
-	return &Node{Kind: KindAtRule, Name: name, Params: params, Nodes: nodes}
+func AtRule(name, parameters string, nodes ...*Node) *Node {
+	return &Node{Kind: KindAtRule, Name: name, Params: parameters, Nodes: nodes}
 }
 
 // Declaration builds a KindDeclaration node with a value present.

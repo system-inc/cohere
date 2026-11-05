@@ -144,12 +144,12 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 			}
 		}
 
-		maxColumnCount := len(headerNames)
+		maximumColumnCount := len(headerNames)
 		for _, row := range tableBody {
-			maxColumnCount = max(maxColumnCount, len(row.cells))
+			maximumColumnCount = max(maximumColumnCount, len(row.cells))
 		}
 
-		maxColumnWidths := make([]int, maxColumnCount)
+		maximumColumnWidths := make([]int, maximumColumnCount)
 		table := []*jestEachTableRow{{cells: headerNames}}
 		for _, row := range tableBody {
 			if len(row.cells) > 0 {
@@ -163,8 +163,8 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 
 			for index, cell := range row.cells {
 				// getStringWidth(cell)
-				maxColumnWidths[index] = max(
-					maxColumnWidths[index],
+				maximumColumnWidths[index] = max(
+					maximumColumnWidths[index],
 					doc.StringWidth(cell),
 				)
 			}
@@ -177,7 +177,7 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 				if row.hasLineBreak {
 					cellDocs[index] = doc.Text(cell)
 				} else {
-					cellDocs[index] = doc.Text(cell + strings.Repeat(" ", maxColumnWidths[index]-doc.StringWidth(cell)))
+					cellDocs[index] = doc.Text(cell + strings.Repeat(" ", maximumColumnWidths[index]-doc.StringWidth(cell)))
 				}
 			}
 			rowDocs[rowIndex] = join(" | ", cellDocs)

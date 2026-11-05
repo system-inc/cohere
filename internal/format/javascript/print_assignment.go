@@ -272,15 +272,15 @@ func isAssignmentOrVariableDeclarator(current Node) bool {
 
 // isComplexTypeAliasParams is upstream's isComplexTypeAliasParams.
 func isComplexTypeAliasParams(current Node) bool {
-	typeParams := getTypeParametersFromTypeAlias(current)
-	if len(typeParams) > 0 {
+	typeParameters := getTypeParametersFromTypeAlias(current)
+	if len(typeParameters) > 0 {
 		constraintPropertyName := "bound"
 		if current.Is("TSTypeAliasDeclaration") {
 			constraintPropertyName = "constraint"
 		}
-		if len(typeParams) > 1 {
-			for _, param := range typeParams {
-				if param.Child(constraintPropertyName) != nil || param.Child("default") != nil {
+		if len(typeParameters) > 1 {
+			for _, parameter := range typeParameters {
+				if parameter.Child(constraintPropertyName) != nil || parameter.Child("default") != nil {
 					return true
 				}
 			}
@@ -306,12 +306,12 @@ func hasComplexTypeAnnotation(current Node) bool {
 	if typeAnnotation == nil || typeAnnotation.Child("typeAnnotation") == nil {
 		return false
 	}
-	typeParams := getTypeParametersFromTypeReference(typeAnnotation.Child("typeAnnotation"))
-	if len(typeParams) <= 1 {
+	typeParameters := getTypeParametersFromTypeReference(typeAnnotation.Child("typeAnnotation"))
+	if len(typeParameters) <= 1 {
 		return false
 	}
-	for _, param := range typeParams {
-		if len(getTypeParametersFromTypeReference(param)) > 0 || param.Is("TSConditionalType") {
+	for _, parameter := range typeParameters {
+		if len(getTypeParametersFromTypeReference(parameter)) > 0 || parameter.Is("TSConditionalType") {
 			return true
 		}
 	}
@@ -402,17 +402,17 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 
 // isCallExpressionWithComplexTypeArguments is upstream's isCallExpressionWithComplexTypeArguments.
 func isCallExpressionWithComplexTypeArguments(current Node, print PrintFunc) bool {
-	typeArgs := current.Child("typeArguments").List("params")
-	if len(typeArgs) > 0 {
-		if len(typeArgs) > 1 {
+	typeArguments := current.Child("typeArguments").List("params")
+	if len(typeArguments) > 0 {
+		if len(typeArguments) > 1 {
 			return true
 		}
-		if len(typeArgs) == 1 {
-			firstArg := typeArgs[0]
-			if isUnionType(firstArg) ||
-				isIntersectionType(firstArg) ||
-				firstArg.Is("TSTypeLiteral") ||
-				firstArg.Is("ObjectTypeAnnotation") {
+		if len(typeArguments) == 1 {
+			firstArgument := typeArguments[0]
+			if isUnionType(firstArgument) ||
+				isIntersectionType(firstArgument) ||
+				firstArgument.Is("TSTypeLiteral") ||
+				firstArgument.Is("ObjectTypeAnnotation") {
 				return true
 			}
 		}

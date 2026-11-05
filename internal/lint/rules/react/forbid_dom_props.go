@@ -20,13 +20,13 @@ import (
 // branch keeps the id and swaps only the text. That is a deliberate divergence in the shape of the
 // report rather than in the decision: the same inputs report, with the same text, and the id stays
 // assertable. Recorded here because a reader comparing to upstream will see the difference.
-func forbidDomPropsMessage(prop string, custom string) rule.Message {
+func forbidDomPropsMessage(property string, custom string) rule.Message {
 	if custom != "" {
 		return rule.Message{Id: "propIsForbidden", Description: custom}
 	}
 	return rule.Message{
 		Id:          "propIsForbidden",
-		Description: fmt.Sprintf("Prop %q is forbidden on DOM Nodes", prop),
+		Description: fmt.Sprintf("Prop %q is forbidden on DOM Nodes", property),
 	}
 }
 

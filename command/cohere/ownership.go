@@ -133,8 +133,8 @@ func resolveOwnership(found *discovery) (ownership, error) {
 				added = append(added, referenced)
 			}
 		}
-		for configFile, read := range readProjectConfigs(*found, added) {
-			reads[configFile] = read
+		for configurationFile, read := range readProjectConfigs(*found, added) {
+			reads[configurationFile] = read
 		}
 		found.Projects = append(found.Projects, added...)
 		queue = added
@@ -235,15 +235,15 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 		if project.Engine != engineTypeScript {
 			continue
 		}
-		configFile := found.configPath(project)
+		configurationFile := found.configPath(project)
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			reading <- struct{}{}
-			config, readProjectConfigurationError := program.ReadProjectConfig(configFile)
+			configuration, readProjectConfigurationError := program.ReadProjectConfig(configurationFile)
 			<-reading
 			lock.Lock()
-			reads[configFile] = projectConfigRead{config: config, err: readProjectConfigurationError}
+			reads[configurationFile] = projectConfigRead{config: configuration, err: readProjectConfigurationError}
 			lock.Unlock()
 		}()
 	}
@@ -254,8 +254,8 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 // projectAt is the project a referenced tsconfig defines, and whether it lies in the repository discovery
 // walked and outside what it never enters: a dependency, build or cache directory, a repository of its
 // own, or a marker the root's ignorePatterns refused.
-func (found discovery) projectAt(configFile string) (discoveredProject, bool) {
-	relative, relativePathError := filepath.Rel(found.Root, configFile)
+func (found discovery) projectAt(configurationFile string) (discoveredProject, bool) {
+	relative, relativePathError := filepath.Rel(found.Root, configurationFile)
 	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return discoveredProject{}, false
 	}
@@ -273,7 +273,7 @@ func (found discovery) projectAt(configFile string) (discoveredProject, bool) {
 	if slices.Contains(found.Refused, relative) {
 		return discoveredProject{}, false
 	}
-	if !isRegularFile(configFile) {
+	if !isRegularFile(configurationFile) {
 		return discoveredProject{}, false
 	}
 	project := discoveredProject{Directory: path.Dir(relative), Engine: engineTypeScript}
@@ -326,8 +326,8 @@ func sharedSegments(left string, right string) int {
 
 // mentionsReferences reports whether a tsconfig's text could hold project references: a byte search, so a
 // false positive costs one read and a false negative is impossible.
-func mentionsReferences(configFile string) bool {
-	contents, readError := os.ReadFile(configFile)
+func mentionsReferences(configurationFile string) bool {
+	contents, readError := os.ReadFile(configurationFile)
 	return readError != nil || bytes.Contains(contents, []byte(`"references"`))
 }
 

@@ -26,27 +26,27 @@ type ProjectConfig struct {
 
 // ReadProjectConfig reads a tsconfig the way Build does, and fails where Build would refuse it, so a
 // config discovery cannot read is one the project's own run reports.
-func ReadProjectConfig(configFileName string) (ProjectConfig, error) {
-	configFileName = tspath.NormalizePath(configFileName)
+func ReadProjectConfig(configurationFileName string) (ProjectConfig, error) {
+	configurationFileName = tspath.NormalizePath(configurationFileName)
 	fileSystem := cachedvfs.From(bundled.WrapFS(osvfs.FS()))
-	if !fileSystem.FileExists(tspath.RootedFilePath(configFileName)) {
-		return ProjectConfig{}, fmt.Errorf("no tsconfig at %s", configFileName)
+	if !fileSystem.FileExists(tspath.RootedFilePath(configurationFileName)) {
+		return ProjectConfig{}, fmt.Errorf("no tsconfig at %s", configurationFileName)
 	}
-	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
-	if len(configErrors) > 0 {
-		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(configErrors))
+	configuration, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configurationFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
+	if len(configurationErrors) > 0 {
+		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationErrors))
 	}
-	if config == nil {
-		return ProjectConfig{}, fmt.Errorf("reading %s: the config parsed to nothing", configFileName)
+	if configuration == nil {
+		return ProjectConfig{}, fmt.Errorf("reading %s: the config parsed to nothing", configurationFileName)
 	}
-	if diagnostics := config.GetConfigFileParsingDiagnostics(); len(diagnostics) > 0 && !onlyOptionValueDiagnostics(diagnostics) {
-		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(diagnostics))
+	if diagnostics := configuration.GetConfigFileParsingDiagnostics(); len(diagnostics) > 0 && !onlyOptionValueDiagnostics(diagnostics) {
+		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(diagnostics))
 	}
 	read := ProjectConfig{}
-	for _, fileName := range config.FileNames() {
+	for _, fileName := range configuration.FileNames() {
 		read.FileNames = append(read.FileNames, filepath.Clean(filepath.FromSlash(fileName.AsString())))
 	}
-	for _, reference := range config.ResolvedProjectReferencePaths() {
+	for _, reference := range configuration.ResolvedProjectReferencePaths() {
 		read.References = append(read.References, filepath.Clean(filepath.FromSlash(reference.AsString())))
 	}
 	return read, nil

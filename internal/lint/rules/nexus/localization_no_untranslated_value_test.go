@@ -73,9 +73,9 @@ func buildTranslations(test *testing.T, files map[string]string) (*program.Graph
 
 	directory := test.TempDir()
 	// A copy, so the caller's fixture map stays as it was handed in.
-	withConfig := maps.Clone(files)
-	withConfig["tsconfig.json"] = translationsConfig
-	for name, contents := range withConfig {
+	withConfiguration := maps.Clone(files)
+	withConfiguration["tsconfig.json"] = translationsConfig
+	for name, contents := range withConfiguration {
 		full := filepath.Join(directory, name)
 		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {
 			test.Fatalf("creating %s: %v", filepath.Dir(full), createDirectoryError)

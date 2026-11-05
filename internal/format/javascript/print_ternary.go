@@ -202,8 +202,8 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	parent := parentOf(path)
 	isParentTest := false
 	if parent.Is(current.Type()) {
-		for _, prop := range testNodePropertyNames {
-			if parent.Child(prop) == current {
+		for _, property := range testNodePropertyNames {
+			if parent.Child(property) == current {
 				isParentTest = true
 				break
 			}
@@ -218,8 +218,8 @@ func printTernaryOld(path *Path, options *Options, print PrintFunc) Doc {
 	var previousParent Node
 	// upstream's `testNodePropertyNames.every((prop) => currentParent[prop] !== previousParent)`.
 	everyPropertyIsNot := func() bool {
-		for _, prop := range testNodePropertyNames {
-			if currentParent.Child(prop) == previousParent {
+		for _, property := range testNodePropertyNames {
+			if currentParent.Child(property) == previousParent {
 				return false
 			}
 		}

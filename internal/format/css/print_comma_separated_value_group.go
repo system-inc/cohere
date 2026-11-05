@@ -16,11 +16,11 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	parentParentNode, _ := path.Grandparent()
-	declAncestorProp := getPropOfDeclNode(path)
-	isGridValue := declAncestorProp != "" &&
+	declAncestorProperty := getPropOfDeclNode(path)
+	isGridValue := declAncestorProperty != "" &&
 		parentNode.Type() == "value-value" &&
-		(declAncestorProp == "grid" ||
-			strings.HasPrefix(declAncestorProp, "grid-template"))
+		(declAncestorProperty == "grid" ||
+			strings.HasPrefix(declAncestorProperty, "grid-template"))
 	atRuleAncestorNode, _ := path.FindAncestor(func(node *estree.Node) bool { return node.Type() == "css-atrule" })
 	isControlDirective := atRuleAncestorNode != nil && isSCSSControlDirectiveNode(atRuleAncestorNode, options)
 	groups := node.List("groups")
@@ -360,8 +360,8 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		}
 
 		// Formatting `font` property
-		if declAncestorProp != "" &&
-			(declAncestorProp == "font" || strings.HasPrefix(declAncestorProp, "--")) {
+		if declAncestorProperty != "" &&
+			(declAncestorProperty == "font" || strings.HasPrefix(declAncestorProperty, "--")) {
 			if isDivisionNode(iNextNode) &&
 				hasEmptyRawBefore(iNextNode) &&
 				isPossibleFontSize(iNode) {

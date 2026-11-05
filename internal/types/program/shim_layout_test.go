@@ -319,14 +319,14 @@ func buildLayoutSubject(test *testing.T) (*checker.Checker, *ast.SourceFile, fun
 	if writeError := os.WriteFile(sourcePath, []byte(layoutSubjectSource), 0o644); writeError != nil {
 		test.Fatalf("writing the fixture: %v", writeError)
 	}
-	configPath := filepath.Join(directory, "tsconfig.json")
-	config := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"types":[]},"include":["*.ts"]}`
-	if writeError := os.WriteFile(configPath, []byte(config), 0o644); writeError != nil {
+	configurationPath := filepath.Join(directory, "tsconfig.json")
+	configuration := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"types":[]},"include":["*.ts"]}`
+	if writeError := os.WriteFile(configurationPath, []byte(configuration), 0o644); writeError != nil {
 		test.Fatalf("writing the tsconfig: %v", writeError)
 	}
 
 	graph, buildError := program.Build(program.Options{
-		ConfigFileName:   configPath,
+		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})

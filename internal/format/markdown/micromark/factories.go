@@ -6,12 +6,12 @@ package micromark
 //
 // Its state is a spaceRun from the parse's Memory, whose states were bound when the slot was made, so
 // a call allocates nothing (#vbjv3d6).
-func factorySpace(effects *Effects, ok State, tokenType string, max int) State {
+func factorySpace(effects *Effects, ok State, tokenType string, maximum int) State {
 	run := effects.memory().spaceRun()
 	run.effects, run.ok, run.tokenType = effects, ok, tokenType
 	run.limit = -1 // Infinity.
-	if max != 0 {
-		run.limit = max - 1
+	if maximum != 0 {
+		run.limit = maximum - 1
 	}
 	return run.startState
 }
@@ -261,9 +261,9 @@ func factoryTitle(effects *Effects, ok State, nok State, tokenType string, marke
 }
 
 // factoryDestination is micromark-factory-destination. max 0 is upstream's undefined: no limit.
-func factoryDestination(effects *Effects, ok State, nok State, tokenType string, literalType string, literalMarkerType string, rawType string, stringType string, max int) State {
-	limit := max
-	unlimited := max == 0
+func factoryDestination(effects *Effects, ok State, nok State, tokenType string, literalType string, literalMarkerType string, rawType string, stringType string, maximum int) State {
+	limit := maximum
+	unlimited := maximum == 0
 	balance := 0
 
 	var start, enclosedBefore, enclosed, enclosedEscape, raw, rawEscape State

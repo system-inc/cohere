@@ -170,9 +170,9 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 		return
 	}
 	builder.states[entryId] = newSSAState[P]()
-	params := builder.graph.Params(builder.function)
-	for index := range params {
-		builder.defineIn(entryId, &params[index])
+	parameters := builder.graph.Params(builder.function)
+	for index := range parameters {
+		builder.defineIn(entryId, &parameters[index])
 	}
 
 	// One visitor for every place, made once with the builder, which reads what to do from

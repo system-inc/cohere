@@ -84,22 +84,22 @@ func findFirstPathRecursive(cwd string, start string, entries []string, fileExis
 }
 
 // loadTsconfigPaths reads a tsconfig and everything it extends into its path mapping.
-func loadTsconfigPaths(configPath string, readFile func(path string) (string, bool), fileExists func(path string) bool) (*tsconfigPaths, error) {
-	config, loadTsconfigError := loadTsconfig(configPath, readFile, fileExists, map[string]bool{})
+func loadTsconfigPaths(configurationPath string, readFile func(path string) (string, bool), fileExists func(path string) bool) (*tsconfigPaths, error) {
+	configuration, loadTsconfigError := loadTsconfig(configurationPath, readFile, fileExists, map[string]bool{})
 	if loadTsconfigError != nil {
 		return nil, loadTsconfigError
 	}
-	compilerOptions := config.compilerOptions()
+	compilerOptions := configuration.compilerOptions()
 	var baseUrl string
 	if raw, isWritten := compilerOptions["baseUrl"]; isWritten {
 		_ = json.Unmarshal(raw, &baseUrl)
 	}
-	absoluteBaseUrl := resolvePath(filepath.Dir(configPath), baseUrl)
+	absoluteBaseUrl := resolvePath(filepath.Dir(configurationPath), baseUrl)
 
 	var paths map[string][]string
 	if raw, isWritten := compilerOptions["paths"]; isWritten {
 		if decodeError := json.Unmarshal(raw, &paths); decodeError != nil {
-			return nil, fmt.Errorf("%s: compilerOptions.paths is not an object of string lists: %w", configPath, decodeError)
+			return nil, fmt.Errorf("%s: compilerOptions.paths is not an object of string lists: %w", configurationPath, decodeError)
 		}
 	}
 
@@ -156,86 +156,86 @@ func (file tsconfigFile) compilerOptions() map[string]json.RawMessage {
 }
 
 // loadTsconfig is tsconfig-paths' loadTsconfig: the file, with whatever it extends merged under it.
-func loadTsconfig(configPath string, readFile func(path string) (string, bool), fileExists func(path string) bool, visiting map[string]bool) (tsconfigFile, error) {
-	if visiting[configPath] {
-		return nil, fmt.Errorf("%s extends itself", configPath)
+func loadTsconfig(configurationPath string, readFile func(path string) (string, bool), fileExists func(path string) bool, visiting map[string]bool) (tsconfigFile, error) {
+	if visiting[configurationPath] {
+		return nil, fmt.Errorf("%s extends itself", configurationPath)
 	}
-	visiting[configPath] = true
-	defer delete(visiting, configPath)
+	visiting[configurationPath] = true
+	defer delete(visiting, configurationPath)
 
-	text, isRead := readFile(configPath)
+	text, isRead := readFile(configurationPath)
 	if !isRead {
 		return nil, nil
 	}
-	config := tsconfigFile{}
-	if decodeError := json.Unmarshal([]byte(stripJsonComments(strings.TrimPrefix(text, "\ufeff"))), &config); decodeError != nil {
-		return nil, fmt.Errorf("%s is malformed: %w; cohere reads a tsconfig as JSON with comments and trailing commas", configPath, decodeError)
+	configuration := tsconfigFile{}
+	if decodeError := json.Unmarshal([]byte(stripJsonComments(strings.TrimPrefix(text, "\ufeff"))), &configuration); decodeError != nil {
+		return nil, fmt.Errorf("%s is malformed: %w; cohere reads a tsconfig as JSON with comments and trailing commas", configurationPath, decodeError)
 	}
 
-	raw, extends := config["extends"]
+	raw, extends := configuration["extends"]
 	if !extends {
-		return config, nil
+		return configuration, nil
 	}
 	var extended []string
 	var single string
 	if decodeError := json.Unmarshal(raw, &single); decodeError == nil {
 		if single == "" {
-			return config, nil
+			return configuration, nil
 		}
 		extended = []string{single}
 	} else if decodeError := json.Unmarshal(raw, &extended); decodeError != nil {
-		return nil, fmt.Errorf("%s: extends is neither a string nor a list of strings", configPath)
+		return nil, fmt.Errorf("%s: extends is neither a string nor a list of strings", configurationPath)
 	}
 
 	base := tsconfigFile{}
 	for _, value := range extended {
-		loaded, loadTsconfigFromExtendsError := loadTsconfigFromExtends(configPath, value, readFile, fileExists, visiting)
+		loaded, loadTsconfigFromExtendsError := loadTsconfigFromExtends(configurationPath, value, readFile, fileExists, visiting)
 		if loadTsconfigFromExtendsError != nil {
 			return nil, loadTsconfigFromExtendsError
 		}
 		base = mergeTsconfigs(base, loaded)
 	}
-	return mergeTsconfigs(base, config), nil
+	return mergeTsconfigs(base, configuration), nil
 }
 
 // loadTsconfigFromExtends is tsconfig-paths' loadTsconfigFromExtends, quirks included: `.json` is
 // appended when the value names no `.json` anywhere, a value holding both a `/` and a `.` that is not
 // beside the file is looked for under its `node_modules`, and an extended `baseUrl` is rebased by the
 // value's own directory so it reads relative to the extending file.
-func loadTsconfigFromExtends(configPath, value string, readFile func(path string) (string, bool), fileExists func(path string) bool, visiting map[string]bool) (tsconfigFile, error) {
+func loadTsconfigFromExtends(configurationPath, value string, readFile func(path string) (string, bool), fileExists func(path string) bool, visiting map[string]bool) (tsconfigFile, error) {
 	if !strings.Contains(value, ".json") {
 		value += ".json"
 	}
-	directory := filepath.Dir(configPath)
+	directory := filepath.Dir(configurationPath)
 	extendedPath := filepath.Join(directory, value)
 	if strings.Contains(value, "/") && strings.Contains(value, ".") && !fileExists(extendedPath) {
 		extendedPath = filepath.Join(directory, "node_modules", value)
 	}
-	config, loadTsconfigError := loadTsconfig(extendedPath, readFile, fileExists, visiting)
-	if loadTsconfigError != nil || config == nil {
+	configuration, loadTsconfigError := loadTsconfig(extendedPath, readFile, fileExists, visiting)
+	if loadTsconfigError != nil || configuration == nil {
 		return tsconfigFile{}, loadTsconfigError
 	}
-	options := config.compilerOptions()
+	options := configuration.compilerOptions()
 	var baseUrl string
 	if raw, isWritten := options["baseUrl"]; isWritten && json.Unmarshal(raw, &baseUrl) == nil && baseUrl != "" {
 		options["baseUrl"], _ = json.Marshal(filepath.Join(filepath.Dir(value), baseUrl))
-		config["compilerOptions"], _ = json.Marshal(options)
+		configuration["compilerOptions"], _ = json.Marshal(options)
 	}
-	return config, nil
+	return configuration, nil
 }
 
 // mergeTsconfigs is tsconfig-paths' mergeTsconfigs: the extending file's keys over the base's, and
 // its compilerOptions over the base's compilerOptions, each replaced whole.
-func mergeTsconfigs(base, config tsconfigFile) tsconfigFile {
+func mergeTsconfigs(base, configuration tsconfigFile) tsconfigFile {
 	merged := tsconfigFile{}
 	for key, value := range base {
 		merged[key] = value
 	}
-	for key, value := range config {
+	for key, value := range configuration {
 		merged[key] = value
 	}
 	options := base.compilerOptions()
-	for key, value := range config.compilerOptions() {
+	for key, value := range configuration.compilerOptions() {
 		options[key] = value
 	}
 	merged["compilerOptions"], _ = json.Marshal(options)

@@ -106,8 +106,8 @@ type Propose func(fileName string, text string) ([]Proposal, error)
 // writing text assembled from a combination no rule proposed and nothing verified. The file is left
 // alone and every proposal in the pass is reported as refused, so the reader learns which file and
 // which rules to look at.
-func FixText(fileName string, text string, propose Propose, maxPasses int) (FileResult, error) {
-	result, _, fixTextError := fixText(fileName, text, nil, propose, maxPasses)
+func FixText(fileName string, text string, propose Propose, maximumPasses int) (FileResult, error) {
+	result, _, fixTextError := fixText(fileName, text, nil, propose, maximumPasses)
 	return result, fixTextError
 }
 
@@ -122,9 +122,9 @@ func FixText(fileName string, text string, propose Propose, maxPasses int) (File
 // and reverts, held two whole trees and a third being built on a file with fixes, and a 2.8 MB bundle is a
 // file with fixes (#xn1k1gz). The formatter parses a reverted file again, as it did before it was handed
 // trees at all. Found by @system_cohere_lint_fix in review.
-func fixText(fileName string, text string, seed *ast.SourceFile, propose Propose, maxPasses int) (FileResult, *ast.SourceFile, error) {
-	if maxPasses <= 0 {
-		maxPasses = DefaultMaxPasses
+func fixText(fileName string, text string, seed *ast.SourceFile, propose Propose, maximumPasses int) (FileResult, *ast.SourceFile, error) {
+	if maximumPasses <= 0 {
+		maximumPasses = DefaultMaxPasses
 	}
 
 	result := FileResult{FileName: fileName, Text: text}
@@ -151,7 +151,7 @@ func fixText(fileName string, text string, seed *ast.SourceFile, propose Propose
 	// can name the rules still proposing at the ceiling rather than only the file they landed on.
 	lastProposals := []Proposal{}
 
-	for pass := 1; pass <= maxPasses; pass++ {
+	for pass := 1; pass <= maximumPasses; pass++ {
 		result.Passes = pass
 
 		proposals, err := propose(fileName, current)
@@ -216,7 +216,7 @@ func fixText(fileName string, text string, seed *ast.SourceFile, propose Propose
 		// mangled file that parses survives review far more easily than an unfixed one does.
 		result.Rejected = append(result.Rejected, Rejection{
 			Proposal: Proposal{RuleName: "fix-engine"},
-			Reason:   fmt.Sprintf("%s (%d passes)", ReasonPassesReached, maxPasses),
+			Reason:   fmt.Sprintf("%s (%d passes)", ReasonPassesReached, maximumPasses),
 		})
 		result.UnconvergedRules = ruleNamesOf(lastProposals)
 		result.Applied = nil
@@ -273,8 +273,8 @@ func ruleNamesOf(proposals []Proposal) []string {
 // A file with nothing to apply is not written at all. Rewriting identical bytes would update the
 // modification time, which invalidates every downstream cache keyed on it and makes a run that
 // changed nothing look like a run that changed everything.
-func FixFile(fileName string, propose Propose, maxPasses int) (FileResult, error) {
-	return FixAndTransformFile(fileName, propose, nil, maxPasses)
+func FixFile(fileName string, propose Propose, maximumPasses int) (FileResult, error) {
+	return FixAndTransformFile(fileName, propose, nil, maximumPasses)
 }
 
 // Transform is a whole-text rewrite applied after fixes have converged — formatting, in practice.
@@ -343,8 +343,8 @@ func skipReasonOf(err error) string {
 // The transform runs even when no fix landed, because a file can be correctly written and badly
 // formatted. It is guarded exactly as a fix pass is: a transform that errors, or whose output does
 // not parse, is discarded whole and the file is left alone.
-func FixAndTransformFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	result, checkFileError := CheckFile(fileName, propose, transform, maxPasses)
+func FixAndTransformFile(fileName string, propose Propose, transform Transform, maximumPasses int) (FileResult, error) {
+	result, checkFileError := CheckFile(fileName, propose, transform, maximumPasses)
 	if checkFileError != nil {
 		return result, checkFileError
 	}
@@ -377,20 +377,20 @@ func FixAndTransformFile(fileName string, propose Propose, transform Transform, 
 // It is `--no-fix`'s answer to "what would change". Every decision is the writing run's own, reached
 // through the same function the writing run calls before it writes, so a file this reports as
 // unchanged is a file `--fix` would leave alone, and the two cannot drift apart.
-func CheckFile(fileName string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	return CheckFileSeeded(fileName, nil, propose, transform, maxPasses)
+func CheckFile(fileName string, propose Propose, transform Transform, maximumPasses int) (FileResult, error) {
+	return CheckFileSeeded(fileName, nil, propose, transform, maximumPasses)
 }
 
 // CheckFileSeeded is CheckFile given a tree of the file that someone already parsed, the program's, or nil.
 // The file is still read now, and the tree is taken only if it is of exactly the bytes read and is the tree
 // the guard would build (seedFor), so a tree of a stale copy, or of another script kind, is parsed past as if
 // it were not there. Taken, it is the starting guard's tree and the transform's (#dk2502g).
-func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
+func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, transform Transform, maximumPasses int) (FileResult, error) {
 	text, readFileError := readFile(fileName)
 	if readFileError != nil {
 		return FileResult{FileName: fileName}, readFileError
 	}
-	return fixAndTransformText(fileName, text, seed, propose, transform, maxPasses)
+	return fixAndTransformText(fileName, text, seed, propose, transform, maximumPasses)
 }
 
 // FixAndTransformText is FixAndTransformFile on text in hand, writing nothing: the fixpoint, then the
@@ -407,22 +407,22 @@ func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, tra
 // fixer fires on the printed text, the fixes land and the result is formatted again, up to
 // FormatFixRoundLimit rounds. A file still changing after that is left exactly as it was found and
 // reported as not converged, naming the rules and the formatter, never written half-settled.
-func FixAndTransformText(fileName string, text string, propose Propose, transform Transform, maxPasses int) (FileResult, error) {
-	return fixAndTransformText(fileName, text, nil, propose, transform, maxPasses)
+func FixAndTransformText(fileName string, text string, propose Propose, transform Transform, maximumPasses int) (FileResult, error) {
+	return fixAndTransformText(fileName, text, nil, propose, transform, maximumPasses)
 }
 
 // CheckTextSeeded is CheckFileSeeded on text the caller already holds, read from nothing: the caller has shown
 // the text is the file's, as the format speculation does when the program's copy still matches the file's
 // stat (#q6dey77). The seed is taken under the same test as CheckFileSeeded's, against this text.
 func CheckTextSeeded(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
-	maxPasses int) (FileResult, error) {
-	return fixAndTransformText(fileName, text, seed, propose, transform, maxPasses)
+	maximumPasses int) (FileResult, error) {
+	return fixAndTransformText(fileName, text, seed, propose, transform, maximumPasses)
 }
 
 // fixAndTransformText is FixAndTransformText with a seed for the starting guard (fixText).
 func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, propose Propose, transform Transform,
-	maxPasses int) (FileResult, error) {
-	result, tree, fixTextError := fixText(fileName, text, seed, propose, maxPasses)
+	maximumPasses int) (FileResult, error) {
+	result, tree, fixTextError := fixText(fileName, text, seed, propose, maximumPasses)
 	if fixTextError != nil || transform == nil {
 		return result, fixTextError
 	}
@@ -482,7 +482,7 @@ func fixAndTransformText(fileName string, text string, seed *ast.SourceFile, pro
 			}
 			return propose(name, current)
 		}
-		next, nextTree, err := fixText(fileName, result.Text, nil, startingWith, maxPasses)
+		next, nextTree, err := fixText(fileName, result.Text, nil, startingWith, maximumPasses)
 		if err != nil {
 			return result, err
 		}

@@ -380,11 +380,11 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(test *testing.T) {
 
 	// The property, stated as a property: all three spellings of one rule must reach the same name,
 	// because a config key and a finding have to meet in the same map for classification to work.
-	fromConfig := NormalizeRuleName("nexus/consistency-no-enum")
+	fromConfiguration := NormalizeRuleName("nexus/consistency-no-enum")
 	fromCohere := NormalizeRuleName("consistency-no-enum/noEnum")
 	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
-	if fromConfig != fromCohere || fromCohere != fromGate {
-		test.Fatalf("one rule normalized three ways: config %q, cohere %q, gate %q", fromConfig, fromCohere, fromGate)
+	if fromConfiguration != fromCohere || fromCohere != fromGate {
+		test.Fatalf("one rule normalized three ways: config %q, cohere %q, gate %q", fromConfiguration, fromCohere, fromGate)
 	}
 }
 

@@ -292,13 +292,13 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 	if writeError := os.WriteFile(path, []byte(fixture.Source), 0o644); writeError != nil {
 		return react_conformance.Result{}, writeError
 	}
-	configPath := filepath.Join(directory, "tsconfig.json")
-	if writeError := os.WriteFile(configPath, []byte(tsConfigText), 0o644); writeError != nil {
+	configurationPath := filepath.Join(directory, "tsconfig.json")
+	if writeError := os.WriteFile(configurationPath, []byte(tsConfigText), 0o644); writeError != nil {
 		return react_conformance.Result{}, writeError
 	}
 
 	graph, buildError := program.Build(program.Options{
-		ConfigFileName:   configPath,
+		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})
@@ -400,13 +400,13 @@ func collectMessageIds(subject RuleUnderTest, fixture react_conformance.Fixture,
 	if writeError := os.WriteFile(path, []byte(fixture.Source), 0o644); writeError != nil {
 		return nil, writeError
 	}
-	configPath := filepath.Join(directory, "tsconfig.json")
-	if writeError := os.WriteFile(configPath, []byte(tsConfigText), 0o644); writeError != nil {
+	configurationPath := filepath.Join(directory, "tsconfig.json")
+	if writeError := os.WriteFile(configurationPath, []byte(tsConfigText), 0o644); writeError != nil {
 		return nil, writeError
 	}
 
 	graph, buildError := program.Build(program.Options{
-		ConfigFileName:   configPath,
+		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		SingleThreaded:   true,
 	})

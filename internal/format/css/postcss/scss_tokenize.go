@@ -162,8 +162,8 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		tokens.pos = tokens.next - 1
 
 	case openSquare, closeSquare, openCurly, closeCurly, colon, semicolon, closeParentheses:
-		controlChar := string(rune(tokens.code))
-		tokens.currentToken = token{kind: controlChar, value: controlChar, start: tokens.pos, end: -1}
+		controlCharacter := string(rune(tokens.code))
+		tokens.currentToken = token{kind: controlCharacter, value: controlCharacter, start: tokens.pos, end: -1}
 
 	// SCSS PATCH {
 	case comma:

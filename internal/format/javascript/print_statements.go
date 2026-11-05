@@ -150,20 +150,20 @@ func printTryStatement(path *Path, options *Options, print PrintFunc) Doc {
 // printCatchClause is upstream's printCatchClause.
 func printCatchClause(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	if param := current.Child("param"); param != nil {
+	if parameter := current.Child("param"); parameter != nil {
 		text := options.OriginalText
-		parameterHasComments := hasComment(param, 0, func(comment Node) bool {
+		parameterHasComments := hasComment(parameter, 0, func(comment Node) bool {
 			data := comment.CommentData()
 			return !isBlockComment(comment) ||
 				data.Leading && hasNewline(text, locEnd(comment)) ||
 				data.Trailing && hasNewlineBackwards(text, locStart(comment))
 		})
-		printedParam := print("param", nil)
+		printedParameter := print("param", nil)
 		var parameter Doc
 		if parameterHasComments {
-			parameter = concatIn(path, "(", indentIn(path, concatIn(path, softline, printedParam)), softline, ") ")
+			parameter = concatIn(path, "(", indentIn(path, concatIn(path, softline, printedParameter)), softline, ") ")
 		} else {
-			parameter = concatIn(path, "(", printedParam, ") ")
+			parameter = concatIn(path, "(", printedParameter, ") ")
 		}
 		// @system-inc: `catch` starts on its own line, never cuddled with `}`.
 		return concatIn(path, hardline, "catch", parameter, print("body", nil))

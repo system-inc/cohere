@@ -338,10 +338,10 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isFunctionParam := func(
-			param *ast.Symbol,
+			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(param, node))
+			t := checker.Checker_getApparentType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node))
 
 			for part := range type_checking.UnionTypePartsSeq(t) {
 				if len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0 {
@@ -393,8 +393,8 @@ var NoFloatingPromises = rule.Rule{
 				if hasMatchingSignature(
 					thenType,
 					func(signature *checker.Signature) bool {
-						params := checker.Signature_parameters(signature)
-						return len(params) >= 2 && isFunctionParam(params[0], node) && isFunctionParam(params[1], node)
+						parameters := checker.Signature_parameters(signature)
+						return len(parameters) >= 2 && isFunctionParam(parameters[0], node) && isFunctionParam(parameters[1], node)
 					}) {
 					return true
 				}
@@ -595,22 +595,22 @@ var NoFloatingPromises = rule.Rule{
 					return
 				}
 				if promiseArray {
-					var msg rule.Message
+					var message rule.Message
 					if *opts.IgnoreVoid {
-						msg = buildFloatingPromiseArrayVoidMessage()
+						message = buildFloatingPromiseArrayVoidMessage()
 					} else {
-						msg = buildFloatingPromiseArrayMessage()
+						message = buildFloatingPromiseArrayMessage()
 					}
-					ruleContext.ReportNode(node, msg)
+					ruleContext.ReportNode(node, message)
 				} else if *opts.IgnoreVoid {
-					var msg rule.Message
+					var message rule.Message
 					if nonFunctionHandler {
-						msg = buildFloatingUselessRejectionHandlerVoidMessage()
+						message = buildFloatingUselessRejectionHandlerVoidMessage()
 					} else {
-						msg = buildFloatingVoidMessage()
+						message = buildFloatingVoidMessage()
 					}
 
-					ruleContext.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(node, message, rule.Suggestion{
 						Message: buildFloatingFixVoidMessage(),
 						Fixes: (func() []rule.Fix {
 							if isHigherPrecedenceThanUnary(exprStatement.Expression) {
@@ -626,13 +626,13 @@ var NoFloatingPromises = rule.Rule{
 						Fixes:   addAwait(expression, exprStatement),
 					})
 				} else {
-					var msg rule.Message
+					var message rule.Message
 					if nonFunctionHandler {
-						msg = buildFloatingUselessRejectionHandlerMessage()
+						message = buildFloatingUselessRejectionHandlerMessage()
 					} else {
-						msg = buildFloatingMessage()
+						message = buildFloatingMessage()
 					}
-					ruleContext.ReportNodeWithSuggestions(node, msg, rule.Suggestion{
+					ruleContext.ReportNodeWithSuggestions(node, message, rule.Suggestion{
 						Message: buildFloatingFixAwaitMessage(),
 						Fixes:   addAwait(expression, exprStatement),
 					})

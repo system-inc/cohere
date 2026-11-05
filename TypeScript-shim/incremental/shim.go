@@ -68,11 +68,11 @@ func NewBuildInfoReader(host compiler.CompilerHost) BuildInfoReader {
 // ReadBuildInfoProgram loads the previous run's change-detection state. Returns nil when no
 // build info exists, its version does not match, or it was not written incrementally.
 func ReadBuildInfoProgram(
-	config *tsoptions.ParsedCommandLine,
+	configuration *tsoptions.ParsedCommandLine,
 	reader BuildInfoReader,
 	host compiler.CompilerHost,
 ) *Program {
-	return incremental.ReadBuildInfoProgram(config, reader, host)
+	return incremental.ReadBuildInfoProgram(configuration, reader, host)
 }
 
 // CreateHost adapts a compiler host for the incremental machinery.

@@ -398,7 +398,7 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 
 	files, contentsOf := pinnedCorpusFiles(test, 150)
 
-	deep, flat, notConverged, maxIterations, conflicts := 0, 0, 0, 0, 0
+	deep, flat, notConverged, maximumIterations, conflicts := 0, 0, 0, 0, 0
 	for _, path := range files {
 		contents := contentsOf[path]
 		fileName := "/corpus/" + filepath.Base(path)
@@ -437,8 +437,8 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 								if !analysis.Converged() {
 									notConverged++
 								}
-								if analysis.Iterations() > maxIterations {
-									maxIterations = analysis.Iterations()
+								if analysis.Iterations() > maximumIterations {
+									maximumIterations = analysis.Iterations()
 								}
 							}
 							after := CollectScopeDependenciesWithHoistable(function, scopes,
@@ -472,9 +472,9 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 		test.Errorf("%d functions failed to converge inside %d iterations", notConverged,
 			hoistableIterationCap)
 	}
-	if maxIterations > 10 {
+	if maximumIterations > 10 {
 		test.Errorf("a function needed %d iterations against a cap of %d; the measured maximum is 3",
-			maxIterations, hoistableIterationCap)
+			maximumIterations, hoistableIterationCap)
 	}
 	// # Why this is one rather than zero
 	//
@@ -786,9 +786,9 @@ func TestHoistableCorpusDistribution(test *testing.T) {
 			"what every mutation of this analysis produces, and a gain in `deep` specifically is "+
 			"the over-approximating direction unless an oracle says otherwise", deep, flat)
 	}
-	if maxIterations != 2 {
+	if maximumIterations != 2 {
 		test.Errorf("max iterations %d, want 2; the intersection at a join is what keeps this low, "+
-			"and unioning instead produces the same answer in 4", maxIterations)
+			"and unioning instead produces the same answer in 4", maximumIterations)
 	}
-	test.Logf("%d dependencies with a path, %d without; max iterations %d", deep, flat, maxIterations)
+	test.Logf("%d dependencies with a path, %d without; max iterations %d", deep, flat, maximumIterations)
 }

@@ -1289,13 +1289,13 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 
 		// `afterComma` is the next token including comments, which is what decides between the
 		// three shapes below.
-		afterCommaPos := oneVarNextTokenOrCommentStart(text, comma.End())
-		if afterCommaPos < 0 {
+		afterCommaPosition := oneVarNextTokenOrCommentStart(text, comma.End())
+		if afterCommaPosition < 0 {
 			continue
 		}
 
 		// `var x,y` -- nothing at all between the comma and the next declarator.
-		if afterCommaPos == comma.End() {
+		if afterCommaPosition == comma.End() {
 			fixes = append(fixes, rule.ReplaceRange(
 				core.NewTextRange(comma.Pos(), comma.End()),
 				"; "+modifierPrefix+kind.text()+" "))
@@ -1305,8 +1305,8 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 		// A newline, or a comment, between the comma and what follows. Upstream keeps everything
 		// from the comma's end up to the last comment's start verbatim and puts the new statement
 		// head after it, so `var f, /* c */ l` becomes `var f; /* c */ var l`.
-		if oneVarCrossesLine(text, comma.End(), afterCommaPos) ||
-			oneVarStartsComment(text, afterCommaPos) {
+		if oneVarCrossesLine(text, comma.End(), afterCommaPosition) ||
+			oneVarStartsComment(text, afterCommaPosition) {
 			lastCommentStart := oneVarLastCommentRunStart(text, comma.End())
 			fixes = append(fixes, rule.ReplaceRange(
 				core.NewTextRange(comma.Pos(), lastCommentStart),

@@ -397,7 +397,7 @@ func isNestedPropTypesCall(value *ast.Node) bool {
 //
 // The `isRequired` peel is one level only, matching upstream: it reads `node.value.object.property`
 // and stops, so `PropTypes.bool.isRequired.isRequired` yields nothing and is silent.
-func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
+func isBooleanPropTypeValue(value *ast.Node, propertyTypeNames []string) bool {
 	value = skipParenthesesOptional(value)
 	if value == nil {
 		return false
@@ -432,7 +432,7 @@ func isBooleanPropTypeValue(value *ast.Node, propTypeNames []string) bool {
 		return false
 	}
 
-	for _, wanted := range propTypeNames {
+	for _, wanted := range propertyTypeNames {
 		if name == wanted {
 			return true
 		}

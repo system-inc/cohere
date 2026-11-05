@@ -152,7 +152,7 @@ var NoUnstableNestedComponents = rule.Rule{
 		if settings.PropNamePattern == "" {
 			settings.PropNamePattern = "render*"
 		}
-		propNameMatches := compilePropNamePattern(settings.PropNamePattern)
+		propertyNameMatches := compilePropNamePattern(settings.PropNamePattern)
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
@@ -171,7 +171,7 @@ var NoUnstableNestedComponents = rule.Rule{
 					ctx:             ruleContext,
 					isComponent:     isComponent,
 					allowAsProps:    settings.AllowAsProps,
-					propNameMatches: propNameMatches,
+					propNameMatches: propertyNameMatches,
 				}
 
 				var visit func(*ast.Node)
@@ -517,8 +517,8 @@ func (state *unstableNestedState) isComponentInRenderProp(node *ast.Node) bool {
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return false
 	}
-	propName := name.Text()
-	return state.propNameMatches(propName) || propName == "children"
+	propertyName := name.Text()
+	return state.propNameMatches(propertyName) || propertyName == "children"
 }
 
 // isDirectValueOfRenderProperty is upstream's function of the same name.

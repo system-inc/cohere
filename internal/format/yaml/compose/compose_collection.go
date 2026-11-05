@@ -26,31 +26,31 @@ func resolveCollection(composition *composeContext, token *cst.Token, onError on
 	return coll
 }
 
-func composeCollection(composition *composeContext, token *cst.Token, props props, onError onErrorFunc) *Node {
-	tagToken := props.tag
+func composeCollection(composition *composeContext, token *cst.Token, properties props, onError onErrorFunc) *Node {
+	tagToken := properties.tag
 	tagName := ""
 	if tagToken != nil {
-		tagName = composition.directives.tagName(tagToken.Source, func(msg string) {
-			onError(tagToken, "TAG_RESOLVE_FAILED", msg, false)
+		tagName = composition.directives.tagName(tagToken.Source, func(message string) {
+			onError(tagToken, "TAG_RESOLVE_FAILED", message, false)
 		})
 	}
 	if token.Type == "block-seq" {
-		anchor, nl := props.anchor, props.newlineAfterProp
-		var lastProp *cst.Token
+		anchor, nl := properties.anchor, properties.newlineAfterProp
+		var lastProperty *cst.Token
 		if anchor != nil && tagToken != nil {
 			if anchor.Offset > tagToken.Offset {
-				lastProp = anchor
+				lastProperty = anchor
 			} else {
-				lastProp = tagToken
+				lastProperty = tagToken
 			}
 		} else if anchor != nil {
-			lastProp = anchor
+			lastProperty = anchor
 		} else {
-			lastProp = tagToken
+			lastProperty = tagToken
 		}
-		if lastProp != nil && (nl == nil || nl.Offset < lastProp.Offset) {
+		if lastProperty != nil && (nl == nil || nl.Offset < lastProperty.Offset) {
 			message := "Missing newline after block sequence props"
-			onError(lastProp, "MISSING_CHAR", message, false)
+			onError(lastProperty, "MISSING_CHAR", message, false)
 		}
 	}
 	expType := "seq"
@@ -96,8 +96,8 @@ func composeCollection(composition *composeContext, token *cst.Token, props prop
 	// each returns a node, so `isNode(res) ? res : new Scalar(res)` is res.
 	node := coll
 	if tag.resolveCollection != nil {
-		node = tag.resolveCollection(coll, func(msg string) {
-			onError(tagToken, "TAG_RESOLVE_FAILED", msg, false)
+		node = tag.resolveCollection(coll, func(message string) {
+			onError(tagToken, "TAG_RESOLVE_FAILED", message, false)
 		})
 	}
 	node.Range = coll.Range
@@ -154,8 +154,8 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 	value := resolved.value
 	tagName := ""
 	if tagToken != nil {
-		tagName = composition.directives.tagName(tagToken.Source, func(msg string) {
-			onError(tagToken, "TAG_RESOLVE_FAILED", msg, false)
+		tagName = composition.directives.tagName(tagToken.Source, func(message string) {
+			onError(tagToken, "TAG_RESOLVE_FAILED", message, false)
 		})
 	}
 	var tag *Tag
@@ -179,8 +179,8 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 		onError(errorSource, "TAG_RESOLVE_FAILED", "tag.resolve is not a function", false)
 		scalar = composition.newScalar(unitsToString(value))
 	} else {
-		res, err := tag.resolveScalar(value, func(msg string) {
-			onError(errorSource, "TAG_RESOLVE_FAILED", msg, false)
+		res, err := tag.resolveScalar(value, func(message string) {
+			onError(errorSource, "TAG_RESOLVE_FAILED", message, false)
 		}, composition.options)
 		if err != nil {
 			onError(errorSource, "TAG_RESOLVE_FAILED", err.Error(), false)

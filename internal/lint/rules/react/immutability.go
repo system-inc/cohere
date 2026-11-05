@@ -812,8 +812,8 @@ func immutabilitySweepFunction(ruleContext rule.Context, function *high_level_in
 //
 // Mutates: entry gains each parameter's starting kind, the state the sweep starts from
 func immutabilitySeedParameters(function *high_level_intermediate_representation.Function, entry map[static_single_assignment.IdentifierId]immutabilityAbstractValue) {
-	for _, param := range function.Params {
-		entry[param.Identifier] = immutabilityAbstractValue{
+	for _, parameter := range function.Params {
+		entry[parameter.Identifier] = immutabilityAbstractValue{
 			Kind:    immutabilityFrozen,
 			Reasons: immutabilityReasonReactiveFunctionArgument,
 		}

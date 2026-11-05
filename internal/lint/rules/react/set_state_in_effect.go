@@ -468,14 +468,14 @@ func findSetStateCall(
 		return high_level_intermediate_representation.Place{}, false
 	}
 
-	refDerived := map[static_single_assignment.IdentifierId]bool{}
+	referenceDerived := map[static_single_assignment.IdentifierId]bool{}
 	local := map[static_single_assignment.IdentifierId]high_level_intermediate_representation.Place{}
 	for id, place := range setStateFunctions {
 		local[id] = place
 	}
 
 	isDerivedFromRef := func(place high_level_intermediate_representation.Place) bool {
-		return refDerived[place.Identifier] || isRefTyped(ruleContext, function, place)
+		return referenceDerived[place.Identifier] || isRefTyped(ruleContext, function, place)
 	}
 
 	// The control-dominance half of the ref exemption, upstream's `isRefControlledBlock`.
@@ -492,8 +492,8 @@ func findSetStateCall(
 		// what carries the exemption across an `if` that assigns from a ref on one path.
 		for _, phi := range block.Phis {
 			for _, entry := range phi.Operands {
-				if refDerived[entry.Place.Identifier] {
-					refDerived[phi.Place.Identifier] = true
+				if referenceDerived[entry.Place.Identifier] {
+					referenceDerived[phi.Place.Identifier] = true
 					break
 				}
 			}
@@ -510,14 +510,14 @@ func findSetStateCall(
 			// keying on the property name and the object being ref-typed.
 			if load, isLoad := instruction.Value.(*high_level_intermediate_representation.PropertyLoad); isLoad {
 				if load.Property == "current" && isRefTyped(ruleContext, function, load.Object) {
-					refDerived[target] = true
+					referenceDerived[target] = true
 				}
 			}
 
 			// Any instruction reading a ref-derived operand produces a ref-derived value, which is
 			// what makes `r.current + 1` and `arr[r.current]` exempt.
 			if instructionReadsRefDerived(instruction, isDerivedFromRef) {
-				refDerived[target] = true
+				referenceDerived[target] = true
 
 				// A store binds through its own lvalue as well as the instruction's, and both have
 				// to be tainted. Upstream reaches them together through `eachInstructionLValue`,
@@ -533,7 +533,7 @@ func findSetStateCall(
 				// The setter map two hundred lines up already does this for its own `StoreLocal`
 				// arm, which is what makes the omission here a slip rather than a decision.
 				if store, isStore := instruction.Value.(*high_level_intermediate_representation.StoreLocal); isStore {
-					refDerived[store.LValue.Identifier] = true
+					referenceDerived[store.LValue.Identifier] = true
 				}
 
 				// A destructure binds through a pattern rather than through the instruction's
@@ -558,7 +558,7 @@ func findSetStateCall(
 				// Removed rather than kept with a fixture, because a test written for a branch that
 				// no input can reach asserts nothing.
 				if destructure, isDestructure := instruction.Value.(*high_level_intermediate_representation.Destructure); isDestructure {
-					markPatternRefDerived(destructure.LValue, refDerived)
+					markPatternRefDerived(destructure.LValue, referenceDerived)
 				}
 			}
 
@@ -612,7 +612,7 @@ func findSetStateCall(
 				}
 				// The value-taint half of the ref exemption: a setter fed a ref-derived value is
 				// synchronizing React with something outside it, which is what effects are for.
-				if argument, ok := firstIdentifierArgument(value.Args); ok && refDerived[argument] {
+				if argument, ok := firstIdentifierArgument(value.Args); ok && referenceDerived[argument] {
 					return high_level_intermediate_representation.Place{}, false
 				}
 				// The control-dominance half: a setter that only runs when a branch on a ref says
@@ -722,34 +722,34 @@ func translateAcrossCaptures(
 // other, which is a distinction upstream does not draw either.
 //
 // Mutates: refDerived marks every binding the pattern introduces as derived from a ref.
-func markPatternRefDerived(pattern high_level_intermediate_representation.Pattern, refDerived map[static_single_assignment.IdentifierId]bool) {
+func markPatternRefDerived(pattern high_level_intermediate_representation.Pattern, referenceDerived map[static_single_assignment.IdentifierId]bool) {
 	switch shape := pattern.(type) {
 	case *high_level_intermediate_representation.PlacePattern:
-		refDerived[shape.Place.Identifier] = true
+		referenceDerived[shape.Place.Identifier] = true
 	case *high_level_intermediate_representation.ObjectPattern:
 		for _, property := range shape.Properties {
 			if property.Value != nil {
-				markPatternRefDerived(property.Value, refDerived)
+				markPatternRefDerived(property.Value, referenceDerived)
 			}
 			if property.Default != nil {
-				refDerived[property.Default.Identifier] = true
+				referenceDerived[property.Default.Identifier] = true
 			}
 		}
 		if shape.Rest != nil {
-			refDerived[shape.Rest.Identifier] = true
+			referenceDerived[shape.Rest.Identifier] = true
 		}
 	case *high_level_intermediate_representation.ArrayPattern:
 		for _, element := range shape.Elements {
 			// A hole from `[a, , b]` has a nil Value and binds nothing.
 			if element.Value != nil {
-				markPatternRefDerived(element.Value, refDerived)
+				markPatternRefDerived(element.Value, referenceDerived)
 			}
 			if element.Default != nil {
-				refDerived[element.Default.Identifier] = true
+				referenceDerived[element.Default.Identifier] = true
 			}
 		}
 		if shape.Rest != nil {
-			refDerived[shape.Rest.Identifier] = true
+			referenceDerived[shape.Rest.Identifier] = true
 		}
 	}
 }

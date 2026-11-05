@@ -12,7 +12,7 @@ import "testing"
 func TestSettingForDeclinesAnAmbiguousBareName(test *testing.T) {
 	test.Parallel()
 
-	config := &Config{
+	configuration := &Config{
 		Rules: map[string]RuleSetting{
 			"@typescript-eslint/no-shadow": {Severity: SeverityError},
 			"nexus/no-shadow":              {Severity: SeverityOff},
@@ -21,7 +21,7 @@ func TestSettingForDeclinesAnAmbiguousBareName(test *testing.T) {
 	}
 
 	for attempt := 0; attempt < 200; attempt++ {
-		if config.Resolve("/file.ts").Enabled("no-shadow") {
+		if configuration.Resolve("/file.ts").Enabled("no-shadow") {
 			test.Fatalf("attempt %d: an ambiguous bare name resolved as enabled; two prefixed entries "+
 				"reach it and the config has not said which one is meant", attempt)
 		}
@@ -39,11 +39,11 @@ func TestSettingForDeclinesAnAmbiguousBareName(test *testing.T) {
 func TestSettingForStillReconcilesABarePluginRule(test *testing.T) {
 	test.Parallel()
 
-	config := &Config{
+	configuration := &Config{
 		Rules: map[string]RuleSetting{"nexus/consistency-no-enum": {Severity: SeverityError}},
 		Root:  "/",
 	}
-	if !config.Resolve("/file.ts").Enabled("consistency-no-enum") {
+	if !configuration.Resolve("/file.ts").Enabled("consistency-no-enum") {
 		test.Error("a bare registry name no longer finds its prefixed config entry")
 	}
 }

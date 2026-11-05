@@ -180,12 +180,12 @@ func TestPluginSlashRuleNamesSurviveNormalization(test *testing.T) {
 	// The config form, which now survives. A regression here means the configured-rule set has gone
 	// back to holding plugin names, and every genuine disagreement would be excused as
 	// not-configured.
-	fromConfig := map[string]string{
+	fromConfiguration := map[string]string{
 		"typescript/no-explicit-any":                    "no-explicit-any",
 		"nexus/consistency-no-enum":                     "consistency-no-enum",
 		"structure/react-component-no-multiple-primary": "react-component-no-multiple-primary",
 	}
-	for raw, want := range fromConfig {
+	for raw, want := range fromConfiguration {
 		if got := NormalizeRuleName(raw); got != want {
 			test.Errorf("NormalizeRuleName(%q) = %q, want %q", raw, got, want)
 		}

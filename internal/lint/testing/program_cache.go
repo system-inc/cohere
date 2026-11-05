@@ -184,11 +184,11 @@ func buildProgramInto(directoryName string, files map[string]string, subjectFile
 		}
 		contents[directory+"/"+filepath.ToSlash(name)] = text
 	}
-	configPath := directory + "/tsconfig.json"
-	contents[configPath] = defaultTsConfig
+	configurationPath := directory + "/tsconfig.json"
+	contents[configurationPath] = defaultTsConfig
 
 	graph, buildError := program.Build(program.Options{
-		ConfigFileName:   configPath,
+		ConfigFileName:   configurationPath,
 		CurrentDirectory: directory,
 		LibraryParses:    libraryParses,
 		FileSystem:       program.NewMemoryFS(contents),

@@ -375,12 +375,12 @@ func TestPreferNullishCoalescingRenderings(test *testing.T) {
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
 
-				wantPos := preferNullishCoalescingOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantPosition := preferNullishCoalescingOffsetOf(test, testCase.source, expected.line, expected.column)
 				wantEnd := preferNullishCoalescingOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
-				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
+				if diagnostic.Range.Pos() != wantPosition || diagnostic.Range.End() != wantEnd {
 					test.Errorf("finding %d: expected span [%d,%d) %q, got [%d,%d) %q",
-						index, wantPos, wantEnd,
-						asTheTypedPreferNullishHarnessWroteIt(testCase.source)[wantPos:wantEnd],
+						index, wantPosition, wantEnd,
+						asTheTypedPreferNullishHarnessWroteIt(testCase.source)[wantPosition:wantEnd],
 						diagnostic.Range.Pos(), diagnostic.Range.End(),
 						asTheTypedPreferNullishHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}

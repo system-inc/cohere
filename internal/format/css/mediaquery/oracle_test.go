@@ -303,7 +303,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		records = append(records, each)
 	}
 
-	identical, refusedByBoth, corpusParams, corpusRefused, fixturesSeen, different := 0, 0, 0, 0, 0, 0
+	identical, refusedByBoth, corpusParameters, corpusRefused, fixturesSeen, different := 0, 0, 0, 0, 0, 0
 	fail := func(format string, arguments ...any) {
 		different++
 		if different <= 20 {
@@ -312,7 +312,7 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	}
 	for _, want := range records {
 		name, nameIsString := want["name"].(string)
-		params, paramsIsString := want["params"].(string)
+		parameters, paramsIsString := want["params"].(string)
 		if !nameIsString || !paramsIsString {
 			test.Fatalf("the oracle printed a record without a name and params: %v", want)
 		}
@@ -321,13 +321,13 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		if isFixture {
 			fixturesSeen++
 		} else {
-			corpusParams++
+			corpusParameters++
 		}
 		if isFixture && expectThrow != oracleRefused {
 			fail("%s: the fixture says throws=%v and the library says %v", name, expectThrow, want)
 			continue
 		}
-		got, dumpMediaQueryError := dumpMediaQuery(params)
+		got, dumpMediaQueryError := dumpMediaQuery(parameters)
 		switch {
 		case oracleRefused && dumpMediaQueryError != nil:
 			if dumpMediaQueryError.Error() != wantError {
@@ -339,38 +339,38 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 				corpusRefused++
 			}
 		case oracleRefused:
-			fail("%s: the library throws (%s) on %q and Go parsed it", name, wantError, params)
+			fail("%s: the library throws (%s) on %q and Go parsed it", name, wantError, parameters)
 		case dumpMediaQueryError != nil:
-			fail("%s: the library parses %q and Go refused: %v", name, params, dumpMediaQueryError)
+			fail("%s: the library parses %q and Go refused: %v", name, parameters, dumpMediaQueryError)
 		default:
 			if difference := firstMediaQueryDifference(want["tree"], got, "tree"); difference != "" {
-				fail("%s (%q): %s", name, params, difference)
+				fail("%s (%q): %s", name, parameters, difference)
 				continue
 			}
 			identical++
 		}
 	}
 	test.Logf("%d compared (%d params from %d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus params refused",
-		len(records), corpusParams, corpusFiles, fixturesSeen, identical, refusedByBoth, different, corpusRefused)
+		len(records), corpusParameters, corpusFiles, fixturesSeen, identical, refusedByBoth, different, corpusRefused)
 	if fixturesSeen != len(mediaQueryFixtures) {
 		test.Errorf("the oracle answered %d of %d fixtures", fixturesSeen, len(mediaQueryFixtures))
 	}
-	if corpusParams == 0 {
+	if corpusParameters == 0 {
 		test.Errorf("the corpus reached parseMediaQuery with no params; the comparison rests on fixtures alone")
 	}
-	if corpusRefused > corpusParams/10 {
-		test.Errorf("the library refused %d of %d corpus params; the comparison is thinner than it looks", corpusRefused, corpusParams)
+	if corpusRefused > corpusParameters/10 {
+		test.Errorf("the library refused %d of %d corpus params; the comparison is thinner than it looks", corpusRefused, corpusParameters)
 	}
 }
 
 // dumpMediaQuery parses params and renders the tree the way the oracle script does, through JSON, so
 // both sides compare as the same Go values.
-func dumpMediaQuery(params string) (any, error) {
-	tree, err := Parse(params)
+func dumpMediaQuery(parameters string) (any, error) {
+	tree, err := Parse(parameters)
 	if err != nil {
 		return nil, err
 	}
-	encoded, err := json.Marshal(dumpMediaQueryValue(tree, utf16OffsetsOf(params)))
+	encoded, err := json.Marshal(dumpMediaQueryValue(tree, utf16OffsetsOf(parameters)))
 	if err != nil {
 		return nil, err
 	}

@@ -144,8 +144,8 @@ func writeAdamicRangesCase(out *strings.Builder, name string, function *Function
 	if graph.ParametersFrozen(function) {
 		out.WriteString("frozen-parameters\n")
 	}
-	for _, param := range graph.Params(function) {
-		fmt.Fprintf(out, "param %d\n", value(param))
+	for _, parameter := range graph.Params(function) {
+		fmt.Fprintf(out, "param %d\n", value(parameter))
 	}
 	for _, context := range graph.Context(function) {
 		fmt.Fprintf(out, "context %d\n", value(context))

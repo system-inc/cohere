@@ -45,8 +45,8 @@ const narrowingDeclarations = "declare const request: { data: { energy: { credit
 func compileErrors(test *testing.T, source string) []string {
 	test.Helper()
 	directory := test.TempDir()
-	config := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"moduleDetection":"force","types":[],"noEmit":true},"include":["*.ts"]}`
-	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+	configuration := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"moduleDetection":"force","types":[],"noEmit":true},"include":["*.ts"]}`
+	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
 	fileName := filepath.Join(directory, "fixture.ts")

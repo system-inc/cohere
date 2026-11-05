@@ -319,14 +319,14 @@ func reportParameterUse(
 	ruleContext rule.Context,
 	identifier *ast.Node,
 	name string,
-	props bool,
+	properties bool,
 	ignored ignoredParameterNames,
 ) {
 	if reference.WritesToBinding(identifier) {
 		ruleContext.ReportNode(identifier, messageAssignmentToParameter(name))
 		return
 	}
-	if !props || ignored.matches(name) {
+	if !properties || ignored.matches(name) {
 		return
 	}
 	if modifiesPropertyThrough(identifier) {

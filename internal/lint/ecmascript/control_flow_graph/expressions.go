@@ -306,8 +306,8 @@ func (builder *Builder[E]) forkOptionalChain(node *ast.Node) {
 // typeArguments walks an explicit `<T>` argument list, so a `typeof x` inside
 // it still counts as a read even though nothing in it runs.
 func (builder *Builder[E]) typeArguments(node *ast.Node) {
-	for _, typeArg := range node.TypeArguments() {
-		builder.expr(typeArg)
+	for _, typeArgument := range node.TypeArguments() {
+		builder.expr(typeArgument)
 	}
 }
 
@@ -315,13 +315,13 @@ func (builder *Builder[E]) typeArguments(node *ast.Node) {
 // inside a constraint or default still counts as a read even though nothing in
 // it runs.
 func (builder *Builder[E]) typeParameters(node *ast.Node) {
-	for _, typeParam := range node.TypeParameters() {
-		param := typeParam.AsTypeParameterDeclaration()
-		if param == nil {
+	for _, typeParameter := range node.TypeParameters() {
+		parameter := typeParameter.AsTypeParameterDeclaration()
+		if parameter == nil {
 			continue
 		}
-		builder.expr(param.Constraint)
-		builder.expr(param.DefaultType)
+		builder.expr(parameter.Constraint)
+		builder.expr(parameter.DefaultType)
 	}
 }
 

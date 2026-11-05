@@ -423,16 +423,16 @@ func reportMismatchedDefaults(
 		return
 	}
 
-	for _, defaultProp := range declarations.defaults {
-		declared, isDeclared := declarations.propTypes[defaultProp.name]
+	for _, defaultProperty := range declarations.defaults {
+		declared, isDeclared := declarations.propTypes[defaultProperty.name]
 		if isDeclared && (settings.AllowRequiredDefaults || !declared.isRequired) {
 			continue
 		}
 		if isDeclared {
-			ruleContext.ReportNode(defaultProp.node, messageRequiredHasDefault(defaultProp.name))
+			ruleContext.ReportNode(defaultProperty.node, messageRequiredHasDefault(defaultProperty.name))
 			continue
 		}
-		ruleContext.ReportNode(defaultProp.node, messageDefaultHasNoType(defaultProp.name))
+		ruleContext.ReportNode(defaultProperty.node, messageDefaultHasNoType(defaultProperty.name))
 	}
 }
 

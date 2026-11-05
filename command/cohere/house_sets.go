@@ -77,8 +77,8 @@ func houseSources(location projectLocation) []string {
 //
 // Written to out and not as an invocation line: which sets applied is part of the verdict, true of the
 // tree rather than of this run, so a replay prints it too and nothing is ever applied silently.
-func writeSetsLine(out *bufio.Writer, lintConfig *configuration.Config) {
-	if line := lintConfig.SetsLine(); line != "" {
+func writeSetsLine(out *bufio.Writer, lintConfiguration *configuration.Config) {
+	if line := lintConfiguration.SetsLine(); line != "" {
 		fmt.Fprintln(out, line)
 	}
 }

@@ -24,9 +24,9 @@ func safeCommentNeighbor(kind string) bool {
 func findLastWithPosition(tokens []token) int {
 	for index := len(tokens) - 1; index >= 0; index-- {
 		each := tokens[index]
-		pos := each.endOrStart()
-		if pos > 0 {
-			return pos
+		position := each.endOrStart()
+		if position > 0 {
+			return position
 		}
 	}
 	return -1
@@ -56,7 +56,7 @@ type parserMethods interface {
 	atrule(atToken token)
 	comment(commentToken token)
 	createTokenizer()
-	raw(each *node, prop string, tokens []token, customProperty bool)
+	raw(each *node, property string, tokens []token, customProperty bool)
 	rule(tokens []token)
 }
 
@@ -106,11 +106,11 @@ func (parser *parser) atrule(atToken token) {
 	parser.init(node, atToken.start)
 
 	var kind string
-	var prev *token
+	var previous *token
 	var shift int
 	last := false
 	open := false
-	params := []token{}
+	parameters := []token{}
 	brackets := []string{}
 
 	for !parser.tokenizer.endOfFile() {
@@ -139,29 +139,29 @@ func (parser *parser) atrule(atToken token) {
 				open = true
 				break
 			} else if kind == "}" {
-				if len(params) > 0 {
-					shift = len(params) - 1
-					prev = &params[shift]
-					for prev != nil && prev.kind == "space" {
+				if len(parameters) > 0 {
+					shift = len(parameters) - 1
+					previous = &parameters[shift]
+					for previous != nil && previous.kind == "space" {
 						shift--
 						if shift >= 0 {
-							prev = &params[shift]
+							previous = &parameters[shift]
 						} else {
-							prev = nil
+							previous = nil
 						}
 					}
-					if prev != nil {
-						node.source.end = parser.getPosition(prev.endOrStart())
+					if previous != nil {
+						node.source.end = parser.getPosition(previous.endOrStart())
 						node.source.end.offset++
 					}
 				}
 				parser.end(each)
 				break
 			} else {
-				params = append(params, each)
+				parameters = append(parameters, each)
 			}
 		} else {
-			params = append(params, each)
+			parameters = append(parameters, each)
 		}
 
 		if parser.tokenizer.endOfFile() {
@@ -170,12 +170,12 @@ func (parser *parser) atrule(atToken token) {
 		}
 	}
 
-	node.raws["between"] = parser.spacesAndCommentsFromEnd(&params)
-	if len(params) > 0 {
-		node.raws["afterName"] = parser.spacesAndCommentsFromStart(&params)
-		parser.this.raw(node, "params", params, false)
+	node.raws["between"] = parser.spacesAndCommentsFromEnd(&parameters)
+	if len(parameters) > 0 {
+		node.raws["afterName"] = parser.spacesAndCommentsFromStart(&parameters)
+		parser.this.raw(node, "params", parameters, false)
 		if last {
-			each := params[len(params)-1]
+			each := parameters[len(parameters)-1]
 			node.source.end = parser.getPosition(each.endOrStart())
 			node.source.end.offset++
 			parser.spaces = node.rawString("between")
@@ -225,7 +225,7 @@ func (parser *parser) checkMissedSemicolon(tokens []token) {
 // colon is the index of the first top-level ":", -1 where upstream returns false.
 func (parser *parser) colon(tokens []token) int {
 	brackets := 0
-	var prev *token
+	var previous *token
 	for index := range tokens {
 		each := &tokens[index]
 		kind := each.kind
@@ -237,16 +237,16 @@ func (parser *parser) colon(tokens []token) int {
 			brackets -= 1
 		}
 		if brackets == 0 && kind == ":" {
-			if prev == nil {
+			if previous == nil {
 				parser.doubleColon(*each)
-			} else if prev.kind == "word" && prev.value == "progid" {
+			} else if previous.kind == "word" && previous.value == "progid" {
 				continue
 			} else {
 				return index
 			}
 		}
 
-		prev = each
+		previous = each
 	}
 	return -1
 }
@@ -305,7 +305,7 @@ func (parser *parser) decl(tokens []token, customProperty bool) {
 	node.raws["before"] = node.rawString("before") + tokensToString(tokens, 0, start)
 	node.source.start = parser.getPosition(tokens[start].start)
 
-	propStart := start
+	propertyStart := start
 	for start < len(tokens) {
 		kind := tokens[start].kind
 		if kind == ":" || kind == "space" || kind == "comment" {
@@ -313,7 +313,7 @@ func (parser *parser) decl(tokens []token, customProperty bool) {
 		}
 		start++
 	}
-	node.prop = tokensToString(tokens, propStart, start)
+	node.prop = tokensToString(tokens, propertyStart, start)
 	node.mark("prop")
 
 	betweenStart := start
@@ -452,15 +452,15 @@ func (parser *parser) endFile() {
 func (parser *parser) freeSemicolon(each token) {
 	parser.spaces += each.value
 	if parser.current.hasNodes() {
-		var prev *node
+		var previous *node
 		if len(parser.current.nodes) > 0 {
-			prev = parser.current.nodes[len(parser.current.nodes)-1]
+			previous = parser.current.nodes[len(parser.current.nodes)-1]
 		}
-		if prev != nil && prev.nodeType == "rule" && prev.rawString("ownSemicolon") == "" {
-			prev.raws["ownSemicolon"] = parser.spaces
+		if previous != nil && previous.nodeType == "rule" && previous.rawString("ownSemicolon") == "" {
+			previous.raws["ownSemicolon"] = parser.spaces
 			parser.spaces = ""
-			prev.source.end = parser.getPosition(each.start)
-			prev.source.end.offset += utf16Length(prev.rawString("ownSemicolon"))
+			previous.source.end = parser.getPosition(each.start)
+			previous.source.end.offset += utf16Length(previous.rawString("ownSemicolon"))
 		}
 	}
 }
@@ -601,7 +601,7 @@ func (parser *parser) parse() {
 	parser.endFile()
 }
 
-func (parser *parser) raw(each *node, prop string, tokens []token, customProperty bool) {
+func (parser *parser) raw(each *node, property string, tokens []token, customProperty bool) {
 	length := len(tokens)
 	var value strings.Builder
 	clean := true
@@ -612,15 +612,15 @@ func (parser *parser) raw(each *node, prop string, tokens []token, customPropert
 		if kind == "space" && index == length-1 && !customProperty {
 			clean = false
 		} else if kind == "comment" {
-			prev := "empty"
+			previous := "empty"
 			if index-1 >= 0 {
-				prev = tokens[index-1].kind
+				previous = tokens[index-1].kind
 			}
 			next := "empty"
 			if index+1 < length {
 				next = tokens[index+1].kind
 			}
-			if !safeCommentNeighbor(prev) && !safeCommentNeighbor(next) {
+			if !safeCommentNeighbor(previous) && !safeCommentNeighbor(next) {
 				if strings.HasSuffix(value.String(), ",") {
 					clean = false
 				} else {
@@ -635,9 +635,9 @@ func (parser *parser) raw(each *node, prop string, tokens []token, customPropert
 	}
 	if !clean {
 		raw := tokensToString(tokens, 0, length)
-		each.raws[prop] = &rawValue{raw: raw, value: value.String()}
+		each.raws[property] = &rawValue{raw: raw, value: value.String()}
 	}
-	each.setField(prop, value.String())
+	each.setField(property, value.String())
 }
 
 func (parser *parser) rule(tokens []token) {
@@ -699,8 +699,8 @@ func (parser *parser) stringFrom(tokens *[]token, from int) string {
 }
 
 func (parser *parser) unclosedBlock() {
-	pos := parser.current.source.start
-	panic(parser.input.errorAtLineAndColumn("Unclosed block", pos.line, pos.column))
+	position := parser.current.source.start
+	panic(parser.input.errorAtLineAndColumn("Unclosed block", position.line, position.column))
 }
 
 func (parser *parser) unclosedBracket(bracket token) {

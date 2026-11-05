@@ -1113,8 +1113,8 @@ func CollectScopeDependencies(function *Function, identity ScopeIdentity) *Scope
 	// Parameters are declared before any instruction runs, so they are available to every scope.
 	// Upstream declares them with `id: UNSET`, which is zero here and compares below every scope
 	// start -- which is the intent: a parameter is always declared before the scope.
-	for _, param := range function.Params {
-		collector.declare(param.Identifier, declaration{})
+	for _, parameter := range function.Params {
+		collector.declare(parameter.Identifier, declaration{})
 	}
 
 	collector.walk(function, terminals)
@@ -1174,8 +1174,8 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 		processedOptionalInstructions: optionalProcessedInstructions(optional),
 		processedOptionalTests:        optionalProcessedTests(optional),
 	}
-	for _, param := range function.Params {
-		collector.declare(param.Identifier, declaration{})
+	for _, parameter := range function.Params {
+		collector.declare(parameter.Identifier, declaration{})
 	}
 	collector.walk(function, terminals)
 	collector.reduce(identity)

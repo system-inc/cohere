@@ -226,10 +226,10 @@ func handleClassComments(context *commentContext) bool {
 				return true
 			}
 
-			for _, prop := range []string{"implements", "extends", "mixins"} {
+			for _, property := range []string{"implements", "extends", "mixins"} {
 				// `enclosingNode[prop] && followingNode === enclosingNode[prop][0]`: an empty list's [0] is
 				// undefined, which a present followingNode never equals.
-				list := enclosingNode.List(prop)
+				list := enclosingNode.List(property)
 				if len(list) > 0 && followingNode == list[0] {
 					if precedingNode != nil &&
 						(precedingNode == enclosingNode.Child("id") ||
@@ -237,7 +237,7 @@ func handleClassComments(context *commentContext) bool {
 							precedingNode == superClass) {
 						printing.AddTrailingComment(precedingNode, comment)
 					} else {
-						printing.AddDanglingComment(enclosingNode, comment, prop)
+						printing.AddDanglingComment(enclosingNode, comment, property)
 					}
 					return true
 				}

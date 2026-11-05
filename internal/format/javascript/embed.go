@@ -388,15 +388,15 @@ func isEmbedMarkdown(path *Path) bool {
 func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
 	current := node(path)
 	quasis := current.List("quasis")
-	numQuasis := len(quasis)
+	quasiCount := len(quasis)
 
 	expressionDocs := printTemplateExpressions(path, options, print)
 	parts := []Doc{}
 
-	for index := 0; index < numQuasis; index++ {
+	for index := 0; index < quasiCount; index++ {
 		templateElement := quasis[index]
 		isFirst := index == 0
-		isLast := index == numQuasis-1
+		isLast := index == quasiCount-1
 		value, isTemplateValue := templateElement.Get("value").(*estree.TemplateValue)
 		if !isTemplateValue || value == nil || value.Cooked == nil {
 			// embed sends no template here whose hasInvalidCookedValue holds, so a miss is a tree that broke
@@ -406,16 +406,16 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		text := *value.Cooked
 
 		lines := strings.Split(text, "\n")
-		numLines := len(lines)
+		lineCount := len(lines)
 
 		// Bail out if an interpolation occurs within a comment.
-		if !isLast && commentAtLineEnd.MatchString(lines[numLines-1]) {
+		if !isLast && commentAtLineEnd.MatchString(lines[lineCount-1]) {
 			return nil, nil
 		}
 
-		startsWithBlankLine := numLines > 2 && estree.TrimJavaScript(lines[0]) == "" && estree.TrimJavaScript(lines[1]) == ""
-		endsWithBlankLine := numLines > 2 && estree.TrimJavaScript(lines[numLines-1]) == "" &&
-			estree.TrimJavaScript(lines[numLines-2]) == ""
+		startsWithBlankLine := lineCount > 2 && estree.TrimJavaScript(lines[0]) == "" && estree.TrimJavaScript(lines[1]) == ""
+		endsWithBlankLine := lineCount > 2 && estree.TrimJavaScript(lines[lineCount-1]) == "" &&
+			estree.TrimJavaScript(lines[lineCount-2]) == ""
 
 		commentsAndWhitespaceOnly := true
 		for _, line := range lines {

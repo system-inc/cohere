@@ -388,9 +388,9 @@ func stripNumericSeparators(raw string) string {
 //
 // An overflow still returns a usable infinity, which is exactly what the rule wants for `2e999`.
 func isRangeError(err error) bool {
-	var numError *strconv.NumError
-	if !errors.As(err, &numError) {
+	var numberError *strconv.NumError
+	if !errors.As(err, &numberError) {
 		return false
 	}
-	return numError.Err == strconv.ErrRange
+	return numberError.Err == strconv.ErrRange
 }

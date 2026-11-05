@@ -31,8 +31,8 @@ const (
 
 // newSelectorNode is node.js's constructor followed by the subclass's: opts are the options object's
 // keys and values in order.
-func newSelectorNode(nodeType string, opts ...any) *estree.Node {
-	node := estree.New(nodeType, 0, 0, opts...)
+func newSelectorNode(nodeType string, options ...any) *estree.Node {
+	node := estree.New(nodeType, 0, 0, options...)
 	// Prettier's parser never passes opts.spaces, so before and after are always the '' defaults.
 	node.Set("spaces", map[string]any{"before": "", "after": ""})
 	switch nodeType {

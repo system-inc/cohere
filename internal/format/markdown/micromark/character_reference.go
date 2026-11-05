@@ -5,7 +5,7 @@ var characterReference = &Construct{Name: "characterReference", Tokenize: tokeni
 
 func tokenizeCharacterReference(self *Self, effects *Effects, ok State, nok State) State {
 	size := 0
-	var max int
+	var maximum int
 	var test func(code Code) bool
 	// Upstream compares the function itself, `test === asciiAlphanumeric`; Go cannot compare funcs, so
 	// open records the named kind alongside test.
@@ -47,7 +47,7 @@ func tokenizeCharacterReference(self *Self, effects *Effects, ok State, nok Stat
 		}
 
 		effects.Enter(TypeCharacterReferenceValue, nil)
-		max = characterReferenceNamedSizeMax
+		maximum = characterReferenceNamedSizeMax
 		test = asciiAlphanumeric
 		named = true
 		return value(code)
@@ -65,13 +65,13 @@ func tokenizeCharacterReference(self *Self, effects *Effects, ok State, nok Stat
 			effects.Consume(code)
 			effects.Exit(TypeCharacterReferenceMarkerHexadecimal)
 			effects.Enter(TypeCharacterReferenceValue, nil)
-			max = characterReferenceHexadecimalSizeMax
+			maximum = characterReferenceHexadecimalSizeMax
 			test = asciiHexDigit
 			return value
 		}
 
 		effects.Enter(TypeCharacterReferenceValue, nil)
-		max = characterReferenceDecimalSizeMax
+		maximum = characterReferenceDecimalSizeMax
 		test = asciiDigit
 		return value(code)
 	}
@@ -112,7 +112,7 @@ func tokenizeCharacterReference(self *Self, effects *Effects, ok State, nok Stat
 		if test(code) {
 			// `size++ < max`: only reached when test passes (short-circuit), and the increment happens
 			// whether or not the comparison passes.
-			below := size < max
+			below := size < maximum
 			size++
 			if below {
 				effects.Consume(code)

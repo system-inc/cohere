@@ -29,7 +29,7 @@ func readHead(repository string) (string, error) {
 	if contents, readError := os.ReadFile(filepath.Join(gitDirectory, "commondir")); readError == nil {
 		commonDirectory = resolveFrom(gitDirectory, strings.TrimSpace(string(contents)))
 	}
-	if config, readError := os.ReadFile(filepath.Join(commonDirectory, "config")); readError == nil && strings.Contains(string(config), "reftable") {
+	if configuration, readError := os.ReadFile(filepath.Join(commonDirectory, "config")); readError == nil && strings.Contains(string(configuration), "reftable") {
 		return "", fmt.Errorf("%s keeps its refs in the reftable store, which cohere does not read", repository)
 	}
 

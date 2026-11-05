@@ -56,11 +56,11 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		}
 		return string(output), childExitCode(test, exitError)
 	}
-	usesPageProps := "export function title(props: PageProps<'/'>): string {\n    return props.route;\n}\n"
+	usesPageProperties := "export function title(props: PageProps<'/'>): string {\n    return props.route;\n}\n"
 
 	test.Run("missing, then generated", func(test *testing.T) {
 		test.Parallel()
-		root := project(test, "import \"./.next/types/routes.d.ts\";\n", usesPageProps)
+		root := project(test, "import \"./.next/types/routes.d.ts\";\n", usesPageProperties)
 
 		output, exitCode := run(test, root)
 		if exitCode == 0 {
@@ -148,7 +148,7 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 
 	test.Run("a reference path", func(test *testing.T) {
 		test.Parallel()
-		root := project(test, "/// <reference path=\"./.next/types/routes.d.ts\" />\n", usesPageProps)
+		root := project(test, "/// <reference path=\"./.next/types/routes.d.ts\" />\n", usesPageProperties)
 		output, exitCode := run(test, root)
 		if exitCode == 0 || !strings.Contains(output, "next-env.d.ts:1:22 error missing-generated-file ./.next/types/routes.d.ts does not exist") {
 			test.Errorf("a missing reference path, exit %d:\n%s", exitCode, output)
@@ -157,7 +157,7 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 
 	test.Run("missing, and not generated", func(test *testing.T) {
 		test.Parallel()
-		root := project(test, "import \"./types/routes.d.ts\";\n", usesPageProps)
+		root := project(test, "import \"./types/routes.d.ts\";\n", usesPageProperties)
 		output, exitCode := run(test, root)
 		if exitCode == 0 || strings.Contains(output, "missing-generated-file") || strings.Contains(output, "folded under it") ||
 			!strings.Contains(output, "Cannot find name 'PageProps'") {

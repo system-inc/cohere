@@ -174,8 +174,8 @@ func isFunctionCompositionArguments(args []Node) bool {
 		} else {
 			arg = stripChainElementWrappers(arg)
 			if isCallExpression(arg) {
-				for _, childArg := range getCallArguments(arg) {
-					if isFunctionOrArrowExpression(childArg) {
+				for _, childArgument := range getCallArguments(arg) {
+					if isFunctionOrArrowExpression(childArgument) {
 						return true
 					}
 				}

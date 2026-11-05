@@ -680,12 +680,12 @@ loop:
 				i--
 				ch = characterAt(lexer.buffer, i)
 			}
-			lastChar := i // Drop the line if last char not more indented
+			lastCharacter := i // Drop the line if last char not more indented
 			for ch == ' ' {
 				i--
 				ch = characterAt(lexer.buffer, i)
 			}
-			if ch == '\n' && i >= lexer.pos && i+1+indent > lastChar {
+			if ch == '\n' && i >= lexer.pos && i+1+indent > lastCharacter {
 				nl = i
 			} else {
 				break

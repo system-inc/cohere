@@ -101,13 +101,13 @@ func TestCompareManualMemoDependenciesWithdrawsTheRuleForRefs(test *testing.T) {
 	root := ManualMemoRoot{Place: Place{Identifier: 1}}
 
 	// Inferred reads deeper AND through `current`: the rule is withdrawn.
-	refCase := CompareManualMemoDependencies(
+	referenceCase := CompareManualMemoDependencies(
 		ManualMemoDependency{Root: root, Path: path("ref", "current", "x")},
 		ManualMemoDependency{Root: root, Path: path("ref")},
 	)
-	if refCase != CompareDependencyRefAccessDifference {
+	if referenceCase != CompareDependencyRefAccessDifference {
 		test.Errorf("a deeper inferred path through `current` returned %v, want a ref-access "+
-			"difference; a prefix match through a ref proves nothing", refCase)
+			"difference; a prefix match through a ref proves nothing", referenceCase)
 	}
 
 	// The control: identical shape, no `current`. Must be Ok, or the case above is not testing refs.

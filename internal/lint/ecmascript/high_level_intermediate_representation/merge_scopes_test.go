@@ -421,7 +421,7 @@ func TestMergeHandlesAnEmptyScopeTable(test *testing.T) {
 
 // mergeCorpusStats walks the corpus once and returns everything the measurements below read.
 func mergeCorpusStats(test *testing.T, limit int) (functions, before, after, unions int,
-	nonNestedBefore, nonNestedAfter int, widthOneMultiAfter, maxWidthBefore, maxWidthAfter int,
+	nonNestedBefore, nonNestedAfter int, widthOneMultiAfter, maximumWidthBefore, maximumWidthAfter int,
 	nestingBefore, nestingAfter int) {
 	test.Helper()
 
@@ -433,8 +433,8 @@ func mergeCorpusStats(test *testing.T, limit int) (functions, before, after, uni
 		for _, scope := range scopes.Ids() {
 			scopeRange := scopes.RangeOf(scope)
 			beforeRanges[scope] = scopeRange
-			if width := int(scopeRange.End - scopeRange.Start); width > maxWidthBefore {
-				maxWidthBefore = width
+			if width := int(scopeRange.End - scopeRange.Start); width > maximumWidthBefore {
+				maximumWidthBefore = width
 			}
 		}
 		nonNestedBefore += countNonNestedPairs(beforeRanges)
@@ -448,8 +448,8 @@ func mergeCorpusStats(test *testing.T, limit int) (functions, before, after, uni
 			scopeRange := merged.RangeOf(scope)
 			afterRanges[scope] = scopeRange
 			width := int(scopeRange.End - scopeRange.Start)
-			if width > maxWidthAfter {
-				maxWidthAfter = width
+			if width > maximumWidthAfter {
+				maximumWidthAfter = width
 			}
 			if width == 1 && len(merged.MembersOf(scope)) > 1 {
 				widthOneMultiAfter++
@@ -510,11 +510,11 @@ func TestMergeDrivesNonNestedOverlapToZero(test *testing.T) {
 
 	skipWithoutCorpus(test)
 	functions, before, after, unions, nonNestedBefore, nonNestedAfter,
-		widthOneMultiAfter, maxWidthBefore, maxWidthAfter, _, _ := mergeCorpusStats(test, 400)
+		widthOneMultiAfter, maximumWidthBefore, maximumWidthAfter, _, _ := mergeCorpusStats(test, 400)
 
 	test.Logf("functions=%d scopes %d->%d (unions=%d) nonNestedOverlap %d->%d maxWidth %d->%d",
 		functions, before, after, unions, nonNestedBefore, nonNestedAfter,
-		maxWidthBefore, maxWidthAfter)
+		maximumWidthBefore, maximumWidthAfter)
 
 	if nonNestedBefore == 0 {
 		test.Fatal("no scopes overlapped without nesting before the merge, so the zero after it is " +
@@ -536,9 +536,9 @@ func TestMergeDrivesNonNestedOverlapToZero(test *testing.T) {
 		test.Errorf("%d merged scopes hold several values in a single instruction, which is the shape "+
 			"catastrophic over-merging produces", widthOneMultiAfter)
 	}
-	if maxWidthAfter > maxWidthBefore*2 {
+	if maximumWidthAfter > maximumWidthBefore*2 {
 		test.Errorf("the widest scope grew from %d to %d instructions, which is more widening than "+
-			"fixing overlaps should require", maxWidthBefore, maxWidthAfter)
+			"fixing overlaps should require", maximumWidthBefore, maximumWidthAfter)
 	}
 }
 

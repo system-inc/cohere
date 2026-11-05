@@ -657,8 +657,8 @@ func TestLowerJsx(test *testing.T) {
 		test.Errorf("the element has %d props, want 2 (one named, one spread)", len(jsx.Props))
 	}
 	spreads := 0
-	for _, prop := range jsx.Props {
-		if prop.Spread {
+	for _, property := range jsx.Props {
+		if property.Spread {
 			spreads++
 		}
 	}

@@ -38,11 +38,11 @@ func tokenizeCodeFenced(self *Self, effects *Effects, ok State, nok State) State
 			effects.Enter(TypeCodeFencedFence, nil)
 			if markdownSpace(code) {
 				// Upstream passes `undefined` (no limit) when codeIndented is disabled, else 4.
-				max := tabSize
+				maximum := tabSize
 				if slices.Contains(self.Parser.Constructs.Disable, "codeIndented") {
-					max = 0
+					maximum = 0
 				}
-				return factorySpace(effects, beforeSequenceClose, TypeLinePrefix, max)(code)
+				return factorySpace(effects, beforeSequenceClose, TypeLinePrefix, maximum)(code)
 			}
 			return beforeSequenceClose(code)
 		}

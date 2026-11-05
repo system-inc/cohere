@@ -75,7 +75,7 @@ func run() error {
 		return runRenameVerb(os.Args[2:])
 	}
 
-	configFileName := flag.String("tsconfig", projectMarker,
+	configurationFileName := flag.String("tsconfig", projectMarker,
 		"the tsconfig that defines the program, relative to --directory or else to where you typed it; unnamed, the file of this name in --directory, or else the nearest one at or above the working directory")
 	directory := flag.String("directory", "",
 		"the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)")
@@ -128,13 +128,13 @@ func run() error {
 	// finally checked against the real resolver. ESLint has had `--print-config` for this reason.
 	listRulesEnabled := flag.Bool("rules-enabled", false,
 		"print the rules the lint config resolves for one file (the path given, else index.ts at the project root), with severity, and exit")
-	printConfig := flag.Bool("print-config", false,
+	printConfiguration := flag.Bool("print-config", false,
 		"print resolved rules, registered settings, language options and matching overrides as JSON for one file (the path given, else index.ts at the project root), and exit; globals name their TypeScript declaration files; ESLint plugin package versions, parser names and settings.react have no cohere meaning (settings.react is refused)")
 	// A bare run, --fix and --no-fix format by default, so naming --format there changes nothing. It is
 	// accepted rather than refused, so the commands written before the default still mean what they did.
 	format := flag.Bool("format", false, "format the files not on record as formatted, or the paths named; a bare run, "+
 		"--fix and --no-fix already do, so naming it there changes nothing")
-	maxFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
+	maximumFixPasses := flag.Int("fix-passes", edit.DefaultMaxPasses, "how many times a file may be re-linted while fixes keep landing")
 	// Readiness is measured only when asked (#9tgm3dq): unasked, none of cohere:adamic's measure-only rules runs,
 	// so a default run pays nothing for it. The set's own findings report whenever a project enables it; this
 	// flag governs only the measurement.
@@ -210,7 +210,7 @@ func run() error {
 	location, locateError := locateProject(locationRequest{
 		WorkingDirectory:        workingDirectory,
 		Directory:               *directory,
-		ConfigFileName:          *configFileName,
+		ConfigFileName:          *configurationFileName,
 		ConfigFileNameGiven:     given["tsconfig"],
 		LintConfigFileName:      *lintConfigFileName,
 		LintConfigFileNameGiven: given["lint-config"],
@@ -222,11 +222,11 @@ func run() error {
 	// A root holding more than one project, TypeScript and Swift side by side or nested, checks each with
 	// its own engine and reports them as one (#f9nftxz). One project is checked here, as it always was.
 	if discoveryApplies(given, flag.Args()) {
-		namedLintConfig := ""
+		namedLintConfiguration := ""
 		if given["lint-config"] {
-			namedLintConfig = absoluteFrom(workingDirectory, *lintConfigFileName)
+			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
 		}
-		exitCode, checked, checkDiscoveredProjectsError := checkDiscoveredProjects(location, locateError, workingDirectory, namedLintConfig)
+		exitCode, checked, checkDiscoveredProjectsError := checkDiscoveredProjects(location, locateError, workingDirectory, namedLintConfiguration)
 		if checkDiscoveredProjectsError != nil {
 			return checkDiscoveredProjectsError
 		}
@@ -295,7 +295,7 @@ func run() error {
 		return nil
 	}
 
-	if *listRulesEnabled || *printConfig {
+	if *listRulesEnabled || *printConfiguration {
 		lintConfigPath := location.LintConfigFileName
 		if locateError != nil {
 			if !given["lint-config"] {
@@ -306,7 +306,7 @@ func run() error {
 		if locateError == nil && usesHouseSets(location) {
 			return errHouseSetsPerFile
 		}
-		lintConfig, loadForError := configuration.LoadFor(lintConfigPath, registeredRuleNames())
+		lintConfiguration, loadForError := configuration.LoadFor(lintConfigPath, registeredRuleNames())
 		if loadForError != nil {
 			return fmt.Errorf("reading %s: %w", lintConfigPath, loadForError)
 		}
@@ -324,14 +324,14 @@ func run() error {
 		if arguments := flag.Args(); len(arguments) > 0 {
 			probePath = absoluteFrom(absoluteFrom(workingDirectory, *directory), arguments[0])
 		}
-		resolved := lintConfig.Resolve(probePath)
+		resolved := lintConfiguration.Resolve(probePath)
 		if resolved.Ignored {
 			fmt.Fprintf(streams.Errors, "note: %s is excluded by ignore pattern %q, so no rule applies to it\n",
 				probePath, resolved.IgnoredBy)
 			return nil
 		}
-		if *printConfig {
-			return writeResolvedConfig(streams.Output, lintConfig, resolved, location, probePath)
+		if *printConfiguration {
+			return writeResolvedConfig(streams.Output, lintConfiguration, resolved, location, probePath)
 		}
 
 		// Only rules the binary actually implements. A config key naming a rule this build does not
@@ -492,7 +492,7 @@ func run() error {
 			WorkingDirectory: workingDirectory,
 			FilePath:         *stdinFilePath,
 			NoFormat:         *noFormat,
-			MaxPasses:        *maxFixPasses,
+			MaxPasses:        *maximumFixPasses,
 			SingleThreaded:   *singleThreaded,
 		}, os.Stdin, os.Stdout)
 	}
@@ -543,7 +543,7 @@ func run() error {
 		if !cacheOff {
 			earlyRecord = loadFormatRecord(repositoryRoot)
 		}
-		early = startEarlyFormat(formatter, earlyRecord, repositoryRoot, *maxFixPasses)
+		early = startEarlyFormat(formatter, earlyRecord, repositoryRoot, *maximumFixPasses)
 	}
 
 	// What this run leaves to nearer projects, when it is one project of several (see ownership.go).
@@ -739,7 +739,7 @@ func run() error {
 	//
 	// The lint config is loaded here because fixing needs to know which rules apply to which files,
 	// and loading it once serves both this phase and lint below.
-	var lintConfig *configuration.Config
+	var lintConfiguration *configuration.Config
 
 	// The fix phase's walk, kept when it is still valid for the lint phase to reuse.
 	//
@@ -754,8 +754,8 @@ func run() error {
 		if configureLintError != nil {
 			return configureLintError
 		}
-		lintConfig = loaded
-		writeSetsLine(accountOutput(streams.Output), lintConfig)
+		lintConfiguration = loaded
+		writeSetsLine(accountOutput(streams.Output), lintConfiguration)
 		// The run cache's second layer, attached once the config is known and before anything walks.
 		attachFindingsCache(graph, location)
 	}
@@ -988,7 +988,7 @@ func run() error {
 			formatPlan,
 			writeScope,
 			repositoryRoot,
-			*maxFixPasses,
+			*maximumFixPasses,
 			mutate,
 			early,
 		)
@@ -1102,7 +1102,7 @@ func run() error {
 		// longer exists, which is the same stale-read corruption the edit engine refuses internally,
 		// one level up.
 		if mutate && fixSummary.FilesChanged > 0 && (runTypes || runLint) {
-			rebuiltGraph, rebuildDuration, rebuildGraphError := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfig, yield.yieldedFiles())
+			rebuiltGraph, rebuildDuration, rebuildGraphError := rebuildGraph(location.ConfigFileName, location.Root, *singleThreaded, lintConfiguration, yield.yieldedFiles())
 			if rebuildGraphError != nil {
 				report.markRemainingNotReachedFor(phaseFix, fmt.Sprintf("the graph could not be rebuilt after fixing: %v", rebuildGraphError), unusedRequest)
 				writeRunEnd(report, streams.Output)
@@ -1307,7 +1307,7 @@ func run() error {
 			lintWalkCost = "walked by the fix phase (nothing was rewritten, so its findings still hold)"
 		}
 
-		findings += len(result.Diagnostics) - lintWarningCount(result.Diagnostics, lintConfig)
+		findings += len(result.Diagnostics) - lintWarningCount(result.Diagnostics, lintConfiguration)
 		if adamicReadinessRequested {
 			activeSummary.Adamic = readinessOf(graph, result, runTypes, typeErrorFiles)
 		}
@@ -1317,7 +1317,7 @@ func run() error {
 		writeLintReport(streams.Output, lintReport{
 			Result:     result,
 			Rules:      rules,
-			LintConfig: lintConfig,
+			LintConfig: lintConfiguration,
 			WalkCost:   lintWalkCost,
 			Details:    *showCoverage,
 		})
@@ -1435,17 +1435,17 @@ func run() error {
 //
 // It costs a full rebuild, which is why it only happens when something actually changed.
 func rebuildGraph(
-	configFileName string,
+	configurationFileName string,
 	directory string,
 	singleThreaded bool,
-	lintConfig *configuration.Config,
+	lintConfiguration *configuration.Config,
 	yieldedFiles map[string]struct{},
 ) (*program.Graph, time.Duration, error) {
 	start := time.Now()
 	// The check's stats predate the rewrite. See distrustCheckStats.
 	distrustCheckStats()
 	rebuilt, buildError := program.Build(program.Options{
-		ConfigFileName:   configFileName,
+		ConfigFileName:   configurationFileName,
 		CurrentDirectory: directory,
 		SingleThreaded:   singleThreaded,
 		ContentPack:      openContentPack(directory),
@@ -1454,8 +1454,8 @@ func rebuildGraph(
 	if buildError != nil {
 		return nil, time.Since(start), buildError
 	}
-	rebuilt.LintConfig = lintConfig
-	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfig, directory))
+	rebuilt.LintConfig = lintConfiguration
+	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfiguration, directory))
 	rebuilt.RegisteredRuleNames = registry.Names()
 	rebuilt.Readiness = requestedReadiness()
 	return rebuilt, time.Since(start), nil
@@ -1480,13 +1480,13 @@ func configureLint(graph *program.Graph, location projectLocation, ahead *lintCo
 	// A config that cannot be read is a hard failure and never a permissive default. Linting
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
-	var lintConfig *configuration.Config
+	var lintConfiguration *configuration.Config
 	var err error
 	if ahead != nil {
 		<-ahead.done
-		lintConfig, err = ahead.config, ahead.loadError
+		lintConfiguration, err = ahead.config, ahead.loadError
 	} else {
-		lintConfig, err = loadLintConfig(graph, location)
+		lintConfiguration, err = loadLintConfig(graph, location)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("loading the lint config: %w", err)
@@ -1503,10 +1503,10 @@ func configureLint(graph *program.Graph, location projectLocation, ahead *lintCo
 	for _, projectFile := range wholeProgramFiles {
 		projectFileNames = append(projectFileNames, projectFile.FileName().AsString())
 	}
-	if validateSelectorsError := lintConfig.ValidateSelectors(projectFileNames); validateSelectorsError != nil {
+	if validateSelectorsError := lintConfiguration.ValidateSelectors(projectFileNames); validateSelectorsError != nil {
 		return nil, fmt.Errorf("validating the lint config: %w", validateSelectorsError)
 	}
-	base := optionsBase(lintConfig, location.Root)
+	base := optionsBase(lintConfiguration, location.Root)
 	if ahead != nil {
 		if ahead.settingsError != nil {
 			return nil, fmt.Errorf("validating the lint config: %w", ahead.settingsError)
@@ -1518,17 +1518,17 @@ func configureLint(graph *program.Graph, location projectLocation, ahead *lintCo
 		}
 		graph.RuleOptions = registry.OptionsAt(base)
 	}
-	graph.LintConfig = lintConfig
+	graph.LintConfig = lintConfiguration
 	graph.RegisteredRuleNames = registry.Names()
 	graph.Readiness = requestedReadiness()
-	return lintConfig, nil
+	return lintConfiguration, nil
 }
 
-func optionsBase(lintConfig *configuration.Config, projectRoot string) rule.OptionsBase {
+func optionsBase(lintConfiguration *configuration.Config, projectRoot string) rule.OptionsBase {
 	base := rule.OptionsBase{ProjectRoot: projectRoot}
-	if lintConfig != nil {
-		base.ConfigDirectory = lintConfig.Root
-		base.Settings = lintConfig.Settings
+	if lintConfiguration != nil {
+		base.ConfigDirectory = lintConfiguration.Root
+		base.Settings = lintConfiguration.Settings
 	}
 	return base
 }
@@ -1740,10 +1740,10 @@ func singleLineDescription(description string) string {
 
 // printRuleDiagnostic prints one rule finding in the same shape, with the rule name where the error
 // code goes, since a reader should not have to learn two formats. The settings give it its severity.
-func printRuleDiagnostic(out *bufio.Writer, diagnostic rule.Diagnostic, lintConfig *configuration.Config) {
+func printRuleDiagnostic(out *bufio.Writer, diagnostic rule.Diagnostic, lintConfiguration *configuration.Config) {
 	sourceFile := diagnostic.SourceFile
 	if sourceFile == nil {
-		printFinding(out, ruleFinding(diagnostic, lintConfig), fmt.Sprintf("error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description))
+		printFinding(out, ruleFinding(diagnostic, lintConfiguration), fmt.Sprintf("error %s: %s\n", diagnostic.RuleName, diagnostic.Message.Description))
 		return
 	}
 
@@ -1761,7 +1761,7 @@ func printRuleDiagnostic(out *bufio.Writer, diagnostic rule.Diagnostic, lintConf
 	// paragraph: the message is the rule's to write and the line discipline is the printer's to keep.
 	description := singleLineDescription(diagnostic.Message.Description)
 
-	printFinding(out, ruleFinding(diagnostic, lintConfig), fmt.Sprintf(
+	printFinding(out, ruleFinding(diagnostic, lintConfiguration), fmt.Sprintf(
 		"%s:%d:%d - %s [%s/%s]\n",
 		sourceFile.FileName(), line+1, character+1,
 		description, diagnostic.RuleName, diagnostic.Message.Id,

@@ -364,9 +364,9 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 		value = doc.NewIndent(doc.Concat{doc.Hardline, doc.Dedent(value)})
 	}
 
-	prop := node.String("prop")
+	property := node.String("prop")
 	if !((parentNode.Type() == "css-atrule" && parentNode.Truthy("variable")) || insideIcssRuleNode(path)) {
-		prop = maybeToLowerCase(prop)
+		property = maybeToLowerCase(property)
 	}
 
 	var space doc.Doc = doc.Text(" ")
@@ -423,7 +423,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 
 	return doc.Concat{
 		doc.Text(declarationBeforePattern.ReplaceAllString(rawString(node, "before"), "")),
-		doc.Text(prop),
+		doc.Text(property),
 		choose(strings.HasPrefix(trimmedBetween, "//"), func() doc.Doc { return doc.Text(" ") }),
 		doc.Text(trimmedBetween),
 		space,
@@ -446,8 +446,8 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	// Less mixins, functions and variables are gated on options.parser === "less".
 
 	name := node.String("name")
-	params := node.Get("params")
-	stringParams, paramsIsString := params.(string)
+	parameters := node.Get("params")
+	stringParameters, paramsIsString := parameters.(string)
 	isImportUnknownValueEndsWithSemiColon := name == "import" &&
 		node.Child("params").Type() == "value-unknown" &&
 		strings.HasSuffix(node.Child("params").String("value"), ";")
@@ -460,8 +460,8 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 		printedName = maybeToLowerCase(name)
 	}
 
-	var printedParams doc.Doc = doc.Text("")
-	if estree.IsTruthy(params) {
+	var printedParameters doc.Doc = doc.Text("")
+	if estree.IsTruthy(parameters) {
 		var leading doc.Doc = doc.Text(" ")
 		if isDetachedRulesetCallNode(node) {
 			leading = doc.Text("")
@@ -478,13 +478,13 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 				leading = doc.Hardline
 			}
 		}
-		var paramsDoc doc.Doc
+		var parametersDoc doc.Doc
 		if paramsIsString {
-			paramsDoc = doc.Text(stringParams)
+			parametersDoc = doc.Text(stringParameters)
 		} else {
-			paramsDoc = print("params", nil)
+			parametersDoc = print("params", nil)
 		}
-		printedParams = doc.Concat{leading, paramsDoc}
+		printedParameters = doc.Concat{leading, parametersDoc}
 	}
 
 	selector := node.Child("selector")
@@ -520,7 +520,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 			lastLineHasInlineComment(selector.String("value"))) ||
 			(selector == nil &&
 				paramsIsString &&
-				lastLineHasInlineComment(stringParams)) {
+				lastLineHasInlineComment(stringParameters)) {
 			opening = doc.LineDoc
 		}
 		ending = doc.Concat{
@@ -541,7 +541,7 @@ func printAtRule(path *astPath, options *printerOptions, print printing.PrintFun
 	return doc.Concat{
 		doc.Text("@"),
 		doc.Text(printedName),
-		printedParams,
+		printedParameters,
 		printedSelector,
 		printedValue,
 		ending,

@@ -141,7 +141,7 @@ func tokenize(input []uint16, options Options) []token {
 	length := len(css)
 	offset := -1
 	line := 1
-	pos := 0
+	position := 0
 	parentCount := 0
 	isURLArg := false
 
@@ -149,7 +149,7 @@ func tokenize(input []uint16, options Options) []token {
 	next := undefinedNext
 	var quote uint16
 	var escaped bool
-	var escapePos int
+	var escapePosition int
 
 	// charCodeAt is css.charCodeAt: -1 stands in for NaN past either end, equal to no code.
 	charCodeAt := func(index int) int {
@@ -175,7 +175,7 @@ func tokenize(input []uint16, options Options) []token {
 
 	// pushStale pushes a bracket or paren token, whose end column is `next - offset` with a stale `next`.
 	pushStale := func(kind string) {
-		each := token{kind: kind, value: slice(pos, pos+1), startLine: line, startColumn: pos - offset, endLine: line, index: pos}
+		each := token{kind: kind, value: slice(position, position+1), startLine: line, startColumn: position - offset, endLine: line, index: position}
 		if next == undefinedNext {
 			each.endColumnIsNaN = true
 		} else {
@@ -185,20 +185,20 @@ func tokenize(input []uint16, options Options) []token {
 	}
 
 	unclosed := func(what string) {
-		panic(&Error{Name: "TokenizeError", Message: "Unclosed " + what + " at line: " + itoa(line) + ", column: " + itoa(pos-offset) + ", token: " + itoa(pos)})
+		panic(&Error{Name: "TokenizeError", Message: "Unclosed " + what + " at line: " + itoa(line) + ", column: " + itoa(position-offset) + ", token: " + itoa(position)})
 	}
 
-	for pos < length {
-		code = charCodeAt(pos)
+	for position < length {
+		code = charCodeAt(position)
 
 		if code == newline {
-			offset = pos
+			offset = position
 			line += 1
 		}
 
 		switch code {
 		case newline, space, tab, cr, feed:
-			next = pos
+			next = position
 			for {
 				next += 1
 				code = charCodeAt(next)
@@ -211,21 +211,21 @@ func tokenize(input []uint16, options Options) []token {
 				}
 			}
 
-			push("space", slice(pos, next), line, pos-offset, line, next-offset, pos)
+			push("space", slice(position, next), line, position-offset, line, next-offset, position)
 
-			pos = next - 1
+			position = next - 1
 
 		case colon:
-			next = pos + 1
-			push("colon", slice(pos, next), line, pos-offset, line, next-offset, pos)
+			next = position + 1
+			push("colon", slice(position, next), line, position-offset, line, next-offset, position)
 
-			pos = next - 1
+			position = next - 1
 
 		case comma:
-			next = pos + 1
-			push("comma", slice(pos, next), line, pos-offset, line, next-offset, pos)
+			next = position + 1
+			push("comma", slice(position, next), line, position-offset, line, next-offset, position)
 
-			pos = next - 1
+			position = next - 1
 
 		case openBracket:
 			pushStale("{")
@@ -252,16 +252,16 @@ func tokenize(input []uint16, options Options) []token {
 			} else {
 				quote = '"'
 			}
-			next = pos
+			next = position
 			for {
 				escaped = false
 				next = indexOfUnits(css, []uint16{quote}, next+1)
 				if next == -1 {
 					unclosed("quote")
 				}
-				escapePos = next
-				for charCodeAt(escapePos-1) == backslash {
-					escapePos -= 1
+				escapePosition = next
+				for charCodeAt(escapePosition-1) == backslash {
+					escapePosition -= 1
 					escaped = !escaped
 				}
 				if !escaped {
@@ -269,11 +269,11 @@ func tokenize(input []uint16, options Options) []token {
 				}
 			}
 
-			push("string", slice(pos, next+1), line, pos-offset, line, next-offset, pos)
-			pos = next
+			push("string", slice(position, next+1), line, position-offset, line, next-offset, position)
+			position = next
 
 		case at:
-			lastIndex := regexLastIndex(css, pos+1, func(css []uint16, index int) bool { return atEnd(css[index]) })
+			lastIndex := regexLastIndex(css, position+1, func(css []uint16, index int) bool { return atEnd(css[index]) })
 
 			if lastIndex == 0 {
 				next = length - 1
@@ -281,23 +281,23 @@ func tokenize(input []uint16, options Options) []token {
 				next = lastIndex - 2
 			}
 
-			push("atword", slice(pos, next+1), line, pos-offset, line, next-offset, pos)
-			pos = next
+			push("atword", slice(position, next+1), line, position-offset, line, next-offset, position)
+			position = next
 
 		case backslash:
-			next = pos
+			next = position
 
 			// Upstream reads the next character's code here and tests an `escape` variable that nothing
 			// assigns, so the backslash is always a one-character word and the branch that would take
 			// the escaped character, the only reader of that code, is dead.
 
-			push("word", slice(pos, next+1), line, pos-offset, line, next-offset, pos)
+			push("word", slice(position, next+1), line, position-offset, line, next-offset, position)
 
-			pos = next
+			position = next
 
 		case plus, minus, asterisk:
-			next = pos + 1
-			nextChar := charCodeAt(pos + 1)
+			next = position + 1
+			nextCharacter := charCodeAt(position + 1)
 
 			// Upstream also computes a prevChar here that it never reads.
 
@@ -305,39 +305,39 @@ func tokenize(input []uint16, options Options) []token {
 			// have a prefix of some kind, and should fall-through. eg. -webkit
 
 			// look for --* for custom variables
-			if code == minus && nextChar == minus {
+			if code == minus && nextCharacter == minus {
 				next++
 
-				push("word", slice(pos, next), line, pos-offset, line, next-offset, pos)
+				push("word", slice(position, next), line, position-offset, line, next-offset, position)
 
-				pos = next - 1
+				position = next - 1
 				break
 			}
 
-			push("operator", slice(pos, next), line, pos-offset, line, next-offset, pos)
+			push("operator", slice(position, next), line, position-offset, line, next-offset, position)
 
-			pos = next - 1
+			position = next - 1
 
 		default:
-			if code == slash && (charCodeAt(pos+1) == asterisk || (options.Loose && !isURLArg && charCodeAt(pos+1) == slash)) {
-				isStandardComment := charCodeAt(pos+1) == asterisk
+			if code == slash && (charCodeAt(position+1) == asterisk || (options.Loose && !isURLArg && charCodeAt(position+1) == slash)) {
+				isStandardComment := charCodeAt(position+1) == asterisk
 
 				if isStandardComment {
-					next = indexOfUnits(css, []uint16{'*', '/'}, pos+2) + 1
+					next = indexOfUnits(css, []uint16{'*', '/'}, position+2) + 1
 					if next == 0 {
 						unclosed("comment")
 					}
 				} else {
-					newlinePos := indexOfUnits(css, []uint16{'\n'}, pos+2)
+					newlinePosition := indexOfUnits(css, []uint16{'\n'}, position+2)
 
-					if newlinePos != -1 {
-						next = newlinePos - 1
+					if newlinePosition != -1 {
+						next = newlinePosition - 1
 					} else {
 						next = length
 					}
 				}
 
-				content := slice(pos, next+1)
+				content := slice(position, next+1)
 				// lines = content.split('\n'), of which only the count and the last line's length are read.
 				last := 0
 				lastLineLength := len(content)
@@ -357,20 +357,20 @@ func tokenize(input []uint16, options Options) []token {
 					nextOffset = offset
 				}
 
-				push("comment", content, line, pos-offset, nextLine, next-nextOffset, pos)
+				push("comment", content, line, position-offset, nextLine, next-nextOffset, position)
 
 				offset = nextOffset
 				line = nextLine
-				pos = next
+				position = next
 
-			} else if code == pound && !(pos+1 < length && alphaNum(css[pos+1])) {
-				next = pos + 1
+			} else if code == pound && !(position+1 < length && alphaNum(css[position+1])) {
+				next = position + 1
 
-				push("#", slice(pos, next), line, pos-offset, line, next-offset, pos)
+				push("#", slice(position, next), line, position-offset, line, next-offset, position)
 
-				pos = next - 1
-			} else if (code == lowerU || code == upperU) && charCodeAt(pos+1) == plus {
-				next = pos + 2
+				position = next - 1
+			} else if (code == lowerU || code == upperU) && charCodeAt(position+1) == plus {
+				next = position + 2
 
 				// Upstream also reads each code here, which the loop test and everything after never read.
 				for {
@@ -380,15 +380,15 @@ func tokenize(input []uint16, options Options) []token {
 					}
 				}
 
-				push("unicoderange", slice(pos, next), line, pos-offset, line, next-offset, pos)
-				pos = next - 1
+				push("unicoderange", slice(position, next), line, position-offset, line, next-offset, position)
+				position = next - 1
 			} else if code == slash {
 				// catch a regular slash, that isn't a comment
-				next = pos + 1
+				next = position + 1
 
-				push("operator", slice(pos, next), line, pos-offset, line, next-offset, pos)
+				push("operator", slice(position, next), line, position-offset, line, next-offset, position)
 
-				pos = next - 1
+				position = next - 1
 			} else {
 				regex := wordEnd
 				isWordEndNum := false
@@ -400,7 +400,7 @@ func tokenize(input []uint16, options Options) []token {
 					isWordEndNum = true
 				}
 
-				lastIndex := regexLastIndex(css, pos+1, regex)
+				lastIndex := regexLastIndex(css, position+1, regex)
 
 				if lastIndex == 0 {
 					next = length - 1
@@ -427,12 +427,12 @@ func tokenize(input []uint16, options Options) []token {
 					}
 				}
 
-				push("word", slice(pos, next+1), line, pos-offset, line, next-offset, pos)
-				pos = next
+				push("word", slice(position, next+1), line, position-offset, line, next-offset, position)
+				position = next
 			}
 		}
 
-		pos++
+		position++
 	}
 
 	return tokens

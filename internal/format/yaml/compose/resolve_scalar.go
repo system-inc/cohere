@@ -10,7 +10,7 @@ func resolveFlowScalar(scalar *cst.Token, strict bool, onError onErrorFunc) scal
 	offset, tokenType, source, end := scalar.Offset, scalar.Type, scalar.Source, scalar.End
 	var scalarType string
 	var value []uint16
-	relativeError := func(rel int, code string, msg string) { onError(offset+rel, code, msg, false) }
+	relativeError := func(rel int, code string, message string) { onError(offset+rel, code, message, false) }
 	switch tokenType {
 	case "scalar":
 		scalarType = Plain
@@ -38,27 +38,27 @@ func resolveFlowScalar(scalar *cst.Token, strict bool, onError onErrorFunc) scal
 	}
 }
 
-func plainValue(source []uint16, onError func(rel int, code string, msg string)) []uint16 {
-	badChar := ""
+func plainValue(source []uint16, onError func(rel int, code string, message string)) []uint16 {
+	badCharacter := ""
 	switch characterAt(source, 0) {
 	case '\t':
-		badChar = "a tab character"
+		badCharacter = "a tab character"
 	case ',':
-		badChar = "flow indicator character ,"
+		badCharacter = "flow indicator character ,"
 	case '%':
-		badChar = "directive indicator character %"
+		badCharacter = "directive indicator character %"
 	case '|', '>':
-		badChar = "block scalar indicator " + string(rune(source[0]))
+		badCharacter = "block scalar indicator " + string(rune(source[0]))
 	case '@', '`':
-		badChar = "reserved character " + string(rune(source[0]))
+		badCharacter = "reserved character " + string(rune(source[0]))
 	}
-	if badChar != "" {
-		onError(0, "BAD_SCALAR_START", "Plain value cannot start with "+badChar)
+	if badCharacter != "" {
+		onError(0, "BAD_SCALAR_START", "Plain value cannot start with "+badCharacter)
 	}
 	return foldLines(source)
 }
 
-func singleQuotedValue(source []uint16, onError func(rel int, code string, msg string)) []uint16 {
+func singleQuotedValue(source []uint16, onError func(rel int, code string, message string)) []uint16 {
 	if characterAt(source, len(source)-1) != '\'' || len(source) == 1 {
 		onError(len(source), "MISSING_CHAR", "Missing closing 'quote")
 	}
@@ -107,9 +107,9 @@ func foldLines(source []uint16) []uint16 {
 	}
 	res := append([]uint16{}, source[:foldLinesEnd(source, 0, n)]...)
 	sep := []uint16{' '}
-	pos := n + 1
+	position := n + 1
 	for {
-		start := pos
+		start := position
 		for start < len(source) && isSpaceOrTab(int(source[start])) {
 			start++
 		}
@@ -134,16 +134,16 @@ func foldLines(source []uint16) []uint16 {
 			res = append(append(res, sep...), match...)
 			sep = []uint16{' '}
 		}
-		pos = newline + 1
+		position = newline + 1
 	}
-	start := pos
+	start := position
 	for start < len(source) && isSpaceOrTab(int(source[start])) {
 		start++
 	}
 	return concatUnits(res, sep, source[start:])
 }
 
-func doubleQuotedValue(source []uint16, onError func(rel int, code string, msg string)) []uint16 {
+func doubleQuotedValue(source []uint16, onError func(rel int, code string, message string)) []uint16 {
 	res := []uint16{}
 	for i := 1; i < len(source)-1; i++ {
 		ch := source[i]
@@ -255,7 +255,7 @@ var escapeCodes = map[int]uint16{
 	'\t': '\t',
 }
 
-func parseCharCode(source []uint16, offset int, length int, onError func(rel int, code string, msg string)) []uint16 {
+func parseCharCode(source []uint16, offset int, length int, onError func(rel int, code string, message string)) []uint16 {
 	cc := substr(source, offset, length)
 	ok := len(cc) == length
 	for _, unit := range cc {
@@ -364,7 +364,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 	}
 	value := []uint16{}
 	sep := []uint16{}
-	prevMoreIndented := false
+	previousMoreIndented := false
 	// leading whitespace is kept intact
 	for i := 0; i < contentStart; i++ {
 		value = append(append(value, slice(lines[i][0], trimIndent, len(lines[i][0]))...), '\n')
@@ -378,11 +378,11 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 		}
 		/* istanbul ignore if already caught in lexer */
 		if len(content) > 0 && len(indent) < trimIndent {
-			src := "first line"
+			source := "first line"
 			if header.indent != 0 {
-				src = "explicit indentation indicator"
+				source = "explicit indentation indicator"
 			}
-			message := "Block scalar lines must not be less indented than their " + src
+			message := "Block scalar lines must not be less indented than their " + source
 			rel := 1
 			if crlf {
 				rel = 2
@@ -398,12 +398,12 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 			// more-indented content within a folded block
 			if equalsASCII(sep, " ") {
 				sep = []uint16{'\n'}
-			} else if !prevMoreIndented && equalsASCII(sep, "\n") {
+			} else if !previousMoreIndented && equalsASCII(sep, "\n") {
 				sep = []uint16{'\n', '\n'}
 			}
 			value = append(append(append(value, sep...), trimmedIndent...), content...)
 			sep = []uint16{'\n'}
-			prevMoreIndented = true
+			previousMoreIndented = true
 		} else if len(content) == 0 {
 			// empty line
 			if equalsASCII(sep, "\n") {
@@ -414,7 +414,7 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 		} else {
 			value = append(append(value, sep...), content...)
 			sep = []uint16{' '}
-			prevMoreIndented = false
+			previousMoreIndented = false
 		}
 	}
 	switch header.chomp {
@@ -434,13 +434,13 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 }
 
 func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc) *blockScalarHeader {
-	offset, props := scalar.Offset, scalar.Props
+	offset, properties := scalar.Offset, scalar.Props
 	/* istanbul ignore if should not happen */
-	if props[0].Type != "block-scalar-header" {
-		onError(props[0], "IMPOSSIBLE", "Block scalar header not found", false)
+	if properties[0].Type != "block-scalar-header" {
+		onError(properties[0], "IMPOSSIBLE", "Block scalar header not found", false)
 		return nil
 	}
-	source := props[0].Source
+	source := properties[0].Source
 	mode := source[0]
 	indent := 0
 	var chomp uint16
@@ -468,8 +468,8 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 	hasSpace := false
 	comment := ""
 	length := len(source)
-	for i := 1; i < len(props); i++ {
-		token := props[i]
+	for i := 1; i < len(properties); i++ {
+		token := properties[i]
 		switch token.Type {
 		case "space":
 			hasSpace = true

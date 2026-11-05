@@ -68,8 +68,8 @@ func runDecoratorMetadata(test *testing.T, subject string, emitDecoratorMetadata
 		"decorators.ts":       decoratorMetadataDecorators,
 		"FormComponent.ts":    subject,
 	}, "FormComponent.ts", DefaultConsistentTypeImportsOptions(), func(directory string) {
-		config := []byte(fmt.Sprintf(decoratorMetadataConfig, enabled))
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), config, 0o644); writeError != nil {
+		configuration := []byte(fmt.Sprintf(decoratorMetadataConfig, enabled))
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), configuration, 0o644); writeError != nil {
 			test.Fatalf("writing the decorator metadata tsconfig: %v", writeError)
 		}
 	})

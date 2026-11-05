@@ -99,11 +99,11 @@ func NewComposer(options Options) *Composer {
 }
 
 func (composer *Composer) onError(source any, code string, message string, warning bool) {
-	pos := getErrorPos(source)
+	position := getErrorPos(source)
 	if warning {
-		composer.warnings = append(composer.warnings, newYAMLWarning(pos, code, message))
+		composer.warnings = append(composer.warnings, newYAMLWarning(position, code, message))
 	} else {
-		composer.errors = append(composer.errors, newYAMLParseError(pos, code, message))
+		composer.errors = append(composer.errors, newYAMLParseError(position, code, message))
 	}
 }
 
@@ -171,9 +171,9 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 	switch token.Type {
 	case "directive":
 		composer.directives.add(token.Source, func(offset int, message string, warning bool) {
-			pos := getErrorPos(token)
-			pos[0] += offset
-			composer.onError(pos, "BAD_DIRECTIVE", message, warning)
+			position := getErrorPos(token)
+			position[0] += offset
+			composer.onError(position, "BAD_DIRECTIVE", message, warning)
 		})
 		composer.prelude = append(composer.prelude, token.Source)
 		composer.atDirectives = true
@@ -194,11 +194,11 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 	case "comment", "newline":
 		composer.prelude = append(composer.prelude, token.Source)
 	case "error":
-		msg := token.Message
+		message := token.Message
 		if len(token.Source) > 0 {
-			msg = token.Message + ": " + jsonStringify(token.Source)
+			message = token.Message + ": " + jsonStringify(token.Source)
 		}
-		yamlError := newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", msg)
+		yamlError := newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message)
 		if composer.atDirectives || composer.doc == nil {
 			composer.errors = append(composer.errors, yamlError)
 		} else {
@@ -206,8 +206,8 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 		}
 	case "doc-end":
 		if composer.doc == nil {
-			msg := "Unexpected doc-end without preceding document"
-			composer.errors = append(composer.errors, newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", msg))
+			message := "Unexpected doc-end without preceding document"
+			composer.errors = append(composer.errors, newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message))
 			break
 		}
 		composer.doc.Directives.DocEnd = true

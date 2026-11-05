@@ -78,9 +78,9 @@ func DecodeNoSelfAssignOptions(raw []byte) (any, error) {
 var NoSelfAssign = rule.Rule{
 	Name: "no-self-assign",
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		props := DefaultNoSelfAssignOptions().Props
+		properties := DefaultNoSelfAssignOptions().Props
 		if resolved, isNoSelfAssignOptions := rule.OptionsAs[NoSelfAssignOptions](options); isNoSelfAssignOptions {
-			props = resolved.Props
+			properties = resolved.Props
 		}
 
 		return rule.Listeners{
@@ -106,7 +106,7 @@ var NoSelfAssign = rule.Rule{
 					return
 				}
 
-				reportSelfAssignments(ruleContext, binary.Left, binary.Right, props)
+				reportSelfAssignments(ruleContext, binary.Left, binary.Right, properties)
 			},
 		}
 	},
@@ -116,7 +116,7 @@ var NoSelfAssign = rule.Rule{
 //
 // Recursive because a destructuring assignment is a tree of targets against a tree of values, and a
 // self-assignment can sit at any depth: `[a, [b]] = [a, [b]]` is two of them.
-func reportSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, properties bool) {
 	if left == nil || right == nil {
 		return
 	}
@@ -133,17 +133,17 @@ func reportSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.
 		}
 
 	case unwrappedLeft.Kind == ast.KindArrayLiteralExpression && unwrappedRight.Kind == ast.KindArrayLiteralExpression:
-		reportArraySelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, props)
+		reportArraySelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, properties)
 
 	case unwrappedLeft.Kind == ast.KindObjectLiteralExpression &&
 		unwrappedRight.Kind == ast.KindObjectLiteralExpression:
-		reportObjectSelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, props)
+		reportObjectSelfAssignments(ruleContext, unwrappedLeft, unwrappedRight, properties)
 
 	case unwrappedLeft.Kind == ast.KindSpreadElement && unwrappedRight.Kind == ast.KindSpreadElement:
 		reportSelfAssignments(ruleContext, unwrappedLeft.AsSpreadElement().Expression,
-			unwrappedRight.AsSpreadElement().Expression, props)
+			unwrappedRight.AsSpreadElement().Expression, properties)
 
-	case props && ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight):
+	case properties && ast.IsAccessExpression(unwrappedLeft) && ast.IsAccessExpression(unwrappedRight):
 		if isSameReference(unwrappedLeft, unwrappedRight) {
 			ruleContext.ReportNode(unwrappedRight, messageSelfAssignment)
 		}
@@ -154,7 +154,7 @@ func reportSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.
 //
 // Positional rather than by membership, which is what keeps `[a, b] = [b, a]` silent: a swap
 // assigns each name a different value and is the reason anyone writes this shape at all.
-func reportArraySelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportArraySelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, properties bool) {
 	leftElements := left.AsArrayLiteralExpression().Elements.Nodes
 	rightElements := right.AsArrayLiteralExpression().Elements.Nodes
 
@@ -169,7 +169,7 @@ func reportArraySelfAssignments(ruleContext rule.Context, left *ast.Node, right 
 			return
 		}
 
-		reportSelfAssignments(ruleContext, leftElement, rightElement, props)
+		reportSelfAssignments(ruleContext, leftElement, rightElement, properties)
 
 		// After a spread on the value side, every later index is unknown, so no further position
 		// can be claimed to match.
@@ -183,7 +183,7 @@ func reportArraySelfAssignments(ruleContext rule.Context, left *ast.Node, right 
 //
 // By name rather than positionally, because object properties are unordered and `{ a, b } = { b, a }`
 // really is a self-assignment of both.
-func reportObjectSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, props bool) {
+func reportObjectSelfAssignments(ruleContext rule.Context, left *ast.Node, right *ast.Node, properties bool) {
 	leftProperties := left.AsObjectLiteralExpression().Properties.Nodes
 	rightProperties := right.AsObjectLiteralExpression().Properties.Nodes
 	if len(rightProperties) == 0 {
@@ -222,7 +222,7 @@ func reportObjectSelfAssignments(ruleContext rule.Context, left *ast.Node, right
 			if !rightOk || leftName != rightName {
 				continue
 			}
-			reportSelfAssignments(ruleContext, propertyValue(leftProperty), propertyValue(rightProperty), props)
+			reportSelfAssignments(ruleContext, propertyValue(leftProperty), propertyValue(rightProperty), properties)
 		}
 	}
 }

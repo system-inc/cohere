@@ -238,15 +238,15 @@ func runTypedFiles(
 		// A hook that wrote its own tsconfig keeps it. A rule whose verdict depends on a compiler
 		// option the default does not set, `emitDecoratorMetadata` for one, has no other way to reach
 		// a program built under that option.
-		configPath := filepath.Join(directory, "tsconfig.json")
-		if _, statError := os.Stat(configPath); os.IsNotExist(statError) {
-			if writeError := os.WriteFile(configPath, []byte(defaultTsConfig), 0o644); writeError != nil {
+		configurationPath := filepath.Join(directory, "tsconfig.json")
+		if _, statError := os.Stat(configurationPath); os.IsNotExist(statError) {
+			if writeError := os.WriteFile(configurationPath, []byte(defaultTsConfig), 0o644); writeError != nil {
 				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
 		}
 
 		built, buildError := program.Build(program.Options{
-			ConfigFileName:   configPath,
+			ConfigFileName:   configurationPath,
 			CurrentDirectory: directory,
 			LibraryParses:    libraryParses,
 			// One checker rather than several: a fixture is one file, and the parallel path adds

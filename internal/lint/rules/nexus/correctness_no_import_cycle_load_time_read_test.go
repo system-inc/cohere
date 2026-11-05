@@ -419,8 +419,8 @@ func correctnessNoImportCycleLoadTimeReadJsxPair(test *testing.T, element string
 			"export function Nested(): unknown { return <Parent />; }",
 		}, "\n"),
 	}, "/repository/source/A.tsx", func(directory string) {
-		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "jsx": "preserve", "moduleDetection": "force", "types": []}, "include": ["**/*.tsx"]}`
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+		configuration := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "jsx": "preserve", "moduleDetection": "force", "types": []}, "include": ["**/*.tsx"]}`
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
 			test.Fatalf("writing the JSX tsconfig: %v", writeError)
 		}
 	})

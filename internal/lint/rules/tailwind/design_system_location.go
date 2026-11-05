@@ -40,11 +40,11 @@ type TailwindLocationOptions struct {
 
 // Location is the design system these options name.
 func (options TailwindLocationOptions) Location() DesignSystemLocation {
-	configPath := options.EntryPoint
-	if configPath == "" {
-		configPath = options.TailwindConfig
+	configurationPath := options.EntryPoint
+	if configurationPath == "" {
+		configurationPath = options.TailwindConfig
 	}
-	return DesignSystemLocation{Anchor: options.anchor, Cwd: options.Cwd, ConfigPath: configPath, Tsconfig: options.Tsconfig}
+	return DesignSystemLocation{Anchor: options.anchor, Cwd: options.Cwd, ConfigPath: configurationPath, Tsconfig: options.Tsconfig}
 }
 
 // anchorAt records where the config was written. Promoted onto every options struct that embeds
@@ -324,11 +324,11 @@ func stylesheetResolverAt(cwd string, configured string, packageRoot string, fil
 	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 	readFile := func(path string) (string, bool) { return fileSystem.ReadFile(tspath.RootedFilePath(path)) }
 	next := tailwindengine.NodeStylesheetResolver(packageRoot)
-	configPath := findTsconfig(cwd, configured, fileExists)
-	if configPath == "" {
+	configurationPath := findTsconfig(cwd, configured, fileExists)
+	if configurationPath == "" {
 		return next, nil
 	}
-	mapping, loadTsconfigPathsError := loadTsconfigPaths(configPath, readFile, fileExists)
+	mapping, loadTsconfigPathsError := loadTsconfigPaths(configurationPath, readFile, fileExists)
 	if loadTsconfigPathsError != nil {
 		return nil, loadTsconfigPathsError
 	}

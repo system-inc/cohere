@@ -79,13 +79,13 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if shouldExpandFirstArg(args) {
-		tailArgs := printedArguments[1:]
-		for _, tailArg := range tailArgs {
-			if doc.WillBreak(tailArg) {
+		tailArguments := printedArguments[1:]
+		for _, tailArgument := range tailArguments {
+			if doc.WillBreak(tailArgument) {
 				return allArgsBrokenOut()
 			}
 		}
-		firstArg, bailedOut := printCatchingArgExpansionBailout(
+		firstArgument, bailedOut := printCatchingArgExpansionBailout(
 			print,
 			getCallArgumentSelector(current, 0),
 			&printArguments{expandFirstArg: true},
@@ -94,30 +94,30 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			return allArgsBrokenOut()
 		}
 
-		if doc.WillBreak(firstArg) {
+		if doc.WillBreak(firstArgument) {
 			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concatIn(path, spreadDocs("(", groupWithIn(path, firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
+					concatIn(path, spreadDocs("(", groupWithIn(path, firstArgument, doc.GroupOptions{ShouldBreak: true}), ", ", tailArguments, ")")...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
 			)
 		}
 
 		return conditionalGroup([]Doc{
-			concatIn(path, spreadDocs("(", firstArg, ", ", tailArgs, ")")...),
-			concatIn(path, spreadDocs("(", groupWithIn(path, firstArg, doc.GroupOptions{ShouldBreak: true}), ", ", tailArgs, ")")...),
+			concatIn(path, spreadDocs("(", firstArgument, ", ", tailArguments, ")")...),
+			concatIn(path, spreadDocs("(", groupWithIn(path, firstArgument, doc.GroupOptions{ShouldBreak: true}), ", ", tailArguments, ")")...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
 	}
 
 	if shouldExpandLastArg(args, printedArguments, options) {
-		headArgs := printedArguments[:len(printedArguments)-1]
-		for _, headArg := range headArgs {
-			if doc.WillBreak(headArg) {
+		headArguments := printedArguments[:len(printedArguments)-1]
+		for _, headArgument := range headArguments {
+			if doc.WillBreak(headArgument) {
 				return allArgsBrokenOut()
 			}
 		}
-		lastArg, bailedOut := printCatchingArgExpansionBailout(
+		lastArgument, bailedOut := printCatchingArgExpansionBailout(
 			print,
 			getCallArgumentSelector(current, -1),
 			&printArguments{expandLastArg: true},
@@ -126,18 +126,18 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			return allArgsBrokenOut()
 		}
 
-		if doc.WillBreak(lastArg) {
+		if doc.WillBreak(lastArgument) {
 			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concatIn(path, spreadDocs("(", headArgs, groupWithIn(path, lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
+					concatIn(path, spreadDocs("(", headArguments, groupWithIn(path, lastArgument, doc.GroupOptions{ShouldBreak: true}), ")")...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
 			)
 		}
 
 		return conditionalGroup([]Doc{
-			concatIn(path, spreadDocs("(", headArgs, lastArg, ")")...),
-			concatIn(path, spreadDocs("(", headArgs, groupWithIn(path, lastArg, doc.GroupOptions{ShouldBreak: true}), ")")...),
+			concatIn(path, spreadDocs("(", headArguments, lastArgument, ")")...),
+			concatIn(path, spreadDocs("(", headArguments, groupWithIn(path, lastArgument, doc.GroupOptions{ShouldBreak: true}), ")")...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
 	}
@@ -258,22 +258,22 @@ func shouldExpandLastArg(args []Node, argDocs []Doc, options *Options) bool {
 	// `label.hug === false`). The JavaScript printer has no embed hook (printer.go), so no argument doc
 	// carries that label and the branch is never taken; argDocs is kept for upstream's signature.
 
-	lastArg := args[len(args)-1]
-	var penultimateArg Node
+	lastArgument := args[len(args)-1]
+	var penultimateArgument Node
 	if len(args) >= 2 {
-		penultimateArg = args[len(args)-2]
+		penultimateArgument = args[len(args)-2]
 	}
-	return !hasComment(lastArg, commentLeading, nil) &&
-		!hasComment(lastArg, commentTrailing, nil) &&
-		couldExpandArg(lastArg, false) &&
+	return !hasComment(lastArgument, commentLeading, nil) &&
+		!hasComment(lastArgument, commentTrailing, nil) &&
+		couldExpandArg(lastArgument, false) &&
 		// If the last two arguments are of the same type,
 		// disable last element expansion.
-		(penultimateArg == nil || penultimateArg.Type() != lastArg.Type()) &&
+		(penultimateArgument == nil || penultimateArgument.Type() != lastArgument.Type()) &&
 		// useMemo(() => func(), [foo, bar, baz])
 		(len(args) != 2 ||
-			!penultimateArg.Is("ArrowFunctionExpression") ||
-			!isArrayExpression(lastArg)) &&
-		!(len(args) > 1 && isConciselyPrintedArray(lastArg, options))
+			!penultimateArgument.Is("ArrowFunctionExpression") ||
+			!isArrayExpression(lastArgument)) &&
+		!(len(args) > 1 && isConciselyPrintedArray(lastArgument, options))
 }
 
 // shouldExpandFirstArg is upstream's shouldExpandFirstArg.
@@ -282,22 +282,22 @@ func shouldExpandFirstArg(args []Node) bool {
 		return false
 	}
 
-	firstArg, secondArg := args[0], args[1]
+	firstArgument, secondArgument := args[0], args[1]
 
-	if firstArg.Is("ModuleExpression") &&
-		isTypeModuleObjectExpression(secondArg) {
+	if firstArgument.Is("ModuleExpression") &&
+		isTypeModuleObjectExpression(secondArgument) {
 		return true
 	}
 
-	return !hasAnyComment(firstArg) &&
-		(firstArg.Is("FunctionExpression") ||
-			(firstArg.Is("ArrowFunctionExpression") &&
-				firstArg.Child("body").Is("BlockStatement"))) &&
-		!secondArg.Is("FunctionExpression") &&
-		!secondArg.Is("ArrowFunctionExpression") &&
-		!secondArg.Is("ConditionalExpression") &&
-		isHopefullyShortCallArgument(secondArg) &&
-		!couldExpandArg(secondArg, false)
+	return !hasAnyComment(firstArgument) &&
+		(firstArgument.Is("FunctionExpression") ||
+			(firstArgument.Is("ArrowFunctionExpression") &&
+				firstArgument.Child("body").Is("BlockStatement"))) &&
+		!secondArgument.Is("FunctionExpression") &&
+		!secondArgument.Is("ArrowFunctionExpression") &&
+		!secondArgument.Is("ConditionalExpression") &&
+		isHopefullyShortCallArgument(secondArgument) &&
+		!couldExpandArg(secondArgument, false)
 }
 
 // isHopefullyShortCallArgument is upstream's isHopefullyShortCallArgument.

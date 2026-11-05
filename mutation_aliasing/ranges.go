@@ -1332,8 +1332,8 @@ func BuildAliasingGraph[G Graph[F, B, P], F any, B comparable, P any](graph G, f
 	// borrowed values, mutable unless their type says otherwise (its inference marks an immutable one
 	// with a Create of its kind), so it answers false.
 	parametersAreFrozen := graph.ParametersFrozen(function)
-	for _, param := range graph.Params(function) {
-		id := graph.IdentifierOf(param)
+	for _, parameter := range graph.Params(function) {
+		id := graph.IdentifierOf(parameter)
 		state.create(id, aliasingNodeObject)
 		if parametersAreFrozen {
 			state.markImmutable(id, EffectValueFrozen)

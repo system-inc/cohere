@@ -720,10 +720,10 @@ func (builder *builder) lowerJsxElement(node *ast.Node) Place {
 
 	tagName, attributes := jsxOpeningParts(opening)
 	tag := builder.lowerJsxTag(tagName)
-	props := builder.lowerJsxAttributes(attributes)
+	properties := builder.lowerJsxAttributes(attributes)
 	childPlaces := builder.lowerJsxChildren(children)
 
-	return builder.emit(&JsxExpression{Tag: tag, Props: props, Children: childPlaces}, node)
+	return builder.emit(&JsxExpression{Tag: tag, Props: properties, Children: childPlaces}, node)
 }
 
 func (builder *builder) lowerJsxFragment(node *ast.Node) Place {
@@ -767,7 +767,7 @@ func (builder *builder) lowerJsxAttributes(attributes *ast.Node) []JsxAttribute 
 		return nil
 	}
 
-	props := make([]JsxAttribute, 0, len(list.Properties.Nodes))
+	properties := make([]JsxAttribute, 0, len(list.Properties.Nodes))
 	for _, property := range list.Properties.Nodes {
 		switch property.Kind {
 		case ast.KindJsxAttribute:
@@ -779,20 +779,20 @@ func (builder *builder) lowerJsxAttributes(attributes *ast.Node) []JsxAttribute 
 			if attribute.Initializer == nil {
 				// A bare attribute is `true`.
 				value := builder.emit(&Primitive{Value: true}, property)
-				props = append(props, JsxAttribute{Name: name, Value: value})
+				properties = append(properties, JsxAttribute{Name: name, Value: value})
 				continue
 			}
-			props = append(props, JsxAttribute{
+			properties = append(properties, JsxAttribute{
 				Name:  name,
 				Value: builder.lowerExpressionToPlace(attribute.Initializer),
 			})
 
 		case ast.KindJsxSpreadAttribute:
 			value := builder.lowerExpressionToPlace(property.AsJsxSpreadAttribute().Expression)
-			props = append(props, JsxAttribute{Value: value, Spread: true})
+			properties = append(properties, JsxAttribute{Value: value, Spread: true})
 		}
 	}
-	return props
+	return properties
 }
 
 func (builder *builder) lowerJsxChildren(children []*ast.Node) []Place {

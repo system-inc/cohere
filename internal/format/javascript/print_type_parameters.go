@@ -17,11 +17,11 @@ import (
 // shouldForceTrailingComma is upstream's shouldForceTrailingComma. Upstream tests the path against
 // /\.ts$/; the name is read through sourcename.TreatedAs, so an Adamic `.a` file drops the comma as the
 // same file named `.ts` does (#6mhafvb).
-func shouldForceTrailingComma(path *Path, options *Options, paramsKey string) bool {
+func shouldForceTrailingComma(path *Path, options *Options, parametersKey string) bool {
 	current := node(path)
 	return len(getFunctionParameters(current)) == 1 &&
 		strings.HasPrefix(current.Type(), "TS") &&
-		!current.List(paramsKey)[0].Truthy("constraint") &&
+		!current.List(parametersKey)[0].Truthy("constraint") &&
 		parentOf(path).Is("ArrowFunctionExpression") &&
 		!(settingsOf(options).FilePath != "" && strings.HasSuffix(sourcename.TreatedAs(settingsOf(options).FilePath), ".ts"))
 }
@@ -36,11 +36,11 @@ func shouldForceTrailingComma(path *Path, options *Options, paramsKey string) bo
 - `TSTypeReference` (TypeScript)
 */
 // printTypeParameters is upstream's printTypeParameters.
-func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKey string) Doc {
+func printTypeParameters(path *Path, options *Options, print PrintFunc, parametersKey string) Doc {
 	current := node(path)
 	// Upstream's `node[paramsKey]` is either an array or a single node; Go reads which with a type
 	// switch. An empty array is truthy upstream, so only a missing value returns "".
-	value := current.Get(paramsKey)
+	value := current.Get(parametersKey)
 
 	if value == nil {
 		return emptyDoc
@@ -49,7 +49,7 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 	// for TypeParameterDeclaration typeParameters is a single node
 	parameters, isArray := value.([]Node)
 	if !isArray {
-		return print(paramsKey, nil)
+		return print(parametersKey, nil)
 	}
 
 	isParameterInTestCall := isTestCall(grandparentOf(path), nil)
@@ -57,7 +57,7 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 	isArrowFunctionVariable := path.Match(
 		func(value any, _ any, _ int, _ bool) bool {
 			node, _ := value.(Node)
-			return !(len(node.List(paramsKey)) == 1 && isObjectType(node.List(paramsKey)[0]))
+			return !(len(node.List(parametersKey)) == 1 && isObjectType(node.List(parametersKey)[0]))
 		},
 		nil,
 		func(_ any, name any, _ int, _ bool) bool {
@@ -96,7 +96,7 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 
 	if shouldInline {
 		return concatIn(path, "<",
-			join(", ", printAll(path, print, paramsKey)),
+			join(", ", printAll(path, print, parametersKey)),
 			printDanglingCommentsForInline(path, options),
 			">",
 		)
@@ -105,14 +105,14 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramsKe
 	var trailingComma Doc
 	if current.Is("TSTypeParameterInstantiation") { // https://github.com/microsoft/TypeScript/issues/21984
 		trailingComma = emptyDoc
-	} else if shouldForceTrailingComma(path, options, paramsKey) {
+	} else if shouldForceTrailingComma(path, options, parametersKey) {
 		trailingComma = toDoc(",")
 	} else {
 		trailingComma = printTrailingComma(options, "")
 	}
 
 	return groupIn(path, concatIn(path, "<",
-		indentIn(path, concatIn(path, softline, join(concatIn(path, ",", line), printAll(path, print, paramsKey)))),
+		indentIn(path, concatIn(path, softline, join(concatIn(path, ",", line), printAll(path, print, parametersKey)))),
 		trailingComma,
 		softline,
 		">",

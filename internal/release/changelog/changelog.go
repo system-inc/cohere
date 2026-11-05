@@ -230,9 +230,9 @@ func Diff(before map[string][]byte, after map[string][]byte) (map[string]SetChan
 
 // SetsAt reads every set as it is in a commit of the repository at moduleDirectory, as name to text. An
 // empty ref reads the working tree.
-func SetsAt(moduleDirectory string, ref string) (map[string][]byte, error) {
+func SetsAt(moduleDirectory string, reference string) (map[string][]byte, error) {
 	sets := map[string][]byte{}
-	if ref == "" {
+	if reference == "" {
 		root := filepath.Join(moduleDirectory, SetDirectory)
 		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 			if err != nil || entry.IsDir() || filepath.Ext(path) != ".json" {
@@ -249,7 +249,7 @@ func SetsAt(moduleDirectory string, ref string) (map[string][]byte, error) {
 		return sets, walkError
 	}
 
-	listing, gitError := git(moduleDirectory, "ls-tree", "-r", "--name-only", ref, "--", SetDirectory)
+	listing, gitError := git(moduleDirectory, "ls-tree", "-r", "--name-only", reference, "--", SetDirectory)
 	if gitError != nil {
 		return nil, gitError
 	}
@@ -257,7 +257,7 @@ func SetsAt(moduleDirectory string, ref string) (map[string][]byte, error) {
 		if filepath.Ext(path) != ".json" {
 			continue
 		}
-		contents, gitError := git(moduleDirectory, "show", ref+":"+path)
+		contents, gitError := git(moduleDirectory, "show", reference+":"+path)
 		if gitError != nil {
 			return nil, gitError
 		}

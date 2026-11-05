@@ -85,11 +85,11 @@ func TestNestedProjectsAreFoundUnderAnyRoot(test *testing.T) {
 		"legacy/tsconfig.json":         `{` + ownershipOptions + `,"include":["**/*.ts"]}`,
 		"legacy/old.ts":                "export const old = 1;\n",
 	}
-	configOnly := map[string]string{
+	configurationOnly := map[string]string{
 		"tsconfig.json":    `{` + ownershipOptions + `,"include":["*.config.ts"]}`,
 		"eslint.config.ts": "export default [];\n",
 	}
-	for name, extra := range map[string]map[string]string{"a config-only root": configOnly, "no root tsconfig": nil} {
+	for name, extra := range map[string]map[string]string{"a config-only root": configurationOnly, "no root tsconfig": nil} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			files := map[string]string{}

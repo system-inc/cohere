@@ -292,9 +292,9 @@ func sortDefaultPropsKeyText(ruleContext rule.Context, property *ast.Node) strin
 	// before this used the token range.
 	keyRange := rule.TokenRange(ruleContext.SourceFile, name)
 	text := ruleContext.SourceFile.Text()
-	pos, end := keyRange.Pos(), keyRange.End()
-	if pos < 0 || end > len(text) || pos > end {
+	position, end := keyRange.Pos(), keyRange.End()
+	if position < 0 || end > len(text) || position > end {
 		return ""
 	}
-	return text[pos:end]
+	return text[position:end]
 }

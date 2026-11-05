@@ -32,11 +32,11 @@ func printFunction(out *strings.Builder, function *Function, depth int) {
 		name = "<anonymous>"
 	}
 	fmt.Fprintf(out, "%sfunction %s(", indent, name)
-	for index, param := range function.Params {
+	for index, parameter := range function.Params {
 		if index > 0 {
 			out.WriteString(", ")
 		}
-		out.WriteString(function.PlaceString(param))
+		out.WriteString(function.PlaceString(parameter))
 	}
 	out.WriteString(")")
 	if function.Kind != FunctionKindOther {

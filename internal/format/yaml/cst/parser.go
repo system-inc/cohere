@@ -70,19 +70,19 @@ func getPrevProps(parent *Token) *[]*Token {
 }
 
 // getFirstKeyStartProps. Note: May modify input array.
-func getFirstKeyStartProps(prevField *[]*Token) []*Token {
-	prev := *prevField
-	if len(prev) == 0 {
+func getFirstKeyStartProps(previousField *[]*Token) []*Token {
+	previous := *previousField
+	if len(previous) == 0 {
 		return []*Token{}
 	}
-	i := len(prev)
+	i := len(previous)
 loop:
 	for {
 		i--
 		if i < 0 {
 			break
 		}
-		switch prev[i].Type {
+		switch previous[i].Type {
 		case "doc-start", "explicit-key-ind", "map-value-ind", "seq-item-ind", "newline":
 			break loop
 		}
@@ -90,12 +90,12 @@ loop:
 	for {
 		// `while (prev[++i]?.type === 'space')`
 		i++
-		if !(i < len(prev) && prev[i].Type == "space") {
+		if !(i < len(previous) && previous[i].Type == "space") {
 			break
 		}
 	}
 	// `prev.splice(i, prev.length)`
-	return spliceTail(prevField, i)
+	return spliceTail(previousField, i)
 }
 
 // spliceTail is `list.splice(start)`: it removes the elements from start on and returns them, as a
@@ -508,8 +508,8 @@ func (parser *Parser) document(doc *Token) {
 
 func (parser *Parser) scalar(scalar *Token) {
 	if parser.tokenType == "map-value-ind" {
-		prev := getPrevProps(parser.peek(2))
-		start := getFirstKeyStartProps(prev)
+		previous := getPrevProps(parser.peek(2))
+		start := getFirstKeyStartProps(previous)
 		var sep []*Token
 		if scalar.End != nil {
 			sep = append(scalar.End, parser.sourceToken())
@@ -584,14 +584,14 @@ func (parser *Parser) blockMap(blockMap *Token) {
 			it.Sep = append(it.Sep, parser.sourceToken())
 		} else {
 			if parser.atIndentedComment(it.Start, blockMap.Indent) {
-				var prev *CollectionItem
+				var previous *CollectionItem
 				if len(blockMap.Items) >= 2 {
-					prev = blockMap.Items[len(blockMap.Items)-2]
+					previous = blockMap.Items[len(blockMap.Items)-2]
 				}
 				// `prev?.value?.end`, an array when present.
-				if prev != nil && prev.Value != nil && prev.Value.End != nil {
-					end := append(prev.Value.End, it.Start...)
-					prev.Value.End = append(end, parser.sourceToken())
+				if previous != nil && previous.Value != nil && previous.Value.End != nil {
+					end := append(previous.Value.End, it.Start...)
+					previous.Value.End = append(end, parser.sourceToken())
 					blockMap.Items = blockMap.Items[: len(blockMap.Items)-1 : len(blockMap.Items)-1]
 					return
 				}
@@ -797,13 +797,13 @@ func (parser *Parser) blockSequence(seq *Token) {
 			seq.Items = append(seq.Items, &CollectionItem{Start: []*Token{parser.sourceToken()}})
 		} else {
 			if parser.atIndentedComment(it.Start, seq.Indent) {
-				var prev *CollectionItem
+				var previous *CollectionItem
 				if len(seq.Items) >= 2 {
-					prev = seq.Items[len(seq.Items)-2]
+					previous = seq.Items[len(seq.Items)-2]
 				}
-				if prev != nil && prev.Value != nil && prev.Value.End != nil {
-					end := append(prev.Value.End, it.Start...)
-					prev.Value.End = append(end, parser.sourceToken())
+				if previous != nil && previous.Value != nil && previous.Value.End != nil {
+					end := append(previous.Value.End, it.Start...)
+					previous.Value.End = append(end, parser.sourceToken())
 					seq.Items = seq.Items[: len(seq.Items)-1 : len(seq.Items)-1]
 					return
 				}
@@ -917,8 +917,8 @@ func (parser *Parser) flowCollection(fc *Token) {
 			parser.step()
 		} else if parser.tokenType == "map-value-ind" &&
 			parent.Type != "flow-collection" {
-			prev := getPrevProps(parent)
-			start := getFirstKeyStartProps(prev)
+			previous := getPrevProps(parent)
+			start := getFirstKeyStartProps(previous)
 			fixFlowSeqItems(fc)
 			// `fc.end.splice(1, fc.end.length)`
 			sep := spliceTail(&fc.End, 1)
@@ -986,8 +986,8 @@ func (parser *Parser) startBlockValue(parent *Token) *Token {
 		})
 	case "explicit-key-ind":
 		parser.onKeyLine = true
-		prev := getPrevProps(parent)
-		start := getFirstKeyStartProps(prev)
+		previous := getPrevProps(parent)
+		start := getFirstKeyStartProps(previous)
 		start = append(start, parser.sourceToken())
 		return parser.Tokens.New(Token{
 			Type:   "block-map",
@@ -997,8 +997,8 @@ func (parser *Parser) startBlockValue(parent *Token) *Token {
 		})
 	case "map-value-ind":
 		parser.onKeyLine = true
-		prev := getPrevProps(parent)
-		start := getFirstKeyStartProps(prev)
+		previous := getPrevProps(parent)
+		start := getFirstKeyStartProps(previous)
 		item := &CollectionItem{Start: start, Sep: []*Token{parser.sourceToken()}}
 		item.setKey(nil)
 		return parser.Tokens.New(Token{

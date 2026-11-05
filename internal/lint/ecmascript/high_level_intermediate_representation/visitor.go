@@ -162,8 +162,8 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 		if v.Tag.Place != nil {
 			visit(*v.Tag.Place, PlaceRoleUse)
 		}
-		for _, prop := range v.Props {
-			visit(prop.Value, PlaceRoleUse)
+		for _, property := range v.Props {
+			visit(property.Value, PlaceRoleUse)
 		}
 		for _, child := range v.Children {
 			visit(child, PlaceRoleUse)

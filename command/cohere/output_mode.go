@@ -101,7 +101,7 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 
 // ruleFinding is a rule's diagnostic as a runFinding, with the severity the settings give the rule for
 // its file. Unnamed rules report as errors, and so does the unused-disable engine diagnostic by default.
-func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) runFinding {
+func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Config) runFinding {
 	finding := runFinding{
 		Severity:  "error",
 		Rule:      diagnostic.RuleName,
@@ -110,12 +110,12 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfig *configuration.Config) r
 	}
 	if diagnostic.RuleName == configuration.UnusedDisable {
 		path, _, _ := diagnostic.Location()
-		finding.Severity = unusedDisableSeverity(lintConfig, path).String()
+		finding.Severity = unusedDisableSeverity(lintConfiguration, path).String()
 	}
 	if sourceFile := diagnostic.SourceFile; sourceFile != nil {
 		finding.Path, finding.Line, finding.Column = diagnostic.Location()
-		if lintConfig != nil {
-			if setting, named := lintConfig.Resolve(sourceFile.FileName().AsString()).Rules[diagnostic.RuleName]; named &&
+		if lintConfiguration != nil {
+			if setting, named := lintConfiguration.Resolve(sourceFile.FileName().AsString()).Rules[diagnostic.RuleName]; named &&
 				setting.Severity == configuration.SeverityWarn {
 				finding.Severity = "warn"
 			}

@@ -290,11 +290,11 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 // The options are a space-separated set of bare words plus an optional `prefix(ident)`. An
 // unrecognized word is ignored, matching upstream, which tests for each known option and falls
 // through silently otherwise.
-func parseThemeOptions(params string) (ThemeOptions, string) {
+func parseThemeOptions(parameters string) (ThemeOptions, string) {
 	options := ThemeOptionNone
 	prefix := ""
 
-	for _, option := range segment(text.TrimWhitespace(params), ' ') {
+	for _, option := range segment(text.TrimWhitespace(parameters), ' ') {
 		switch {
 		case option == "reference":
 			options |= ThemeOptionReference

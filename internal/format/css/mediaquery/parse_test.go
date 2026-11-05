@@ -130,8 +130,8 @@ func TestParseTrees(test *testing.T) {
 		},
 	}
 	for _, each := range cases {
-		params := strings.NewReplacer("<e>", "\xc3\xa9", "<nbsp>", "\u00a0").Replace(each.params)
-		tree, parseError := Parse(params)
+		parameters := strings.NewReplacer("<e>", "\xc3\xa9", "<nbsp>", "\u00a0").Replace(each.params)
+		tree, parseError := Parse(parameters)
 		if parseError != nil {
 			test.Errorf("%q: %v", each.params, parseError)
 			continue
@@ -149,14 +149,14 @@ func TestParseTrees(test *testing.T) {
 // in a feature, and an endless loop on an unclosed url( (which the oracle cannot run).
 func TestParseRefusals(test *testing.T) {
 	test.Parallel()
-	for _, params := range []string{"(a} b", "screen and (color}", "url(", "  url (a(b)"} {
-		tree, parseError := Parse(params)
+	for _, parameters := range []string{"(a} b", "screen and (color}", "url(", "  url (a(b)"} {
+		tree, parseError := Parse(parameters)
 		if parseError == nil {
-			test.Errorf("%q: parsed to %v, want a refusal", params, tree.Type())
+			test.Errorf("%q: parsed to %v, want a refusal", parameters, tree.Type())
 			continue
 		}
 		if !printing.IsSyntax(parseError) {
-			test.Errorf("%q: %v is not marked as a syntax error", params, parseError)
+			test.Errorf("%q: %v is not marked as a syntax error", parameters, parseError)
 		}
 	}
 }

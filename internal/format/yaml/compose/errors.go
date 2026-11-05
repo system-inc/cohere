@@ -22,12 +22,12 @@ type YAMLError struct {
 
 func (yamlError *YAMLError) Error() string { return yamlError.Message }
 
-func newYAMLParseError(pos [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLParseError", Code: code, Message: message, Pos: pos}
+func newYAMLParseError(position [2]int, code string, message string) *YAMLError {
+	return &YAMLError{Name: "YAMLParseError", Code: code, Message: message, Pos: position}
 }
 
-func newYAMLWarning(pos [2]int, code string, message string) *YAMLError {
-	return &YAMLError{Name: "YAMLWarning", Code: code, Message: message, Pos: pos}
+func newYAMLWarning(position [2]int, code string, message string) *YAMLError {
+	return &YAMLError{Name: "YAMLWarning", Code: code, Message: message, Pos: position}
 }
 
 // errorString is an Error upstream throws, whose message a caller catches and reports.

@@ -21,20 +21,20 @@ func itemAt(items []*cst.CollectionItem, index int) *cst.CollectionItem {
 type createItemFunc func(position *position, key *Node, value *Node) *Node
 
 // transformMap is upstream's transformMap.
-func (context *context) transformMap(mapNode *compose.Node, props []*cst.Token) *Node {
-	srcToken := mapNode.SrcToken
-	if srcToken == nil || srcToken.Type != "block-map" {
+func (context *context) transformMap(mapNode *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := mapNode.SrcToken
+	if sourceToken == nil || sourceToken.Type != "block-map" {
 		throwError("Expected block mapping srcToken")
 	}
 	mappingItems := make([]*Node, len(mapNode.Items))
 	for index, pair := range mapNode.Items {
-		srcItem := itemAt(srcToken.Items, index)
-		mappingItems[index] = context.transformPair(pair, srcItem, context.createMappingItem)
+		sourceItem := itemAt(sourceToken.Items, index)
+		mappingItems[index] = context.transformPair(pair, sourceItem, context.createMappingItem)
 	}
-	if len(mapNode.Items) < len(srcToken.Items) {
-		for i := len(mapNode.Items); i < len(srcToken.Items); i++ {
-			srcItem := srcToken.Items[i]
-			for _, token := range context.extractComments(srcItem.Start) {
+	if len(mapNode.Items) < len(sourceToken.Items) {
+		for i := len(mapNode.Items); i < len(sourceToken.Items); i++ {
+			sourceItem := sourceToken.Items[i]
+			for _, token := range context.extractComments(sourceItem.Start) {
 				throwError("Unexpected token type in collection item start: %s", token.Type)
 			}
 		}
@@ -45,26 +45,26 @@ func (context *context) transformMap(mapNode *compose.Node, props []*cst.Token) 
 	}
 	return context.createMapping(
 		context.createPosition(context.position(mappingItems[0]).start, context.position(mappingItems[len(mappingItems)-1]).end),
-		context.transformContentProperties(mapNode, props), mappingItems)
+		context.transformContentProperties(mapNode, properties), mappingItems)
 }
 
 // transformSeq is upstream's transformSeq.
-func (context *context) transformSeq(seq *compose.Node, props []*cst.Token) *Node {
-	srcToken := seq.SrcToken
-	if srcToken == nil || srcToken.Type != "block-seq" {
+func (context *context) transformSeq(seq *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := seq.SrcToken
+	if sourceToken == nil || sourceToken.Type != "block-seq" {
 		throwError("Expected block sequence srcToken")
 	}
 	sequenceItems := make([]*Node, len(seq.Items))
 	for index, itemNode := range seq.Items {
-		srcItem := itemAt(srcToken.Items, index)
-		if srcItem == nil {
+		sourceItem := itemAt(sourceToken.Items, index)
+		if sourceItem == nil {
 			throwTypeError("undefined", "start")
 		}
-		propTokens := []*cst.Token{}
+		propertyTokens := []*cst.Token{}
 		var seqItemIndToken *cst.Token
-		for _, token := range tokens(srcItem.Start) {
+		for _, token := range tokens(sourceItem.Start) {
 			if maybeContentPropertyToken(token) {
-				propTokens = append(propTokens, token)
+				propertyTokens = append(propertyTokens, token)
 				continue
 			}
 			if token.Type == "seq-item-ind" {
@@ -73,7 +73,7 @@ func (context *context) transformSeq(seq *compose.Node, props []*cst.Token) *Nod
 			}
 			throwError("Unexpected token type in sequence item start: %s", token.Type)
 		}
-		item := context.transformItemValue(itemNode, propTokens)
+		item := context.transformItemValue(itemNode, propertyTokens)
 		var start *point
 		if seqItemIndToken != nil {
 			start = context.transformOffset(seqItemIndToken.Offset)
@@ -92,10 +92,10 @@ func (context *context) transformSeq(seq *compose.Node, props []*cst.Token) *Nod
 		}
 		sequenceItems[index] = context.createSequenceItem(context.createPosition(start, end), item)
 	}
-	if len(seq.Items) < len(srcToken.Items) {
-		for i := len(seq.Items); i < len(srcToken.Items); i++ {
-			srcItem := srcToken.Items[i]
-			for _, token := range context.extractComments(srcItem.Start) {
+	if len(seq.Items) < len(sourceToken.Items) {
+		for i := len(seq.Items); i < len(sourceToken.Items); i++ {
+			sourceItem := sourceToken.Items[i]
+			for _, token := range context.extractComments(sourceItem.Start) {
 				throwError("Unexpected token type in collection item start: %s", token.Type)
 			}
 		}
@@ -105,40 +105,40 @@ func (context *context) transformSeq(seq *compose.Node, props []*cst.Token) *Nod
 	}
 	return context.createSequence(
 		context.createPosition(context.position(sequenceItems[0]).start, context.position(sequenceItems[len(sequenceItems)-1]).end),
-		context.transformContentProperties(seq, props), sequenceItems)
+		context.transformContentProperties(seq, properties), sequenceItems)
 }
 
 // transformItemValue is upstream's transformItemValue. A pair is an item of a sequence a !!pairs or
 // !!omap tag resolved; its srcToken is the collection item of the map it came from, and the mapping
 // built around it shares the item's position object, as upstream's does.
-func (context *context) transformItemValue(itemNode *compose.Node, props []*cst.Token) *Node {
+func (context *context) transformItemValue(itemNode *compose.Node, properties []*cst.Token) *Node {
 	if !compose.IsPair(itemNode) {
-		if isEmptyNode(itemNode, props) {
-			context.extractComments(props)
+		if isEmptyNode(itemNode, properties) {
+			context.extractComments(properties)
 			return nil
 		}
-		return context.transformNode(itemNode, props)
+		return context.transformNode(itemNode, properties)
 	}
-	srcItem := itemNode.SrcItem
-	mappingItem := context.transformPair(itemNode, srcItem, context.createMappingItem)
-	return context.createMapping(context.position(mappingItem), context.transformContentProperties(itemNode.Key, props),
+	sourceItem := itemNode.SrcItem
+	mappingItem := context.transformPair(itemNode, sourceItem, context.createMappingItem)
+	return context.createMapping(context.position(mappingItem), context.transformContentProperties(itemNode.Key, properties),
 		[]*Node{mappingItem})
 }
 
 // transformFlowMap is upstream's transformFlowMap.
-func (context *context) transformFlowMap(flowMap *compose.Node, props []*cst.Token) *Node {
-	srcToken := flowMap.SrcToken
-	if srcToken == nil || srcToken.Type != "flow-collection" {
+func (context *context) transformFlowMap(flowMap *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := flowMap.SrcToken
+	if sourceToken == nil || sourceToken.Type != "flow-collection" {
 		throwError("Expected flow-collection CST node for flow map")
 	}
 	flowMappingItems := make([]*Node, len(flowMap.Items))
 	for index, pair := range flowMap.Items {
-		srcItem := itemAt(srcToken.Items, index)
-		flowMappingItems[index] = context.transformPair(pair, srcItem, context.createFlowMappingItem)
+		sourceItem := itemAt(sourceToken.Items, index)
+		flowMappingItems[index] = context.transformPair(pair, sourceItem, context.createFlowMappingItem)
 	}
-	context.extractTrailingItemComments(len(flowMap.Items), srcToken.Items)
+	context.extractTrailingItemComments(len(flowMap.Items), sourceToken.Items)
 	var flowMapEndToken *cst.Token
-	for _, token := range context.extractComments(srcToken.End) {
+	for _, token := range context.extractComments(sourceToken.End) {
 		if token.Type == "flow-map-end" {
 			flowMapEndToken = token
 			continue
@@ -149,8 +149,8 @@ func (context *context) transformFlowMap(flowMap *compose.Node, props []*cst.Tok
 		throwError("Expected flow-map-end token")
 	}
 	return context.createFlowMapping(
-		context.transformRange(srcToken.FlowStart.Offset, flowMapEndToken.Offset+len(flowMapEndToken.Source)),
-		context.transformContentProperties(flowMap, props), flowMappingItems)
+		context.transformRange(sourceToken.FlowStart.Offset, flowMapEndToken.Offset+len(flowMapEndToken.Source)),
+		context.transformContentProperties(flowMap, properties), flowMappingItems)
 }
 
 // extractTrailingItemComments is the loop transformFlowMap and transformFlowSeq share: the source items
@@ -158,8 +158,8 @@ func (context *context) transformFlowMap(flowMap *compose.Node, props []*cst.Tok
 func (context *context) extractTrailingItemComments(composed int, items []*cst.CollectionItem) {
 	if composed < len(items) {
 		for i := composed; i < len(items); i++ {
-			srcItem := items[i]
-			for _, token := range context.extractComments(srcItem.Start) {
+			sourceItem := items[i]
+			for _, token := range context.extractComments(sourceItem.Start) {
 				if token.Type == "comma" {
 					continue
 				}
@@ -170,26 +170,26 @@ func (context *context) extractTrailingItemComments(composed int, items []*cst.C
 }
 
 // transformFlowSeq is upstream's transformFlowSeq.
-func (context *context) transformFlowSeq(flowSeq *compose.Node, props []*cst.Token) *Node {
-	srcToken := flowSeq.SrcToken
-	if srcToken == nil || srcToken.Type != "flow-collection" {
+func (context *context) transformFlowSeq(flowSequence *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := flowSequence.SrcToken
+	if sourceToken == nil || sourceToken.Type != "flow-collection" {
 		throwError("Expected flow-collection CST node for flow sequence")
 	}
-	flowSequenceItems := make([]*Node, len(flowSeq.Items))
-	for index, item := range flowSeq.Items {
-		srcItem := itemAt(srcToken.Items, index)
-		if isBlockMappingOfImmediateChildOfFlowSequence(item, srcItem) {
-			flowSequenceItems[index] = context.transformPair(item.Items[len(item.Items)-1], srcItem, context.createFlowMappingItem)
+	flowSequenceItems := make([]*Node, len(flowSequence.Items))
+	for index, item := range flowSequence.Items {
+		sourceItem := itemAt(sourceToken.Items, index)
+		if isBlockMappingOfImmediateChildOfFlowSequence(item, sourceItem) {
+			flowSequenceItems[index] = context.transformPair(item.Items[len(item.Items)-1], sourceItem, context.createFlowMappingItem)
 			continue
 		}
 		if !compose.IsPair(item) {
-			if srcItem == nil {
+			if sourceItem == nil {
 				throwTypeError("undefined", "start")
 			}
-			propTokens := []*cst.Token{}
-			for _, token := range tokens(srcItem.Start) {
+			propertyTokens := []*cst.Token{}
+			for _, token := range tokens(sourceItem.Start) {
 				if maybeContentPropertyToken(token) {
-					propTokens = append(propTokens, token)
+					propertyTokens = append(propertyTokens, token)
 					continue
 				}
 				if token.Type == "comma" {
@@ -197,41 +197,41 @@ func (context *context) transformFlowSeq(flowSeq *compose.Node, props []*cst.Tok
 				}
 				throwError("Unexpected token type in sequence item start: %s", token.Type)
 			}
-			node := context.transformNode(item, propTokens)
+			node := context.transformNode(item, propertyTokens)
 			if node == nil {
 				throwTypeError("null", "position")
 			}
 			flowSequenceItems[index] = context.createFlowSequenceItem(
 				context.createPosition(context.position(node).start, context.position(node).end), node)
 		} else {
-			flowSequenceItems[index] = context.transformPair(item, srcItem, context.createFlowMappingItem)
+			flowSequenceItems[index] = context.transformPair(item, sourceItem, context.createFlowMappingItem)
 		}
 	}
-	context.extractTrailingItemComments(len(flowSeq.Items), srcToken.Items)
-	var flowSeqEndToken *cst.Token
-	for _, token := range tokens(srcToken.End) {
+	context.extractTrailingItemComments(len(flowSequence.Items), sourceToken.Items)
+	var flowSequenceEndToken *cst.Token
+	for _, token := range tokens(sourceToken.End) {
 		if token.Type == "comment" {
 			context.transformComment(token)
 			continue
 		}
 		if token.Type == "flow-seq-end" {
-			flowSeqEndToken = token
+			flowSequenceEndToken = token
 			continue
 		}
 		throwError("Unexpected token type in flow seq end: %s", token.Type)
 	}
-	if flowSeqEndToken == nil {
+	if flowSequenceEndToken == nil {
 		throwError("Expected flow-seq-end token")
 	}
 	return context.createFlowSequence(
-		context.transformRange(srcToken.FlowStart.Offset, flowSeqEndToken.Offset+len(flowSeqEndToken.Source)),
-		context.transformContentProperties(flowSeq, props), flowSequenceItems)
+		context.transformRange(sourceToken.FlowStart.Offset, flowSequenceEndToken.Offset+len(flowSequenceEndToken.Source)),
+		context.transformContentProperties(flowSequence, properties), flowSequenceItems)
 }
 
 // isBlockMappingOfImmediateChildOfFlowSequence is upstream's: the map the composer wraps around a pair
 // in a flow sequence, `[ key: value ]`, which has no source token and one pair whose source is this
 // item. Both sides of the last comparison can be undefined, and undefined === undefined.
-func isBlockMappingOfImmediateChildOfFlowSequence(item *compose.Node, srcItem *cst.CollectionItem) bool {
+func isBlockMappingOfImmediateChildOfFlowSequence(item *compose.Node, sourceItem *cst.CollectionItem) bool {
 	if item.SrcToken != nil {
 		return false
 	}
@@ -241,17 +241,17 @@ func isBlockMappingOfImmediateChildOfFlowSequence(item *compose.Node, srcItem *c
 	if len(item.Items) != 1 {
 		return false
 	}
-	return item.Items[0].SrcItem == srcItem
+	return item.Items[0].SrcItem == sourceItem
 }
 
 // transformPair is upstream's transformPair (pair.mjs).
-func (context *context) transformPair(pair *compose.Node, srcItem *cst.CollectionItem, createNode createItemFunc) *Node {
-	if srcItem == nil {
+func (context *context) transformPair(pair *compose.Node, sourceItem *cst.CollectionItem, createNode createItemFunc) *Node {
+	if sourceItem == nil {
 		throwTypeError("undefined", "start")
 	}
 	keyPropTokens := []*cst.Token{}
 	var explicitKeyIndToken *cst.Token
-	for _, token := range tokens(srcItem.Start) {
+	for _, token := range tokens(sourceItem.Start) {
 		if maybeContentPropertyToken(token) {
 			keyPropTokens = append(keyPropTokens, token)
 			continue
@@ -267,7 +267,7 @@ func (context *context) transformPair(pair *compose.Node, srcItem *cst.Collectio
 	}
 	valuePropTokens := []*cst.Token{}
 	var mapValueIndToken *cst.Token
-	for _, token := range tokens(srcItem.Sep) {
+	for _, token := range tokens(sourceItem.Sep) {
 		if maybeContentPropertyToken(token) {
 			valuePropTokens = append(valuePropTokens, token)
 			continue
@@ -284,19 +284,19 @@ func (context *context) transformPair(pair *compose.Node, srcItem *cst.Collectio
 	switch {
 	case explicitKeyIndToken != nil:
 		keyStartOffset = explicitKeyIndToken.Offset
-	case srcItem.Key != nil:
-		keyStartOffset = srcItem.Key.Offset
+	case sourceItem.Key != nil:
+		keyStartOffset = sourceItem.Key.Offset
 	case mapValueIndToken != nil:
 		keyStartOffset = mapValueIndToken.Offset
 	default:
-		if srcItem.Value == nil {
+		if sourceItem.Value == nil {
 			throwTypeError("undefined", "offset")
 		}
-		keyStartOffset = srcItem.Value.Offset
+		keyStartOffset = sourceItem.Value.Offset
 	}
 	keyRange := []int{keyStartOffset, 0}
 	switch {
-	case srcItem.Key != nil:
+	case sourceItem.Key != nil:
 		if pair.Key == nil {
 			throwTypeError("null", "range")
 		}
@@ -316,14 +316,14 @@ func (context *context) transformPair(pair *compose.Node, srcItem *cst.Collectio
 		switch {
 		case mapValueIndToken != nil:
 			valueStartOffset = mapValueIndToken.Offset
-		case srcItem.Value != nil:
-			valueStartOffset = srcItem.Value.Offset
+		case sourceItem.Value != nil:
+			valueStartOffset = sourceItem.Value.Offset
 		default:
 			valueStartOffset = pair.Value.Range[0]
 		}
 		valueRange = []int{valueStartOffset, 0}
 		switch {
-		case srcItem.Value != nil:
+		case sourceItem.Value != nil:
 			valueRange[1] = pair.Value.Range[1]
 		case mapValueIndToken != nil:
 			valueRange[1] = mapValueIndToken.Offset + len(mapValueIndToken.Source)
@@ -336,18 +336,18 @@ func (context *context) transformPair(pair *compose.Node, srcItem *cst.Collectio
 
 // transformAstPair is upstream's transformAstPair. Upstream's additionalKeyData and additionalValueData
 // are { range, props }: the ranges, nil for null, and the prop tokens.
-func (context *context) transformAstPair(pair *compose.Node, createNode createItemFunc, keyRange []int, keyProps []*cst.Token, valueRange []int, valueProps []*cst.Token) *Node {
+func (context *context) transformAstPair(pair *compose.Node, createNode createItemFunc, keyRange []int, keyProperties []*cst.Token, valueRange []int, valueProperties []*cst.Token) *Node {
 	var keyContent *Node
-	if !isEmptyNode(pair.Key, keyProps) {
-		keyContent = context.transformNode(pair.Key, keyProps)
+	if !isEmptyNode(pair.Key, keyProperties) {
+		keyContent = context.transformNode(pair.Key, keyProperties)
 	} else {
-		context.extractComments(keyProps)
+		context.extractComments(keyProperties)
 	}
 	var valueContent *Node
-	if !isEmptyNode(pair.Value, valueProps) {
-		valueContent = context.transformNode(pair.Value, valueProps)
+	if !isEmptyNode(pair.Value, valueProperties) {
+		valueContent = context.transformNode(pair.Value, valueProperties)
 	} else {
-		context.extractComments(valueProps)
+		context.extractComments(valueProperties)
 	}
 
 	// keyRange is never null upstream either; keyContent's start is the fallback it never takes.

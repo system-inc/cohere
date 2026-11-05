@@ -158,17 +158,17 @@ func ParseCSS(input string) ([]*Node, error) {
 	}
 
 	for i := 0; i < len(input); i++ {
-		currentChar := input[i]
+		currentCharacter := input[i]
 
 		// Skip the CR of a CRLF so that every branch below only has to recognize a bare line break.
-		if currentChar == byteCarriageReturn && peekAt(i+1) == byteLineBreak {
+		if currentCharacter == byteCarriageReturn && peekAt(i+1) == byteLineBreak {
 			continue
 		}
 
 		switch {
 		// A backslash escapes the byte after it. Both are consumed together, so an escaped `:` or
 		// `;` inside a selector such as `.hover\:foo:hover` cannot be mistaken for structure.
-		case currentChar == byteBackslash:
+		case currentCharacter == byteBackslash:
 			if buffer.Len() == 0 {
 				bufferStart = i
 			}
@@ -181,13 +181,13 @@ func ParseCSS(input string) ([]*Node, error) {
 
 		// Start of a comment. The comment is consumed and dropped, except for a license comment
 		// (`/*!`), which is hoisted to the top of the output.
-		case currentChar == byteSlash && peekAt(i+1) == byteAsterisk:
+		case currentCharacter == byteSlash && peekAt(i+1) == byteAsterisk:
 			start := i
 			for j := i + 2; j < len(input); j++ {
-				peekChar := input[j]
-				if peekChar == byteBackslash {
+				peekCharacter := input[j]
+				if peekCharacter == byteBackslash {
 					j++
-				} else if peekChar == byteAsterisk && peekAt(j+1) == byteSlash {
+				} else if peekCharacter == byteAsterisk && peekAt(j+1) == byteSlash {
 					i = j + 1
 					break
 				}
@@ -202,8 +202,8 @@ func ParseCSS(input string) ([]*Node, error) {
 
 		// Start of a string. The whole string, quotes included, joins the buffer verbatim; a `;`,
 		// `}` or `:` inside it is text rather than structure.
-		case currentChar == byteSingleQuote || currentChar == byteDoubleQuote:
-			end, parseCSSStringError := parseCSSString(input, i, currentChar)
+		case currentCharacter == byteSingleQuote || currentCharacter == byteDoubleQuote:
+			end, parseCSSStringError := parseCSSString(input, i, currentCharacter)
 			if parseCSSStringError != nil {
 				return nil, parseCSSStringError
 			}
@@ -212,13 +212,13 @@ func ParseCSS(input string) ([]*Node, error) {
 
 		// Collapse a run of whitespace: skip this one if the next is also whitespace. This is what
 		// keeps the AST from carrying the stylesheet's indentation.
-		case (currentChar == byteSpace || currentChar == byteLineBreak || currentChar == byteTab) &&
+		case (currentCharacter == byteSpace || currentCharacter == byteLineBreak || currentCharacter == byteTab) &&
 			isFollowedByWhitespace(input, i, peekAt):
 			continue
 
 		// A line break that survived the collapse above becomes a single space, and only when the
 		// buffer does not already end in whitespace.
-		case currentChar == byteLineBreak:
+		case currentCharacter == byteLineBreak:
 			if buffer.Len() == 0 {
 				continue
 			}
@@ -242,7 +242,7 @@ func ParseCSS(input string) ([]*Node, error) {
 		// recorded during this scan rather than searched for afterwards, because a `:` may appear
 		// inside the value (in a `url()`, or a nested `var()` fallback) and `indexOf` would find
 		// the wrong one.
-		case currentChar == byteDash && peekAt(i+1) == byteDash && buffer.Len() == 0:
+		case currentCharacter == byteDash && peekAt(i+1) == byteDash && buffer.Len() == 0:
 			// Shadows the outer stack deliberately, exactly as upstream does: brackets opened
 			// inside a custom property are balanced within it and must not disturb the block
 			// structure the outer loop is tracking.
@@ -256,20 +256,20 @@ func ParseCSS(input string) ([]*Node, error) {
 			terminated := false
 
 			for j := i + 2; j < len(input); j++ {
-				peekChar := input[j]
+				peekCharacter := input[j]
 
 				switch {
-				case peekChar == byteBackslash:
+				case peekCharacter == byteBackslash:
 					j++
 
-				case peekChar == byteSingleQuote || peekChar == byteDoubleQuote:
-					end, parseCSSStringError := parseCSSString(input, j, peekChar)
+				case peekCharacter == byteSingleQuote || peekCharacter == byteDoubleQuote:
+					end, parseCSSStringError := parseCSSString(input, j, peekCharacter)
 					if parseCSSStringError != nil {
 						return nil, parseCSSStringError
 					}
 					j = end
 
-				case peekChar == byteSlash && peekAt(j+1) == byteAsterisk:
+				case peekCharacter == byteSlash && peekAt(j+1) == byteAsterisk:
 					for k := j + 2; k < len(input); k++ {
 						innerPeek := input[k]
 						if innerPeek == byteBackslash {
@@ -283,33 +283,33 @@ func ParseCSS(input string) ([]*Node, error) {
 				// The first colon separates the property from the value. It is recorded as an index
 				// into the buffer-relative string that parseCSSDeclaration will be handed, which is
 				// why the current buffer length is part of the arithmetic.
-				case colonIndex == -1 && peekChar == byteColon:
+				case colonIndex == -1 && peekCharacter == byteColon:
 					colonIndex = buffer.Len() + j - start
 
-				case peekChar == byteSemicolon && len(closingBracketStack) == 0:
+				case peekCharacter == byteSemicolon && len(closingBracketStack) == 0:
 					appendToBuffer(input[start:j])
 					i = j
 					terminated = true
 
-				case peekChar == byteOpenParen:
+				case peekCharacter == byteOpenParen:
 					closingBracketStack = append(closingBracketStack, byteCloseParen)
 
-				case peekChar == byteOpenBracket:
+				case peekCharacter == byteOpenBracket:
 					closingBracketStack = append(closingBracketStack, byteCloseBracket)
 
-				case peekChar == byteOpenCurly:
+				case peekCharacter == byteOpenCurly:
 					closingBracketStack = append(closingBracketStack, byteCloseCurly)
 
 				// A custom property that ends at the enclosing block's `}` rather than at a `;`,
 				// or that ends at the end of the input. `i` is set to `j - 1` so the outer loop's
 				// increment lands on the `}` itself and the close-block branch runs for it.
-				case (peekChar == byteCloseCurly || j == len(input)-1) && len(closingBracketStack) == 0:
+				case (peekCharacter == byteCloseCurly || j == len(input)-1) && len(closingBracketStack) == 0:
 					i = j - 1
 					appendToBuffer(input[start:j])
 					terminated = true
 
-				case peekChar == byteCloseParen || peekChar == byteCloseBracket || peekChar == byteCloseCurly:
-					if len(closingBracketStack) > 0 && peekChar == closingBracketStack[len(closingBracketStack)-1] {
+				case peekCharacter == byteCloseParen || peekCharacter == byteCloseBracket || peekCharacter == byteCloseCurly:
+					if len(closingBracketStack) > 0 && peekCharacter == closingBracketStack[len(closingBracketStack)-1] {
 						closingBracketStack = closingBracketStack[:len(closingBracketStack)-1]
 					}
 				}
@@ -333,7 +333,7 @@ func ParseCSS(input string) ([]*Node, error) {
 			resetBuffer()
 
 		// End of a body-less at-rule, such as `@charset "UTF-8";` or `@import "tailwindcss";`.
-		case currentChar == byteSemicolon && bufferFirst == byteAtSign:
+		case currentCharacter == byteSemicolon && bufferFirst == byteAtSign:
 			node = ParseAtRule(buffer.String())
 
 			if parent != nil {
@@ -347,7 +347,7 @@ func ParseCSS(input string) ([]*Node, error) {
 
 		// End of an ordinary declaration. The `)` guard keeps a `;` inside parentheses (which is
 		// legal inside, for example, a `url()`) from ending the declaration early.
-		case currentChar == byteSemicolon && topOfStack(closingBracketStack) != byteCloseParen:
+		case currentCharacter == byteSemicolon && topOfStack(closingBracketStack) != byteCloseParen:
 			declaration := parseCSSDeclaration(buffer.String(), strings.Index(buffer.String(), ":"))
 			if declaration == nil {
 				// A stray `;` with nothing before it is not an error, it is empty input.
@@ -373,7 +373,7 @@ func ParseCSS(input string) ([]*Node, error) {
 		// Upstream builds a `rule` node here unconditionally and lets `parseAtRule` reshape it
 		// later; the node is retagged below when the buffer starts with `@`, which is the same
 		// result reached one step earlier.
-		case currentChar == byteOpenCurly && topOfStack(closingBracketStack) != byteCloseParen:
+		case currentCharacter == byteOpenCurly && topOfStack(closingBracketStack) != byteCloseParen:
 			closingBracketStack = append(closingBracketStack, byteCloseCurly)
 
 			trimmed := text.TrimWhitespace(buffer.String())
@@ -395,7 +395,7 @@ func ParseCSS(input string) ([]*Node, error) {
 			node = nil
 
 		// End of a block.
-		case currentChar == byteCloseCurly && topOfStack(closingBracketStack) != byteCloseParen:
+		case currentCharacter == byteCloseCurly && topOfStack(closingBracketStack) != byteCloseParen:
 			if len(closingBracketStack) == 0 {
 				return nil, &CSSSyntaxError{Message: "Missing opening {", Offset: i}
 			}
@@ -453,14 +453,14 @@ func ParseCSS(input string) ([]*Node, error) {
 			resetBuffer()
 			node = nil
 
-		case currentChar == byteOpenParen:
+		case currentCharacter == byteOpenParen:
 			closingBracketStack = append(closingBracketStack, byteCloseParen)
 			if buffer.Len() == 0 {
 				bufferStart = i
 			}
 			appendToBuffer("(")
 
-		case currentChar == byteCloseParen:
+		case currentCharacter == byteCloseParen:
 			if topOfStack(closingBracketStack) != byteCloseParen {
 				return nil, &CSSSyntaxError{Message: "Missing opening (", Offset: i}
 			}
@@ -471,7 +471,7 @@ func ParseCSS(input string) ([]*Node, error) {
 		default:
 			// Leading whitespace never starts a node, which is what makes bufferStart the offset of
 			// the first meaningful byte.
-			if buffer.Len() == 0 && (currentChar == byteSpace || currentChar == byteLineBreak || currentChar == byteTab) {
+			if buffer.Len() == 0 && (currentCharacter == byteSpace || currentCharacter == byteLineBreak || currentCharacter == byteTab) {
 				continue
 			}
 			if buffer.Len() == 0 {
@@ -515,11 +515,11 @@ func ParseCSS(input string) ([]*Node, error) {
 // A CRLF counts as whitespace only as the complete pair, matching upstream's peek through the CR to
 // the LF behind it. A lone CR does not, so it stays in the buffer as content.
 func isFollowedByWhitespace(input string, index int, peekAt func(int) byte) bool {
-	peekChar := peekAt(index + 1)
-	if peekChar == byteSpace || peekChar == byteLineBreak || peekChar == byteTab {
+	peekCharacter := peekAt(index + 1)
+	if peekCharacter == byteSpace || peekCharacter == byteLineBreak || peekCharacter == byteTab {
 		return true
 	}
-	return peekChar == byteCarriageReturn && peekAt(index+2) == byteLineBreak
+	return peekCharacter == byteCarriageReturn && peekAt(index+2) == byteLineBreak
 }
 
 // topOfStack returns the innermost expected closing bracket, or 0 when no block is open.
@@ -540,18 +540,18 @@ func topOfStack(stack []byte) byte {
 // checked against.
 func ParseAtRule(buffer string, nodes ...*Node) *Node {
 	name := buffer
-	params := ""
+	parameters := ""
 
 	for i := 5; i < len(buffer); i++ {
-		currentChar := buffer[i]
-		if currentChar == byteSpace || currentChar == byteTab || currentChar == byteOpenParen {
+		currentCharacter := buffer[i]
+		if currentCharacter == byteSpace || currentCharacter == byteTab || currentCharacter == byteOpenParen {
 			name = buffer[:i]
-			params = buffer[i:]
+			parameters = buffer[i:]
 			break
 		}
 	}
 
-	return AtRule(text.TrimWhitespace(name), text.TrimWhitespace(params), nodes...)
+	return AtRule(text.TrimWhitespace(name), text.TrimWhitespace(parameters), nodes...)
 }
 
 // parseCSSDeclaration splits a buffer into a property and a value at colonIndex.
@@ -589,31 +589,31 @@ func parseCSSDeclaration(buffer string, colonIndex int) *Node {
 // A string must close on the same quote it opened with, so an apostrophe inside a double-quoted
 // value is content. An unterminated string is an error rather than a value running to end of input,
 // which is what stops a missing quote from swallowing the rest of the stylesheet.
-func parseCSSString(input string, startIndex int, quoteChar byte) (int, error) {
+func parseCSSString(input string, startIndex int, quoteCharacter byte) (int, error) {
 	for i := startIndex + 1; i < len(input); i++ {
-		peekChar := input[i]
+		peekCharacter := input[i]
 
 		switch {
-		case peekChar == byteBackslash:
+		case peekCharacter == byteBackslash:
 			i++
 
-		case peekChar == quoteChar:
+		case peekCharacter == quoteCharacter:
 			return i, nil
 
 		// A `;` at the end of the line inside an unterminated string. Reported separately from the
 		// bare line break below because upstream includes the `;` in the message.
-		case peekChar == byteSemicolon &&
+		case peekCharacter == byteSemicolon &&
 			(peekByte(input, i+1) == byteLineBreak ||
 				(peekByte(input, i+1) == byteCarriageReturn && peekByte(input, i+2) == byteLineBreak)):
 			return 0, &CSSSyntaxError{
-				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:i+1], quoteChar),
+				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:i+1], quoteCharacter),
 				Offset:  startIndex,
 			}
 
-		case peekChar == byteLineBreak ||
-			(peekChar == byteCarriageReturn && peekByte(input, i+1) == byteLineBreak):
+		case peekCharacter == byteLineBreak ||
+			(peekCharacter == byteCarriageReturn && peekByte(input, i+1) == byteLineBreak):
 			return 0, &CSSSyntaxError{
-				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:i], quoteChar),
+				Message: fmt.Sprintf("Unterminated string: %s%c", input[startIndex:i], quoteCharacter),
 				Offset:  startIndex,
 			}
 		}

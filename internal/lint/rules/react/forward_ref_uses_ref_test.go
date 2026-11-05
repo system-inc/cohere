@@ -164,7 +164,7 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(test *testing.T) {
 			continue
 		}
 
-		addRef := suggestions[0]
+		addReference := suggestions[0]
 		if testCase.wantRemove != "" {
 			// Order matters: an engine applying one suggestion unattended takes the first, and
 			// upstream's first is the removal.
@@ -174,12 +174,12 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(test *testing.T) {
 			if got := applySuggestion(testCase.source, suggestions[0]); got != testCase.wantRemove {
 				test.Errorf("%q removal produced %q, want %q", testCase.source, got, testCase.wantRemove)
 			}
-			addRef = suggestions[1]
+			addReference = suggestions[1]
 		}
-		if addRef.Message.Id != "forwardRefAddRefParameter" {
-			test.Errorf("%q add-ref suggestion was %q", testCase.source, addRef.Message.Id)
+		if addReference.Message.Id != "forwardRefAddRefParameter" {
+			test.Errorf("%q add-ref suggestion was %q", testCase.source, addReference.Message.Id)
 		}
-		if got := applySuggestion(testCase.source, addRef); got != testCase.wantAddRef {
+		if got := applySuggestion(testCase.source, addReference); got != testCase.wantAddRef {
 			test.Errorf("%q add-ref produced %q, want %q", testCase.source, got, testCase.wantAddRef)
 		}
 	}
@@ -394,8 +394,8 @@ func TestForwardRefUsesRefRewritesAwkwardParameterLists(test *testing.T) {
 		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", testCase.source)
 		rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 		suggestions := result.Diagnostics[0].Suggestions
-		addRef := suggestions[len(suggestions)-1]
-		got := applySuggestion(testCase.source, addRef)
+		addReference := suggestions[len(suggestions)-1]
+		got := applySuggestion(testCase.source, addReference)
 		if got != testCase.wantAddRef {
 			test.Errorf("%q add-ref produced %q, want %q", testCase.source, got, testCase.wantAddRef)
 		}

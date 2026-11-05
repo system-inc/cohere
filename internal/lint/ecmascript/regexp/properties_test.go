@@ -73,11 +73,11 @@ func oracleProperties(test *testing.T, probes []propertyProbe) []propertyAnswer 
 	if err != nil {
 		test.Fatal(err)
 	}
-	cmd := exec.Command("node", "-e", propertyOracle)
-	cmd.Stdin = bytes.NewReader(input)
+	command := exec.Command("node", "-e", propertyOracle)
+	command.Stdin = bytes.NewReader(input)
 	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	output, err := cmd.Output()
+	command.Stderr = &stderr
+	output, err := command.Output()
 	if err != nil {
 		test.Fatalf("Node oracle: %v: %s", err, stderr.String())
 	}
@@ -160,8 +160,8 @@ func TestUnicodePropertiesNode(test *testing.T) {
 
 func TestUnicodePropertiesFresh(test *testing.T) {
 	test.Parallel()
-	cmd := exec.Command("go", "run", "../../../../unicodeproperties/internal/generate", "-check", "-output", "../../../../unicodeproperties/tables_generated.go")
-	output, outputError := cmd.CombinedOutput()
+	command := exec.Command("go", "run", "../../../../unicodeproperties/internal/generate", "-check", "-output", "../../../../unicodeproperties/tables_generated.go")
+	output, outputError := command.CombinedOutput()
 	if outputError != nil {
 		test.Fatalf("freshness: %v: %s", outputError, output)
 	}
@@ -204,9 +204,9 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	cmd := exec.Command("node", "-e", `const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`)
-	cmd.Stdin = bytes.NewReader(input)
-	output, err := cmd.CombinedOutput()
+	command := exec.Command("node", "-e", `const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`)
+	command.Stdin = bytes.NewReader(input)
+	output, err := command.CombinedOutput()
 	if err != nil {
 		test.Fatalf("Node: %v: %s", err, output)
 	}

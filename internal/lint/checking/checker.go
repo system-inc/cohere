@@ -362,9 +362,9 @@ func isUnsafeAssignmentWorker(
 		}
 
 		for i, arg := range typeArguments {
-			receiverArg := receiverTypeArguments[i]
+			receiverArgument := receiverTypeArguments[i]
 
-			_, _, unsafe := isUnsafeAssignmentWorker(arg, receiverArg, typeChecker, senderNode, visited)
+			_, _, unsafe := isUnsafeAssignmentWorker(arg, receiverArgument, typeChecker, senderNode, visited)
 			if unsafe {
 				return receiver, t, true
 			}

@@ -337,7 +337,7 @@ func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, eleme
 	if elementCapacity > 0 {
 		out = make([]RegexCharElement, 0, elementCapacity)
 	}
-	pendingIdx := -1 // index into `out` of the last RegexCharSingle (candidate for range start)
+	pendingIndex := -1 // index into `out` of the last RegexCharSingle (candidate for range start)
 
 	for i < len(pattern) {
 		c := pattern[i]
@@ -352,11 +352,11 @@ func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, eleme
 			}
 			if el.Kind == RegexCharBreaker {
 				out = append(out, el)
-				pendingIdx = -1
+				pendingIndex = -1
 			} else {
 				// RegexCharSingle (possibly with companion astral surrogate entry below)
 				out = append(out, el)
-				pendingIdx = len(out) - 1
+				pendingIndex = len(out) - 1
 				// Under non-u/v mode, a raw astral character or a `\u{H}` with H>0xFFFF
 				// should emit TWO units. But class escapes only produce 1 unit per call;
 				// astral raw chars are handled in the `default` case below, and `\u{H}`
@@ -374,15 +374,15 @@ func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, eleme
 			}
 			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: i, End: nestedEnd})
 			i = nestedEnd
-			pendingIdx = -1
+			pendingIndex = -1
 
 		case (c == '-' || c == '&') && flags.UnicodeSets && i+1 < len(pattern) && pattern[i+1] == c:
 			// v-flag set operator `--` or `&&` — breaker
 			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: i, End: i + 2})
 			i += 2
-			pendingIdx = -1
+			pendingIndex = -1
 
-		case c == '-' && pendingIdx >= 0 && i+1 < len(pattern) && pattern[i+1] != ']':
+		case c == '-' && pendingIndex >= 0 && i+1 < len(pattern) && pattern[i+1] != ']':
 			// Range: combine pending with next element.
 			i++
 			var nextEl RegexCharElement
@@ -405,7 +405,7 @@ func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, eleme
 				// and abort class parsing (caller will skip the regex).
 				return nil, start, false
 			}
-			minEl := out[pendingIdx]
+			minEl := out[pendingIndex]
 			rangeEl := RegexCharElement{
 				Kind:        RegexCharRange,
 				Value:       minEl.Value,
@@ -415,13 +415,13 @@ func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, eleme
 				Start:       minEl.Start,
 				End:         nextEl.End,
 			}
-			out[pendingIdx] = rangeEl
+			out[pendingIndex] = rangeEl
 			// If the min endpoint came from a raw astral in non-u mode
 			// (which would logically expand to a surrogate pair), the range
 			// representation is already degenerate; callers in this project
 			// only inspect endpoints, so we don't split here.
 			i += step
-			pendingIdx = -1
+			pendingIndex = -1
 
 		default:
 			el, step, ok := readRawClassChar(pattern, i, flags)
@@ -430,7 +430,7 @@ func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, eleme
 			}
 			if el.Kind == RegexCharSingle {
 				out = append(out, el)
-				pendingIdx = len(out) - 1
+				pendingIndex = len(out) - 1
 				// Note: we do NOT split raw astrals into surrogate pairs here
 				// — callers (e.g. the misleading-character-class rule) decide
 				// per-flag whether to expand them, based on the rule's own

@@ -553,11 +553,11 @@ func TestNoTyposSpans(test *testing.T) {
 func TestNoTyposMessagesReadAsWritten(test *testing.T) {
 	test.Parallel()
 
-	propType := runNoTypos(test,
+	propertyType := runNoTypos(test,
 		"import PropTypes from 'prop-types';\ndeclare const React: any;\nclass Foo extends React.Component {}\nFoo.propTypes = { a: PropTypes.strng };\n")
-	rule_testing.ExpectFindings(test, propType, "typoPropType")
-	if !strings.Contains(propType.Diagnostics[0].Message.Description, "`strng` is not a prop type") {
-		test.Errorf("typoPropType reads %q", propType.Diagnostics[0].Message.Description)
+	rule_testing.ExpectFindings(test, propertyType, "typoPropType")
+	if !strings.Contains(propertyType.Diagnostics[0].Message.Description, "`strng` is not a prop type") {
+		test.Errorf("typoPropType reads %q", propertyType.Diagnostics[0].Message.Description)
 	}
 
 	chain := runNoTypos(test,

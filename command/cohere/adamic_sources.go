@@ -31,13 +31,13 @@ func adamicHeld(graph *program.Graph) map[string]struct{} {
 // by an import from outside the include, which Adamic's layout does not have: its code is listed where its
 // tsconfig claims ".a". ReadProjectConfig cleans each name to the platform's separator, the form the walk's
 // names and adamicHeld's are in, so a tsconfig's `/` names match a walk's `\` ones on Windows.
-func adamicIncluded(configFileName string) (map[string]struct{}, error) {
-	config, readProjectConfigurationError := program.ReadProjectConfig(configFileName)
+func adamicIncluded(configurationFileName string) (map[string]struct{}, error) {
+	configuration, readProjectConfigurationError := program.ReadProjectConfig(configurationFileName)
 	if readProjectConfigurationError != nil {
 		return nil, readProjectConfigurationError
 	}
 	held := map[string]struct{}{}
-	for _, fileName := range config.FileNames {
+	for _, fileName := range configuration.FileNames {
 		if sourcename.IsAdamic(fileName) {
 			held[fileName] = struct{}{}
 		}

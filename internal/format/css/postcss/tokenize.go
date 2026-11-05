@@ -177,12 +177,12 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 
 	var currentToken token
 	var next int
-	pos := tokens.pos
-	code := tokens.charCodeAt(pos)
+	position := tokens.pos
+	code := tokens.charCodeAt(position)
 
 	switch code {
 	case newline, space, tab, carriageReturn, feed:
-		next = pos
+		next = position
 		for {
 			next += 1
 			code = tokens.charCodeAt(next)
@@ -191,21 +191,21 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			}
 		}
 
-		currentToken = token{kind: "space", value: tokens.input.slice(pos, next), start: -1, end: -1}
-		pos = next - 1
+		currentToken = token{kind: "space", value: tokens.input.slice(position, next), start: -1, end: -1}
+		position = next - 1
 
 	case openSquare, closeSquare, openCurly, closeCurly, colon, semicolon, closeParentheses:
-		controlChar := string(rune(code))
-		currentToken = token{kind: controlChar, value: controlChar, start: pos, end: -1}
+		controlCharacter := string(rune(code))
+		currentToken = token{kind: controlCharacter, value: controlCharacter, start: position, end: -1}
 
 	case openParentheses:
-		prev := ""
+		previous := ""
 		if len(tokens.buffer) > 0 {
-			prev = tokens.buffer[len(tokens.buffer)-1].value
+			previous = tokens.buffer[len(tokens.buffer)-1].value
 			tokens.buffer = tokens.buffer[:len(tokens.buffer)-1]
 		}
-		n := tokens.charCodeAt(pos + 1)
-		if prev == "url" &&
+		n := tokens.charCodeAt(position + 1)
+		if previous == "url" &&
 			n != singleQuote &&
 			n != doubleQuote &&
 			n != space &&
@@ -213,18 +213,18 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			n != tab &&
 			n != feed &&
 			n != carriageReturn {
-			next = pos
+			next = position
 			for {
 				escaped := false
 				next = tokens.indexOf(")", next+1)
 				if next == -1 {
 					// ignore and ignoreUnclosed are always false here.
-					tokens.pos = pos
+					tokens.pos = position
 					tokens.unclosed("bracket")
 				}
-				escapePos := next
-				for tokens.charCodeAt(escapePos-1) == backslash {
-					escapePos -= 1
+				escapePosition := next
+				for tokens.charCodeAt(escapePosition-1) == backslash {
+					escapePosition -= 1
 					escaped = !escaped
 				}
 				if !escaped {
@@ -232,16 +232,16 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				}
 			}
 
-			currentToken = token{kind: "brackets", value: tokens.input.slice(pos, next+1), start: pos, end: next}
+			currentToken = token{kind: "brackets", value: tokens.input.slice(position, next+1), start: position, end: next}
 
-			pos = next
-		} else if pos <= tokens.lastBadParen {
-			currentToken = token{kind: "(", value: "(", start: pos, end: -1}
+			position = next
+		} else if position <= tokens.lastBadParen {
+			currentToken = token{kind: "(", value: "(", start: position, end: -1}
 		} else {
-			next = tokens.indexOf(")", pos+1)
+			next = tokens.indexOf(")", position+1)
 			var contentUnits []uint16
 			if next != -1 {
-				contentUnits = tokens.css[pos : next+1]
+				contentUnits = tokens.css[position : next+1]
 			}
 
 			if next == -1 || hasBadBracket(contentUnits) {
@@ -250,10 +250,10 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				} else {
 					tokens.lastBadParen = next
 				}
-				currentToken = token{kind: "(", value: "(", start: pos, end: -1}
+				currentToken = token{kind: "(", value: "(", start: position, end: -1}
 			} else {
-				currentToken = token{kind: "brackets", value: tokens.input.slice(pos, next+1), start: pos, end: next}
-				pos = next
+				currentToken = token{kind: "brackets", value: tokens.input.slice(position, next+1), start: position, end: next}
+				position = next
 			}
 		}
 
@@ -262,18 +262,18 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 		if code == doubleQuote {
 			quote = "\""
 		}
-		next = pos
+		next = position
 		for {
 			escaped := false
 			next = tokens.indexOf(quote, next+1)
 			if next == -1 {
 				// ignore and ignoreUnclosed are always false here.
-				tokens.pos = pos
+				tokens.pos = position
 				tokens.unclosed("string")
 			}
-			escapePos := next
-			for tokens.charCodeAt(escapePos-1) == backslash {
-				escapePos -= 1
+			escapePosition := next
+			for tokens.charCodeAt(escapePosition-1) == backslash {
+				escapePosition -= 1
 				escaped = !escaped
 			}
 			if !escaped {
@@ -281,14 +281,14 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			}
 		}
 
-		currentToken = token{kind: "string", value: tokens.input.slice(pos, next+1), start: pos, end: next}
-		pos = next
+		currentToken = token{kind: "string", value: tokens.input.slice(position, next+1), start: position, end: next}
+		position = next
 
 	case at:
 		// RE_AT_END.lastIndex = pos + 1; RE_AT_END.test(css): a match at index m leaves lastIndex m + 1,
 		// and no match leaves it 0.
 		match := -1
-		for index := pos + 1; index < tokens.length; index++ {
+		for index := position + 1; index < tokens.length; index++ {
 			if isAtEnd(tokens.css[index]) {
 				match = index
 				break
@@ -300,12 +300,12 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			next = match - 1
 		}
 
-		currentToken = token{kind: "at-word", value: tokens.input.slice(pos, next+1), start: pos, end: next}
+		currentToken = token{kind: "at-word", value: tokens.input.slice(position, next+1), start: position, end: next}
 
-		pos = next
+		position = next
 
 	case backslash:
-		next = pos
+		next = position
 		escape := true
 		for tokens.charCodeAt(next+1) == backslash {
 			next += 1
@@ -330,25 +330,25 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			}
 		}
 
-		currentToken = token{kind: "word", value: tokens.input.slice(pos, next+1), start: pos, end: next}
+		currentToken = token{kind: "word", value: tokens.input.slice(position, next+1), start: position, end: next}
 
-		pos = next
+		position = next
 
 	default:
-		if code == slash && tokens.charCodeAt(pos+1) == asterisk {
-			next = tokens.indexOf("*/", pos+2) + 1
+		if code == slash && tokens.charCodeAt(position+1) == asterisk {
+			next = tokens.indexOf("*/", position+2) + 1
 			if next == 0 {
 				// ignore and ignoreUnclosed are always false here.
-				tokens.pos = pos
+				tokens.pos = position
 				tokens.unclosed("comment")
 			}
 
-			currentToken = token{kind: "comment", value: tokens.input.slice(pos, next+1), start: pos, end: next}
-			pos = next
+			currentToken = token{kind: "comment", value: tokens.input.slice(position, next+1), start: position, end: next}
+			position = next
 		} else {
 			// RE_WORD_END.lastIndex = pos + 1; RE_WORD_END.test(css).
 			match := -1
-			for index := pos + 1; index < tokens.length; index++ {
+			for index := position + 1; index < tokens.length; index++ {
 				unit := tokens.css[index]
 				if isWordEnd(unit) || (unit == slash && tokens.charCodeAt(index+1) == asterisk) {
 					match = index
@@ -361,14 +361,14 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				next = match - 1
 			}
 
-			currentToken = token{kind: "word", value: tokens.input.slice(pos, next+1), start: pos, end: next}
+			currentToken = token{kind: "word", value: tokens.input.slice(position, next+1), start: position, end: next}
 			tokens.buffer = append(tokens.buffer, currentToken)
-			pos = next
+			position = next
 		}
 	}
 
-	pos++
-	tokens.pos = pos
+	position++
+	tokens.pos = position
 	return currentToken, true
 }
 

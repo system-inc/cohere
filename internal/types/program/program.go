@@ -432,11 +432,11 @@ func buildOnce(options Options) (*Graph, error) {
 	if options.ConfigFileName == "" {
 		return nil, errors.New("no tsconfig given: a type graph needs a config to know what belongs in it")
 	}
-	configFileName := options.ConfigFileName
-	if !tspath.IsRootedDiskPath(configFileName) {
-		configFileName = tspath.CombinePaths(currentDirectory, configFileName)
+	configurationFileName := options.ConfigFileName
+	if !tspath.IsRootedDiskPath(configurationFileName) {
+		configurationFileName = tspath.CombinePaths(currentDirectory, configurationFileName)
 	}
-	configFileName = tspath.NormalizePath(configFileName)
+	configurationFileName = tspath.NormalizePath(configurationFileName)
 
 	// bundled.WrapFS overlays the embedded lib.*.d.ts files onto the real disk, so `lib.dom.d.ts`
 	// resolves without anything being installed. cachedvfs memoizes stat and readdir: config
@@ -473,12 +473,12 @@ func buildOnce(options Options) (*Graph, error) {
 	// Timed just beneath the cache, so it counts the calls that reach the disk (or the pack), and what the
 	// recorder costs them, but not the ones the cache answered.
 	var timedDisk *timingFS
-	var configDisk diskCounters
+	var configurationDisk diskCounters
 	var programDisk diskCounters
 	if options.Timing != nil {
 		options.Timing.Builds++
 		timedDisk = &timingFS{FS: disk}
-		timedDisk.current.Store(&configDisk)
+		timedDisk.current.Store(&configurationDisk)
 		disk = timedDisk
 	}
 	var fileSystem vfs.FS = cachedvfs.From(bundled.WrapFS(disk))
@@ -486,19 +486,19 @@ func buildOnce(options Options) (*Graph, error) {
 		fileSystem = newOverlayFS(fileSystem, options.Overlay)
 	}
 
-	configStarted := time.Now()
-	if !fileSystem.FileExists(tspath.RootedFilePath(configFileName)) {
-		return nil, fmt.Errorf("no tsconfig at %s", configFileName)
+	configurationStarted := time.Now()
+	if !fileSystem.FileExists(tspath.RootedFilePath(configurationFileName)) {
+		return nil, fmt.Errorf("no tsconfig at %s", configurationFileName)
 	}
 
 	// A nil extended-config cache is supported upstream and correct for a one-shot build: the cache
 	// only pays off across repeated parses of the same `extends` chain within one process.
-	config, configErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
-	if len(configErrors) > 0 {
-		return nil, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(configErrors))
+	config, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configurationFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
+	if len(configurationErrors) > 0 {
+		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationErrors))
 	}
 	if config == nil {
-		return nil, fmt.Errorf("reading %s: the config parsed to nothing", configFileName)
+		return nil, fmt.Errorf("reading %s: the config parsed to nothing", configurationFileName)
 	}
 
 	// A malformed option arrives on the config rather than in the returned error slice, and the two
@@ -510,19 +510,19 @@ func buildOnce(options Options) (*Graph, error) {
 	// Except a diagnostic about one option's name or value, an option TypeScript 7 no longer knows above
 	// all: the graph builds over it, and it is reported with the program's own diagnostics (they include
 	// the config's), so the options are never silently wrong. See configParsingOptionCodes.
-	if configFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(configFileDiagnostics) > 0 && !onlyOptionValueDiagnostics(configFileDiagnostics) {
-		return nil, fmt.Errorf("reading %s: %w", configFileName, joinDiagnostics(configFileDiagnostics))
+	if configurationFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(configurationFileDiagnostics) > 0 && !onlyOptionValueDiagnostics(configurationFileDiagnostics) {
+		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationFileDiagnostics))
 	}
 
 	// The config resolving to zero files is a configuration error, not a clean tree. Catching it here
 	// means the caller never has to distinguish "nothing to check" from "nothing was checked", which
 	// is the distinction every silent-green failure in this project's history collapsed.
 	if len(config.FileNames()) == 0 {
-		return nil, fmt.Errorf("%s matched no files: check its include, files, and exclude", configFileName)
+		return nil, fmt.Errorf("%s matched no files: check its include, files, and exclude", configurationFileName)
 	}
 	if options.Timing != nil {
-		options.Timing.Config += time.Since(configStarted)
-		options.Timing.ConfigDisk = options.Timing.ConfigDisk.plus(configDisk.snapshot())
+		options.Timing.Config += time.Since(configurationStarted)
+		options.Timing.ConfigDisk = options.Timing.ConfigDisk.plus(configurationDisk.snapshot())
 		timedDisk.current.Store(&programDisk)
 	}
 
@@ -601,19 +601,19 @@ func buildOnce(options Options) (*Graph, error) {
 		options.Timing.CheckedAnswers += checkedAnswers.Load()
 	}
 	if builtProgram == nil {
-		return nil, fmt.Errorf("building a program from %s produced nothing", configFileName)
+		return nil, fmt.Errorf("building a program from %s produced nothing", configurationFileName)
 	}
 
 	// The same guard one layer down, and it is not redundant with the one above: the config can match
 	// files that the program then fails to load. Both are loud, and neither is an empty success.
 	if len(builtProgram.GetSourceFiles()) == 0 {
-		return nil, fmt.Errorf("the program built from %s contains no source files", configFileName)
+		return nil, fmt.Errorf("the program built from %s contains no source files", configurationFileName)
 	}
 
 	return &Graph{
 		Program:        builtProgram,
 		Config:         config,
-		ConfigFileName: configFileName,
+		ConfigFileName: configurationFileName,
 		CompilerHost:   compilerHost,
 		Anchor:         NewPathAnchor(currentDirectory),
 		contentPack:    options.ContentPack,

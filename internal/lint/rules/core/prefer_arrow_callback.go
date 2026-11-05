@@ -715,8 +715,8 @@ func preferArrowCallbackParameterListStart(ruleContext rule.Context, node *ast.N
 //
 // Scanning backward from the body's start over whitespace lands on the closing parenthesis of the
 // parameter list, or on a return type annotation's last character.
-func preferArrowCallbackTokenBeforeBodyEnd(text string, bodyPos int) int {
-	index := bodyPos
+func preferArrowCallbackTokenBeforeBodyEnd(text string, bodyPosition int) int {
+	index := bodyPosition
 	for index > 0 && (text[index-1] == ' ' || text[index-1] == '\t' ||
 		text[index-1] == '\n' || text[index-1] == '\r') {
 		index--

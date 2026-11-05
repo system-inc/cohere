@@ -41,13 +41,13 @@ export const account = getAccount() as Account;
 func checkInMemory(test *testing.T, source string) int {
 	test.Helper()
 	root := path.Join(test.TempDir(), "regression")
-	configFileName := path.Join(root, "tsconfig.json")
+	configurationFileName := path.Join(root, "tsconfig.json")
 	graph, buildError := Build(Options{
-		ConfigFileName:   configFileName,
+		ConfigFileName:   configurationFileName,
 		CurrentDirectory: root,
 		SingleThreaded:   true,
 		Overlay: map[string]string{
-			configFileName: `{ "compilerOptions": { "strict": true, "target": "es2022", "module": "esnext", ` +
+			configurationFileName: `{ "compilerOptions": { "strict": true, "target": "es2022", "module": "esnext", ` +
 				`"noEmit": true, "skipLibCheck": true }, "files": ["probe.ts"] }`,
 			path.Join(root, "probe.ts"): source,
 		},

@@ -15,8 +15,8 @@ import (
 func graduationProject(test *testing.T, names ...string) (*Graph, []*ast.SourceFile) {
 	test.Helper()
 	root := test.TempDir()
-	config := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
-	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+	configuration := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
+	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
 	for _, name := range names {

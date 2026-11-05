@@ -72,14 +72,14 @@ func cohereEverywhere(test *testing.T, function *Function) {
 func TestSSAMatchesReactSpecFixtures(test *testing.T) {
 	test.Parallel()
 
-	for _, src := range []string{
+	for _, source := range []string{
 		"export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n",
 		"export function f(){ let x = 1; while (x < 10) { x = x + 1; } return x; }\n",
 		"export function f(){ let x = 1; try { x = 2; } finally { x = 3; } return x; }\n",
 	} {
-		fn := lowerTypedForSSA(test, src)
+		fn := lowerTypedForSSA(test, source)
 		Construct(fn)
-		test.Logf("SRC %s\n%s", src, Print(fn))
+		test.Logf("SRC %s\n%s", source, Print(fn))
 		if v := VerifySSA(fn); len(v) > 0 {
 			for _, one := range v {
 				test.Errorf("VIOLATION: %s", one)
@@ -408,8 +408,8 @@ func TestConstructionIsIdempotent(test *testing.T) {
 	// produce.
 	countStale := func(function *Function) (phis int, stale int) {
 		defined := map[static_single_assignment.IdentifierId]bool{}
-		for _, param := range function.Params {
-			defined[param.Identifier] = true
+		for _, parameter := range function.Params {
+			defined[parameter.Identifier] = true
 		}
 		for _, block := range function.Blocks {
 			if block == nil {

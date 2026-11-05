@@ -102,16 +102,16 @@ func matchScssDirective(value string, directive string) (int, string, bool) {
 // customSelectorName is node.params.match(/:--\S+\s+/)[0].trim(): the first `:--` followed by
 // non-whitespace and then whitespace, without the whitespace. Upstream throws a TypeError on null when
 // there is none.
-func customSelectorName(params string) string {
+func customSelectorName(parameters string) string {
 	for from := 0; ; {
-		index := indexFrom(params, ":--", from)
+		index := indexFrom(parameters, ":--", from)
 		if index == -1 {
 			panic(javaScriptError{message: "Cannot read properties of null (reading '0')"})
 		}
-		rest := params[index+3:]
+		rest := parameters[index+3:]
 		nameEnd := strings.IndexFunc(rest, ecmascripttext.IsWhitespace)
 		if nameEnd > 0 {
-			return params[index : index+3+nameEnd]
+			return parameters[index : index+3+nameEnd]
 		}
 		from = index + 1
 	}
@@ -175,7 +175,7 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 	}
 
 	// Custom properties looks like declarations
-	if prop, isString := node.Get("prop").(string); node.Type() == "css-decl" && isString && strings.HasPrefix(prop, "--") {
+	if property, isString := node.Get("prop").(string); node.Type() == "css-decl" && isString && strings.HasPrefix(property, "--") {
 		if value, isString := node.Get("value").(string); isString && strings.HasPrefix(value, "{") {
 			var rules []*estree.Node
 			hasRules := false
@@ -184,8 +184,8 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 				startOffset, _ := numberIn(mapIn(source, "start"), "offset")
 				endOffset, _ := numberIn(mapIn(source, "end"), "offset")
 				textBefore := sliceJavaScript(options.originalText, 0, startOffset)
-				nodeText := strings.Repeat("a", len(prop)) +
-					sliceJavaScript(options.originalText, startOffset+len(prop), endOffset)
+				nodeText := strings.Repeat("a", len(property)) +
+					sliceJavaScript(options.originalText, startOffset+len(property), endOffset)
 				fakeContent := replaceNonLineBreaksWithSpace(textBefore) + nodeText
 				// The less parser (options.parser === "less") is not ported.
 				parse := parseCss
@@ -244,26 +244,26 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 		raws["value"] = trim(value)
 	}
 
-	params := ""
+	parameters := ""
 
-	if nodeParams, isString := node.Get("params").(string); isString {
-		if rawParams, isObject := raws["params"].(map[string]any); isObject {
-			params = scssOrRaw(rawParams)
+	if nodeParameters, isString := node.Get("params").(string); isString {
+		if rawParameters, isObject := raws["params"].(map[string]any); isObject {
+			parameters = scssOrRaw(rawParameters)
 		} else {
-			params = nodeParams
+			parameters = nodeParameters
 		}
 
 		if afterName, isString := raws["afterName"].(string); isString && trim(afterName) != "" {
-			params = afterName + params
+			parameters = afterName + parameters
 		}
 
 		if between, isString := raws["between"].(string); isString && trim(between) != "" {
-			params += between
+			parameters += between
 		}
 
-		params = trim(params)
+		parameters = trim(parameters)
 
-		raws["params"] = params
+		raws["params"] = parameters
 	}
 
 	// Ignore LESS mixin declaration
@@ -319,10 +319,10 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 
 		// only CSS support custom-selector
 		if options.parser == "css" && node.String("name") == "custom-selector" {
-			nodeParams, _ := node.Get("params").(string)
-			customSelector := trim(customSelectorName(nodeParams))
+			nodeParameters, _ := node.Get("params").(string)
+			customSelector := trim(customSelectorName(nodeParameters))
 			node.Set("customSelector", customSelector)
-			node.Set("selector", parseSelector(trim(sliceJavaScript(nodeParams, len(customSelector), len(nodeParams)))))
+			node.Set("selector", parseSelector(trim(sliceJavaScript(nodeParameters, len(customSelector), len(nodeParameters)))))
 			node.Delete("params")
 			return node
 		}
@@ -330,27 +330,27 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 		// The Less variable cases (`@color:blue;`, `@color :blue;`) are not ported.
 	}
 
-	if node.Type() == "css-atrule" && params != "" {
+	if node.Type() == "css-atrule" && parameters != "" {
 		name := node.String("name")
 
 		if name == "warn" || name == "error" {
-			node.Set("params", estree.New("media-unknown", 0, 0, "value", params))
+			node.Set("params", estree.New("media-unknown", 0, 0, "value", parameters))
 
 			return node
 		}
 
 		if name == "extend" || name == "nest" {
-			node.Set("selector", parseSelector(params))
+			node.Set("selector", parseSelector(parameters))
 			node.Delete("params")
 
 			return node
 		}
 
 		if name == "at-root" {
-			if atRootWithPattern.MatchString(params) {
-				node.Set("params", parseValue(params, options))
+			if atRootWithPattern.MatchString(parameters) {
+				node.Set("params", parseValue(parameters, options))
 			} else {
-				node.Set("selector", parseSelector(params))
+				node.Set("selector", parseSelector(parameters))
 				node.Delete("params")
 			}
 
@@ -361,45 +361,45 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 		if isModuleRuleName(lowercasedName) {
 			node.Set("import", true)
 			node.Delete("filename")
-			node.Set("params", parseValue(params, options))
+			node.Set("params", parseValue(parameters, options))
 			return node
 		}
 
 		if valueParamsAtRuleNames[name] {
 			// Remove unnecessary spaces in SCSS variable arguments
 			// Move spaces after the `...`, so we can keep the range correct
-			if match := scssVariableArgumentsPattern.FindStringSubmatchIndex(params); match != nil {
+			if match := scssVariableArgumentsPattern.FindStringSubmatchIndex(parameters); match != nil {
 				spaces := ""
 				if match[4] != -1 {
-					spaces = params[match[4]:match[5]]
+					spaces = parameters[match[4]:match[5]]
 				}
-				params = params[:match[0]] + params[match[2]:match[3]] + "..." + spaces + params[match[1]:]
+				parameters = parameters[:match[0]] + parameters[match[2]:match[3]] + "..." + spaces + parameters[match[1]:]
 			}
 			// Remove unnecessary spaces before SCSS control, mixin and function directives
 			// Move spaces after the `(`, so we can keep the range correct
 			// Only match the first function call at the beginning, not nested ones
-			if !strings.HasPrefix(params, "if") {
-				params = replaceFirst(scssDirectiveFunctionPattern, params, "$1($2")
+			if !strings.HasPrefix(parameters, "if") {
+				parameters = replaceFirst(scssDirectiveFunctionPattern, parameters, "$1($2")
 			}
 
-			node.Set("value", parseValue(params, options))
+			node.Set("value", parseValue(parameters, options))
 			node.Delete("params")
 
 			return node
 		}
 
 		if lowercasedName == "media" || lowercasedName == "custom-media" {
-			if strings.Contains(params, "#{") {
+			if strings.Contains(parameters, "#{") {
 				// Workaround for media at rule with scss interpolation
-				return estree.New("media-unknown", 0, 0, "value", params)
+				return estree.New("media-unknown", 0, 0, "value", parameters)
 			}
 
-			node.Set("params", parseMediaQuery(params))
+			node.Set("params", parseMediaQuery(parameters))
 
 			return node
 		}
 
-		node.Set("params", params)
+		node.Set("params", parameters)
 
 		return node
 	}

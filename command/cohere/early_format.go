@@ -48,7 +48,7 @@ type earlyFormat struct {
 
 // startEarlyFormat begins the default scope's walk and its speculation, and returns at once. record is the one the
 // run would have loaded, and transform is built from it the way the fix phase builds its own.
-func startEarlyFormat(engine formatEngine, record *formatRecord, root string, maxPasses int) *earlyFormat {
+func startEarlyFormat(engine formatEngine, record *formatRecord, root string, maximumPasses int) *earlyFormat {
 	early := &earlyFormat{record: record, formatting: newFormatClock(), lineEndings: &crlfFiles{}, ready: make(chan struct{})}
 	go func() {
 		defer close(early.ready)
@@ -59,12 +59,12 @@ func startEarlyFormat(engine formatEngine, record *formatRecord, root string, ma
 		}
 		early.universe, early.err = enumerateFormatUniverse(engine, root)
 		if early.err != nil {
-			early.started(speculateFormatOn(nil, nil, maxPasses, 0, nil))
+			early.started(speculateFormatOn(nil, nil, maximumPasses, 0, nil))
 			return
 		}
 		early.scope = unformattedScopeOf(engine, record, early.universe)
 		transform := early.lineEndings.observing(early.transform(engine))
-		early.started(speculateFormatOn(early.scope.formatCandidates(), transform, maxPasses, earlyFormatWorkers(), &early.programs))
+		early.started(speculateFormatOn(early.scope.formatCandidates(), transform, maximumPasses, earlyFormatWorkers(), &early.programs))
 	}()
 	return early
 }

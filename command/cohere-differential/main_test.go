@@ -20,7 +20,7 @@ import (
 // guarantee to a run that has none.
 func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 	test.Parallel()
-	lintConfig := configFrom(test, lintConfigFile{
+	lintConfiguration := configFrom(test, lintConfigFile{
 		Rules:          map[string]string{"nexus/consistency-no-enum": "error"},
 		IgnorePatterns: []string{"ignored-here/**"},
 	})
@@ -31,13 +31,13 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 		RelativePath: filepath.Join("linted", "Planted.ts"),
 		Rule:         "consistency-no-enum",
 	}
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfig, []differential.Control{lintable}, nil); checkControlsAreLintableError != nil {
+	if checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, []differential.Control{lintable}, nil); checkControlsAreLintableError != nil {
 		test.Fatalf("a control on a linted path with an enabled rule must be accepted: %v", checkControlsAreLintableError)
 	}
 
 	ignoredPath := lintable
 	ignoredPath.RelativePath = filepath.Join("ignored-here", "Planted.ts")
-	err := checkControlsAreLintable(lintConfig, []differential.Control{ignoredPath}, nil)
+	err := checkControlsAreLintable(lintConfiguration, []differential.Control{ignoredPath}, nil)
 	if err == nil {
 		test.Fatal("a control on an ignored path must be refused: it would miss for a reason unrelated to the harness")
 	}
@@ -49,7 +49,7 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 
 	unconfiguredRule := lintable
 	unconfiguredRule.Rule = "import-require-path-alias"
-	err = checkControlsAreLintable(lintConfig, []differential.Control{unconfiguredRule}, nil)
+	err = checkControlsAreLintable(lintConfiguration, []differential.Control{unconfiguredRule}, nil)
 	if err == nil {
 		test.Fatal("a control naming a rule the config does not enable must be refused")
 	}
@@ -65,7 +65,7 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 // an override turned that rule off for exactly that directory.
 func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 	test.Parallel()
-	lintConfig := configFrom(test, lintConfigFile{
+	lintConfiguration := configFrom(test, lintConfigFile{
 		Rules: map[string]string{"nexus/consistency-no-enum": "error"},
 		Overrides: []lintConfigOverride{{
 			Files: []string{"generated/**/*.ts"},
@@ -78,14 +78,14 @@ func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 		RelativePath: filepath.Join("generated", "Planted.ts"),
 		Rule:         "consistency-no-enum",
 	}
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfig, []differential.Control{control}, nil); checkControlsAreLintableError == nil {
+	if checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, []differential.Control{control}, nil); checkControlsAreLintableError == nil {
 		test.Fatal("a control under an override that turns its rule off must be refused, even though the base config enables the rule")
 	}
 
 	// The same rule and the same config, outside the override's scope, must still be accepted.
 	elsewhere := control
 	elsewhere.RelativePath = filepath.Join("source", "Planted.ts")
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfig, []differential.Control{elsewhere}, nil); checkControlsAreLintableError != nil {
+	if checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, []differential.Control{elsewhere}, nil); checkControlsAreLintableError != nil {
 		test.Fatalf("the override must not reject a control outside its scope: %v", checkControlsAreLintableError)
 	}
 }
@@ -97,16 +97,16 @@ func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 // because the opposite fix, dropping the check, is the tempting one.
 func TestABareRuleNameFindsItsPluginPrefixedConfigKey(test *testing.T) {
 	test.Parallel()
-	lintConfig := configFrom(test, lintConfigFile{
+	lintConfiguration := configFrom(test, lintConfigFile{
 		Rules: map[string]string{"nexus/consistency-no-enum": "error"},
 	})
 
-	if got := pluginQualified(lintConfig, "consistency-no-enum"); got != "nexus/consistency-no-enum" {
+	if got := pluginQualified(lintConfiguration, "consistency-no-enum"); got != "nexus/consistency-no-enum" {
 		test.Fatalf("pluginQualified(%q) = %q, want the config's own key", "consistency-no-enum", got)
 	}
 	// A rule the config never mentions returns the bare name, so Enabled reports unconfigured rather
 	// than this helper deciding the control is valid.
-	if got := pluginQualified(lintConfig, "never-configured"); got != "never-configured" {
+	if got := pluginQualified(lintConfiguration, "never-configured"); got != "never-configured" {
 		test.Fatalf("an unconfigured rule must come back unchanged, got %q", got)
 	}
 }

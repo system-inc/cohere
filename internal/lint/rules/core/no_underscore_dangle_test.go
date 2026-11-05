@@ -529,11 +529,11 @@ func TestNoUnderscoreDangleFires(test *testing.T) {
 
 			for index, expected := range testCase.findings {
 				diagnostic := result.Diagnostics[index]
-				wantPos := noUnderscoreDangleOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantPosition := noUnderscoreDangleOffsetOf(test, testCase.source, expected.line, expected.column)
 				wantEnd := noUnderscoreDangleOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
-				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
+				if diagnostic.Range.Pos() != wantPosition || diagnostic.Range.End() != wantEnd {
 					test.Errorf("finding %d: expected span [%d,%d), got [%d,%d) %q",
-						index, wantPos, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
+						index, wantPosition, wantEnd, diagnostic.Range.Pos(), diagnostic.Range.End(),
 						testCase.source[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 				want := "Unexpected dangling '_' in '" + expected.identifier + "'."

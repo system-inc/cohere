@@ -166,12 +166,12 @@ func IsSymbolFlagSet(symbol *ast.Symbol, flag ast.SymbolFlags) bool {
 
 func IsCallback(
 	typeChecker *checker.Checker,
-	param *ast.Symbol,
+	parameter *ast.Symbol,
 	node *ast.Node,
 ) bool {
-	t := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(param, node))
+	t := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(parameter, node))
 
-	if param.ValueDeclaration != nil && ast.IsParameterDeclaration(param.ValueDeclaration) && param.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
+	if parameter.ValueDeclaration != nil && ast.IsParameterDeclaration(parameter.ValueDeclaration) && parameter.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
 		t = checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker))
 		if t == nil {
 			return false

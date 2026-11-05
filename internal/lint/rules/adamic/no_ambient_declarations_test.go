@@ -117,8 +117,8 @@ func TestNoAmbientDeclarationsFileScope(test *testing.T) {
 			filename := "Case" + extension
 			setup := func(directory string) {
 				writeAdamicSupport(test)(directory)
-				config := strings.Replace(strings.Replace(adamicConfiguration, `"strict": true`, `"strict": true, "allowJs": true`, 1), `"include": ["**/*.ts"]`, `"sourceExtensions": [".a"], "include": ["**/*"]`, 1)
-				if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+				configuration := strings.Replace(strings.Replace(adamicConfiguration, `"strict": true`, `"strict": true, "allowJs": true`, 1), `"include": ["**/*.ts"]`, `"sourceExtensions": [".a"], "include": ["**/*"]`, 1)
+				if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
 					test.Fatal(writeError)
 				}
 			}

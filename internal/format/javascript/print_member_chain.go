@@ -67,11 +67,11 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	shouldInsertEmptyLineAfter := func(node Node) bool {
 		originalText := options.OriginalText
 		nextCharIndex := getNextNonSpaceNonCommentCharacterIndex(originalText, locEnd(node))
-		nextChar := charAt(originalText, nextCharIndex)
+		nextCharacter := charAt(originalText, nextCharIndex)
 
 		// if it is cut off by a parenthesis, we only account for one typed empty
 		// line after that parenthesis
-		if nextChar == ")" {
+		if nextCharacter == ")" {
 			// upstream's `nextCharIndex !== false`: the core's false position is notFound.
 			return nextCharIndex != notFound &&
 				isNextLineEmpty(originalText, nextCharIndex+1)

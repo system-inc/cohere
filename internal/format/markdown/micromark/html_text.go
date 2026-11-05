@@ -501,11 +501,11 @@ func tokenizeHtmlText(self *Self, effects *Effects, ok State, nok State) State {
 
 		if markdownSpace(code) {
 			// Upstream passes `undefined` (no limit) when codeIndented is disabled, else 4.
-			max := tabSize
+			maximum := tabSize
 			if disabled(self, "codeIndented") {
-				max = 0
+				maximum = 0
 			}
-			return factorySpace(effects, lineEndingAfterPrefix, TypeLinePrefix, max)(code)
+			return factorySpace(effects, lineEndingAfterPrefix, TypeLinePrefix, maximum)(code)
 		}
 		return lineEndingAfterPrefix(code)
 	}

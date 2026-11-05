@@ -71,8 +71,8 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 				// Always break the chain if:
 				(current.Truthy("returnType") && len(getFunctionParameters(current)) > 0) ||
 				current.Truthy("typeParameters") ||
-				slices.ContainsFunc(getFunctionParameters(current), func(param Node) bool {
-					return !param.Is("Identifier")
+				slices.ContainsFunc(getFunctionParameters(current), func(parameter Node) bool {
+					return !parameter.Is("Identifier")
 				})
 		}
 

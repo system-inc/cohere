@@ -37,9 +37,9 @@ func errNamedPathsOutsideProgram(location projectLocation, names []string) error
 // which is what a reader needs to change it. See ignoreSource.
 func explainNamedPathsOutsideProgram(location projectLocation, names []string) string {
 	sentences := make([]string, 0, len(names))
-	configName := location.ConfigFileName
-	if relative, relativePathError := filepath.Rel(location.Root, configName); relativePathError == nil && !strings.HasPrefix(relative, "..") {
-		configName = relative
+	configurationName := location.ConfigFileName
+	if relative, relativePathError := filepath.Rel(location.Root, configurationName); relativePathError == nil && !strings.HasPrefix(relative, "..") {
+		configurationName = relative
 	}
 
 	for _, name := range names {
@@ -54,11 +54,11 @@ func explainNamedPathsOutsideProgram(location projectLocation, names []string) s
 		switch {
 		case statError == nil && information.IsDir():
 			sentence = name + " is a directory holding no file the program contains, because the tsconfig at " +
-				configName + " leaves every file in it out with its `include` and `exclude` lists"
+				configurationName + " leaves every file in it out with its `include` and `exclude` lists"
 		case !programExtensions[strings.ToLower(filepath.Ext(path))]:
 			sentence = name + " is not a TypeScript or JavaScript file, so no tsconfig can put it in the program"
 		default:
-			sentence = name + " is not one of the program's files, because the tsconfig at " + configName +
+			sentence = name + " is not one of the program's files, because the tsconfig at " + configurationName +
 				" leaves it out with its `include` and `exclude` lists"
 		}
 

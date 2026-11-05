@@ -194,12 +194,12 @@ func (context *context) getHeadPosition(directives []*Node, document *compose.Do
 // transformDocumentBody is upstream's transformDocumentBody: the body, the point where the document
 // ends, and the comment on the line of the ... marker.
 func (context *context) transformDocumentBody(docStart *cst.Token, tokensBeforeBody []*cst.Token, cstNode *cst.Token, document *compose.Document, tokensAfterBody []*cst.Token, docEnd *cst.Token) (*Node, *point, *Node) {
-	documentTrailingComment, endComments, propTokens := context.categorizeBodyNodes(tokensBeforeBody, cstNode, tokensAfterBody, docEnd)
+	documentTrailingComment, endComments, propertyTokens := context.categorizeBodyNodes(tokensBeforeBody, cstNode, tokensAfterBody, docEnd)
 	hasContent := false
 	if contents := document.Contents; contents != nil {
 		hasContent = contents.Range[0] < contents.Range[1]
 		if !hasContent {
-			for _, token := range propTokens {
+			for _, token := range propertyTokens {
 				if token.Type == "tag" || token.Type == "anchor" {
 					hasContent = true
 					break
@@ -209,10 +209,10 @@ func (context *context) transformDocumentBody(docStart *cst.Token, tokensBeforeB
 	}
 	var content *Node
 	if hasContent {
-		content = context.transformNode(document.Contents, propTokens)
+		content = context.transformNode(document.Contents, propertyTokens)
 	}
 	if !hasContent {
-		for _, token := range context.extractComments(propTokens) {
+		for _, token := range context.extractComments(propertyTokens) {
 			throwError("Unexpected token type in empty document body: %s", token.Type)
 		}
 	}
@@ -221,13 +221,13 @@ func (context *context) transformDocumentBody(docStart *cst.Token, tokensBeforeB
 }
 
 // categorizeBodyNodes is document-body.mjs's categorizeNodes.
-func (context *context) categorizeBodyNodes(tokensBeforeBody []*cst.Token, cstNode *cst.Token, tokensAfterBody []*cst.Token, docEnd *cst.Token) (documentTrailingComment *Node, endComments []*Node, propTokens []*cst.Token) {
+func (context *context) categorizeBodyNodes(tokensBeforeBody []*cst.Token, cstNode *cst.Token, tokensAfterBody []*cst.Token, docEnd *cst.Token) (documentTrailingComment *Node, endComments []*Node, propertyTokens []*cst.Token) {
 	endComments = []*Node{}
 	documentTrailingComments := []*Node{}
-	propTokens = []*cst.Token{}
+	propertyTokens = []*cst.Token{}
 	for _, token := range tokensBeforeBody {
 		if maybeContentPropertyToken(token) {
-			propTokens = append(propTokens, token)
+			propertyTokens = append(propertyTokens, token)
 			continue
 		}
 		throwError("Unexpected token type: %s", token.Type)
@@ -270,7 +270,7 @@ func (context *context) categorizeBodyNodes(tokensBeforeBody []*cst.Token, cstNo
 	if len(documentTrailingComments) > 0 {
 		documentTrailingComment = documentTrailingComments[len(documentTrailingComments)-1]
 	}
-	return documentTrailingComment, endComments, propTokens
+	return documentTrailingComment, endComments, propertyTokens
 }
 
 // getBodyPosition is document-body.mjs's getPosition.

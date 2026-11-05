@@ -128,7 +128,7 @@ func byteOffsets(text string, offsets []int) []int {
 var compileConfig = sync.OnceValue(newConfig)
 
 func newConfig() *config {
-	config := &config{
+	configuration := &config{
 		canContainEols: []string{"emphasis", "fragment", "heading", "paragraph", "strong"},
 		enter: map[string]handle{
 			"autolink":                    opener(newLink, nil),
@@ -242,22 +242,22 @@ func newConfig() *config {
 		wikiLinkFromMarkdown(),
 		liquidFromMarkdown(),
 	} {
-		config.canContainEols = append(config.canContainEols, extension.canContainEols...)
+		configuration.canContainEols = append(configuration.canContainEols, extension.canContainEols...)
 		for tokenType, handler := range extension.enter {
-			config.enter[tokenType] = handler
+			configuration.enter[tokenType] = handler
 		}
 		for tokenType, handler := range extension.exit {
-			config.exit[tokenType] = handler
+			configuration.exit[tokenType] = handler
 		}
 	}
 
-	return config
+	return configuration
 }
 
 // compile turns events into a tree, upstream's compile.
-func compile(events []micromark.Event, config *config, offsets []int, nodes *arena.Arena[Node]) *Node {
+func compile(events []micromark.Event, configuration *config, offsets []int, nodes *arena.Arena[Node]) *Node {
 	tree := nodes.New(Node{NodeType: "root", IsParent: true, Children: []*Node{}})
-	context := &compileContext{stack: []*Node{tree}, config: config, offsets: offsets, nodes: nodes}
+	context := &compileContext{stack: []*Node{tree}, config: configuration, offsets: offsets, nodes: nodes}
 	var listStack []int
 
 	for index := 0; index < len(events); index++ {
@@ -275,9 +275,9 @@ func compile(events []micromark.Event, config *config, offsets []int, nodes *are
 	}
 
 	for _, event := range events {
-		handlers := config.exit
+		handlers := configuration.exit
 		if event.Enter {
-			handlers = config.enter
+			handlers = configuration.enter
 		}
 
 		if handler, present := handlers[event.Token.Type]; present {

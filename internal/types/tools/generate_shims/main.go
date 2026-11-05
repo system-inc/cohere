@@ -139,9 +139,9 @@ func main() {
 	var tempBuffer bytes.Buffer
 
 	for _, pkg := range packages {
-		shimDirPath := path.Join("./TypeScript-shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
+		shimDirectoryPath := path.Join("./TypeScript-shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
 		var extraShim ExtraShim
-		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
+		extraShimFilePath := path.Join(shimDirectoryPath, "extra-shim.json")
 		if data, readError := os.ReadFile(extraShimFilePath); readError == nil {
 			if decodeError := json.Unmarshal(data, &extraShim); decodeError != nil {
 				// Ignored: the generator runs by hand at a terminal, where a failed print has nowhere else to go.
@@ -290,20 +290,20 @@ func main() {
 				t := typedObject.Type()
 				named, isNamed := t.(*types.Named)
 				if isNamed {
-					_, nameWithTypeParams, _ := strings.Cut(types.TypeString(named, qualifierOnlyPackageName), ".")
+					_, nameWithTypeParameters, _ := strings.Cut(types.TypeString(named, qualifierOnlyPackageName), ".")
 					importPackage(pkg.Types.Path(), true)
 					shimBuilder.WriteString("type ")
-					shimBuilder.WriteString(nameWithTypeParams)
+					shimBuilder.WriteString(nameWithTypeParameters)
 					shimBuilder.WriteString(" = ")
 					shimBuilder.WriteString(pkg.Name)
 					shimBuilder.WriteString(".")
 					shimBuilder.WriteString(name)
 
-					typeParams := slices.Collect(named.TypeParams().TypeParams())
-					if len(typeParams) > 0 {
+					typeParameters := slices.Collect(named.TypeParams().TypeParams())
+					if len(typeParameters) > 0 {
 						// (*typeWriter)typeList
 						shimBuilder.WriteByte('[')
-						for i, typ := range typeParams {
+						for i, typ := range typeParameters {
 							if i > 0 {
 								shimBuilder.WriteByte(',')
 							}
@@ -326,17 +326,17 @@ func main() {
 						extraMethods[methodName] = true
 						prefix := name + "_"
 						emitGoLinknameDirective(prefix+methodName, method)
-						funcDeclStr := types.ObjectString(method, qualifierOnlyPackageName)
+						funcDeclString := types.ObjectString(method, qualifierOnlyPackageName)
 						recvStart := 0
 						recvEnd := 0
-						paramsStart := 0
-						for i, s := range funcDeclStr {
+						parametersStart := 0
+						for i, s := range funcDeclString {
 							if s == '(' {
 								if recvStart == 0 {
 									recvStart = i + 1
 								}
 								if recvEnd != 0 {
-									paramsStart = i + 1
+									parametersStart = i + 1
 									break
 								}
 							}
@@ -346,13 +346,13 @@ func main() {
 						}
 						shimBuilder.WriteString("func ")
 						shimBuilder.WriteString(prefix)
-						shimBuilder.WriteString(funcDeclStr[recvEnd+2 : paramsStart])
+						shimBuilder.WriteString(funcDeclString[recvEnd+2 : parametersStart])
 						shimBuilder.WriteString("recv ")
-						shimBuilder.WriteString(funcDeclStr[recvStart:recvEnd])
+						shimBuilder.WriteString(funcDeclString[recvStart:recvEnd])
 						if method.Signature().Params() != nil {
 							shimBuilder.WriteString(", ")
 						}
-						shimBuilder.WriteString(funcDeclStr[paramsStart:])
+						shimBuilder.WriteString(funcDeclString[parametersStart:])
 						shimBuilder.WriteString("\n")
 					}
 				}
@@ -434,11 +434,11 @@ func main() {
 						shimBuilder.WriteString(name)
 						shimBuilder.WriteString(") ")
 
-						fieldVar, ok := mappedFieldTypes[field]
+						fieldVariable, ok := mappedFieldTypes[field]
 						if !ok {
 							log.Fatalf("expected struct %q to contain field %q", name, field)
 						}
-						shimBuilder.WriteString(types.TypeString(fieldVar.Type(), qualifierOnlyPackageName))
+						shimBuilder.WriteString(types.TypeString(fieldVariable.Type(), qualifierOnlyPackageName))
 						shimBuilder.WriteString(" {\n")
 						shimBuilder.WriteString("  return ((*")
 						shimBuilder.WriteString(mirrorStructName)
@@ -505,7 +505,7 @@ func main() {
 		// and the files they wrote went unformatted into the tree, where a gofmt guard over it would fail on
 		// output nobody may edit by hand. A source that does not parse is refused rather than written: the
 		// printer cannot format it, and a shim that does not compile is worse than the stale one it replaces.
-		shimGoPath := path.Join(shimDirPath, "shim.go")
+		shimGoPath := path.Join(shimDirectoryPath, "shim.go")
 		formatted, sourceError := format.Source([]byte(shimHeaderBuilder.String() + shimBuilder.String()))
 		if sourceError != nil {
 			log.Fatalf("error formatting %v, so it was not written: %v", shimGoPath, sourceError)

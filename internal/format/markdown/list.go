@@ -20,7 +20,7 @@ func printList(path *astPath, options *options, print printing.PrintFunc) doc.Do
 
 	isGitDiffFriendlyOrderedList := hasGitDiffFriendlyOrderedList(node, options.OriginalText)
 
-	minIndent := requiredIndent(path)
+	minimumIndent := requiredIndent(path)
 
 	return printChildren(path, options, print, func(path *astPath) (doc.Doc, bool) {
 		getPrefix := func() string {
@@ -52,16 +52,16 @@ func printList(path *astPath, options *options, print printing.PrintFunc) doc.Do
 				prefix = alignListPrefix(rawPrefix, settingsOf(options))
 			}
 
-			if len(prefix) >= minIndent {
+			if len(prefix) >= minimumIndent {
 				return prefix
 			}
 
 			prefix = strings.TrimRight(prefix, javaScriptSpaceText)
-			trailingSpaces := min(minIndent-len(prefix), 4) // 5+ will cause indented code block
+			trailingSpaces := min(minimumIndent-len(prefix), 4) // 5+ will cause indented code block
 			if trailingSpaces > 0 {
 				prefix += strings.Repeat(" ", trailingSpaces)
 			}
-			leadingSpaces := min(minIndent-len(prefix), 3) // 4+ will cause indented code block
+			leadingSpaces := min(minimumIndent-len(prefix), 3) // 4+ will cause indented code block
 			if leadingSpaces > 0 {
 				prefix = strings.Repeat(" ", leadingSpaces) + prefix
 			}

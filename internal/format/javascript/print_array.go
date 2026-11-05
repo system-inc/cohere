@@ -148,21 +148,21 @@ func isLineAfterElementEmpty(path *Path, options *Options) bool {
 	current := node(path)
 	text := options.OriginalText
 
-	currentIdx := locEnd(current)
-	if currentIdx == locStart(current) {
+	currentIndex := locEnd(current)
+	if currentIndex == locStart(current) {
 		return false
 	}
 
 	length := len(text)
-	for currentIdx < length {
-		if text[currentIdx] == ',' {
+	for currentIndex < length {
+		if text[currentIndex] == ',' {
 			break
 		}
 
-		currentIdx = printing.SkipInlineComment(text, printing.SkipTrailingComment(text, currentIdx+1))
+		currentIndex = printing.SkipInlineComment(text, printing.SkipTrailingComment(text, currentIndex+1))
 	}
 
-	return isNextLineEmpty(text, currentIdx)
+	return isNextLineEmpty(text, currentIndex)
 }
 
 // printArrayElements is upstream's printArrayElements, without the Flow-only `inexact` parameter.

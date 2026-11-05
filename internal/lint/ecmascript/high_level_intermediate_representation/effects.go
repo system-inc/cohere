@@ -728,9 +728,9 @@ func effectsForInstruction(function *Function, producers *calleeProducers, instr
 		if value.Tag.Place != nil {
 			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, *value.Tag.Place))
 		}
-		for _, prop := range value.Props {
-			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, prop.Value))
-			out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, prop.Value, lvalue))
+		for _, property := range value.Props {
+			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, property.Value))
+			out = append(out, mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, property.Value, lvalue))
 		}
 		for _, child := range value.Children {
 			out = append(out, mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectFreeze, child))
@@ -1482,8 +1482,8 @@ func mutatesOwnParameter(nested *Function) bool {
 
 	// Values reachable from a parameter by assignment or aliasing, seeded with the parameters.
 	reaches := map[static_single_assignment.IdentifierId]bool{}
-	for _, param := range nested.Params {
-		reaches[param.Identifier] = true
+	for _, parameter := range nested.Params {
+		reaches[parameter.Identifier] = true
 	}
 	var mutated []static_single_assignment.IdentifierId
 	for _, block := range nested.Blocks {

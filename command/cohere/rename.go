@@ -49,7 +49,7 @@ const renameVerbName = "rename"
 // nobody read, and those are not comparable.
 func runRenameVerb(arguments []string) error {
 	flags := flag.NewFlagSet(renameVerbName, flag.ContinueOnError)
-	configFileName := flags.String("tsconfig", "tsconfig.json", "the tsconfig that defines the program, relative to --directory")
+	configurationFileName := flags.String("tsconfig", "tsconfig.json", "the tsconfig that defines the program, relative to --directory")
 	directory := flags.String("directory", "", "the working directory paths resolve against (default: the process's own)")
 	singleThreaded := flags.Bool("single-threaded", false, "use one checker instead of several")
 	write := flags.Bool("write", false, "apply the rename; without it nothing is written")
@@ -87,7 +87,7 @@ func runRenameVerb(arguments []string) error {
 	}
 
 	graph, err := program.Build(program.Options{
-		ConfigFileName:   *configFileName,
+		ConfigFileName:   *configurationFileName,
 		CurrentDirectory: *directory,
 		SingleThreaded:   *singleThreaded,
 	})

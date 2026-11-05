@@ -78,9 +78,9 @@ func TestTailwindLocationOptions(test *testing.T) {
 			test.Errorf("%s: want brand-glow reported once, got %d findings", name, len(result.Diagnostics))
 		}
 	}
-	location := func(entryPoint, tailwindConfig, cwd string) NoUnknownClassesOptions {
+	location := func(entryPoint, tailwindConfiguration, cwd string) NoUnknownClassesOptions {
 		return NoUnknownClassesOptions{TailwindLocationOptions: TailwindLocationOptions{
-			EntryPoint: entryPoint, TailwindConfig: tailwindConfig, Cwd: cwd,
+			EntryPoint: entryPoint, TailwindConfig: tailwindConfiguration, Cwd: cwd,
 		}}
 	}
 

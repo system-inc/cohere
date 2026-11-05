@@ -175,22 +175,22 @@ func Locate(spelling string) (string, error) {
 	return locate(spelling, os.Getenv, ConfigPath)
 }
 
-func locate(spelling string, lookup func(string) string, configPath func() (string, error)) (string, error) {
+func locate(spelling string, lookup func(string) string, configurationPath func() (string, error)) (string, error) {
 	corpus, inside, spelled, spelledError := Spelled(spelling)
 	if spelledError != nil || !spelled {
 		return spelling, spelledError
 	}
 	root := lookup(corpus.Variable)
 	if root == "" {
-		path, err := configPath()
+		path, err := configurationPath()
 		if err != nil {
 			return "", err
 		}
-		config, err := ReadConfig(path)
+		configuration, err := ReadConfig(path)
 		if err != nil {
 			return "", err
 		}
-		root = config[corpus.Name]
+		root = configuration[corpus.Name]
 	}
 	if root == "" {
 		return "", fmt.Errorf("%s needs %s: set %s, or name %q in the corpora file", spelling, corpus.What, corpus.Variable, corpus.Name)
@@ -265,10 +265,10 @@ func ReadConfig(path string) (map[string]string, error) {
 
 // Environment is the variables to add to a test run's environment: each corpus the config names whose
 // variable lookup leaves unset. A variable already set wins, so one run can point a corpus elsewhere.
-func Environment(config map[string]string, lookup func(string) string) []string {
+func Environment(configuration map[string]string, lookup func(string) string) []string {
 	environment := []string{}
 	for _, corpus := range All {
-		if path, found := config[corpus.Name]; found && lookup(corpus.Variable) == "" {
+		if path, found := configuration[corpus.Name]; found && lookup(corpus.Variable) == "" {
 			environment = append(environment, corpus.Variable+"="+path)
 		}
 	}

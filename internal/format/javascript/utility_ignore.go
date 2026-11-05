@@ -17,19 +17,19 @@ func hasJsxIgnoreComment(path *Path) bool {
 
 	// Lookup the previous sibling, ignoring any empty JSXText elements
 	index, siblings := indexOf(path), siblingsOf(path)
-	var prevSibling Node
+	var previousSibling Node
 	for candidateIndex := index; candidateIndex > 0; candidateIndex-- {
 		candidate := siblings[candidateIndex-1]
 		if candidate.Is("JSXText") && !isMeaningfulJsxText(candidate) {
 			continue
 		}
-		prevSibling = candidate
+		previousSibling = candidate
 		break
 	}
 
-	return prevSibling.Is("JSXExpressionContainer") &&
-		prevSibling.Child("expression").Is("JSXEmptyExpression") &&
-		hasNodeIgnoreComment(prevSibling.Child("expression"))
+	return previousSibling.Is("JSXExpressionContainer") &&
+		previousSibling.Child("expression").Is("JSXEmptyExpression") &&
+		hasNodeIgnoreComment(previousSibling.Child("expression"))
 }
 
 // isIgnored is upstream's isIgnored.

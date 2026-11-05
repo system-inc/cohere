@@ -40,19 +40,19 @@ func (typeError *TypeError) Error() string {
 
 func (parser *scssParser) atrule(atToken token) {
 	name := atToken.value
-	prev := atToken
+	previous := atToken
 	for !parser.tokenizer.endOfFile() {
 		next, _ := parser.tokenizer.nextToken()
-		if next.kind == "word" && next.start == prev.end+1 {
+		if next.kind == "word" && next.start == previous.end+1 {
 			name += next.value
-			prev = next
+			previous = next
 		} else {
 			parser.tokenizer.back(next)
 			break
 		}
 	}
 
-	parser.parser.atrule(token{kind: "at-word", value: name, start: atToken.start, end: prev.end})
+	parser.parser.atrule(token{kind: "at-word", value: name, start: atToken.start, end: previous.end})
 }
 
 func (parser *scssParser) comment(commentToken token) {
@@ -92,9 +92,9 @@ func (parser *scssParser) createTokenizer() {
 	parser.tokenizer = newScssTokenizer(parser.input)
 }
 
-func (parser *scssParser) raw(each *node, prop string, tokens []token, customProperty bool) {
-	parser.parser.raw(each, prop, tokens, customProperty)
-	if raws, isRaw := each.raws[prop].(*rawValue); isRaw {
+func (parser *scssParser) raw(each *node, property string, tokens []token, customProperty bool) {
+	parser.parser.raw(each, property, tokens, customProperty)
+	if raws, isRaw := each.raws[property].(*rawValue); isRaw {
 		scss := raws.raw
 		var all strings.Builder
 		for _, i := range tokens {

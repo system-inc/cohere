@@ -70,76 +70,76 @@ func (collector *commentCollector) visit(node *ast.Node) {
 }
 
 // scanTrivia records the comments in the trivia that starts at pos, stopping at the first token.
-func (collector *commentCollector) scanTrivia(pos int, end int) {
-	for pos < end {
-		next, isTrivia := collector.skipOneTrivia(pos, end)
+func (collector *commentCollector) scanTrivia(position int, end int) {
+	for position < end {
+		next, isTrivia := collector.skipOneTrivia(position, end)
 		if !isTrivia {
 			return
 		}
-		pos = next
+		position = next
 	}
 }
 
 // scanGap records the comments in text that holds only trivia and tokens that are not nodes:
 // punctuation, keywords and operators. Quoted text is skipped as a guard, should a string ever sit in
 // a gap, so its contents can never be read as a comment.
-func (collector *commentCollector) scanGap(pos int, end int) {
+func (collector *commentCollector) scanGap(position int, end int) {
 	text := collector.text
-	for pos < end {
-		next, isTrivia := collector.skipOneTrivia(pos, end)
+	for position < end {
+		next, isTrivia := collector.skipOneTrivia(position, end)
 		if isTrivia {
-			pos = next
+			position = next
 			continue
 		}
-		switch quote := text[pos]; quote {
+		switch quote := text[position]; quote {
 		case '"', '\'', '`':
-			pos++
-			for pos < end && text[pos] != quote {
-				if text[pos] == '\\' {
-					pos++
+			position++
+			for position < end && text[position] != quote {
+				if text[position] == '\\' {
+					position++
 				}
-				pos++
+				position++
 			}
-			pos++
+			position++
 		default:
-			pos++
+			position++
 		}
 	}
 }
 
 // skipOneTrivia skips one whitespace character or one comment at pos, recording the comment, and
 // reports whether there was trivia there at all.
-func (collector *commentCollector) skipOneTrivia(pos int, end int) (int, bool) {
+func (collector *commentCollector) skipOneTrivia(position int, end int) (int, bool) {
 	text := collector.text
-	character := text[pos]
+	character := text[position]
 	switch {
-	case character == '/' && pos+1 < end && text[pos+1] == '/':
-		start := pos
-		pos += 2
-		for pos < end {
-			if size := lineTerminatorSize(text, pos); size > 0 {
+	case character == '/' && position+1 < end && text[position+1] == '/':
+		start := position
+		position += 2
+		for position < end {
+			if size := lineTerminatorSize(text, position); size > 0 {
 				break
 			}
-			pos++
+			position++
 		}
-		collector.add("Line", start, pos, text[start+2:pos])
-		return pos, true
-	case character == '/' && pos+1 < end && text[pos+1] == '*':
-		start := pos
-		closing := strings.Index(text[pos+2:end], "*/")
+		collector.add("Line", start, position, text[start+2:position])
+		return position, true
+	case character == '/' && position+1 < end && text[position+1] == '*':
+		start := position
+		closing := strings.Index(text[position+2:end], "*/")
 		if closing < 0 {
-			pos = end
-			collector.add("Block", start, pos, text[start+2:pos])
-			return pos, true
+			position = end
+			collector.add("Block", start, position, text[start+2:position])
+			return position, true
 		}
-		pos = pos + 2 + closing + 2
-		collector.add("Block", start, pos, text[start+2:pos-2])
-		return pos, true
+		position = position + 2 + closing + 2
+		collector.add("Block", start, position, text[start+2:position-2])
+		return position, true
 	}
-	if size := whitespaceSize(text, pos); size > 0 {
-		return pos + size, true
+	if size := whitespaceSize(text, position); size > 0 {
+		return position + size, true
 	}
-	return pos, false
+	return position, false
 }
 
 func (collector *commentCollector) add(commentType string, start int, end int, value string) {
@@ -151,12 +151,12 @@ func (collector *commentCollector) add(commentType string, start int, end int, v
 }
 
 // lineTerminatorSize is the byte length of the line terminator at pos, or 0: \n, \r, U+2028, U+2029.
-func lineTerminatorSize(text string, pos int) int {
-	switch text[pos] {
+func lineTerminatorSize(text string, position int) int {
+	switch text[position] {
 	case '\n', '\r':
 		return 1
 	case 0xE2:
-		if strings.HasPrefix(text[pos:], " ") || strings.HasPrefix(text[pos:], " ") {
+		if strings.HasPrefix(text[position:], " ") || strings.HasPrefix(text[position:], " ") {
 			return 3
 		}
 	}
@@ -165,8 +165,8 @@ func lineTerminatorSize(text string, pos int) int {
 
 // whitespaceSize is the byte length of the JavaScript whitespace or line terminator at pos, or 0.
 // JavaScript's \s: the ASCII spaces, U+00A0, U+FEFF, the Unicode Zs category, and line terminators.
-func whitespaceSize(text string, pos int) int {
-	character := text[pos]
+func whitespaceSize(text string, position int) int {
+	character := text[position]
 	if character < utf8.RuneSelf {
 		switch character {
 		case ' ', '\t', '\n', '\r', '\v', '\f':
@@ -174,7 +174,7 @@ func whitespaceSize(text string, pos int) int {
 		}
 		return 0
 	}
-	value, size := utf8.DecodeRuneInString(text[pos:])
+	value, size := utf8.DecodeRuneInString(text[position:])
 	if ecmascripttext.IsWhitespace(value) {
 		return size
 	}

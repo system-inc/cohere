@@ -24,11 +24,11 @@ func testEnvironment(base []string) ([]string, []corpus.Corpus, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	config, err := corpus.ReadConfig(path)
+	configuration, err := corpus.ReadConfig(path)
 	if err != nil {
 		return nil, nil, err
 	}
-	added := corpus.Environment(config, os.Getenv)
+	added := corpus.Environment(configuration, os.Getenv)
 	environment = append(environment, added...)
 	set := map[string]string{}
 	for _, variable := range environment {

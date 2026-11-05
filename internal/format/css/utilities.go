@@ -193,8 +193,8 @@ func isSCSSControlDirectiveNode(node *estree.Node, options *printerOptions) bool
 var detachedRulesetCallPattern = regexp.MustCompile(`^\(` + javaScriptWhitespaceClass + `*\)$`)
 
 func isDetachedRulesetCallNode(node *estree.Node) bool {
-	params := rawString(node, "params")
-	return params != "" && detachedRulesetCallPattern.MatchString(params)
+	parameters := rawString(node, "params")
+	return parameters != "" && detachedRulesetCallPattern.MatchString(parameters)
 }
 
 func isTemplatePlaceholderNode(node *estree.Node) bool {

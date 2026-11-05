@@ -265,7 +265,7 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 	scopedOff := map[string]int{}
 	unconfigured := map[string]int{}
 	unrunRuleReferences := map[string]int{}
-	configFailures := []error{}
+	configurationFailures := []error{}
 	fileCrashes := []FileCrash{}
 	ruleCrashesAll := []RuleCrash{}
 	notes := map[string]RuleNotes{}
@@ -654,7 +654,7 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 			for name, count := range localUnconfigured {
 				unconfigured[name] += count
 			}
-			configFailures = append(configFailures, localFailures...)
+			configurationFailures = append(configurationFailures, localFailures...)
 			fileCrashes = append(fileCrashes, localCrashes...)
 			ruleCrashesAll = append(ruleCrashesAll, localRuleCrashes...)
 			for fileName, fileNotes := range localNotes {
@@ -688,10 +688,10 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 
 	sortDiagnostics(diagnostics)
 
-	if len(configFailures) > 0 {
+	if len(configurationFailures) > 0 {
 		// One error is enough to stop the run: they are all the same misconfiguration seen once per
 		// file, so reporting the first names the problem without printing it 3,408 times.
-		return Result{}, fmt.Errorf("rule configuration: %w", configFailures[0])
+		return Result{}, fmt.Errorf("rule configuration: %w", configurationFailures[0])
 	}
 
 	return Result{
@@ -762,19 +762,19 @@ type ruleNameCatalog struct {
 
 // newRuleNameCatalog returns nil when no registry was supplied, which turns the check off: without
 // one, every name would read as unknown.
-func newRuleNameCatalog(registered []string, configKeys []string) *ruleNameCatalog {
+func newRuleNameCatalog(registered []string, configurationKeys []string) *ruleNameCatalog {
 	if len(registered) == 0 {
 		return nil
 	}
 	catalog := &ruleNameCatalog{
-		names:                make(map[string]bool, len(registered)+len(configKeys)),
+		names:                make(map[string]bool, len(registered)+len(configurationKeys)),
 		registeredByBareName: make(map[string]string, len(registered)),
 	}
 	for _, name := range registered {
 		catalog.names[name] = true
 		catalog.registeredByBareName[bareRuleName(name)] = name
 	}
-	for _, key := range configKeys {
+	for _, key := range configurationKeys {
 		catalog.names[key] = true
 	}
 	return catalog

@@ -118,9 +118,9 @@ func applyRewrites[G Graph[F, B, P], F any, B comparable, P any](graph G, functi
 		}
 		graph.EachTerminalPlace(block, rewrite)
 	}
-	params := graph.Params(function)
-	for index := range params {
-		rewrite(&params[index], Define)
+	parameters := graph.Params(function)
+	for index := range parameters {
+		rewrite(&parameters[index], Define)
 	}
 	if returns := graph.Returns(function); returns != nil {
 		rewrite(returns, Use)

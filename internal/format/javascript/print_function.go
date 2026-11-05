@@ -43,9 +43,9 @@ func printFunction(path *Path, options *Options, print PrintFunc, args *printArg
 		parent := parentOf(path)
 		if isCallExpression(parent) &&
 			(len(getCallArguments(parent)) > 1 ||
-				!slices.ContainsFunc(getFunctionParameters(current), func(param Node) bool {
+				!slices.ContainsFunc(getFunctionParameters(current), func(parameter Node) bool {
 					// upstream's .every(param => param.type === "Identifier" && !param.typeAnnotation)
-					return !(param.Is("Identifier") && !param.Truthy("typeAnnotation"))
+					return !(parameter.Is("Identifier") && !parameter.Truthy("typeAnnotation"))
 				})) {
 			shouldExpandParameters = true
 		}

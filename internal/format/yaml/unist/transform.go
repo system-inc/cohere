@@ -16,37 +16,37 @@ import (
 
 // transformNode is upstream's transformNode. props is upstream's { tokens }: the tag, anchor and comment
 // tokens in front of the node.
-func (context *context) transformNode(node *compose.Node, props []*cst.Token) *Node {
+func (context *context) transformNode(node *compose.Node, properties []*cst.Token) *Node {
 	if node == nil {
 		return nil
 	}
 	if compose.IsAlias(node) {
-		return context.transformAlias(node, props)
+		return context.transformAlias(node, properties)
 	}
 	if compose.IsMap(node) {
 		if node.Flow {
-			return context.transformFlowMap(node, props)
+			return context.transformFlowMap(node, properties)
 		}
-		return context.transformMap(node, props)
+		return context.transformMap(node, properties)
 	}
 	if compose.IsSeq(node) {
 		if node.Flow {
-			return context.transformFlowSeq(node, props)
+			return context.transformFlowSeq(node, properties)
 		}
-		return context.transformSeq(node, props)
+		return context.transformSeq(node, properties)
 	}
 	if compose.IsScalar(node) {
 		switch node.Type {
 		case compose.BlockFolded:
-			return context.transformBlockValue("blockFolded", node, props)
+			return context.transformBlockValue("blockFolded", node, properties)
 		case compose.BlockLiteral:
-			return context.transformBlockValue("blockLiteral", node, props)
+			return context.transformBlockValue("blockLiteral", node, properties)
 		case compose.Plain:
-			return context.transformPlain(node, props)
+			return context.transformPlain(node, properties)
 		case compose.QuoteDouble:
-			return context.transformQuoteValue("quoteDouble", node, props)
+			return context.transformQuoteValue("quoteDouble", node, properties)
 		case compose.QuoteSingle:
-			return context.transformQuoteValue("quoteSingle", node, props)
+			return context.transformQuoteValue("quoteSingle", node, properties)
 		}
 		scalarType := node.Type
 		if scalarType == "" {
@@ -60,7 +60,7 @@ func (context *context) transformNode(node *compose.Node, props []*cst.Token) *N
 
 // isEmptyNode is upstream's isEmptyNode:
 // `!node || node.range[0] === node.range[1] && props.tokens.every((t) => t.type === "comment")`.
-func isEmptyNode(node *compose.Node, props []*cst.Token) bool {
+func isEmptyNode(node *compose.Node, properties []*cst.Token) bool {
 	if node == nil {
 		return true
 	}
@@ -71,7 +71,7 @@ func isEmptyNode(node *compose.Node, props []*cst.Token) bool {
 	if node.Range[0] != node.Range[1] {
 		return false
 	}
-	for _, token := range props {
+	for _, token := range properties {
 		if token.Type != "comment" {
 			return false
 		}
@@ -80,33 +80,33 @@ func isEmptyNode(node *compose.Node, props []*cst.Token) bool {
 }
 
 // transformAlias is upstream's transformAlias.
-func (context *context) transformAlias(alias *compose.Node, props []*cst.Token) *Node {
-	srcToken := alias.SrcToken
-	if srcToken == nil {
+func (context *context) transformAlias(alias *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := alias.SrcToken
+	if sourceToken == nil {
 		throwTypeError("undefined", "end")
 	}
-	for _, token := range context.extractComments(srcToken.End) {
+	for _, token := range context.extractComments(sourceToken.End) {
 		throwError("Unexpected token type in alias end: %s", token.Type)
 	}
 	return context.createAlias(context.transformRange(alias.Range[0], alias.Range[1]),
-		context.transformContentProperties(alias, props), alias.Source)
+		context.transformContentProperties(alias, properties), alias.Source)
 }
 
 // transformBlockValue is transformBlockFolded and transformBlockLiteral, which differ only in the
 // factory they hand transformAstBlockValue's result to.
-func (context *context) transformBlockValue(nodeType string, blockValue *compose.Node, props []*cst.Token) *Node {
-	srcToken := blockValue.SrcToken
-	if srcToken == nil || srcToken.Type != "block-scalar" {
+func (context *context) transformBlockValue(nodeType string, blockValue *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := blockValue.SrcToken
+	if sourceToken == nil || sourceToken.Type != "block-scalar" {
 		throwError("Expected block scalar srcToken")
 	}
-	return context.transformAstBlockValue(nodeType, blockValue, srcToken, props)
+	return context.transformAstBlockValue(nodeType, blockValue, sourceToken, properties)
 }
 
 // transformAstBlockValue is upstream's transformAstBlockValue.
-func (context *context) transformAstBlockValue(nodeType string, blockValue *compose.Node, srcToken *cst.Token, props []*cst.Token) *Node {
+func (context *context) transformAstBlockValue(nodeType string, blockValue *compose.Node, sourceToken *cst.Token, properties []*cst.Token) *Node {
 	var blockScalarHeaderToken *cst.Token
 	var indicatorComment *Node
-	for _, token := range tokens(srcToken.Props) {
+	for _, token := range tokens(sourceToken.Props) {
 		if token.Type == "comment" {
 			indicatorComment = context.transformComment(token)
 		} else if token.Type == "block-scalar-header" {
@@ -120,7 +120,7 @@ func (context *context) transformAstBlockValue(nodeType string, blockValue *comp
 	}
 	chomping, indent := parseHeader(unitsToString(blockScalarHeaderToken.Source))
 	return context.createBlockValue(nodeType, context.transformRange(blockValue.Range[0], blockValue.Range[1]),
-		context.transformContentProperties(blockValue, props), chomping, indent, blockValue.Source, indicatorComment)
+		context.transformContentProperties(blockValue, properties), chomping, indent, blockValue.Source, indicatorComment)
 }
 
 // headerPattern is /([+-]?)(\d*)([+-]?)$/u. Go's regexp finds the leftmost match and prefers what a
@@ -155,39 +155,39 @@ func parseHeader(header string) (chomping string, indent *int) {
 }
 
 // transformPlain is upstream's transformPlain.
-func (context *context) transformPlain(plain *compose.Node, props []*cst.Token) *Node {
+func (context *context) transformPlain(plain *compose.Node, properties []*cst.Token) *Node {
 	if plain.Range[0] == plain.Range[1] {
 		index := findLastCharIndex(context.text, plain.Range[0]-1, isNotWhitespace) + 1
-		return context.createPlain(context.transformRange(index, index), context.transformContentProperties(plain, props), "")
+		return context.createPlain(context.transformRange(index, index), context.transformContentProperties(plain, properties), "")
 	}
-	srcToken := plain.SrcToken
-	if srcToken == nil || srcToken.Type != "scalar" {
+	sourceToken := plain.SrcToken
+	if sourceToken == nil || sourceToken.Type != "scalar" {
 		throwError("Expected plain scalar srcToken")
 	}
-	for _, token := range context.extractComments(srcToken.End) {
+	for _, token := range context.extractComments(sourceToken.End) {
 		throwError("Unexpected token type in plain scalar end: %s", token.Type)
 	}
 	return context.createPlain(context.transformRange(plain.Range[0], plain.Range[1]),
-		context.transformContentProperties(plain, props), plain.Source)
+		context.transformContentProperties(plain, properties), plain.Source)
 }
 
 // transformQuoteValue is transformQuoteDouble and transformQuoteSingle with transformAstQuoteValue.
-func (context *context) transformQuoteValue(nodeType string, quoteValue *compose.Node, props []*cst.Token) *Node {
-	srcToken := quoteValue.SrcToken
+func (context *context) transformQuoteValue(nodeType string, quoteValue *compose.Node, properties []*cst.Token) *Node {
+	sourceToken := quoteValue.SrcToken
 	expected := "single-quoted-scalar"
 	message := "Expected single-quoted scalar srcToken"
 	if nodeType == "quoteDouble" {
 		expected = "double-quoted-scalar"
 		message = "Expected double-quoted scalar srcToken"
 	}
-	if srcToken == nil || srcToken.Type != expected {
+	if sourceToken == nil || sourceToken.Type != expected {
 		throwError("%s", message)
 	}
-	for _, token := range context.extractComments(srcToken.End) {
+	for _, token := range context.extractComments(sourceToken.End) {
 		throwError("Unexpected token type in quote value end: %s", token.Type)
 	}
 	return context.createQuoteValue(nodeType, context.transformRange(quoteValue.Range[0], quoteValue.Range[1]),
-		context.transformContentProperties(quoteValue, props), quoteValue.Source)
+		context.transformContentProperties(quoteValue, properties), quoteValue.Source)
 }
 
 // transformContentProperties is upstream's transformContentProperties (content.mjs): the node's tag and

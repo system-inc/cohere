@@ -47,14 +47,14 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 	// The config sits one level above the project, as a repository-level config over a monorepo
 	// project would, so "relative to the config" and "the project root" are different answers and a
 	// decoder that confused them fails a case below.
-	configDirectory := test.TempDir()
-	projectRoot := filepath.Join(configDirectory, "project")
-	for _, directory := range []string{projectRoot, filepath.Join(configDirectory, "beside")} {
+	configurationDirectory := test.TempDir()
+	projectRoot := filepath.Join(configurationDirectory, "project")
+	for _, directory := range []string{projectRoot, filepath.Join(configurationDirectory, "beside")} {
 		if createDirectoryError := os.Mkdir(directory, 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
 	}
-	base := rule.OptionsBase{ConfigDirectory: configDirectory, ProjectRoot: projectRoot}
+	base := rule.OptionsBase{ConfigDirectory: configurationDirectory, ProjectRoot: projectRoot}
 
 	accepted := []struct {
 		name string
@@ -62,13 +62,13 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 		want string
 	}{
 		// The spelling ahra should commit: the config's own directory, on every machine.
-		{"dot is the config's directory", ".", configDirectory},
+		{"dot is the config's directory", ".", configurationDirectory},
 		// Relative to the config file, not to the project root and not to the process.
 		{"a relative path resolves against the config", "project", projectRoot},
 		{"absent defaults to the project root", "", projectRoot},
 		// An absolute root that holds the project is still honoured, so a config written before this
 		// keeps working on the machine it was written on.
-		{"an absolute root holding the project is kept", configDirectory, configDirectory},
+		{"an absolute root holding the project is kept", configurationDirectory, configurationDirectory},
 	}
 	for _, testCase := range accepted {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -86,7 +86,7 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 		})
 	}
 
-	aFile := filepath.Join(configDirectory, "NotADirectory.json")
+	aFile := filepath.Join(configurationDirectory, "NotADirectory.json")
 	if writeError := os.WriteFile(aFile, []byte("{}"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -97,14 +97,14 @@ func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {
 		base rule.OptionsBase
 	}{
 		// The pinned path from another machine: the exact shape that made the rule inert.
-		{"an absolute root that does not exist here", filepath.Join(configDirectory, "elsewhere", "ahra"), base},
+		{"an absolute root that does not exist here", filepath.Join(configurationDirectory, "elsewhere", "ahra"), base},
 		{"a relative root that resolves to nothing", "missing", base},
 		{"a root that is a file", "NotADirectory.json", base},
 		// The worktree case: the pinned root exists, and it is another checkout, so nothing this run
 		// checks is under it.
 		{"an existing absolute root beside the project", test.TempDir(), base},
 		{"a relative root beside the project", "beside", base},
-		{"absent with no project root known", "", rule.OptionsBase{ConfigDirectory: configDirectory}},
+		{"absent with no project root known", "", rule.OptionsBase{ConfigDirectory: configurationDirectory}},
 		{"relative with no config directory known", ".", rule.OptionsBase{ProjectRoot: projectRoot}},
 	}
 	for _, testCase := range refused {

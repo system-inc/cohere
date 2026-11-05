@@ -61,10 +61,10 @@ func TestOpenFlag(test *testing.T) {
 				if open {
 					args = append(args, "--open")
 				}
-				cmd := exec.Command(binary, args...)
-				cmd.Dir = root
-				cmd.Env = append(os.Environ(), "PATH="+editor, "OPEN_LOG="+log)
-				output, outputError := cmd.CombinedOutput()
+				command := exec.Command(binary, args...)
+				command.Dir = root
+				command.Env = append(os.Environ(), "PATH="+editor, "OPEN_LOG="+log)
+				output, outputError := command.CombinedOutput()
 				if outputError == nil {
 					return string(output), 0
 				}
@@ -201,10 +201,10 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 	if writeError := os.WriteFile(filepath.Join(editor, "code"), []byte("#!/bin/sh\nprintf 'invocation\\n' >> \"$OPEN_LOG\"\nprintf '%s\\n' \"$@\" >> \"$OPEN_LOG\"\n"), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
-	cmd := exec.Command(binary, "--no-fix", "--no-format", "--no-cache", "--json", "--open")
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "PATH="+editor, "OPEN_LOG="+log)
-	output, err := cmd.CombinedOutput()
+	command := exec.Command(binary, "--no-fix", "--no-format", "--no-cache", "--json", "--open")
+	command.Dir = root
+	command.Env = append(os.Environ(), "PATH="+editor, "OPEN_LOG="+log)
+	output, err := command.CombinedOutput()
 	if exited, ok := err.(*exec.ExitError); !ok || exited.ExitCode() != 1 {
 		test.Fatalf("exit %v: %s", err, output)
 	}
@@ -233,9 +233,9 @@ func TestOpenCrash(test *testing.T) {
 			source = "// cohere-test: panic here\n" + source
 		}
 		writeTree(test, root, map[string]string{"Crash.ts": source})
-		cmd := exec.Command(binary, "--directory", root, "--lint", "--no-format", "--no-cache", "--open")
-		cmd.Env = append(os.Environ(), "PATH="+test.TempDir())
-		output, outputError := cmd.CombinedOutput()
+		command := exec.Command(binary, "--directory", root, "--lint", "--no-format", "--no-cache", "--open")
+		command.Env = append(os.Environ(), "PATH="+test.TempDir())
+		output, outputError := command.CombinedOutput()
 		if plant {
 			if exited, ok := outputError.(*exec.ExitError); !ok || exited.ExitCode() != 1 || !strings.Contains(string(output), "planted:") {
 				test.Fatalf("crash plant: %v\n%s", outputError, output)

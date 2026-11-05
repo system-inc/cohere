@@ -1142,11 +1142,11 @@ func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(test *testing.T) 
 	test.Parallel()
 
 	withFactory := func(directory string) {
-		config := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
+		configuration := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
 			`"moduleDetection": "force", "types": [], "jsx": "react", "jsxFactory": "h.createElement", ` +
 			`"jsxFragmentFactory": "Fragment"}, ` +
 			`"include": ["**/*.ts", "**/*.tsx"]}`
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(config), 0o644); writeError != nil {
+		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
 			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	}

@@ -107,8 +107,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	}
 
 	entry := graph.Entry(function)
-	for _, param := range graph.Params(function) {
-		recordDefinition(graph.IdentifierOf(param), entry, -1)
+	for _, parameter := range graph.Params(function) {
+		recordDefinition(graph.IdentifierOf(parameter), entry, -1)
 	}
 
 	// The visitors are made once and read the block and position being walked from these: one handed

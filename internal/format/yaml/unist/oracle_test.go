@@ -366,7 +366,7 @@ func compareParse(text string, expected oracleResult) []string {
 }
 
 // compareAll parses every text both ways and reports the first few that differ.
-func compareAll(test *testing.T, label string, names []string, texts []string, maxReported int) (failures int, errored int) {
+func compareAll(test *testing.T, label string, names []string, texts []string, maximumReported int) (failures int, errored int) {
 	test.Helper()
 	expected := oracleParse(test, texts)
 	for index, text := range texts {
@@ -378,7 +378,7 @@ func compareAll(test *testing.T, label string, names []string, texts []string, m
 			continue
 		}
 		failures++
-		if failures <= maxReported {
+		if failures <= maximumReported {
 			name := fmt.Sprintf("%q", text)
 			if names != nil {
 				name = names[index]
