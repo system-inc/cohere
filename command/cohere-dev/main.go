@@ -296,9 +296,9 @@ func withWorkspaceModules(arguments []string) ([]string, error) {
 // symlink passes its tests on a disk where the symlink resolves. A ./... anywhere else is that directory's tree,
 // and a root with no .git has no commit to read, so both run as they did.
 func checkRootGitlinks() error {
-	root, err := os.Getwd()
-	if err != nil {
-		return err
+	root, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		return workingDirectoryError
 	}
 	if _, statError := os.Lstat(filepath.Join(root, ".git")); statError != nil {
 		if os.IsNotExist(statError) {

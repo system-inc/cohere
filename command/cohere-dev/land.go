@@ -262,9 +262,9 @@ func checkGitlinks(repository string, commit string) error {
 		if !found || !strings.HasPrefix(key, "submodule.") || !strings.HasSuffix(key, ".path") {
 			continue
 		}
-		mode, err := treeMode(repository, resolved, path)
-		if err != nil {
-			return err
+		mode, treeModeError := treeMode(repository, resolved, path)
+		if treeModeError != nil {
+			return treeModeError
 		}
 		if mode == gitlinkMode {
 			continue
@@ -283,9 +283,9 @@ func checkGitlinks(repository string, commit string) error {
 
 // treeMode is the mode a commit records a path under, or empty when it records nothing there.
 func treeMode(repository string, commit string, path string) (string, error) {
-	entry, err := gitOutput(repository, "ls-tree", commit, "--", path)
-	if err != nil {
-		return "", fmt.Errorf("reading %s at %s: %w", path, shortCommit(commit), err)
+	entry, gitOutputError := gitOutput(repository, "ls-tree", commit, "--", path)
+	if gitOutputError != nil {
+		return "", fmt.Errorf("reading %s at %s: %w", path, shortCommit(commit), gitOutputError)
 	}
 	if fields := strings.Fields(entry); len(fields) > 0 {
 		return fields[0], nil
