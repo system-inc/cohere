@@ -136,6 +136,8 @@ func rulesFromExplain(ctx context.Context, command GateCommand, explainFile stri
 
 	for _, line := range strings.Split(output, "\n") {
 		if match := ruleCountPattern.FindStringSubmatch(strings.TrimRight(line, "\r")); match != nil {
+			// Ignored: the pattern takes only digits, so this fails only past an int's range, where it gives the
+			// largest int and the check against the parsed names below refuses the list.
 			declaredCount, _ = strconv.Atoi(match[1])
 			continue
 		}

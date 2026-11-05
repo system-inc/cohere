@@ -118,6 +118,15 @@ type ControlResult struct {
 	Detail string
 }
 
+// minimumPlausibleFileCount is the floor below which a run over this codebase is assumed to have
+// been pointed at the wrong thing.
+//
+// A threshold rather than an exact expected count on purpose: the tree grows, and a harness that
+// has to be edited every time a file lands is a harness that gets its guard commented out. The
+// number only has to be high enough that a misconfigured run cannot slip under it, and low enough
+// that it never fires on a real one.
+const minimumPlausibleFileCount = 100
+
 // Trustworthy is whether this run's population supports drawing any conclusion from the diff.
 //
 // Deliberately strict, and deliberately not a judgment about the findings. A run over zero files
@@ -198,15 +207,6 @@ func (provenance Provenance) ControlsProven() bool {
 	}
 	return sawVerifyDirection && sawGateDirection
 }
-
-// minimumPlausibleFileCount is the floor below which a run over this codebase is assumed to have
-// been pointed at the wrong thing.
-//
-// A threshold rather than an exact expected count on purpose: the tree grows, and a harness that
-// has to be edited every time a file lands is a harness that gets its guard commented out. The
-// number only has to be high enough that a misconfigured run cannot slip under it, and low enough
-// that it never fires on a real one.
-const minimumPlausibleFileCount = 100
 
 // Describe renders provenance for the report, as prose a reader can check.
 func (provenance Provenance) Describe() string {

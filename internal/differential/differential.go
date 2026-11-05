@@ -20,7 +20,6 @@ package differential
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 )
@@ -146,20 +145,6 @@ type Difference struct {
 	Planted bool
 }
 
-// printAcknowledgedCaveat states that a green verdict rested on an acknowledgement.
-//
-// Factored out because there is more than one way to pass, and a caveat attached to only some of
-// them is worse than none: it reads as absent on exactly the paths nobody checked. That is the same
-// failure the scoped verdict above exists to prevent, arriving through the fix for it.
-func printAcknowledgedCaveat(out io.Writer, byClassification map[Classification]int) {
-	if acknowledgedCount := byClassification[ClassificationAcknowledged]; acknowledgedCount > 0 {
-		fmt.Fprintf(out,
-			"  %d differences were acknowledged rather than absent, each with a recorded reason\n",
-			acknowledgedCount,
-		)
-	}
-}
-
 // Classification is the mechanical part of "why do these disagree."
 //
 // It is deliberately coarse. Most differences are configuration rather than correctness, and the
@@ -191,6 +176,20 @@ const (
 	// could not decide from the evidence it has.
 	ClassificationUnclassified Classification = "unclassified"
 )
+
+// printAcknowledgedCaveat states that a green verdict rested on an acknowledgement.
+//
+// Factored out because there is more than one way to pass, and a caveat attached to only some of
+// them is worse than none: it reads as absent on exactly the paths nobody checked. That is the same
+// failure the scoped verdict above exists to prevent, arriving through the fix for it.
+func printAcknowledgedCaveat(out *strings.Builder, byClassification map[Classification]int) {
+	if acknowledgedCount := byClassification[ClassificationAcknowledged]; acknowledgedCount > 0 {
+		fmt.Fprintf(out,
+			"  %d differences were acknowledged rather than absent, each with a recorded reason\n",
+			acknowledgedCount,
+		)
+	}
+}
 
 // RuleAgreement is the verdict for one rule across the whole tree.
 type RuleAgreement struct {
