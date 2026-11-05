@@ -421,8 +421,9 @@ func DecodeNoUnsafeMemberAccessOptions(raw []byte) (any, error) {
 // ast.SkipParentheses, which dereferences its argument and is how this project once lost 167 files
 // to a nil panic; the caller here can hold nil.
 func noUnsafeMemberAccessUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }

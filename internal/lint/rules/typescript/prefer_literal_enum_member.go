@@ -208,19 +208,20 @@ func isAllowedEnumInitializer(
 	// parser removes these nodes before its rule runs, so every recursion below expects to be
 	// looking at the expression itself. Doing it once at the top of the recursion puts the unwrap
 	// on every path rather than only on the outermost one, which is what `((2))` needs.
-	for expression.Kind == ast.KindParenthesizedExpression {
-		inner := expression.AsParenthesizedExpression().Expression
+	unwrapped := expression
+	for unwrapped.Kind == ast.KindParenthesizedExpression {
+		inner := unwrapped.AsParenthesizedExpression().Expression
 		if inner == nil {
 			return false
 		}
-		expression = inner
+		unwrapped = inner
 	}
 
-	if partOfBitwiseComputation && isSelfEnumMember(declaration, expression) {
+	if partOfBitwiseComputation && isSelfEnumMember(declaration, unwrapped) {
 		return true
 	}
 
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	// Every shape the typescript-eslint parser calls a Literal. Ours splits them across separate
 	// kinds, so the single upstream arm becomes this list. `null` and a regular expression are here
 	// because upstream reaches them through the same Literal case, verified silent on the installed
@@ -240,7 +241,7 @@ func isAllowedEnumInitializer(
 		return true
 
 	case ast.KindPrefixUnaryExpression:
-		unary := expression.AsPrefixUnaryExpression()
+		unary := unwrapped.AsPrefixUnaryExpression()
 
 		// `+123` and `-123`. The flag is passed through rather than set, so a sibling member under
 		// a minus sign at the top level is still not allowed. Measured, not inferred.
@@ -259,7 +260,7 @@ func isAllowedEnumInitializer(
 		if !allowBitwiseExpressions {
 			return false
 		}
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if !isBitwiseEnumOperator(binary.OperatorToken.Kind) {
 			return false
 		}

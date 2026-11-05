@@ -598,17 +598,18 @@ func bindingElementPropertyName(node *ast.Node) string {
 // Upstream accepts an identifier, a literal (stringified), and a template with no substitutions.
 // The template case is not decoration: the corpus writes one, and it reports.
 func staticPropertyKeyText(key *ast.Node) string {
+	keyNode := key
 	if ast.IsComputedPropertyName(key) {
 		inner := key.AsComputedPropertyName().Expression
 		if inner == nil {
 			return ""
 		}
-		key = inner
+		keyNode = inner
 	}
-	switch key.Kind {
+	switch keyNode.Kind {
 	case ast.KindIdentifier, ast.KindStringLiteral, ast.KindNumericLiteral,
 		ast.KindNoSubstitutionTemplateLiteral:
-		return key.Text()
+		return keyNode.Text()
 	}
 	return ""
 }

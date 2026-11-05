@@ -449,10 +449,10 @@ func preferNullishCoalescingIsUndefinedIdentifier(node *ast.Node) bool {
 // ChainExpression that upstream has to skip; ours marks the access itself, so two chains differing
 // only in their `?.` links are already two property accesses with the same names.
 func preferNullishCoalescingSimilarMemberAccess(left *ast.Node, right *ast.Node) bool {
-	left, right = preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
-	if preferNullishCoalescingIsMemberAccess(left) && preferNullishCoalescingIsMemberAccess(right) {
-		leftObject, leftProperty, leftComputed := preferNullishCoalescingMemberParts(left)
-		rightObject, rightProperty, rightComputed := preferNullishCoalescingMemberParts(right)
+	unwrappedLeft, unwrappedRight := preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
+	if preferNullishCoalescingIsMemberAccess(unwrappedLeft) && preferNullishCoalescingIsMemberAccess(unwrappedRight) {
+		leftObject, leftProperty, leftComputed := preferNullishCoalescingMemberParts(unwrappedLeft)
+		rightObject, rightProperty, rightComputed := preferNullishCoalescingMemberParts(unwrappedRight)
 		if !preferNullishCoalescingSimilarMemberAccess(leftObject, rightObject) {
 			return false
 		}
@@ -468,7 +468,7 @@ func preferNullishCoalescingSimilarMemberAccess(left *ast.Node, right *ast.Node)
 		return computed.Kind == ast.KindStringLiteral && named.Kind == ast.KindIdentifier &&
 			computed.Text() == named.Text()
 	}
-	return preferNullishCoalescingNodesEqual(left, right)
+	return preferNullishCoalescingNodesEqual(unwrappedLeft, unwrappedRight)
 }
 
 // preferNullishCoalescingNodesEqual is typescript-eslint's `isNodeEqual`, and it is deliberately
@@ -480,31 +480,31 @@ func preferNullishCoalescingSimilarMemberAccess(left *ast.Node, right *ast.Node)
 // `a[b.c]`), where that quirk cannot change a verdict on real code, and is kept rather than tidied
 // so the two implementations answer alike.
 func preferNullishCoalescingNodesEqual(left *ast.Node, right *ast.Node) bool {
-	left, right = preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
-	if left == nil || right == nil {
+	unwrappedLeft, unwrappedRight := preferNullishCoalescingUnwrap(left), preferNullishCoalescingUnwrap(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
-	if preferNullishCoalescingIsMemberAccess(left) && preferNullishCoalescingIsMemberAccess(right) {
-		leftObject, leftProperty, _ := preferNullishCoalescingMemberParts(left)
-		rightObject, rightProperty, _ := preferNullishCoalescingMemberParts(right)
+	if preferNullishCoalescingIsMemberAccess(unwrappedLeft) && preferNullishCoalescingIsMemberAccess(unwrappedRight) {
+		leftObject, leftProperty, _ := preferNullishCoalescingMemberParts(unwrappedLeft)
+		rightObject, rightProperty, _ := preferNullishCoalescingMemberParts(unwrappedRight)
 		return preferNullishCoalescingNodesEqual(leftProperty, rightProperty) &&
 			preferNullishCoalescingNodesEqual(leftObject, rightObject)
 	}
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindThisKeyword, ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		return true
 	case ast.KindIdentifier, ast.KindStringLiteral, ast.KindBigIntLiteral:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 	case ast.KindNumericLiteral:
 		// ESTree compares the literal's value, so `1` and `1.0` are one key. Parsed rather than
 		// trusted to arrive normalized; an unparsable spelling falls back to its text.
-		leftValue, leftError := strconv.ParseFloat(left.Text(), 64)
-		rightValue, rightError := strconv.ParseFloat(right.Text(), 64)
+		leftValue, leftError := strconv.ParseFloat(unwrappedLeft.Text(), 64)
+		rightValue, rightError := strconv.ParseFloat(unwrappedRight.Text(), 64)
 		if leftError != nil || rightError != nil {
-			return left.Text() == right.Text()
+			return unwrappedLeft.Text() == unwrappedRight.Text()
 		}
 		return leftValue == rightValue
 	}

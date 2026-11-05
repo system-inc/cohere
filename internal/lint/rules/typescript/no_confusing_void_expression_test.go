@@ -31,7 +31,7 @@ type noConfusingVoidExpressionCase struct {
 	messageIds  []string
 }
 
-func noConfusingVoidExpressionStringPointer(value string) *string { return &value }
+func noConfusingVoidExpressionStringPointer(value string) *string { return new(value) }
 
 // decodeNoConfusingVoidExpressionOptionsForTest routes a case's options through the decoder.
 func decodeNoConfusingVoidExpressionOptionsForTest(test *testing.T, optionsJson string) any {

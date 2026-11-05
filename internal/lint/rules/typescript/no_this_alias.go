@@ -277,16 +277,17 @@ func isThisKeyword(expression *ast.Node) bool {
 // It returns whatever it lands on rather than only an identifier, so the caller's kind test is
 // where the decline is written and a member expression declines at one visible place.
 func unwrapAssignmentTarget(target *ast.Node) *ast.Node {
-	for target != nil {
-		switch target.Kind {
+	unwrapped := target
+	for unwrapped != nil {
+		switch unwrapped.Kind {
 		case ast.KindParenthesizedExpression,
 			ast.KindAsExpression,
 			ast.KindSatisfiesExpression,
 			ast.KindTypeAssertionExpression,
 			ast.KindNonNullExpression:
-			target = target.Expression()
+			unwrapped = unwrapped.Expression()
 		default:
-			return target
+			return unwrapped
 		}
 	}
 	return nil

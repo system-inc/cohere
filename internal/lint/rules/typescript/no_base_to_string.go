@@ -275,14 +275,15 @@ func (state *noBaseToStringState) checkExpression(node *ast.Node, knownType *che
 	// The second is what upstream's own corpus catches: two of its cases write exactly that shape
 	// and record the name without the parentheses. Written as a loop because `((x))` nests, and
 	// deliberately not ast.SkipParentheses, which dereferences its argument.
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		inner := node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		inner := unwrapped.AsParenthesizedExpression().Expression
 		if inner == nil {
 			break
 		}
-		node = inner
+		unwrapped = inner
 	}
-	if node == nil {
+	if unwrapped == nil {
 		return
 	}
 
@@ -296,13 +297,13 @@ func (state *noBaseToStringState) checkExpression(node *ast.Node, knownType *che
 	// Kept because it is upstream's, because it declines in one kind test what otherwise costs a type
 	// query and a walk, and because the premise is a library declaration rather than this rule's: the
 	// same shape as the boolean carve-out above.
-	if isNoBaseToStringLiteral(node) {
+	if isNoBaseToStringLiteral(unwrapped) {
 		return
 	}
 
 	subjectType := knownType
 	if subjectType == nil {
-		subjectType = state.ctx.TypeChecker.GetTypeAtLocation(node)
+		subjectType = state.ctx.TypeChecker.GetTypeAtLocation(unwrapped)
 	}
 	if subjectType == nil {
 		return
@@ -313,9 +314,9 @@ func (state *noBaseToStringState) checkExpression(node *ast.Node, knownType *che
 		return
 	}
 
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
+	nodeRange := rule.TokenRange(state.ctx.SourceFile, unwrapped)
 	name := state.ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
-	state.ctx.ReportNode(node, rule.Message{
+	state.ctx.ReportNode(unwrapped, rule.Message{
 		Id: "baseToString",
 		Description: "'" + name + "' " + string(certainty) +
 			" use Object's default stringification format ('[object Object]') when stringified.",
@@ -526,9 +527,9 @@ func (state *noBaseToStringState) matchesTypeOrBaseType(
 		type_checking.GetTypeName(state.ctx.TypeChecker, subjectType)) {
 		return true
 	}
-	visited = append(visited, subjectType)
+	visitedWithSubject := append(visited, subjectType)
 	for _, baseType := range state.baseTypesOf(subjectType) {
-		if state.matchesTypeOrBaseType(baseType, visited) {
+		if state.matchesTypeOrBaseType(baseType, visitedWithSubject) {
 			return true
 		}
 	}

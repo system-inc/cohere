@@ -109,6 +109,7 @@ var NoUnsafeCall = rule.Rule{
 			}
 
 			if type_checking.IsTypeAnyType(subjectType) {
+				reportedUnsafeId, reportedErrorId := unsafeId, errorId
 				// The `this` swap, gated on the compiler option. See the doc comment: this arm is
 				// correct and unreachable through this package's fixtures, because the harness
 				// pins the option above the rule.
@@ -125,8 +126,8 @@ var NoUnsafeCall = rule.Rule{
 					if thisExpression != nil {
 						thisType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, thisExpression)
 						if thisType != nil && type_checking.IsTypeAnyType(thisType) {
-							unsafeId = "unsafeCallThis"
-							errorId = "errorCallThis"
+							reportedUnsafeId = "unsafeCallThis"
+							reportedErrorId = "errorCallThis"
 						}
 					}
 				}
@@ -135,10 +136,10 @@ var NoUnsafeCall = rule.Rule{
 				// intrinsic name does. Getting this backwards renames every unresolved-type finding
 				// into one claiming an `any` the reader never wrote.
 				if type_checking.IsIntrinsicErrorType(subjectType) {
-					ruleContext.ReportNode(reportOn, unsafeCallMessageFor(errorId, ""))
+					ruleContext.ReportNode(reportOn, unsafeCallMessageFor(reportedErrorId, ""))
 					return
 				}
-				ruleContext.ReportNode(reportOn, unsafeCallMessageFor(unsafeId, "an `any`"))
+				ruleContext.ReportNode(reportOn, unsafeCallMessageFor(reportedUnsafeId, "an `any`"))
 				return
 			}
 

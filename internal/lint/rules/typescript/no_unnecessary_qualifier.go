@@ -319,10 +319,11 @@ func isEntityNameExpressionForQualifier(node *ast.Node) bool {
 // ast.SkipParentheses, which dereferences its argument: the caller's node is optional and that
 // helper is how this project lost 167 files to a nil panic.
 func unwrapQualifierParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // qualifierRemovalWouldStrandAParenthesis answers whether removing the qualifier and its dot would

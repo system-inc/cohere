@@ -521,10 +521,11 @@ func noUnnecessaryBooleanLiteralCompareReplacement(
 // stops being recognized as a literal at all), the parent walk (`!(b !== false)` stops being seen as
 // negated), and the compared expression (its text would carry parentheses upstream does not write).
 func noUnnecessaryBooleanLiteralCompareSkipParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return node
+	return unwrapped
 }
 
 // noUnnecessaryBooleanLiteralCompareIsUnaryNegation answers whether a node is `!x`.
@@ -541,8 +542,9 @@ func noUnnecessaryBooleanLiteralCompareIsUnaryNegation(node *ast.Node) bool {
 // operator, the branches of a conditional, the last element of a sequence, and a negation. The walk
 // stops at a node whose parent tests it.
 func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
-	for node != nil {
-		parent := node.Parent
+	current := node
+	for current != nil {
+		parent := current.Parent
 		if parent == nil {
 			return false
 		}
@@ -558,18 +560,18 @@ func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
 			}
 			switch operator.Kind {
 			case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-				node = parent
+				current = parent
 				continue
 			}
 			return false
 
 		case ast.KindConditionalExpression:
 			conditional := parent.AsConditionalExpression()
-			if conditional.Condition == node {
+			if conditional.Condition == current {
 				return true
 			}
-			if conditional.WhenTrue == node || conditional.WhenFalse == node {
-				node = parent
+			if conditional.WhenTrue == current || conditional.WhenFalse == current {
+				current = parent
 				continue
 			}
 			return false
@@ -578,7 +580,7 @@ func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
 			if parent.AsPrefixUnaryExpression().Operator != ast.KindExclamationToken {
 				return false
 			}
-			node = parent
+			current = parent
 			continue
 
 		case ast.KindParenthesizedExpression:
@@ -586,17 +588,17 @@ func noUnnecessaryBooleanLiteralCompareIsConditionalTest(node *ast.Node) bool {
 			// so a parenthesized test reaches upstream's walk already unwrapped. Without this arm
 			// `if ((b === true)) {}` would read as not-a-test and the repair would add a nullish
 			// default the conditional does not need.
-			node = parent
+			current = parent
 			continue
 
 		case ast.KindIfStatement:
-			return parent.AsIfStatement().Expression == node
+			return parent.AsIfStatement().Expression == current
 		case ast.KindWhileStatement:
-			return parent.AsWhileStatement().Expression == node
+			return parent.AsWhileStatement().Expression == current
 		case ast.KindDoStatement:
-			return parent.AsDoStatement().Expression == node
+			return parent.AsDoStatement().Expression == current
 		case ast.KindForStatement:
-			return parent.AsForStatement().Condition == node
+			return parent.AsForStatement().Condition == current
 		}
 
 		return false
