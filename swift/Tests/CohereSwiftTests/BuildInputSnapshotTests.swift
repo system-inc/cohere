@@ -10,8 +10,12 @@ import Testing
  A reuse is proven by the types record's own words, and every change a build would see must end it: a planted
  type error after a warm run must be found (the failure a cache that never invalidates would hide), and a
  record removed from the scratch must mean building, never a run that comes back incomplete.
+
+ Not serialized: each test writes its own UUID-named package, the build cache is keyed by the package's path,
+ and the process-wide state is two Mutex-guarded singletons that parallel callers queue on. In series this
+ suite took 57s; in parallel, 7s, green in every round measured (#7r8mct7).
  */
-@Suite(.serialized)
+@Suite
 struct BuildInputSnapshotTests {
     static let reusedWords = "no input changed since the last successful build"
 
