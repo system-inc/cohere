@@ -18,7 +18,7 @@ import (
 // everybody looks at until the harness is measuring a surface that no longer matches the tool.
 //
 // The risk is the opposite one: a format change breaks parsing. That is why parse failures are
-// counted and surfaced rather than skipped. A line that does not parse is not nothing — it is a
+// counted and surfaced rather than skipped. A line that does not parse is not nothing: it is a
 // finding the harness cannot see, and silently dropping it is precisely how a diff comes back
 // clean because it failed to read one side.
 
@@ -162,7 +162,7 @@ func isVerifySummaryLine(line string) bool {
 	}
 	// `phases:` says which phases ran and which were skipped, so a lint-only run cannot be mistaken
 	// for a full one. Added to cohere after this parser was written, and caught by the harness's
-	// refusal to compare when a line does not parse rather than by anyone noticing — which is the
+	// refusal to compare when a line does not parse rather than by anyone noticing, which is the
 	// whole argument for that refusal being an error instead of a note.
 	for _, prefix := range []string{"graph built in ", "lint: ", "types: ", "fix: ", "format: ", "phases: "} {
 		if strings.HasPrefix(line, prefix) {
@@ -194,8 +194,8 @@ func parsePosition(lineText string, columnText string) (int, int, error) {
 
 // relativeTo normalizes a path against the tree root so both gates' paths compare.
 //
-// The two sides genuinely differ here — cohere prints absolute paths and the gate prints paths
-// relative to the project — and this is the single most likely place for a silent total mismatch,
+// The two sides genuinely differ here (cohere prints absolute paths and the gate prints paths
+// relative to the project), and this is the single most likely place for a silent total mismatch,
 // because a path difference makes every finding look one-sided and the diff still comes back
 // well-formed. It is the reason the controls exist.
 func relativeTo(root string, path string) string {

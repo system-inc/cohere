@@ -10,7 +10,7 @@ import (
 )
 
 // The defect every test here guards is one shape: a resolution that produces something runnable
-// when it should have produced an error. That is the failure that cost days — a resolver found no
+// when it should have produced an error. That is the failure that cost days: a resolver found no
 // binary, returned a bare command name, and the failed spawn read as a clean tree. So these assert
 // on the error as hard as they assert on the success.
 
@@ -127,7 +127,8 @@ func TestOverrideTakesPrecedence(test *testing.T) {
 	}
 	if path != override {
 		test.Fatalf(
-			"resolved %s while %s pointed at %s — a developer would read results from the wrong binary as their own",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"resolved %s while %s pointed at %s \u2014 a developer would read results from the wrong binary as their own",
 			path,
 			BinaryOverrideVariable,
 			override,
@@ -205,7 +206,7 @@ func TestBinaryFileNameCarriesTheWindowsExtension(test *testing.T) {
 // clearOverride makes a test independent of the developer's own shell.
 //
 // Without this, a machine with COHERE_BINARY exported would pass the "nothing is installed"
-// test by resolving the developer's local build — the exact green-over-nothing result these tests
+// test by resolving the developer's local build, the exact green-over-nothing result these tests
 // exist to catch.
 func clearOverride(test *testing.T) {
 	test.Helper()

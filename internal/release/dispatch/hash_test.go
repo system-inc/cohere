@@ -42,7 +42,7 @@ func TestHashChangesWhenContentsChangeWithoutChangingLength(test *testing.T) {
 	//
 	// It exists because the obvious version of the previous test does not. Each file is framed in
 	// the digest with its name and its length, so an edit that changes the length moves the hash
-	// through the length field alone — and a Compute that never hashed a single byte of content
+	// through the length field alone, and a Compute that never hashed a single byte of content
 	// still passed. A same-length edit removes every signal but the contents themselves.
 	directory := test.TempDir()
 	path := filepath.Join(directory, "rule.go")

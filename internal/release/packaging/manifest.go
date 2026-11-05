@@ -92,7 +92,7 @@ func PlatformManifest(target Target, version string) ([]byte, error) {
 // DispatcherManifest is the package.json for the package a consumer installs.
 //
 // Every platform package is an optional dependency. That is what makes an install on an unsupported
-// platform succeed with a missing binary rather than fail outright — which sounds worse and is
+// platform succeed with a missing binary rather than fail outright, which sounds worse and is
 // better, because the failure then happens at `cohere --version` with a message naming the
 // platform, instead of inside a package manager's dependency resolution where it says nothing
 // useful. The loud failure is the dispatcher's job and it is a better place to fail from.

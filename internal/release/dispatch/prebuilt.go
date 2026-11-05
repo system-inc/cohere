@@ -9,7 +9,7 @@ import (
 //
 // It is a named error rather than a message because the dispatcher reports it as the reason a local
 // build was not attempted, alongside the separate failure of not finding a shipped binary. The two
-// call for different fixes — install Go, or fix the install — and a reader needs to be told which.
+// call for different fixes (install Go, or fix the install), and a reader needs to be told which.
 var ErrNoToolchain = errors.New("no Go toolchain found on PATH")
 
 // HasToolchain reports whether a Go toolchain is available.
